@@ -16,6 +16,8 @@ boundary. Status changes require test evidence rather than a checkbox alone.
 7. [Decision records](adr/README.md): why key choices were made.
 
 See [implementation progress](IMPLEMENTATION.md) for completed tasks and their contracts.
+The accepted [product requirements](PRODUCT.md) and [extension/uBO design](EXTENSIONS.md)
+define mandatory full-engine scope beyond the first document milestones.
 The [README graph](PROGRESS.md) measures whole-engine delivery using a weighted
 capability catalog, with source/test evidence and automatic default-branch updates.
 
@@ -38,7 +40,8 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | Pinned WPT URL data subset | Implemented offline runner | 685 selected URL records; no full browser harness |
 | Pinned html5lib declaration tokenizer subset | Implemented offline runner | 1,079 selected cases; token fields/error codes and all fixture splits |
-| Whole-engine progress graph | Implemented and automated | 18 subsystems, 142 capability gates; [methodology](PROGRESS.md) |
+| Whole-engine progress graph | Implemented and automated | 21 subsystems, 172 capability gates; [methodology](PROGRESS.md) |
+| Brave comparison, competitive browser targets, Wasm, native MV2 extensions and uBO port | Accepted product requirements; implementation pending | [PRODUCT.md](PRODUCT.md), [EXTENSIONS.md](EXTENSIONS.md), ADR 0007 |
 | Browser WPT harness, Test262, fuzzing, benchmarks, releases | Planned | Milestone-specific gates; no broad results claimed |
 
 There are no external Rust dependencies yet. URL subset evidence is recorded in

@@ -10,6 +10,12 @@ M0 has a verified repository baseline. M1 implementation has started with DOC-01
 M2–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
+[PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
+coverage, measured Chrome/Firefox improvements, GPU acceleration, WebAssembly,
+Rustic-only Manifest V2 extensions and the Rustic uBO port mandatory full-product
+targets. [ADR 0007](adr/0007-product-scope.md) supersedes the earlier optional
+Wasm/extension scope. No planning checkbox grants implementation credit.
+
 Assume one primary maintainer with occasional contributions. A small team can
 work on the independent tracks below after agreeing on interfaces. Full modern
 web compatibility is a multi-year program with ongoing maintenance, not a fixed
@@ -28,7 +34,7 @@ reveals complexity. Later milestones deliberately have no fabricated estimates.
 | M5 Scripted documents | Events and JS mutations update rendered local pages | M3, M4, traced DOM | Re-estimate after M3/M4 |
 | M6 Controlled web services | Fixture-host HTTPS, Fetch policy, cookies and profiles | M5, origin model | Re-estimate after integration prototype |
 | M7 Isolated browsing | Enforced broker/renderer isolation on supported platforms | M6, IPC prototypes | Dedicated security program |
-| M8 Desktop/mobile alpha | Native desktop and Android/iOS hosts, accessibility, inspection, GPU option | M7 per platform; local surface prototypes start in M3 | Re-estimate by platform |
+| M8 Desktop/mobile alpha | Native hosts, accessibility/inspection, required GPU backend and extension/uBO integration | M7 per platform; local surface prototypes start in M3 | Re-estimate by platform |
 | M9 Compatibility expansion | Broad modern site/API coverage, published test results | M8 | Open-ended feature program |
 | M10 Embedding and stabilization | Versioned API and maintained beta/release process | Evidence from M8/M9 | Evidence-based release decision |
 
@@ -170,6 +176,11 @@ visible. GC stress proves reachable host cycles survive and unreachable cycles
 are reclaimed. Infinite execution is cancellable. Parser subsets must not be
 advertised as complete ECMAScript support. No JIT until a separate measured ADR.
 
+The required Wasm track starts after values/heap/execution foundations, follows
+WASM-01–08 in [PRODUCT.md](PRODUCT.md), and integrates with M5 host policy. Its
+decoder/validator/interpreter can be tested independently; full JS/Web binding,
+baseline feature and mobile gates remain mandatory through M9.
+
 ## 8. M5 — Scripted document integration
 
 | Task | Work and deliverable | Prerequisite |
@@ -278,14 +289,19 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 | Offline/data | IndexedDB, Cache API, service workers and update/lifetime rules | Transaction/crash-recovery and partition tests |
 | Graphics/media | Canvas 2D; audio/video with reviewed codecs; then evaluate WebGL/WebGPU | Rendering/codec corpora, permissions and sandbox review |
 | Network | HTTP/2 and HTTP/3 via reviewed transports, WebSockets, cache/cookie compatibility | Protocol fixtures, cancellation and cross-origin tests |
-| Modern execution | WebAssembly proposal/evaluation; JIT only if measured need exists | Separate design, isolation and code-generation review |
+| Modern execution | Required original Wasm runtime and JS/Web integration; WASM-01–08 | Core/JS/Web suites, bounded execution, reviewed acceleration and interpreter fallback |
+| Native extensions | Rustic-only MV2 platform, background/content worlds, blocking requests and mobile lifecycle; EXT-01–10 | Signed-package, permission/revocation, API and hostile-extension corpus |
+| uBlock Origin port | Required full-feature Rustic port, broker filtering, UI and list updates; BLK-01–08 | Pinned upstream feature matrix, reference/optimized parity, hostile-list and device tests |
 | Usability | Full editing/contenteditable, IME, accessibility parity, printing | Platform/manual automation and assistive-technology evidence |
 | Site compatibility | Versioned representative static/dynamic site corpus, regression triage | Reproducible outcomes, explicit scope and test denominators |
 
-Extensions, sync/accounts, DRM/proprietary services, password manager,
-and a stable third-party plugin ABI are outside the initial engine program. Add
-them only through explicit scope decisions. They must not delay the first static
-renderer or scripted local document.
+GPU delivery is required, with per-platform parity/recovery and energy measurements.
+The extension/filtering tracks start contract prototypes in M5/M6, require M7
+authority/isolation, and reach product acceptance in M8/M9. Follow [EXTENSIONS.md](EXTENSIONS.md).
+They must not delay the first static renderer or scripted local document.
+Sync/accounts, a password manager and a general native plugin ABI remain separate
+scope decisions. Track DRM/proprietary-service compatibility constraints explicitly
+rather than promising access that depends on third-party eligibility.
 
 Android and iOS are in scope from early core design. Their native hosts and
 runtime gates follow the same engine milestones, rather than being optional ports.
@@ -307,6 +323,12 @@ does not publish packages, releases, or binaries.
 no unexplained regressions; supported-platform security gates and accessibility
 flows pass; reproducible builds and incident handling are exercised. Full web
 compatibility is not inferred from a version number.
+
+**Full-product gate:** all [PRODUCT.md](PRODUCT.md) acceptance criteria pass,
+including the dated Brave security/privacy comparison, required standards/site
+coverage, five-platform GPU/Wasm and MV2/uBO operation, and controlled competitive
+measurements. Targets and measured results are reported separately. Final 100%
+progress cannot bypass these gates.
 
 ## 14. First implementation queue
 

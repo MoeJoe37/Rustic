@@ -151,12 +151,20 @@ describe only their declared tested scope.
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
-18-subsystem, 142-capability catalog includes unfinished libraries, all five native
+21-subsystem, 172-capability engine-v2 catalog includes unfinished libraries, all five native
 platform acceptance targets and final release/security/conformance gates. Source
 and test references are validated; score calculations and safe Git publication
 have eight Python regression tests. See [PROGRESS.md](PROGRESS.md) for definitions
 and the automatic post-CI default-branch update path. Reporting infrastructure
 does not itself add engine completion credit.
+
+The accepted full-product requirements now include Brave-comparable security/
+privacy, broad standards/site coverage, measured Chrome/Firefox improvements,
+required GPU/Wasm, Rustic-only MV2 extensions and a uBO port. [PRODUCT.md](PRODUCT.md),
+[EXTENSIONS.md](EXTENSIONS.md) and ADR 0007 define tasks/gates; these features remain
+planned. The catalog retained all 142 prior capabilities and added 30 unfinished
+gates. The renderer now sizes the progress map for 21 subsystems. Scope expansion
+earns no completion credit; the reweighting is recorded in [PROGRESS.md](PROGRESS.md).
 
 Platform scope now includes Windows, macOS, Linux, Android and iOS/iPadOS, with
 Mozilla/Firefox/Gecko and SpiderMonkey explicitly excluded as engine foundations.

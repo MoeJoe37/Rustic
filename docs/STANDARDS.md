@@ -12,6 +12,12 @@ Current M1 evidence includes the original [URL/parser and origin subset](URL.md)
 with 685 pinned upstream URL-data cases. This is not full browser WPT conformance
 and does not implement the remaining IDNA/file/blob or browser binding features.
 
+The full-product baseline targets complete required CSS/ECMAScript semantics and
+broad real-site interoperability, including GPU-backed APIs, WebAssembly and the
+Rustic MV2 ecosystem. See [PRODUCT.md](PRODUCT.md) for dated baseline selection,
+complete feature accounting, competitive claims and vendor/OS eligibility limits.
+Initial subsets are staging steps, not permanent replacements for mature standards.
+
 For each task, record the specification section, revision/date, upstream test
 revision, supported subset, known deviations, and regression fixtures. Prefer
 standard algorithms over reverse engineering one browser's output. When browsers
@@ -30,6 +36,7 @@ the discrepancy; don't silently hard-code a site-specific exception.
 | Formatting | [CSS 2](https://www.w3.org/TR/CSS2/), [Display](https://www.w3.org/TR/css-display-3/), [Flexbox](https://www.w3.org/TR/css-flexbox-1/), [Grid](https://www.w3.org/TR/css-grid-1/) | Block/inline first; distinct formatting-context work after that |
 | Text | [CSS Text](https://www.w3.org/TR/css-text-3/), [CSS Fonts](https://www.w3.org/TR/css-fonts-4/), [Unicode bidi](https://www.unicode.org/reports/tr9/), [text segmentation](https://www.unicode.org/reports/tr29/) | Font metrics, shaping adapter, bidi, wrapping, caret clusters |
 | Language | [ECMAScript](https://tc39.es/ecma262/), [Intl](https://tc39.es/ecma402/), [Test262](https://github.com/tc39/test262) | Interpreter semantics and scoped conformance selections |
+| WebAssembly | [Core](https://webassembly.github.io/spec/core/), [JS interface](https://webassembly.github.io/spec/js-api/), [Web API](https://webassembly.github.io/spec/web-api/) | Required original validator/interpreter, explicit imports and JS/Web integration |
 | Bindings/execution | [Web IDL](https://webidl.spec.whatwg.org/), [HTML web APIs/event loops](https://html.spec.whatwg.org/multipage/webappapis.html) | Conversions, wrappers, tasks/jobs, reentry and lifecycle |
 | Network | [Fetch](https://fetch.spec.whatwg.org/), [HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110), [HTTP caching](https://www.rfc-editor.org/rfc/rfc9111), [TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446) | Browser policy over a reviewed transport and TLS library |
 | Web security | [CSP](https://www.w3.org/TR/CSP3/), [Mixed Content](https://www.w3.org/TR/mixed-content/), [Secure Contexts](https://www.w3.org/TR/secure-contexts/) | Enforce policies on every implemented loading/execution path |

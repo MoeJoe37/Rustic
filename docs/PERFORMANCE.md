@@ -4,6 +4,13 @@ There are no engine performance results yet. Budgets below are initial
 engineering targets to calibrate after M3; they are not user-facing promises or
 measurements. Correctness and security gates remain prerequisites to optimization.
 
+Beating Chrome and Firefox in measured speed, memory and energy is a required
+product target. [PRODUCT.md](PRODUCT.md) defines initial 10% aggregate improvement
+targets and p95/correctness guardrails. Record exact browser versions, native
+engines, feature parity and both default/equivalent-blocking configurations.
+Results must include uncertainty and regressions; no present performance or
+universal superiority claim is implied by the target.
+
 ## Measurements and corpus
 
 Measure each stage independently and end to end: byte decoding, tokenization,

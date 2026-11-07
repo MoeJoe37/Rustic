@@ -8,8 +8,8 @@ external badge service to display it.
 
 ## What the number means
 
-[progress/catalog.json](../progress/catalog.json) defines `engine-v1`: 18 weighted
-subsystems and 142 concrete capabilities covering the whole engine plan. Within
+[progress/catalog.json](../progress/catalog.json) defines `engine-v2`: 21 weighted
+subsystems and 172 concrete capabilities covering the whole engine plan. Within
 a subsystem, each capability has equal weight. Overall progress is the sum of
 `subsystem weight × completed capabilities / subsystem capabilities`. The weights
 sum to 100. Use the [generated table and evidence](progress/summary.md) to inspect
@@ -18,7 +18,8 @@ every capability, including unfinished libraries which have no crate yet.
 **100% means all catalog capabilities and final full-engine acceptance are
 complete**, including JavaScript/GC, rendering/layout, standards and site gates,
 network/storage/security, accessibility, performance/reliability, embedding,
-signed artifacts and runtime acceptance on Windows, macOS, Linux, Android and
+GPU/Wasm, Rustic MV2 extensions, the uBlock Origin port, comparative
+security/performance evidence, signed artifacts and runtime acceptance on Windows, macOS, Linux, Android and
 iOS/iPadOS. It cannot be reached by completing just the currently existing crates
 or the first milestone. The final acceptance gate remains open until the actual
 engine and required platform evidence are ready.
@@ -31,6 +32,47 @@ weight changes. Do not remove unfinished work or rename partial implementations
 to raise the number. Each capability is deliberately narrow enough that an early
 tested subset can complete one item while the larger subsystem remains unfinished.
 
+## engine-v2 scope change (2026-11-07)
+
+[ADR 0007](adr/0007-product-scope.md) adds required WebAssembly, Rustic-only
+Manifest V2 extensions, the uBO port and comparative security/privacy/performance
+acceptance. All 142 earlier capability IDs are retained; 30 planned capabilities
+are added, giving 172 across 21 subsystems. The existing JS/Wasm integration gate
+remains separate from the new runtime's decoder/validator/execution work.
+
+Weights remain a 100% scope allocation. Dedicated Wasm/extension/filtering tracks
+receive weight and security/GPU receive more, with explicit reductions elsewhere:
+
+| Subsystem | engine-v1 | engine-v2 |
+| --- | --- | --- |
+| Foundation | 2% | 2% |
+| URLs & encoding | 4% | 3% |
+| DOM | 7% | 6% |
+| HTML | 7% | 6% |
+| CSS & style | 10% | 9% |
+| Text & fonts | 5% | 4% |
+| Layout | 10% | 9% |
+| Paint & raster | 7% | 6% |
+| JavaScript & GC | 15% | 12% |
+| WebAssembly | 0% | 4% |
+| Bindings & web APIs | 7% | 6% |
+| Network & navigation | 5% | 4% |
+| Storage & workers | 4% | 3% |
+| Security & IPC | 5% | 6% |
+| Compositor & GPU | 3% | 4% |
+| Platform hosts | 4% | 4% |
+| Accessibility | 2% | 2% |
+| DevTools | 1% | 1% |
+| Extensions (MV2) | 0% | 4% |
+| uBO port & filtering | 0% | 3% |
+| Embedding & release | 2% | 2% |
+
+At migration the same 15 completed capabilities measure **6.04%**, versus 6.89%
+under engine-v1. That change represents a larger accepted product scope, not lost
+implementation or new completion credit. Later source commits add credit only
+when their declared gates pass. Historical snapshots remain reproducible in Git;
+do not compare percentages across catalog versions without their weights/scope.
+
 ## Evidence and status
 
 - **Green / complete:** the declared behavior exists, focused tests cover it, and
@@ -39,7 +81,7 @@ tested subset can complete one item while the larger subsystem remains unfinishe
 - **Amber / in progress:** work is underway but contributes no completion credit.
 - **Gray / planned:** the capability is unfinished and contributes no credit.
 
-The generator validates schema, all 18 subsystem identities, positive weights,
+The generator validates schema, all 21 subsystem identities, positive weights,
 unique capability IDs, mandatory final/platform/conformance gates, and complete
 items' evidence paths/markers. It does not prove semantics by reading source.
 Maintainers must review the exact claim and tests; an empty function or placeholder

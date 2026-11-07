@@ -70,6 +70,9 @@ class ProgressTests(unittest.TestCase):
             lambda catalog: catalog["groups"][0].update(weight=99),
             lambda catalog: catalog["groups"][0]["features"].append(copy.deepcopy(catalog["groups"][0]["features"][0])),
             lambda catalog: catalog["groups"][-1]["features"].pop(),
+            lambda catalog: catalog["groups"].remove(next(group for group in catalog["groups"] if group["id"] == "extensions")),
+            lambda catalog: next(group for group in catalog["groups"] if group["id"] == "wasm")["features"].pop(),
+            lambda catalog: next(group for group in catalog["groups"] if group["id"] == "filtering")["features"].pop(),
         ]:
             catalog = copy.deepcopy(self.catalog)
             edit(catalog)
@@ -84,6 +87,10 @@ class ProgressTests(unittest.TestCase):
         self.assertNotIn("<script>", svg)
         self.assertIn("&lt;script&gt;", svg)
         self.assertIn("aria-labelledby", svg)
+        self.assertIn("21 subsystems", svg)
+        self.assertEqual(tree.attrib["height"], "804")
+        ns = {"svg": "http://www.w3.org/2000/svg"}
+        self.assertTrue(all(float(node.attrib["y"]) < 804 for node in tree.findall(".//svg:text", ns)))
 
     def test_generated_files_do_not_change_fingerprint_but_source_changes_do(self):
         before = progress.source_fingerprint(self.root)

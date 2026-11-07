@@ -23,6 +23,10 @@ arbitrary remote content. Rust memory safety alone cannot enforce browser policy
 
 ## 2. Component map
 
+The required product scope includes GPU/Wasm, a native MV2 extension ecosystem
+and a Rustic uBlock Origin port, with comparative security/privacy and performance
+gates. See [PRODUCT.md](PRODUCT.md) and [ADR 0007](adr/0007-product-scope.md).
+
 `rustic-base`, `rustic-dom`, `rustic-url`, `rustic-html`, `rustic-engine` and `rustic-cli` now exist; see
 [implementation progress](IMPLEMENTATION.md) for their actual scope. The following
 is the target decomposition, not a requirement to create empty crates today.
@@ -40,10 +44,13 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-paint` | Stacking/paint order, immutable display lists, clipping, damage | base, layout fragments | M3 |
 | `rustic-raster` | Deterministic CPU display-list interpreter and surfaces | base, paint commands, codec adapters | M3 |
 | `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
+| `rustic-wasm` | Original bounded Wasm decoder, validator, interpreter and reviewed acceleration | base; JS/Web integration through explicit adapters | M4 foundations, M5/M9 integration |
 | `rustic-bindings` | Web IDL subset tooling, JS/DOM wrappers, exception conversion, tracing edges | JS, DOM; generated from pinned IDL | M5 |
 | `rustic-web` | Window, agents, tasks/microtasks, timers, script loading, browser APIs | JS, bindings, DOM, service interfaces | M5 |
 | `rustic-net` | Fetch policy, HTTP adapter, redirects, cookies, cache, TLS integration | URL, base, audited protocol libraries | M6 |
 | `rustic-storage` | Partitioned profile data, quotas, transactions, eviction/private mode | base, origin/storage keys, database adapter | M6/M9 |
+| `rustic-extensions` | Rustic MV2 package/identity, isolated worlds, APIs, lifecycle and permissions | JS/web, broker/service interfaces; no ambient page authority | M5/M6 prototypes, M8/M9 delivery |
+| `rustic-filter` | Bounded reference/optimized filtering, list snapshots and broker policy hooks | URL/base, controlled DOM/CSS interfaces | M6–M9 |
 | `rustic-ipc` | Versioned messages, validation, resource handles, bounded transport | base, selected serialization adapter | M7 |
 | `rustic-platform` | Windows/events, font discovery, graphics surfaces, OS adapters | base, platform libraries | M8 |
 | Future Android/iOS adapters | Native surfaces, lifecycle, touch/IME, accessibility and OS service/process bridges | engine/platform contracts; JNI/NDK or Apple SDK only at the boundary | Prototype with M3; host integration M8 |
@@ -151,7 +158,8 @@ explicit text work; a character-to-glyph mapping is only an early debug aid.
 Painting builds an immutable, versioned display list: rectangles, borders, glyph
 runs, images, clips, transforms, and stacking contexts. Hit testing shares fragment
 geometry and transforms with painting. The CPU rasterizer is the initial reference
-backend; GPU scenes are an optimization, with a usable CPU fallback. Frame epochs
+backend; GPU scenes/raster acceleration are a required production backend, with
+a usable CPU fallback and independent parity tests. Frame epochs
 prevent an old layout or resource completion from replacing a newer frame. Scroll
 updates can later avoid full layout when geometry is unchanged.
 
@@ -171,7 +179,18 @@ no filesystem, sockets, process spawning, or implicit native API. Host callbacks
 receive explicit capabilities. Instruction checkpoints support cancellation and
 budgets; an infinite script must not freeze browser chrome. JIT compilation is
 deferred until compatibility and profiling justify its security and maintenance
-cost. WebAssembly is a separate late-stage subsystem, not an interpreter shortcut.
+cost. WebAssembly is a required separate original runtime with bounded decoding,
+validation, execution/traps and explicit imports. Its JS identity/tracing and Web
+streaming/CSP/MIME adapters do not bypass the existing host policy. Maintain an
+interpreter on platforms without executable-memory permission; see WASM-01–08 in
+[PRODUCT.md](PRODUCT.md).
+
+Extensions execute under distinct principals/realms through broker-checked
+capabilities, with isolated content-script worlds and attributed messages. Native
+MV2 blocking callbacks and trusted compiled filters share a deterministic request
+policy pipeline; neither grants cross-origin or native authority. The uBO port
+is a separately licensed application using these APIs. See [EXTENSIONS.md](EXTENSIONS.md)
+for package/permission, lifecycle, filter-data and update boundaries.
 
 A document agent owns DOM mutation and JavaScript execution on one thread.
 Rust async tasks may perform I/O off-thread; they post completions to the owning

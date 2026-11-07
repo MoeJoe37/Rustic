@@ -11,6 +11,12 @@ assumptions. Read `docs/MOBILE.md` before adding platform dependencies. Do not
 substitute Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink, WebKit or an
 existing JS runtime, including in mobile hosts.
 
+Read `docs/PRODUCT.md` and `docs/EXTENSIONS.md` for required full-product scope:
+Brave-comparable security/privacy, broad standards compatibility, measured
+Chrome/Firefox comparisons, GPU/Wasm, Rustic-only MV2 extensions and the uBO port.
+Keep those as unimplemented targets until evidence exists. A licensed uBO port is
+an extension application layer, not permission to replace the original engine.
+
 ## Code organization and ownership
 
 - Keep modules focused on one responsibility. Share a helper when there is a real shared contract; avoid speculative frameworks and placeholder crates.

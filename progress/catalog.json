@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "catalog_version": "engine-v1",
-  "meaning": "100% requires all capabilities and final five-platform engine acceptance; this is weighted delivery progress, not web compatibility or time remaining.",
+  "catalog_version": "engine-v2",
+  "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
   "groups": [
     {
       "id": "base",
@@ -116,7 +116,7 @@
     {
       "id": "url",
       "label": "URLs & encoding",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "url.records",
@@ -228,7 +228,7 @@
     {
       "id": "dom",
       "label": "DOM",
-      "weight": 7,
+      "weight": 6,
       "features": [
         {
           "id": "dom.storage",
@@ -328,7 +328,7 @@
     {
       "id": "html",
       "label": "HTML",
-      "weight": 7,
+      "weight": 6,
       "features": [
         {
           "id": "html.input",
@@ -458,7 +458,7 @@
     {
       "id": "css",
       "label": "CSS & style",
-      "weight": 10,
+      "weight": 9,
       "features": [
         {
           "id": "css.syntax",
@@ -513,7 +513,7 @@
     {
       "id": "text",
       "label": "Text & fonts",
-      "weight": 5,
+      "weight": 4,
       "features": [
         {
           "id": "text.fonts",
@@ -556,7 +556,7 @@
     {
       "id": "layout",
       "label": "Layout",
-      "weight": 10,
+      "weight": 9,
       "features": [
         {
           "id": "layout.boxes",
@@ -623,7 +623,7 @@
     {
       "id": "paint",
       "label": "Paint & raster",
-      "weight": 7,
+      "weight": 6,
       "features": [
         {
           "id": "paint.display",
@@ -672,7 +672,7 @@
     {
       "id": "js",
       "label": "JavaScript & GC",
-      "weight": 15,
+      "weight": 12,
       "features": [
         {
           "id": "js.parser",
@@ -748,7 +748,7 @@
         },
         {
           "id": "js.wasm",
-          "label": "WebAssembly execution integration",
+          "label": "JavaScript/WebAssembly identity, conversions and tracing integration",
           "status": "planned",
           "evidence": []
         },
@@ -767,9 +767,64 @@
       ]
     },
     {
+      "id": "wasm",
+      "label": "WebAssembly",
+      "weight": 4,
+      "features": [
+        {
+          "id": "wasm.decode",
+          "label": "Bounded binary decoder and malformed-module handling",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.validate",
+          "label": "Complete selected type/instruction/module validation",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.execute",
+          "label": "Original interpreter, numerics, control flow and traps",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.instances",
+          "label": "Memories, tables, globals, instances and resource limits",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.web",
+          "label": "Streaming Web API, MIME/CSP and capability-safe imports",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.features",
+          "label": "Required reference/GC, exception, SIMD, shared-memory and baseline features",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.accelerate",
+          "label": "Reviewed acceleration with interpreter fallback on mobile/desktop",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "wasm.conformance",
+          "label": "Core/JS/Web suites, fuzzing and five-platform acceptance",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
       "id": "web",
       "label": "Bindings & web APIs",
-      "weight": 7,
+      "weight": 6,
       "features": [
         {
           "id": "web.idl",
@@ -824,7 +879,7 @@
     {
       "id": "network",
       "label": "Network & navigation",
-      "weight": 5,
+      "weight": 4,
       "features": [
         {
           "id": "network.transport",
@@ -873,7 +928,7 @@
     {
       "id": "storage",
       "label": "Storage & workers",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "storage.profiles",
@@ -922,7 +977,7 @@
     {
       "id": "security",
       "label": "Security & IPC",
-      "weight": 5,
+      "weight": 6,
       "features": [
         {
           "id": "security.ipc",
@@ -967,6 +1022,24 @@
           "evidence": []
         },
         {
+          "id": "security.brave",
+          "label": "Versioned Brave security comparison and independent review",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.privacy",
+          "label": "Default tracking/bounce/fingerprinting defenses and privacy matrix",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.updates",
+          "label": "Authenticated updates, incident response and vulnerability triage",
+          "status": "planned",
+          "evidence": []
+        },
+        {
           "id": "security.audit",
           "label": "Fuzz/native-memory review and security release gate",
           "status": "planned",
@@ -977,7 +1050,7 @@
     {
       "id": "compositor",
       "label": "Compositor & GPU",
-      "weight": 3,
+      "weight": 4,
       "features": [
         {
           "id": "compositor.scene",
@@ -1140,6 +1213,128 @@
       ]
     },
     {
+      "id": "extensions",
+      "label": "Extensions (MV2)",
+      "weight": 4,
+      "features": [
+        {
+          "id": "extensions.manifest",
+          "label": "Rustic-native Manifest V2 schema and API version contract",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.packages",
+          "label": "Package identity, signatures and hostile archive validation",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.worlds",
+          "label": "Isolated content-script worlds and extension principals",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.background",
+          "label": "MV2 background pages and mobile lifecycle",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.messaging",
+          "label": "Attributed bounded messaging and storage APIs",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.ui",
+          "label": "Actions, options, permissions and developer diagnostics",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.requests",
+          "label": "Blocking webRequest and reviewed response filtering",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.updates",
+          "label": "Signed updates, revocation and rollback protection",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.platforms",
+          "label": "Native desktop/Android/iOS extension acceptance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "extensions.conformance",
+          "label": "Supported-API parity and hostile-extension security gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "id": "filtering",
+      "label": "uBO port & filtering",
+      "weight": 3,
+      "features": [
+        {
+          "id": "filtering.inventory",
+          "label": "Pinned uBlock Origin port feature/license inventory",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.network",
+          "label": "Reference static/dynamic network rules and exceptions",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.cosmetic",
+          "label": "Cosmetic/procedural filters, packaged scriptlets and resources",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.broker",
+          "label": "Redirect/cache/worker/WebSocket and request-policy integration",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.port",
+          "label": "Rustic uBO port dashboard, logger, picker and advanced controls",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.lists",
+          "label": "Bounded transactional filter-list updates and rollback",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.optimize",
+          "label": "Rust acceleration/reference parity and measured budgets",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "filtering.acceptance",
+          "label": "Full declared uBO feature, mobile and security acceptance",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
       "id": "release",
       "label": "Embedding & release",
       "weight": 2,
@@ -1165,6 +1360,12 @@
         {
           "id": "release.artifacts",
           "label": "Reproducible signed desktop/mobile artifacts and updates",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.comparison",
+          "label": "Controlled Chrome/Firefox speed, memory and energy comparison gates",
           "status": "planned",
           "evidence": []
         },

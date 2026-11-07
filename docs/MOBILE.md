@@ -49,6 +49,14 @@ feasibility and reference-renderer parity evidence.
 
 ## Implementation tracks
 
+Required full-product mobile acceptance also includes Wasm interpreter/Web APIs,
+GPU acceleration, native Rustic MV2 extension lifecycle and the uBO port. See
+[PRODUCT.md](PRODUCT.md) and [EXTENSIONS.md](EXTENSIONS.md). Budget background
+callbacks, preserve broker filtering while UI pages are suspended, and test
+permission revocation/update recovery on devices. Recheck current platform
+entitlements, distribution eligibility and executable-memory constraints before
+release; missing approvals cannot be represented as successful runtime support.
+
 | Task | Milestone | Deliverable and acceptance evidence |
 | --- | --- | --- |
 | MOB-01 | M1 | Shared library cross-checks for Android ARM64/x86-64 and iOS device/ARM64 simulator, required by CI |

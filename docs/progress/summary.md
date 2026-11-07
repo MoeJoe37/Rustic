@@ -1,31 +1,34 @@
 # Engine progress snapshot
 
-**Overall completion: 6.89%** · 15/142 capabilities complete.
+**Overall completion: 6.04%** · 15/172 capabilities complete.
 
-Catalog: `engine-v1`. Source fingerprint: `60b69743ed9fe721121fc5a3b586b531d44b71867cacd00fa41ad91cb2a9221b`.
+Catalog: `engine-v2`. Source fingerprint: `034b09ff07f13c82d822b34a6b95a18770e428888349b4479e9dc77d75c77d29`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 
 | Subsystem | Completed | Subsystem progress | Engine weight |
 | --- | --- | --- | --- |
 | Foundation | 5/8 | 62.50% | 2% |
-| URLs & encoding | 3/12 | 25.00% | 4% |
-| DOM | 3/10 | 30.00% | 7% |
-| HTML | 3/10 | 30.00% | 7% |
-| CSS & style | 0/8 | 0.00% | 10% |
-| Text & fonts | 0/6 | 0.00% | 5% |
-| Layout | 0/10 | 0.00% | 10% |
-| Paint & raster | 0/7 | 0.00% | 7% |
-| JavaScript & GC | 0/15 | 0.00% | 15% |
-| Bindings & web APIs | 0/8 | 0.00% | 7% |
-| Network & navigation | 0/7 | 0.00% | 5% |
-| Storage & workers | 0/7 | 0.00% | 4% |
-| Security & IPC | 0/8 | 0.00% | 5% |
-| Compositor & GPU | 0/4 | 0.00% | 3% |
+| URLs & encoding | 3/12 | 25.00% | 3% |
+| DOM | 3/10 | 30.00% | 6% |
+| HTML | 3/10 | 30.00% | 6% |
+| CSS & style | 0/8 | 0.00% | 9% |
+| Text & fonts | 0/6 | 0.00% | 4% |
+| Layout | 0/10 | 0.00% | 9% |
+| Paint & raster | 0/7 | 0.00% | 6% |
+| JavaScript & GC | 0/15 | 0.00% | 12% |
+| WebAssembly | 0/8 | 0.00% | 4% |
+| Bindings & web APIs | 0/8 | 0.00% | 6% |
+| Network & navigation | 0/7 | 0.00% | 4% |
+| Storage & workers | 0/7 | 0.00% | 3% |
+| Security & IPC | 0/11 | 0.00% | 6% |
+| Compositor & GPU | 0/4 | 0.00% | 4% |
 | Platform hosts | 1/9 | 11.11% | 4% |
 | Accessibility | 0/4 | 0.00% | 2% |
 | DevTools | 0/4 | 0.00% | 1% |
-| Embedding & release | 0/5 | 0.00% | 2% |
+| Extensions (MV2) | 0/10 | 0.00% | 4% |
+| uBO port & filtering | 0/8 | 0.00% | 3% |
+| Embedding & release | 0/6 | 0.00% | 2% |
 
 ## Capability evidence
 
@@ -138,9 +141,20 @@ Catalog: `engine-v1`. Source fingerprint: `60b69743ed9fe721121fc5a3b586b531d44b7
 - **planned** `js.advanced` — BigInt, RegExp, proxies, generators and async
 - **planned** `js.buffers` — Buffers, typed arrays and memory semantics
 - **planned** `js.intl` — Intl and required Unicode semantics
-- **planned** `js.wasm` — WebAssembly execution integration
+- **planned** `js.wasm` — JavaScript/WebAssembly identity, conversions and tracing integration
 - **planned** `js.limits` — Cancellation, stack/heap limits and GC stress
 - **planned** `js.conformance` — Declared full Test262 and runtime correctness gate
+
+### WebAssembly
+
+- **planned** `wasm.decode` — Bounded binary decoder and malformed-module handling
+- **planned** `wasm.validate` — Complete selected type/instruction/module validation
+- **planned** `wasm.execute` — Original interpreter, numerics, control flow and traps
+- **planned** `wasm.instances` — Memories, tables, globals, instances and resource limits
+- **planned** `wasm.web` — Streaming Web API, MIME/CSP and capability-safe imports
+- **planned** `wasm.features` — Required reference/GC, exception, SIMD, shared-memory and baseline features
+- **planned** `wasm.accelerate` — Reviewed acceleration with interpreter fallback on mobile/desktop
+- **planned** `wasm.conformance` — Core/JS/Web suites, fuzzing and five-platform acceptance
 
 ### Bindings & web APIs
 
@@ -182,6 +196,9 @@ Catalog: `engine-v1`. Source fingerprint: `60b69743ed9fe721121fc5a3b586b531d44b7
 - **planned** `security.mobile` — Verified Android/iOS process and broker restrictions
 - **planned** `security.permissions` — Trusted permissions, activation, files and downloads
 - **planned** `security.recovery` — Renderer/service crash recovery without stale authority
+- **planned** `security.brave` — Versioned Brave security comparison and independent review
+- **planned** `security.privacy` — Default tracking/bounce/fingerprinting defenses and privacy matrix
+- **planned** `security.updates` — Authenticated updates, incident response and vulnerability triage
 - **planned** `security.audit` — Fuzz/native-memory review and security release gate
 
 ### Compositor & GPU
@@ -217,10 +234,35 @@ Catalog: `engine-v1`. Source fingerprint: `60b69743ed9fe721121fc5a3b586b531d44b7
 - **planned** `devtools.automation` — Secure headless automation and profiling protocol
 - **planned** `devtools.acceptance` — Debugger privacy, authority and diagnostic acceptance
 
+### Extensions (MV2)
+
+- **planned** `extensions.manifest` — Rustic-native Manifest V2 schema and API version contract
+- **planned** `extensions.packages` — Package identity, signatures and hostile archive validation
+- **planned** `extensions.worlds` — Isolated content-script worlds and extension principals
+- **planned** `extensions.background` — MV2 background pages and mobile lifecycle
+- **planned** `extensions.messaging` — Attributed bounded messaging and storage APIs
+- **planned** `extensions.ui` — Actions, options, permissions and developer diagnostics
+- **planned** `extensions.requests` — Blocking webRequest and reviewed response filtering
+- **planned** `extensions.updates` — Signed updates, revocation and rollback protection
+- **planned** `extensions.platforms` — Native desktop/Android/iOS extension acceptance
+- **planned** `extensions.conformance` — Supported-API parity and hostile-extension security gate
+
+### uBO port & filtering
+
+- **planned** `filtering.inventory` — Pinned uBlock Origin port feature/license inventory
+- **planned** `filtering.network` — Reference static/dynamic network rules and exceptions
+- **planned** `filtering.cosmetic` — Cosmetic/procedural filters, packaged scriptlets and resources
+- **planned** `filtering.broker` — Redirect/cache/worker/WebSocket and request-policy integration
+- **planned** `filtering.port` — Rustic uBO port dashboard, logger, picker and advanced controls
+- **planned** `filtering.lists` — Bounded transactional filter-list updates and rollback
+- **planned** `filtering.optimize` — Rust acceleration/reference parity and measured budgets
+- **planned** `filtering.acceptance` — Full declared uBO feature, mobile and security acceptance
+
 ### Embedding & release
 
 - **planned** `release.embedding` — Versioned ownership/thread/cancellation embedding contract
 - **planned** `release.compatibility` — Representative sites and complete declared conformance gates
 - **planned** `release.performance` — Measured time, memory, reliability and energy budgets
 - **planned** `release.artifacts` — Reproducible signed desktop/mobile artifacts and updates
+- **planned** `release.comparison` — Controlled Chrome/Firefox speed, memory and energy comparison gates
 - **planned** `release.complete` — Final full-engine acceptance across all five target platforms

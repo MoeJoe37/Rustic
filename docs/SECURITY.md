@@ -1,6 +1,6 @@
 # Security architecture and browsing gates
 
-This is a target threat model. The M0 program has no page execution or network
+This is a target threat model. The current program has no page execution or network
 support and no sandbox implementation. Future security claims require tests and
 platform evidence, not this document alone. Reporting instructions are in the
 root [security policy](../SECURITY.md).
@@ -23,6 +23,9 @@ or user-approved replacement of the browser binary is outside this model.
 | Page → native OS | Browser broker and sandbox | No ambient renderer filesystem/network/process access |
 | GPU/codec/native library → host | Restricted service where appropriate | Validated buffers, narrow FFI, crash isolation and updates |
 | Page → user decision | Trusted chrome | Unspoofable origin display and prompts; activation-gated privileges |
+| Extension → page/broker | Distinct extension principal and permission broker | Isolated worlds, scoped host access, sender/epoch checks and live revocation |
+| Filter data → matcher/injection | Bounded parser and reviewed packaged resources | Transactional snapshots, selector/regex budgets and no downloaded executable code |
+| Wasm → host/memory | Validator, runtime and explicit import adapter | Bounds/traps, rooted JS edges, cancellation and capability-safe imports |
 | Repository contribution → CI | GitHub workflow | Read-only tokens, untrusted PR event, no privileged code execution |
 
 ## Policy rules
@@ -93,6 +96,15 @@ as a security specification.
 
 ## General remote browsing release gates
 
+Brave-level security and privacy is a required product target. Maintain the dated
+comparison matrix in [PRODUCT.md](PRODUCT.md) for containment, browser policies,
+partitioning, default anti-tracking/fingerprinting, downloads and update/incident
+handling. Privacy safeguards include minimized background connections, documented
+telemetry consent and trusted per-site controls. A filter-block count or feature
+checklist is not proof of equal security; unresolved high-risk gaps and missing
+independent review block a parity claim. Required extension/Wasm/GPU functionality
+must satisfy these same boundaries. See [EXTENSIONS.md](EXTENSIONS.md).
+
 - [ ] URL/origin, redirects, inherited/opaque origins and response visibility have negative tests.
 - [ ] CSP and loading/execution policy cover all exposed script and resource paths.
 - [ ] Cookies, storage, cache, permissions and private profiles cannot cross their isolation keys.
@@ -104,6 +116,9 @@ as a security specification.
 - [ ] Certificate verification is enabled and errors have no silent fallback.
 - [ ] Debugging/inspection has no unintended remote listener or private-data exposure.
 - [ ] A documented review has no unresolved release-blocking security defects.
+- [ ] Brave comparison gaps, privacy defaults and independent-review findings have recorded closure evidence.
+- [ ] Extension packages/worlds/updates, hostile filter lists, Wasm imports and GPU IPC pass their boundary tests.
+- [ ] Engine/extension/filter updates and a vulnerability response/recovery exercise are verified per platform.
 
 Record evidence per platform and committed SHA. Re-run affected gates after
 changes to authority, process assignment, serialization, native dependencies or

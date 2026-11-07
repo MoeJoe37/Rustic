@@ -24,7 +24,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine subsystem progress](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 6.89%** — 15/142 capabilities complete across 18 subsystems.
+**Overall engine completion: 6.04%** — 15/172 capabilities complete across 21 subsystems.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -35,6 +35,8 @@ engineering effort; milestones below describe targets, not existing support.
 | Document | Purpose |
 | --- | --- |
 | [Documentation index](docs/README.md) | Reading order and current implementation inventory |
+| [Full-engine product requirements](docs/PRODUCT.md) | Brave-level security/privacy, broad site/CSS/JS compatibility, competitive targets, GPU and Wasm |
+| [Rustic extensions and uBO port](docs/EXTENSIONS.md) | Rustic-only Manifest V2 ecosystem, blocking APIs and the planned uBlock Origin port |
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
 | [Progress graph methodology](docs/PROGRESS.md) | Whole-engine completion criteria, weights, evidence and automatic commit updates |
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
@@ -85,6 +87,13 @@ and clocks), `rustic-dom` (bounded node storage and checked tree mutation),
 are created only when their milestone needs them. All packages are unpublished.
 
 ## Development direction
+
+The complete product targets security/privacy at least as strong as Brave, broad
+standards-complete website/CSS/JavaScript support, and measured improvements over
+Chrome and Firefox. GPU acceleration, WebAssembly, **Rustic-only Manifest V2
+extensions**, and a rebuilt/ported **uBlock Origin for Rustic** are required parts
+of the plan. These are future acceptance targets, not current support or measured
+superiority. See [product requirements](docs/PRODUCT.md) for exact gates and scope.
 
 1. Establish deterministic infrastructure and parser tests.
 2. Render local static documents with an original HTML/CSS/layout pipeline.

@@ -1,0 +1,10 @@
+/target/
+/artifacts/
+/third_party/checkouts/
+*.profraw
+*.profdata
+__pycache__/
+*.pyc
+/.DS_Store
+/.idea/
+/.vscode/

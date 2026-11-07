@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  RUST_VERSION: "1.99.1"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust and tools
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt --component clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Build API documentation
+        run: cargo doc --locked --workspace --no-deps
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal
+      - name: Test all targets
+        run: cargo test --locked --workspace --all-targets
+      - name: Test documentation examples
+        run: cargo test --locked --workspace --doc
+      - name: CLI smoke test
+        run: cargo run --locked -p rustic-cli -- info
+
+  compatibility:
+    name: Compatibility (${{ matrix.toolchain }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["1.85.0", stable]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install compatibility toolchain
+        env:
+          CHECK_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: rustup toolchain install "$CHECK_TOOLCHAIN" --profile minimal
+      - name: Test compiler compatibility
+        env:
+          RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo test --locked --workspace --all-targets
+
+  repository:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check source and documentation consistency
+        run: python3 tools/check_repository.py
+
+  ci:
+    name: CI
+    if: ${{ always() }}
+    needs: [quality, test, compatibility, repository]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
+          REPOSITORY_RESULT: ${{ needs.repository.result }}
+        run: |
+          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT"; do
+            if [ "$result" != success ]; then
+              echo "A required job did not succeed: $result"
+              exit 1
+            fi
+          done

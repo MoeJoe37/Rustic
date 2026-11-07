@@ -1,0 +1,25 @@
+name: Implementation task
+description: Plan a bounded engine feature or roadmap task.
+title: "[Task] "
+body:
+  - type: input
+    id: roadmap
+    attributes:
+      label: Roadmap task and prerequisites
+      description: Include the stable task ID and dependencies.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Behavior and scope
+      description: State inputs, outputs, in/out scope, and relevant specification sections/revisions.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: Define fixtures, negative cases, budgets/cancellation, and the demo that proves completion.
+    validations:
+      required: true

@@ -1,0 +1,244 @@
+# Architecture
+
+## 1. Mission and constraints
+
+Build an original Rust implementation of the web engine, usable headlessly and
+eventually embedded in a desktop browser. Standards behavior and diagnosability
+come before optimization. A small vertical slice must be runnable before broad
+feature expansion. Linux headless is the reference runtime; Windows and macOS
+remain compile/test targets from the first commit.
+
+An engine owns document interpretation and web execution. Browser chrome owns
+tabs, address entry, profiles, permissions UI, downloads, and OS integration.
+Keep those responsibilities separate so an embedder does not need the reference
+shell. Browser chrome must never be controlled by page DOM or page CSS.
+
+The implementation starts with local fixtures and no network. A single-process
+development harness is permitted for trusted input; it is not a sandbox. Design
+service interfaces early, then introduce enforced process isolation before
+arbitrary remote content. Rust memory safety alone cannot enforce browser policy.
+
+## 2. Component map
+
+Only `rustic-engine` and `rustic-cli` exist at M0. The following is the target
+workspace decomposition, not a requirement to create empty crates today.
+
+| Proposed crate | Responsibilities | Primary dependencies | First milestone |
+| --- | --- | --- | --- |
+| `rustic-base` | Typed IDs, checked geometry, byte budgets, cancellation, clocks, diagnostics | std, reviewed utility crates | M1 |
+| `rustic-url` | WHATWG URL parsing/serialization, origin records, relative resolution | base, Unicode/IDNA data adapter | M1 |
+| `rustic-html` | Encoding integration, incremental tokenizer, tree builder, recovery | base, DOM mutation interface | M1 |
+| `rustic-dom` | Document/node graph, mutation, names, events, traversal, tracing integration | base, URL | M1 |
+| `rustic-css` | Syntax tokens, stylesheet/declaration parsing, selectors, value syntax | base | M2 |
+| `rustic-style` | Selector matching, cascade, inheritance, computed styles, invalidation | CSS, read-only DOM view | M2 |
+| `rustic-text` | Font selection, shaping adapter, bidi, line breaking, glyph metrics/cache | base, reviewed text/font libraries | M3 |
+| `rustic-layout` | Formatting contexts, fragments, intrinsic sizes, hit-test geometry | base, computed styles, text | M3 |
+| `rustic-paint` | Stacking/paint order, immutable display lists, clipping, damage | base, layout fragments | M3 |
+| `rustic-raster` | Deterministic CPU display-list interpreter and surfaces | base, paint commands, codec adapters | M3 |
+| `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
+| `rustic-bindings` | Web IDL subset tooling, JS/DOM wrappers, exception conversion, tracing edges | JS, DOM; generated from pinned IDL | M5 |
+| `rustic-web` | Window, agents, tasks/microtasks, timers, script loading, browser APIs | JS, bindings, DOM, service interfaces | M5 |
+| `rustic-net` | Fetch policy, HTTP adapter, redirects, cookies, cache, TLS integration | URL, base, audited protocol libraries | M6 |
+| `rustic-storage` | Partitioned profile data, quotas, transactions, eviction/private mode | base, origin/storage keys, database adapter | M6/M9 |
+| `rustic-ipc` | Versioned messages, validation, resource handles, bounded transport | base, selected serialization adapter | M7 |
+| `rustic-platform` | Windows/events, font discovery, graphics surfaces, OS adapters | base, platform libraries | M8 |
+| `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
+| `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
+| `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
+| `rustic-engine` | Public Rust facade and browser/document lifecycle coordination | component/service interfaces | M0 onward |
+| `rustic-cli` / future `rustic-shell` | Headless test host / desktop browser chrome | engine API, platform | M0 / M8 |
+| `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
+
+Dependencies form a DAG. Keep the pure tokenizer, selector parser, and JavaScript
+runtime usable independently. DOM exposes mutation and read views without
+depending on style/layout. Style invalidation consumes mutation records; it does
+not call back into arbitrary JavaScript. Layout produces geometry; rasterization
+does not read or mutate live DOM. Engine orchestration resolves integration,
+instead of a global mutable singleton shared across crates.
+
+```mermaid
+flowchart TD
+    Host["Shell or headless host"] --> Engine["Engine coordinator"]
+    Engine --> Web["Document agent and web APIs"]
+    Engine --> Services["Network and storage services"]
+    Web --> DOM["HTML parser and DOM"]
+    Web --> JS["JavaScript and bindings"]
+    DOM --> Style["CSS and computed style"]
+    Style --> Layout["Text and layout fragments"]
+    Layout --> Paint["Paint and display list"]
+    Paint --> Raster["CPU raster or compositor"]
+    Raster --> Surface["Headless image or OS surface"]
+```
+
+Arrows show major data/control flow, not every Cargo dependency. In particular,
+JS interacts with DOM through bindings and service access goes through policy.
+
+## 3. Documents, identity, and memory
+
+Use typed `DocumentId`, `NodeId`, `NavigationId`, `FrameId`, `ResourceId`, and
+`FrameEpoch`, with separate ID domains. An arena ID contains a slot and generation;
+lookups check generation and document ownership. Never serialize Rust pointers,
+references, or raw arena indexes across processes. Node identity survives DOM
+mutation, but references to destroyed documents fail validation.
+
+Initially a document owns a nonmoving node arena. Public node handles do not
+expose `Rc<RefCell<_>>` or borrow lifetimes tied to the whole engine. Before JS
+bindings land, implement a nonmoving traced heap with explicit root scopes,
+generation-checked handles, and a shared tracing contract for JS and DOM objects.
+The runtime heap can trace registered host objects without depending on the DOM
+crate. Document roots, active jobs, stacks, bindings, and embedder handles are
+roots. A detached subtree stays alive if reachable from JS; unreachable cycles
+across JS objects, DOM nodes, event listeners, and closures must be collectable.
+
+Start with stop-the-world mark/sweep on the document agent thread. Incremental or
+generational collection needs a later ADR, barriers, and correctness tests. A weak
+wrapper cache preserves identity without retaining dead nodes. Generation IDs
+detect stale references; they do not replace reachability tracking. Style/layout
+data live in separate epoch-owned arenas and use weak node identity. Explicitly
+dispose native resources; collection is not a timely file/network close protocol.
+
+Use Rust UTF-8 for tooling and byte-oriented source buffers where appropriate.
+ECMAScript strings use UTF-16 code units, including lone surrogates. DOM string
+conversion follows its IDL type; do not silently normalize or replace code units.
+Distinguish source byte offsets, UTF-16 offsets, scalar indices, and glyph clusters.
+
+Each untrusted entry point consumes a resource budget: input bytes, tokens,
+nodes, nested structures, decoded pixels, heap, tasks, and wall/CPU time. Bound
+queues and caches. Checked arithmetic precedes allocation. Avoid recursion whose
+depth comes directly from content. A future surface allocation must validate
+stride and bytes per pixel as well as the viewport pixel count present at M0.
+
+## 4. Parsing, style, layout, and painting
+
+The loader produces byte chunks plus response metadata. Encoding detection and
+decoder state precede HTML tokenization; charset changes may require a bounded
+restart before the appropriate lock point. The tokenizer preserves state across
+chunks and feeds a tree builder with insertion modes, implied elements, foster
+parenting, formatting-element reconstruction, templates, and quirks mode. Parse
+errors usually recover per HTML rather than aborting. DOM mutation is observable;
+parser-blocking scripts suspend/resume the parser and later support reentry.
+
+CSS syntax parsing is separate from property validation. Unknown declarations
+are discarded according to grammar recovery rather than accepted as arbitrary
+strings. The cascade models origins, importance, order, specificity, inheritance,
+initial values, and later layers/custom properties. Keep specified, computed,
+used, and actual values distinct. A UA stylesheet provides defaults. Mutation,
+stylesheet, pseudo-class, viewport, and font changes produce invalidation sets.
+Start with a correct full restyle/reflow before selective invalidation.
+
+Layout consumes a stable style snapshot. Generate a box tree distinct from DOM,
+then fragments for block/inline formatting, anonymous boxes, line boxes, replaced
+elements, and later fragmentation. Distinguish CSS pixels, device pixels, logical
+inline/block axes, and font units in types. Resolve containing blocks, intrinsic
+sizes, margin collapse, overflow, baseline alignment, and rounding deliberately.
+Use deterministic bundled fonts for reference tests, then system discovery for UI.
+Arabic shaping, combining marks, bidi, grapheme navigation, and fallback are
+explicit text work; a character-to-glyph mapping is only an early debug aid.
+
+Painting builds an immutable, versioned display list: rectangles, borders, glyph
+runs, images, clips, transforms, and stacking contexts. Hit testing shares fragment
+geometry and transforms with painting. The CPU rasterizer is the initial reference
+backend; GPU scenes are an optimization, with a usable CPU fallback. Frame epochs
+prevent an old layout or resource completion from replacing a newer frame. Scroll
+updates can later avoid full layout when geometry is unchanged.
+
+## 5. JavaScript and host execution
+
+Build Rustic's own runtime, beginning with an interpreter. Lexer and parser must
+handle lexical goals, automatic semicolon insertion, source spans, early errors,
+strict mode, scopes, and Unicode identifiers. Bytecode compilation follows an
+AST reference evaluator or a deliberately small initial bytecode subset. Preserve
+completion records, references, environments, property descriptors, prototypes,
+call/construct semantics, exceptions, realms, and abstract operations. Do not
+substitute Rust numeric/string behavior for ECMAScript coercions.
+
+Stage built-ins, functions/closures, collections, promises, modules, typed arrays,
+BigInt, RegExp, proxies, and Intl against explicit Test262 selections. The VM has
+no filesystem, sockets, process spawning, or implicit native API. Host callbacks
+receive explicit capabilities. Instruction checkpoints support cancellation and
+budgets; an infinite script must not freeze browser chrome. JIT compilation is
+deferred until compatibility and profiling justify its security and maintenance
+cost. WebAssembly is a separate late-stage subsystem, not an interpreter shortcut.
+
+A document agent owns DOM mutation and JavaScript execution on one thread.
+Rust async tasks may perform I/O off-thread; they post completions to the owning
+agent, never execute page callbacks directly. The coordinator schedules task
+sources, microtask checkpoints, rendering opportunities, timers, animation frames,
+and user input according to the HTML model. ECMAScript jobs and host tasks are
+distinct. No Rust lock or DOM mutable borrow is held across a call into page JS.
+Event dispatch, custom callbacks, and getters are reentry points. Define safe
+points and root scopes before implementing them.
+
+## 6. Navigation, resources, and persistence
+
+The coordinator owns a navigation state machine: requested, policy-checked,
+fetching, provisional document, committed, complete/failed/cancelled. Same-document
+navigation takes a separate path. Assign the origin from committed navigation
+rules, not a renderer-supplied string. Recheck redirects, MIME, policy containers,
+and resource limits at every relevant step. A newer navigation cancels previous
+work; all asynchronous completions carry the navigation/document epoch.
+
+Network request context includes initiator origin, top-level site, destination,
+credentials mode, referrer policy, CSP context, and cancellation. A reviewed HTTP
+transport is not the Fetch implementation: Rustic owns CORS, response filtering,
+redirect semantics, cookie access, mixed-content and other browser policy.
+Classify trust at service ingress; validate a request even if the renderer says it
+already checked it. Partition cache/cookies/storage consistently and invalidate
+authority after navigation. Dev fixture transport is explicit and unavailable to
+normal page script.
+
+Storage keys include origin and the selected top-level partition policy. Start
+with ephemeral in-memory profiles, then versioned disk schemas and atomic updates.
+Private mode avoids persistent writes and clears state on exit. IndexedDB and
+service-worker storage require their own transactions/lifecycle work later. A
+profile lock prevents unsafe concurrent writers. Database failures degrade to a
+documented error; never reinterpret corrupted persisted state as trusted config.
+
+## 7. Processes, IPC, and crash recovery
+
+Target: browser/broker process, renderer processes grouped by validated site/agent
+policy, network/storage services, and optionally a GPU process. Do not promise a
+literal process-per-tab or process-per-origin mapping: cross-origin frames,
+same-origin synchronous access, opener relationships, and agent clusters require
+an isolation policy designed together. M7 defines the mapping and tests.
+
+Renderers receive narrow handles instead of ambient OS privileges. Linux uses
+reviewed namespace/seccomp/broker controls; Windows restricted tokens/AppContainer
+and job controls; macOS sandbox controls require a separate feasibility decision.
+If a required sandbox cannot be enforced, general remote browsing remains gated
+on that platform. Unsupported configurations must not silently weaken isolation.
+
+IPC messages have protocol version, sender identity, document/navigation IDs,
+sequence/epoch, bounded payload lengths, and typed variants. Validate limits before
+allocation/deserialization; reject unknown capabilities, stale epochs, duplicate
+replies, invalid handles, and version mismatches. Bound shared-memory size and
+validate its layout; immutable snapshots avoid races with mutable renderer data.
+No arbitrary-path open, raw pointer, or generic “execute host function” message.
+Service death cancels outstanding operations. Renderer death produces a tab error
+and releases handles without killing chrome. Recovery never reuses old authority.
+
+## 8. Embedding, accessibility, and observability
+
+The future Rust facade offers engine/profile creation, view creation, navigation,
+resize, input, polling/event delivery, cancellation, and shutdown. Commands return
+request IDs; events include navigation status, title, surface readiness, console,
+permission requests, and failures. Callbacks are delivered at documented pump
+points, not while internal borrows are held. An embedder grants capabilities for
+network/files/clipboard/downloads explicitly. A C ABI is deferred until this Rust
+API settles and must define ownership and ABI versioning.
+
+Headless tests inject clocks, randomness, fonts, network fixtures, storage, and
+surfaces. Production uses real implementations. Diagnostic events include stage,
+duration, document and navigation IDs; redact credentials and private content.
+DevTools binds to local authenticated opt-in transport. Accessibility consumes a
+semantic DOM snapshot with roles, names, states, focus, and geometry, independently
+of the display list; platform adapters map it to OS accessibility APIs.
+
+## 9. Extension rules and review triggers
+
+Keep APIs internal and unpublished through the prototypes. Do not create a
+plugin ABI, distributed service architecture, or a global web-feature trait per
+property. Add a crate only for a real ownership, testability, or dependency
+boundary. Any change to original-engine scope, GC, process authority, JS host
+capabilities, public API stability, or graphics backend requires an
+[architecture decision](adr/README.md), regression tests, and roadmap updates.

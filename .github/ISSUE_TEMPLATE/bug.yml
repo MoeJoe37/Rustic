@@ -1,0 +1,27 @@
+name: Bug report
+description: Report a reproducible non-security defect.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: Use SECURITY.md for sensitive reports. Do not include secrets or personal browsing data.
+  - type: input
+    id: environment
+    attributes:
+      label: Commit, platform, and Rust version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include the exact command and a small redistributable fixture.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Include diagnostics and the relevant specification or test case when available.
+    validations:
+      required: true

@@ -1,0 +1,19 @@
+[package]
+name = "rustic-cli"
+description = "Development command line entry point for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "rustic"
+path = "src/main.rs"
+
+[dependencies]
+rustic-engine = { path = "../rustic-engine" }
+
+[lints]
+workspace = true

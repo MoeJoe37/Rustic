@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 6.64%** · 16/172 capabilities complete.
+**Overall completion: 7.24%** · 17/172 capabilities complete.
 
-Catalog: `engine-v2`. Source fingerprint: `d7c5b660840b74daa6c58e7997d090c1578e6d2f1dc0eaade3b51dc9ec8514a0`.
+Catalog: `engine-v2`. Source fingerprint: `ccc93640822ba0d6373563a340948ff5832b1f1ed42b587e888dc74a9037320f`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 
@@ -11,7 +11,7 @@ Catalog: `engine-v2`. Source fingerprint: `d7c5b660840b74daa6c58e7997d090c1578e6
 | Foundation | 5/8 | 62.50% | 2% |
 | URLs & encoding | 3/12 | 25.00% | 3% |
 | DOM | 3/10 | 30.00% | 6% |
-| HTML | 4/10 | 40.00% | 6% |
+| HTML | 5/10 | 50.00% | 6% |
 | CSS & style | 0/8 | 0.00% | 9% |
 | Text & fonts | 0/6 | 0.00% | 4% |
 | Layout | 0/10 | 0.00% | 9% |
@@ -77,7 +77,7 @@ Catalog: `engine-v2`. Source fingerprint: `d7c5b660840b74daa6c58e7997d090c1578e6
 - **complete** `html.tags` — Declared data/tag/attribute tokenizer subset ([source](../../crates/rustic-html/src/tokenizer.rs), [test](../../crates/rustic-html/tests/tokenizer.rs), [test](../../crates/rustic-html/tests/tokenizer.rs), [test](../../crates/rustic-html/tests/tokenizer.rs))
 - **complete** `html.references` — Full named/numeric character references ([source](../../crates/rustic-html/src/tokenizer/reference.rs), [test](../../crates/rustic-html/tests/references.rs), [test](../../crates/rustic-html/tests/references.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.declarations` — Comments, doctypes and declaration recovery ([source](../../crates/rustic-html/src/tokenizer/comment.rs), [source](../../crates/rustic-html/src/tokenizer/doctype.rs), [source](../../crates/rustic-html/src/tokenizer/instruction.rs), [test](../../crates/rustic-html/tests/declarations.rs), [test](../../crates/rustic-html/tests/corpus.rs))
-- **planned** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes
+- **complete** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes ([source](../../crates/rustic-html/src/tokenizer/text.rs), [source](../../crates/rustic-html/src/tokenizer/driver.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **planned** `html.tree` — Core insertion modes and malformed-tree recovery
 - **planned** `html.tables` — Table, formatting, template and foreign content rules
 - **planned** `html.scripts` — Parser/script reentry and encoding restart

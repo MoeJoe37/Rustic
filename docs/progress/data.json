@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_version": "engine-v2",
-  "source_fingerprint": "d7c5b660840b74daa6c58e7997d090c1578e6d2f1dc0eaade3b51dc9ec8514a0",
-  "percent": "6.64",
-  "completed": 16,
+  "source_fingerprint": "ccc93640822ba0d6373563a340948ff5832b1f1ed42b587e888dc74a9037320f",
+  "percent": "7.24",
+  "completed": 17,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -455,8 +455,34 @@
         {
           "id": "html.textmodes",
           "label": "RCDATA, RAWTEXT, script and plaintext modes",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/text.rs",
+              "marker": "pub(super) fn text_step"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/driver.rs",
+              "marker": "pub fn next_token"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/text_modes.rs",
+              "marker": "fn pull_feedback_applies_before_the_remainder_of_the_same_input_chunk"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/text_modes.rs",
+              "marker": "fn failed_end_tag_and_script_word_probes_do_not_grow_with_literal_name_runs"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
+            }
+          ]
         },
         {
           "id": "html.tree",
@@ -489,9 +515,9 @@
           "evidence": []
         }
       ],
-      "completed": 4,
+      "completed": 5,
       "total": 10,
-      "percent": "40.00"
+      "percent": "50.00"
     },
     {
       "id": "css",

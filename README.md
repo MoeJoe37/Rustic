@@ -24,7 +24,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine subsystem progress](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 6.04%** — 15/172 capabilities complete across 21 subsystems.
+**Overall engine completion: 6.64%** — 16/172 capabilities complete across 21 subsystems.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

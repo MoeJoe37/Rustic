@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_version": "engine-v2",
-  "source_fingerprint": "034b09ff07f13c82d822b34a6b95a18770e428888349b4479e9dc77d75c77d29",
-  "percent": "6.04",
-  "completed": 15,
+  "source_fingerprint": "d7c5b660840b74daa6c58e7997d090c1578e6d2f1dc0eaade3b51dc9ec8514a0",
+  "percent": "6.64",
+  "completed": 16,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -396,8 +396,29 @@
         {
           "id": "html.references",
           "label": "Full named/numeric character references",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/reference.rs",
+              "marker": "pub(super) fn reference_step"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/references.rs",
+              "marker": "fn longest_named_match_preserves_case_and_two_scalar_values"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/references.rs",
+              "marker": "fn expanded_payloads_and_reference_errors_respect_resource_limits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_reference_corpus_and_all_input_splits_have_no_unexpected_failures"
+            }
+          ]
         },
         {
           "id": "html.declarations",
@@ -468,9 +489,9 @@
           "evidence": []
         }
       ],
-      "completed": 3,
+      "completed": 4,
       "total": 10,
-      "percent": "30.00"
+      "percent": "40.00"
     },
     {
       "id": "css",

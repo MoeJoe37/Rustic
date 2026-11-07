@@ -5,7 +5,9 @@
 The current suite has viewport boundary/error tests, CLI subprocess tests, a
 rustdoc example, shared primitive boundary/concurrency tests, DOM hierarchy and
 payload tests, seeded mutations against an independent ordered-tree model, repository
-consistency checks, and compiler/linter checks. Browser conformance,
+consistency checks, and compiler/linter checks.
+URL parsing now adds focused host/origin/limit tests and a 685-case pinned WPT
+URL-data subset; see [scope and provenance](URL.md). Full browser conformance,
 rendering, fuzzing, GC stress, integration servers, and benchmarks are planned;
 they do not run in the initial CI. Add each harness with the subsystem it tests.
 

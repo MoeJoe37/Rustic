@@ -23,3 +23,10 @@ dependencies = [
 [[package]]
 name = "rustic-engine"
 version = "0.1.0"
+
+[[package]]
+name = "rustic-url"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+]

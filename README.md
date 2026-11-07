@@ -23,6 +23,8 @@ engineering effort; milestones below describe targets, not existing support.
 | --- | --- |
 | [Documentation index](docs/README.md) | Reading order and current implementation inventory |
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
+| [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
+| [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
 | [Roadmap](docs/ROADMAP.md) | Dependency-ordered milestones, acceptance gates, first tasks, and risks |
 | [Standards and compatibility](docs/STANDARDS.md) | Feature scope, authoritative references, and conformance reporting |
@@ -44,6 +46,7 @@ cargo run --locked -p rustic-cli -- info
 cargo test --locked --workspace --all-targets
 cargo test --locked --workspace --doc
 cargo run --locked -p rustic-dom --example tree
+cargo run --locked -p rustic-url --example resolve
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
@@ -56,6 +59,7 @@ a deterministic inspection dump. It does not parse HTML or load a page.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
 and clocks), `rustic-dom` (bounded node storage and checked tree mutation),
+`rustic-url` (URL records, parsing and origins),
 `rustic-engine` (bounded viewport configuration), and `rustic-cli`
 (development entry point). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

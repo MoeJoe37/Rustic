@@ -11,6 +11,7 @@ local toolchain definition. All packages are private/unpublished.
 ```sh
 cargo run --locked -p rustic-cli -- info
 cargo run --locked -p rustic-dom --example tree
+cargo run --locked -p rustic-url --example resolve
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace --all-targets
@@ -79,6 +80,12 @@ repository settings. Private-repository runner usage is subject to the account's
 Actions allowance. There are no scheduled heavy build/fuzz jobs in the first CI.
 
 ## Failure diagnosis
+
+The pinned URL-data subset runs offline as a normal Rust integration test. Use
+`cargo test --locked -p rustic-url --test wpt -- --nocapture` for case counts.
+[URL.md](URL.md) documents the fixed selection, limits, unsupported features and
+fixture update/check commands. Repository checks validate the generated fixture
+digest against its manifest; normal CI does not download upstream test data.
 
 Read the first failed step, not just the aggregate gate. A lockfile failure means
 the manifest/lockfile need a deliberate update. A format failure is resolved with

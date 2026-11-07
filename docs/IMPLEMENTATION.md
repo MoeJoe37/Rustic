@@ -11,7 +11,7 @@ Implemented in `rustic-base`, with no external dependencies and no unsafe code:
 | Contract | Behavior | Regression evidence |
 | --- | --- | --- |
 | `DocumentId` | Process-local monotonic allocation; exhaustion never wraps or reuses an ID | Concurrent allocation and exhaustion tests |
-| `NodeId` | Typed document/slot/generation identity; ownership and generation must be checked by storage | Storage checks land with the DOM arena |
+| `NodeId` | Typed document/slot/generation identity; ownership and generation are checked by storage | Foreign/stale/vacant/out-of-range checks in the DOM arena |
 | `Budget` | Explicit charge/release; failures preserve usage; arithmetic never wraps | Exact-limit, overflow, zero-capacity and release-underflow cases |
 | `CancellationToken` | Shared one-way cooperative cancellation, including across threads | Clone sharing, repeat cancellation and independent-token cases |
 | `SourceSpan` | Half-open byte offsets; checked bounds and UTF-8 slicing | Reversed ranges, extreme offsets and split multibyte characters |
@@ -89,6 +89,29 @@ The example creates a doctype, HTML/body nodes, an attribute, mixed Arabic/Latin
 text and an SVG-namespaced node. There is no parser involved, and no `dump-dom`
 HTML command is advertised yet.
 
+## DOC-02a — URL records, parsing and origins
+
+`rustic-url` now implements immutable URL records, original special/generic URL
+and reference parsing, ASCII hosts, IPv4/IPv6, encoding/serialization and structured
+origins. It depends only on `rustic-base`. File/blob URLs and Unicode IDNA return
+explicit unsupported errors. Limits and cooperative cancellation are integrated;
+the supplied base is immutable even on failure. Debug/error output omits userinfo
+and private URL payloads.
+
+Tuple origins compare canonical scheme/host/port. Opaque origins have unique
+process-local identity; `null` is never compared as authority. Each URL-origin
+derivation for a non-tuple URL is fresh, while cloning an assigned `Origin`
+retains its identity. Document inheritance and navigation authority remain future
+work, separate from URL parsing.
+
+Eleven focused regression tests cover canonicalization, references, addresses,
+origin equality/hashing, resource boundaries, cancellation and sensitive debug
+output. An offline WPT-data runner passes 685 statically selected cases from 899
+upstream records: 443 positive, 242 negative, 214 excluded. The exact revision,
+source/generated digests, indices, license, selection rules and untested fields
+are recorded; this is not whole-WPT or complete URL conformance. See [URL.md](URL.md)
+for contracts, evidence and the runnable `resolve` example.
+
 ## Queue status
 
 Platform scope now includes Windows, macOS, Linux, Android and iOS/iPadOS, with
@@ -100,10 +123,10 @@ link/package checks, runtime tests and device support remain planned.
 | First implementation queue item | Status |
 | --- | --- |
 | DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |
-| DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; parser checkpoint integration waits for its implementation |
+| DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; integrated into URL parsing, HTML integration pending |
 | DOC-03: minimal document arena and node kinds | Complete internal subset described above |
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
-| DOC-02a: URL records and tuple/opaque origins | Next |
+| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
 | DOC-05a/b and DOC-06a/b: tokenizer and tree builder | Not started |
 | DOC-07/08: bounded HTML loader/CLI and parser corpus/fuzzing | Not started |
 | DOC-09: traced node/JS ownership prototype | Not started |

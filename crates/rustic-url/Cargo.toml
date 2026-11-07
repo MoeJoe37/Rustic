@@ -1,0 +1,15 @@
+[package]
+name = "rustic-url"
+description = "Original URL records, parsing, and process-local origins for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+
+[lints]
+workspace = true

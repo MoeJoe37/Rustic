@@ -28,14 +28,17 @@ See [implementation progress](IMPLEMENTATION.md) for completed tasks and their c
 | Bounded DOM node storage, names/attributes, UTF-16 data, checked moves and destruction | Implemented internal subset | `rustic-dom`; DOC-03 and first DOC-04 slice |
 | Bounded deterministic subtree dump and executable tree example | Implemented diagnostic tool | `rustic-dom` example and golden/escaping/boundary tests |
 | Android/iOS shared-library cross-compilation | Configured | Four mobile target checks; runtime and host work in [mobile plan](MOBILE.md) |
+| URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope and 685 pinned cases](URL.md) |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
 | HTML parsing, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
-| WPT, Test262, fuzzing, benchmark runners, release automation | Planned | Milestone-specific gates; no results claimed |
+| Pinned WPT URL data subset | Implemented offline runner | 685 selected URL records; no full browser harness |
+| Browser WPT harness, Test262, fuzzing, benchmarks, releases | Planned | Milestone-specific gates; no broad results claimed |
 
-There are no external Rust dependencies yet. There are no WPT/Test262 pass
-percentages, sandbox guarantees, performance measurements, or releases yet.
+There are no external Rust dependencies yet. URL subset evidence is recorded in
+[URL.md](URL.md); there are no whole-WPT/Test262 pass percentages, sandbox
+guarantees, performance measurements, or releases yet.
 Configuration present in the repository is distinct from a successful Actions
 run; inspect the [Actions page](https://github.com/MoeJoe37/Rustic/actions) for run results.
 

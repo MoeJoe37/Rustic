@@ -2,6 +2,7 @@
 """Dependency-free source/documentation consistency checks for Python 3.11+."""
 
 from pathlib import Path
+import hashlib
 import json
 import re
 import sys
@@ -67,6 +68,24 @@ def main() -> int:
                 error(path, f"invalid JSON: {exc}")
         elif path.suffix == ".md":
             check_markdown(path, source)
+
+    url_manifest = ROOT / "crates/rustic-url/tests/fixtures/wpt_manifest.json"
+    if url_manifest.exists():
+        try:
+            manifest = json.loads(url_manifest.read_text(encoding="utf-8"))
+            fixture = url_manifest.parent / "wpt_cases.rs"
+            if hashlib.sha256(fixture.read_bytes()).hexdigest() != manifest["fixture_sha256"]:
+                error(fixture, "generated fixture digest differs from WPT manifest; regenerate deliberately")
+            if not (url_manifest.parent / "WPT-LICENSE.md").is_file():
+                error(url_manifest, "missing upstream WPT license")
+            selected = manifest["selected_cases"]
+            indices = manifest["selected_array_indices"]
+            if (manifest["positive_cases"] + manifest["negative_cases"] != selected
+                    or selected + manifest["excluded_cases"] != manifest["upstream_cases"]
+                    or len(indices) != selected or indices != sorted(set(indices))):
+                error(url_manifest, "inconsistent WPT counts or selected indices")
+        except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            error(url_manifest, f"invalid WPT fixture metadata: {exc}")
 
     try:
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]

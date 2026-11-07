@@ -8,6 +8,10 @@ which algorithms, syntax, APIs, and test selections work. Standards links below
 are authoritative references, not claims that Rustic is conformant today.
 No HTML, CSS, JavaScript, or network behavior is implemented at M0.
 
+Current M1 evidence includes the original [URL/parser and origin subset](URL.md)
+with 685 pinned upstream URL-data cases. This is not full browser WPT conformance
+and does not implement the remaining IDNA/file/blob or browser binding features.
+
 For each task, record the specification section, revision/date, upstream test
 revision, supported subset, known deviations, and regression fixtures. Prefer
 standard algorithms over reverse engineering one browser's output. When browsers

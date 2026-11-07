@@ -62,7 +62,7 @@ the first commit. Major/authority-affecting upgrades need focused review.
 | --- | --- | --- | --- |
 | Linux x86-64 | Ubuntu 24.04 build/tests; quality and docs checks | Reference headless renderer, then desktop host | Linux broker/sandbox and runtime integration evidence |
 | Windows x86-64 | Windows Server 2022 build/tests | Headless first, desktop/input/accessibility next | Windows isolation and platform flow evidence |
-| macOS runner architecture | macOS 14 native runner build/tests | Headless first; desktop feasibility by platform ADR | Actual macOS sandbox and bridge evidence |
+| macOS runner architecture | macOS 15 native runner build/tests | Headless first; desktop feasibility by platform ADR | Actual macOS sandbox and bridge evidence |
 | Additional CPU architectures | Not configured | Cross-compile then native testing on demand | Native runtime tests before support claims |
 | Android/iOS/other mobile | Not configured | Outside initial scope | Separate product/platform plan |
 

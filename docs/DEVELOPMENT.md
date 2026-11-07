@@ -45,7 +45,7 @@ use `pull_request_target`, publish artifacts/packages, deploy, or auto-merge.
 | Job | Environment | Checks |
 | --- | --- | --- |
 | `Quality` | Ubuntu 24.04, pinned toolchain | rustfmt, Clippy with denied warnings, rustdoc with denied warnings |
-| `Test (OS)` | Ubuntu 24.04, Windows 2022, macOS 14; pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run |
+| `Test (OS)` | Ubuntu 24.04, Windows 2022, macOS 15; pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |
 | `Repository checks` | Ubuntu 24.04, Python 3.11+ | Local Markdown file links, whitespace, TOML/JSON parse, manifest/toolchain consistency |
 | `CI` | Aggregate gate | Fails if any prerequisite fails, is cancelled, or is unexpectedly skipped |

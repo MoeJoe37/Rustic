@@ -114,6 +114,14 @@ for contracts, evidence and the runnable `resolve` example.
 
 ## Queue status
 
+The README now includes an automatically regenerated engine progress map. Its
+18-subsystem, 142-capability catalog includes unfinished libraries, all five native
+platform acceptance targets and final release/security/conformance gates. Source
+and test references are validated; score calculations and safe Git publication
+have eight Python regression tests. See [PROGRESS.md](PROGRESS.md) for definitions
+and the automatic post-CI default-branch update path. Reporting infrastructure
+does not itself add engine completion credit.
+
 Platform scope now includes Windows, macOS, Linux, Android and iOS/iPadOS, with
 Mozilla/Firefox/Gecko and SpiderMonkey explicitly excluded as engine foundations.
 MOB-01 configures four shared-library cross-checks; see [MOBILE.md](MOBILE.md) and

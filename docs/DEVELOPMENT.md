@@ -47,10 +47,12 @@ repository-level coding and validation rules.
 ## Initial GitHub Actions
 
 [ci.yml](../.github/workflows/ci.yml) runs on pushes to any branch, pull requests,
-and manual dispatch. It uses read-only contents permission, finite job timeouts,
+and manual dispatch. Build/test jobs use read-only contents permission, finite job timeouts,
 concurrency cancellation for superseded runs, and a full-SHA-pinned checkout with
 credential persistence disabled. No repository secrets are needed. It does not
-use `pull_request_target`, publish artifacts/packages, deploy, or auto-merge.
+use `pull_request_target`, publish packages, deploy a site, or auto-merge. The
+post-CI default-branch progress publisher alone has contents/actions write access
+to refresh generated README assets and dispatch CI for its bot commit.
 
 | Job | Environment | Checks |
 | --- | --- | --- |
@@ -60,6 +62,7 @@ use `pull_request_target`, publish artifacts/packages, deploy, or auto-merge.
 | `Mobile core (target)` | Ubuntu for Android ARM64/x86-64; macOS for iOS ARM64 device/simulator | Check all workspace libraries with pinned Rust; no application linking or device execution |
 | `Repository checks` | Ubuntu 24.04, Python 3.11+ | Local Markdown file links, whitespace, TOML/JSON parse, manifest/toolchain consistency |
 | `CI` | Aggregate gate | Fails if any prerequisite fails, is cancelled, or is unexpectedly skipped |
+| `Publish progress` | Successful default-branch CI only | Regenerates README/chart; safely pushes changed outputs and dispatches bot-commit validation |
 
 Checkout is pinned to the verified v7.0.1 commit. Rust toolchains are installed
 with rustup already present on GitHub-hosted runners. No additional third-party
@@ -80,6 +83,11 @@ repository settings. Private-repository runner usage is subject to the account's
 Actions allowance. There are no scheduled heavy build/fuzz jobs in the first CI.
 
 ## Failure diagnosis
+
+The [progress reporter](PROGRESS.md) validates catalog/evidence and runs eight
+Python regression tests in the repository job. The chart is regenerated for each
+source snapshot; successful default-branch CI publishes changed output. Inspect
+the publishing job as well as the native/check gate when testing automation.
 
 The pinned URL-data subset runs offline as a normal Rust integration test. Use
 `cargo test --locked -p rustic-url --test wpt -- --nocapture` for case counts.

@@ -17,12 +17,25 @@ integration. It does not yet parse HTML, execute JavaScript, fetch web pages, or
 render content. A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
 
+<!-- rustic-progress:start -->
+
+## Engine progress
+
+[![Rustic engine subsystem progress](docs/progress/engine.svg)](docs/progress/summary.md)
+
+**Overall engine completion: 4.79%** — 12/142 capabilities complete across 18 subsystems.
+
+100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
+
+<!-- rustic-progress:end -->
+
 ## Start here
 
 | Document | Purpose |
 | --- | --- |
 | [Documentation index](docs/README.md) | Reading order and current implementation inventory |
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
+| [Progress graph methodology](docs/PROGRESS.md) | Whole-engine completion criteria, weights, evidence and automatic commit updates |
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |

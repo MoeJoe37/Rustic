@@ -1,0 +1,1176 @@
+{
+  "schema_version": 1,
+  "catalog_version": "engine-v1",
+  "source_fingerprint": "9e9ceda7fcc3e2344875d7517b54fe2dde4263cf009611326e70221b6032586d",
+  "percent": "4.79",
+  "completed": 12,
+  "total": 142,
+  "fully_complete": false,
+  "meaning": "100% requires all capabilities and final five-platform engine acceptance; this is weighted delivery progress, not web compatibility or time remaining.",
+  "groups": [
+    {
+      "id": "base",
+      "label": "Foundation",
+      "weight": 2,
+      "features": [
+        {
+          "id": "base.identity",
+          "label": "Document/node identity and stale-handle contracts",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/id.rs",
+              "marker": "pub struct NodeId"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tree.rs",
+              "marker": "stale_forged_and_foreign_handles"
+            }
+          ]
+        },
+        {
+          "id": "base.budgets",
+          "label": "Checked resource accounting",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/budget.rs",
+              "marker": "pub struct Budget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/budget.rs",
+              "marker": "overflow_and_zero_capacity_are_checked"
+            }
+          ]
+        },
+        {
+          "id": "base.cancellation",
+          "label": "Cooperative cancellation",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/cancellation.rs",
+              "marker": "pub struct CancellationToken"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/cancellation.rs",
+              "marker": "clones_share_cancellation_across_threads"
+            }
+          ]
+        },
+        {
+          "id": "base.spans",
+          "label": "Checked source byte spans",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/source.rs",
+              "marker": "pub struct SourceSpan"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/source.rs",
+              "marker": "rejects_reversed_out_of_bounds"
+            }
+          ]
+        },
+        {
+          "id": "base.clocks",
+          "label": "Injectable monotonic clocks",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/clock.rs",
+              "marker": "pub struct ManualClock"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/clock.rs",
+              "marker": "advances_deterministically"
+            }
+          ]
+        },
+        {
+          "id": "base.geometry",
+          "label": "Typed CSS/device geometry and checked surface allocation",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "base.diagnostics",
+          "label": "Structured source/revision diagnostics and redaction",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "base.lifecycle",
+          "label": "Coordinated lifecycle, shutdown and resource ownership",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 5,
+      "total": 8,
+      "percent": "62.50"
+    },
+    {
+      "id": "url",
+      "label": "URLs & encoding",
+      "weight": 4,
+      "features": [
+        {
+          "id": "url.records",
+          "label": "Declared ASCII URL/reference parsing subset",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/parser.rs",
+              "marker": "pub struct UrlParser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/wpt.rs",
+              "marker": "pinned_upstream_url_subset"
+            }
+          ]
+        },
+        {
+          "id": "url.addresses",
+          "label": "IPv4/IPv6 host parsing and canonicalization",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/ipv6.rs",
+              "marker": "pub(crate) fn parse"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/url.rs",
+              "marker": "ipv6_uses_first_longest_zero_run"
+            }
+          ]
+        },
+        {
+          "id": "url.origins",
+          "label": "Tuple and process-local opaque origin identity",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/origin.rs",
+              "marker": "pub struct Origin"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/url.rs",
+              "marker": "null_serialization_never_merges"
+            }
+          ]
+        },
+        {
+          "id": "url.idna",
+          "label": "Unicode IDNA and data adapter",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.file",
+          "label": "File URL and platform rules",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.blob",
+          "label": "Blob registry and origin rules",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.setters",
+          "label": "URL setters and URLSearchParams",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.encoding",
+          "label": "Required legacy decoders and charset selection",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.restart",
+          "label": "Encoding sniff/restart integration",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.diagnostics",
+          "label": "Validation-error diagnostics and source locations",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.policy",
+          "label": "Navigation origin inheritance and policy integration",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "url.conformance",
+          "label": "Complete declared URL/encoding conformance gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 3,
+      "total": 12,
+      "percent": "25.00"
+    },
+    {
+      "id": "dom",
+      "label": "DOM",
+      "weight": 7,
+      "features": [
+        {
+          "id": "dom.storage",
+          "label": "Bounded document-owned node storage",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/storage.rs",
+              "marker": "pub(crate) struct Arena"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/src/storage.rs",
+              "marker": "exhausted_slot_generation_is_retired"
+            }
+          ]
+        },
+        {
+          "id": "dom.mutation",
+          "label": "Checked same-document mutation and traversal",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub fn insert_before"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tree.rs",
+              "marker": "seeded_mutation_sequences_match"
+            }
+          ]
+        },
+        {
+          "id": "dom.values",
+          "label": "Namespace/attribute identity and UTF-16 values",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/string.rs",
+              "marker": "pub struct DomString"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tree.rs",
+              "marker": "attributes_preserve_expanded_name"
+            }
+          ]
+        },
+        {
+          "id": "dom.nodekinds",
+          "label": "Fragments, processing instructions and full node kinds",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "dom.adoption",
+          "label": "Adoption, cloning and document lifecycle",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "dom.events",
+          "label": "DOM event propagation and default actions",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "dom.observers",
+          "label": "Mutation records and observers",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "dom.ranges",
+          "label": "Ranges, live collections and traversal APIs",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "dom.shadow",
+          "label": "Shadow DOM and custom element lifecycle",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "dom.tracing",
+          "label": "Tracing integration and DOM conformance gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 3,
+      "total": 10,
+      "percent": "30.00"
+    },
+    {
+      "id": "html",
+      "label": "HTML",
+      "weight": 7,
+      "features": [
+        {
+          "id": "html.input",
+          "label": "Bounded incremental UTF-8 decoding and input preprocessing",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.tags",
+          "label": "Declared data/tag/attribute tokenizer subset",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.references",
+          "label": "Full named/numeric character references",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.declarations",
+          "label": "Comments, doctypes and declaration recovery",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.textmodes",
+          "label": "RCDATA, RAWTEXT, script and plaintext modes",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.tree",
+          "label": "Core insertion modes and malformed-tree recovery",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.tables",
+          "label": "Table, formatting, template and foreign content rules",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.scripts",
+          "label": "Parser/script reentry and encoding restart",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.loader",
+          "label": "Bounded local loader and dump-dom command",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "html.conformance",
+          "label": "Parser corpora, chunk invariance and fuzz gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 10,
+      "percent": "0.00"
+    },
+    {
+      "id": "css",
+      "label": "CSS & style",
+      "weight": 10,
+      "features": [
+        {
+          "id": "css.syntax",
+          "label": "CSS tokenizer/parser and recovery",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.selectors",
+          "label": "Required selectors and specificity",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.properties",
+          "label": "Typed property grammar and supported property catalog",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.cascade",
+          "label": "Complete cascade/origins/layers and inheritance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.values",
+          "label": "Computed values, variables and cycle handling",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.queries",
+          "label": "Media/container queries and style attachment",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.invalidation",
+          "label": "Correct incremental invalidation against reference path",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.conformance",
+          "label": "Declared CSS conformance and regression gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 8,
+      "percent": "0.00"
+    },
+    {
+      "id": "text",
+      "label": "Text & fonts",
+      "weight": 5,
+      "features": [
+        {
+          "id": "text.fonts",
+          "label": "Font selection/discovery and metrics",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "text.shaping",
+          "label": "Shaping, fallback and glyph clusters",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "text.bidi",
+          "label": "Bidi and mixed-direction text",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "text.breaking",
+          "label": "Line breaking and grapheme navigation",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "text.writing",
+          "label": "Writing modes, vertical text and font loading",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "text.conformance",
+          "label": "Text/font conformance and platform parity",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 6,
+      "percent": "0.00"
+    },
+    {
+      "id": "layout",
+      "label": "Layout",
+      "weight": 10,
+      "features": [
+        {
+          "id": "layout.boxes",
+          "label": "Box/fragment trees and checked geometry",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.block",
+          "label": "Block flow, margins and anonymous boxes",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.inline",
+          "label": "Inline formatting, line boxes and baselines",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.sizing",
+          "label": "Intrinsic and replaced-element sizing",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.position",
+          "label": "Floats, positioning and overflow",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.flex",
+          "label": "Flexbox",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.grid",
+          "label": "Grid",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.tables",
+          "label": "Tables",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.fragmentation",
+          "label": "Fragmentation, printing and advanced formatting",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "layout.incremental",
+          "label": "Incremental/full-layout parity and conformance",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 10,
+      "percent": "0.00"
+    },
+    {
+      "id": "paint",
+      "label": "Paint & raster",
+      "weight": 7,
+      "features": [
+        {
+          "id": "paint.display",
+          "label": "Immutable display lists and paint order",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "paint.stacking",
+          "label": "Stacking, clips and transforms",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "paint.raster",
+          "label": "Deterministic CPU reference rasterizer",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "paint.images",
+          "label": "Bounded images, color/alpha and resource lifecycle",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "paint.hit",
+          "label": "Hit testing and resize/zoom geometry",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "paint.formats",
+          "label": "SVG/MathML painting integration and Canvas 2D",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "paint.conformance",
+          "label": "Reftest output, damage and paint conformance",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 7,
+      "percent": "0.00"
+    },
+    {
+      "id": "js",
+      "label": "JavaScript & GC",
+      "weight": 15,
+      "features": [
+        {
+          "id": "js.parser",
+          "label": "Lexer/parser, ASI, early errors and UTF-16",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.values",
+          "label": "Values, coercions, references and completions",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.objects",
+          "label": "Object methods, descriptors and prototypes",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.heap",
+          "label": "Rooted traced heap and host-object cycle collection",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.interpreter",
+          "label": "Original interpreter/bytecode and control flow",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.functions",
+          "label": "Functions, closures, call/construct and exceptions",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.builtins",
+          "label": "Core built-ins and collections",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.jobs",
+          "label": "Promises, jobs and realms",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.modules",
+          "label": "Modules and host loading hooks",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.advanced",
+          "label": "BigInt, RegExp, proxies, generators and async",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.buffers",
+          "label": "Buffers, typed arrays and memory semantics",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.intl",
+          "label": "Intl and required Unicode semantics",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.wasm",
+          "label": "WebAssembly execution integration",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.limits",
+          "label": "Cancellation, stack/heap limits and GC stress",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "js.conformance",
+          "label": "Declared full Test262 and runtime correctness gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 15,
+      "percent": "0.00"
+    },
+    {
+      "id": "web",
+      "label": "Bindings & web APIs",
+      "weight": 7,
+      "features": [
+        {
+          "id": "web.idl",
+          "label": "Web IDL tooling, conversions and rooted wrappers",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.window",
+          "label": "Window/Document/Element bindings and identity",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.scheduler",
+          "label": "Tasks, microtasks and rendering opportunities",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.scripts",
+          "label": "Classic/module script lifecycle and readiness",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.input",
+          "label": "Forms, focus, editing and user input",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.observers",
+          "label": "Timers, animation frames and observer APIs",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.streams",
+          "label": "Streams, messaging and structured clone",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.conformance",
+          "label": "Exposed web API conformance and reentry gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 8,
+      "percent": "0.00"
+    },
+    {
+      "id": "network",
+      "label": "Network & navigation",
+      "weight": 5,
+      "features": [
+        {
+          "id": "network.transport",
+          "label": "Reviewed TLS/HTTP transport with cancellation",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "network.navigation",
+          "label": "Navigation/history state machine and redirects",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "network.fetch",
+          "label": "Fetch, CORS and response filtering",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "network.cookies",
+          "label": "Cookies and partitioned HTTP cache",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "network.policy",
+          "label": "CSP, MIME, secure contexts and mixed-content policy",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "network.protocols",
+          "label": "Required HTTP versions, WebSockets and referrer rules",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "network.conformance",
+          "label": "Network policy and navigation conformance gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 7,
+      "percent": "0.00"
+    },
+    {
+      "id": "storage",
+      "label": "Storage & workers",
+      "weight": 4,
+      "features": [
+        {
+          "id": "storage.profiles",
+          "label": "Ephemeral/persistent profiles and private mode",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "storage.partition",
+          "label": "Storage keys, quotas and schema recovery",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "storage.webstorage",
+          "label": "Local/session storage",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "storage.indexeddb",
+          "label": "IndexedDB transactions and crash recovery",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "storage.workers",
+          "label": "Worker agents, lifetimes and messaging",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "storage.offline",
+          "label": "Service workers and Cache API",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "storage.conformance",
+          "label": "Persistence/offline/worker isolation and conformance",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 7,
+      "percent": "0.00"
+    },
+    {
+      "id": "security",
+      "label": "Security & IPC",
+      "weight": 5,
+      "features": [
+        {
+          "id": "security.ipc",
+          "label": "Bounded versioned hostile-peer-safe IPC",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.authority",
+          "label": "Browser-assigned authority and capability brokering",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.isolation",
+          "label": "Site/agent/process assignment and origin separation",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.desktop",
+          "label": "Verified Windows/macOS/Linux sandboxing",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.mobile",
+          "label": "Verified Android/iOS process and broker restrictions",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.permissions",
+          "label": "Trusted permissions, activation, files and downloads",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.recovery",
+          "label": "Renderer/service crash recovery without stale authority",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "security.audit",
+          "label": "Fuzz/native-memory review and security release gate",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 8,
+      "percent": "0.00"
+    },
+    {
+      "id": "compositor",
+      "label": "Compositor & GPU",
+      "weight": 3,
+      "features": [
+        {
+          "id": "compositor.scene",
+          "label": "Incremental scene submission and scrolling",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "compositor.backend",
+          "label": "Mobile/desktop GPU adapters and CPU fallback",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "compositor.recovery",
+          "label": "Surface/device loss and resource recovery",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "compositor.parity",
+          "label": "GPU/reference parity, performance and energy gates",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 4,
+      "percent": "0.00"
+    },
+    {
+      "id": "platform",
+      "label": "Platform hosts",
+      "weight": 4,
+      "features": [
+        {
+          "id": "platform.crosschecks",
+          "label": "Android/iOS shared-core cross-compilation",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": ".github/workflows/ci.yml",
+              "marker": "target: aarch64-apple-ios-sim"
+            },
+            {
+              "kind": "test",
+              "path": ".github/workflows/ci.yml",
+              "marker": "cargo check --locked --workspace --lib --target"
+            }
+          ]
+        },
+        {
+          "id": "platform.linux",
+          "label": "Linux runtime and native host acceptance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.windows",
+          "label": "Windows runtime and native host acceptance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.macos",
+          "label": "macOS runtime and native host acceptance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.android",
+          "label": "Android runtime and native host acceptance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.ios",
+          "label": "iOS/iPadOS runtime and native host acceptance",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.lifecycle",
+          "label": "Surface, touch/IME and background lifecycle parity",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.native",
+          "label": "Native font/codec/OS service adapters",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "platform.device",
+          "label": "Linked artifacts, device/simulator suites and OS policy",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 1,
+      "total": 9,
+      "percent": "11.11"
+    },
+    {
+      "id": "a11y",
+      "label": "Accessibility",
+      "weight": 2,
+      "features": [
+        {
+          "id": "a11y.semantics",
+          "label": "Semantic roles, names and state tree",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "a11y.bridges",
+          "label": "Desktop and mobile accessibility bridges",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "a11y.editing",
+          "label": "Keyboard/IME, focus and assistive editing flows",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "a11y.acceptance",
+          "label": "Assistive-technology and accessibility acceptance",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 4,
+      "percent": "0.00"
+    },
+    {
+      "id": "devtools",
+      "label": "DevTools",
+      "weight": 1,
+      "features": [
+        {
+          "id": "devtools.inspection",
+          "label": "DOM/style/layout inspection and console",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devtools.debugger",
+          "label": "Source debugging, breakpoints and network diagnostics",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devtools.automation",
+          "label": "Secure headless automation and profiling protocol",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devtools.acceptance",
+          "label": "Debugger privacy, authority and diagnostic acceptance",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 4,
+      "percent": "0.00"
+    },
+    {
+      "id": "release",
+      "label": "Embedding & release",
+      "weight": 2,
+      "features": [
+        {
+          "id": "release.embedding",
+          "label": "Versioned ownership/thread/cancellation embedding contract",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.compatibility",
+          "label": "Representative sites and complete declared conformance gates",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.performance",
+          "label": "Measured time, memory, reliability and energy budgets",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.artifacts",
+          "label": "Reproducible signed desktop/mobile artifacts and updates",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.complete",
+          "label": "Final full-engine acceptance across all five target platforms",
+          "status": "planned",
+          "evidence": []
+        }
+      ],
+      "completed": 0,
+      "total": 5,
+      "percent": "0.00"
+    }
+  ]
+}

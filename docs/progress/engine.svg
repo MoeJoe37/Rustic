@@ -1,0 +1,270 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="720" viewBox="0 0 1000 720" role="img" aria-labelledby="title desc">
+<title id="title">Rustic engine completion: 4.79%</title>
+<desc id="desc">Green cells are completed, evidence-backed capabilities; amber is work in progress and gray is planned. Overall completion weights every engine subsystem, including final five-platform release gates.</desc>
+<rect width="1000" height="720" rx="12" fill="#0d1117"/>
+<g font-family="DejaVu Sans,Arial,sans-serif">
+<text x="24" y="36" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine subsystem progress</text>
+<text x="976" y="39" fill="#3fb950" font-size="28" font-weight="700" text-anchor="end">4.79%</text>
+<rect x="24" y="56" width="952" height="10" rx="5" fill="#30363d"/>
+<rect x="24" y="56" width="45.60" height="10" rx="5" fill="#3fb950"/>
+<text x="24" y="91" fill="#8b949e" font-size="12">12/142 capabilities complete · 18 subsystems · engine-v1</text>
+<g><title>Foundation: 5/8 capabilities, 2% of engine scope</title>
+<rect x="24" y="110" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="36" y="132" fill="#f0f6fc" font-size="13" font-weight="600">Foundation</text>
+<text x="320" y="132" fill="#8b949e" text-anchor="end" font-size="12">62.50%</text>
+<rect x="36.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Document/node identity and stale-handle contracts: complete</title></rect>
+<rect x="53.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Checked resource accounting: complete</title></rect>
+<rect x="70.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Cooperative cancellation: complete</title></rect>
+<rect x="87.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Checked source byte spans: complete</title></rect>
+<rect x="104.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Injectable monotonic clocks: complete</title></rect>
+<rect x="121.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Typed CSS/device geometry and checked surface allocation: planned</title></rect>
+<rect x="138.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Structured source/revision diagnostics and redaction: planned</title></rect>
+<rect x="155.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Coordinated lifecycle, shutdown and resource ownership: planned</title></rect>
+<text x="36" y="172" fill="#8b949e" font-size="10">5/8 complete · scope weight 2%</text>
+</g>
+<g><title>URLs &amp; encoding: 3/12 capabilities, 4% of engine scope</title>
+<rect x="346" y="110" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="358" y="132" fill="#f0f6fc" font-size="13" font-weight="600">URLs &amp; encoding</text>
+<text x="642" y="132" fill="#8b949e" text-anchor="end" font-size="12">25.00%</text>
+<rect x="358.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Declared ASCII URL/reference parsing subset: complete</title></rect>
+<rect x="375.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>IPv4/IPv6 host parsing and canonicalization: complete</title></rect>
+<rect x="392.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Tuple and process-local opaque origin identity: complete</title></rect>
+<rect x="409.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Unicode IDNA and data adapter: planned</title></rect>
+<rect x="426.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>File URL and platform rules: planned</title></rect>
+<rect x="443.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Blob registry and origin rules: planned</title></rect>
+<rect x="460.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>URL setters and URLSearchParams: planned</title></rect>
+<rect x="477.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Required legacy decoders and charset selection: planned</title></rect>
+<rect x="494.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Encoding sniff/restart integration: planned</title></rect>
+<rect x="511.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Validation-error diagnostics and source locations: planned</title></rect>
+<rect x="528.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Navigation origin inheritance and policy integration: planned</title></rect>
+<rect x="545.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Complete declared URL/encoding conformance gate: planned</title></rect>
+<text x="358" y="172" fill="#8b949e" font-size="10">3/12 complete · scope weight 4%</text>
+</g>
+<g><title>DOM: 3/10 capabilities, 7% of engine scope</title>
+<rect x="668" y="110" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="680" y="132" fill="#f0f6fc" font-size="13" font-weight="600">DOM</text>
+<text x="964" y="132" fill="#8b949e" text-anchor="end" font-size="12">30.00%</text>
+<rect x="680.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Bounded document-owned node storage: complete</title></rect>
+<rect x="697.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Checked same-document mutation and traversal: complete</title></rect>
+<rect x="714.00" y="144" width="14.00" height="12" rx="2" fill="#3fb950"><title>Namespace/attribute identity and UTF-16 values: complete</title></rect>
+<rect x="731.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Fragments, processing instructions and full node kinds: planned</title></rect>
+<rect x="748.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Adoption, cloning and document lifecycle: planned</title></rect>
+<rect x="765.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>DOM event propagation and default actions: planned</title></rect>
+<rect x="782.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Mutation records and observers: planned</title></rect>
+<rect x="799.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Ranges, live collections and traversal APIs: planned</title></rect>
+<rect x="816.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Shadow DOM and custom element lifecycle: planned</title></rect>
+<rect x="833.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Tracing integration and DOM conformance gate: planned</title></rect>
+<text x="680" y="172" fill="#8b949e" font-size="10">3/10 complete · scope weight 7%</text>
+</g>
+<g><title>HTML: 0/10 capabilities, 7% of engine scope</title>
+<rect x="24" y="194" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="36" y="216" fill="#f0f6fc" font-size="13" font-weight="600">HTML</text>
+<text x="320" y="216" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="36.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Bounded incremental UTF-8 decoding and input preprocessing: planned</title></rect>
+<rect x="53.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Declared data/tag/attribute tokenizer subset: planned</title></rect>
+<rect x="70.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Full named/numeric character references: planned</title></rect>
+<rect x="87.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Comments, doctypes and declaration recovery: planned</title></rect>
+<rect x="104.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>RCDATA, RAWTEXT, script and plaintext modes: planned</title></rect>
+<rect x="121.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Core insertion modes and malformed-tree recovery: planned</title></rect>
+<rect x="138.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Table, formatting, template and foreign content rules: planned</title></rect>
+<rect x="155.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Parser/script reentry and encoding restart: planned</title></rect>
+<rect x="172.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Bounded local loader and dump-dom command: planned</title></rect>
+<rect x="189.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Parser corpora, chunk invariance and fuzz gate: planned</title></rect>
+<text x="36" y="256" fill="#8b949e" font-size="10">0/10 complete · scope weight 7%</text>
+</g>
+<g><title>CSS &amp; style: 0/8 capabilities, 10% of engine scope</title>
+<rect x="346" y="194" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="358" y="216" fill="#f0f6fc" font-size="13" font-weight="600">CSS &amp; style</text>
+<text x="642" y="216" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="358.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>CSS tokenizer/parser and recovery: planned</title></rect>
+<rect x="375.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Required selectors and specificity: planned</title></rect>
+<rect x="392.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Typed property grammar and supported property catalog: planned</title></rect>
+<rect x="409.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Complete cascade/origins/layers and inheritance: planned</title></rect>
+<rect x="426.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Computed values, variables and cycle handling: planned</title></rect>
+<rect x="443.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Media/container queries and style attachment: planned</title></rect>
+<rect x="460.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Correct incremental invalidation against reference path: planned</title></rect>
+<rect x="477.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Declared CSS conformance and regression gate: planned</title></rect>
+<text x="358" y="256" fill="#8b949e" font-size="10">0/8 complete · scope weight 10%</text>
+</g>
+<g><title>Text &amp; fonts: 0/6 capabilities, 5% of engine scope</title>
+<rect x="668" y="194" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="680" y="216" fill="#f0f6fc" font-size="13" font-weight="600">Text &amp; fonts</text>
+<text x="964" y="216" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="680.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Font selection/discovery and metrics: planned</title></rect>
+<rect x="697.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Shaping, fallback and glyph clusters: planned</title></rect>
+<rect x="714.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Bidi and mixed-direction text: planned</title></rect>
+<rect x="731.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Line breaking and grapheme navigation: planned</title></rect>
+<rect x="748.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Writing modes, vertical text and font loading: planned</title></rect>
+<rect x="765.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Text/font conformance and platform parity: planned</title></rect>
+<text x="680" y="256" fill="#8b949e" font-size="10">0/6 complete · scope weight 5%</text>
+</g>
+<g><title>Layout: 0/10 capabilities, 10% of engine scope</title>
+<rect x="24" y="278" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="36" y="300" fill="#f0f6fc" font-size="13" font-weight="600">Layout</text>
+<text x="320" y="300" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="36.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Box/fragment trees and checked geometry: planned</title></rect>
+<rect x="53.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Block flow, margins and anonymous boxes: planned</title></rect>
+<rect x="70.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Inline formatting, line boxes and baselines: planned</title></rect>
+<rect x="87.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Intrinsic and replaced-element sizing: planned</title></rect>
+<rect x="104.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Floats, positioning and overflow: planned</title></rect>
+<rect x="121.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Flexbox: planned</title></rect>
+<rect x="138.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Grid: planned</title></rect>
+<rect x="155.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Tables: planned</title></rect>
+<rect x="172.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Fragmentation, printing and advanced formatting: planned</title></rect>
+<rect x="189.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Incremental/full-layout parity and conformance: planned</title></rect>
+<text x="36" y="340" fill="#8b949e" font-size="10">0/10 complete · scope weight 10%</text>
+</g>
+<g><title>Paint &amp; raster: 0/7 capabilities, 7% of engine scope</title>
+<rect x="346" y="278" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="358" y="300" fill="#f0f6fc" font-size="13" font-weight="600">Paint &amp; raster</text>
+<text x="642" y="300" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="358.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Immutable display lists and paint order: planned</title></rect>
+<rect x="375.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Stacking, clips and transforms: planned</title></rect>
+<rect x="392.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Deterministic CPU reference rasterizer: planned</title></rect>
+<rect x="409.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Bounded images, color/alpha and resource lifecycle: planned</title></rect>
+<rect x="426.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Hit testing and resize/zoom geometry: planned</title></rect>
+<rect x="443.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>SVG/MathML painting integration and Canvas 2D: planned</title></rect>
+<rect x="460.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Reftest output, damage and paint conformance: planned</title></rect>
+<text x="358" y="340" fill="#8b949e" font-size="10">0/7 complete · scope weight 7%</text>
+</g>
+<g><title>JavaScript &amp; GC: 0/15 capabilities, 15% of engine scope</title>
+<rect x="668" y="278" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="680" y="300" fill="#f0f6fc" font-size="13" font-weight="600">JavaScript &amp; GC</text>
+<text x="964" y="300" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="680.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Lexer/parser, ASI, early errors and UTF-16: planned</title></rect>
+<rect x="697.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Values, coercions, references and completions: planned</title></rect>
+<rect x="714.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Object methods, descriptors and prototypes: planned</title></rect>
+<rect x="731.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Rooted traced heap and host-object cycle collection: planned</title></rect>
+<rect x="748.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Original interpreter/bytecode and control flow: planned</title></rect>
+<rect x="765.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Functions, closures, call/construct and exceptions: planned</title></rect>
+<rect x="782.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Core built-ins and collections: planned</title></rect>
+<rect x="799.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Promises, jobs and realms: planned</title></rect>
+<rect x="816.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Modules and host loading hooks: planned</title></rect>
+<rect x="833.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>BigInt, RegExp, proxies, generators and async: planned</title></rect>
+<rect x="850.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Buffers, typed arrays and memory semantics: planned</title></rect>
+<rect x="867.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Intl and required Unicode semantics: planned</title></rect>
+<rect x="884.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>WebAssembly execution integration: planned</title></rect>
+<rect x="901.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Cancellation, stack/heap limits and GC stress: planned</title></rect>
+<rect x="918.00" y="312" width="14.00" height="12" rx="2" fill="#30363d"><title>Declared full Test262 and runtime correctness gate: planned</title></rect>
+<text x="680" y="340" fill="#8b949e" font-size="10">0/15 complete · scope weight 15%</text>
+</g>
+<g><title>Bindings &amp; web APIs: 0/8 capabilities, 7% of engine scope</title>
+<rect x="24" y="362" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="36" y="384" fill="#f0f6fc" font-size="13" font-weight="600">Bindings &amp; web APIs</text>
+<text x="320" y="384" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="36.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Web IDL tooling, conversions and rooted wrappers: planned</title></rect>
+<rect x="53.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Window/Document/Element bindings and identity: planned</title></rect>
+<rect x="70.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Tasks, microtasks and rendering opportunities: planned</title></rect>
+<rect x="87.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Classic/module script lifecycle and readiness: planned</title></rect>
+<rect x="104.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Forms, focus, editing and user input: planned</title></rect>
+<rect x="121.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Timers, animation frames and observer APIs: planned</title></rect>
+<rect x="138.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Streams, messaging and structured clone: planned</title></rect>
+<rect x="155.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Exposed web API conformance and reentry gate: planned</title></rect>
+<text x="36" y="424" fill="#8b949e" font-size="10">0/8 complete · scope weight 7%</text>
+</g>
+<g><title>Network &amp; navigation: 0/7 capabilities, 5% of engine scope</title>
+<rect x="346" y="362" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="358" y="384" fill="#f0f6fc" font-size="13" font-weight="600">Network &amp; navigation</text>
+<text x="642" y="384" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="358.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Reviewed TLS/HTTP transport with cancellation: planned</title></rect>
+<rect x="375.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Navigation/history state machine and redirects: planned</title></rect>
+<rect x="392.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Fetch, CORS and response filtering: planned</title></rect>
+<rect x="409.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Cookies and partitioned HTTP cache: planned</title></rect>
+<rect x="426.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>CSP, MIME, secure contexts and mixed-content policy: planned</title></rect>
+<rect x="443.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Required HTTP versions, WebSockets and referrer rules: planned</title></rect>
+<rect x="460.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Network policy and navigation conformance gate: planned</title></rect>
+<text x="358" y="424" fill="#8b949e" font-size="10">0/7 complete · scope weight 5%</text>
+</g>
+<g><title>Storage &amp; workers: 0/7 capabilities, 4% of engine scope</title>
+<rect x="668" y="362" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="680" y="384" fill="#f0f6fc" font-size="13" font-weight="600">Storage &amp; workers</text>
+<text x="964" y="384" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="680.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Ephemeral/persistent profiles and private mode: planned</title></rect>
+<rect x="697.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Storage keys, quotas and schema recovery: planned</title></rect>
+<rect x="714.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Local/session storage: planned</title></rect>
+<rect x="731.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>IndexedDB transactions and crash recovery: planned</title></rect>
+<rect x="748.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Worker agents, lifetimes and messaging: planned</title></rect>
+<rect x="765.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Service workers and Cache API: planned</title></rect>
+<rect x="782.00" y="396" width="14.00" height="12" rx="2" fill="#30363d"><title>Persistence/offline/worker isolation and conformance: planned</title></rect>
+<text x="680" y="424" fill="#8b949e" font-size="10">0/7 complete · scope weight 4%</text>
+</g>
+<g><title>Security &amp; IPC: 0/8 capabilities, 5% of engine scope</title>
+<rect x="24" y="446" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="36" y="468" fill="#f0f6fc" font-size="13" font-weight="600">Security &amp; IPC</text>
+<text x="320" y="468" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="36.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Bounded versioned hostile-peer-safe IPC: planned</title></rect>
+<rect x="53.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Browser-assigned authority and capability brokering: planned</title></rect>
+<rect x="70.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Site/agent/process assignment and origin separation: planned</title></rect>
+<rect x="87.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Verified Windows/macOS/Linux sandboxing: planned</title></rect>
+<rect x="104.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Verified Android/iOS process and broker restrictions: planned</title></rect>
+<rect x="121.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Trusted permissions, activation, files and downloads: planned</title></rect>
+<rect x="138.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Renderer/service crash recovery without stale authority: planned</title></rect>
+<rect x="155.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Fuzz/native-memory review and security release gate: planned</title></rect>
+<text x="36" y="508" fill="#8b949e" font-size="10">0/8 complete · scope weight 5%</text>
+</g>
+<g><title>Compositor &amp; GPU: 0/4 capabilities, 3% of engine scope</title>
+<rect x="346" y="446" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="358" y="468" fill="#f0f6fc" font-size="13" font-weight="600">Compositor &amp; GPU</text>
+<text x="642" y="468" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="358.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Incremental scene submission and scrolling: planned</title></rect>
+<rect x="375.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Mobile/desktop GPU adapters and CPU fallback: planned</title></rect>
+<rect x="392.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Surface/device loss and resource recovery: planned</title></rect>
+<rect x="409.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>GPU/reference parity, performance and energy gates: planned</title></rect>
+<text x="358" y="508" fill="#8b949e" font-size="10">0/4 complete · scope weight 3%</text>
+</g>
+<g><title>Platform hosts: 1/9 capabilities, 4% of engine scope</title>
+<rect x="668" y="446" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="680" y="468" fill="#f0f6fc" font-size="13" font-weight="600">Platform hosts</text>
+<text x="964" y="468" fill="#8b949e" text-anchor="end" font-size="12">11.11%</text>
+<rect x="680.00" y="480" width="14.00" height="12" rx="2" fill="#3fb950"><title>Android/iOS shared-core cross-compilation: complete</title></rect>
+<rect x="697.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Linux runtime and native host acceptance: planned</title></rect>
+<rect x="714.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Windows runtime and native host acceptance: planned</title></rect>
+<rect x="731.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>macOS runtime and native host acceptance: planned</title></rect>
+<rect x="748.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Android runtime and native host acceptance: planned</title></rect>
+<rect x="765.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>iOS/iPadOS runtime and native host acceptance: planned</title></rect>
+<rect x="782.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Surface, touch/IME and background lifecycle parity: planned</title></rect>
+<rect x="799.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Native font/codec/OS service adapters: planned</title></rect>
+<rect x="816.00" y="480" width="14.00" height="12" rx="2" fill="#30363d"><title>Linked artifacts, device/simulator suites and OS policy: planned</title></rect>
+<text x="680" y="508" fill="#8b949e" font-size="10">1/9 complete · scope weight 4%</text>
+</g>
+<g><title>Accessibility: 0/4 capabilities, 2% of engine scope</title>
+<rect x="24" y="530" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="36" y="552" fill="#f0f6fc" font-size="13" font-weight="600">Accessibility</text>
+<text x="320" y="552" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="36.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Semantic roles, names and state tree: planned</title></rect>
+<rect x="53.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Desktop and mobile accessibility bridges: planned</title></rect>
+<rect x="70.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Keyboard/IME, focus and assistive editing flows: planned</title></rect>
+<rect x="87.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Assistive-technology and accessibility acceptance: planned</title></rect>
+<text x="36" y="592" fill="#8b949e" font-size="10">0/4 complete · scope weight 2%</text>
+</g>
+<g><title>DevTools: 0/4 capabilities, 1% of engine scope</title>
+<rect x="346" y="530" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="358" y="552" fill="#f0f6fc" font-size="13" font-weight="600">DevTools</text>
+<text x="642" y="552" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="358.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>DOM/style/layout inspection and console: planned</title></rect>
+<rect x="375.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Source debugging, breakpoints and network diagnostics: planned</title></rect>
+<rect x="392.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Secure headless automation and profiling protocol: planned</title></rect>
+<rect x="409.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Debugger privacy, authority and diagnostic acceptance: planned</title></rect>
+<text x="358" y="592" fill="#8b949e" font-size="10">0/4 complete · scope weight 1%</text>
+</g>
+<g><title>Embedding &amp; release: 0/5 capabilities, 2% of engine scope</title>
+<rect x="668" y="530" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
+<text x="680" y="552" fill="#f0f6fc" font-size="13" font-weight="600">Embedding &amp; release</text>
+<text x="964" y="552" fill="#8b949e" text-anchor="end" font-size="12">0.00%</text>
+<rect x="680.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Versioned ownership/thread/cancellation embedding contract: planned</title></rect>
+<rect x="697.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Representative sites and complete declared conformance gates: planned</title></rect>
+<rect x="714.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Measured time, memory, reliability and energy budgets: planned</title></rect>
+<rect x="731.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Reproducible signed desktop/mobile artifacts and updates: planned</title></rect>
+<rect x="748.00" y="564" width="14.00" height="12" rx="2" fill="#30363d"><title>Final full-engine acceptance across all five target platforms: planned</title></rect>
+<text x="680" y="592" fill="#8b949e" font-size="10">0/5 complete · scope weight 2%</text>
+</g>
+<rect x="24" y="632" width="12" height="12" rx="2" fill="#3fb950"/>
+<text x="44" y="643" fill="#c9d1d9" font-size="12">Complete + evidence</text>
+<rect x="220" y="632" width="12" height="12" rx="2" fill="#d29922"/>
+<text x="240" y="643" fill="#c9d1d9" font-size="12">In progress</text>
+<rect x="370" y="632" width="12" height="12" rx="2" fill="#30363d"/>
+<text x="390" y="643" fill="#c9d1d9" font-size="12">Planned</text>
+<text x="24" y="672" fill="#c9d1d9" font-size="12">100% requires every capability and final engine acceptance on Windows, macOS, Linux, Android and iOS.</text>
+<text x="24" y="696" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 9e9ceda7fcc3</text>
+</g>
+</svg>

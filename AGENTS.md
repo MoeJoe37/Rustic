@@ -31,6 +31,7 @@ existing JS runtime, including in mobile hosts.
 - Keep deterministic reference paths and fixtures for future optimized behavior. Expected-failure or golden-output updates require an explanation.
 - Update the implementation ledger and affected architecture/feature docs in the same change. Record specification sections/revisions without claiming unrun conformance suites passed.
 - Introduce an ADR for changed ownership/GC, authority/process boundaries, public API guarantees, major dependencies or engine scope.
+- Maintain `progress/catalog.json` when a declared capability is actually completed, with source/test evidence. Read `docs/PROGRESS.md`; do not infer completion from placeholders, function counts or crate existence, or shrink the full-engine denominator to raise the score.
 
 ## Before committing a finished unit
 
@@ -43,6 +44,7 @@ cargo test --locked --workspace --all-targets
 cargo test --locked --workspace --doc
 RUSTDOCFLAGS=-Dwarnings cargo doc --locked --workspace --no-deps
 python3 tools/check_repository.py
+python3 -m unittest discover -s tools/tests -p 'test_*.py'
 ```
 
 Use the platform's Python 3.11+ command if it is named `python`. Run affected
@@ -52,3 +54,7 @@ Commit coherent finished units with their tests and docs; push when the user has
 authorized it. Preserve existing history and unrelated work. Do not claim that
 code will never need refactoring; keep contracts clear and change them with
 evidence when requirements become concrete.
+
+Use `python3 tools/progress.py --write` to include current README assets locally;
+successful default-branch CI also refreshes and pushes those generated files.
+Verify the publishing job and follow-up CI whenever exercising automatic refresh.

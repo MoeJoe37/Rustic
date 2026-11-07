@@ -16,6 +16,8 @@ boundary. Status changes require test evidence rather than a checkbox alone.
 7. [Decision records](adr/README.md): why key choices were made.
 
 See [implementation progress](IMPLEMENTATION.md) for completed tasks and their contracts.
+The [README graph](PROGRESS.md) measures whole-engine delivery using a weighted
+capability catalog, with source/test evidence and automatic default-branch updates.
 
 ## Implementation inventory
 
@@ -34,6 +36,7 @@ See [implementation progress](IMPLEMENTATION.md) for completed tasks and their c
 | HTML parsing, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | Pinned WPT URL data subset | Implemented offline runner | 685 selected URL records; no full browser harness |
+| Whole-engine progress graph | Implemented and automated | 18 subsystems, 142 capability gates; [methodology](PROGRESS.md) |
 | Browser WPT harness, Test262, fuzzing, benchmarks, releases | Planned | Milestone-specific gates; no broad results claimed |
 
 There are no external Rust dependencies yet. URL subset evidence is recorded in

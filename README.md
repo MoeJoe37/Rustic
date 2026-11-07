@@ -46,7 +46,8 @@ the 2024 edition. `rustic info`, `--help`, and `--version` are the only commands
 Other arguments, including URLs, return an error instead of implying navigation.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
-and clocks), `rustic-engine` (bounded viewport configuration), and `rustic-cli`
+and clocks), `rustic-dom` (bounded node storage and checked tree mutation),
+`rustic-engine` (bounded viewport configuration), and `rustic-cli`
 (development entry point). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.
 

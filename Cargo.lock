@@ -14,5 +14,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-dom"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+]
+
+[[package]]
 name = "rustic-engine"
 version = "0.1.0"

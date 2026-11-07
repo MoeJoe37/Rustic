@@ -28,6 +28,43 @@ free resources. Cancellation is checked cooperatively; it does not preempt block
 code. Source spans refer to the caller's matching buffer; they are byte offsets,
 not JS UTF-16 indices or persistent source-revision handles.
 
-Next: DOC-03 and the first DOC-04 slice implement bounded node storage, checked
-tree mutation and deterministic inspection. URL parsing, HTML parsing, browser
-bindings, tracing GC and page execution remain unimplemented.
+## DOC-03 and DOC-04a — Document-owned tree core
+
+Implemented in `rustic-dom`, depending only on `rustic-base`:
+
+- Protected document root, elements, text, comments and document type nodes.
+- Parsed namespace/prefix/local-name storage; stable ordered attributes keyed by namespace/local name.
+- UTF-16 text and values, including unpaired surrogates, with no implicit lossy conversion.
+- Read-only node inspection; only the owning document edits links and payload accounting.
+- Same-document insert-before, append, reorder and detach; validation precedes unlinking.
+- Document root/doctype ordering, cycle prevention, child-kind rules and subtree depth checks.
+- Per-document live-node and retained-string budgets, including detached nodes.
+- Explicit iterative subtree destruction; slots reuse new generations and retire at generation exhaustion.
+- Stack-free preorder traversal, restricted to the selected attached or detached subtree.
+
+Validation covers invalid/foreign/stale handles, generation exhaustion, root
+protection, no-op/self moves, invalid references, failure atomicity, exact budgets,
+namespace attribute replacement, and a 1,500-edge tree. A seeded 1,500-operation
+mutation test compares every parent/child/sibling link with an independent model
+using ordered vectors instead of the implementation's sibling links.
+
+The internal model follows the supported node hierarchy and tree concepts from
+the [DOM Standard](https://dom.spec.whatwg.org/#concept-node-tree) and
+[mutation algorithms](https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity),
+reviewed 2026-11-07 against the living document last updated 2026-11-04. This is
+not a conformance claim: public DOM APIs, fragments, processing instructions,
+shadow trees, cross-document adoption, cloning, mutation records/observers and
+script bindings remain unimplemented. Internal parsed names do not perform the
+validation or case normalization required by future public `createElement*` APIs.
+
+Detachment retains node identity and data. Explicit destruction is a separate
+engine operation that invalidates all handles in that subtree; it is not the
+semantics of JS-visible DOM removal and will not replace future tracing GC.
+String budgets account for UTF-8 names and UTF-16 payload length, not allocator
+capacity/overhead, caller buffers, or total process memory. `Box<Node>` keeps live
+node allocations stable even when the slot table grows. Resource limits are
+checked before logical mutation; process-wide allocation failure is not a
+recoverable guarantee.
+
+Next: add a bounded deterministic inspection dump and executable tree example,
+then URL/origin records and incremental HTML tokenization. M1 remains in progress.

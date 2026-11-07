@@ -3,7 +3,8 @@
 ## Current and planned coverage
 
 The current suite has viewport boundary/error tests, CLI subprocess tests, a
-rustdoc example, shared primitive boundary/concurrency tests, repository
+rustdoc example, shared primitive boundary/concurrency tests, DOM hierarchy and
+payload tests, seeded mutations against an independent ordered-tree model, repository
 consistency checks, and compiler/linter checks. Browser conformance,
 rendering, fuzzing, GC stress, integration servers, and benchmarks are planned;
 they do not run in the initial CI. Add each harness with the subsystem it tests.

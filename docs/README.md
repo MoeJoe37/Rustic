@@ -25,9 +25,10 @@ See [implementation progress](IMPLEMENTATION.md) for completed tasks and their c
 | Viewport dimensions and pixel budget | Implemented | `rustic-engine` validation and boundary tests |
 | CLI information/help/version and rejection of unsupported commands | Implemented | `rustic-cli` and subprocess tests |
 | Document/node identity, budgets, cancellation, byte spans and clocks | Implemented | `rustic-base` and boundary/concurrency tests; DOC-01 |
+| Bounded DOM node storage, names/attributes, UTF-16 data, checked moves and destruction | Implemented internal subset | `rustic-dom`; DOC-03 and first DOC-04 slice |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
-| HTML, DOM, CSS, layout, painting, JavaScript | Planned | M1–M5 |
+| HTML parsing, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | WPT, Test262, fuzzing, benchmark runners, release automation | Planned | Milestone-specific gates; no results claimed |
 

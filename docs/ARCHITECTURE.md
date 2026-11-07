@@ -20,8 +20,9 @@ arbitrary remote content. Rust memory safety alone cannot enforce browser policy
 
 ## 2. Component map
 
-Only `rustic-engine` and `rustic-cli` exist at M0. The following is the target
-workspace decomposition, not a requirement to create empty crates today.
+`rustic-base`, `rustic-dom`, `rustic-engine` and `rustic-cli` now exist; see
+[implementation progress](IMPLEMENTATION.md) for their actual scope. The following
+is the target decomposition, not a requirement to create empty crates today.
 
 | Proposed crate | Responsibilities | Primary dependencies | First milestone |
 | --- | --- | --- | --- |

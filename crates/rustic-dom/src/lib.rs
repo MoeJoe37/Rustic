@@ -18,6 +18,7 @@
 #![warn(missing_docs)]
 
 mod document;
+mod dump;
 mod error;
 mod name;
 mod node;
@@ -26,6 +27,7 @@ mod string;
 mod traversal;
 
 pub use document::{Document, DocumentLimits};
+pub use dump::DumpError;
 pub use error::DomError;
 pub use name::{HTML_NAMESPACE, MATHML_NAMESPACE, QualifiedName, SVG_NAMESPACE};
 pub use node::{Attribute, DocumentType, Element, Node, NodeKind};

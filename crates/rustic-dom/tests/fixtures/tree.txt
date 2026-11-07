@@ -1,0 +1,7 @@
+#document
+  doctype name="html" public="" system=""
+  element namespace="http://www.w3.org/1999/xhtml" prefix=null local="html"
+    element namespace="http://www.w3.org/1999/xhtml" prefix=null local="body"
+      attribute namespace=null prefix=null local="id" value="example"
+      text "Hello, Rustic"
+      comment "inspect me"

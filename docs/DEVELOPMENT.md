@@ -10,6 +10,7 @@ local toolchain definition. All packages are private/unpublished.
 
 ```sh
 cargo run --locked -p rustic-cli -- info
+cargo run --locked -p rustic-dom --example tree
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace --all-targets
@@ -33,6 +34,14 @@ The first `Cargo.lock` is a dependency-free workspace lockfile. Keep it committe
 and use `--locked` so implicit resolution changes fail visibly. Do not publish the
 scaffold or claim rendering support. The initial CLI deliberately accepts only
 `info`, `--help`, and `--version`.
+
+The DOM `tree` example constructs nodes through the storage API, then emits an
+inspection dump. It is a runnable check of document ownership and traversal, not
+an HTML parser or the future `dump-dom` command. The dump is capped at 64 KiB,
+contains no allocation IDs, preserves attribute insertion order, and quotes
+names/UTF-16 values including lone surrogates. Its diagnostic format is not HTML
+serialization or a stable external protocol. See [AGENTS.md](../AGENTS.md) for
+repository-level coding and validation rules.
 
 ## Initial GitHub Actions
 

@@ -66,5 +66,42 @@ node allocations stable even when the slot table grows. Resource limits are
 checked before logical mutation; process-wide allocation failure is not a
 recoverable guarantee.
 
-Next: add a bounded deterministic inspection dump and executable tree example,
-then URL/origin records and incremental HTML tokenization. M1 remains in progress.
+## DOC-04a — Deterministic inspection
+
+`Document::dump_tree` now emits a preorder diagnostic dump of one valid subtree,
+with a caller-provided output byte cap. It omits IDs and allocation history,
+preserves attribute order, quotes names and values, and escapes unpaired UTF-16
+surrogates, control characters and line separators. A failed dump returns no
+partial string. The format is a development diagnostic, not HTML serialization
+or a stable embedding protocol.
+
+Golden output tests compare independently constructed documents with different
+allocation histories. Other tests cover exact output limits, Unicode escaping,
+invalid roots, sibling/detached-node exclusion and escaped names.
+
+Run a real constructed-tree demonstration:
+
+```sh
+cargo run --locked -p rustic-dom --example tree
+```
+
+The example creates a doctype, HTML/body nodes, an attribute, mixed Arabic/Latin
+text and an SVG-namespaced node. There is no parser involved, and no `dump-dom`
+HTML command is advertised yet.
+
+## Queue status
+
+| First implementation queue item | Status |
+| --- | --- |
+| DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |
+| DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; parser checkpoint integration waits for its implementation |
+| DOC-03: minimal document arena and node kinds | Complete internal subset described above |
+| DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
+| DOC-02a: URL records and tuple/opaque origins | Next |
+| DOC-05a/b and DOC-06a/b: tokenizer and tree builder | Not started |
+| DOC-07/08: bounded HTML loader/CLI and parser corpus/fuzzing | Not started |
+| DOC-09: traced node/JS ownership prototype | Not started |
+
+M1 remains in progress. Cross-document adoption, cloning and mutation records
+are still needed for the broader DOC-04 task. All project crates remain safe
+Rust, unpublished, and free of third-party Rust dependencies.

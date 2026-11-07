@@ -26,6 +26,7 @@ See [implementation progress](IMPLEMENTATION.md) for completed tasks and their c
 | CLI information/help/version and rejection of unsupported commands | Implemented | `rustic-cli` and subprocess tests |
 | Document/node identity, budgets, cancellation, byte spans and clocks | Implemented | `rustic-base` and boundary/concurrency tests; DOC-01 |
 | Bounded DOM node storage, names/attributes, UTF-16 data, checked moves and destruction | Implemented internal subset | `rustic-dom`; DOC-03 and first DOC-04 slice |
+| Bounded deterministic subtree dump and executable tree example | Implemented diagnostic tool | `rustic-dom` example and golden/escaping/boundary tests |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
 | HTML parsing, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |

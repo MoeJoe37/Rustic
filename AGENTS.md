@@ -5,6 +5,12 @@ current behavior, `docs/ROADMAP.md` for task dependencies, and
 `docs/ARCHITECTURE.md` before changing component boundaries. A planned feature is
 not implemented merely because it has a type, placeholder, crate or document.
 
+The target platforms are Windows, macOS, Linux, Android and iOS/iPadOS. Keep the
+shared engine independent of desktop event loops and OS-specific process/graphics
+assumptions. Read `docs/MOBILE.md` before adding platform dependencies. Do not
+substitute Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink, WebKit or an
+existing JS runtime, including in mobile hosts.
+
 ## Code organization and ownership
 
 - Keep modules focused on one responsibility. Share a helper when there is a real shared contract; avoid speculative frameworks and placeholder crates.

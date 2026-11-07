@@ -18,6 +18,11 @@ HTTP transport, Unicode/IDNA data, shaping/font parsing, codecs, databases,
 serialization, platform windows and GPU access behind adapters. No candidate is
 adopted solely because this record mentions its category.
 
+Clarification, 2026-11-07: this excludes Mozilla/Firefox/Gecko and SpiderMonkey as
+implementation foundations, as well as Servo, Chromium/Blink, WebKit, V8 and
+JavaScriptCore. It applies equally to desktop, Android and iOS hosts. A system
+WebView must not silently replace Rustic's engine on a mobile platform.
+
 ## Alternatives and consequences
 
 A browser-engine wrapper is faster but misses the goal. A temporary external

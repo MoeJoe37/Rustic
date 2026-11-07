@@ -6,6 +6,11 @@ Rustic is an independent browser engine being built from scratch in Rust. The
 goal is a standards-oriented, embeddable engine with its own HTML/CSS pipeline,
 DOM, layout, painting, JavaScript runtime, and web platform integration.
 
+The target platforms are **Windows, macOS, Linux, Android, and iOS/iPadOS**. The
+shared engine is being designed for desktop and mobile hosts from the beginning.
+Mobile core cross-compilation is checked in CI; device shells, rendering, input,
+and runtime validation are still planned. See the [mobile plan](docs/MOBILE.md).
+
 **Current stage: early M1 document-core implementation.** This repository contains the project
 architecture, implementation plan, shared engine primitives, and continuous
 integration. It does not yet parse HTML, execute JavaScript, fetch web pages, or
@@ -64,8 +69,10 @@ are created only when their milestone needs them. All packages are unpublished.
 5. Establish process isolation and security gates before general web browsing.
 6. Expand modern platform compatibility, accessibility, performance, and embedding.
 
-No Chromium, Blink, WebKit, Gecko, Servo, or existing JavaScript engine is embedded
-as the implementation. Reviewed libraries for TLS, fonts, Unicode, image codecs,
+Rustic is not based on **Mozilla, Firefox, Gecko, or SpiderMonkey**. No Chromium,
+Blink, WebKit, Servo, or existing JavaScript engine is embedded as its implementation.
+That rule applies to desktop and mobile hosts alike. Reviewed low-level libraries
+for TLS, fonts, Unicode, image codecs,
 graphics APIs, and operating system integration are allowed. See
 [dependency boundaries](docs/DEPENDENCIES.md) for the precise policy.
 

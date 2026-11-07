@@ -28,7 +28,7 @@ reveals complexity. Later milestones deliberately have no fabricated estimates.
 | M5 Scripted documents | Events and JS mutations update rendered local pages | M3, M4, traced DOM | Re-estimate after M3/M4 |
 | M6 Controlled web services | Fixture-host HTTPS, Fetch policy, cookies and profiles | M5, origin model | Re-estimate after integration prototype |
 | M7 Isolated browsing | Enforced broker/renderer isolation on supported platforms | M6, IPC prototypes | Dedicated security program |
-| M8 Desktop alpha | Usable reference shell, accessibility, inspection, GPU option | M7; UI mocks may start earlier | Re-estimate by platform |
+| M8 Desktop/mobile alpha | Native desktop and Android/iOS hosts, accessibility, inspection, GPU option | M7 per platform; local surface prototypes start in M3 | Re-estimate by platform |
 | M9 Compatibility expansion | Broad modern site/API coverage, published test results | M8 | Open-ended feature program |
 | M10 Embedding and stabilization | Versioned API and maintained beta/release process | Evidence from M8/M9 | Evidence-based release decision |
 
@@ -44,7 +44,7 @@ flowchart TD
     M4 --> M5
     M5 --> M6["M6 Controlled services"]
     M6 --> M7["M7 Isolation gate"]
-    M7 --> M8["M8 Desktop alpha"]
+    M7 --> M8["M8 Desktop and mobile alpha"]
     M8 --> M9["M9 Compatibility"]
     M9 --> M10["M10 Stable embedding"]
 ```
@@ -70,6 +70,7 @@ not scheduled automation created by this commit.
 - [x] Pin development Rust, declare/test MSRV, and forbid unsafe project code.
 - [x] Define CI for formatting, Clippy, docs, builds/tests, and repository checks.
 - [x] Configure weekly Dependabot checks for Cargo and GitHub Actions.
+- [x] Include Android/iOS in the architecture and configure early shared-core cross-checks; see [mobile plan](MOBILE.md).
 - [x] Record a successful baseline CI run ([run](https://github.com/MoeJoe37/Rustic/actions/runs/42371959628)).
 - [x] Proceed with the baseline design following maintainer authorization to execute the plan.
 - [ ] Configure repository rules requiring the CI gate after it has run once.
@@ -135,6 +136,7 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | REN-06 | `render` headless command, PNG output, layout/display-list dumps, resize and hit testing | REN-05 |
 | REN-07 | Reftest harness, checked image fixtures, deterministic clocks/fonts, allocation counters | REN-06 |
 | REN-08 | Implement flexbox as its own tested formatting context; start grid/table plans from failures | REN-07 |
+| MOB-03/04 | Android/iOS local-fixture CPU surfaces through narrow native bridges | REN-05; mobile core checks |
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin
 mixed text, resize, and overflow render through Rustic's pipeline. Early debug
@@ -219,6 +221,9 @@ network prototype. General remote browsing is still gated on M7.
   renderer filesystem/network/device access and broker only permitted operations.
 - **ISO-04:** implement Windows isolation; evaluate macOS restrictions with a
   platform ADR. Gate remote browsing separately on each platform's actual status.
+- **ISO-08 / MOB-07:** define Android application/service and iOS supported engine-
+  extension isolation, brokering and crash recovery. Verify OS capabilities and
+  applicable entitlements rather than assuming desktop sandbox/JIT mechanisms.
 - **ISO-05:** protect permission prompts, trusted address display, clipboard and
   download/file access; require genuine user activation where applicable.
 - **ISO-06:** review attack surfaces, fuzz IPC/decoders/parsers, run sanitizer/GC
@@ -234,12 +239,14 @@ and focused external review where available. Unresolved sandbox escapes, origin
 confusion, or native memory issues block remote browsing. A failed sandbox setup
 is an explicit error, not a reason to launch an unsandboxed renderer silently.
 
-## 11. M8 — Reference desktop alpha
+## 11. M8 — Reference desktop and mobile alpha
 
 - **UI-01:** desktop shell with address entry, tabs, loading/error state, history,
   profiles, zoom, find, downloads and permission UI; keep chrome separate from DOM.
 - **UI-02:** platform window/event loop/surface integration on Linux, then Windows
-  and macOS when runtime support meets their gates; document platform differences.
+  and macOS, plus Android/iOS native hosts when each runtime meets its gates.
+  Shared mobile checks start in M1 and local CPU surfaces in M3, per
+  [MOB-01–MOB-10](MOBILE.md). Document actual platform differences and status.
 - **UI-03:** accessibility roles/names/focus/state tree, keyboard navigation,
   selection, IME/composition, clipboard grants and platform accessibility bridges.
 - **UI-04:** inspector DOM/style/layout views, console, network diagnostics,
@@ -250,7 +257,8 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
   reproducible selected WPT baseline and real-world fixture failures.
 
 **Demo:** a reproducible curated site corpus works in an isolated desktop alpha,
-with keyboard and accessibility checks. Alpha labeling lists known limitations.
+then native Android/iOS hosts with touch/IME, lifecycle and accessibility checks.
+Record each platform's actual status; alpha labels list known limitations.
 
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
@@ -274,10 +282,13 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 | Usability | Full editing/contenteditable, IME, accessibility parity, printing | Platform/manual automation and assistive-technology evidence |
 | Site compatibility | Versioned representative static/dynamic site corpus, regression triage | Reproducible outcomes, explicit scope and test denominators |
 
-Extensions, sync/accounts, mobile ports, DRM/proprietary services, password manager,
+Extensions, sync/accounts, DRM/proprietary services, password manager,
 and a stable third-party plugin ABI are outside the initial engine program. Add
 them only through explicit scope decisions. They must not delay the first static
 renderer or scripted local document.
+
+Android and iOS are in scope from early core design. Their native hosts and
+runtime gates follow the same engine milestones, rather than being optional ports.
 
 ## 13. M10 — Embedding, releases, and maintenance
 

@@ -94,10 +94,48 @@ jobs:
       - name: Check source and documentation consistency
         run: python3 tools/check_repository.py
 
+  mobile:
+    name: Mobile core (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            os: ubuntu-24.04
+          - target: x86_64-linux-android
+            os: ubuntu-24.04
+          - target: aarch64-apple-ios
+            os: macos-15
+            sdk: iphoneos
+          - target: aarch64-apple-ios-sim
+            os: macos-15
+            sdk: iphonesimulator
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust and mobile standard library
+        env:
+          CHECK_TARGET: ${{ matrix.target }}
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup target add --toolchain "$RUST_VERSION" "$CHECK_TARGET"
+      - name: Select iOS SDK
+        if: runner.os == 'macOS'
+        env:
+          IOS_SDK: ${{ matrix.sdk }}
+        run: echo "SDKROOT=$(xcrun --sdk "$IOS_SDK" --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: Cross-check shared engine libraries
+        env:
+          CHECK_TARGET: ${{ matrix.target }}
+        run: cargo check --locked --workspace --lib --target "$CHECK_TARGET"
+
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, compatibility, repository]
+    needs: [quality, test, compatibility, repository, mobile]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -107,8 +145,9 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
           REPOSITORY_RESULT: ${{ needs.repository.result }}
+          MOBILE_RESULT: ${{ needs.mobile.result }}
         run: |
-          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT"; do
+          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT"; do
             if [ "$result" != success ]; then
               echo "A required job did not succeed: $result"
               exit 1

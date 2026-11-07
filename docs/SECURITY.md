@@ -83,7 +83,10 @@ An explicitly separate test harness is never advertised as protected browsing.
 
 The OS implementation is platform-specific. Linux namespace/seccomp policy,
 Windows token/AppContainer/job policy, and macOS feasibility each need practical
-prototypes and adversarial verification. A compile pass on an OS does not prove
+prototypes and adversarial verification. Android needs application/service isolation and broker tests;
+iOS needs the applicable engine extension/process/entitlement design and tests.
+Do not assume desktop process/JIT/sandbox mechanisms exist on mobile. See the
+[mobile gates](MOBILE.md). A compile pass does not prove
 that its runtime sandbox exists. Process mapping must respect same-origin access,
 agent relationships and cross-origin frames; “one process per tab” is insufficient
 as a security specification.

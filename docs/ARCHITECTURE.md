@@ -3,10 +3,13 @@
 ## 1. Mission and constraints
 
 Build an original Rust implementation of the web engine, usable headlessly and
-eventually embedded in a desktop browser. Standards behavior and diagnosability
+embedded in desktop and mobile browsers on Windows, macOS, Linux, Android, and
+iOS/iPadOS. Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink and WebKit
+are not implementation foundations. Standards behavior and diagnosability
 come before optimization. A small vertical slice must be runnable before broad
 feature expansion. Linux headless is the reference runtime; Windows and macOS
-remain compile/test targets from the first commit.
+remain native compile/test targets. Android and iOS shared-library cross-checks
+start during M1; platform host and device/runtime gates follow the [mobile plan](MOBILE.md).
 
 An engine owns document interpretation and web execution. Browser chrome owns
 tabs, address entry, profiles, permissions UI, downloads, and OS integration.
@@ -43,6 +46,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-storage` | Partitioned profile data, quotas, transactions, eviction/private mode | base, origin/storage keys, database adapter | M6/M9 |
 | `rustic-ipc` | Versioned messages, validation, resource handles, bounded transport | base, selected serialization adapter | M7 |
 | `rustic-platform` | Windows/events, font discovery, graphics surfaces, OS adapters | base, platform libraries | M8 |
+| Future Android/iOS adapters | Native surfaces, lifecycle, touch/IME, accessibility and OS service/process bridges | engine/platform contracts; JNI/NDK or Apple SDK only at the boundary | Prototype with M3; host integration M8 |
 | `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
@@ -206,6 +210,11 @@ an isolation policy designed together. M7 defines the mapping and tests.
 Renderers receive narrow handles instead of ambient OS privileges. Linux uses
 reviewed namespace/seccomp/broker controls; Windows restricted tokens/AppContainer
 and job controls; macOS sandbox controls require a separate feasibility decision.
+Android needs its own application/service isolation and broker design, and iOS
+needs the applicable platform browser-engine extension/entitlement model. Do not
+assume desktop process spawning, Linux sandbox controls, or JIT availability can
+be carried across unchanged. Platform adapters map the same authority contracts
+to each OS; [ADR 0006](adr/0006-desktop-and-mobile-platforms.md) records this scope.
 If a required sandbox cannot be enforced, general remote browsing remains gated
 on that platform. Unsupported configurations must not silently weaken isolation.
 

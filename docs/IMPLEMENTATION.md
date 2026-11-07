@@ -91,6 +91,12 @@ HTML command is advertised yet.
 
 ## Queue status
 
+Platform scope now includes Windows, macOS, Linux, Android and iOS/iPadOS, with
+Mozilla/Firefox/Gecko and SpiderMonkey explicitly excluded as engine foundations.
+MOB-01 configures four shared-library cross-checks; see [MOBILE.md](MOBILE.md) and
+[ADR 0006](adr/0006-desktop-and-mobile-platforms.md). Native mobile hosts,
+link/package checks, runtime tests and device support remain planned.
+
 | First implementation queue item | Status |
 | --- | --- |
 | DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |

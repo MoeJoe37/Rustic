@@ -7,6 +7,8 @@ building, DOM, CSS syntax/cascade, layout and paint semantics, JavaScript runtim
 web API bindings, task scheduling, Fetch/browser policy and navigation. The
 reference CPU raster backend interprets Rustic's display list. Existing browser
 engines and existing JS runtimes are not implementation dependencies.
+This explicitly excludes Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink,
+WebKit, V8, and JavaScriptCore as engine/runtime implementations on every platform.
 
 Reusing reviewed low-level libraries is permitted and expected. Do not implement
 cryptographic primitives, certificate verification, operating system drivers or
@@ -64,12 +66,18 @@ the first commit. Major/authority-affecting upgrades need focused review.
 | Windows x86-64 | Windows Server 2022 build/tests | Headless first, desktop/input/accessibility next | Windows isolation and platform flow evidence |
 | macOS runner architecture | macOS 15 native runner build/tests | Headless first; desktop feasibility by platform ADR | Actual macOS sandbox and bridge evidence |
 | Additional CPU architectures | Not configured | Cross-compile then native testing on demand | Native runtime tests before support claims |
-| Android/iOS/other mobile | Not configured | Outside initial scope | Separate product/platform plan |
+| Android ARM64 and x86-64 emulator | Shared library cross-checks for `aarch64-linux-android` and `x86_64-linux-android` | Native Android shell, surfaces, input and lifecycle adapters | NDK link/package, emulator and real-device rendering/security tests |
+| iOS/iPadOS ARM64 and ARM64 simulator | Shared library cross-checks for `aarch64-apple-ios` and `aarch64-apple-ios-sim` on macOS | Native UIKit/engine host and platform-constrained process adapters | Xcode link/sign/package, simulator/device tests and applicable distribution entitlements |
+| Other mobile platforms / older CPU architectures | Not configured | Evaluate separately after the initial five-platform targets | Explicit scope and platform support decision |
 
 Hosted macOS runner architecture may differ by availability; inspect the actual
 runner image instead of claiming both Intel and Apple Silicon are tested.
 Cross-platform CI currently exercises std-only code, not fonts, GPU, sandbox,
-network, a desktop application, or end-to-end browser behavior.
+network, desktop/mobile UI, or end-to-end browser behavior. The four mobile jobs
+run `cargo check --workspace --lib --target ...`: they compile the shared library
+code without linking an application, running target tests, or proving device
+support. The desktop CLI and subprocess tests are not mobile app entry points.
+See [mobile architecture and gates](MOBILE.md) for the rest of the required work.
 
 ## Source layout and data
 

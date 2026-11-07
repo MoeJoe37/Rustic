@@ -56,6 +56,7 @@ use `pull_request_target`, publish artifacts/packages, deploy, or auto-merge.
 | `Quality` | Ubuntu 24.04, pinned toolchain | rustfmt, Clippy with denied warnings, rustdoc with denied warnings |
 | `Test (OS)` | Ubuntu 24.04, Windows 2022, macOS 15; pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |
+| `Mobile core (target)` | Ubuntu for Android ARM64/x86-64; macOS for iOS ARM64 device/simulator | Check all workspace libraries with pinned Rust; no application linking or device execution |
 | `Repository checks` | Ubuntu 24.04, Python 3.11+ | Local Markdown file links, whitespace, TOML/JSON parse, manifest/toolchain consistency |
 | `CI` | Aggregate gate | Fails if any prerequisite fails, is cancelled, or is unexpectedly skipped |
 
@@ -92,6 +93,10 @@ workflow linter, or a security audit. GitHub validates workflow syntax at load;
 the initial configuration should also be parsed/reviewed before committing.
 
 ## Workflow growth and releases
+
+See [MOBILE.md](MOBILE.md) for target triples, native host milestones and runtime
+gates. Mobile metadata checks are included in the aggregate `CI` job, while
+NDK/Xcode linking, packaging and device testing are staged with actual adapters.
 
 Introduce parser corpora with M1, render artifacts with M3, Test262 with M4, and
 integrated WPT with the host adapter. Add bounded fuzz smoke checks first, then

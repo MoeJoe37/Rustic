@@ -1,7 +1,7 @@
 //! Original incremental HTML input and tokenization foundations.
 //!
-//! The initial tokenizer supports data, tag names, ordered attributes and
-//! self-closing syntax. Character references and markup declarations return
+//! The tokenizer supports data, tags, ordered attributes, comments, doctypes and
+//! processing instructions in HTML context. Character references return
 //! explicit unsupported errors. Tree construction and alternate text modes are
 //! not implemented. This crate does not yet parse complete HTML documents.
 //!
@@ -27,5 +27,5 @@ mod tokenizer;
 
 pub use error::{Diagnostic, DiagnosticKind, HtmlError};
 pub use input::Utf8Input;
-pub use token::{Attribute, Tag, Token};
+pub use token::{Attribute, Doctype, ProcessingInstruction, Tag, Token};
 pub use tokenizer::{HtmlTokenizer, TokenizerLimits};

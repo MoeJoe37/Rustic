@@ -1,6 +1,18 @@
 use rustic_base::{Budget, CancellationToken};
 
-use crate::{Attribute, Diagnostic, DiagnosticKind, HtmlError, Tag, Token, Utf8Input};
+use crate::{
+    Attribute, Diagnostic, DiagnosticKind, Doctype, HtmlError, ProcessingInstruction, Tag, Token,
+    Utf8Input,
+};
+
+mod comment;
+mod declaration;
+mod doctype;
+mod instruction;
+
+use comment::CommentState;
+use doctype::DoctypeState;
+use instruction::InstructionState;
 
 /// Original-input, token, attribute and diagnostic budgets for one stream.
 #[derive(Clone, Copy, Debug)]
@@ -9,7 +21,7 @@ pub struct TokenizerLimits {
     pub max_input_bytes: usize,
     /// Total emitted tokens, including the final EOF token.
     pub max_tokens: usize,
-    /// UTF-8 data processed into one tag, or retained in a character token.
+    /// UTF-8 payload per markup token, or bytes retained in a character token.
     pub max_token_bytes: usize,
     /// Deterministic maximum character-token UTF-8 bytes, independent of feeds.
     pub max_text_chunk_bytes: usize,
@@ -46,6 +58,10 @@ enum State {
     UnquotedValue,
     AfterQuotedValue,
     SelfClosing,
+    MarkupDeclaration,
+    Comment(CommentState),
+    Doctype(DoctypeState),
+    Instruction(InstructionState),
 }
 
 #[derive(Debug)]
@@ -57,10 +73,10 @@ struct BuildingTag {
     attributes_seen: usize,
 }
 
-/// Incremental data/tag/attribute tokenizer for the declared initial HTML subset.
+/// Incremental tokenizer for data, tags and declarations in HTML context.
 ///
-/// Feed boundaries do not change token grouping. Character references, comments
-/// and declarations fail explicitly. RCDATA/RAWTEXT/script modes and DOM tree
+/// Feed boundaries do not change token grouping. Character references fail
+/// explicitly. RCDATA/RAWTEXT/script/foreign-content modes and DOM tree
 /// construction remain unimplemented. Recoverable syntax errors are diagnosed;
 /// fatal/unsupported conditions poison the stream instead of guessing behavior.
 #[derive(Debug)]
@@ -70,7 +86,11 @@ pub struct HtmlTokenizer {
     limits: TokenizerLimits,
     state: State,
     tag: Option<BuildingTag>,
-    tag_bytes: Budget,
+    token_bytes: Budget,
+    prefix: String,
+    comment: String,
+    doctype: Option<Doctype>,
+    instruction: Option<ProcessingInstruction>,
     tokens: Budget,
     text: String,
     diagnostics: Vec<Diagnostic>,
@@ -102,7 +122,11 @@ impl HtmlTokenizer {
             limits,
             state: State::Data,
             tag: None,
-            tag_bytes: Budget::new(limits.max_token_bytes),
+            token_bytes: Budget::new(limits.max_token_bytes),
+            prefix: String::new(),
+            comment: String::new(),
+            doctype: None,
+            instruction: None,
             tokens: Budget::new(limits.max_tokens),
             text: String::new(),
             diagnostics: Vec::new(),
@@ -155,6 +179,14 @@ impl HtmlTokenizer {
                     self.diagnostic(DiagnosticKind::EofBeforeTagName)?;
                     self.text_char('<', &mut output)?;
                     self.text_char('/', &mut output)?;
+                }
+                State::MarkupDeclaration => self.finish_declaration(&mut output)?,
+                State::Comment(state) => self.finish_comment(state, &mut output)?,
+                State::Doctype(state) => self.finish_doctype(state, &mut output)?,
+                State::Instruction(_) => {
+                    self.diagnostic(DiagnosticKind::EofInProcessingInstruction)?;
+                    self.prefix.clear();
+                    self.instruction = None;
                 }
                 _ => {
                     self.diagnostic(DiagnosticKind::EofInTag)?;
@@ -214,7 +246,11 @@ impl HtmlTokenizer {
             },
             State::TagOpen => match value {
                 '/' => self.state = State::EndTagOpen,
-                '!' | '?' => return Err(HtmlError::UnsupportedDeclaration),
+                '!' => {
+                    self.prefix.clear();
+                    self.state = State::MarkupDeclaration;
+                }
+                '?' => self.start_instruction(),
                 value if value.is_ascii_alphabetic() => self.start_tag(false, value)?,
                 _ => {
                     self.diagnostic(DiagnosticKind::InvalidTagStart)?;
@@ -229,7 +265,11 @@ impl HtmlTokenizer {
                     self.diagnostic(DiagnosticKind::MissingEndTagName)?;
                     self.state = State::Data;
                 }
-                _ => return Err(HtmlError::UnsupportedDeclaration),
+                _ => {
+                    self.diagnostic(DiagnosticKind::InvalidTagStart)?;
+                    self.start_comment(CommentState::Bogus);
+                    return Ok(true);
+                }
             },
             State::TagName => match value {
                 value if whitespace(value) => self.state = State::BeforeAttribute,
@@ -237,7 +277,7 @@ impl HtmlTokenizer {
                 '>' => self.emit_tag(output)?,
                 _ => {
                     let value = self.name_char(value)?;
-                    self.charge_tag(value)?;
+                    self.charge_token(value)?;
                     self.building().tag.name.push(value);
                 }
             },
@@ -354,12 +394,16 @@ impl HtmlTokenizer {
                     return Ok(true);
                 }
             }
+            State::MarkupDeclaration => return self.declaration_step(value),
+            State::Comment(state) => return self.comment_step(state, value, output),
+            State::Doctype(state) => return self.doctype_step(state, value, output),
+            State::Instruction(state) => return self.instruction_step(state, value, output),
         }
         Ok(false)
     }
 
     fn start_tag(&mut self, end: bool, first: char) -> Result<(), HtmlError> {
-        self.tag_bytes = Budget::new(self.limits.max_token_bytes);
+        self.token_bytes = Budget::new(self.limits.max_token_bytes);
         self.tag = Some(BuildingTag {
             tag: Tag {
                 name: String::new(),
@@ -372,7 +416,7 @@ impl HtmlTokenizer {
             attributes_seen: 0,
         });
         let first = first.to_ascii_lowercase();
-        self.charge_tag(first)?;
+        self.charge_token(first)?;
         self.building().tag.name.push(first);
         self.state = State::TagName;
         Ok(())
@@ -415,7 +459,7 @@ impl HtmlTokenizer {
     }
 
     fn push_attribute_name(&mut self, value: char) -> Result<(), HtmlError> {
-        self.charge_tag(value)?;
+        self.charge_token(value)?;
         self.building()
             .current
             .as_mut()
@@ -430,7 +474,7 @@ impl HtmlTokenizer {
             return Err(HtmlError::UnsupportedCharacterReference);
         }
         let value = self.replace_null(value)?;
-        self.charge_tag(value)?;
+        self.charge_token(value)?;
         self.building()
             .current
             .as_mut()
@@ -456,8 +500,8 @@ impl HtmlTokenizer {
     fn building(&mut self) -> &mut BuildingTag {
         self.tag.as_mut().expect("tag state requires a builder")
     }
-    fn charge_tag(&mut self, value: char) -> Result<(), HtmlError> {
-        self.tag_bytes
+    fn charge_token(&mut self, value: char) -> Result<(), HtmlError> {
+        self.token_bytes
             .charge(value.len_utf8())
             .map_err(|_| HtmlError::TokenBytesLimit)
     }
@@ -505,12 +549,20 @@ impl HtmlTokenizer {
     }
 
     fn diagnostic(&mut self, kind: DiagnosticKind) -> Result<(), HtmlError> {
+        self.diagnostic_at(kind, self.normalized_offset)
+    }
+
+    fn diagnostic_at(
+        &mut self,
+        kind: DiagnosticKind,
+        normalized_offset: usize,
+    ) -> Result<(), HtmlError> {
         if self.diagnostics.len() >= self.limits.max_diagnostics {
             return Err(HtmlError::DiagnosticLimit);
         }
         self.diagnostics.push(Diagnostic {
             kind,
-            normalized_offset: self.normalized_offset,
+            normalized_offset,
         });
         Ok(())
     }

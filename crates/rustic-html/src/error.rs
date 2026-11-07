@@ -26,8 +26,6 @@ pub enum HtmlError {
     Poisoned,
     /// Character-reference tokenization is not implemented yet.
     UnsupportedCharacterReference,
-    /// Comments, doctypes, bogus comments and other declarations are not implemented.
-    UnsupportedDeclaration,
 }
 
 impl fmt::Display for HtmlError {
@@ -43,14 +41,13 @@ impl fmt::Display for HtmlError {
             Self::AlreadyFinished => "HTML stream is already finished",
             Self::Poisoned => "HTML stream previously failed",
             Self::UnsupportedCharacterReference => "HTML character references are not implemented",
-            Self::UnsupportedDeclaration => "HTML declarations/comments are not implemented",
         })
     }
 }
 
 impl std::error::Error for HtmlError {}
 
-/// Recoverable errors in the initial tokenizer state subset.
+/// Recoverable errors in the implemented tokenizer states.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DiagnosticKind {
     /// Null input in a tokenizer state with prescribed recovery.
@@ -79,6 +76,54 @@ pub enum DiagnosticKind {
     EofBeforeTagName,
     /// EOF interrupted an unfinished tag, which was discarded.
     EofInTag,
+    /// A markup declaration was neither a comment nor a recognized declaration.
+    IncorrectlyOpenedComment,
+    /// An empty comment closed before its normal closing delimiter.
+    AbruptClosingOfEmptyComment,
+    /// A nested comment opening occurred inside a comment.
+    NestedComment,
+    /// A comment closed with `--!>`.
+    IncorrectlyClosedComment,
+    /// Input ended inside an ordinary comment.
+    EofInComment,
+    /// A CDATA opening in HTML context recovered as a bogus comment.
+    CdataInHtmlContent,
+    /// The doctype keyword was immediately followed by its name.
+    MissingWhitespaceBeforeDoctypeName,
+    /// A doctype closed without a name.
+    MissingDoctypeName,
+    /// Input ended inside a doctype outside its bogus recovery state.
+    EofInDoctype,
+    /// Text after a doctype name was not a PUBLIC or SYSTEM keyword.
+    InvalidSequenceAfterDoctypeName,
+    /// A quoted identifier immediately followed PUBLIC.
+    MissingWhitespaceAfterDoctypePublicKeyword,
+    /// A doctype closed without the required public identifier.
+    MissingDoctypePublicIdentifier,
+    /// A public identifier did not begin with a quote.
+    MissingQuoteBeforeDoctypePublicIdentifier,
+    /// A greater-than sign interrupted a quoted public identifier.
+    AbruptDoctypePublicIdentifier,
+    /// A system identifier immediately followed the public identifier's quote.
+    MissingWhitespaceBetweenDoctypeIdentifiers,
+    /// A system identifier did not begin with a quote.
+    MissingQuoteBeforeDoctypeSystemIdentifier,
+    /// A quoted identifier immediately followed SYSTEM.
+    MissingWhitespaceAfterDoctypeSystemKeyword,
+    /// A doctype closed without the required system identifier.
+    MissingDoctypeSystemIdentifier,
+    /// A greater-than sign interrupted a quoted system identifier.
+    AbruptDoctypeSystemIdentifier,
+    /// Unexpected text followed a completed system identifier.
+    UnexpectedCharacterAfterDoctypeSystemIdentifier,
+    /// A processing-instruction target did not start with an ASCII letter or `_`.
+    InvalidFirstInstructionTarget,
+    /// A processing-instruction target contained an invalid character.
+    InvalidInstructionTarget,
+    /// An XML or XML-stylesheet target recovered as a bogus comment.
+    DisallowedInstructionTarget,
+    /// An unfinished processing instruction was discarded at EOF.
+    EofInProcessingInstruction,
 }
 
 /// Diagnostic location in the normalized scalar-value stream.

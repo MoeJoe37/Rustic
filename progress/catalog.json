@@ -388,8 +388,34 @@
         {
           "id": "html.declarations",
           "label": "Comments, doctypes and declaration recovery",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/comment.rs",
+              "marker": "pub(super) fn comment_step"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/doctype.rs",
+              "marker": "pub(super) fn doctype_step"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/instruction.rs",
+              "marker": "pub(super) fn instruction_step"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/declarations.rs",
+              "marker": "fn declarations_are_invariant_at_every_byte_split_and_one_byte_feeds"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_declaration_corpus_and_all_input_splits_have_no_unexpected_failures"
+            }
+          ]
         },
         {
           "id": "html.textmodes",

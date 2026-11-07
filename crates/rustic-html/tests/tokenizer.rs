@@ -329,13 +329,6 @@ fn unsupported_syntax_fails_instead_of_silently_changing_meaning() {
             HtmlError::UnsupportedCharacterReference,
         );
     }
-    for bytes in ["<!--x-->", "<!DOCTYPE html>", "<?target?>", "</1>"] {
-        assert_fatal(
-            bytes.as_bytes(),
-            TokenizerLimits::default(),
-            HtmlError::UnsupportedDeclaration,
-        );
-    }
     let (tokens, _) = tokenize(&[b"<a&b x&y=z>"], TokenizerLimits::default());
     assert_start(&tokens[0], "a&b", &[("x&y", "z")], false);
 }

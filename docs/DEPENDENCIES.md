@@ -89,6 +89,12 @@ in separately. Generated artifacts go under ignored `artifacts` or `target`.
 Generated source must identify its input revision and reproducible generator;
 test whether checked-in generated output is fresh once generators exist.
 
+Current imported test data includes a pinned BSD-licensed WPT URL subset and an
+MIT-licensed html5lib declaration-tokenizer subset. Their per-crate fixture
+directories retain notices, source revisions/digests, selection manifests and
+reproduction tooling. These are offline test expectations; runtime crates still
+have no third-party Rust dependencies or parser/engine implementations.
+
 The AGPL license already present in the repository is retained. Workspace package
 metadata uses `AGPL-3.0-only`; changing the licensing policy is a maintainer
 decision, not an incidental dependency or scaffolding change.

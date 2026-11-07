@@ -87,6 +87,31 @@ def main() -> int:
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
             error(url_manifest, f"invalid WPT fixture metadata: {exc}")
 
+    html_manifest = ROOT / "crates/rustic-html/tests/fixtures/html5lib_manifest.json"
+    if html_manifest.exists():
+        try:
+            manifest = json.loads(html_manifest.read_text(encoding="utf-8"))
+            fixture = html_manifest.parent / "html5lib_cases.rs"
+            if hashlib.sha256(fixture.read_bytes()).hexdigest() != manifest["fixture_sha256"]:
+                error(fixture, "generated fixture digest differs from HTML manifest; regenerate deliberately")
+            if not (html_manifest.parent / "HTML5LIB-LICENSE.md").is_file():
+                error(html_manifest, "missing upstream html5lib license")
+            if not re.fullmatch(r"[0-9a-f]{40}", manifest["upstream_revision"]):
+                error(html_manifest, "upstream revision must be a full commit SHA")
+            sources = manifest["sources"]
+            for source in sources:
+                indices = source["selected_array_indices"]
+                if (len(indices) != source["selected_cases"] or indices != sorted(set(indices))
+                        or any(index < 0 or index >= source["upstream_cases"] for index in indices)
+                        or source["selected_cases"] + source["excluded_cases"] != source["upstream_cases"]
+                        or sum(source["exclusion_reasons"].values()) != source["excluded_cases"]):
+                    error(html_manifest, f"inconsistent source counts/indices: {source['path']}")
+            for count in ("upstream_cases", "selected_cases", "excluded_cases"):
+                if sum(source[count] for source in sources) != manifest[count]:
+                    error(html_manifest, f"inconsistent aggregate {count}")
+        except (OSError, KeyError, TypeError, ValueError) as exc:
+            error(html_manifest, f"invalid HTML fixture metadata: {exc}")
+
     try:
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]
         toolchain = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())["toolchain"]

@@ -116,7 +116,9 @@ stride and bytes per pixel as well as the viewport pixel count present at M0.
 ## 4. Parsing, style, layout, and painting
 
 The current `rustic-html` crate depends only on `rustic-base` and implements
-explicit UTF-8 input plus a data/tag/attribute subset. It has no DOM dependency
+explicit UTF-8 input plus data/tags, comments, doctypes and processing instructions
+in HTML context. Declaration, comment, doctype and instruction states have focused
+internal modules. It has no DOM dependency
 until tree construction needs the checked mutation API. See [HTML.md](HTML.md)
 for implemented behavior and remaining states. The following pipeline describes
 the target architecture.

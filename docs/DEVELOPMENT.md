@@ -97,9 +97,12 @@ fixture update/check commands. Repository checks validate the generated fixture
 digest against its manifest; normal CI does not download upstream test data.
 
 `cargo test --locked -p rustic-html` runs the streaming input/tokenizer subset
-tests and its rustdoc example. The `tokenize` example exercises chunked UTF-8,
-tag and attribute processing; it does not build a DOM. [HTML.md](HTML.md) records
-the implemented states and the unimplemented references/declarations/text modes.
+tests, 1,079 pinned html5lib declaration cases and its rustdoc example. The
+`tokenize` example exercises chunked UTF-8, tags, comments, doctypes and processing
+instructions; it does not build a DOM. [HTML.md](HTML.md) records corpus provenance,
+reproduction commands and the unimplemented character references/text modes.
+The importer has three Python regression tests; repository checks validate its
+fixture digest, aggregate counts and per-source selection indices.
 
 Read the first failed step, not just the aggregate gate. A lockfile failure means
 the manifest/lockfile need a deliberate update. A format failure is resolved with

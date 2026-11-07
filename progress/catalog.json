@@ -333,14 +333,51 @@
         {
           "id": "html.input",
           "label": "Bounded incremental UTF-8 decoding and input preprocessing",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/input.rs",
+              "marker": "pub struct Utf8Input"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/input.rs",
+              "marker": "fn utf8_preprocessing_is_independent_of_byte_boundaries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/input.rs",
+              "marker": "fn every_two_byte_input_matches_an_independent_lossy_decode"
+            }
+          ]
         },
         {
           "id": "html.tags",
           "label": "Declared data/tag/attribute tokenizer subset",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer.rs",
+              "marker": "pub struct HtmlTokenizer"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tokenizer.rs",
+              "marker": "fn tags_attributes_and_text_follow_the_declared_subset"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tokenizer.rs",
+              "marker": "fn tokens_and_diagnostics_are_independent_of_chunk_boundaries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tokenizer.rs",
+              "marker": "fn exact_resource_boundaries_are_enforced_before_further_output"
+            }
+          ]
         },
         {
           "id": "html.references",

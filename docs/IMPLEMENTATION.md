@@ -112,6 +112,28 @@ source/generated digests, indices, license, selection rules and untested fields
 are recorded; this is not whole-WPT or complete URL conformance. See [URL.md](URL.md)
 for contracts, evidence and the runnable `resolve` example.
 
+## DOC-05a (partial) — Incremental HTML input and tag states
+
+`rustic-html` now implements explicitly UTF-8 streaming input and the initial
+data/tag/attribute tokenizer. BOM stripping, invalid-sequence replacement and
+CR/CRLF preprocessing survive arbitrary byte boundaries. Token grouping is
+deterministic across feeds. Names use ASCII case normalization; attributes retain
+source order and the first duplicate. Supported syntax errors have bounded
+diagnostics and recovery; unsupported character references/declarations fail
+explicitly. EOF, budgets and cancellation have defined terminal behavior.
+
+Seventeen integration tests include every two-byte input compared with a separate
+whole-buffer decoding/preprocessing oracle, fixed expected tokens/errors, all
+fixture split positions, one-byte feeds, exact budgets and poisoned/closed stream
+checks. One compiled rustdoc example and a runnable `tokenize` example accompany
+the crate. See [HTML.md](HTML.md) for specification references, resource units,
+diagnostic offsets and API contracts.
+
+DOC-05a is still partial: comments and declaration states remain pending, along
+with DOC-05b character references and alternate text modes. There is no HTML tree
+builder, loader or upstream HTML corpus result. The two catalog capabilities
+`html.input` and `html.tags` describe only this tested subset.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -131,11 +153,12 @@ link/package checks, runtime tests and device support remain planned.
 | First implementation queue item | Status |
 | --- | --- |
 | DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |
-| DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; integrated into URL parsing, HTML integration pending |
+| DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; integrated into URL parsing and initial HTML tokenization |
 | DOC-03: minimal document arena and node kinds | Complete internal subset described above |
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
-| DOC-05a/b and DOC-06a/b: tokenizer and tree builder | Not started |
+| DOC-05a: incremental tokenizer data/tag/comment states | Partial: UTF-8 input and data/tag/attribute states implemented; comments pending |
+| DOC-05b and DOC-06a/b: remaining tokenizer and tree builder | Not started |
 | DOC-07/08: bounded HTML loader/CLI and parser corpus/fuzzing | Not started |
 | DOC-09: traced node/JS ownership prototype | Not started |
 

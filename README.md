@@ -13,8 +13,9 @@ and runtime validation are still planned. See the [mobile plan](docs/MOBILE.md).
 
 **Current stage: early M1 document-core implementation.** This repository contains the project
 architecture, implementation plan, shared engine primitives, and continuous
-integration. It does not yet parse HTML, execute JavaScript, fetch web pages, or
-render content. A complete modern browser engine is a sustained, multi-year
+integration. Bounded DOM/URL foundations and an initial HTML input/tokenizer
+subset are implemented. It does not yet build HTML documents, execute
+JavaScript, fetch web pages, or render content. A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
 
 <!-- rustic-progress:start -->
@@ -37,6 +38,7 @@ engineering effort; milestones below describe targets, not existing support.
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
 | [Progress graph methodology](docs/PROGRESS.md) | Whole-engine completion criteria, weights, evidence and automatic commit updates |
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
+| [HTML input and tokenization](docs/HTML.md) | Streaming UTF-8 and initial tokenizer subset, limits, evidence and remaining states |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
 | [Roadmap](docs/ROADMAP.md) | Dependency-ordered milestones, acceptance gates, first tasks, and risks |
@@ -60,6 +62,7 @@ cargo test --locked --workspace --all-targets
 cargo test --locked --workspace --doc
 cargo run --locked -p rustic-dom --example tree
 cargo run --locked -p rustic-url --example resolve
+cargo run --locked -p rustic-html --example tokenize
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
@@ -69,10 +72,13 @@ Other arguments, including URLs, return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints
 a deterministic inspection dump. It does not parse HTML or load a page.
+The `tokenize` example reads a small UTF-8 stream in chunks and emits tokens;
+comments, character references, alternate text modes and tree building are pending.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
 and clocks), `rustic-dom` (bounded node storage and checked tree mutation),
 `rustic-url` (URL records, parsing and origins),
+`rustic-html` (streaming UTF-8 and data/tag/attribute tokenization),
 `rustic-engine` (bounded viewport configuration), and `rustic-cli`
 (development entry point). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

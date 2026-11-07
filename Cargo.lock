@@ -25,6 +25,13 @@ name = "rustic-engine"
 version = "0.1.0"
 
 [[package]]
+name = "rustic-html"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+]
+
+[[package]]
 name = "rustic-url"
 version = "0.1.0"
 dependencies = [

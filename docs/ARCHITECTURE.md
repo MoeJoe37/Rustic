@@ -23,7 +23,7 @@ arbitrary remote content. Rust memory safety alone cannot enforce browser policy
 
 ## 2. Component map
 
-`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-engine` and `rustic-cli` now exist; see
+`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-html`, `rustic-engine` and `rustic-cli` now exist; see
 [implementation progress](IMPLEMENTATION.md) for their actual scope. The following
 is the target decomposition, not a requirement to create empty crates today.
 
@@ -114,6 +114,12 @@ depth comes directly from content. A future surface allocation must validate
 stride and bytes per pixel as well as the viewport pixel count present at M0.
 
 ## 4. Parsing, style, layout, and painting
+
+The current `rustic-html` crate depends only on `rustic-base` and implements
+explicit UTF-8 input plus a data/tag/attribute subset. It has no DOM dependency
+until tree construction needs the checked mutation API. See [HTML.md](HTML.md)
+for implemented behavior and remaining states. The following pipeline describes
+the target architecture.
 
 The loader produces byte chunks plus response metadata. Encoding detection and
 decoder state precede HTML tokenization; charset changes may require a bounded

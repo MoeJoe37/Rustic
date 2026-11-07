@@ -31,9 +31,10 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Bounded deterministic subtree dump and executable tree example | Implemented diagnostic tool | `rustic-dom` example and golden/escaping/boundary tests |
 | Android/iOS shared-library cross-compilation | Configured | Four mobile target checks; runtime and host work in [mobile plan](MOBILE.md) |
 | URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope and 685 pinned cases](URL.md) |
+| Incremental UTF-8 input and data/tag/attribute tokenizer | Implemented initial subset | `rustic-html`; [scope and 17 regression tests](HTML.md) |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
-| HTML parsing, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
+| Remaining HTML tokenizer states/tree building, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | Pinned WPT URL data subset | Implemented offline runner | 685 selected URL records; no full browser harness |
 | Whole-engine progress graph | Implemented and automated | 18 subsystems, 142 capability gates; [methodology](PROGRESS.md) |

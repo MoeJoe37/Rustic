@@ -12,6 +12,7 @@ local toolchain definition. All packages are private/unpublished.
 cargo run --locked -p rustic-cli -- info
 cargo run --locked -p rustic-dom --example tree
 cargo run --locked -p rustic-url --example resolve
+cargo run --locked -p rustic-html --example tokenize
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace --all-targets
@@ -94,6 +95,11 @@ The pinned URL-data subset runs offline as a normal Rust integration test. Use
 [URL.md](URL.md) documents the fixed selection, limits, unsupported features and
 fixture update/check commands. Repository checks validate the generated fixture
 digest against its manifest; normal CI does not download upstream test data.
+
+`cargo test --locked -p rustic-html` runs the streaming input/tokenizer subset
+tests and its rustdoc example. The `tokenize` example exercises chunked UTF-8,
+tag and attribute processing; it does not build a DOM. [HTML.md](HTML.md) records
+the implemented states and the unimplemented references/declarations/text modes.
 
 Read the first failed step, not just the aggregate gate. A lockfile failure means
 the manifest/lockfile need a deliberate update. A format failure is resolved with

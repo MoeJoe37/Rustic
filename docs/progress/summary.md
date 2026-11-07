@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 6.19%** · 14/142 capabilities complete.
+**Overall completion: 6.89%** · 15/142 capabilities complete.
 
-Catalog: `engine-v1`. Source fingerprint: `b44855102bf77224a3231abbe390466bc051517e9f3c360fa11ad6dfbc252989`.
+Catalog: `engine-v1`. Source fingerprint: `60b69743ed9fe721121fc5a3b586b531d44b71867cacd00fa41ad91cb2a9221b`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 
@@ -11,7 +11,7 @@ Catalog: `engine-v1`. Source fingerprint: `b44855102bf77224a3231abbe390466bc0515
 | Foundation | 5/8 | 62.50% | 2% |
 | URLs & encoding | 3/12 | 25.00% | 4% |
 | DOM | 3/10 | 30.00% | 7% |
-| HTML | 2/10 | 20.00% | 7% |
+| HTML | 3/10 | 30.00% | 7% |
 | CSS & style | 0/8 | 0.00% | 10% |
 | Text & fonts | 0/6 | 0.00% | 5% |
 | Layout | 0/10 | 0.00% | 10% |
@@ -73,7 +73,7 @@ Catalog: `engine-v1`. Source fingerprint: `b44855102bf77224a3231abbe390466bc0515
 - **complete** `html.input` — Bounded incremental UTF-8 decoding and input preprocessing ([source](../../crates/rustic-html/src/input.rs), [test](../../crates/rustic-html/tests/input.rs), [test](../../crates/rustic-html/tests/input.rs))
 - **complete** `html.tags` — Declared data/tag/attribute tokenizer subset ([source](../../crates/rustic-html/src/tokenizer.rs), [test](../../crates/rustic-html/tests/tokenizer.rs), [test](../../crates/rustic-html/tests/tokenizer.rs), [test](../../crates/rustic-html/tests/tokenizer.rs))
 - **planned** `html.references` — Full named/numeric character references
-- **planned** `html.declarations` — Comments, doctypes and declaration recovery
+- **complete** `html.declarations` — Comments, doctypes and declaration recovery ([source](../../crates/rustic-html/src/tokenizer/comment.rs), [source](../../crates/rustic-html/src/tokenizer/doctype.rs), [source](../../crates/rustic-html/src/tokenizer/instruction.rs), [test](../../crates/rustic-html/tests/declarations.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **planned** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes
 - **planned** `html.tree` — Core insertion modes and malformed-tree recovery
 - **planned** `html.tables` — Table, formatting, template and foreign content rules

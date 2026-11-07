@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_version": "engine-v1",
-  "source_fingerprint": "b44855102bf77224a3231abbe390466bc051517e9f3c360fa11ad6dfbc252989",
-  "percent": "6.19",
-  "completed": 14,
+  "source_fingerprint": "60b69743ed9fe721121fc5a3b586b531d44b71867cacd00fa41ad91cb2a9221b",
+  "percent": "6.89",
+  "completed": 15,
   "total": 142,
   "fully_complete": false,
   "meaning": "100% requires all capabilities and final five-platform engine acceptance; this is weighted delivery progress, not web compatibility or time remaining.",
@@ -402,8 +402,34 @@
         {
           "id": "html.declarations",
           "label": "Comments, doctypes and declaration recovery",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/comment.rs",
+              "marker": "pub(super) fn comment_step"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/doctype.rs",
+              "marker": "pub(super) fn doctype_step"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/instruction.rs",
+              "marker": "pub(super) fn instruction_step"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/declarations.rs",
+              "marker": "fn declarations_are_invariant_at_every_byte_split_and_one_byte_feeds"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_declaration_corpus_and_all_input_splits_have_no_unexpected_failures"
+            }
+          ]
         },
         {
           "id": "html.textmodes",
@@ -442,9 +468,9 @@
           "evidence": []
         }
       ],
-      "completed": 2,
+      "completed": 3,
       "total": 10,
-      "percent": "20.00"
+      "percent": "30.00"
     },
     {
       "id": "css",

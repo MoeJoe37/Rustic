@@ -1,0 +1,10 @@
+{
+  "data_version": "2026-11-07",
+  "entries": 2231,
+  "legacy_entries": 106,
+  "license": "WHATWG source-code portions: BSD-3-Clause; WHATWG-LICENSE.md",
+  "max_name_bytes": 32,
+  "source_sha256": "d741d877ac77c4194c4ad526b5b4a19aef8dfe411ab840a466891cdbb9f362e6",
+  "source_url": "https://html.spec.whatwg.org/entities.json",
+  "table_sha256": "da92edd2e76b29a6d0379d74df0c1a261e988f7d4ef591bf95e8fe3cc48a1140"
+}

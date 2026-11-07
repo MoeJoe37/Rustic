@@ -1,7 +1,7 @@
 use rustic_html::HtmlTokenizer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bytes = "<!DOCTYPE html><!--original tokenizer--><?sample data?><DIV id='sample'>Hello, Rustic 🙂<br /></DIV>".as_bytes();
+    let bytes = "<!DOCTYPE html><!--original tokenizer--><?sample data?><DIV id='sample'>Hello, Rustic 🙂 &amp; &#169;<br /></DIV>".as_bytes();
     let mut tokenizer = HtmlTokenizer::default();
     // Deliberately split tags and a multibyte character across feeds.
     for chunk in bytes.chunks(3) {

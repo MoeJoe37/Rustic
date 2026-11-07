@@ -75,8 +75,8 @@ Other arguments, including URLs, return an error instead of implying navigation.
 The `tree` example builds nodes directly through the internal DOM API and prints
 a deterministic inspection dump. It does not parse HTML or load a page.
 The `tokenize` example reads a small UTF-8 stream in chunks and emits tokens;
-comments, doctypes and processing instructions are included. Character references,
-alternate text modes and tree building are pending.
+comments, doctypes, processing instructions and named/numeric character references
+are included. Alternate text modes and tree building are pending.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
 and clocks), `rustic-dom` (bounded node storage and checked tree mutation),

@@ -1,8 +1,8 @@
 //! Original incremental HTML input and tokenization foundations.
 //!
 //! The tokenizer supports data, tags, ordered attributes, comments, doctypes and
-//! processing instructions in HTML context. Character references return
-//! explicit unsupported errors. Tree construction and alternate text modes are
+//! processing instructions and named/numeric references in HTML context.
+//! Tree construction and alternate text modes are
 //! not implemented. This crate does not yet parse complete HTML documents.
 //!
 //! ```
@@ -20,6 +20,7 @@
 
 #![warn(missing_docs)]
 
+mod entities;
 mod error;
 mod input;
 mod token;

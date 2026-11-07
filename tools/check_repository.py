@@ -8,6 +8,7 @@ import re
 import sys
 import tomllib
 from urllib.parse import unquote, urlsplit
+import import_html_entities
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +37,49 @@ def check_markdown(path: Path, source: str) -> None:
             resolved = (path.parent / local).resolve()
             if not resolved.is_relative_to(ROOT) or not resolved.exists():
                 error(path, f"line {number}: missing local link: {target}")
+
+
+def check_html_fixture(stem: str) -> None:
+    manifest_path = ROOT / f"crates/rustic-html/tests/fixtures/{stem}_manifest.json"
+    if not manifest_path.exists():
+        return
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        fixture = manifest_path.parent / f"{stem}_cases.rs"
+        if hashlib.sha256(fixture.read_bytes()).hexdigest() != manifest["fixture_sha256"]:
+            error(fixture, "generated fixture digest differs from HTML manifest; regenerate deliberately")
+        if not (manifest_path.parent / "HTML5LIB-LICENSE.md").is_file():
+            error(manifest_path, "missing upstream html5lib license")
+        if not re.fullmatch(r"[0-9a-f]{40}", manifest["upstream_revision"]):
+            error(manifest_path, "upstream revision must be a full commit SHA")
+        sources = manifest["sources"]
+        for source in sources:
+            indices = source["selected_array_indices"]
+            if (len(indices) != source["selected_cases"] or indices != sorted(set(indices))
+                    or any(index < 0 or index >= source["upstream_cases"] for index in indices)
+                    or source["selected_cases"] + source["excluded_cases"] != source["upstream_cases"]
+                    or sum(source["exclusion_reasons"].values()) != source["excluded_cases"]):
+                error(manifest_path, f"inconsistent source counts/indices: {source['path']}")
+        for count in ("upstream_cases", "selected_cases", "excluded_cases"):
+            if sum(source[count] for source in sources) != manifest[count]:
+                error(manifest_path, f"inconsistent aggregate {count}")
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        error(manifest_path, f"invalid HTML fixture metadata: {exc}")
+
+
+def check_entities() -> None:
+    data = ROOT / "crates/rustic-html/data"
+    manifest_path = data / "entities_manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        rust, metadata = import_html_entities.generate((data / "entities.json").read_bytes(), manifest["data_version"])
+        table = ROOT / "crates/rustic-html/src/entities.rs"
+        if table.read_text(encoding="utf-8") != rust or manifest != json.loads(metadata):
+            error(table, "entity source/table/manifest differ; run tools/import_html_entities.py deliberately")
+        if not (data / "WHATWG-LICENSE.md").is_file():
+            error(manifest_path, "missing WHATWG data notice")
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        error(manifest_path, f"invalid entity table/provenance: {exc}")
 
 
 def main() -> int:
@@ -87,30 +131,9 @@ def main() -> int:
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
             error(url_manifest, f"invalid WPT fixture metadata: {exc}")
 
-    html_manifest = ROOT / "crates/rustic-html/tests/fixtures/html5lib_manifest.json"
-    if html_manifest.exists():
-        try:
-            manifest = json.loads(html_manifest.read_text(encoding="utf-8"))
-            fixture = html_manifest.parent / "html5lib_cases.rs"
-            if hashlib.sha256(fixture.read_bytes()).hexdigest() != manifest["fixture_sha256"]:
-                error(fixture, "generated fixture digest differs from HTML manifest; regenerate deliberately")
-            if not (html_manifest.parent / "HTML5LIB-LICENSE.md").is_file():
-                error(html_manifest, "missing upstream html5lib license")
-            if not re.fullmatch(r"[0-9a-f]{40}", manifest["upstream_revision"]):
-                error(html_manifest, "upstream revision must be a full commit SHA")
-            sources = manifest["sources"]
-            for source in sources:
-                indices = source["selected_array_indices"]
-                if (len(indices) != source["selected_cases"] or indices != sorted(set(indices))
-                        or any(index < 0 or index >= source["upstream_cases"] for index in indices)
-                        or source["selected_cases"] + source["excluded_cases"] != source["upstream_cases"]
-                        or sum(source["exclusion_reasons"].values()) != source["excluded_cases"]):
-                    error(html_manifest, f"inconsistent source counts/indices: {source['path']}")
-            for count in ("upstream_cases", "selected_cases", "excluded_cases"):
-                if sum(source[count] for source in sources) != manifest[count]:
-                    error(html_manifest, f"inconsistent aggregate {count}")
-        except (OSError, KeyError, TypeError, ValueError) as exc:
-            error(html_manifest, f"invalid HTML fixture metadata: {exc}")
+    check_html_fixture("html5lib")
+    check_html_fixture("references")
+    check_entities()
 
     try:
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]

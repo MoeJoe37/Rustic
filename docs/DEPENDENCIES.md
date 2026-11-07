@@ -95,6 +95,12 @@ directories retain notices, source revisions/digests, selection manifests and
 reproduction tooling. These are offline test expectations; runtime crates still
 have no third-party Rust dependencies or parser/engine implementations.
 
+The HTML runtime now uses a generated table of WHATWG named-reference data.
+Its vendored JSON source, source/table digests, snapshot date, reproduction tool
+and WHATWG source-code license notice are retained under `rustic-html` data/source.
+This is standards data behind an original parser/lookup algorithm. No external
+Rust library or existing parser was introduced. See [HTML data provenance](HTML.md).
+
 The AGPL license already present in the repository is retained. Workspace package
 metadata uses `AGPL-3.0-only`; changing the licensing policy is a maintainer
 decision, not an incidental dependency or scaffolding change.

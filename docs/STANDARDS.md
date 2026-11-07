@@ -11,6 +11,9 @@ No HTML, CSS, JavaScript, or network behavior is implemented at M0.
 Current M1 evidence includes the original [URL/parser and origin subset](URL.md)
 with 685 pinned upstream URL-data cases. This is not full browser WPT conformance
 and does not implement the remaining IDNA/file/blob or browser binding features.
+HTML evidence now includes streaming input, tags/declarations and character
+references, with 1,079 selected declaration cases and all 4,626 cases in three
+pinned reference files; [HTML.md](HTML.md) records exact scope and provenance.
 
 The full-product baseline targets complete required CSS/ECMAScript semantics and
 broad real-site interoperability, including GPU-backed APIs, WebAssembly and the

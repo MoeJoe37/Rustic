@@ -321,14 +321,7 @@ fn exact_resource_boundaries_are_enforced_before_further_output() {
 }
 
 #[test]
-fn unsupported_syntax_fails_instead_of_silently_changing_meaning() {
-    for bytes in ["a&b", "<a x='&amp;'>", "<a x=&gt;>"] {
-        assert_fatal(
-            bytes.as_bytes(),
-            TokenizerLimits::default(),
-            HtmlError::UnsupportedCharacterReference,
-        );
-    }
+fn ampersands_in_tag_and_attribute_names_are_literal() {
     let (tokens, _) = tokenize(&[b"<a&b x&y=z>"], TokenizerLimits::default());
     assert_start(&tokens[0], "a&b", &[("x&y", "z")], false);
 }

@@ -11,6 +11,7 @@ enum Expected {
         bool,
     ),
     Instruction(&'static str, &'static str),
+    StartTag(&'static str, &'static [(&'static str, &'static str)], bool),
 }
 
 struct Case {
@@ -24,6 +25,9 @@ struct Case {
 
 #[path = "fixtures/html5lib_cases.rs"]
 mod fixtures;
+
+#[path = "fixtures/references_cases.rs"]
+mod references;
 
 fn tokenize(chunks: &[&[u8]], case: &Case) -> (Vec<Token>, Vec<Diagnostic>) {
     let mut tokenizer = HtmlTokenizer::default();
@@ -74,16 +78,45 @@ fn token_matches(actual: &Token, expected: &Expected) -> bool {
         (Token::ProcessingInstruction(data), Expected::Instruction(target, value)) => {
             (data.target(), data.data()) == (*target, *value)
         }
+        (Token::StartTag(tag), Expected::StartTag(name, attributes, flag)) => {
+            tag.name() == *name
+                && tag.self_closing() == *flag
+                && tag.attributes().len() == attributes.len()
+                && attributes.iter().all(|(name, value)| {
+                    tag.attributes()
+                        .iter()
+                        .any(|attribute| attribute.name() == *name && attribute.value() == *value)
+                })
+        }
         _ => false,
     }
 }
 
 #[test]
 fn pinned_declaration_corpus_and_all_input_splits_have_no_unexpected_failures() {
-    assert_eq!(fixtures::CASES.len(), fixtures::SELECTED);
+    run_cases(
+        "declarations",
+        fixtures::CASES,
+        fixtures::SELECTED,
+        fixtures::UPSTREAM,
+    );
+}
+
+#[test]
+fn pinned_reference_corpus_and_all_input_splits_have_no_unexpected_failures() {
+    run_cases(
+        "references",
+        references::CASES,
+        references::SELECTED,
+        references::UPSTREAM,
+    );
+}
+
+fn run_cases(suite: &str, cases: &[Case], selected: usize, upstream: usize) {
+    assert_eq!(cases.len(), selected);
     let mut failures = Vec::new();
     let mut split_runs = 0;
-    for case in fixtures::CASES {
+    for case in cases {
         let bytes = case.input.as_bytes();
         let (tokens, errors) = tokenize(&[bytes], case);
         let kinds: Vec<_> = errors.iter().map(|error| error.kind).collect();
@@ -125,9 +158,6 @@ fn pinned_declaration_corpus_and_all_input_splits_have_no_unexpected_failures() 
         failures.join("\n")
     );
     println!(
-        "html5lib declaration subset: {} selected / {} upstream; {split_runs} two-chunk splits and {} one-byte runs passed.",
-        fixtures::SELECTED,
-        fixtures::UPSTREAM,
-        fixtures::SELECTED
+        "html5lib {suite} subset: {selected} selected / {upstream} upstream; {split_runs} two-chunk splits and {selected} one-byte runs passed."
     );
 }

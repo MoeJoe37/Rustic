@@ -382,8 +382,29 @@
         {
           "id": "html.references",
           "label": "Full named/numeric character references",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/reference.rs",
+              "marker": "pub(super) fn reference_step"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/references.rs",
+              "marker": "fn longest_named_match_preserves_case_and_two_scalar_values"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/references.rs",
+              "marker": "fn expanded_payloads_and_reference_errors_respect_resource_limits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_reference_corpus_and_all_input_splits_have_no_unexpected_failures"
+            }
+          ]
         },
         {
           "id": "html.declarations",

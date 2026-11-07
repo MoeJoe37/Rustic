@@ -59,6 +59,20 @@ class HtmlImportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "full upstream commit SHA"):
             importer.generate({}, "main")
 
+    def test_reference_suite_keeps_attributes_and_uses_a_separate_selection_policy(self):
+        case = {"description": "attribute", "input": "<a x=&amp;>", "output": [["StartTag", "a", {"x": "&"}]]}
+        self.assertIsNone(importer.reference_exclusion(case))
+        self.assertEqual(importer.exclusion(case), "outside_declaration_entry_points")
+        sources = {path: json.dumps({"tests": [case]}).encode() for path in importer.REFERENCE_FILES}
+        rust, metadata = importer.generate(sources, "a" * 40, "references")
+        self.assertIn('Expected::StartTag("a", &[("x", "&")], false)', rust)
+        manifest = json.loads(metadata)
+        self.assertEqual(manifest["selection_policy"], importer.REFERENCE_POLICY)
+        self.assertEqual(manifest["selected_cases"], 3)
+        invalid = copy.deepcopy(case)
+        invalid["output"][0][2]["x"] = "\ud800"
+        self.assertEqual(importer.reference_exclusion(invalid), "surrogate_input_or_output")
+
 
 if __name__ == "__main__":
     unittest.main()

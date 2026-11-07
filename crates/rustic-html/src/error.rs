@@ -1,6 +1,6 @@
 use std::fmt;
 
-/// Fatal resource, lifecycle or explicitly unsupported tokenizer condition.
+/// Resource, cancellation or stream-lifecycle condition.
 ///
 /// Fatal errors poison the stream. Earlier successful feed results remain valid;
 /// a failing call returns no partial result and cannot be retried on that stream.
@@ -24,8 +24,6 @@ pub enum HtmlError {
     AlreadyFinished,
     /// A prior fatal error made further input invalid.
     Poisoned,
-    /// Character-reference tokenization is not implemented yet.
-    UnsupportedCharacterReference,
 }
 
 impl fmt::Display for HtmlError {
@@ -40,7 +38,6 @@ impl fmt::Display for HtmlError {
             Self::Cancelled => "HTML processing cancelled",
             Self::AlreadyFinished => "HTML stream is already finished",
             Self::Poisoned => "HTML stream previously failed",
-            Self::UnsupportedCharacterReference => "HTML character references are not implemented",
         })
     }
 }
@@ -124,6 +121,22 @@ pub enum DiagnosticKind {
     DisallowedInstructionTarget,
     /// An unfinished processing instruction was discarded at EOF.
     EofInProcessingInstruction,
+    /// A matched character reference lacked its semicolon.
+    MissingSemicolonAfterCharacterReference,
+    /// An ambiguous ampersand ended with an unknown name and a semicolon.
+    UnknownNamedCharacterReference,
+    /// A numeric reference had no digits after its prefix.
+    AbsenceOfDigitsInNumericReference,
+    /// A reference to zero recovered as U+FFFD.
+    NullCharacterReference,
+    /// A numeric reference exceeded the Unicode scalar range.
+    CharacterReferenceOutsideUnicodeRange,
+    /// A surrogate reference recovered as U+FFFD.
+    SurrogateCharacterReference,
+    /// A numeric reference preserved a Unicode noncharacter with a diagnostic.
+    NoncharacterCharacterReference,
+    /// A numeric reference used a disallowed control, with legacy C1 mapping.
+    ControlCharacterReference,
 }
 
 /// Diagnostic location in the normalized scalar-value stream.

@@ -56,12 +56,29 @@ An individual scalar larger than the configured text chunk limit fails. Consumer
 must allow adjacent character tokens; grouping has no HTML semantic meaning.
 The tokenizer may retain the last text chunk until more input or EOF arrives.
 
+Named and numeric character references expand in data and quoted/unquoted
+attribute values. The complete 2,231-entry WHATWG name table includes 106 legacy
+semicolonless spellings and two-scalar values. Matching uses the longest valid
+name, preserves case, and handles the historical attribute exception when a
+semicolonless name is followed by ASCII alphanumeric text or `=`. Unknown names
+and malformed numeric prefixes preserve their literal spelling with the prescribed
+diagnostics. A bare ampersand is ordinary data.
+
+Decimal/hex references use checked accumulation, Unicode-range/surrogate/null
+recovery, noncharacter/control diagnostics and legacy C1 remapping. Decoded
+characters go directly to their destination: a decoded quote cannot close an
+attribute and a decoded `<` cannot begin a tag. Numeric CR is output data and is
+not fed through raw-input newline preprocessing again. Ampersands in tag/attribute
+names, comments, doctype identifiers and instruction data remain literal.
+
 Diagnostics use zero-based **normalized Unicode scalar offsets**, with EOF at
 the normalized stream length. They are neither raw input byte offsets nor DOM
 UTF-16 offsets. Original-byte mapping, line/column information, decoder error
 diagnostics and input control/noncharacter diagnostics remain future work.
 Keyword lookahead failures point to the first candidate character; EOF is used
 when an empty lookahead has no character. These offsets are stable across feeds.
+Missing-semicolon diagnostics point immediately after the matched name/digits;
+longest-match lookahead does not move that location to a later mismatch.
 
 ## Limits and stream lifecycle
 
@@ -82,14 +99,18 @@ additional leading `?`. Deferred comment delimiter characters are charged when
 they become data. Declaration/doctype lookahead retains at most six ASCII bytes
 apart from the current candidate; it is separate from a budgeted instruction
 target. Punctuation/whitespace not stored as payload and ignored bogus-doctype
-text are covered by the raw-input budget. These are logical resource limits rather than
+text are covered by the raw-input budget. Character-reference scratch retains at
+most a 32-byte possible name plus its current candidate. Numeric digits are not
+retained; overflow uses a fixed-size accumulator/flag. Expanded attribute/text
+payloads consume the existing token/chunk budgets, and all reference errors use
+the diagnostic budget. These are logical resource limits rather than
 total process memory guarantees. The decoder temporarily owns a copy of a feed
 and its decoded output; replacement characters can expand input bytes. A returned
 token vector is bounded by input and token budgets. Allocation failure is not a
 recoverable contract. No content-controlled recursion is used.
 
 Both input and tokenizer check shared cooperative cancellation, including on an
-empty feed or EOF. After a resource, cancellation or unsupported-feature error,
+empty feed or EOF. After a resource or cancellation error,
 the stream is poisoned and rejects further calls. Tokens returned by earlier
 successful feeds remain final. A failing call returns no partial vector; the
 consumer must terminate the document and discard partial parsing state. Internal
@@ -98,23 +119,18 @@ stream; another feed/finish returns `AlreadyFinished`.
 
 ## Deliberate remaining scope
 
-Character-reference entry in data or attribute values currently returns
-`UnsupportedCharacterReference`, including a bare ampersand. Ampersands in tag
-or attribute names are ordinary name data. Ampersands in comments, doctype
-identifiers and processing-instruction data remain literal. Unsupported
-character-reference syntax fails rather than producing a silently altered stream.
-
 RCDATA, RAWTEXT, script data and plaintext modes are not implemented. There is no
 tree builder to select those modes; a tokenized `script` or `style` start tag
 does not activate special handling. Encoding sniffing, legacy decoders, restart,
 parser/script reentry, foreign content and complete HTML recovery remain planned.
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
-DOC-05b, DOC-06 and the broader corpus/fuzz gate remain open.
+DOC-05b now has reference expansion, while alternate text modes remain pending.
+DOC-06 and the broader corpus/fuzz gate remain open.
 
 ## Evidence and references
 
-Twenty-nine focused Rust integration tests cover exact limits, poisoning, cancellation,
+Forty focused Rust integration tests cover exact limits, poisoning, cancellation,
 attributes, error recovery and EOF. Input tests compare **all 65,536 two-byte
 sequences** with an independent whole-buffer lossy decode/preprocessing oracle,
 using both unbroken and split input. Further fixtures split BOMs, valid and
@@ -153,6 +169,34 @@ Omit `--check` only for a deliberate fixture update, with reviewed selection and
 expected-result changes. Three Python tests cover importer selection, escaping,
 field conversion and provenance; repository checks verify fixture integrity.
 
+A second corpus test passes **all 4,626 cases** from the pinned `entities.test`,
+`namedEntities.test` and `numericEntities.test` files: zero cases excluded by its
+separate default-data-state/reference policy. It compares character data,
+attribute values and ordered diagnostic kinds, checks 43,069 two-chunk splits and
+4,626 one-byte runs, and verifies one EOF. Attribute dictionaries are compared by
+name/value; separate tests enforce source order. The existing declaration subset
+and its exclusions are unchanged. Upstream error line/column positions and
+unimplemented tokenizer contexts are not conformance claims.
+
+[Reference corpus provenance](../crates/rustic-html/tests/fixtures/references_manifest.json)
+records the same pinned upstream revision, source/generated digests, indices and
+counts. Reproduce it with:
+
+```sh
+python3 tools/import_html_tests.py --source-dir /path/to/html5lib-tests --revision c5495c539ca8a79c3c5107f5f14010bcff9a35d5 --suite references --check
+```
+
+The runtime name table is generated from the vendored WHATWG
+[entities.json](../crates/rustic-html/data/entities.json), snapshot 2026-11-07.
+[Its manifest](../crates/rustic-html/data/entities_manifest.json) pins the canonical
+source URL, source/table SHA-256 digests, counts and maximum name size; the
+[WHATWG notice](../crates/rustic-html/data/WHATWG-LICENSE.md) preserves source-code
+licensing/attribution. This imports standard character data, not another engine's
+parser. `python3 tools/import_html_entities.py --check` reproduces it offline.
+Updating data requires an explicit snapshot date and reviewed source/table/notice
+changes. Repository checks regenerate/compare it; Python tests reject duplicate
+keys, invalid scalars/names, mismatched values and missing legacy equivalents.
+
 ```sh
 cargo test --locked -p rustic-html
 cargo test --locked -p rustic-html --test corpus -- --nocapture
@@ -160,7 +204,7 @@ cargo run --locked -p rustic-html --example tokenize
 ```
 
 The example tokenizes a doctype, comment, processing instruction and
-tag/attribute/text stream in three-byte feeds. It does not build a document.
+tag/attribute/text/reference stream in three-byte feeds. It does not build a document.
 
 Implementation review: **2026-11-07**, against the WHATWG HTML Living Standard
 last updated **2026-11-06**: [input preprocessing](https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream),
@@ -171,6 +215,8 @@ last updated **2026-11-06**: [input preprocessing](https://html.spec.whatwg.org/
 [declarations/comments](https://html.spec.whatwg.org/multipage/parsing.html#markup-declaration-open-state),
 [doctypes](https://html.spec.whatwg.org/multipage/parsing.html#doctype-state) and
 [processing instructions](https://html.spec.whatwg.org/multipage/parsing.html#processing-instruction-open-state).
+Reference handling follows [character-reference states](https://html.spec.whatwg.org/multipage/parsing.html#character-reference-state)
+and the [named-reference table](https://html.spec.whatwg.org/multipage/named-characters.html).
 UTF-8 behavior uses the Rust standard library's validated decoding primitives;
 Rustic owns the incremental buffering and HTML preprocessing/state machine.
 No browser engine or external parser implementation is used.

@@ -10,7 +10,7 @@ impl Attribute {
     pub fn name(&self) -> &str {
         &self.name
     }
-    /// Decoded scalar-value text; character-reference support is still pending.
+    /// Scalar-value text after named/numeric character-reference expansion.
     pub fn value(&self) -> &str {
         &self.value
     }

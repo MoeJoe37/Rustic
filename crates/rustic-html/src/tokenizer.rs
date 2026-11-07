@@ -9,10 +9,12 @@ mod comment;
 mod declaration;
 mod doctype;
 mod instruction;
+mod reference;
 
 use comment::CommentState;
 use doctype::DoctypeState;
 use instruction::InstructionState;
+use reference::{CharacterReference, ReferenceContext, ReferenceState};
 
 /// Original-input, token, attribute and diagnostic budgets for one stream.
 #[derive(Clone, Copy, Debug)]
@@ -62,6 +64,7 @@ enum State {
     Comment(CommentState),
     Doctype(DoctypeState),
     Instruction(InstructionState),
+    Reference(ReferenceState),
 }
 
 #[derive(Debug)]
@@ -75,10 +78,9 @@ struct BuildingTag {
 
 /// Incremental tokenizer for data, tags and declarations in HTML context.
 ///
-/// Feed boundaries do not change token grouping. Character references fail
-/// explicitly. RCDATA/RAWTEXT/script/foreign-content modes and DOM tree
+/// Feed boundaries do not change token grouping. RCDATA/RAWTEXT/script/foreign-content modes and DOM tree
 /// construction remain unimplemented. Recoverable syntax errors are diagnosed;
-/// fatal/unsupported conditions poison the stream instead of guessing behavior.
+/// fatal conditions poison the stream instead of allowing a retry.
 #[derive(Debug)]
 pub struct HtmlTokenizer {
     input: Utf8Input,
@@ -91,6 +93,7 @@ pub struct HtmlTokenizer {
     comment: String,
     doctype: Option<Doctype>,
     instruction: Option<ProcessingInstruction>,
+    reference: Option<CharacterReference>,
     tokens: Budget,
     text: String,
     diagnostics: Vec<Diagnostic>,
@@ -127,6 +130,7 @@ impl HtmlTokenizer {
             comment: String::new(),
             doctype: None,
             instruction: None,
+            reference: None,
             tokens: Budget::new(limits.max_tokens),
             text: String::new(),
             diagnostics: Vec::new(),
@@ -166,6 +170,9 @@ impl HtmlTokenizer {
             let decoded = self.input.finish()?;
             let mut output = Vec::new();
             self.consume(&decoded, &mut output)?;
+            if let State::Reference(state) = self.state {
+                self.finish_reference(state, &mut output)?;
+            }
             if matches!(self.state, State::AttributeName) {
                 self.finish_attribute_name()?;
             }
@@ -236,7 +243,7 @@ impl HtmlTokenizer {
                     self.flush_text(output)?;
                     self.state = State::TagOpen;
                 }
-                '&' => return Err(HtmlError::UnsupportedCharacterReference),
+                '&' => self.start_reference(ReferenceContext::Data),
                 _ => {
                     if value == '\0' {
                         self.diagnostic(DiagnosticKind::UnexpectedNull)?;
@@ -354,6 +361,8 @@ impl HtmlTokenizer {
                 if value == quote {
                     self.finish_attribute()?;
                     self.state = State::AfterQuotedValue;
+                } else if value == '&' {
+                    self.start_reference(ReferenceContext::QuotedAttribute(quote));
                 } else {
                     self.push_attribute_value(value)?;
                 }
@@ -367,6 +376,7 @@ impl HtmlTokenizer {
                     self.finish_attribute()?;
                     self.emit_tag(output)?;
                 }
+                '&' => self.start_reference(ReferenceContext::UnquotedAttribute),
                 _ => {
                     if matches!(value, '"' | '\'' | '<' | '=' | '`') {
                         self.diagnostic(DiagnosticKind::UnexpectedAttributeCharacter)?;
@@ -398,6 +408,7 @@ impl HtmlTokenizer {
             State::Comment(state) => return self.comment_step(state, value, output),
             State::Doctype(state) => return self.doctype_step(state, value, output),
             State::Instruction(state) => return self.instruction_step(state, value, output),
+            State::Reference(state) => return self.reference_step(state, value, output),
         }
         Ok(false)
     }
@@ -470,9 +481,6 @@ impl HtmlTokenizer {
     }
 
     fn push_attribute_value(&mut self, value: char) -> Result<(), HtmlError> {
-        if value == '&' {
-            return Err(HtmlError::UnsupportedCharacterReference);
-        }
         let value = self.replace_null(value)?;
         self.charge_token(value)?;
         self.building()

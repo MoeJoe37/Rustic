@@ -120,8 +120,7 @@ BOM stripping, invalid-sequence replacement and
 CR/CRLF preprocessing survive arbitrary byte boundaries. Token grouping is
 deterministic across feeds. Names use ASCII case normalization; attributes retain
 source order and the first duplicate. Supported syntax errors have bounded
-diagnostics and recovery; unsupported character references fail
-explicitly. EOF, budgets and cancellation have defined terminal behavior.
+diagnostics and recovery. EOF, budgets and cancellation have defined terminal behavior.
 
 Twenty-nine focused integration tests include every two-byte input compared with a separate
 whole-buffer decoding/preprocessing oracle, fixed expected tokens/errors, all
@@ -143,10 +142,28 @@ diagnostic offsets across feeds. Provenance, exclusions, notices and untested
 fields are pinned; the importer has three Python tests. This begins DOC-08's
 corpus work without claiming full tokenizer conformance or fuzzing.
 
-DOC-05a's initial data/tag/comment scope is complete. DOC-05b character references
-and alternate text modes, foreign-content CDATA, tree building and loading remain
-pending. The catalog's `html.input`, `html.tags` and `html.declarations` capabilities
-describe only their declared tested scope.
+DOC-05a's initial data/tag/comment scope is complete. Its capabilities describe
+their declared tested scope; full tokenizer/tree construction remains unfinished.
+
+## DOC-05b (partial) — Character references
+
+Named/numeric references now expand in data and quoted/unquoted attributes, with
+longest-name matching, legacy attribute ambiguity, Unicode/control recovery and
+EOF handling. Expanded characters are appended as data rather than retokenized.
+The original lookup/state machine uses a bounded name probe and constant-size
+numeric accumulator, with decoded-payload budgets and cooperative cancellation.
+
+Eleven new focused tests cover state restoration, offsets, decoded markup/quotes,
+two-scalar values, malformed prefixes, large numbers, exact budgets and poisoned
+streams. An offline reference corpus passes all 4,626 upstream cases with zero
+exclusions, plus 43,069 two-chunk splits and 4,626 one-byte runs. The declaration
+subset remains unchanged. Generated WHATWG standard data has 2,231 names, a
+pinned source snapshot/digests, a reproducible generator and retained notice.
+See [HTML.md](HTML.md) for algorithms, provenance and untested contexts.
+
+`html.references` is complete for its algorithmic scope; DOC-05b still needs
+RCDATA/RAWTEXT/script/plaintext modes and broader encoding work. Foreign-content
+CDATA, tree construction and loading remain pending. No full-parser claim is made.
 
 ## Queue status
 
@@ -180,7 +197,8 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
-| DOC-05b and DOC-06a/b: remaining tokenizer and tree builder | Not started |
+| DOC-05b: references and alternate text modes | Partial: named/numeric references complete; text modes and broader encoding cases pending |
+| DOC-06a/b: tree builder | Not started |
 | DOC-07: bounded HTML loader/CLI | Not started |
 | DOC-08: parser corpus/fuzzing | Partial: pinned declaration corpus and chunk splits; tree corpus and fuzz targets pending |
 | DOC-09: traced node/JS ownership prototype | Not started |

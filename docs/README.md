@@ -15,6 +15,8 @@ boundary. Status changes require test evidence rather than a checkbox alone.
 6. [Development](DEVELOPMENT.md) and [dependencies](DEPENDENCIES.md): how to work here.
 7. [Decision records](adr/README.md): why key choices were made.
 
+See [implementation progress](IMPLEMENTATION.md) for completed tasks and their contracts.
+
 ## Implementation inventory
 
 | Item | Status | Evidence |
@@ -22,6 +24,7 @@ boundary. Status changes require test evidence rather than a checkbox alone.
 | Workspace, lockfile, pinned toolchain, lint policy | Implemented | Root Cargo/toolchain files |
 | Viewport dimensions and pixel budget | Implemented | `rustic-engine` validation and boundary tests |
 | CLI information/help/version and rejection of unsupported commands | Implemented | `rustic-cli` and subprocess tests |
+| Document/node identity, budgets, cancellation, byte spans and clocks | Implemented | `rustic-base` and boundary/concurrency tests; DOC-01 |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
 | HTML, DOM, CSS, layout, painting, JavaScript | Planned | M1–M5 |

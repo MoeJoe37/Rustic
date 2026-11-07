@@ -6,7 +6,9 @@ The outcome is a new engine, not a wrapper around an existing renderer or JS VM.
 Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
-At this baseline M0 has repository scaffolding only; M1–M10 are unstarted.
+M0 has a verified repository baseline. M1 implementation has started with DOC-01;
+M2–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
+current completed scope without implying completion of the entire milestone.
 
 Assume one primary maintainer with occasional contributions. A small team can
 work on the independent tracks below after agreeing on interfaces. Full modern
@@ -68,7 +70,8 @@ not scheduled automation created by this commit.
 - [x] Pin development Rust, declare/test MSRV, and forbid unsafe project code.
 - [x] Define CI for formatting, Clippy, docs, builds/tests, and repository checks.
 - [x] Configure weekly Dependabot checks for Cargo and GitHub Actions.
-- [ ] Record a successful first CI run and review the baseline design.
+- [x] Record a successful baseline CI run ([run](https://github.com/MoeJoe37/Rustic/actions/runs/42371959628)).
+- [x] Proceed with the baseline design following maintainer authorization to execute the plan.
 - [ ] Configure repository rules requiring the CI gate after it has run once.
 
 **Exit evidence:** clean CI for the committed SHA, CLI `info` works on three

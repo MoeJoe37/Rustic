@@ -6,8 +6,8 @@ Rustic is an independent browser engine being built from scratch in Rust. The
 goal is a standards-oriented, embeddable engine with its own HTML/CSS pipeline,
 DOM, layout, painting, JavaScript runtime, and web platform integration.
 
-**Current stage: foundation and design.** This repository contains the project
-architecture, implementation plan, a small Rust workspace, and continuous
+**Current stage: early M1 document-core implementation.** This repository contains the project
+architecture, implementation plan, shared engine primitives, and continuous
 integration. It does not yet parse HTML, execute JavaScript, fetch web pages, or
 render content. A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
@@ -17,6 +17,7 @@ engineering effort; milestones below describe targets, not existing support.
 | Document | Purpose |
 | --- | --- |
 | [Documentation index](docs/README.md) | Reading order and current implementation inventory |
+| [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
 | [Roadmap](docs/ROADMAP.md) | Dependency-ordered milestones, acceptance gates, first tasks, and risks |
 | [Standards and compatibility](docs/STANDARDS.md) | Feature scope, authoritative references, and conformance reporting |
@@ -44,8 +45,9 @@ supported Rust version is **1.85.0**, tested separately in CI; the workspace use
 the 2024 edition. `rustic info`, `--help`, and `--version` are the only commands.
 Other arguments, including URLs, return an error instead of implying navigation.
 
-The two current crates are `rustic-engine` (bounded viewport configuration) and
-`rustic-cli` (development entry point). Future crates listed in the architecture
+The current crates are `rustic-base` (identity, budgets, cancellation, source spans
+and clocks), `rustic-engine` (bounded viewport configuration), and `rustic-cli`
+(development entry point). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.
 
 ## Development direction

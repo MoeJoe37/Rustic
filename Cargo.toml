@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rustic-engine", "crates/rustic-cli"]
+members = ["crates/rustic-base", "crates/rustic-engine", "crates/rustic-cli"]
 resolver = "3"
 
 [workspace.package]

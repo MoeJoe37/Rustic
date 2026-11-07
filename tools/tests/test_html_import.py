@@ -73,6 +73,29 @@ class HtmlImportTests(unittest.TestCase):
         invalid["output"][0][2]["x"] = "\ud800"
         self.assertEqual(importer.reference_exclusion(invalid), "surrogate_input_or_output")
 
+    def test_text_suite_expands_contexts_without_counting_other_states(self):
+        case = {"description": "end tag", "input": "</title>", "initialStates": ["Data state", "RCDATA state", "RAWTEXT state"], "lastStartTag": "title", "output": [["EndTag", "title"]]}
+        ignored = {"description": "ordinary", "input": "", "output": []}
+        sources = {path: json.dumps({"tests": [case, ignored] if i == 0 else []}).encode() for i, path in enumerate(importer.TEXT_FILES)}
+        rust, metadata = importer.generate(sources, "a" * 40, "text")
+        manifest = json.loads(metadata)
+        self.assertEqual((manifest["selected_cases"], manifest["selected_state_runs"], manifest["excluded_cases"]), (1, 2, 1))
+        self.assertEqual(manifest["omitted_selected_case_state_runs"], 1)
+        self.assertEqual(manifest["sources"][0]["selected_states"], {"0": ["RCDATA state", "RAWTEXT state"]})
+        self.assertIn('Expected::EndTag("title")', rust)
+        self.assertIn('mode: M::Rcdata, last_start_tag: Some("title")', rust)
+        self.assertIn("pub const STATE_RUNS: usize = 2", rust)
+
+    def test_text_double_escapes_combine_pairs_and_preserve_unpaired_exclusion(self):
+        case = {"description": "escaped", "initialStates": ["Script data state"], "doubleEscaped": True, "input": r"\u0000\uD83D\uDE42", "output": [["Character", r"\uFFFD\uD83D\uDE42"]], "errors": [{"code": "unexpected-null-character"}]}
+        normalized = importer.text_case(case)
+        self.assertEqual(normalized["input"], "\0🙂")
+        self.assertEqual(normalized["output"], [["Character", "\ufffd🙂"]])
+        self.assertIsNone(importer.text_exclusion(normalized))
+        case["input"] = r"\uD800"
+        self.assertEqual(importer.text_exclusion(importer.text_case(case)), "surrogate_input_output_or_context")
+        self.assertEqual(case["output"], [["Character", r"\uFFFD\uD83D\uDE42"]])
+
 
 if __name__ == "__main__":
     unittest.main()

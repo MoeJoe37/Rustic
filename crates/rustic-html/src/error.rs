@@ -2,8 +2,9 @@ use std::fmt;
 
 /// Resource, cancellation or stream-lifecycle condition.
 ///
-/// Fatal errors poison the stream. Earlier successful feed results remain valid;
-/// a failing call returns no partial result and cannot be retried on that stream.
+/// Resource/cancellation errors poison the stream; rejected lifecycle/control
+/// calls preserve it. Earlier successful results remain valid. A fatal failing
+/// call returns no partial result and cannot be retried on that stream.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HtmlError {
     /// Original input byte budget was exceeded.
@@ -20,10 +21,12 @@ pub enum HtmlError {
     InvalidLimits,
     /// Cooperative cancellation was requested.
     Cancelled,
-    /// Finish was already called successfully.
+    /// Input was already closed, or EOF processing already completed.
     AlreadyFinished,
     /// A prior fatal error made further input invalid.
     Poisoned,
+    /// A mode change was attempted outside a delivered start-tag boundary.
+    InvalidModeChange,
 }
 
 impl fmt::Display for HtmlError {
@@ -36,8 +39,9 @@ impl fmt::Display for HtmlError {
             Self::DiagnosticLimit => "HTML diagnostic count limit exceeded",
             Self::InvalidLimits => "invalid HTML tokenizer limits",
             Self::Cancelled => "HTML processing cancelled",
-            Self::AlreadyFinished => "HTML stream is already finished",
+            Self::AlreadyFinished => "HTML input is already closed",
             Self::Poisoned => "HTML stream previously failed",
+            Self::InvalidModeChange => "HTML mode change requires a start-tag boundary",
         })
     }
 }
@@ -121,6 +125,8 @@ pub enum DiagnosticKind {
     DisallowedInstructionTarget,
     /// An unfinished processing instruction was discarded at EOF.
     EofInProcessingInstruction,
+    /// EOF interrupted script data's escaped/comment-like states.
+    EofInScriptHtmlCommentLikeText,
     /// A matched character reference lacked its semicolon.
     MissingSemicolonAfterCharacterReference,
     /// An ambiguous ampersand ended with an unknown name and a semicolon.

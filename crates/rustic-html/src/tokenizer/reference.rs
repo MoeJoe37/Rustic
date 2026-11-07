@@ -5,6 +5,7 @@ use super::{DiagnosticKind as D, HtmlError, HtmlTokenizer, State, Token};
 #[derive(Clone, Copy, Debug)]
 pub(super) enum ReferenceContext {
     Data,
+    Rcdata,
     QuotedAttribute(char),
     UnquotedAttribute,
 }
@@ -13,13 +14,14 @@ impl ReferenceContext {
     fn state(self) -> State {
         match self {
             Self::Data => State::Data,
+            Self::Rcdata => State::Text(super::TextState::Rcdata),
             Self::QuotedAttribute(quote) => State::QuotedValue(quote),
             Self::UnquotedAttribute => State::UnquotedValue,
         }
     }
 
     fn in_attribute(self) -> bool {
-        !matches!(self, Self::Data)
+        matches!(self, Self::QuotedAttribute(_) | Self::UnquotedAttribute)
     }
 }
 
@@ -158,7 +160,7 @@ impl HtmlTokenizer {
         output: &mut Vec<Token>,
     ) -> Result<(), HtmlError> {
         match context {
-            ReferenceContext::Data => self.text_char(value, output),
+            ReferenceContext::Data | ReferenceContext::Rcdata => self.text_char(value, output),
             _ => self.push_attribute_value(value),
         }
     }

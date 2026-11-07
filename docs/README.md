@@ -33,7 +33,8 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Bounded deterministic subtree dump and executable tree example | Implemented diagnostic tool | `rustic-dom` example and golden/escaping/boundary tests |
 | Android/iOS shared-library cross-compilation | Configured | Four mobile target checks; runtime and host work in [mobile plan](MOBILE.md) |
 | URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope and 685 pinned cases](URL.md) |
-| Incremental UTF-8, tags/attributes, declarations and named/numeric references | Implemented HTML-context subset | `rustic-html`; [40 focused tests and two pinned corpora](HTML.md) |
+| Incremental UTF-8, tags/attributes, declarations, references and text modes | Implemented declared tokenizer scope | `rustic-html`; [53 focused tests and three pinned corpora](HTML.md) |
+| Token-at-a-time input drive and text-mode feedback | Implemented internal contract | Same-chunk feedback, queued-input, control/lifecycle tests; [ADR 0008](adr/0008-tokenizer-drive.md) |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
 | Remaining HTML tokenizer states/tree building, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
@@ -41,6 +42,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Pinned WPT URL data subset | Implemented offline runner | 685 selected URL records; no full browser harness |
 | Pinned html5lib declaration tokenizer subset | Implemented offline runner | 1,079 selected cases; token fields/error codes and all fixture splits |
 | Pinned html5lib character-reference corpus | Implemented offline runner | All 4,626 cases in three pinned files; fields/diagnostics and all fixture splits |
+| Pinned html5lib text-mode corpus | Implemented offline runner | 109 selected records expanded into 282 contexts; initial modes/last tag and all fixture splits |
 | Whole-engine progress graph | Implemented and automated | 21 subsystems, 172 capability gates; [methodology](PROGRESS.md) |
 | Brave comparison, competitive browser targets, Wasm, native MV2 extensions and uBO port | Accepted product requirements; implementation pending | [PRODUCT.md](PRODUCT.md), [EXTENSIONS.md](EXTENSIONS.md), ADR 0007 |
 | Browser WPT harness, Test262, fuzzing, benchmarks, releases | Planned | Milestone-specific gates; no broad results claimed |

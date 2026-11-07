@@ -1,7 +1,7 @@
 # HTML input and tokenizer foundations
 
 `rustic-html` is an original, safe Rust implementation depending only on
-`rustic-base`. It tokenizes data, tags/attributes and declarations in HTML context. It
+`rustic-base`. It tokenizes data, tags/attributes, declarations and text contexts. It
 does not construct a DOM, select encodings, load documents or render pages.
 
 ## Implemented behavior
@@ -71,6 +71,44 @@ attribute and a decoded `<` cannot begin a tag. Numeric CR is output data and is
 not fed through raw-input newline preprocessing again. Ampersands in tag/attribute
 names, comments, doctype identifiers and instruction data remain literal.
 
+RCDATA expands references and recognizes only the appropriate end tag; RAWTEXT
+keeps references/other markup literal. Script data implements the HTML escape,
+escaped and double-escaped states, not JavaScript parsing or execution. A literal
+`</script>` can close script data inside a JS-looking quoted string. Plaintext
+keeps markup/references literal through EOF. All four replace null with U+FFFD
+and the required diagnostic, while ordinary data retains its existing null rule.
+Incomplete end-tag probes recover their original spelling; appropriate end tags
+reuse the ordinary attribute/solidus recovery states. Escaped script EOF has its
+own diagnostic. Probes stop retaining characters as soon as a match is impossible.
+
+## Input drive and mode feedback
+
+Use `write(bytes)` to submit bounded UTF-8 input and `next_token()` to read one
+token at a time. After a start tag is delivered, `set_text_mode(TokenizerMode::...)`
+can select the context before another input scalar is processed, including when
+all remaining bytes are already queued. The tree builder owns that decision:
+namespace, insertion mode and scripting flags cannot be inferred from a tag name
+alone. The tokenizer does not automatically select modes for `title`/`style`/
+`script`. A rejected mode change returns `InvalidModeChange` without mutation or
+poisoning; the opportunity expires after more input/a token is processed.
+
+`end()` closes byte submission without parsing ahead. Continue reading through
+one EOF token; `next_token()` then returns `None` repeatedly. Before EOF, `None`
+means more input is needed (including buffered partial text/probes). Another
+write/end/finish after input closure returns `AlreadyFinished`, while queued input
+can still be consumed. Cancellation/fatal parse errors poison future reads and
+writes. `feed`/`finish` collect tokens for fixed-context consumers; use the pull
+driver for feedback within a chunk. `with_context` supplies an explicit initial
+mode and bounded last-start-tag name for tests and future fragment integration.
+It still consumes UTF-8 bytes and is not a DOM-string fragment parser.
+
+The decoder's owned normalized output moves into a queued-input buffer when
+possible. Consumed prefixes compact only after sufficient progress, avoiding a
+full suffix copy for every small write. Input is not parsed past a returned token
+boundary. Multiple emissions from one scalar/EOF recovery wait in a token queue.
+The same budgets cover both drivers; reference/tag/text modules retain their
+syntax responsibilities. See [ADR 0008](adr/0008-tokenizer-drive.md).
+
 Diagnostics use zero-based **normalized Unicode scalar offsets**, with EOF at
 the normalized stream length. They are neither raw input byte offsets nor DOM
 UTF-16 offsets. Original-byte mapping, line/column information, decoder error
@@ -103,7 +141,11 @@ text are covered by the raw-input budget. Character-reference scratch retains at
 most a 32-byte possible name plus its current candidate. Numeric digits are not
 retained; overflow uses a fixed-size accumulator/flag. Expanded attribute/text
 payloads consume the existing token/chunk budgets, and all reference errors use
-the diagnostic budget. These are logical resource limits rather than
+the diagnostic budget. Last-start-tag context and a matching end-tag probe are
+bounded by the markup-token byte limit; failed probes stream as literal text.
+Script keyword probes retain at most six ASCII bytes. Queued normalized input is
+bounded by cumulative raw input and decoding expansion; the token queue by the
+cumulative token limit. These are logical resource limits rather than
 total process memory guarantees. The decoder temporarily owns a copy of a feed
 and its decoded output; replacement characters can expand input bytes. A returned
 token vector is bounded by input and token budgets. Allocation failure is not a
@@ -119,18 +161,18 @@ stream; another feed/finish returns `AlreadyFinished`.
 
 ## Deliberate remaining scope
 
-RCDATA, RAWTEXT, script data and plaintext modes are not implemented. There is no
-tree builder to select those modes; a tokenized `script` or `style` start tag
-does not activate special handling. Encoding sniffing, legacy decoders, restart,
-parser/script reentry, foreign content and complete HTML recovery remain planned.
+There is no tree builder to select modes in a real document. Encoding sniffing,
+legacy decoders, restart, parser/script execution/reentry, foreign content and
+complete HTML recovery remain planned. DOM-string/UTF-16 fragment input is also
+separate from the current UTF-8 byte interface.
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
-DOC-05b now has reference expansion, while alternate text modes remain pending.
+DOC-05b now has reference expansion and all four text modes; broader encoding work,
 DOC-06 and the broader corpus/fuzz gate remain open.
 
 ## Evidence and references
 
-Forty focused Rust integration tests cover exact limits, poisoning, cancellation,
+Fifty-three focused Rust integration tests cover exact limits, poisoning, cancellation,
 attributes, error recovery and EOF. Input tests compare **all 65,536 two-byte
 sequences** with an independent whole-buffer lossy decode/preprocessing oracle,
 using both unbroken and split input. Further fixtures split BOMs, valid and
@@ -197,14 +239,34 @@ Updating data requires an explicit snapshot date and reviewed source/table/notic
 changes. Repository checks regenerate/compare it; Python tests reject duplicate
 keys, invalid scalars/names, mismatched values and missing legacy equivalents.
 
+A third corpus covers text states: **109 selected source records**, expanded into
+**282 mode/context runs**, from 1,865 records across seven pinned files. It checks
+last-start-tag context, double-escaped Unicode input/output, 1,902 two-chunk splits
+and 282 one-byte runs. Non-text initial states, unsupported input diagnostic codes
+and non-scalar inputs remain outside the declared selection. The manifest records
+omitted states from selected multi-state cases; no failure-driven exclusions were
+added. [Text corpus provenance](../crates/rustic-html/tests/fixtures/text_manifest.json)
+records all indices, states, counts and digests. Reproduce with `--suite text` in
+the same import command. Older declaration/reference selections remain unchanged.
+
+The upstream tokenizer fixtures provide decoded Unicode streams. The harness
+encodes them with an explicit transport BOM, which the byte decoder removes;
+this preserves an intentional leading U+FEFF in the fixture as content. Dedicated
+raw-byte input tests separately verify BOM stripping and every byte split. The
+runner compares token fields/ordered diagnostic kinds and local offset invariance;
+upstream line/column positions and full parser conformance remain unclaimed.
+
 ```sh
 cargo test --locked -p rustic-html
 cargo test --locked -p rustic-html --test corpus -- --nocapture
 cargo run --locked -p rustic-html --example tokenize
+cargo run --locked -p rustic-html --example text_modes
 ```
 
 The example tokenizes a doctype, comment, processing instruction and
 tag/attribute/text/reference stream in three-byte feeds. It does not build a document.
+The `text_modes` example drives explicit feedback for a known HTML fixture; that
+small selection helper is not a substitute for tree construction.
 
 Implementation review: **2026-11-07**, against the WHATWG HTML Living Standard
 last updated **2026-11-06**: [input preprocessing](https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream),
@@ -217,6 +279,10 @@ last updated **2026-11-06**: [input preprocessing](https://html.spec.whatwg.org/
 [processing instructions](https://html.spec.whatwg.org/multipage/parsing.html#processing-instruction-open-state).
 Reference handling follows [character-reference states](https://html.spec.whatwg.org/multipage/parsing.html#character-reference-state)
 and the [named-reference table](https://html.spec.whatwg.org/multipage/named-characters.html).
+Text states follow [RCDATA](https://html.spec.whatwg.org/multipage/parsing.html#rcdata-state),
+[RAWTEXT](https://html.spec.whatwg.org/multipage/parsing.html#rawtext-state),
+[script data](https://html.spec.whatwg.org/multipage/parsing.html#script-data-state) and
+[plaintext](https://html.spec.whatwg.org/multipage/parsing.html#plaintext-state).
 UTF-8 behavior uses the Rust standard library's validated decoding primitives;
 Rustic owns the incremental buffering and HTML preprocessing/state machine.
 No browser engine or external parser implementation is used.

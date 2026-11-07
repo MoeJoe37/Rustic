@@ -9,6 +9,7 @@ import sys
 import tomllib
 from urllib.parse import unquote, urlsplit
 import import_html_entities
+import import_html_tests
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,9 +61,17 @@ def check_html_fixture(stem: str) -> None:
                     or source["selected_cases"] + source["excluded_cases"] != source["upstream_cases"]
                     or sum(source["exclusion_reasons"].values()) != source["excluded_cases"]):
                 error(manifest_path, f"inconsistent source counts/indices: {source['path']}")
+            if "selected_states" in source:
+                states = source["selected_states"]
+                if (set(states) != {str(index) for index in indices}
+                        or sum(map(len, states.values())) != source["selected_state_runs"]
+                        or any(not modes or len(modes) != len(set(modes)) or not set(modes).issubset(import_html_tests.TEXT_MODES) for modes in states.values())):
+                    error(manifest_path, f"inconsistent text-state runs: {source['path']}")
         for count in ("upstream_cases", "selected_cases", "excluded_cases"):
             if sum(source[count] for source in sources) != manifest[count]:
                 error(manifest_path, f"inconsistent aggregate {count}")
+        if "selected_state_runs" in manifest and sum(source["selected_state_runs"] for source in sources) != manifest["selected_state_runs"]:
+            error(manifest_path, "inconsistent aggregate text-state runs")
     except (OSError, KeyError, TypeError, ValueError) as exc:
         error(manifest_path, f"invalid HTML fixture metadata: {exc}")
 
@@ -133,6 +142,7 @@ def main() -> int:
 
     check_html_fixture("html5lib")
     check_html_fixture("references")
+    check_html_fixture("text")
     check_entities()
 
     try:

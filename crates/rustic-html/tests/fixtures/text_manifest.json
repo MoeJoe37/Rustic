@@ -1,0 +1,912 @@
+{
+  "checked_fields": [
+    "complete token stream (adjacent character tokens coalesced)",
+    "doctype optional fields and force-quirks",
+    "ordered parse-error codes",
+    "all two-chunk byte splits and one-byte feeds",
+    "each declared supported text initial state",
+    "lastStartTag context",
+    "double-escaped scalar unescaping"
+  ],
+  "excluded_cases": 1756,
+  "expected_token_counts": {
+    "Character": 114,
+    "Comment": 1,
+    "EndTag": 23
+  },
+  "fixture_sha256": "6b976ee39abc38c6d30127ca07ef2065f2e0d122fd6687cecd1f0cb611049743",
+  "input_adapter": "Unicode fixture stream encoded as UTF-8 after an explicit transport BOM",
+  "license": "MIT; HTML5LIB-LICENSE.md",
+  "not_checked": [
+    "upstream error line/column positions",
+    "excluded cases/states",
+    "tree construction",
+    "full tokenizer conformance"
+  ],
+  "omitted_selected_case_state_runs": 49,
+  "selected_cases": 109,
+  "selected_state_runs": 282,
+  "selection_policy": "html-text-contexts-scalar-input-explicit-state-expansion-v1",
+  "sources": [
+    {
+      "excluded_cases": 56,
+      "exclusion_reasons": {
+        "outside_text_initial_states": 56
+      },
+      "omitted_selected_case_states": {},
+      "path": "tokenizer/test1.test",
+      "selected_array_indices": [
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "selected_cases": 13,
+      "selected_state_runs": 13,
+      "selected_states": {
+        "33": [
+          "Script data state"
+        ],
+        "34": [
+          "Script data state"
+        ],
+        "35": [
+          "Script data state"
+        ],
+        "36": [
+          "Script data state"
+        ],
+        "37": [
+          "Script data state"
+        ],
+        "38": [
+          "Script data state"
+        ],
+        "39": [
+          "Script data state"
+        ],
+        "40": [
+          "Script data state"
+        ],
+        "41": [
+          "Script data state"
+        ],
+        "42": [
+          "Script data state"
+        ],
+        "43": [
+          "Script data state"
+        ],
+        "44": [
+          "Script data state"
+        ],
+        "45": [
+          "Script data state"
+        ]
+      },
+      "source_git_blob": "5323fbbeae2c6116aab14a716c8df1174e7870fb",
+      "source_sha256": "524fcfa4d561a14f0c4e72e0573549abe6341fd4dfb8e16bc2dcf59a608a7219",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/test1.test",
+      "upstream_cases": 69
+    },
+    {
+      "excluded_cases": 46,
+      "exclusion_reasons": {
+        "outside_text_initial_states": 46
+      },
+      "omitted_selected_case_states": {},
+      "path": "tokenizer/test2.test",
+      "selected_array_indices": [],
+      "selected_cases": 0,
+      "selected_state_runs": 0,
+      "selected_states": {},
+      "source_git_blob": "edbec4b5c3f5f1142758026effa1edf861f3ae36",
+      "source_sha256": "f0e2bf7d21de13a8e930d350d0a5ad364e2546ce9ca8e938ab8cb63a5bbe417d",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/test2.test",
+      "upstream_cases": 46
+    },
+    {
+      "excluded_cases": 1558,
+      "exclusion_reasons": {
+        "outside_declared_error_codes": 1,
+        "outside_text_initial_states": 1557
+      },
+      "omitted_selected_case_states": {
+        "0": [
+          "Data state"
+        ],
+        "10": [
+          "Data state"
+        ],
+        "12": [
+          "Data state"
+        ],
+        "14": [
+          "Data state"
+        ],
+        "1576": [
+          "Data state"
+        ],
+        "1578": [
+          "Data state"
+        ],
+        "1580": [
+          "Data state"
+        ],
+        "1582": [
+          "Data state"
+        ],
+        "1584": [
+          "Data state"
+        ],
+        "1586": [
+          "Data state"
+        ],
+        "1588": [
+          "Data state"
+        ],
+        "1590": [
+          "Data state"
+        ],
+        "1592": [
+          "Data state"
+        ],
+        "1594": [
+          "Data state"
+        ],
+        "1596": [
+          "Data state"
+        ],
+        "1598": [
+          "Data state"
+        ],
+        "16": [
+          "Data state"
+        ],
+        "1600": [
+          "Data state"
+        ],
+        "1602": [
+          "Data state"
+        ],
+        "1604": [
+          "Data state"
+        ],
+        "18": [
+          "Data state"
+        ],
+        "2": [
+          "Data state"
+        ],
+        "20": [
+          "Data state"
+        ],
+        "22": [
+          "Data state"
+        ],
+        "24": [
+          "Data state"
+        ],
+        "26": [
+          "Data state"
+        ],
+        "28": [
+          "Data state"
+        ],
+        "30": [
+          "Data state"
+        ],
+        "32": [
+          "Data state"
+        ],
+        "34": [
+          "Data state"
+        ],
+        "36": [
+          "Data state"
+        ],
+        "38": [
+          "Data state"
+        ],
+        "4": [
+          "Data state"
+        ],
+        "40": [
+          "Data state"
+        ],
+        "42": [
+          "Data state"
+        ],
+        "44": [
+          "Data state"
+        ],
+        "46": [
+          "Data state"
+        ],
+        "48": [
+          "Data state"
+        ],
+        "50": [
+          "Data state"
+        ],
+        "52": [
+          "Data state"
+        ],
+        "54": [
+          "Data state"
+        ],
+        "56": [
+          "Data state"
+        ],
+        "58": [
+          "Data state"
+        ],
+        "60": [
+          "Data state"
+        ],
+        "62": [
+          "Data state"
+        ],
+        "64": [
+          "Data state"
+        ],
+        "66": [
+          "Data state"
+        ],
+        "8": [
+          "Data state"
+        ]
+      },
+      "path": "tokenizer/test3.test",
+      "selected_array_indices": [
+        0,
+        2,
+        4,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20,
+        22,
+        24,
+        26,
+        28,
+        30,
+        32,
+        34,
+        36,
+        38,
+        40,
+        42,
+        44,
+        46,
+        48,
+        50,
+        52,
+        54,
+        56,
+        58,
+        60,
+        62,
+        64,
+        66,
+        1576,
+        1578,
+        1580,
+        1582,
+        1584,
+        1586,
+        1588,
+        1590,
+        1592,
+        1594,
+        1596,
+        1598,
+        1600,
+        1602,
+        1604
+      ],
+      "selected_cases": 48,
+      "selected_state_runs": 192,
+      "selected_states": {
+        "0": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "10": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "12": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "14": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1576": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1578": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1580": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1582": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1584": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1586": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1588": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1590": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1592": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1594": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1596": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1598": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "16": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1600": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1602": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "1604": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "18": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "2": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "20": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "22": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "24": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "26": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "28": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "30": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "32": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "34": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "36": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "38": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "4": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "40": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "42": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "44": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "46": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "48": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "50": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "52": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "54": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "56": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "58": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "60": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "62": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "64": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "66": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "8": [
+          "PLAINTEXT state",
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ]
+      },
+      "source_git_blob": "0fba732130243909e05ee0f5d08b6fd5651e825e",
+      "source_sha256": "8353ddf5dcdf41586af14863904ff6c11082e63ff5c6d71e890deb6fdf795605",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/test3.test",
+      "upstream_cases": 1606
+    },
+    {
+      "excluded_cases": 85,
+      "exclusion_reasons": {
+        "outside_text_initial_states": 85
+      },
+      "omitted_selected_case_states": {},
+      "path": "tokenizer/test4.test",
+      "selected_array_indices": [],
+      "selected_cases": 0,
+      "selected_state_runs": 0,
+      "selected_states": {},
+      "source_git_blob": "8963c7471184e53446afaa31e9cc7a74624a3812",
+      "source_sha256": "c4967118aecbf8eb2ca34d5c5306f536614acca03e58610f75fbd9efa89fbb42",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/test4.test",
+      "upstream_cases": 85
+    },
+    {
+      "excluded_cases": 11,
+      "exclusion_reasons": {
+        "outside_text_initial_states": 11
+      },
+      "omitted_selected_case_states": {
+        "21": [
+          "Data state"
+        ]
+      },
+      "path": "tokenizer/domjs.test",
+      "selected_array_indices": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        39
+      ],
+      "selected_cases": 29,
+      "selected_state_runs": 44,
+      "selected_states": {
+        "0": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "PLAINTEXT state",
+          "Script data state"
+        ],
+        "10": [
+          "Script data state"
+        ],
+        "11": [
+          "Script data state"
+        ],
+        "12": [
+          "Script data state"
+        ],
+        "13": [
+          "Script data state"
+        ],
+        "14": [
+          "Script data state"
+        ],
+        "15": [
+          "Script data state"
+        ],
+        "16": [
+          "Script data state"
+        ],
+        "17": [
+          "Script data state"
+        ],
+        "18": [
+          "Script data state"
+        ],
+        "19": [
+          "Script data state"
+        ],
+        "2": [
+          "Script data state"
+        ],
+        "20": [
+          "Script data state"
+        ],
+        "21": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "22": [
+          "RCDATA state"
+        ],
+        "23": [
+          "RCDATA state"
+        ],
+        "24": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "25": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "26": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "27": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "28": [
+          "RCDATA state",
+          "RAWTEXT state",
+          "Script data state"
+        ],
+        "3": [
+          "Script data state"
+        ],
+        "39": [
+          "Script data state"
+        ],
+        "4": [
+          "Script data state"
+        ],
+        "5": [
+          "Script data state"
+        ],
+        "6": [
+          "Script data state"
+        ],
+        "7": [
+          "Script data state"
+        ],
+        "8": [
+          "Script data state"
+        ],
+        "9": [
+          "Script data state"
+        ]
+      },
+      "source_git_blob": "b54e3203f336cd759b895e47482cab0a31aff6a9",
+      "source_sha256": "b8c18aed0ca2e9eb089c3f1b17edf0143f5379622d19b27500649c528723a48e",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/domjs.test",
+      "upstream_cases": 40
+    },
+    {
+      "excluded_cases": 0,
+      "exclusion_reasons": {},
+      "omitted_selected_case_states": {},
+      "path": "tokenizer/contentModelFlags.test",
+      "selected_array_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "selected_cases": 14,
+      "selected_state_runs": 24,
+      "selected_states": {
+        "0": [
+          "PLAINTEXT state"
+        ],
+        "1": [
+          "PLAINTEXT state"
+        ],
+        "10": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "11": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "12": [
+          "RAWTEXT state"
+        ],
+        "13": [
+          "RCDATA state"
+        ],
+        "2": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "3": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "4": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "5": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "6": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "7": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "8": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "9": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ]
+      },
+      "source_git_blob": "9cf7c8bd9e70dfbd0037726d6a840e67d3aa5e12",
+      "source_sha256": "77784a505a528950761cfb3c76617afade28b27c3be2a8c37dce3c3d8988391d",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/contentModelFlags.test",
+      "upstream_cases": 14
+    },
+    {
+      "excluded_cases": 0,
+      "exclusion_reasons": {},
+      "omitted_selected_case_states": {},
+      "path": "tokenizer/escapeFlag.test",
+      "selected_array_indices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "selected_cases": 5,
+      "selected_state_runs": 9,
+      "selected_states": {
+        "0": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "1": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "2": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ],
+        "3": [
+          "RCDATA state"
+        ],
+        "4": [
+          "RCDATA state",
+          "RAWTEXT state"
+        ]
+      },
+      "source_git_blob": "d7d2c490bfd161681df4a846a454d588b94e3d19",
+      "source_sha256": "edbd2e070a14fc67f6bbc104e50207f0fe206a21891c260deea3d227b32c93c9",
+      "source_url": "https://github.com/html5lib/html5lib-tests/blob/c5495c539ca8a79c3c5107f5f14010bcff9a35d5/tokenizer/escapeFlag.test",
+      "upstream_cases": 5
+    }
+  ],
+  "upstream_cases": 1865,
+  "upstream_repository": "html5lib/html5lib-tests",
+  "upstream_revision": "c5495c539ca8a79c3c5107f5f14010bcff9a35d5"
+}

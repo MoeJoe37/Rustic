@@ -8,11 +8,13 @@ payload tests, seeded mutations against an independent ordered-tree model, repos
 consistency checks, and compiler/linter checks.
 URL parsing now adds focused host/origin/limit tests and a 685-case pinned WPT
 URL-data subset; see [scope and provenance](URL.md). HTML input/tokenization adds
-40 focused tests plus 1,079 selected declaration cases and all 4,626 cases in the
+53 focused tests plus 1,079 selected declaration cases and all 4,626 cases in the
 pinned html5lib reference files, with token fields, diagnostic order and chunk
 invariance checked. See [HTML evidence](HTML.md) for
-the pinned revision, selection policy and untested fields. Full browser conformance,
-rendering, fuzzing, GC stress, integration servers, and benchmarks are planned;
+the pinned revision, selection policy and untested fields. Text-mode tests add
+109 records expanded into 282 initial contexts and exercise pull feedback,
+queued input, raw-byte boundaries, probe budgets and Unicode fixture adaptation.
+Full browser conformance, rendering, fuzzing, GC stress, integration servers and benchmarks are planned;
 they do not run in the initial CI. Add each harness with the subsystem it tests.
 
 | Layer | What it proves | First milestone / execution |

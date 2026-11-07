@@ -161,9 +161,34 @@ subset remains unchanged. Generated WHATWG standard data has 2,231 names, a
 pinned source snapshot/digests, a reproducible generator and retained notice.
 See [HTML.md](HTML.md) for algorithms, provenance and untested contexts.
 
-`html.references` is complete for its algorithmic scope; DOC-05b still needs
-RCDATA/RAWTEXT/script/plaintext modes and broader encoding work. Foreign-content
-CDATA, tree construction and loading remain pending. No full-parser claim is made.
+`html.references` is complete for its algorithmic scope. Foreign-content CDATA,
+tree construction and loading remain pending. No full-parser claim is made.
+
+## DOC-05b — Text modes and token-at-a-time drive
+
+RCDATA, RAWTEXT, script-data escape/double-escape and plaintext states are now
+implemented in a focused text module. Appropriate end-tag matching preserves
+original spelling on fallback and bounds probes by the known context; long
+nonmatching names/keywords stream as literal text. EOF/null behavior is explicit.
+
+The pull driver separates input submission/closure from token delivery, allowing
+mode feedback at a delivered start-tag boundary within the same queued chunk.
+Input ownership, amortized compaction, token queuing and lifecycle live apart from
+syntax state modules. Invalid control operations preserve state; fatal processing
+errors terminate it. Collecting feed/finish helpers remain available. [ADR 0008](adr/0008-tokenizer-drive.md)
+records this contract and pending script reentry/encoding/fragment controls.
+
+Thirteen focused tests cover exact token behavior, same-chunk feedback, queued
+append/read order, chunk invariance, long probes, limits, cancellation and lifecycle.
+A pinned text corpus passes 109 selected records in 282 contexts, with 1,902
+two-chunk splits and 282 one-byte runs. Unicode fixture adaptation preserves an
+intentional leading U+FEFF without changing the byte decoder's BOM contract.
+Earlier declaration/reference selections still pass. The importer and manifest
+checker account separately for records, selected contexts and omitted states.
+
+`html.textmodes` completes its declared four-mode scope. DOC-05b's broader encoding
+work, foreign-content CDATA, tree construction and the corpus/fuzz gate remain
+pending. The new example demonstrates tokenizer feedback, not a document parser.
 
 ## Queue status
 
@@ -197,7 +222,7 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
-| DOC-05b: references and alternate text modes | Partial: named/numeric references complete; text modes and broader encoding cases pending |
+| DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a/b: tree builder | Not started |
 | DOC-07: bounded HTML loader/CLI | Not started |
 | DOC-08: parser corpus/fuzzing | Partial: pinned declaration corpus and chunk splits; tree corpus and fuzz targets pending |

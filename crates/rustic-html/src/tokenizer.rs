@@ -1,4 +1,5 @@
 use rustic_base::{Budget, CancellationToken};
+use std::collections::VecDeque;
 
 use crate::{
     Attribute, Diagnostic, DiagnosticKind, Doctype, HtmlError, ProcessingInstruction, Tag, Token,
@@ -8,13 +9,18 @@ use crate::{
 mod comment;
 mod declaration;
 mod doctype;
+mod driver;
 mod instruction;
 mod reference;
+mod text;
 
 use comment::CommentState;
 use doctype::DoctypeState;
+use driver::DecodedInput;
 use instruction::InstructionState;
 use reference::{CharacterReference, ReferenceContext, ReferenceState};
+use text::TextState;
+pub use text::TokenizerMode;
 
 /// Original-input, token, attribute and diagnostic budgets for one stream.
 #[derive(Clone, Copy, Debug)]
@@ -65,6 +71,7 @@ enum State {
     Doctype(DoctypeState),
     Instruction(InstructionState),
     Reference(ReferenceState),
+    Text(TextState),
 }
 
 #[derive(Debug)]
@@ -78,8 +85,9 @@ struct BuildingTag {
 
 /// Incremental tokenizer for data, tags and declarations in HTML context.
 ///
-/// Feed boundaries do not change token grouping. RCDATA/RAWTEXT/script/foreign-content modes and DOM tree
-/// construction remain unimplemented. Recoverable syntax errors are diagnosed;
+/// Feed boundaries do not change token grouping. Text mode selection belongs to
+/// the caller/tree builder through the pull driver. DOM tree construction and
+/// foreign-content context integration remain unimplemented. Syntax errors are diagnosed;
 /// fatal conditions poison the stream instead of allowing a retry.
 #[derive(Debug)]
 pub struct HtmlTokenizer {
@@ -94,6 +102,13 @@ pub struct HtmlTokenizer {
     doctype: Option<Doctype>,
     instruction: Option<ProcessingInstruction>,
     reference: Option<CharacterReference>,
+    decoded: DecodedInput,
+    pending: VecDeque<Token>,
+    input_closed: bool,
+    mode_opportunity: bool,
+    last_start_tag: Option<String>,
+    text_probe: String,
+    text_probe_matches: bool,
     tokens: Budget,
     text: String,
     diagnostics: Vec<Diagnostic>,
@@ -131,6 +146,13 @@ impl HtmlTokenizer {
             doctype: None,
             instruction: None,
             reference: None,
+            decoded: DecodedInput::default(),
+            pending: VecDeque::new(),
+            input_closed: false,
+            mode_opportunity: false,
+            last_start_tag: None,
+            text_probe: String::new(),
+            text_probe_matches: false,
             tokens: Budget::new(limits.max_tokens),
             text: String::new(),
             diagnostics: Vec::new(),
@@ -145,73 +167,6 @@ impl HtmlTokenizer {
         &self.diagnostics
     }
 
-    /// Consume bytes without closing an unfinished UTF-8 sequence, text or tag.
-    ///
-    /// Tokens returned by earlier successful calls are final. A failing call
-    /// returns no partial vector and must terminate the consuming document.
-    pub fn feed(&mut self, bytes: &[u8]) -> Result<Vec<Token>, HtmlError> {
-        self.ensure_active()?;
-        let result = (|| {
-            let decoded = self.input.feed(bytes)?;
-            let mut output = Vec::new();
-            self.consume(&decoded, &mut output)?;
-            Ok(output)
-        })();
-        if result.is_err() {
-            self.poisoned = true;
-        }
-        result
-    }
-
-    /// Finish input, recover from supported EOF states, and emit exactly one EOF.
-    pub fn finish(&mut self) -> Result<Vec<Token>, HtmlError> {
-        self.ensure_active()?;
-        let result = (|| {
-            let decoded = self.input.finish()?;
-            let mut output = Vec::new();
-            self.consume(&decoded, &mut output)?;
-            if let State::Reference(state) = self.state {
-                self.finish_reference(state, &mut output)?;
-            }
-            if matches!(self.state, State::AttributeName) {
-                self.finish_attribute_name()?;
-            }
-            match self.state {
-                State::Data => {}
-                State::TagOpen => {
-                    self.diagnostic(DiagnosticKind::EofBeforeTagName)?;
-                    self.text_char('<', &mut output)?;
-                }
-                State::EndTagOpen => {
-                    self.diagnostic(DiagnosticKind::EofBeforeTagName)?;
-                    self.text_char('<', &mut output)?;
-                    self.text_char('/', &mut output)?;
-                }
-                State::MarkupDeclaration => self.finish_declaration(&mut output)?,
-                State::Comment(state) => self.finish_comment(state, &mut output)?,
-                State::Doctype(state) => self.finish_doctype(state, &mut output)?,
-                State::Instruction(_) => {
-                    self.diagnostic(DiagnosticKind::EofInProcessingInstruction)?;
-                    self.prefix.clear();
-                    self.instruction = None;
-                }
-                _ => {
-                    self.diagnostic(DiagnosticKind::EofInTag)?;
-                    self.tag = None;
-                }
-            }
-            self.flush_text(&mut output)?;
-            self.emit(Token::Eof, &mut output)?;
-            Ok(output)
-        })();
-        if result.is_ok() {
-            self.finished = true;
-        } else {
-            self.poisoned = true;
-        }
-        result
-    }
-
     fn ensure_active(&self) -> Result<(), HtmlError> {
         if self.poisoned {
             Err(HtmlError::Poisoned)
@@ -220,20 +175,6 @@ impl HtmlTokenizer {
         } else {
             Ok(())
         }
-    }
-
-    fn consume(&mut self, decoded: &str, output: &mut Vec<Token>) -> Result<(), HtmlError> {
-        for value in decoded.chars() {
-            self.cancellation
-                .check()
-                .map_err(|_| HtmlError::Cancelled)?;
-            while self.step(value, output)? {} // Reconsume only after a state transition.
-            self.normalized_offset = self
-                .normalized_offset
-                .checked_add(1)
-                .ok_or(HtmlError::InputLimit)?;
-        }
-        Ok(())
     }
 
     fn step(&mut self, value: char, output: &mut Vec<Token>) -> Result<bool, HtmlError> {
@@ -409,6 +350,7 @@ impl HtmlTokenizer {
             State::Doctype(state) => return self.doctype_step(state, value, output),
             State::Instruction(state) => return self.instruction_step(state, value, output),
             State::Reference(state) => return self.reference_step(state, value, output),
+            State::Text(state) => return self.text_step(state, value, output),
         }
         Ok(false)
     }

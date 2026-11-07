@@ -65,6 +65,7 @@ cargo test --locked --workspace --doc
 cargo run --locked -p rustic-dom --example tree
 cargo run --locked -p rustic-url --example resolve
 cargo run --locked -p rustic-html --example tokenize
+cargo run --locked -p rustic-html --example text_modes
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
@@ -76,7 +77,8 @@ The `tree` example builds nodes directly through the internal DOM API and prints
 a deterministic inspection dump. It does not parse HTML or load a page.
 The `tokenize` example reads a small UTF-8 stream in chunks and emits tokens;
 comments, doctypes, processing instructions and named/numeric character references
-are included. Alternate text modes and tree building are pending.
+are included. The `text_modes` example uses token-at-a-time feedback for
+RCDATA/raw text/script/plaintext contexts. Tree building remains pending.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
 and clocks), `rustic-dom` (bounded node storage and checked tree mutation),

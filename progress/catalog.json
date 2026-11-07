@@ -441,8 +441,34 @@
         {
           "id": "html.textmodes",
           "label": "RCDATA, RAWTEXT, script and plaintext modes",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/text.rs",
+              "marker": "pub(super) fn text_step"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/tokenizer/driver.rs",
+              "marker": "pub fn next_token"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/text_modes.rs",
+              "marker": "fn pull_feedback_applies_before_the_remainder_of_the_same_input_chunk"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/text_modes.rs",
+              "marker": "fn failed_end_tag_and_script_word_probes_do_not_grow_with_literal_name_runs"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
+            }
+          ]
         },
         {
           "id": "html.tree",

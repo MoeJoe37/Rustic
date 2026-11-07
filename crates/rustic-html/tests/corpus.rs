@@ -1,4 +1,7 @@
-use rustic_html::{Diagnostic, DiagnosticKind, HtmlTokenizer, Token};
+use rustic_base::CancellationToken;
+use rustic_html::{
+    Diagnostic, DiagnosticKind, HtmlTokenizer, Token, TokenizerLimits, TokenizerMode,
+};
 
 #[derive(Debug, Eq, PartialEq)]
 enum Expected {
@@ -12,6 +15,7 @@ enum Expected {
     ),
     Instruction(&'static str, &'static str),
     StartTag(&'static str, &'static [(&'static str, &'static str)], bool),
+    EndTag(&'static str),
 }
 
 struct Case {
@@ -23,14 +27,37 @@ struct Case {
     errors: &'static [DiagnosticKind],
 }
 
+struct TextCase {
+    case: Case,
+    mode: TokenizerMode,
+    last_start_tag: Option<&'static str>,
+}
+
 #[path = "fixtures/html5lib_cases.rs"]
 mod fixtures;
 
 #[path = "fixtures/references_cases.rs"]
 mod references;
 
-fn tokenize(chunks: &[&[u8]], case: &Case) -> (Vec<Token>, Vec<Diagnostic>) {
-    let mut tokenizer = HtmlTokenizer::default();
+#[path = "fixtures/text_cases.rs"]
+mod text;
+
+fn tokenize(
+    chunks: &[&[u8]],
+    case: &Case,
+    mode: TokenizerMode,
+    last: Option<&str>,
+) -> (Vec<Token>, Vec<Diagnostic>) {
+    let mut tokenizer = HtmlTokenizer::with_context(
+        TokenizerLimits::default(),
+        CancellationToken::default(),
+        mode,
+        last,
+    )
+    .unwrap();
+    // Upstream supplies an already decoded Unicode stream. Add a transport BOM
+    // so a leading U+FEFF in that stream remains content after UTF-8 decoding.
+    assert!(tokenizer.feed(b"\xef\xbb\xbf").unwrap().is_empty());
     let mut output = Vec::new();
     for chunk in chunks {
         let tokens = tokenizer
@@ -88,6 +115,7 @@ fn token_matches(actual: &Token, expected: &Expected) -> bool {
                         .any(|attribute| attribute.name() == *name && attribute.value() == *value)
                 })
         }
+        (Token::EndTag(name), Expected::EndTag(expected)) => name == expected,
         _ => false,
     }
 }
@@ -117,40 +145,91 @@ fn run_cases(suite: &str, cases: &[Case], selected: usize, upstream: usize) {
     let mut failures = Vec::new();
     let mut split_runs = 0;
     for case in cases {
-        let bytes = case.input.as_bytes();
-        let (tokens, errors) = tokenize(&[bytes], case);
-        let kinds: Vec<_> = errors.iter().map(|error| error.kind).collect();
-        if tokens.len() != case.output.len()
-            || !tokens
-                .iter()
-                .zip(case.output)
-                .all(|(a, b)| token_matches(a, b))
-            || kinds != case.errors
-        {
-            failures.push(format!(
-                "{}[{}] {}: expected {:?} / {:?}; got {:?} / {:?}",
-                case.file, case.index, case.description, case.output, case.errors, tokens, kinds
-            ));
-            continue;
-        }
-        for split in 0..=bytes.len() {
-            assert_eq!(
-                tokenize(&[&bytes[..split], b"", &bytes[split..]], case),
-                (tokens.clone(), errors.clone()),
-                "{}[{}], split {split}",
-                case.file,
-                case.index
-            );
-            split_runs += 1;
-        }
+        check_case(
+            case,
+            TokenizerMode::Data,
+            None,
+            &mut failures,
+            &mut split_runs,
+        );
+    }
+    report(suite, failures, selected, upstream, split_runs, selected);
+}
+
+#[test]
+fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures() {
+    assert_eq!(text::CASES.len(), text::STATE_RUNS);
+    let mut failures = Vec::new();
+    let mut split_runs = 0;
+    for context in text::CASES {
+        check_case(
+            &context.case,
+            context.mode,
+            context.last_start_tag,
+            &mut failures,
+            &mut split_runs,
+        );
+    }
+    report(
+        "text modes",
+        failures,
+        text::SELECTED,
+        text::UPSTREAM,
+        split_runs,
+        text::STATE_RUNS,
+    );
+}
+
+fn check_case(
+    case: &Case,
+    mode: TokenizerMode,
+    last: Option<&str>,
+    failures: &mut Vec<String>,
+    split_runs: &mut usize,
+) {
+    let bytes = case.input.as_bytes();
+    let (tokens, errors) = tokenize(&[bytes], case, mode, last);
+    let kinds: Vec<_> = errors.iter().map(|error| error.kind).collect();
+    if tokens.len() != case.output.len()
+        || !tokens
+            .iter()
+            .zip(case.output)
+            .all(|(a, b)| token_matches(a, b))
+        || kinds != case.errors
+    {
+        failures.push(format!(
+            "{}[{}] {:?} {}: expected {:?} / {:?}; got {:?} / {:?}",
+            case.file, case.index, mode, case.description, case.output, case.errors, tokens, kinds
+        ));
+        return;
+    }
+    for split in 0..=bytes.len() {
         assert_eq!(
-            tokenize(&bytes.chunks(1).collect::<Vec<_>>(), case),
-            (tokens, errors),
-            "{}[{}], one-byte feeds",
+            tokenize(&[&bytes[..split], b"", &bytes[split..]], case, mode, last),
+            (tokens.clone(), errors.clone()),
+            "{}[{}], split {split}",
             case.file,
             case.index
         );
+        *split_runs += 1;
     }
+    assert_eq!(
+        tokenize(&bytes.chunks(1).collect::<Vec<_>>(), case, mode, last),
+        (tokens, errors),
+        "{}[{}], one-byte feeds",
+        case.file,
+        case.index
+    );
+}
+
+fn report(
+    suite: &str,
+    failures: Vec<String>,
+    selected: usize,
+    upstream: usize,
+    split_runs: usize,
+    state_runs: usize,
+) {
     assert!(
         failures.is_empty(),
         "{} corpus failures:\n{}",
@@ -158,6 +237,6 @@ fn run_cases(suite: &str, cases: &[Case], selected: usize, upstream: usize) {
         failures.join("\n")
     );
     println!(
-        "html5lib {suite} subset: {selected} selected / {upstream} upstream; {split_runs} two-chunk splits and {selected} one-byte runs passed."
+        "html5lib {suite}: {selected} selected / {upstream} upstream; {state_runs} contexts, {split_runs} two-chunk splits and {state_runs} one-byte runs passed."
     );
 }

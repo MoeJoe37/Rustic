@@ -123,10 +123,12 @@ stride and bytes per pixel as well as the viewport pixel count present at M0.
 ## 4. Parsing, style, layout, and painting
 
 The current `rustic-html` crate depends only on `rustic-base` and implements
-explicit UTF-8 input plus data/tags, named/numeric references, comments, doctypes and processing instructions
-in HTML context. Declaration, comment, doctype and instruction states have focused
-internal modules. It has no DOM dependency
-until tree construction needs the checked mutation API. See [HTML.md](HTML.md)
+explicit UTF-8 input, data/tags, named/numeric references, comments, doctypes,
+processing instructions and caller-controlled RCDATA/RAWTEXT/script/plaintext
+states. Syntax families have focused internal modules. The pull
+driver owns queued input and pauses at token boundaries for mode feedback; it
+does not infer tree-builder context from tag names. See [ADR 0008](adr/0008-tokenizer-drive.md).
+It has no DOM dependency until tree construction needs the checked mutation API. See [HTML.md](HTML.md)
 for implemented behavior and remaining states. The following pipeline describes
 the target architecture.
 

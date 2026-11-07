@@ -14,6 +14,8 @@ and does not implement the remaining IDNA/file/blob or browser binding features.
 HTML evidence now includes streaming input, tags/declarations and character
 references, with 1,079 selected declaration cases and all 4,626 cases in three
 pinned reference files; [HTML.md](HTML.md) records exact scope and provenance.
+The text-mode corpus adds 109 selected records in 282 explicit RCDATA/RAWTEXT/
+script/plaintext contexts. Tokenizer context selection is not HTML tree construction.
 
 The full-product baseline targets complete required CSS/ECMAScript semantics and
 broad real-site interoperability, including GPU-backed APIs, WebAssembly and the

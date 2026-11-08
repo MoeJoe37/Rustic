@@ -68,6 +68,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Open, pay with CSS-05 restyle |
+| TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Open, fix before CSS-05 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -298,6 +299,23 @@ the hosted images ship rustup.
 `rustup/archive` path and refuses to run it unless its SHA-256 matches the
 hash pinned in the workflow for that OS/CPU (published hashes, checked when
 pinned). Unknown runner platforms fail instead of falling back to `curl | sh`.
+
+### TD-21 — Nested pseudo-class matching is exponential in nesting
+
+`matches_complex` (`crates/rustic-style/src/matching.rs`) re-runs a nested
+selector from scratch for every candidate element that an outer combinator
+tries. With a descendant combinator at each level, a selector nested *k*
+levels deep costs about O(*d*^*k*) on a document *d* elements deep. Measured
+in a release build on a 100-deep `<div>` chain, `q` wrapped in *k* layers of
+`:is(… *)` took 0.04 ms for *k* = 1, 1.4 ms for 2, 38 ms for 3 and 0.79 s for
+4, roughly ×25 per level. `MAX_SELECTOR_NESTING` (32) bounds stack depth, not
+time, so a 60-byte selector can hang matching for hours on a 250-deep tree.
+
+**Why bad:** stylesheets are content, so this is an algorithmic-complexity hang
+reachable from any page. **Pay:** memoize nested selector-list results per
+(selector, element) for the duration of a match or restyle, which makes the
+cost linear in nesting. Add the probe above as a timing regression case and a
+style fuzz target. **Trigger:** before CSS-05 attaches stylesheets to documents.
 
 ## Reviewing new work
 

@@ -39,7 +39,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-html` | Encoding integration, incremental tokenizer, tree builder, recovery | base, DOM mutation interface | M1 |
 | `rustic-dom` | Document/node graph, mutation, names, events, traversal, tracing integration | base, URL | M1 |
 | `rustic-css` | Syntax tokens, stylesheet/declaration parsing, selectors, value syntax | base | M2 |
-| `rustic-style` | Selector matching, cascade, inheritance, computed styles, invalidation | CSS, read-only DOM view | M2 |
+| `rustic-style` | Selector matching, cascade, inheritance, computed styles, invalidation, external sheet loading through an embedder fetcher | CSS, read-only DOM view, URL | M2 |
 | `rustic-text` | Font selection, shaping adapter, bidi, line breaking, glyph metrics/cache | base, reviewed text/font libraries | M3 |
 | `rustic-layout` | Formatting contexts, fragments, intrinsic sizes, hit-test geometry | base, computed styles, text | M3 |
 | `rustic-paint` | Stacking/paint order, immutable display lists, clipping, damage | base, layout fragments | M3 |

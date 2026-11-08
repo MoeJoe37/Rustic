@@ -43,6 +43,7 @@ mod computed;
 mod dom;
 mod html;
 mod layer;
+mod loading;
 mod matching;
 mod sheet;
 mod text;
@@ -53,11 +54,16 @@ pub use computed::{ComputeContext, ComputedStyle};
 pub use dom::{DomElement, ElementStyle, query_selector_all, shadow_tree_context, style_tree};
 pub use html::{
     HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,
-    dump_computed_styles, html_user_agent_sheet,
+    document_cascade_with, dump_computed_styles, html_user_agent_sheet,
 };
 pub use layer::{LayerName, LayerSegment};
+pub use loading::{
+    DEFAULT_MAX_EXTERNAL_BYTES, DEFAULT_MAX_EXTERNAL_SHEETS, DEFAULT_MAX_IMPORT_DEPTH, FetchError,
+    ImportReport, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader, StylesheetFetcher,
+};
 pub use matching::{MatchContext, matches, matches_complex};
 pub use sheet::{
-    Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet, parse_style_attribute,
+    ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
+    parse_style_attribute,
 };
 pub use view::{AttributeRef, ElementView};

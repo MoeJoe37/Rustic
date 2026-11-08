@@ -16,6 +16,7 @@ dependencies = [
  "rustic-engine",
  "rustic-html",
  "rustic-style",
+ "rustic-url",
 ]
 
 [[package]]
@@ -64,6 +65,7 @@ dependencies = [
  "rustic-css",
  "rustic-dom",
  "rustic-html",
+ "rustic-url",
 ]
 
 [[package]]

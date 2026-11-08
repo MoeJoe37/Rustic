@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "48be369df37049f0a0fee3e315609d44fb56530604b4f53a960311188f1aaab3",
-  "percent": "16.85",
+  "source_fingerprint": "45038f9cb33aacb316672ef2dd75b19467dcb7f5787d0b8e62dd275d8464cabd",
+  "percent": "17.03",
   "verified_percent": "14.96",
-  "partial_percent": "1.89",
+  "partial_percent": "2.07",
   "completed": 31,
   "in_progress": 4,
   "total": 172,
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 3,
       "total": 8,
-      "percent": "59.61",
+      "percent": "61.53",
       "verified_percent": "41.02",
-      "partial_percent": "18.59"
+      "partial_percent": "20.51"
     },
     {
       "id": "M3",
@@ -1386,8 +1386,29 @@
             },
             {
               "label": "External stylesheets: link rel=stylesheet and @import over controlled fetching",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/html.rs",
+                  "marker": "pub fn document_cascade_with("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/loading.rs",
+                  "marker": "pub trait StylesheetFetcher"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/external.rs",
+                  "marker": "fn imports_precede_their_sheet_and_resolve_against_it"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn dump_style_loads_linked_and_imported_sheets_beside_the_document"
+                }
+              ]
             },
             {
               "label": "Media queries (@media rules and media attributes) re-evaluated when the environment changes",
@@ -1411,7 +1432,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.69"
         },
         {
@@ -1439,10 +1460,10 @@
       "completed": 3,
       "in_progress": 3,
       "total": 8,
-      "contribution": "5.36",
-      "percent": "59.61",
+      "contribution": "5.53",
+      "percent": "61.53",
       "verified_percent": "41.02",
-      "partial_percent": "18.59"
+      "partial_percent": "20.51"
     },
     {
       "id": "text",

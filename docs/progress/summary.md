@@ -2,7 +2,7 @@
 
 **Overall completion: 9.04%** · 20/172 capabilities complete.
 
-Catalog: `engine-v2`. Source fingerprint: `d7c16874dd4d77ba05679fb219bc1f7922eed054d61e54e2272a4c23779eb6c1`.
+Catalog: `engine-v2`. Source fingerprint: `17800c1cfded49aaf1e65bea148eeb51cf579a396b3ca15a58f8fa0d340fd2a0`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 

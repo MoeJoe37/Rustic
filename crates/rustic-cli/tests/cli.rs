@@ -148,3 +148,39 @@ fn dump_dom_fails_cleanly_on_missing_files_directories_and_unsupported_markup() 
         assert!(output.stdout.is_empty());
     }
 }
+
+#[test]
+fn dump_dom_parser_limits_are_configurable() {
+    let directory = env!("CARGO_TARGET_TMPDIR");
+    let deep = Path::new(directory).join("rustic-cli-deep.html");
+    fs::write(&deep, "<div>".repeat(300)).expect("write fixture");
+    let deep = deep.to_str().expect("UTF-8 path");
+    let output = rustic(&["dump-dom", deep]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let output = rustic(&["dump-dom", "--max-depth", "400", deep]);
+    assert!(output.status.success(), "{}", stderr(&output));
+
+    let noisy = Path::new(directory).join("rustic-cli-noisy.html");
+    fs::write(&noisy, "<!doctype html>".to_owned() + &"</span>".repeat(20)).expect("write fixture");
+    let noisy = noisy.to_str().expect("UTF-8 path");
+    assert!(rustic(&["dump-dom", noisy]).status.success());
+    let output = rustic(&["dump-dom", "--max-diagnostics", "5", noisy]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        stderr(&output).contains("diagnostic limit"),
+        "{}",
+        stderr(&output)
+    );
+    assert!(
+        rustic(&["dump-dom", "--max-diagnostics", "40", noisy])
+            .status
+            .success()
+    );
+
+    let path = fixture("malformed.html");
+    let path = path.to_str().expect("UTF-8 fixture path");
+    let output = rustic(&["dump-dom", "--max-nodes", "5", path]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+}

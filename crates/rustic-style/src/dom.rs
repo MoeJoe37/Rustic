@@ -56,6 +56,10 @@ impl<'a> DomElement<'a> {
         self.id
     }
 
+    pub(crate) fn document(&self) -> &'a Document {
+        self.document
+    }
+
     fn element_at(
         &self,
         mut id: Option<NodeId>,

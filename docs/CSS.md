@@ -705,18 +705,22 @@ cascade's selectors decides the scope:
 | Attribute tested in an ancestor or sibling position | The element's subtree, and with `+`/`~` the following siblings' subtrees |
 | Children inserted, removed or moved | Inserted and moved elements with their subtrees (found because they have no style or a new style parent); with structural selectors (`:nth-*`, `:*-child`, `:*-of-type`, `:empty`) or sibling combinators also the siblings and the parent |
 | Text | The parent, when a selector uses `:empty` |
-| Anything, with `:has()` or HTML element states (`:checked`, `:default`, `:disabled`, `:lang()`, `:dir()`, ...) in the cascade, that those can read | Everything (TD-32) |
+| Attribute or content a `:has()` argument tests | The possible anchors: the changed element's ancestors as far as the relative selectors reach (`> x > y` reaches two levels, any descendant combinator reaches the root), with their preceding siblings when a relative selector uses `+`/`~`; anchor subtrees instead when a `:has()` is outside the subject compound. A test in a nested list's ancestor position (`:has(:is(.p .q))`) also restyles the changed element's subtree |
+| `lang` | The element's subtree (`:lang()`); a `<meta http-equiv=content-language>` change restyles everything |
+| `dir`, an input's `type` or `value`, or text and children under a `dir=auto` or `bdi` element | The element's subtree and the outermost `dir=auto` ancestor's subtree (`:dir()`) |
+| A form-control attribute (`disabled`, `readonly`, `contenteditable`, `placeholder`, ...) | The element's subtree; `checked`, `name`, `type`, `form`, `id` and `selected`, and any child-list change, also restyle every `input`, `button` and `option` (radio groups, default buttons, selected options) |
+| Text in a `textarea`, children of a `fieldset`, `select` or `optgroup` | The textarea; the container's children with their subtrees |
 | Stylesheets or the media environment (`cascade_changed`) | Everything |
 | A container size (`set_container_size`) | The element's subtree |
 
 During the walk an element whose computed style changed restyles its children
 (inheritance, and `inherit` on non-inherited properties), which stops where
 the children's styles come out equal; a changed root style restyles everything
-(`rem`, `rlh`). Whole-tree facts (radio groups, default buttons, the pragma
-language, IDs referenced by `form`) are what force the conservative full
-restyle for element states, and `:has()` can make any ancestor or earlier
-sibling depend on a change. The `Element states` facts in
-[Selectors](#element-states) list what each state reads.
+(`rem`, `rlh`). An element state used outside a subject compound
+(`input:checked + label`) restyles the changed elements' subtrees and following
+siblings instead of the elements alone. A state inside a nested list's ancestor
+position of a `:has()` argument still restyles everything. The `Element
+states` facts in [Selectors](#element-states) list what each state reads.
 
 The result always equals a fresh `style_tree` walk (`matches_full_restyle`
 checks it). A `<style>` element's text or a loaded external sheet changes the
@@ -725,13 +729,20 @@ root is `Mutation::Everything`.
 
 ### Invalidation evidence
 
-* `rustic-style/tests/invalidation.rs`: eleven scenarios, each checked against a
+* `rustic-style/tests/invalidation.rs`: seventeen scenarios, each checked against a
   full restyle after every change: unrelated attributes restyle nothing and
   `style` one element; subject versus ancestor classes; inherited changes
   stopping where children's styles stay equal; sibling combinators; inserted,
   moved and removed elements; structural selectors and `:empty`; text; form
   states, radio groups and `:has()`; root font size and `rem`; custom
-  properties used through `var()`; and a media environment change.
+  properties used through `var()`; and a media environment change. The
+  TD-32 scenarios pad the page with 40 unrelated elements and require fewer
+  than 20 recomputed: `:has()` anchors (descendant, child, `+`/`~`, outside the
+  subject, nested ancestor tests, insertion and removal, `:empty`), radio
+  groups and default buttons, fieldsets and editing hosts, a textarea's
+  placeholder, `lang` and `dir=auto` text. Planting each of seven bugs in the
+  targeting (dropping preceding siblings, the `dir=auto` root, the pragma
+  check, ...) fails one of them.
 * The `css-invalidation` fuzz target styles a fixed document (forms, lists,
   `dir=auto`, links, a dialog) with an arbitrary sheet, applies up to 96
   scripted attribute, insertion, removal, move and text mutations, and checks

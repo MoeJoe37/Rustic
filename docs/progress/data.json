@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "411b7745bc93ee69672bd7e7aa047d52f521b03228d7194d04a23cfa1d1e2283",
-  "percent": "20.26",
-  "verified_percent": "19.11",
-  "partial_percent": "1.15",
-  "completed": 35,
-  "in_progress": 2,
+  "source_fingerprint": "e012337d6cedc99a9c9aa7aa0b5c69dbef2d4f4881a11c645f0e8ccb690cd8af",
+  "percent": "20.49",
+  "verified_percent": "20.27",
+  "partial_percent": "0.22",
+  "completed": 36,
+  "in_progress": 1,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -25,11 +25,11 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 7,
+      "completed": 8,
       "total": 8,
-      "percent": "97.43",
-      "verified_percent": "87.17",
-      "partial_percent": "10.26"
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "M3",
@@ -1449,80 +1449,65 @@
           "label": "Correct incremental invalidation against reference path",
           "size": 5,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Incremental restyle from attribute, child-list and text mutations, checked against the full-restyle reference (tests and fuzz target)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/invalidation.rs",
-                  "marker": "pub struct StyledDocument"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/invalidation.rs",
-                  "marker": "fn inserted_removed_and_moved_elements"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/invalidation.rs",
+              "marker": "pub struct StyledDocument"
             },
             {
-              "label": "Media environment changes (viewport resize, preferences) restyle only when a query result changes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/cascade.rs",
-                  "marker": "pub fn set_environment"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/invalidation.rs",
-                  "marker": "fn environment_changes_restyle_through_the_cascade"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn inserted_removed_and_moved_elements"
             },
             {
-              "label": "Targeted invalidation for :has() and element states instead of full restyles (TD-32)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-style/src/cascade.rs",
+              "marker": "pub fn set_environment"
             },
             {
-              "label": "Invalidation for custom property dependencies (var() users restyle when an inherited custom property changes)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/variables.rs",
-                  "marker": "pub struct CustomProperties"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/invalidation.rs",
-                  "marker": "fn custom_property_changes_flow_to_var_users"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn environment_changes_restyle_through_the_cascade"
             },
             {
-              "label": "Invalidation for container query dependencies (container sizes and container styles restyle descendants)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/invalidation.rs",
-                  "marker": "pub fn set_container_size"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/containers.rs",
-                  "marker": "fn sizes_and_container_styles_invalidate_descendants"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/variables.rs",
+              "marker": "pub struct CustomProperties"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn custom_property_changes_flow_to_var_users"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/invalidation.rs",
+              "marker": "pub fn set_container_size"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/containers.rs",
+              "marker": "fn sizes_and_container_styles_invalidate_descendants"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/invalidation.rs",
+              "marker": "fn has_anchors"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn has_restyles_the_anchors_not_the_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn radio_groups_and_default_buttons_restyle_their_controls"
             }
           ],
-          "credit": "80.00",
+          "credit": "100.00",
           "engine_share": "1.15"
         },
         {
@@ -1563,13 +1548,13 @@
         }
       ],
       "points": 39,
-      "completed": 7,
-      "in_progress": 1,
+      "completed": 8,
+      "in_progress": 0,
       "total": 8,
-      "contribution": "8.76",
-      "percent": "97.43",
-      "verified_percent": "87.17",
-      "partial_percent": "10.26"
+      "contribution": "9.00",
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "text",

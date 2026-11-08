@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 20.26%** = 19.11% verified complete + 1.15% partial credit. 35/172 capabilities complete, 2 in progress.
+**Overall completion: 20.49%** = 20.27% verified complete + 0.22% partial credit. 36/172 capabilities complete, 1 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `411b7745bc93ee69672bd7e7aa047d52f521b03228d7194d04a23cfa1d1e2283`.
+Catalog: `engine-v3`. Source fingerprint: `e012337d6cedc99a9c9aa7aa0b5c69dbef2d4f4881a11c645f0e8ccb690cd8af`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `411b7745bc93ee69672bd7e7aa047d52f521b
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 7/8 | 97.43% | 87.17% | 9.00% |
+| M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `411b7745bc93ee69672bd7e7aa047d52f521b
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 7/8 | 1 | 97.43% | 87.17% | 9% | 8.76 |
+| CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -115,12 +115,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/layer.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/layers.rs), [test](../../crates/rustic-style/tests/layers.rs), [source](../../crates/rustic-style/src/cascade.rs), [source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/shadow.rs), [test](../../crates/rustic-style/tests/layers.rs))
 - **complete** `css.values` — Computed values, variables, registered properties and cycle handling · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/computed.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-css/src/calc.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-css/src/custom.rs), [test](../../crates/rustic-style/tests/variables.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/variables.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/registered.rs))
 - **complete** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine ([source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-style/src/html.rs), [source](../../crates/rustic-style/src/loading.rs), [test](../../crates/rustic-style/tests/external.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-css/src/media.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-css/src/container.rs), [source](../../crates/rustic-style/src/containers.rs), [test](../../crates/rustic-style/tests/containers.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/containers.rs))
-- **in progress 80.00%** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine
-  - [x] Incremental restyle from attribute, child-list and text mutations, checked against the full-restyle reference (tests and fuzz target) ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
-  - [x] Media environment changes (viewport resize, preferences) restyle only when a query result changes ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
-  - [ ] Targeted invalidation for :has() and element states instead of full restyles (TD-32)
-  - [x] Invalidation for custom property dependencies (var() users restyle when an inherited custom property changes) ([source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
-  - [x] Invalidation for container query dependencies (container sizes and container styles restyle descendants) ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/containers.rs))
+- **complete** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/containers.rs), [source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
 - **complete** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 1.15% of engine ([source](../../tools/import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/wpt_conformance.rs), [test](../../tools/tests/test_import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/corpus.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
 
 ### Text & fonts

@@ -145,6 +145,11 @@ jobs:
       # binfmt-launched QEMU finds the target's dynamic loader and libraries
       # here, so CLI subprocess tests can execute target binaries directly.
       QEMU_LD_PREFIX: ${{ matrix.sysroot }}
+      # QEMU user mode occasionally segfaults internally when many guest
+      # threads run at once (seen about 1 in 12 runs of the fuzz harness on
+      # s390x). Serial tests cost little here because the slow tests sleep.
+      # TD-22 tracks this.
+      RUST_TEST_THREADS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

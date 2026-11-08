@@ -59,13 +59,14 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Open, pay with the engine facade |
 | TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, M1 queue |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, M1 queue |
-| TD-12 | Deliberate | CI / platforms | No native ARM or 32-bit test runs; mobile is check-only | Open |
+| TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
 | TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
+| TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -195,14 +196,19 @@ past 2,000 bytes / 1,000 code points fail to bound quadratic work. The pinned
 WPT `urltestdata.json` subset now includes all non-ASCII records (887 of 899;
 only blob cases are excluded).
 
-### TD-12 — No native ARM or 32-bit test runs; mobile is check-only
+### TD-12 — Mobile is check-only; platform CI currently cannot run
 
-CI runs tests on x64 Linux, Windows and Apple-silicon macOS, and only
-`cargo check` for Android and iOS. Windows ARM64, Linux aarch64 and 32-bit
-targets (such as `armv7-linux-androideabi`) are required platforms but are not
-yet exercised; 32-bit `usize` is where `u64 as usize` and size-limit
-arithmetic would first break. **Pay:** native ARM runners and at least one
-32-bit check target. **Trigger:** now; the platform-support work owns it.
+`ci.yml` now tests natively on Linux, Windows and macOS for both x64 and
+ARM64, and under emulation for armv7, i686 and riscv64 (32-bit pointers and a
+third instruction set). Android and iOS still get only `cargo check`, with no
+tests on a device or simulator. Since 2026-11-08 GitHub has refused to start
+the Windows and macOS jobs because of an account billing limit, so those
+platforms have no CI evidence at all. In the meantime merges are verified in a
+local sandbox: the full Linux suite, MSRV 1.85, fuzz smoke, and `cargo check`
+for aarch64 Linux, Android (aarch64 and armv7), Windows (x86_64-gnu), iOS and
+i686. **Pay:** restore billing so the full matrix runs, then add Android/iOS
+test runs once a host exists. **Trigger:** now for billing; mobile tests with
+the mobile hosts.
 
 ### TD-13 — Long spec state-machine functions
 
@@ -276,6 +282,16 @@ caller's byte cap bounded memory, but `dump-dom` hit it on small adversarial
 inputs. Reported by the milestone M1 work. Paid by indenting at most 64 levels;
 deeper lines start with an `@<depth> ` marker, so output is linear in node count.
 The test now runs in well under a second and checks the threshold.
+
+### TD-19 — Runners without rustup download its installer unpinned
+
+The native test job installs rustup with `curl | sh` from `sh.rustup.rs` (or
+`rustup-init.exe` on Windows) when a runner image lacks it, such as
+`windows-11-arm`. The download is over HTTPS but not checked against a hash,
+unlike the SHA-pinned actions (rule 5). Acceptable while only
+images without rustup use it. **Pay:** check the installer's published SHA-256
+before running it. **Trigger:** when another job starts using the step, or
+the hosted images ship rustup.
 
 ## Reviewing new work
 

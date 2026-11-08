@@ -19,7 +19,7 @@ Device shells, rendering, input, and runtime validation are still planned. See
 architecture, implementation plan, shared engine primitives, and continuous
 integration. Bounded DOM/URL foundations, HTML tokenization,
 [document and fragment tree construction](docs/HTML_TREE.md), parser fuzzing and
-[CSS syntax, selector matching and typed property values](docs/CSS.md) are implemented.
+[CSS syntax, selector matching, typed property values and the cascade](docs/CSS.md) are implemented.
 It does not yet execute JavaScript, fetch web pages, or render content.
 A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 13.75%** (11.96% verified complete + 1.79% partial credit) — 29/172 capabilities complete and 2 in progress across 21 subsystems. Current milestone: **M2 CSS & computed style**, 27.56% done.
+**Overall engine completion: 14.33%** (11.96% verified complete + 2.37% partial credit) — 29/172 capabilities complete and 3 in progress across 21 subsystems. Current milestone: **M2 CSS & computed style**, 33.97% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -99,7 +99,7 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 `rustic-url` (URL records, parsing and origins),
 `rustic-html` (streaming tokens and full WHATWG document tree construction),
 `rustic-css` (CSS syntax, selectors, specificity and typed property values),
-`rustic-style` (selector matching over a read-only DOM view),
+`rustic-style` (selector matching and the cascade over a read-only DOM view),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

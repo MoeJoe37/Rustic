@@ -1,6 +1,6 @@
 [package]
 name = "rustic-style"
-description = "Selector matching over a read-only DOM view for Rustic"
+description = "Selector matching and the cascade over a read-only DOM view for Rustic"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 

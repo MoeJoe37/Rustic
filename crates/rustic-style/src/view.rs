@@ -15,8 +15,9 @@ pub struct AttributeRef<'a> {
 
 /// A copyable, read-only handle to an element in some tree.
 ///
-/// Equality must mean "the same element".
-pub trait ElementView: Copy + PartialEq {
+/// Equality must mean "the same element", and hashing must agree with it
+/// (the matcher memoizes nested selector results per element).
+pub trait ElementView: Copy + Eq + std::hash::Hash {
     /// The parent, if it is an element.
     fn parent_element(&self) -> Option<Self>;
 

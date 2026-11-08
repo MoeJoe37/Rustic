@@ -1,9 +1,15 @@
-//! Selector matching, and later the cascade and computed style, for Rustic.
+//! Selector matching and the cascade, and later computed style, for Rustic.
 //!
 //! Matching works over any [`ElementView`]: a read-only, copyable handle to an
 //! element that can reach its parent and sibling elements. [`DomElement`]
 //! implements it for `rustic-dom` documents, and [`query_selector_all`] walks a
 //! subtree in tree order.
+//!
+//! [`StyleSheet::parse`] prepares a stylesheet for the cascade, and
+//! [`Cascade::specified_style`] (or [`style_tree`] for a whole document) picks
+//! each longhand's winning declaration by origin, importance, `style`
+//! attribute, specificity and order, resolves the CSS-wide keywords and
+//! applies inheritance.
 //!
 //! The matcher runs right to left with an explicit stack and the usual
 //! "restart from the closest descendant/sibling combinator" pruning, so
@@ -31,11 +37,17 @@
 
 #![warn(missing_docs)]
 
+mod cascade;
 mod dom;
 mod matching;
+mod sheet;
 mod text;
 mod view;
 
-pub use dom::{DomElement, query_selector_all};
+pub use cascade::{Cascade, SpecifiedStyle};
+pub use dom::{DomElement, ElementStyle, query_selector_all, style_tree};
 pub use matching::{MatchContext, matches, matches_complex};
+pub use sheet::{
+    Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet, parse_style_attribute,
+};
 pub use view::{AttributeRef, ElementView};

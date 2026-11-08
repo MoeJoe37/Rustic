@@ -8,8 +8,8 @@ no dependencies beyond `rustic-base`. Since CSS-02 it also parses
 and the `An+B` microsyntax, and the new `rustic-style` crate matches selectors
 against a read-only DOM view (see [Selectors](#selectors)). CSS-03 added typed
 values for colors, lengths, the box model, `display` and font basics (see
-[Property values](#property-values)). The cascade and computed values are CSS-04
-onward.
+[Property values](#property-values)), and CSS-04 the cascade (see
+[Cascade](#cascade)). Computed values are CSS-05.
 
 ## Implemented behavior
 
@@ -110,8 +110,10 @@ The matcher runs right to left with an explicit stack and the "restart from the
 closest descendant or sibling combinator" pruning, so a long descendant chain
 never backtracks exponentially and a selector with tens of thousands of
 compounds never recurses. Recursion happens only into pseudo-class arguments,
-which the parser bounds. `:nth-*` pseudo-classes count siblings on each test
-without caching (TD-20).
+which the parser bounds, and each top-level match memoizes nested list results
+per element, so nested `:is(… *)` levels cost polynomial rather than
+exponential time (TD-21, paid with CSS-04). `:nth-*` pseudo-classes count
+siblings on each test without caching (TD-20).
 
 ### Selector evidence
 
@@ -191,3 +193,46 @@ later tasks.
   value serializes and reparses to itself.
 * The `css` fuzz target now also checks that every typed longhand it parses
   serializes to a fixed point.
+
+## Cascade
+
+`StyleSheet::parse` prepares a stylesheet for one origin (user agent, user or
+author): style rules keep their parsed selector lists and typed longhand
+declarations in order. Invalid selectors drop their rule, invalid or unknown
+declarations drop themselves, and each drop is a `StyleDiagnostic` with a span.
+`@namespace` rules before the first style rule build the namespace map; other
+at-rules (`@media`, `@import`, `@layer`, ...) and nested rules are reported as
+unsupported for now. `parse_style_attribute` reads a `style` attribute.
+
+`Cascade::specified_style` picks each longhand's winner by, in order:
+
+1. Origin and importance: important user agent, important user, important
+   author, normal author, normal user, normal user agent.
+2. Declarations from the element's `style` attribute over rule declarations.
+3. Specificity of the most specific matching selector in the rule's list.
+4. Order of appearance across sheets, rules and declarations.
+
+`initial`, `inherit` and `unset` resolve as specified. `revert` rolls back to
+the previous origin (author to user to user agent; in the user-agent origin it
+acts like `unset`), and `revert-layer` does the same because cascade layers are
+not implemented yet. Undeclared properties inherit or take their initial value.
+`style_tree` styles a whole document subtree in tree order, inheriting from
+each parent element.
+
+The result is the *specified* value. Until computed values arrive (CSS-05),
+inheritance passes the parent's specified value unchanged, so a relative value
+such as `font-size: 2em` is inherited as written rather than resolved. Cascade
+layers, shadow-tree encapsulation and the animation/transition origins are
+later steps.
+
+### Cascade evidence
+
+* `rustic-style/tests/cascade.rs`: specificity and order, all six origin and
+  importance tiers, style attributes (including important user styles beating
+  them), dropped inline declarations, inheritance over several generations,
+  every CSS-wide keyword including `revert` across origins, and stylesheet
+  diagnostics with spans.
+* The `css-cascade` fuzz target styles a fixed document with an arbitrary
+  author sheet and checks that splitting the sheet in two, repeating it, or
+  adding an empty user sheet never changes any element's specified style
+  (400,000 executions before landing, no failures).

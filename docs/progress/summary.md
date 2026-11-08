@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 13.75%** = 11.96% verified complete + 1.79% partial credit. 29/172 capabilities complete, 2 in progress.
+**Overall completion: 14.33%** = 11.96% verified complete + 2.37% partial credit. 29/172 capabilities complete, 3 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `d2bed6dd95adeb6151be7a085732a848d377be56457b5c8cd97c6d956ec0df61`.
+Catalog: `engine-v3`. Source fingerprint: `68a9b827408b89fd89734da71dabf93ee0077831688bc3d67cf02cba26e66d9d`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `d2bed6dd95adeb6151be7a085732a848d377b
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 1/8 | 27.56% | 7.69% | 9.00% |
+| M2 CSS & computed style | 1/8 | 33.97% | 7.69% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `d2bed6dd95adeb6151be7a085732a848d377b
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 0 | 52.94% | 52.94% | 6% | 3.17 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 1/8 | 2 | 27.56% | 7.69% | 9% | 2.48 |
+| CSS & style | 1/8 | 3 | 33.97% | 7.69% | 9% | 3.05 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -116,7 +116,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Lengths, percentages and the CSS-03 longhands and shorthands with initial values and inheritance ([source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/properties.rs))
   - [ ] Math functions: calc(), min(), max(), clamp()
   - [ ] Property catalog for layout, text, backgrounds, positioning and the font shorthand
-- **planned** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine
+- **in progress 50.00%** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine
+  - [x] Origins, importance, style attributes, specificity and order of appearance ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs))
+  - [x] CSS-wide keywords (initial, inherit, unset, revert, revert-layer) and inheritance ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs))
+  - [ ] Cascade layers (@layer) and layered revert-layer
+  - [ ] Encapsulation contexts (shadow trees), animation and transition origins
 - **planned** `css.values` — Computed values, variables and cycle handling · size 5 · M2 · 1.15% of engine
 - **planned** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine
 - **planned** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine

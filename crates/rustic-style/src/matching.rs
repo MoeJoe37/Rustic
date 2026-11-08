@@ -6,6 +6,9 @@ use rustic_css::{
 };
 use rustic_dom::HTML_NAMESPACE;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use crate::ElementView;
 use crate::text;
 
@@ -47,9 +50,10 @@ impl<E> MatchContext<E> {
 /// Selectors that target a pseudo-element never match an element itself, as
 /// in `Element.matches()`.
 pub fn matches<E: ElementView>(list: &SelectorList, element: E, cx: &MatchContext<E>) -> bool {
+    let m = Matcher::new(cx);
     list.selectors()
         .iter()
-        .any(|s| s.pseudo_element().is_none() && matches_complex(s, element, cx))
+        .any(|s| s.pseudo_element().is_none() && complex(s, element, &m))
 }
 
 /// Whether `element` is the subject (originating element, for a selector
@@ -59,13 +63,50 @@ pub fn matches_complex<E: ElementView>(
     element: E,
     cx: &MatchContext<E>,
 ) -> bool {
+    complex(selector, element, &Matcher::new(cx))
+}
+
+/// One top-level match: the context plus a memo of nested selector-list
+/// results (`:is()`, `:where()`, `:not()`, `:nth-*(of S)`) per element.
+///
+/// Without the memo, an outer descendant combinator re-evaluates a nested
+/// list from scratch for every ancestor it tries, which is exponential in the
+/// nesting depth (TD-21). With it, each (list, element) pair is evaluated at
+/// most once per top-level match.
+struct Matcher<'c, E> {
+    cx: &'c MatchContext<E>,
+    memo: RefCell<HashMap<(usize, E), bool>>,
+}
+
+impl<'c, E: ElementView> Matcher<'c, E> {
+    fn new(cx: &'c MatchContext<E>) -> Self {
+        Self {
+            cx,
+            memo: RefCell::new(HashMap::new()),
+        }
+    }
+
+    /// Whether any selector of a nested `list` (pseudo-elements excluded by
+    /// the parser) matches `e`, memoized by the list's address.
+    fn list(&self, list: &SelectorList, e: E) -> bool {
+        let key = (std::ptr::from_ref(list) as usize, e);
+        if let Some(&known) = self.memo.borrow().get(&key) {
+            return known;
+        }
+        let result = list.selectors().iter().any(|s| complex(s, e, self));
+        self.memo.borrow_mut().insert(key, result);
+        result
+    }
+}
+
+fn complex<E: ElementView>(selector: &ComplexSelector, element: E, m: &Matcher<'_, E>) -> bool {
     let compounds = selector.compounds();
     let combinators = selector.combinators();
     let last = compounds.len() - 1;
     // Index `j` counts compounds from the subject (j = 0) leftwards.
     let compound = |j: usize| &compounds[last - j];
     let combinator = |j: usize| combinators[last - j - 1];
-    if !compound_matches(compound(0), element, cx) {
+    if !compound_matches(compound(0), element, m) {
         return false;
     }
     if last == 0 {
@@ -120,7 +161,7 @@ pub fn matches_complex<E: ElementView>(
             continue;
         };
         stack.last_mut().expect("nonempty stack").1 = candidate;
-        returned = Some(if !compound_matches(compound(j + 1), candidate, cx) {
+        returned = Some(if !compound_matches(compound(j + 1), candidate, m) {
             Outcome::RestartFromSibling
         } else if j + 1 == last {
             Outcome::Matched
@@ -143,15 +184,15 @@ enum Outcome {
     Global,
 }
 
-fn compound_matches<E: ElementView>(compound: &Compound, e: E, cx: &MatchContext<E>) -> bool {
+fn compound_matches<E: ElementView>(compound: &Compound, e: E, m: &Matcher<'_, E>) -> bool {
     compound
         .simple_selectors()
         .iter()
-        .all(|simple| simple_matches(simple, e, cx))
+        .all(|simple| simple_matches(simple, e, m))
 }
 
-fn is_html<E: ElementView>(e: &E, cx: &MatchContext<E>) -> bool {
-    cx.html_document && e.namespace() == Some(HTML_NAMESPACE)
+fn is_html<E: ElementView>(e: &E, m: &Matcher<'_, E>) -> bool {
+    m.cx.html_document && e.namespace() == Some(HTML_NAMESPACE)
 }
 
 fn namespace_matches(constraint: &NamespaceSelector, namespace: Option<&str>) -> bool {
@@ -170,11 +211,11 @@ fn attribute_value<'a, E: ElementView>(e: &'a E, local: &str) -> Option<&'a [u16
         .map(|a| a.value)
 }
 
-fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, cx: &MatchContext<E>) -> bool {
+fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, m: &Matcher<'_, E>) -> bool {
     match simple {
         SimpleSelector::Type { namespace, local } => {
             namespace_matches(namespace, e.namespace())
-                && if is_html(&e, cx) {
+                && if is_html(&e, m) {
                     e.local_name().eq_ignore_ascii_case(local)
                         && !e.local_name().bytes().any(|b| b.is_ascii_uppercase())
                 } else {
@@ -183,13 +224,13 @@ fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, cx: &MatchConte
         }
         SimpleSelector::Universal { namespace } => namespace_matches(namespace, e.namespace()),
         SimpleSelector::Id(id) => {
-            attribute_value(&e, "id").is_some_and(|v| text::equals(v, id, cx.quirks))
+            attribute_value(&e, "id").is_some_and(|v| text::equals(v, id, m.cx.quirks))
         }
         SimpleSelector::Class(class) => {
-            attribute_value(&e, "class").is_some_and(|v| text::includes(v, class, cx.quirks))
+            attribute_value(&e, "class").is_some_and(|v| text::includes(v, class, m.cx.quirks))
         }
-        SimpleSelector::Attribute(attribute) => attribute_matches(attribute, e, cx),
-        SimpleSelector::PseudoClass(class) => pseudo_class_matches(class, e, cx),
+        SimpleSelector::Attribute(attribute) => attribute_matches(attribute, e, m),
+        SimpleSelector::PseudoClass(class) => pseudo_class_matches(class, e, m),
     }
 }
 
@@ -247,9 +288,9 @@ const CASE_INSENSITIVE_HTML_ATTRIBUTES: &[&str] = &[
 fn attribute_matches<E: ElementView>(
     attribute: &AttributeSelector,
     e: E,
-    cx: &MatchContext<E>,
+    m: &Matcher<'_, E>,
 ) -> bool {
-    let html = is_html(&e, cx);
+    let html = is_html(&e, m);
     let lowered;
     let name = if html {
         lowered = attribute.local.to_ascii_lowercase();
@@ -302,15 +343,15 @@ fn is_link<E: ElementView>(e: &E) -> bool {
         && attribute_value(e, "href").is_some()
 }
 
-fn nth_matches<E: ElementView>(nth: &Nth, e: E, cx: &MatchContext<E>) -> bool {
+fn nth_matches<E: ElementView>(nth: &Nth, e: E, m: &Matcher<'_, E>) -> bool {
     if let Some(of) = &nth.of {
-        if !matches(of, e, cx) {
+        if !m.list(of, e) {
             return false;
         }
     }
     let counts = |sibling: &E| match nth.kind {
         NthKind::Child | NthKind::LastChild => {
-            nth.of.as_ref().is_none_or(|of| matches(of, *sibling, cx))
+            nth.of.as_ref().is_none_or(|of| m.list(of, *sibling))
         }
         NthKind::OfType | NthKind::LastOfType => same_type(sibling, &e),
     };
@@ -333,11 +374,11 @@ fn nth_matches<E: ElementView>(nth: &Nth, e: E, cx: &MatchContext<E>) -> bool {
     nth.matches_position(position)
 }
 
-fn pseudo_class_matches<E: ElementView>(class: &PseudoClass, e: E, cx: &MatchContext<E>) -> bool {
+fn pseudo_class_matches<E: ElementView>(class: &PseudoClass, e: E, m: &Matcher<'_, E>) -> bool {
     match class {
         PseudoClass::Root => e.is_root(),
         PseudoClass::Empty => e.is_empty(),
-        PseudoClass::Scope => cx.scope.map_or_else(|| e.is_root(), |scope| scope == e),
+        PseudoClass::Scope => m.cx.scope.map_or_else(|| e.is_root(), |scope| scope == e),
         PseudoClass::OnlyChild => {
             e.previous_sibling_element().is_none() && e.next_sibling_element().is_none()
         }
@@ -354,11 +395,9 @@ fn pseudo_class_matches<E: ElementView>(class: &PseudoClass, e: E, cx: &MatchCon
             unique(e.previous_sibling_element(), E::previous_sibling_element)
                 && unique(e.next_sibling_element(), E::next_sibling_element)
         }
-        PseudoClass::Nth { nth, .. } => nth_matches(nth, e, cx),
-        PseudoClass::Is(list) | PseudoClass::Where(list) => {
-            list.selectors().iter().any(|s| matches_complex(s, e, cx))
-        }
-        PseudoClass::Not(list) => !list.selectors().iter().any(|s| matches_complex(s, e, cx)),
+        PseudoClass::Nth { nth, .. } => nth_matches(nth, e, m),
+        PseudoClass::Is(list) | PseudoClass::Where(list) => m.list(list, e),
+        PseudoClass::Not(list) => !m.list(list, e),
         PseudoClass::AnyLink { .. } => is_link(&e),
         PseudoClass::Visited => false,
         PseudoClass::State(state) => e.in_state(*state),

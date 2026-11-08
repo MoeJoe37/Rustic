@@ -68,7 +68,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Open, pay with CSS-05 restyle |
-| TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Open, fix before CSS-05 |
+| TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -300,7 +300,18 @@ the hosted images ship rustup.
 hash pinned in the workflow for that OS/CPU (published hashes, checked when
 pinned). Unknown runner platforms fail instead of falling back to `curl | sh`.
 
-### TD-21 — Nested pseudo-class matching is exponential in nesting
+### TD-20 — `:nth-*` matching recounts siblings on every test
+
+`rustic-style` (CSS-02) computes an element's position for `:nth-child()`,
+`:nth-of-type()` and their `last` forms by walking its siblings on every test,
+and `of S` re-matches `S` against each sibling. Matching every element of a
+parent with *n* children against such a selector is therefore O(*n*²), which
+is fine for the reference matcher and tests but not for full restyles of large
+lists. **Pay:** cache sibling indices per parent for the duration of a restyle
+(as browsers do) and reuse them across selectors. **Trigger:** CSS-05 full
+restyle, or a measured slowdown on a page with large sibling lists.
+
+### TD-21 — Nested pseudo-class matching is exponential in nesting (Paid)
 
 `matches_complex` (`crates/rustic-style/src/matching.rs`) re-runs a nested
 selector from scratch for every candidate element that an outer combinator
@@ -317,20 +328,18 @@ reachable from any page. **Pay:** memoize nested selector-list results per
 cost linear in nesting. Add the probe above as a timing regression case and a
 style fuzz target. **Trigger:** before CSS-05 attaches stylesheets to documents.
 
+**Paid** (CSS-04): each top-level match now memoizes nested selector-list
+results (`:is()`, `:where()`, `:not()` and `:nth-*(of S)`) per (list, element),
+so each pair is evaluated at most once and nesting costs O(*k*·*d*²) instead of
+O(*d*^*k*). `ElementView` requires `Eq + Hash` for the memo key. The regression
+test `nested_logical_pseudo_classes_stay_polynomial` matches eight nested
+`:is(… *)` levels, the `:not(:not(…))` and `:nth-child(of …)` forms on a
+100-deep chain in milliseconds, and the new `css-cascade` fuzz target styles a
+document with arbitrary stylesheets.
+
 ## Reviewing new work
 
 When reviewing a merge, check each new shortcut against the rules above. Add a
 ledger entry for deliberate debt in the same change that takes it, mark entries
 **Paid** with the paying change rather than deleting them, and keep the summary
 table in sync with the sections.
-
-### TD-20 — `:nth-*` matching recounts siblings on every test
-
-`rustic-style` (CSS-02) computes an element's position for `:nth-child()`,
-`:nth-of-type()` and their `last` forms by walking its siblings on every test,
-and `of S` re-matches `S` against each sibling. Matching every element of a
-parent with *n* children against such a selector is therefore O(*n*²), which
-is fine for the reference matcher and tests but not for full restyles of large
-lists. **Pay:** cache sibling indices per parent for the duration of a restyle
-(as browsers do) and reuse them across selectors. **Trigger:** CSS-05 full
-restyle, or a measured slowdown on a page with large sibling lists.

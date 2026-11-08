@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "d2bed6dd95adeb6151be7a085732a848d377be56457b5c8cd97c6d956ec0df61",
-  "percent": "13.75",
+  "source_fingerprint": "68a9b827408b89fd89734da71dabf93ee0077831688bc3d67cf02cba26e66d9d",
+  "percent": "14.33",
   "verified_percent": "11.96",
-  "partial_percent": "1.79",
+  "partial_percent": "2.37",
   "completed": 29,
-  "in_progress": 2,
+  "in_progress": 3,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 1,
       "total": 8,
-      "percent": "27.56",
+      "percent": "33.97",
       "verified_percent": "7.69",
-      "partial_percent": "19.87"
+      "partial_percent": "26.28"
     },
     {
       "id": "M3",
@@ -1195,9 +1195,53 @@
           "label": "Complete cascade/origins/layers and inheritance",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Origins, importance, style attributes, specificity and order of appearance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "pub fn specified_style"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn origins_and_importance_follow_the_cascade_order"
+                }
+              ]
+            },
+            {
+              "label": "CSS-wide keywords (initial, inherit, unset, revert, revert-layer) and inheritance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "CssWideKeyword::Revert | CssWideKeyword::RevertLayer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn revert_rolls_back_to_the_previous_origin"
+                }
+              ]
+            },
+            {
+              "label": "Cascade layers (@layer) and layered revert-layer",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Encapsulation contexts (shadow trees), animation and transition origins",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "1.15"
         },
         {
@@ -1243,12 +1287,12 @@
       ],
       "points": 39,
       "completed": 1,
-      "in_progress": 2,
+      "in_progress": 3,
       "total": 8,
-      "contribution": "2.48",
-      "percent": "27.56",
+      "contribution": "3.05",
+      "percent": "33.97",
       "verified_percent": "7.69",
-      "partial_percent": "19.87"
+      "partial_percent": "26.28"
     },
     {
       "id": "text",

@@ -1,9 +1,12 @@
 //! [`ElementView`] for `rustic-dom` documents.
 
-use rustic_css::SelectorList;
+use rustic_css::{CssParser, SelectorList};
 use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind};
 
-use crate::{AttributeRef, ElementView, MatchContext, matches};
+use crate::{
+    AttributeRef, Cascade, ElementView, MatchContext, SpecifiedStyle, StyleDiagnostic, matches,
+    parse_style_attribute,
+};
 
 /// An element of a [`Document`], borrowed for matching.
 #[derive(Clone, Copy, Debug)]
@@ -17,6 +20,15 @@ pub struct DomElement<'a> {
 impl PartialEq for DomElement<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && std::ptr::eq(self.document, other.document)
+    }
+}
+
+impl Eq for DomElement<'_> {}
+
+impl std::hash::Hash for DomElement<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        std::ptr::from_ref(self.document).hash(state);
     }
 }
 
@@ -123,4 +135,62 @@ pub fn query_selector_all(
         }
     }
     Ok(found)
+}
+
+/// One element's specified style from [`style_tree`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct ElementStyle {
+    /// The element.
+    pub node: NodeId,
+    /// Its specified style.
+    pub style: SpecifiedStyle,
+    /// Diagnostics from its `style` attribute.
+    pub inline_diagnostics: Vec<StyleDiagnostic>,
+}
+
+/// Compute the specified style of every element in the subtree rooted at
+/// `root`, in tree order, with each element inheriting from its parent
+/// element (template contents are not styled).
+///
+/// `style` attributes on elements are parsed with `parser`; if one exceeds
+/// the parser's limits it is ignored (reported as an empty declaration list).
+pub fn style_tree(
+    document: &Document,
+    root: NodeId,
+    cascade: &Cascade,
+    parser: &CssParser,
+    cx: &MatchContext<DomElement<'_>>,
+) -> Result<Vec<ElementStyle>, DomError> {
+    let mut out: Vec<ElementStyle> = Vec::new();
+    // Indices into `out` of the styled ancestors on the current path.
+    let mut path: Vec<(usize, usize)> = Vec::new(); // (depth, index)
+    for (id, depth) in document.walk(root)? {
+        while path.last().is_some_and(|&(d, _)| d >= depth) {
+            path.pop();
+        }
+        let Some(element) = DomElement::new(document, id) else {
+            continue;
+        };
+        let style_attribute = element
+            .attributes()
+            .find(|a| a.namespace.is_none() && a.local == "style")
+            .map(|a| String::from_utf16_lossy(a.value));
+        let (inline, inline_diagnostics) = match style_attribute {
+            Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
+            None => Default::default(),
+        };
+        // Only a direct parent element passes its style on.
+        let parent = path
+            .last()
+            .filter(|&&(d, _)| d + 1 == depth)
+            .map(|&(_, i)| &out[i].style);
+        let style = cascade.specified_style(element, cx, &inline, parent);
+        path.push((depth, out.len()));
+        out.push(ElementStyle {
+            node: id,
+            style,
+            inline_diagnostics,
+        });
+    }
+    Ok(out)
 }

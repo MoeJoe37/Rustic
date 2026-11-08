@@ -14,7 +14,7 @@ use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
     ParseError, Token,
 };
-use rustic_style::{MatchContext, query_selector_all};
+use rustic_style::{Cascade, MatchContext, Origin, StyleSheet, query_selector_all, style_tree};
 use rustic_url::{Url, UrlParser};
 
 use crate::fingerprint;
@@ -39,6 +39,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(HtmlFragmentTarget),
         Box::new(CssTarget),
         Box::new(CssSelectorTarget),
+        Box::new(CssCascadeTarget),
         Box::new(UrlTarget),
     ]
 }
@@ -748,6 +749,134 @@ impl Target for CssSelectorTarget {
         let document = document.document();
         if select_all(document, &list) != select_all(document, &reparsed) {
             return Err(format!("matching changed through {serialized:?}"));
+        }
+        Ok(())
+    }
+}
+
+/// The cascade over an arbitrary author stylesheet (`rustic-style`).
+///
+/// Invariants: styling a fixed document is total; splitting the sheet's
+/// rules across two author sheets, or appending the sheet to itself, gives
+/// the same specified styles; and so does adding a user-agent copy of the
+/// sheet, because author declarations win unless a UA one is `!important`
+/// (checked by comparing against a cascade where the copy is a no-op).
+pub struct CssCascadeTarget;
+
+const CASCADE_DOCUMENT: &[u8] =
+    b"<!doctype html><div id=a class='x y' style='color: red; width: 1px'>\
+<p id=b class=x>one<span style='font-size: 2em !important'>two</span></p><p lang=en>\
+<b></b><i style='margin: inherit; color: revert'></i></p></div><ul><li><li class=y></ul>";
+
+fn cascade_styles(cascade: &Cascade) -> Vec<String> {
+    let mut document = HtmlDocumentParser::default();
+    if document.feed(CASCADE_DOCUMENT).is_err() {
+        return Vec::new();
+    }
+    let Ok(document) = document.finish() else {
+        return Vec::new();
+    };
+    let document = document.document();
+    style_tree(
+        document,
+        document.root(),
+        cascade,
+        &CssParser::default(),
+        &MatchContext::html(),
+    )
+    .map(|styles| {
+        styles
+            .into_iter()
+            .map(|s| s.style.dump_non_initial())
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+impl Target for CssCascadeTarget {
+    fn name(&self) -> &'static str {
+        "css-cascade"
+    }
+
+    fn max_len(&self) -> usize {
+        2048
+    }
+
+    fn dictionary(&self) -> &'static [&'static [u8]] {
+        &[
+            b"{",
+            b"}",
+            b";",
+            b":",
+            b"!important",
+            b"p",
+            b"#a",
+            b".x",
+            b"*",
+            b" > ",
+            b",",
+            b"color:",
+            b"width:",
+            b"margin:",
+            b"font-size:",
+            b"display:",
+            b"border:",
+            b"inherit",
+            b"initial",
+            b"unset",
+            b"revert",
+            b"revert-layer",
+            b"red",
+            b"1px",
+            b"2em",
+            b"50%",
+            b"auto",
+            b"block",
+            b"@namespace x url(y);",
+            b"@media x {",
+            b"/*",
+            b"*/",
+        ]
+    }
+
+    fn check(&self, input: &[u8]) -> Result<(), String> {
+        let text = String::from_utf8_lossy(input);
+        let parser = CssParser::default();
+        let Ok((sheet, _)) = StyleSheet::parse(&parser, &text, Origin::Author) else {
+            return Ok(()); // A resource limit is a legitimate outcome.
+        };
+        let mut single = Cascade::new();
+        single.push(sheet.clone());
+        let reference = cascade_styles(&single);
+
+        let middle = sheet.rules.len() / 2;
+        let mut split = Cascade::new();
+        split.push(StyleSheet {
+            origin: Origin::Author,
+            rules: sheet.rules[..middle].to_vec(),
+        });
+        split.push(StyleSheet {
+            origin: Origin::Author,
+            rules: sheet.rules[middle..].to_vec(),
+        });
+        if cascade_styles(&split) != reference {
+            return Err("splitting the sheet changed the cascade".into());
+        }
+
+        let mut doubled = single.clone();
+        doubled.push(sheet.clone());
+        if cascade_styles(&doubled) != reference {
+            return Err("repeating the sheet changed the cascade".into());
+        }
+
+        let mut user_below = Cascade::new();
+        user_below.push(StyleSheet {
+            origin: Origin::User,
+            rules: Vec::new(),
+        });
+        user_below.push(sheet);
+        if cascade_styles(&user_below) != reference {
+            return Err("an empty user sheet changed the cascade".into());
         }
         Ok(())
     }

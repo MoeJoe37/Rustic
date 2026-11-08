@@ -256,3 +256,29 @@ fn pathological_selectors_stay_linear_and_stack_safe() {
     let long = format!("{}i", "* ".repeat(20_000));
     assert_eq!(select(&page, &long), "");
 }
+
+#[test]
+fn nested_logical_pseudo_classes_stay_polynomial() {
+    // TD-21: an outer descendant combinator used to re-run a nested list for
+    // every ancestor it tried, so each extra `:is(X *)` level multiplied the
+    // work by the tree depth (k = 4 took about 0.8 s in release builds).
+    let page = document(&format!("{}<i></i>", "<div>".repeat(100)));
+    let mut selector = String::from("div");
+    for _ in 0..8 {
+        selector = format!(":is({selector} *)");
+    }
+    let not_selector = selector
+        .replace(":is(", ":not(:not(")
+        .replace(" *)", " *))");
+    let started = std::time::Instant::now();
+    let found = select(&page, &selector);
+    assert!(found.ends_with("div div div i"), "{found}");
+    let _ = select(&page, &not_selector);
+    let nth = format!("i:nth-child(1 of {selector})");
+    assert_eq!(select(&page, &nth), "i");
+    assert!(
+        started.elapsed().as_secs() < 5,
+        "nested matching took {:?}",
+        started.elapsed()
+    );
+}

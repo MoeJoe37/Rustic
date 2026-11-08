@@ -1009,8 +1009,52 @@
           "label": "Complete cascade/origins/layers and inheritance",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Origins, importance, style attributes, specificity and order of appearance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "pub fn specified_style"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn origins_and_importance_follow_the_cascade_order"
+                }
+              ]
+            },
+            {
+              "label": "CSS-wide keywords (initial, inherit, unset, revert, revert-layer) and inheritance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "CssWideKeyword::Revert | CssWideKeyword::RevertLayer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn revert_rolls_back_to_the_previous_origin"
+                }
+              ]
+            },
+            {
+              "label": "Cascade layers (@layer) and layered revert-layer",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Encapsulation contexts (shadow trees), animation and transition origins",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.values",

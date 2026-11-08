@@ -58,6 +58,7 @@ dependencies = [
 name = "rustic-style"
 version = "0.1.0"
 dependencies = [
+ "rustic-base",
  "rustic-css",
  "rustic-dom",
  "rustic-html",

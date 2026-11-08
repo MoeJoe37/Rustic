@@ -80,6 +80,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Open |
+| TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Open, fix before real-page styling |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -491,6 +492,26 @@ buttons, the subtree under a changed `lang`/`dir`/`disabled` fieldset, text
 changes only under `dir=auto` ancestors). **Trigger:** script-driven DOM
 mutation (JS-series) or a measured restyle cost on a page using these
 selectors.
+
+### TD-33 — `var()` substitution budget is per element
+
+`MAX_SUBSTITUTED_VALUES` (65,536 component values, `rustic-css/src/custom.rs`)
+stops exponential `var()` expansion for **one element**, and each element that
+matches the declarations expands and stores its own copy. The chain
+`--v0: aaaaaaaaaa; --v1: var(--v0) var(--v0); …` to `--v39` in a 4.6 KB
+stylesheet makes every matching element hold about 360 KB of substituted
+values. In a release build, `dump-style` took 3.4 s for 500 `<p>` elements and
+10.7 s for 2,000, and both exceeded the 64 MiB output cap. Memory and time grow
+as budget × elements, so a few kilobytes of CSS on a page with 10,000 elements
+amount to gigabytes.
+
+**Why bad:** a content-controlled amplification that bypasses the per-element
+budget's purpose. **Pay:** share computed custom properties between elements
+with the same parent values and matched declarations (as browsers' matched
+properties caches do), and/or charge substitutions to a document-wide budget
+per restyle, failing the substitution (invalid at computed-value time) when it
+runs out. Add the chain above as a timing regression case. **Trigger:** before
+styling real pages or network content.
 
 ## Reviewing new work
 

@@ -13,9 +13,10 @@ and runtime validation are still planned. See the [mobile plan](docs/MOBILE.md).
 
 **Current stage: early M1 document-core implementation.** This repository contains the project
 architecture, implementation plan, shared engine primitives, and continuous
-integration. Bounded DOM/URL foundations and an initial HTML input/tokenizer
-subset are implemented. It does not yet build HTML documents, execute
-JavaScript, fetch web pages, or render content. A complete modern browser engine is a sustained, multi-year
+integration. Bounded DOM/URL foundations, HTML tokenization and an
+[initial document-construction subset](docs/HTML_TREE.md) are implemented.
+It does not yet execute JavaScript, fetch web pages, or render content.
+A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
 
 <!-- rustic-progress:start -->
@@ -66,6 +67,7 @@ cargo run --locked -p rustic-dom --example tree
 cargo run --locked -p rustic-url --example resolve
 cargo run --locked -p rustic-html --example tokenize
 cargo run --locked -p rustic-html --example text_modes
+cargo run --locked -p rustic-html --example document
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
@@ -78,13 +80,15 @@ a deterministic inspection dump. It does not parse HTML or load a page.
 The `tokenize` example reads a small UTF-8 stream in chunks and emits tokens;
 comments, doctypes, processing instructions and named/numeric character references
 are included. The `text_modes` example uses token-at-a-time feedback for
-RCDATA/raw text/script/plaintext contexts. Tree building remains pending.
+RCDATA/raw text/script/plaintext contexts. The `document` example parses a local
+fixture into a DOM tree with implied elements and paragraph recovery. Unsupported
+tree constructs return explicit errors; broad tree-building rules remain pending.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
 and clocks), `rustic-dom` (bounded node storage, checked tree mutation and
 [UTF-16 text edits](docs/DOM.md)),
 `rustic-url` (URL records, parsing and origins),
-`rustic-html` (streaming UTF-8, tags/attributes, comments and declarations),
+`rustic-html` (streaming tokens and bounded initial/head/body construction),
 `rustic-engine` (bounded viewport configuration), and `rustic-cli`
 (development entry point). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

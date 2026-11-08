@@ -29,6 +29,7 @@ name = "rustic-html"
 version = "0.1.0"
 dependencies = [
  "rustic-base",
+ "rustic-dom",
 ]
 
 [[package]]

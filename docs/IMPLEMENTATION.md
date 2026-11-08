@@ -82,8 +82,8 @@ and rejected edits after every step; a separate arithmetic test covers impossibl
 length/byte overflow without large allocations. [DOM.md](DOM.md) defines the
 contract, specification reference, capacity accounting and remaining web APIs.
 
-This is a tree-builder prerequisite, not a completed tree builder or full
-`CharacterData` implementation. Live ranges, mutation records/observers and
+These primitives support the initial tree builder described below; they are not
+a full `CharacterData` implementation. Live ranges, mutation records/observers and
 bindings remain pending. No additional whole-engine capability gate is completed.
 
 ## DOC-04a — Deterministic inspection
@@ -182,7 +182,7 @@ pinned source snapshot/digests, a reproducible generator and retained notice.
 See [HTML.md](HTML.md) for algorithms, provenance and untested contexts.
 
 `html.references` is complete for its algorithmic scope. Foreign-content CDATA,
-tree construction and loading remain pending. No full-parser claim is made.
+broader tree construction and loading remain pending. No full-parser claim is made.
 
 ## DOC-05b — Text modes and token-at-a-time drive
 
@@ -207,8 +207,35 @@ Earlier declaration/reference selections still pass. The importer and manifest
 checker account separately for records, selected contexts and omitted states.
 
 `html.textmodes` completes its declared four-mode scope. DOC-05b's broader encoding
-work, foreign-content CDATA, tree construction and the corpus/fuzz gate remain
+work, foreign-content CDATA, broader tree construction and the corpus/fuzz gate remain
 pending. The new example demonstrates tokenizer feedback, not a document parser.
+
+## DOC-06a — Initial document construction subset
+
+`HtmlDocumentParser` now owns the tokenizer and a checked DOM until successful
+EOF. Initial/before-html/before-head/head/noscript/after-head/text modes create
+explicit/implied shell nodes, select text contexts and compute compatibility
+mode. A small body subset adds p/div/span/br/hr/plaintext, paragraph/end-tag
+recovery, repeated html/body attribute merging, text coalescing and post-body
+recovery. Syntax families, driver lifecycle and DOM mutation remain separate.
+
+Fatal errors discard private partial trees and poison the parser; unsupported
+body families, templates, framesets and instruction nodes fail explicitly.
+Scripting is disabled and input is fixed UTF-8. [ADR 0009](adr/0009-parser-owned-construction.md)
+records ownership, and [HTML_TREE.md](HTML_TREE.md) lists exact accepted/rejected
+constructs, diagnostics, resource contracts and pending web integration.
+
+Sixteen focused tests cover fixed trees, text-mode feedback at all byte splits
+and three token sizes, attribute/whitespace/paragraph recovery, exact DOM and
+diagnostic budgets, Unicode, unsupported inputs, cancellation and lifecycle.
+A pinned 45/112-record tree subset passes complete-tree comparisons, all 905
+two-chunk splits and 45 one-byte runs. Offline regeneration retains the complete
+upstream source, source/fixture digests, selection counts and MIT notice. Four
+Python regressions and ordinary repository checks validate importer provenance.
+
+`html.tree` is now visibly in progress in the README map; broad body rules,
+tables, formatting, templates, foreign content, script reentry and the full
+corpus/fuzz gate remain unfinished. No new completion credit is awarded yet.
 
 ## Queue status
 
@@ -244,9 +271,10 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
-| DOC-06a/b: tree builder | Not started |
+| DOC-06a: initial/head/body tree construction | Partial: shell/head rules and a declared small body set; broader body algorithms pending |
+| DOC-06b: tables/formatting/template/foreign tree rules | Not started |
 | DOC-07: bounded HTML loader/CLI | Not started |
-| DOC-08: parser corpus/fuzzing | Partial: pinned declaration corpus and chunk splits; tree corpus and fuzz targets pending |
+| DOC-08: parser corpus/fuzzing | Partial: tokenizer corpora and 45 pinned tree records with chunk splits; broader tree corpus and fuzz targets pending |
 | DOC-09: traced node/JS ownership prototype | Not started |
 
 M1 remains in progress. Cross-document adoption, node cloning and mutation records

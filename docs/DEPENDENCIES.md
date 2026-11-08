@@ -101,6 +101,13 @@ and WHATWG source-code license notice are retained under `rustic-html` data/sour
 This is standards data behind an original parser/lookup algorithm. No external
 Rust library or existing parser was introduced. See [HTML data provenance](HTML.md).
 
+The initial document builder also uses the WHATWG compatibility-identifier data
+and a pinned MIT-licensed html5lib tree-construction file. The complete upstream
+file, source/fixture digests, closed selection policy and offline generator are
+retained; [tree evidence](HTML_TREE.md) records its earlier revision and unrun
+scope. `rustic-html` now depends on the existing original `rustic-dom` crate;
+there are still no external Rust dependencies.
+
 The AGPL license already present in the repository is retained. Workspace package
 metadata uses `AGPL-3.0-only`; changing the licensing policy is a maintainer
 decision, not an incidental dependency or scaffolding change.

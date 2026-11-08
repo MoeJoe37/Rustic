@@ -473,8 +473,24 @@
         {
           "id": "html.tree",
           "label": "Core insertion modes and malformed-tree recovery",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree.rs",
+              "marker": "struct TreeBuilder"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/document.rs",
+              "marker": "fn paragraph_recovery_closes_spans_and_blocks_without_moving_existing_nodes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_corpus.rs",
+              "marker": "fn pinned_tree_subset_matches_expected_trees_at_every_byte_split"
+            }
+          ]
         },
         {
           "id": "html.tables",

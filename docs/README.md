@@ -36,9 +36,10 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope and 685 pinned cases](URL.md) |
 | Incremental UTF-8, tags/attributes, declarations, references and text modes | Implemented declared tokenizer scope | `rustic-html`; [53 focused tests and three pinned corpora](HTML.md) |
 | Token-at-a-time input drive and text-mode feedback | Implemented internal contract | Same-chunk feedback, queued-input, control/lifecycle tests; [ADR 0008](adr/0008-tokenizer-drive.md) |
+| Initial/head/body document construction and compatibility modes | Implemented explicit subset | [Scope, 16 focused tests and 45 pinned tree cases](HTML_TREE.md); remaining body/table/formatting/foreign rules pending |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
-| Remaining HTML tokenizer states/tree building, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
+| Remaining HTML tokenizer/tree rules, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | Pinned WPT URL data subset | Implemented offline runner | 685 selected URL records; no full browser harness |
 | Pinned html5lib declaration tokenizer subset | Implemented offline runner | 1,079 selected cases; token fields/error codes and all fixture splits |

@@ -10,6 +10,7 @@ import tomllib
 from urllib.parse import unquote, urlsplit
 import import_html_entities
 import import_html_tests
+import import_html_tree_tests
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -144,6 +145,10 @@ def main() -> int:
     check_html_fixture("references")
     check_html_fixture("text")
     check_entities()
+    try:
+        import_html_tree_tests.check()
+    except (OSError, ValueError) as exc:
+        error(ROOT / "crates/rustic-html/tests/fixtures/tree_manifest.json", str(exc))
 
     try:
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]

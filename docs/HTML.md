@@ -39,7 +39,8 @@ Doctype tokens preserve missing versus empty names/identifiers, ASCII-lowercase
 names, case-preserved public/system identifiers, and the tokenizer's force-quirks
 flag. PUBLIC/SYSTEM keywords can span feeds. Errors after a completed system
 identifier preserve the flag; other malformed forms use their specified recovery.
-The flag is input to future document-mode selection, not a computed quirks mode.
+The flag is input to the separate document builder's mode selection, not itself
+a computed quirks mode; see [tree construction](HTML_TREE.md).
 System identifiers remain token data; resource loading belongs to the loader.
 
 Processing instructions preserve case in accepted ASCII targets and retain
@@ -161,14 +162,15 @@ stream; another feed/finish returns `AlreadyFinished`.
 
 ## Deliberate remaining scope
 
-There is no tree builder to select modes in a real document. Encoding sniffing,
+The [inert document parser](HTML_TREE.md) now selects modes in a declared
+initial/head/body subset and rejects unsupported tree constructs. Encoding sniffing,
 legacy decoders, restart, parser/script execution/reentry, foreign content and
 complete HTML recovery remain planned. DOM-string/UTF-16 fragment input is also
 separate from the current UTF-8 byte interface.
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
 DOC-05b now has reference expansion and all four text modes; broader encoding work,
-DOC-06 and the broader corpus/fuzz gate remain open.
+the remaining DOC-06 rules and the broader corpus/fuzz gate remain open.
 
 ## Evidence and references
 

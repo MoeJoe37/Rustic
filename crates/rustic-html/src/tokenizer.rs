@@ -86,8 +86,8 @@ struct BuildingTag {
 /// Incremental tokenizer for data, tags and declarations in HTML context.
 ///
 /// Feed boundaries do not change token grouping. Text mode selection belongs to
-/// the caller/tree builder through the pull driver. DOM tree construction and
-/// foreign-content context integration remain unimplemented. Syntax errors are diagnosed;
+/// the caller/tree builder through the pull driver. Tree construction is separate;
+/// foreign-content context integration remains unimplemented. Syntax errors are diagnosed;
 /// fatal conditions poison the stream instead of allowing a retry.
 #[derive(Debug)]
 pub struct HtmlTokenizer {

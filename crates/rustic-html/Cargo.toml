@@ -1,6 +1,6 @@
 [package]
 name = "rustic-html"
-description = "Bounded incremental HTML input and tokenizer foundations for Rustic"
+description = "Bounded incremental HTML tokenization and document construction for Rustic"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 rustic-base = { path = "../rustic-base" }
+rustic-dom = { path = "../rustic-dom" }
 
 [lints]
 workspace = true

@@ -125,15 +125,18 @@ stride and bytes per pixel as well as the viewport pixel count present at M0.
 
 ## 4. Parsing, style, layout, and painting
 
-The current `rustic-html` crate depends only on `rustic-base` and implements
+The current `rustic-html` crate depends on `rustic-base` and `rustic-dom`. It implements
 explicit UTF-8 input, data/tags, named/numeric references, comments, doctypes,
 processing instructions and caller-controlled RCDATA/RAWTEXT/script/plaintext
 states. Syntax families have focused internal modules. The pull
 driver owns queued input and pauses at token boundaries for mode feedback; it
 does not infer tree-builder context from tag names. See [ADR 0008](adr/0008-tokenizer-drive.md).
-It has no DOM dependency until tree construction needs the checked mutation API. See [HTML.md](HTML.md)
-for implemented behavior and remaining states. The following pipeline describes
-the target architecture.
+The inert document parser owns a checked DOM while driving an explicit subset of
+initial/head/body insertion modes. Failed partial trees are discarded; only EOF
+transfers ownership. [ADR 0009](adr/0009-parser-owned-construction.md) records the
+construction boundary and [HTML tree scope](HTML_TREE.md) lists accepted/rejected
+constructs. See [HTML.md](HTML.md) for tokenization. The following broader pipeline
+describes the target architecture.
 
 The loader produces byte chunks plus response metadata. Encoding detection and
 decoder state precede HTML tokenization; charset changes may require a bounded

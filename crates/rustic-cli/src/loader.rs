@@ -83,6 +83,8 @@ pub enum LoadError {
     Parse(ParseError),
     /// The tree dump would exceed its output limit.
     Dump(DumpError),
+    /// Principal box construction failed or exceeded its limits.
+    Layout(rustic_layout::LayoutError),
 }
 
 impl fmt::Display for LoadError {
@@ -98,6 +100,7 @@ impl fmt::Display for LoadError {
             Self::Cancelled => f.write_str("load cancelled"),
             Self::Parse(error) => error.fmt(f),
             Self::Dump(error) => error.fmt(f),
+            Self::Layout(error) => error.fmt(f),
         }
     }
 }
@@ -108,6 +111,7 @@ impl Error for LoadError {
             Self::Io(error) => Some(error),
             Self::Parse(error) => Some(error),
             Self::Dump(error) => Some(error),
+            Self::Layout(error) => Some(error),
             _ => None,
         }
     }
@@ -260,26 +264,7 @@ pub fn dump_style(
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
     let document = parsed.document();
-    let node_error = |error| LoadError::Dump(DumpError::Node(error));
-    let parser = CssParser::default();
-    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
-    let document_url = file_url(&canonical);
-    let mut local = canonical.parent().and_then(|root| {
-        LocalStylesheetFetcher::new(
-            root.to_path_buf(),
-            limits.read_chunk_bytes,
-            CancellationToken::default(),
-        )
-    });
-    let mut no_fetch = NoFetch;
-    let fetcher: &mut dyn StylesheetFetcher = match local.as_mut() {
-        Some(local) => local,
-        None => &mut no_fetch,
-    };
-    let mut loader = StyleLoader::new(fetcher, limits.stylesheets);
-    let (cascade, sheets) =
-        document_cascade_with(document, &parser, document_url.as_ref(), &mut loader)
-            .map_err(node_error)?;
+    let (styles, sheets) = compute_styles(parsed, path, limits)?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
         let status = status_text(sheet.status);
@@ -305,6 +290,49 @@ pub fn dump_style(
             return Err(LoadError::Dump(DumpError::OutputLimit));
         }
     }
+    let remaining = limits
+        .max_dump_bytes
+        .checked_sub(out.len())
+        .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
+    let elements = dump_computed_styles(document, &styles, remaining)
+        .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
+    out.push_str(&elements);
+    Ok(out)
+}
+
+/// Share the same local stylesheet policy and M2 reference cascade in all dumps.
+fn compute_styles(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<
+    (
+        Vec<rustic_style::ElementStyle>,
+        Vec<rustic_style::StyleElementSheet>,
+    ),
+    LoadError,
+> {
+    let document = parsed.document();
+    let node_error = |error| LoadError::Dump(DumpError::Node(error));
+    let parser = CssParser::default();
+    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
+    let document_url = file_url(&canonical);
+    let mut local = canonical.parent().and_then(|root| {
+        LocalStylesheetFetcher::new(
+            root.to_path_buf(),
+            limits.read_chunk_bytes,
+            CancellationToken::default(),
+        )
+    });
+    let mut no_fetch = NoFetch;
+    let fetcher: &mut dyn StylesheetFetcher = match local.as_mut() {
+        Some(local) => local,
+        None => &mut no_fetch,
+    };
+    let mut loader = StyleLoader::new(fetcher, limits.stylesheets);
+    let (cascade, sheets) =
+        document_cascade_with(document, &parser, document_url.as_ref(), &mut loader)
+            .map_err(node_error)?;
     let mut cx = MatchContext::html();
     cx.quirks = parsed.mode() == DocumentMode::Quirks;
     let styles = style_tree(
@@ -316,14 +344,31 @@ pub fn dump_style(
         &ComputeContext::default(),
     )
     .map_err(node_error)?;
-    let remaining = limits
-        .max_dump_bytes
-        .checked_sub(out.len())
-        .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
-    let elements = dump_computed_styles(document, &styles, remaining)
-        .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
-    out.push_str(&elements);
-    Ok(out)
+    Ok((styles, sheets))
+}
+
+/// Dump an initial principal-box snapshot, before anonymous/line box construction.
+/// This has no layout positions, shaped text, images or paint output yet.
+pub fn dump_boxes(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
+    let (styles, _) = compute_styles(parsed, path, limits)?;
+    let tree = rustic_layout::BoxTree::build(
+        parsed.document(),
+        parsed.document().root(),
+        &styles,
+        rustic_layout::LayoutLimits {
+            max_nodes: limits.parser.document.max_nodes,
+            max_boxes: limits.parser.document.max_nodes,
+            max_depth: limits.parser.document.max_depth,
+            ..rustic_layout::LayoutLimits::default()
+        },
+        &CancellationToken::default(),
+    )
+    .map_err(LoadError::Layout)?;
+    tree.dump(limits.max_dump_bytes).map_err(LoadError::Layout)
 }
 
 #[cfg(test)]

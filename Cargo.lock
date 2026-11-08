@@ -15,6 +15,7 @@ dependencies = [
  "rustic-dom",
  "rustic-engine",
  "rustic-html",
+ "rustic-layout",
  "rustic-style",
  "rustic-url",
 ]
@@ -55,6 +56,17 @@ version = "0.1.0"
 dependencies = [
  "rustic-base",
  "rustic-dom",
+]
+
+[[package]]
+name = "rustic-layout"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-css",
+ "rustic-dom",
+ "rustic-html",
+ "rustic-style",
 ]
 
 [[package]]

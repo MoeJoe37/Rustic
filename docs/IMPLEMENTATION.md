@@ -718,6 +718,16 @@ Filtered `of S` selectors conservatively use full restyles after mutations
 until counting-scope dependencies exist (TD-36). All new cases compare against
 the independent full-restyle path; ordinary targeted invalidation remains.
 
+## REN-01a — Checked geometry, principal boxes and block widths
+
+M3 has started in `rustic-layout`: checked CSS/device geometry, an immutable flat
+DOM/style-to-principal-box snapshot, raw UTF-16 text with correct boxless-parent
+inheritance, resource/cancellation guards, and normal-flow non-replaced block
+width measurement. `rustic dump-boxes` exposes a bounded deterministic snapshot
+through the existing local HTML/stylesheet loader. [LAYOUT.md](LAYOUT.md) specifies
+the supported width algorithm and exact limits. Anonymous boxes, vertical flow,
+fragments, text layout and painted images remain pending; REN-01 is partial.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -792,5 +802,6 @@ failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
 complete (media queries, invalidation, custom properties and container
 queries), and CSS-08 closed the declared conformance gate with known failures
 recorded rather than hidden. The M2 catalog scope is complete, including its
-math-function and invalidation steps; broader CSS compatibility remains open. All project crates remain safe
+math-function and invalidation steps; broader CSS compatibility remains open.
+M3 has started with REN-01a, while full static rendering remains unimplemented. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

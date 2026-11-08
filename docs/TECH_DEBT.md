@@ -82,6 +82,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
+| TD-37 | Deliberate | Layout | Principal snapshots precede normalized/anonymous and flattened trees | Open, REN-01b |
 | TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
 
@@ -586,3 +587,14 @@ This preserves the full-restyle reference contract without changing ordinary
 structural or targeted `:has()` invalidation. **Pay:** record each filter's
 counting scope and dependency reach, retaining the new regression tests.
 **Trigger:** profiling a real filtered-sibling workload.
+
+### TD-37 — Principal snapshots before normalized and flattened trees
+
+REN-01a snapshots computed display boxes and raw UTF-16 text, suppressing
+`none` and promoting `contents`. Anonymous boxes, whitespace processing,
+pseudo boxes and formatting-context fixups come with REN-01b, before vertical
+flow. Visible shadow hosts fail explicitly until slot assignment and a
+flattened tree are available. `dump-boxes` labels the result a principal
+snapshot and never claims positions or pixels. **Pay:** implement normalization
+with mixed inline/block fixtures and a flattened-tree input contract.
+**Trigger:** vertical flow/inline layout; shadow rendering before M5.

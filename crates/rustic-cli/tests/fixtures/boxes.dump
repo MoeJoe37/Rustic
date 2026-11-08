@@ -1,0 +1,6 @@
+box 0 parent=- node=2:1 display=block
+box 1 parent=0 node=6:1 display=block
+box 2 parent=1 node=7:1 display=block
+box 3 parent=2 node=9:1 text-units=8
+box 4 parent=2 node=12:1 display=block
+box 5 parent=1 node=17:1 text-units=1

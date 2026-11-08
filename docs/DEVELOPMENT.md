@@ -38,7 +38,9 @@ and use `--locked` so implicit resolution changes fail visibly. Do not publish t
 scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
 `--version`, the local-only `dump-dom` command described in
 [HTML_TREE.md](HTML_TREE.md#local-dump-dom-command), and `dump-style`, which
-prints computed styles for the same input ([CSS.md](CSS.md#style-dump)).
+prints computed styles for the same input ([CSS.md](CSS.md#style-dump)),
+and `dump-boxes`, which prints an initial principal-box snapshot
+([LAYOUT.md](LAYOUT.md)) without positions or painting.
 
 The DOM `tree` example constructs nodes through the storage API, then emits an
 inspection dump. It is a runnable check of document ownership and traversal, not

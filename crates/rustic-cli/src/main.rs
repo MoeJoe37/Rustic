@@ -19,6 +19,7 @@ Usage:
   rustic info
   rustic dump-dom [OPTIONS] [--] <file>
   rustic dump-style [OPTIONS] [--] <file>
+  rustic dump-boxes [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
@@ -29,7 +30,10 @@ computed style for a 1280x720 viewport. Linked and imported sheets load only
 from files in the document's directory or below it; network URLs and paths
 outside it are blocked. URLs are rejected as the file argument.
 
-Options for both commands (positive integers; exceeding any limit except
+dump-boxes loads the same styles and prints a principal-box snapshot (no
+anonymous/line boxes, layout positions or painting yet).
+
+Options for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
   --max-input-bytes N    file and tokenizer input bytes (default 8388608)
   --max-output-bytes N   dump output bytes (default 67108864)
@@ -39,7 +43,7 @@ Options for both commands (positive integers; exceeding any limit except
   --max-diagnostics N    retained tokenizer and tree recoveries, each; later
                          recoveries are counted, not fatal (default 1024)
 
-Options for dump-style only (exceeding one skips the sheet, never fatal):
+Stylesheet options for dump-style and dump-boxes (exceeding one skips the sheet, never fatal):
   --max-stylesheets N       linked and imported sheets fetched (default 64)
   --max-stylesheet-bytes N  total bytes of those sheets (default 8388608)
   --max-import-depth N      @import nesting (default 16)";
@@ -63,7 +67,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; layout, JavaScript, networking, and rendering: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes; full layout, JavaScript, networking, and rendering: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -72,6 +76,9 @@ fn main() -> ExitCode {
     }
     if args[0] == "dump-style" {
         return dump_command("dump-style", &args[1..], loader::dump_style);
+    }
+    if args[0] == "dump-boxes" {
+        return dump_command("dump-boxes", &args[1..], loader::dump_boxes);
     }
     eprintln!(
         "Unsupported command. Rendering and navigation are not implemented; see docs/ROADMAP.md."

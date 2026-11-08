@@ -316,3 +316,28 @@ fn dump_style_never_follows_links_out_of_the_document_directory() {
         "{dump}"
     );
 }
+
+#[test]
+fn dump_boxes_matches_snapshot_across_chunks_and_enforces_output_limit() {
+    let input = fixture("boxes.html");
+    let input = input.to_str().unwrap();
+    let expected = fs::read(fixture("boxes.dump")).unwrap();
+    for chunk in ["1", "7", "65536"] {
+        let output = rustic(&["dump-boxes", "--chunk-bytes", chunk, input]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(output.stdout, expected);
+    }
+    let exact = expected.len().to_string();
+    let short = (expected.len() - 1).to_string();
+    assert!(
+        rustic(&["dump-boxes", "--max-output-bytes", &exact, input])
+            .status
+            .success()
+    );
+    let output = rustic(&["dump-boxes", "--max-output-bytes", &short, input]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let output = rustic(&["dump-boxes", "https://example.com/page"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+}

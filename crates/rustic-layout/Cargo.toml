@@ -1,0 +1,21 @@
+[package]
+name = "rustic-layout"
+description = "Checked geometry and reference box construction for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-css = { path = "../rustic-css" }
+rustic-dom = { path = "../rustic-dom" }
+rustic-style = { path = "../rustic-style" }
+
+[dev-dependencies]
+rustic-html = { path = "../rustic-html" }
+
+[lints]
+workspace = true

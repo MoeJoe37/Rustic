@@ -155,7 +155,10 @@ used, and actual values distinct. A UA stylesheet provides defaults. Mutation,
 stylesheet, pseudo-class, viewport, and font changes produce invalidation sets.
 Start with a correct full restyle/reflow before selective invalidation.
 
-Layout consumes a stable style snapshot. Generate a box tree distinct from DOM,
+Layout consumes a stable style snapshot. REN-01a starts this boundary in
+`rustic-layout` with checked unit geometry, principal snapshots and block width
+measurement; see [LAYOUT.md](LAYOUT.md). Normalization, vertical flow and
+fragments remain pending. Generate a box tree distinct from DOM,
 then fragments for block/inline formatting, anonymous boxes, line boxes, replaced
 elements, and later fragmentation. Distinguish CSS pixels, device pixels, logical
 inline/block axes, and font units in types. Resolve containing blocks, intrinsic

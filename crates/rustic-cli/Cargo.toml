@@ -21,5 +21,7 @@ rustic-html = { path = "../rustic-html" }
 rustic-style = { path = "../rustic-style" }
 rustic-url = { path = "../rustic-url" }
 
+rustic-layout = { path = "../rustic-layout" }
+
 [lints]
 workspace = true

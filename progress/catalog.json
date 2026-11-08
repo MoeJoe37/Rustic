@@ -1417,16 +1417,84 @@
           "label": "Box/fragment trees and checked geometry",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "geometry",
+              "label": "Checked CSS/device units and geometry arithmetic",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/geometry.rs",
+                  "marker": "pub struct CssPx"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/reference.rs",
+                  "marker": "fn geometry_rejects_nonfinite_and_out_of_budget_edges_before_conversion"
+                }
+              ]
+            },
+            {
+              "id": "normalized",
+              "label": "Normalized principal and anonymous box tree",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "fragments",
+              "label": "Fragment tree with layout geometry",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "layout.block",
           "label": "Block flow, margins and anonymous boxes",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "widths",
+              "label": "Normal-flow non-replaced horizontal width equation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/sizing.rs",
+                  "marker": "pub fn measure_block_width"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/reference.rs",
+                  "marker": "fn width_equation_holds_across_auto_negative_and_overconstrained_cases"
+                }
+              ]
+            },
+            {
+              "id": "flow",
+              "label": "Vertical block flow and used geometry",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "margins",
+              "label": "Adjoining and parent-child margin collapse",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "anonymous",
+              "label": "Mixed block/inline flow through anonymous boxes",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "layout.inline",

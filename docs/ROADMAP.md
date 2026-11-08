@@ -8,7 +8,9 @@ when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-07
 and DOC-08 are complete for their declared scope, including fragment parsing;
-M2 has CSS-01 through CSS-05 done; M3–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
+M2 has completed its declared CSS subset and conformance gate; M3 has started
+with REN-01a (checked geometry, principal snapshots and horizontal block sizing).
+M4–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
@@ -148,6 +150,11 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | REN-07 | Reftest harness, checked image fixtures, deterministic clocks/fonts, allocation counters | REN-06 |
 | REN-08 | Implement flexbox as its own tested formatting context; start grid/table plans from failures | REN-07 |
 | MOB-03/04 | Android/iOS local-fixture CPU surfaces through narrow native bridges | REN-05; mobile core checks |
+
+**Current slice:** REN-01a implements checked CSS/device geometry, bounded
+principal-box snapshots, horizontal block width measurement and `dump-boxes`.
+Anonymous boxes, vertical flow and the final box/fragment tree are pending.
+See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin
 mixed text, resize, and overflow render through Rustic's pipeline. Early debug

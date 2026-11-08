@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "e012337d6cedc99a9c9aa7aa0b5c69dbef2d4f4881a11c645f0e8ccb690cd8af",
-  "percent": "20.49",
+  "source_fingerprint": "53bc7dd341ec29c0c9e82bf361267da4eefc3c1cce3acb89d5c884e34d8dfbfc",
+  "percent": "20.93",
   "verified_percent": "20.27",
-  "partial_percent": "0.22",
+  "partial_percent": "0.66",
   "completed": 36,
-  "in_progress": 1,
+  "in_progress": 3,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 0,
       "total": 17,
-      "percent": "0.00",
+      "percent": "3.59",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "3.59"
     },
     {
       "id": "M4",
@@ -1641,9 +1641,40 @@
           "label": "Box/fragment trees and checked geometry",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "geometry",
+              "label": "Checked CSS/device units and geometry arithmetic",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/geometry.rs",
+                  "marker": "pub struct CssPx"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/reference.rs",
+                  "marker": "fn geometry_rejects_nonfinite_and_out_of_budget_edges_before_conversion"
+                }
+              ]
+            },
+            {
+              "id": "normalized",
+              "label": "Normalized principal and anonymous box tree",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "fragments",
+              "label": "Fragment tree with layout geometry",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.58"
         },
         {
@@ -1651,9 +1682,46 @@
           "label": "Block flow, margins and anonymous boxes",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "widths",
+              "label": "Normal-flow non-replaced horizontal width equation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/sizing.rs",
+                  "marker": "pub fn measure_block_width"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/reference.rs",
+                  "marker": "fn width_equation_holds_across_auto_negative_and_overconstrained_cases"
+                }
+              ]
+            },
+            {
+              "id": "flow",
+              "label": "Vertical block flow and used geometry",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "margins",
+              "label": "Adjoining and parent-child margin collapse",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "anonymous",
+              "label": "Mixed block/inline flow through anonymous boxes",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.97"
         },
         {
@@ -1739,12 +1807,12 @@
       ],
       "points": 46,
       "completed": 0,
-      "in_progress": 0,
+      "in_progress": 2,
       "total": 10,
-      "contribution": "0.00",
-      "percent": "0.00",
+      "contribution": "0.44",
+      "percent": "4.89",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "4.89"
     },
     {
       "id": "paint",

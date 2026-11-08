@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 20.49%** (20.27% verified complete + 0.22% partial credit) — 36/172 capabilities complete and 1 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 0.00% done.
+**Overall engine completion: 20.93%** (20.27% verified complete + 0.66% partial credit) — 36/172 capabilities complete and 3 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 3.59% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -76,6 +76,7 @@ cargo run --locked -p rustic-html --example tokenize
 cargo run --locked -p rustic-html --example text_modes
 cargo run --locked -p rustic-html --example document
 cargo run --locked -p rustic-cli -- dump-style crates/rustic-cli/tests/fixtures/styled.html
+cargo run --locked -p rustic-cli -- dump-boxes crates/rustic-cli/tests/fixtures/boxes.html
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
@@ -84,7 +85,9 @@ the 2024 edition. The commands are `rustic info`, `--help`, `--version` and
 `rustic dump-dom <file>`, which loads one local HTML file within byte, token,
 node and output budgets and prints a deterministic DOM dump, and
 `rustic dump-style <file>`, which prints each element's computed style for the
-same file. URLs and other
+same file. `rustic dump-boxes <file>` exposes M3's initial principal-box
+snapshot; [geometry and block-width measurement](docs/LAYOUT.md) have started,
+while vertical flow, text layout and image output remain pending. URLs and other
 arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints
@@ -103,6 +106,7 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 `rustic-html` (streaming tokens and full WHATWG document tree construction),
 `rustic-css` (CSS syntax, selectors, specificity and typed property values),
 `rustic-style` (selector matching, the cascade and computed style over a read-only DOM view),
+`rustic-layout` (checked geometry, principal boxes and reference block widths),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

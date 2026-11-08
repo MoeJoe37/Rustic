@@ -14,11 +14,19 @@ const USAGE: &str = "Rustic browser engine development scaffold
 
 Usage:
   rustic info
-  rustic dump-dom [--max-input-bytes N] [--max-output-bytes N] [--chunk-bytes N] [--] <file>
+  rustic dump-dom [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
-prints a deterministic DOM tree dump. URLs are rejected.";
+prints a deterministic DOM tree dump. URLs are rejected.
+
+dump-dom options (positive integers; exceeding any limit fails the load):
+  --max-input-bytes N    file and tokenizer input bytes (default 8388608)
+  --max-output-bytes N   dump output bytes (default 67108864)
+  --chunk-bytes N        bytes read per step (default 65536)
+  --max-nodes N          document nodes, including the root (default 100000)
+  --max-depth N          element nesting depth (default 256)
+  --max-diagnostics N    retained tokenizer and tree recoveries, each (default 1024)";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -94,6 +102,7 @@ fn dump_dom(args: &[OsString]) -> ExitCode {
 
 fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String> {
     let mut limits = LoaderLimits::default();
+    let mut diagnostics = None;
     let mut path = None;
     let mut options_done = false;
     let mut iter = args.iter();
@@ -107,6 +116,11 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
                 Some("--max-input-bytes") => Some(&mut limits.max_file_bytes),
                 Some("--max-output-bytes") => Some(&mut limits.max_dump_bytes),
                 Some("--chunk-bytes") => Some(&mut limits.read_chunk_bytes),
+                Some("--max-nodes") => Some(&mut limits.parser.document.max_nodes),
+                Some("--max-depth") => Some(&mut limits.parser.document.max_depth),
+                Some("--max-diagnostics") => {
+                    Some(diagnostics.insert(limits.parser.max_tree_diagnostics))
+                }
                 Some(option) if option.starts_with('-') && option != "-" => {
                     return Err(format!("unknown option {option}"));
                 }
@@ -129,6 +143,10 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
         if path.replace(arg.clone()).is_some() {
             return Err("expected exactly one file path".into());
         }
+    }
+    if let Some(diagnostics) = diagnostics {
+        limits.parser.tokenizer.max_diagnostics = diagnostics;
+        limits.parser.max_tree_diagnostics = diagnostics;
     }
     path.map(|path| (limits, path))
         .ok_or_else(|| "missing file path".into())

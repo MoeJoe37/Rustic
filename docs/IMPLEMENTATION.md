@@ -211,8 +211,9 @@ gone. Native path conversion and access policy remain loader/platform work.
 covering the URL parser, host code points and all IPv4/IPv6 errors. IDNA-specific
 errors arrive with the IDNA adapter.
 
-Evidence: the pinned WPT subset grows from 685 to 815 cases (all 130 file cases
-pass, 84 excluded), every expected failure there yields a diagnostic, two new
+Evidence: the pinned WPT subset grew from 685 to 815 cases (all 130 file cases
+pass), then to 887 once IDNA allowed the 72 non-ASCII records (only 12 blob
+records remain excluded), every expected failure there yields a diagnostic, two new
 file tests and eight diagnostics tests in `rustic-url`, and the URL fuzz target
 now also uses file bases and checks diagnostic offsets and result equality.
 
@@ -561,7 +562,7 @@ must keep all tiers green.
 | DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |
 | DOC-04c: node kinds, cloning, adoption and lifecycle | Complete: general fragments, PI/CDATA, clone, cross-document adoption with ID maps, `ReadyState`; mutation records pending |
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset plus UTS #46 IDNA (all 6,389 Unicode IdnaTestV2 cases); blob remains pending |
-| DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 815-case WPT subset, standard-named diagnostics with offsets |
+| DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 887-case WPT subset (all but 12 blob records), standard-named diagnostics with offsets |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |

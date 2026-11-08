@@ -6,7 +6,7 @@ The current suite has viewport boundary/error tests, CLI subprocess tests, a
 rustdoc example, shared primitive boundary/concurrency tests, DOM hierarchy and
 payload tests, seeded mutations against an independent ordered-tree model, repository
 consistency checks, and compiler/linter checks.
-URL parsing now adds focused host/origin/limit, file URL and diagnostics tests and an 815-case pinned WPT
+URL parsing now adds focused host/origin/limit, file URL and diagnostics tests and an 887-case pinned WPT
 URL-data subset; see [scope and provenance](URL.md). HTML input/tokenization adds
 53 focused tests plus 1,079 selected declaration cases and all 4,626 cases in the
 pinned html5lib reference files, with token fields, diagnostic order and chunk

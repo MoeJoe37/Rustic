@@ -157,27 +157,28 @@ cargo run --locked -p rustic-url --example resolve
 
 ## Pinned upstream evidence
 
-The offline integration test runs **815 selected cases** from the 899 test records
+The offline integration test runs **887 selected cases** from the 899 test records
 in WPT's `url/resources/urltestdata.json` at
 [revision 8c17bfeb3e66a2986be16b0e004f85ace68db647](https://github.com/web-platform-tests/wpt/blob/8c17bfeb3e66a2986be16b0e004f85ace68db647/url/resources/urltestdata.json).
-The fixed selection rule is defined before running Rustic: ASCII input/base,
-excluding the blob scheme and percent-encoded non-ASCII octets in any component.
-File cases joined the selection with DOC-02b (policy v2); all 130 pass.
-The last rule is intentionally conservative and excludes some otherwise-supported
-encoded paths to keep this subset independent of IDNA.
+The fixed selection rule is defined before running Rustic: every record except
+blob-scheme cases and any record with a lone surrogate (which a Rust string
+cannot hold; none exist at this revision). File cases joined with DOC-02b
+(policy v2) and the 72 non-ASCII and percent-encoded non-ASCII cases joined once
+IDNA landed (policy v3); all pass. Fixture literals escape every non-ASCII code
+point as `\u{...}` so no bidi or invisible text enters the source.
 
 | Count | Meaning |
 | --- | --- |
 | 899 | All upstream test records; section-description strings are not cases |
-| 815 | Selected and executed with no unexpected failures |
-| 564 | Expected successful parses checked field by field and reparsed for record stability |
-| 251 | Expected parse rejections, each also checked to produce a diagnostic |
-| 84 | Excluded: 12 blob, 56 non-ASCII input/base, 16 encoded non-ASCII |
+| 887 | Selected and executed with no unexpected failures |
+| 617 | Expected successful parses checked field by field and reparsed for record stability |
+| 270 | Expected parse rejections, each also checked to produce a diagnostic |
+| 12 | Excluded: blob scheme (registry not implemented) |
 
 Every successful selected case checks href, protocol, username/password, host,
 hostname, port, pathname, search and hash, plus origin where supplied upstream.
 This does not execute URLSearchParams expectations, setters, legacy encodings,
-other WPT files or a full browser WPT harness. The 815-case result is a declared
+other WPT files or a full browser WPT harness. The 887-case result is a declared
 subset, not a whole-suite pass percentage. Crashes or unexpected errors fail it;
 cases are not dynamically skipped based on Rustic's results.
 

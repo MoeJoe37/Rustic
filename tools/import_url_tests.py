@@ -15,16 +15,14 @@ FIELDS = (
     "href", "protocol", "username", "password", "host", "hostname", "port",
     "pathname", "search", "hash",
 )
-POLICY = "ascii-input-and-base-without-blob-or-percent-encoded-non-ascii-v2"
+POLICY = "all-records-except-blob-or-lone-surrogates-v3"
 
 
 def exclusion(value: str) -> str | None:
-    if not value.isascii():
-        return "non_ascii_input_or_base"
-    # This deliberately conservative subset excludes encoded non-ASCII bytes in
-    # any component, including paths, so it never needs Unicode IDNA processing.
-    if re.search(r"%[89a-fA-F][0-9a-fA-F]", value):
-        return "percent_encoded_non_ascii"
+    # Rust strings cannot hold lone surrogates, which upstream uses to test
+    # replacement-character handling in UTF-16 bindings.
+    if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+        return "lone_surrogate"
     cleaned = value.strip("".join(chr(code) for code in range(33)))
     cleaned = cleaned.replace("\t", "").replace("\r", "").replace("\n", "")
     match = re.match(r"([a-zA-Z][a-zA-Z0-9+.-]*):", cleaned)
@@ -43,7 +41,10 @@ def literal(value: str) -> str:
         elif ord(char) < 32 or ord(char) == 127:
             pieces.append(f"\\u{{{ord(char):x}}}")
         elif 0xD800 <= ord(char) <= 0xDFFF:
-            raise ValueError("surrogates cannot appear in this ASCII fixture subset")
+            raise ValueError("lone surrogates are excluded before generating literals")
+        elif ord(char) > 127:
+            # Escape non-ASCII so fixtures stay reviewable (no bidi or invisible text).
+            pieces.append(f"\\u{{{ord(char):x}}}")
         else:
             pieces.append(char)
     return "".join(pieces) + '"'

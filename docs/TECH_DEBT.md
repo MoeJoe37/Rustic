@@ -192,8 +192,8 @@ pinned Unicode data and `ParseError::UnsupportedIdna` is gone. What remains
 there is deliberate and documented in [URL.md](URL.md): strict (`beStrict`)
 domain validation is only needed by conformance checkers, and Punycode labels
 past 2,000 bytes / 1,000 code points fail to bound quadratic work. The pinned
-WPT `urltestdata.json` subset still excludes non-ASCII inputs; widening it now
-only needs the importer's selection rule changed.
+WPT `urltestdata.json` subset now includes all non-ASCII records (887 of 899;
+only blob cases are excluded).
 
 ### TD-12 — No native ARM or 32-bit test runs; mobile is check-only
 

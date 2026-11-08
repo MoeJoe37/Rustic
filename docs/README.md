@@ -37,7 +37,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Bounded deterministic subtree dump and executable tree example | Implemented diagnostic tool | `rustic-dom` example and golden/escaping/boundary tests |
 | Android/iOS shared-library cross-compilation | Configured | Seven mobile target checks across ARM64, 32-bit ARM, x86-64 and x86; runtime and host work in [mobile plan](MOBILE.md) |
 | Any-device portability (x64, ARM64, 32-bit ARM/x86, RISC-V, big-endian) | Configured and required | Native tests on six desktop OS/CPU pairs, four emulated test targets and eight cross-checks; [platform support](PLATFORMS.md), ADR 0013 |
-| URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope, file URLs, diagnostics and 815 pinned cases](URL.md) |
+| URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope, file URLs, diagnostics and 887 pinned cases](URL.md) |
 | Incremental UTF-8, tags/attributes, declarations, references and text modes | Implemented declared tokenizer scope | `rustic-html`; [53 focused tests and three pinned corpora](HTML.md) |
 | Token-at-a-time input drive and text-mode feedback | Implemented internal contract | Same-chunk feedback, queued-input, control/lifecycle tests; [ADR 0008](adr/0008-tokenizer-drive.md) |
 | Document tree construction: all 21 insertion modes, tables, formatting, templates and foreign content | Implemented for document parsing | [Scope and all 1,776 runnable html5lib records, including 192 fragments and `selectedcontent`](HTML_TREE.md); scripting pending |
@@ -48,7 +48,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
 | Remaining HTML tokenizer/tree rules, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
-| Pinned WPT URL data subset | Implemented offline runner | 815 selected URL records, including file URLs; no full browser harness |
+| Pinned WPT URL data subset | Implemented offline runner | 887 selected URL records, including file and non-ASCII URLs; no full browser harness |
 | Pinned html5lib declaration tokenizer subset | Implemented offline runner | 1,079 selected cases; token fields/error codes and all fixture splits |
 | Pinned html5lib character-reference corpus | Implemented offline runner | All 4,626 cases in three pinned files; fields/diagnostics and all fixture splits |
 | Pinned html5lib text-mode corpus | Implemented offline runner | 109 selected records expanded into 282 contexts; initial modes/last tag and all fixture splits |

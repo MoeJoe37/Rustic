@@ -9,7 +9,7 @@ are authoritative references, not claims that Rustic is conformant today.
 No HTML, CSS, JavaScript, or network behavior is implemented at M0.
 
 Current M1 evidence includes the original [URL/parser and origin subset](URL.md)
-with 815 pinned upstream URL-data cases, including file URLs, plus named
+with 887 pinned upstream URL-data cases, including file and non-ASCII URLs, plus named
 validation diagnostics and UTS #46 IDNA checked against all well-formed Unicode
 17.0.0 IdnaTestV2 cases and WPT `toascii.json`. This is not full browser WPT
 conformance and does not implement blob or browser binding features.

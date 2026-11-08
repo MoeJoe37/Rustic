@@ -82,6 +82,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
+| TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -574,3 +575,14 @@ When reviewing a merge, check each new shortcut against the rules above. Add a
 ledger entry for deliberate debt in the same change that takes it, mark entries
 **Paid** with the paying change rather than deleting them, and keep the summary
 table in sync with the sections.
+
+### TD-36 — Filtered sibling-count invalidation
+
+M2 review found that changing a class in `:nth-child(2 of .hot)` restyled
+only the changed element, leaving other counted siblings stale. Filters can
+also inspect ancestors, sibling combinators, states and `:has()`, so cascades
+with any `of S` filter now use a full restyle after a reported mutation.
+This preserves the full-restyle reference contract without changing ordinary
+structural or targeted `:has()` invalidation. **Pay:** record each filter's
+counting scope and dependency reach, retaining the new regression tests.
+**Trigger:** profiling a real filtered-sibling workload.

@@ -112,6 +112,10 @@ pub struct InvalidationMap {
     attributes: HashMap<String, bool>,
     /// Any `:nth-*`, `:first-*`, `:last-*`, `:only-*` or `:empty`.
     structural: bool,
+    /// Structural tests in ancestor compounds can change descendant subjects.
+    structural_outside_subject: bool,
+    /// Filtered sibling counting can read arbitrary selector dependencies.
+    nth_filter: bool,
     /// Any `+` or `~` combinator outside `:has()` arguments.
     siblings: bool,
     /// The `:has()` dependencies.
@@ -239,11 +243,14 @@ impl InvalidationMap {
     fn pseudo_class(&mut self, class: &PseudoClass, at: Position) {
         match class {
             PseudoClass::Empty | PseudoClass::OnlyChild | PseudoClass::OnlyOfType => {
-                self.structural = true
+                self.structural = true;
+                self.structural_outside_subject |= !at.subject;
             }
             PseudoClass::Nth { nth, .. } => {
                 self.structural = true;
+                self.structural_outside_subject |= !at.subject;
                 if let Some(of) = &nth.of {
+                    self.nth_filter = true;
                     self.nested(of, at);
                 }
             }
@@ -683,6 +690,13 @@ impl StyledDocument {
 
     /// Record a mutation already made to `document`.
     pub fn note(&mut self, document: &Document, mutation: Mutation) {
+        // A filter may depend on ancestors, preceding siblings or :has(), so
+        // its membership can change outside the mutation's sibling list.
+        // Keep the reference fallback until those dependencies carry their
+        // counting scope (TD-36).
+        if self.map.nth_filter {
+            self.dirty.all = true;
+        }
         match mutation {
             Mutation::Everything => self.dirty.all = true,
             Mutation::Attribute { element, local } => {
@@ -699,7 +713,7 @@ impl StyledDocument {
                                 document.node(child).map(|n| n.kind()),
                                 Ok(NodeKind::Element(_))
                             ) {
-                                if self.map.siblings {
+                                if self.map.siblings || self.map.structural_outside_subject {
                                     self.dirty.subtrees.insert(child);
                                 } else {
                                     self.dirty.elements.insert(child);
@@ -707,7 +721,12 @@ impl StyledDocument {
                             }
                         }
                     }
-                    self.dirty.elements.insert(parent);
+                    self.changed(
+                        document,
+                        parent,
+                        self.map.structural_outside_subject,
+                        self.map.siblings,
+                    );
                 }
                 self.content_changed(document, parent, true);
                 if self.map.has.any {
@@ -728,7 +747,9 @@ impl StyledDocument {
             Mutation::Text { node } => {
                 let parent = document.node(node).ok().and_then(|n| n.parent());
                 if let Some(parent) = parent {
-                    if self.map.structural {
+                    if self.map.structural_outside_subject {
+                        self.changed(document, parent, true, self.map.siblings);
+                    } else if self.map.structural {
                         self.dirty.elements.insert(parent);
                     }
                     self.content_changed(document, parent, false);

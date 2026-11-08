@@ -557,3 +557,49 @@ fn custom_property_changes_flow_to_var_users() {
     assert_eq!(page.restyle().recomputed, 1);
     assert_eq!(page.color("b"), "rgb(0, 128, 0)");
 }
+
+#[test]
+fn structural_ancestor_changes_restyle_descendant_subjects() {
+    let mut page = Page::new(
+        "<main id=m><section id=a><b id=x></b></section><section id=b><b id=y></b></section></main>",
+        "section:first-child b { width: 7px } section:nth-child(2) b { color: red }",
+    );
+    let parent = by_id(&page.document, "m");
+    let first = by_id(&page.document, "a");
+    page.document.detach(first).unwrap();
+    page.styled
+        .note(&page.document, Mutation::Children { parent });
+    page.restyle();
+}
+
+#[test]
+fn nth_filter_attribute_changes_restyle_other_counted_siblings() {
+    let mut page = Page::new(
+        "<main><p id=a class=hot></p><p id=b class=hot></p><p id=c class=hot></p></main>",
+        "p:nth-child(2 of .hot) { width: 7px }",
+    );
+    page.remove("a", "class");
+    page.restyle();
+}
+
+#[test]
+fn empty_ancestor_sibling_subjects_change_after_text_and_child_list_edits() {
+    for child_list in [false, true] {
+        let mut page = Page::new(
+            "<main><div id=a>x</div><section><b id=b></b></section></main>",
+            "div:empty + section b { width: 7px }",
+        );
+        let parent = by_id(&page.document, "a");
+        let text = page.document.children(parent).unwrap().next().unwrap();
+        if child_list {
+            page.document.detach(text).unwrap();
+            page.styled
+                .note(&page.document, Mutation::Children { parent });
+        } else {
+            page.document.set_character_data(text, "").unwrap();
+            page.styled
+                .note(&page.document, Mutation::Text { node: text });
+        }
+        page.restyle();
+    }
+}

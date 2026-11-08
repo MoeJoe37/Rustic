@@ -707,6 +707,17 @@ the only stylesheet encoding (TD-28). `css.queries` now has its
 external-sheet step; import media lists restrict imported sheets. See
 [CSS.md](CSS.md#external-stylesheets).
 
+## M2 review — structural invalidation
+
+The 2026-11-08 review reproduced stale styles in three differential scenarios:
+removing a sibling when `:first-child`/`:nth-child()` occurs in an ancestor
+compound, changing membership of `:nth-child(2 of .hot)`, and changing `:empty`
+text/children before a sibling subject. Structural changes now reach descendant
+and following-sibling subjects even when the ancestor's own style is unchanged.
+Filtered `of S` selectors conservatively use full restyles after mutations
+until counting-scope dependencies exist (TD-36). All new cases compare against
+the independent full-restyle path; ordinary targeted invalidation remains.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -779,6 +790,7 @@ adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and 
 `html.conformance` is complete and DOC-06d removed the last known tree
 failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
 complete (media queries, invalidation, custom properties and container
-queries), and CSS-08 closed the declared conformance gate. Math functions and
-invalidation steps remain in progress. All project crates remain safe
+queries), and CSS-08 closed the declared conformance gate with known failures
+recorded rather than hidden. The M2 catalog scope is complete, including its
+math-function and invalidation steps; broader CSS compatibility remains open. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

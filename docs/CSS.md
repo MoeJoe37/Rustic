@@ -704,12 +704,13 @@ cascade's selectors decides the scope:
 | Attribute tested only in subject compounds (`.x`, `#id`, `[a]`, `:any-link`'s `href`) | The element |
 | Attribute tested in an ancestor or sibling position | The element's subtree, and with `+`/`~` the following siblings' subtrees |
 | Children inserted, removed or moved | Inserted and moved elements with their subtrees (found because they have no style or a new style parent); with structural selectors (`:nth-*`, `:*-child`, `:*-of-type`, `:empty`) or sibling combinators also the siblings and the parent |
-| Text | The parent, when a selector uses `:empty` |
+| Text | The parent for `:empty`; ancestor structural tests also reach descendant and following-sibling subjects |
 | Attribute or content a `:has()` argument tests | The possible anchors: the changed element's ancestors as far as the relative selectors reach (`> x > y` reaches two levels, any descendant combinator reaches the root), with their preceding siblings when a relative selector uses `+`/`~`; anchor subtrees instead when a `:has()` is outside the subject compound. A test in a nested list's ancestor position (`:has(:is(.p .q))`) also restyles the changed element's subtree |
 | `lang` | The element's subtree (`:lang()`); a `<meta http-equiv=content-language>` change restyles everything |
 | `dir`, an input's `type` or `value`, or text and children under a `dir=auto` or `bdi` element | The element's subtree and the outermost `dir=auto` ancestor's subtree (`:dir()`) |
 | A form-control attribute (`disabled`, `readonly`, `contenteditable`, `placeholder`, ...) | The element's subtree; `checked`, `name`, `type`, `form`, `id` and `selected`, and any child-list change, also restyle every `input`, `button` and `option` (radio groups, default buttons, selected options) |
 | Text in a `textarea`, children of a `fieldset`, `select` or `optgroup` | The textarea; the container's children with their subtrees |
+| Any reported mutation with an `:nth-child(... of S)` filter | Everything, preserving sibling-count/filter dependencies until targeted counting scopes exist (TD-36) |
 | Stylesheets or the media environment (`cascade_changed`) | Everything |
 | A container size (`set_container_size`) | The element's subtree |
 
@@ -722,6 +723,11 @@ siblings instead of the elements alone. A state inside a nested list's ancestor
 position of a `:has()` argument still restyles everything. The `Element
 states` facts in [Selectors](#element-states) list what each state reads.
 
+Structural tests in ancestor compounds dirty descendant subjects and, with
+sibling combinators, following siblings even when the ancestor itself retains
+the same computed style. Review regressions cover child-list and text changes
+and filtered sibling membership; see [the M2 review](IMPLEMENTATION.md#m2-review--structural-invalidation).
+
 The result always equals a fresh `style_tree` walk (`matches_full_restyle`
 checks it). A `<style>` element's text or a loaded external sheet changes the
 cascade itself: rebuild it and call `cascade_changed`. A newly attached shadow
@@ -729,7 +735,7 @@ root is `Mutation::Everything`.
 
 ### Invalidation evidence
 
-* `rustic-style/tests/invalidation.rs`: seventeen scenarios, each checked against a
+* `rustic-style/tests/invalidation.rs`: twenty scenarios, each checked against a
   full restyle after every change: unrelated attributes restyle nothing and
   `style` one element; subject versus ancestor classes; inherited changes
   stopping where children's styles stay equal; sibling combinators; inserted,

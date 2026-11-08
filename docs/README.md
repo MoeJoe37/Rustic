@@ -43,6 +43,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Document tree construction: all 21 insertion modes, tables, formatting, templates and foreign content | Implemented for document parsing | [Scope and all 1,776 runnable html5lib records, including 192 fragments and `selectedcontent`](HTML_TREE.md); scripting pending |
 | HTML fragment parsing algorithm (scripting disabled) | Implemented | `HtmlFragmentParser`; html5lib fragment records and focused tests |
 | CSS syntax tokenizer, component values, rules, declarations and nested block contents | Implemented (CSS-01) | `rustic-css`; [139 pinned corpus cases and focused tests](CSS.md) |
+| Colors, lengths and typed values for display, box model and font basics | Implemented declared set (CSS-03) | `rustic-css`; [8,041 pinned color cases and property tests](CSS.md#property-values) |
 | Selector syntax, specificity, An+B and selector matching over the DOM | Implemented declared subset (CSS-02) | `rustic-css` and `rustic-style`; [128 An+B cases, syntax and matching tests](CSS.md#selectors) |
 | Deterministic parser fuzz targets, seed replay and reproducers | Implemented blind mutation fuzzer | `rustic-fuzz`; required CI smoke job and nightly campaign |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |

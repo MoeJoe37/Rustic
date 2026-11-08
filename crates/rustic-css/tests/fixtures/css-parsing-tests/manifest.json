@@ -48,7 +48,67 @@
       "path": "An+B.json",
       "sha256": "0deb798e84ecf7f08de3c89b3ecdc65caceb8f31a45b03fcf3622e6ba69dfd2b",
       "cases": 128
+    },
+    {
+      "path": "color_keywords_3.json",
+      "sha256": "8f321f601eeab746630e100d7c881f86d71eb9c2a4065694e0187febb1f9e789",
+      "cases": 160
+    },
+    {
+      "path": "color_keywords_4.json",
+      "sha256": "fa22d2d0bc5cf484c349fde579060f4cb556aa43c6e5b9f1c3d54c71ebe3de69",
+      "cases": 1
+    },
+    {
+      "path": "color_hexadecimal_3.json",
+      "sha256": "0aed408d6a75f643ce853dafb384ba729ca0d923d7b7071c75cd3cb097b79ef1",
+      "cases": 81
+    },
+    {
+      "path": "color_hexadecimal_4.json",
+      "sha256": "5830aa181bf4366b62b8f7f1d25b9d2851f9e264d9b497291822fc7b95225109",
+      "cases": 324
+    },
+    {
+      "path": "color_hsl_3.json",
+      "sha256": "ab9cc9d5189873a04b19c82487747224d3474e477a69bb76aefd81484856d662",
+      "cases": 256
+    },
+    {
+      "path": "color_hsl_4.json",
+      "sha256": "c29d39d4e8628bd9d3101d309732b06249dba9d081a945f5844a5a9edc6bb5f3",
+      "cases": 500
+    },
+    {
+      "path": "color_hwb_4.json",
+      "sha256": "d13aede0fa4268693b560971bb35ae104365f0deb133895bf54b7fc5fc41eb55",
+      "cases": 500
+    },
+    {
+      "path": "color_lab_4.json",
+      "sha256": "598314a02ab709ac09712a20dd7b538df95e4ff3b36593560c5368fb188991be",
+      "cases": 1500
+    },
+    {
+      "path": "color_lch_4.json",
+      "sha256": "690c6463ab14e819492f1bebf38febfd26b8e3cd128a8ea402747148e41515c5",
+      "cases": 1500
+    },
+    {
+      "path": "color_oklab_4.json",
+      "sha256": "1b26ee888ec159f0112d21f81bbd51737c04a1fc78624701c0d3ea3351e61adb",
+      "cases": 1500
+    },
+    {
+      "path": "color_oklch_4.json",
+      "sha256": "6f87da07a30db677a5f111d4729477d3c48ebb9acb9aeb44adceb6e4d4ac97fe",
+      "cases": 1500
+    },
+    {
+      "path": "color_function_4.json",
+      "sha256": "ab4620b84f8304fd79c7eac77faceb9fec9e645e19f61032ddfc81144146234d",
+      "cases": 219
     }
   ],
-  "cases": 277
+  "cases": 8318
 }

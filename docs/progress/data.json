@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "6b50dce419d6d2f427ea873f0f6f70ee58aaf9049f307b479ba19a6ddeae49cf",
-  "percent": "12.83",
+  "source_fingerprint": "446fbef9576805bd34c0fe86df6a06a30ff186f05e3c80b4d1ba6ff8908db758",
+  "percent": "13.75",
   "verified_percent": "11.96",
-  "partial_percent": "0.87",
+  "partial_percent": "1.79",
   "completed": 29,
-  "in_progress": 1,
+  "in_progress": 2,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 1,
       "total": 8,
-      "percent": "17.30",
+      "percent": "27.56",
       "verified_percent": "7.69",
-      "partial_percent": "9.61"
+      "partial_percent": "19.87"
     },
     {
       "id": "M3",
@@ -1141,9 +1141,53 @@
           "label": "Typed property grammar and supported property catalog",
           "size": 8,
           "milestone": "M2",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "<color> values (pinned css-parsing-tests Color 3/4 files)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/color.rs",
+                  "marker": "pub fn parse(value: &Value)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/color.rs",
+                  "marker": "fn pinned_color_corpus_matches"
+                }
+              ]
+            },
+            {
+              "label": "Lengths, percentages and the CSS-03 longhands and shorthands with initial values and inheritance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/properties.rs",
+                  "marker": "pub fn parse_declaration"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/properties.rs",
+                  "marker": "fn every_longhand_has_an_initial_value_that_reparses"
+                }
+              ]
+            },
+            {
+              "label": "Math functions: calc(), min(), max(), clamp()",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Property catalog for layout, text, backgrounds, positioning and the font shorthand",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "1.84"
         },
         {
@@ -1199,12 +1243,12 @@
       ],
       "points": 39,
       "completed": 1,
-      "in_progress": 1,
+      "in_progress": 2,
       "total": 8,
-      "contribution": "1.55",
-      "percent": "17.30",
+      "contribution": "2.48",
+      "percent": "27.56",
       "verified_percent": "7.69",
-      "partial_percent": "9.61"
+      "partial_percent": "19.87"
     },
     {
       "id": "text",

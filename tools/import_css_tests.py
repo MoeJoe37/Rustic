@@ -2,8 +2,11 @@
 """Vendor and verify the pinned CSS syntax parsing corpus, offline.
 
 The corpus is SimonSapin/css-parsing-tests (CC0-1.0). The CSS Syntax
-entry-point files and the An+B microsyntax file are vendored; colour and
-byte-stream files belong to later tasks. Files are copied byte for byte; the Rust runner reads them.
+entry-point files, the An+B microsyntax file and the CSS Color Level 3/4
+files are vendored; the CSS Color 5 (`device-cmyk`) and byte-stream files
+belong to later tasks. Files are copied byte for byte, except that a missing
+final newline is added (the repository requires one; JSON ignores it). The
+Rust runners read them.
 """
 
 import argparse
@@ -27,6 +30,18 @@ SUITE_FILES = (
     "rule_list.json",
     "stylesheet.json",
     "An+B.json",
+    "color_keywords_3.json",
+    "color_keywords_4.json",
+    "color_hexadecimal_3.json",
+    "color_hexadecimal_4.json",
+    "color_hsl_3.json",
+    "color_hsl_4.json",
+    "color_hwb_4.json",
+    "color_lab_4.json",
+    "color_lch_4.json",
+    "color_oklab_4.json",
+    "color_oklch_4.json",
+    "color_function_4.json",
 )
 NOTICE = "LICENSE"
 
@@ -58,7 +73,11 @@ def manifest() -> str:
 def vendor(source: Path) -> None:
     CORPUS.mkdir(parents=True, exist_ok=True)
     for name in (*SUITE_FILES, NOTICE):
-        shutil.copyfile(source / name, CORPUS / name)
+        if name == NOTICE:
+            shutil.copyfile(source / name, CORPUS / name)
+            continue
+        raw = (source / name).read_bytes()
+        (CORPUS / name).write_bytes(raw if raw.endswith(b"\n") else raw + b"\n")
     MANIFEST.write_text(manifest())
 
 

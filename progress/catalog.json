@@ -957,8 +957,52 @@
           "label": "Typed property grammar and supported property catalog",
           "size": 8,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "<color> values (pinned css-parsing-tests Color 3/4 files)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/color.rs",
+                  "marker": "pub fn parse(value: &Value)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/color.rs",
+                  "marker": "fn pinned_color_corpus_matches"
+                }
+              ]
+            },
+            {
+              "label": "Lengths, percentages and the CSS-03 longhands and shorthands with initial values and inheritance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/properties.rs",
+                  "marker": "pub fn parse_declaration"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/properties.rs",
+                  "marker": "fn every_longhand_has_an_initial_value_that_reparses"
+                }
+              ]
+            },
+            {
+              "label": "Math functions: calc(), min(), max(), clamp()",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Property catalog for layout, text, backgrounds, positioning and the font shorthand",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.cascade",

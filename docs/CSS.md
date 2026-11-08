@@ -1,4 +1,4 @@
-# CSS syntax and selectors
+# CSS syntax, selectors and values
 
 `rustic-css` implements [CSS Syntax Module Level 3](https://drafts.csswg.org/css-syntax-3/)
 (Editor's Draft, reviewed 2026-11-08) with the block-contents changes from
@@ -6,8 +6,10 @@
 no dependencies beyond `rustic-base`. Since CSS-02 it also parses
 [Selectors Level 4](https://drafts.csswg.org/selectors-4/) syntax, specificity
 and the `An+B` microsyntax, and the new `rustic-style` crate matches selectors
-against a read-only DOM view (see [Selectors](#selectors)). Properties, the
-cascade and computed values are CSS-03 onward.
+against a read-only DOM view (see [Selectors](#selectors)). CSS-03 added typed
+values for colors, lengths, the box model, `display` and font basics (see
+[Property values](#property-values)). The cascade and computed values are CSS-04
+onward.
 
 ## Implemented behavior
 
@@ -52,8 +54,8 @@ rust-cssparser's representation in places: EOF-in-string/URL and "invalid"
 markers inside lists are diagnostics here, the obsolete match/column tokens
 (`~=`, `||`, ...) are two delims, and declaration values drop surrounding
 whitespace as the specification says. `An+B.json` is vendored for CSS-02 (see
-below); colour and byte-stream files are not vendored yet and belong to later
-tasks.
+below), and so are the CSS Color Level 3/4 files (CSS-03). The Color 5
+(`device-cmyk`) and byte-stream files are not vendored yet.
 
 Eight focused tests cover byte spans across CRLF/comments/NUL, escape
 replacement, bad strings and URLs, EOF recovery with spans, number
@@ -133,3 +135,59 @@ without caching (TD-20).
 cargo test --locked -p rustic-css -p rustic-style
 cargo run --release -p rustic-fuzz -- run --target css-selector --iterations 200000
 ```
+
+## Property values
+
+`Color::parse` reads a `<color>` from one component value: named colors,
+`transparent`, `currentcolor`, 3/4/6/8-digit hex, `rgb()`/`rgba()` and
+`hsl()`/`hsla()` in legacy and modern syntax, `hwb()`, `lab()`, `lch()`,
+`oklab()`, `oklch()` and `color()` with the nine predefined spaces, with `none`
+where the modern syntax allows it. sRGB forms convert to sRGB channels at parse
+time and serialize as `rgb()`/`rgba()`; the others keep their space. Math
+functions, relative colors, `color-mix()`, `light-dark()` and system colors are
+rejected for now.
+
+`parse_declaration` turns a syntax-level declaration into typed longhand
+declarations, expanding shorthands and applying CSS-wide keywords (`initial`,
+`inherit`, `unset`, `revert`, `revert-layer`) to every longhand. Unknown
+properties return `UnknownProperty` and values outside the grammar return
+`InvalidValue`, so the cascade drops them as CSS requires.
+
+| Property | Grammar |
+| --- | --- |
+| `display` | One keyword (`none`, `contents`, `block`, `inline`, `inline-block`, `flow-root`, `list-item`, `flex`, `inline-flex`, `grid`, `inline-grid`, `table`, `inline-table` and the table-part keywords) or an outer/inner pair such as `inline flow-root` |
+| `color`, `background-color`, `border-*-color` | `<color>` |
+| `margin-*` | `auto` or `<length-percentage>` |
+| `padding-*` | Nonnegative `<length-percentage>` |
+| `width`, `height`, `min-width`, `min-height` | `auto` or nonnegative `<length-percentage>` |
+| `max-width`, `max-height` | `none` or nonnegative `<length-percentage>` |
+| `border-*-width` | `thin`, `medium`, `thick` or nonnegative `<length>` |
+| `border-*-style` | `none`, `hidden`, `dotted`, `dashed`, `solid`, `double`, `groove`, `ridge`, `inset`, `outset` |
+| `box-sizing` | `content-box`, `border-box` |
+| `font-size` | Absolute/relative size keyword or nonnegative `<length-percentage>` |
+| `font-weight` | `normal`, `bold`, `bolder`, `lighter` or a number from 1 to 1000 |
+| `font-style` | `normal`, `italic`, `oblique` (angles later) |
+| `font-family` | Comma-separated strings, identifier sequences and generic families |
+| `line-height` | `normal`, nonnegative number or nonnegative `<length-percentage>` |
+| Shorthands | `margin`, `padding`, `border-width`, `border-style`, `border-color` (1–4 values), `border-top`/`-right`/`-bottom`/`-left` and `border` (width, style and color in any order) |
+
+Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
+`rex`, `ch`, `rch`, `cap`, `rcap`, `ic`, `ric`, `lh`, `rlh`) and the viewport
+units including the small/large/dynamic variants, plus unitless zero. Every
+longhand reports `initial_value()` and `inherited()`. `color`'s initial value is
+`CanvasText` and `font-family`'s depends on the user agent; Rustic uses opaque
+black and `serif` until system colors and font settings exist. `calc()` and the
+other math functions, `var()`, the `font` shorthand and custom properties are
+later tasks.
+
+### Property value evidence
+
+* The CSS Color files of css-parsing-tests (same pinned revision, 12 files):
+  **all 8,041 cases pass**, 7,965 of them byte for byte. The other 76 differ only
+  in the sixth decimal, because the expectations were computed with 32-bit
+  floats, so the runner compares numbers with a 1e-4 relative tolerance.
+* `tests/properties.rs`: 32 valid declarations with their expected longhands,
+  22 invalid ones with their error, and a check that every longhand's initial
+  value serializes and reparses to itself.
+* The `css` fuzz target now also checks that every typed longhand it parses
+  serializes to a fixed point.

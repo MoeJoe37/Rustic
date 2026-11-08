@@ -12,14 +12,18 @@
 //! iterative.
 //!
 //! Selector syntax and specificity (Selectors Level 4, the CSS-02 subset)
-//! and the `An+B` microsyntax are parsed from component values here;
-//! selector matching, properties and the cascade live elsewhere.
+//! and the `An+B` microsyntax are parsed from component values here, as are
+//! typed values for the CSS-03 property set (colors, lengths, box model,
+//! display and font basics). Selector matching and the cascade live elsewhere.
 
 #![warn(missing_docs)]
 
 mod anb;
+mod color;
 mod error;
+mod length;
 mod parser;
+mod properties;
 mod rules;
 mod selector;
 mod serialize;
@@ -28,8 +32,16 @@ mod tokenizer;
 mod values;
 
 pub use anb::parse_an_plus_b;
+pub use color::{Color, LabSpace, PredefinedSpace};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
+pub use length::{Length, LengthPercentage, LengthUnit};
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
+pub use properties::{
+    BorderStyle, BorderWidth, BoxSizing, CssWideKeyword, DeclaredValue, Display, FamilyName,
+    FontSize, FontSizeKeyword, FontStyle, FontWeight, GenericFamily, LengthPercentageOrAuto,
+    LineHeight, MaxSize, PropertyDeclaration, PropertyError, PropertyId, PropertyValue,
+    parse_declaration,
+};
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{
     AttributeCase, AttributeOperator, AttributeSelector, AttributeValue, Combinator,

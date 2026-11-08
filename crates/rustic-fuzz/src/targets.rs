@@ -7,7 +7,8 @@
 
 use rustic_base::CancellationToken;
 use rustic_css::{
-    BlockItem, CssParser, NamespaceMap, Parsed, Rule, SelectorList, parse_block_contents,
+    BlockItem, CssParser, Declaration, NamespaceMap, Parsed, Rule, SelectorList,
+    parse_block_contents, parse_declaration,
 };
 use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
@@ -469,6 +470,9 @@ impl Target for CssTarget {
         // Read nested blocks iteratively, as a style engine would.
         while let Some(block) = blocks.pop() {
             for item in parse_block_contents(&block, 64).value {
+                if let BlockItem::Declaration(declaration) = &item {
+                    check_typed_declaration(&parser, declaration)?;
+                }
                 if let BlockItem::Rule(Rule::Qualified(q)) = item {
                     blocks.push(q.block);
                 } else if let BlockItem::Rule(Rule::At(a)) = item {
@@ -481,6 +485,27 @@ impl Target for CssTarget {
         }
         Ok(())
     }
+}
+
+/// Typed values must serialize to a fixed point: reparsing a longhand's
+/// serialization serializes identically.
+fn check_typed_declaration(parser: &CssParser, declaration: &Declaration) -> Result<(), String> {
+    let Ok(longhands) = parse_declaration(declaration) else {
+        return Ok(());
+    };
+    for longhand in longhands {
+        let once = longhand.to_string();
+        let again = parser
+            .declaration(&once)
+            .ok()
+            .and_then(|parsed| parsed.value)
+            .and_then(|d| parse_declaration(&d).ok());
+        match again.as_deref() {
+            Some([reparsed]) if reparsed.to_string() == once => {}
+            other => return Err(format!("typed value {once:?} reparsed as {other:?}")),
+        }
+    }
+    Ok(())
 }
 
 /// URL parsing must be total and serialization must be a fixed point.

@@ -440,7 +440,7 @@ default budgets plus a differential invariant:
 | `html-tokenizer` | Tokens and diagnostics match the unbroken input for a two-chunk split, fixed-size chunks and (up to 512 bytes) one-byte feeds | Checked-in pages plus all 1,792 html5lib tree `#data` inputs |
 | `html-document` | The same feed plans yield the same dump or the same `ParseError`; completed trees always dump; a fresh parser never reports a lifecycle error; a cancelled parser never completes | Same as above |
 | `html-fragment` | The same feed-plan equality for fragment parsing, with one of 28 HTML/SVG/MathML contexts chosen from the input's fingerprint (added with DOC-06c) | Same as above |
-| `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01) | Checked-in sheet plus the css-parsing-tests inputs |
+| `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01); typed longhands serialize to a fixed point (CSS-03) | Checked-in sheet plus the css-parsing-tests inputs |
 | `css-selector` | Every valid selector list serializes to a fixed point with equal specificities and selects the same elements of a fixed document in HTML, quirks and XML modes (added with CSS-02) | Checked-in selectors plus the pinned `An+B` inputs |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
@@ -542,6 +542,19 @@ fuzz target, `css-selector`, checks serialization and matching invariants
 (600,000 executions, no failures). `:nth-*` sibling counting is uncached
 (TD-20). See [CSS.md](CSS.md#selectors).
 
+## CSS-03 — Typed property values
+
+`rustic-css` parses `<color>` (named, hex, `rgb`, `hsl`, `hwb`, `lab`, `lch`,
+`oklab`, `oklch` and `color()` with `none`), `<length>` (absolute,
+font-relative and viewport units) and `<length-percentage>`, and turns
+declarations into typed longhands for `display`, colors, margins, padding,
+borders, sizes, `box-sizing` and font basics, expanding the box shorthands and
+applying CSS-wide keywords. Every longhand has an initial value and an
+inheritance flag. All **8,041** pinned css-parsing-tests color cases pass (76
+within a float tolerance, because the expectations used 32-bit floats). Math
+functions, `var()` and the wider property catalog are still open, so
+`css.properties` has two of four steps. See [CSS.md](CSS.md#property-values).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -596,11 +609,12 @@ must keep all tiers green.
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and six fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
+| CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
-failures. M2 has CSS-01 and CSS-02 done. Next: CSS-03 typed property parsers,
-then CSS-04 cascade. All project crates remain safe
+failures. M2 has CSS-01, CSS-02 and CSS-03 done. Next: CSS-04 cascade
+(origins, importance, inline styles, inheritance), then CSS-05 computed values. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

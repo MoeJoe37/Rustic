@@ -1,4 +1,4 @@
-use crate::redact::{DiagnosticValue, EscapedText, RedactionPolicy};
+use crate::redact::{DiagnosticValue, EscapedText, RedactionPolicy, write_escaped};
 use crate::{Budget, BudgetError, SourceLocation};
 use std::fmt::{self, Write};
 
@@ -216,8 +216,8 @@ impl Diagnostic {
         }
         // The summary is engine-controlled, but escape it anyway so a careless
         // literal cannot break the one-line format.
-        let summary = EscapedText(self.summary).to_string();
-        write!(output, ": {}", &summary[1..summary.len() - 1])?;
+        output.write_str(": ")?;
+        write_escaped(output, self.summary)?;
         for (key, value) in &self.fields {
             write!(
                 output,

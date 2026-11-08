@@ -62,6 +62,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-12 | Deliberate | CI / platforms | No native ARM or 32-bit test runs; mobile is check-only | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
+| TD-15 | Deliberate | HTML parser / base | HTML diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 
 ### TD-01 — Diagnostic count limits make error-heavy pages fail
 
@@ -202,6 +203,19 @@ traceability. **Trigger:** a change that has to touch most of one function.
 open pull request runs the full matrix twice. Acceptable while Actions minutes
 are not constrained. **Pay:** restrict `push` to the default and `feature`
 branches. **Trigger:** queue times or minutes become a problem.
+
+### TD-15 — HTML diagnostics not yet routed through `rustic-base` diagnostics
+
+`rustic-base` now has the shared `Diagnostic`/`DiagnosticLog` contract with
+source revisions and redaction (DOC-01c in [IMPLEMENTATION.md](IMPLEMENTATION.md)).
+The HTML tokenizer and tree builder still keep their own compact `Copy`
+diagnostics, positioned by normalized code-point offset and token index, so
+they cannot yet be expressed as revision-tied byte spans. This is honest (each
+type documents its units) but means two diagnostic shapes coexist. **Pay:**
+map tokenizer positions back to original-byte spans, then convert at the
+parser boundary into `Diagnostic`s with `Private` fields for any content.
+**Trigger:** original-byte offset mapping, or the first consumer (DevTools
+console, CLI diagnostic output) that needs both kinds together.
 
 ## Reviewing new work
 

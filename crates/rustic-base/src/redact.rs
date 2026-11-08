@@ -103,31 +103,35 @@ impl fmt::Display for EscapedText<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         use fmt::Write;
         formatter.write_char('"')?;
-        let mut clean_start = 0;
-        for (index, character) in self.0.char_indices() {
-            let escape = match character {
-                '"' => Some(Escape::Literal("\\\"")),
-                '\\' => Some(Escape::Literal("\\\\")),
-                '\n' => Some(Escape::Literal("\\n")),
-                '\r' => Some(Escape::Literal("\\r")),
-                '\t' => Some(Escape::Literal("\\t")),
-                _ if needs_code_escape(character) => Some(Escape::Code(character)),
-                _ => None,
-            };
-            if let Some(escape) = escape {
-                formatter.write_str(&self.0[clean_start..index])?;
-                match escape {
-                    Escape::Literal(text) => formatter.write_str(text)?,
-                    Escape::Code(character) => {
-                        write!(formatter, "\\u{{{:x}}}", u32::from(character))?
-                    }
-                }
-                clean_start = index + character.len_utf8();
-            }
-        }
-        formatter.write_str(&self.0[clean_start..])?;
+        write_escaped(formatter, self.0)?;
         formatter.write_char('"')
     }
+}
+
+/// Write `text` with [`EscapedText`]'s escapes but without surrounding quotes.
+pub(crate) fn write_escaped(output: &mut impl fmt::Write, text: &str) -> fmt::Result {
+    let mut clean_start = 0;
+    for (index, character) in text.char_indices() {
+        let escape = match character {
+            '"' => Some(Escape::Literal("\\\"")),
+            '\\' => Some(Escape::Literal("\\\\")),
+            '\n' => Some(Escape::Literal("\\n")),
+            '\r' => Some(Escape::Literal("\\r")),
+            '\t' => Some(Escape::Literal("\\t")),
+            _ if needs_code_escape(character) => Some(Escape::Code(character)),
+            _ => None,
+        };
+        if let Some(escape) = escape {
+            // `index` and `clean_start` are both char boundaries of `text`.
+            output.write_str(&text[clean_start..index])?;
+            match escape {
+                Escape::Literal(literal) => output.write_str(literal)?,
+                Escape::Code(character) => write!(output, "\\u{{{:x}}}", u32::from(character))?,
+            }
+            clean_start = index + character.len_utf8();
+        }
+    }
+    output.write_str(&text[clean_start..])
 }
 
 impl fmt::Debug for EscapedText<'_> {

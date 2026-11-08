@@ -56,7 +56,7 @@ Known limits, recorded as deliberate follow-up work: the HTML tokenizer and tree
 builder keep their own compact `Copy` diagnostics, whose positions are
 normalized code-point offsets and token indexes rather than original-byte spans.
 Converting them needs original-byte offset mapping, which is separate HTML work;
-until then they are not routed through `DiagnosticLog`. Line/column display,
+until then they are not routed through `DiagnosticLog` ([TD-15](TECH_DEBT.md)). Line/column display,
 UTF-16 positions, structured (JSON) export and a process-wide logging sink are
 not implemented. Redaction classifies values at the point they are recorded; it
 does not detect secrets inside text that a caller wrongly marks `Public`.

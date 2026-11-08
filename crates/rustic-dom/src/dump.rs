@@ -47,19 +47,36 @@ impl Write for LimitedString {
 impl Document {
     /// Produce a deterministic preorder diagnostic dump, never HTML serialization.
     ///
+    /// Template contents follow their template's attributes, one level deeper.
     /// The output excludes IDs, allocation history, and detached nodes outside the
     /// selected subtree. Names and values are quoted; lone UTF-16 surrogates are
     /// escaped rather than replaced. The limit counts final UTF-8 output bytes,
     /// not temporary allocation capacity. Failure returns no partial string.
     pub fn dump_tree(&self, root: NodeId, max_bytes: usize) -> Result<String, DumpError> {
-        let walk = self.walk(root).map_err(DumpError::Node)?;
         let mut writer = LimitedString {
             output: String::new(),
             budget: Budget::new(max_bytes),
         };
-        for (id, depth) in walk {
+        // Nested template contents are separate roots; an explicit stack of
+        // walkers (bounded by live nodes) avoids content-controlled recursion.
+        let mut walks = vec![(self.walk(root).map_err(DumpError::Node)?, 0usize)];
+        while let Some((walk, base)) = walks.last_mut() {
+            let base = *base;
+            let Some((id, depth)) = walk.next() else {
+                walks.pop();
+                continue;
+            };
             let node = self.node(id).map_err(DumpError::Node)?;
-            write_node(&mut writer, node.kind(), depth).map_err(|_| DumpError::OutputLimit)?;
+            write_node(&mut writer, node.kind(), base + depth)
+                .map_err(|_| DumpError::OutputLimit)?;
+            if let NodeKind::Element(element) = node.kind() {
+                if let Some(contents) = element.template_contents() {
+                    walks.push((
+                        self.walk(contents).map_err(DumpError::Node)?,
+                        base + depth + 1,
+                    ));
+                }
+            }
         }
         Ok(writer.output)
     }
@@ -111,6 +128,7 @@ fn write_node(writer: &mut impl Write, kind: &NodeKind, depth: usize) -> fmt::Re
     indent(writer, depth)?;
     match kind {
         NodeKind::Document => writer.write_str("#document\n"),
+        NodeKind::DocumentFragment => writer.write_str("#template-contents\n"),
         NodeKind::Element(element) => {
             writer.write_str("element ")?;
             name(writer, element.name())?;

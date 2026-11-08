@@ -80,7 +80,28 @@ impl Document {
         self.arena.insert(NodeKind::Element(Element {
             name,
             attributes: Vec::new(),
+            template_contents: None,
         }))
+    }
+
+    /// Create and associate the empty contents fragment of an HTML `template`.
+    ///
+    /// The fragment is a separate tree root: it is not a child, is skipped by
+    /// [`Self::walk`] of the template, cannot be inserted, detached or destroyed
+    /// on its own, and is destroyed together with its template element.
+    pub fn create_template_contents(&mut self, template: NodeId) -> Result<NodeId, DomError> {
+        let element = self.element(template)?;
+        if element.name.namespace() != Some(crate::HTML_NAMESPACE)
+            || element.name.local() != "template"
+        {
+            return Err(DomError::WrongNodeKind);
+        }
+        if element.template_contents.is_some() {
+            return Err(DomError::InvalidHierarchy);
+        }
+        let fragment = self.arena.insert(NodeKind::DocumentFragment)?;
+        self.element_mut(template).template_contents = Some(fragment);
+        Ok(fragment)
     }
 
     /// Create unattached text, preserving UTF-16 code units.
@@ -107,6 +128,9 @@ impl Document {
     }
 
     /// Walk an attached or detached subtree in preorder, including its root.
+    ///
+    /// Template contents are separate roots and are not visited; use
+    /// [`crate::Element::template_contents`] to walk them explicitly.
     pub fn walk(&self, root: NodeId) -> Result<Walk<'_>, DomError> {
         self.node(root)?;
         Ok(Walk::new(self, root))
@@ -132,9 +156,12 @@ impl Document {
         if child == self.root {
             return Err(DomError::ProtectedRoot);
         }
+        if matches!(child_node.kind(), NodeKind::DocumentFragment) {
+            return Err(DomError::InvalidHierarchy);
+        }
         if !matches!(
             parent_node.kind(),
-            NodeKind::Document | NodeKind::Element(_)
+            NodeKind::Document | NodeKind::Element(_) | NodeKind::DocumentFragment
         ) {
             return Err(DomError::InvalidHierarchy);
         }
@@ -198,9 +225,11 @@ impl Document {
 
     /// Disconnect a subtree while preserving all node IDs and accounted payload.
     pub fn detach(&mut self, node: NodeId) -> Result<(), DomError> {
-        self.node(node)?;
         if node == self.root {
             return Err(DomError::ProtectedRoot);
+        }
+        if matches!(self.node(node)?.kind(), NodeKind::DocumentFragment) {
+            return Err(DomError::InvalidHierarchy);
         }
         self.unlink(node);
         Ok(())
@@ -212,13 +241,24 @@ impl Document {
     /// removal: detached nodes can remain reachable from script. No recursion or
     /// depth-sized temporary stack is needed to destroy a deeply nested tree.
     pub fn destroy_subtree(&mut self, root: NodeId) -> Result<(), DomError> {
-        self.node(root)?;
         if root == self.root {
             return Err(DomError::ProtectedRoot);
+        }
+        if matches!(self.node(root)?.kind(), NodeKind::DocumentFragment) {
+            return Err(DomError::InvalidHierarchy);
         }
         self.unlink(root);
         let mut current = root;
         loop {
+            // Splice template contents in as a final child so the same
+            // allocation-free walk destroys arbitrarily nested templates.
+            let contents = match &mut self.live_mut(current).kind {
+                NodeKind::Element(element) => element.template_contents.take(),
+                _ => None,
+            };
+            if let Some(fragment) = contents {
+                self.link_last_child(current, fragment);
+            }
             if let Some(child) = self.live(current).first_child() {
                 current = child;
                 continue;
@@ -317,6 +357,20 @@ impl Document {
         self.arena
             .get_mut(id)
             .expect("validated internal node link")
+    }
+
+    /// Unchecked append of a detached node, used only during destruction.
+    fn link_last_child(&mut self, parent: NodeId, child: NodeId) {
+        let previous = self.live(parent).last_child();
+        if let Some(id) = previous {
+            self.live_mut(id).next_sibling = Some(child);
+        } else {
+            self.live_mut(parent).first_child = Some(child);
+        }
+        self.live_mut(parent).last_child = Some(child);
+        let node = self.live_mut(child);
+        node.parent = Some(parent);
+        node.previous_sibling = previous;
     }
 
     fn unlink(&mut self, id: NodeId) {

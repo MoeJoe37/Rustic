@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_version": "engine-v2",
-  "source_fingerprint": "ca876e8de24549a2f05d7b000ae5d8defde2e3b38e8b440ba80e19f94081a43c",
-  "percent": "7.24",
-  "completed": 17,
+  "source_fingerprint": "51e9867fde31d67b892f69c357019cfc1b597d764a1973de92a2351affd2d7f3",
+  "percent": "8.44",
+  "completed": 19,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -487,7 +487,7 @@
         {
           "id": "html.tree",
           "label": "Core insertion modes and malformed-tree recovery",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             {
               "kind": "source",
@@ -501,16 +501,42 @@
             },
             {
               "kind": "test",
-              "path": "crates/rustic-html/tests/tree_corpus.rs",
-              "marker": "fn pinned_tree_subset_matches_expected_trees_at_every_byte_split"
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
             }
           ]
         },
         {
           "id": "html.tables",
           "label": "Table, formatting, template and foreign content rules",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/formatting.rs",
+              "marker": "fn adoption_agency"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/table.rs",
+              "marker": "fn in_table"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/foreign.rs",
+              "marker": "fn foreign"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_rules.rs",
+              "marker": "fn table_text_is_foster_parented_and_formatting_is_adopted"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
+            }
+          ]
         },
         {
           "id": "html.scripts",
@@ -531,9 +557,9 @@
           "evidence": []
         }
       ],
-      "completed": 5,
+      "completed": 7,
       "total": 10,
-      "percent": "50.00"
+      "percent": "70.00"
     },
     {
       "id": "css",

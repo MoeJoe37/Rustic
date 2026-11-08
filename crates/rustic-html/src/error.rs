@@ -89,6 +89,8 @@ pub enum DiagnosticKind {
     EofInComment,
     /// A CDATA opening in HTML context recovered as a bogus comment.
     CdataInHtmlContent,
+    /// Input ended inside an allowed foreign-content CDATA section.
+    EofInCdata,
     /// The doctype keyword was immediately followed by its name.
     MissingWhitespaceBeforeDoctypeName,
     /// A doctype closed without a name.

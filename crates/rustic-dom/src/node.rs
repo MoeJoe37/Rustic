@@ -33,6 +33,7 @@ impl Attribute {
 pub struct Element {
     pub(crate) name: QualifiedName,
     pub(crate) attributes: Vec<Attribute>,
+    pub(crate) template_contents: Option<NodeId>,
 }
 
 impl Element {
@@ -44,6 +45,11 @@ impl Element {
     /// Stable insertion order; replacing an attribute preserves its position.
     pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
+    }
+
+    /// Separate template contents fragment, which is never one of the children.
+    pub fn template_contents(&self) -> Option<NodeId> {
+        self.template_contents
     }
 }
 
@@ -71,12 +77,14 @@ pub enum NodeKind {
     Comment(DomString),
     /// Document type declaration.
     DocumentType(DocumentType),
+    /// A template contents root owned by exactly one HTML `template` element.
+    DocumentFragment,
 }
 
 impl NodeKind {
     pub(crate) fn data_bytes(&self) -> Result<usize, DomError> {
         match self {
-            Self::Document => Ok(0),
+            Self::Document | Self::DocumentFragment => Ok(0),
             Self::Element(element) => element.name.data_bytes(), // Created without attributes.
             Self::Text(value) | Self::Comment(value) => Ok(value.data_bytes()),
             Self::DocumentType(doctype) => doctype

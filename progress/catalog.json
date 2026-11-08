@@ -473,7 +473,7 @@
         {
           "id": "html.tree",
           "label": "Core insertion modes and malformed-tree recovery",
-          "status": "in_progress",
+          "status": "complete",
           "evidence": [
             {
               "kind": "source",
@@ -487,16 +487,42 @@
             },
             {
               "kind": "test",
-              "path": "crates/rustic-html/tests/tree_corpus.rs",
-              "marker": "fn pinned_tree_subset_matches_expected_trees_at_every_byte_split"
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
             }
           ]
         },
         {
           "id": "html.tables",
           "label": "Table, formatting, template and foreign content rules",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/formatting.rs",
+              "marker": "fn adoption_agency"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/table.rs",
+              "marker": "fn in_table"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/foreign.rs",
+              "marker": "fn foreign"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_rules.rs",
+              "marker": "fn table_text_is_foster_parented_and_formatting_is_adopted"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
+            }
+          ]
         },
         {
           "id": "html.scripts",

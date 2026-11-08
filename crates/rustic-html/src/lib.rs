@@ -3,8 +3,8 @@
 //! The tokenizer supports data, tags, ordered attributes, comments, doctypes and
 //! processing instructions and named/numeric references in HTML context.
 //! RCDATA/RAWTEXT/script/plaintext modes use caller-selected contexts. The inert
-//! document parser drives a declared initial/head/body construction subset and
-//! explicitly rejects unsupported tree constructs; it is not a full HTML parser.
+//! document parser implements complete WHATWG document tree construction with
+//! scripting disabled; fragment parsing and script integration are not provided.
 //!
 //! ```
 //! use rustic_html::{HtmlTokenizer, Token};

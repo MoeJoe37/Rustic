@@ -66,6 +66,17 @@ choose the correct insertion location and adjacent text node through checked
 document APIs. Future observers/ranges must be integrated at the mutation
 boundary before these primitives are exposed as web APIs.
 
+## Template contents
+
+An HTML `template` element can own one `DocumentFragment` created by
+`Document::create_template_contents`. The fragment is a separate root, not a
+child: it accepts ordinary children but cannot be inserted, detached or destroyed
+by itself, and `walk` does not enter it. Destroying the template destroys its
+contents, including arbitrarily nested templates, without recursion. `dump_tree`
+prints contents as `#template-contents` after the template's attributes. Public
+fragment APIs, cloning and inert template owner documents are not implemented;
+see [ADR 0010](adr/0010-template-contents.md).
+
 ## Regression evidence
 
 Run `cargo test --locked -p rustic-dom`. The character-data suite covers:

@@ -52,7 +52,8 @@ The internal model follows the supported node hierarchy and tree concepts from
 the [DOM Standard](https://dom.spec.whatwg.org/#concept-node-tree) and
 [mutation algorithms](https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity),
 reviewed 2026-11-07 against the living document last updated 2026-11-04. This is
-not a conformance claim: public DOM APIs, fragments, processing instructions,
+not a conformance claim: public DOM APIs, general fragments (only parser-owned
+template contents exist), processing instructions,
 shadow trees, cross-document adoption, cloning, mutation records/observers and
 script bindings remain unimplemented. Internal parsed names do not perform the
 validation or case normalization required by future public `createElement*` APIs.
@@ -237,6 +238,32 @@ Python regressions and ordinary repository checks validate importer provenance.
 tables, formatting, templates, foreign content, script reentry and the full
 corpus/fuzz gate remain unfinished. No new completion credit is awarded yet.
 
+## DOC-06b — Complete document tree construction
+
+The tree builder now implements all 21 document insertion modes: the full body
+rules, the list of active formatting elements and adoption agency, tables with
+pending character tokens and foster parenting, the current customizable-select
+rules, templates with a template-mode stack, framesets, and SVG/MathML foreign
+content with name/attribute adjustment and integration points. The tokenizer
+gains CDATA sections, enabled per token by the tree builder. `rustic-dom` gains
+template contents fragments owned by their template ([ADR 0010](adr/0010-template-contents.md)).
+Body, table, template and frameset constructs no longer return `Unsupported`;
+only processing-instruction tokens do. Scripting remains disabled.
+
+All 57 top-level html5lib tree-construction files at the pinned revision are
+vendored with a digest manifest. **1,580 of the 1,584 document records** that do
+not need fragments, scripting or instruction nodes pass complete-tree comparison
+for unbroken input, all 70,993 two-chunk splits and one-byte feeds; the four
+explicit known failures need `selectedcontent` mirroring. Focused tests cover
+template ownership and 20,000-deep template nesting, CDATA permission, foreign
+adjustments, foster parenting, adoption, framesets and newline skipping. The
+earlier 45-record subset and its generator are replaced by the full runner.
+See [HTML_TREE.md](HTML_TREE.md) for exact boundaries.
+
+`html.tree` and `html.tables` are complete for document parsing. The fragment
+parsing algorithm, scripting/reentry, encoding restart, `selectedcontent`,
+processing-instruction nodes and the fuzz gate remain open.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -271,10 +298,10 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
-| DOC-06a: initial/head/body tree construction | Partial: shell/head rules and a declared small body set; broader body algorithms pending |
-| DOC-06b: tables/formatting/template/foreign tree rules | Not started |
+| DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |
+| DOC-06b: tables/formatting/template/foreign tree rules | Done: 1,580/1,584 runnable html5lib document records at every split; `selectedcontent` pending |
 | DOC-07: bounded HTML loader/CLI | Not started |
-| DOC-08: parser corpus/fuzzing | Partial: tokenizer corpora and 45 pinned tree records with chunk splits; broader tree corpus and fuzz targets pending |
+| DOC-08: parser corpus/fuzzing | Partial: tokenizer corpora and the full html5lib document tree corpus with chunk splits; fragment records and fuzz targets pending |
 | DOC-09: traced node/JS ownership prototype | Not started |
 
 M1 remains in progress. Cross-document adoption, node cloning and mutation records

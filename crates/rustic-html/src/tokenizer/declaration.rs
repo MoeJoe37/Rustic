@@ -10,10 +10,12 @@ impl HtmlTokenizer {
             self.start_comment(CommentState::Start);
         } else if candidate.eq_ignore_ascii_case("DOCTYPE") {
             self.start_doctype();
+        } else if candidate == "[CDATA[" && self.cdata_allowed {
+            self.prefix.clear();
+            self.state = super::State::Cdata(super::cdata::CdataState::Section);
         } else if candidate == "[CDATA[" {
             self.diagnostic(DiagnosticKind::CdataInHtmlContent)?;
-            // The current tokenizer always has HTML context. Foreign-content
-            // CDATA needs the future tree builder's adjusted-current-node input.
+            // HTML context: the tree builder did not allow foreign CDATA.
             self.start_comment(CommentState::Bogus);
             self.append_comment_text("[CDATA[")?;
         } else if "--".starts_with(&candidate)

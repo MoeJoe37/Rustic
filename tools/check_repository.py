@@ -148,7 +148,7 @@ def main() -> int:
     try:
         import_html_tree_tests.check()
     except (OSError, ValueError) as exc:
-        error(ROOT / "crates/rustic-html/tests/fixtures/tree_manifest.json", str(exc))
+        error(ROOT / "crates/rustic-html/tests/fixtures/tree/manifest.json", str(exc))
 
     try:
         workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]

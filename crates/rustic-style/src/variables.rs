@@ -28,6 +28,10 @@ pub struct CustomProperties {
 }
 
 impl CustomProperties {
+    pub(crate) fn inherit_without_declarations(&self) -> Self {
+        compute_pass(self, &[], &self.registry, &[])
+    }
+
     /// The value of custom property `name` (with its leading `--`).
     pub fn get(&self, name: &str) -> Option<&CustomValue> {
         self.map.get(name)

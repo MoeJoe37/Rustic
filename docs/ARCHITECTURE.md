@@ -159,8 +159,13 @@ Layout consumes a stable style snapshot. REN-01a starts this boundary in
 `rustic-layout` with checked unit geometry, principal snapshots and block width
 measurement; REN-01b/REN-02a emit used static-block geometry and collapsed
 margins through bounded top-down/bottom-up/top-down passes without live DOM
-access. See [LAYOUT.md](LAYOUT.md). Full normalization, general
-vertical flow and fragments remain pending. Generate a box tree distinct from DOM,
+access. REN-01c derives a borrowed formatting forest from the principal snapshot,
+wrapping mixed inline runs and splitting inline ancestors around block groups.
+Source indexes and continuation edges preserve identity without DOM reparenting.
+Anonymous styles inherit from their enclosing non-anonymous source and reset
+non-inherited values. Separate box/depth/work limits bound expansion; both trees
+use flat arenas. See [LAYOUT.md](LAYOUT.md). Other formatting contexts, inline
+geometry and general fragments remain pending. Generate a box tree distinct from DOM,
 then fragments for block/inline formatting, anonymous boxes, line boxes, replaced
 elements, and later fragmentation. Distinguish CSS pixels, device pixels, logical
 inline/block axes, and font units in types. Resolve containing blocks, intrinsic

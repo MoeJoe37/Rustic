@@ -47,6 +47,8 @@ pub struct LoaderLimits {
     pub parser: ParserLimits,
     /// External stylesheet budgets for `dump-style`.
     pub stylesheets: StyleLoadLimits,
+    /// Anonymous flow normalization budgets for `dump-formatting`.
+    pub formatting: rustic_layout::FormattingLimits,
 }
 
 impl Default for LoaderLimits {
@@ -57,6 +59,7 @@ impl Default for LoaderLimits {
             max_dump_bytes: DEFAULT_MAX_DUMP_BYTES,
             parser: ParserLimits::default(),
             stylesheets: StyleLoadLimits::default(),
+            formatting: rustic_layout::FormattingLimits::default(),
         }
     }
 }
@@ -87,6 +90,8 @@ pub enum LoadError {
     Layout(rustic_layout::LayoutError),
     /// The block-only reference layout failed.
     Flow(rustic_layout::FlowError),
+    /// Anonymous flow normalization failed.
+    Formatting(rustic_layout::FormattingError),
 }
 
 impl fmt::Display for LoadError {
@@ -104,6 +109,7 @@ impl fmt::Display for LoadError {
             Self::Dump(error) => error.fmt(f),
             Self::Layout(error) => error.fmt(f),
             Self::Flow(error) => error.fmt(f),
+            Self::Formatting(error) => error.fmt(f),
         }
     }
 }
@@ -116,6 +122,7 @@ impl Error for LoadError {
             Self::Dump(error) => Some(error),
             Self::Layout(error) => Some(error),
             Self::Flow(error) => Some(error),
+            Self::Formatting(error) => Some(error),
             _ => None,
         }
     }
@@ -361,6 +368,22 @@ pub fn dump_boxes(
     box_tree(parsed, path, limits)?
         .dump(limits.max_dump_bytes)
         .map_err(LoadError::Layout)
+}
+
+/// Normalize flow boxes and dump anonymous wrappers/inline continuations.
+pub fn dump_formatting(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
+    let principal = box_tree(parsed, path, limits)?;
+    rustic_layout::FormattingTree::build(
+        &principal,
+        limits.formatting,
+        &CancellationToken::default(),
+    )
+    .and_then(|tree| tree.dump(limits.max_dump_bytes))
+    .map_err(LoadError::Formatting)
 }
 
 fn box_tree(

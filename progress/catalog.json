@@ -1440,8 +1440,29 @@
             {
               "id": "normalized",
               "label": "Normalized principal and anonymous box tree",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/formatting.rs",
+                  "marker": "pub struct FormattingTree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/formatting.rs",
+                  "marker": "fn exhaustive_short_runs_match_an_independent_block_group_model"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/formatting.rs",
+                  "marker": "fn nested_inline_ancestors_split_and_keep_open_edges"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn dump_formatting_matches_reviewed_structure_across_chunks_and_output_boundaries"
+                }
+              ]
             },
             {
               "id": "fragments",

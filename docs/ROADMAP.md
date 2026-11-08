@@ -156,8 +156,9 @@ principal-box snapshots, horizontal block width measurement and `dump-boxes`.
 The first REN-01b block-only pass adds used rectangles and `dump-layout` for
 a static block subset. REN-02a adds sibling, parent-child and empty-through
 margin collapse, with signed struts and root/BFC/border/padding/min-height
-boundaries. Anonymous/inline flow, clearance with floats and the final general
-box/fragment tree remain pending.
+boundaries. REN-01c adds bounded normal-flow anonymous blocks, split inline
+continuations and `dump-formatting`. Inline used geometry/shaping, clearance
+with floats and the final general fragment tree remain pending.
 See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin

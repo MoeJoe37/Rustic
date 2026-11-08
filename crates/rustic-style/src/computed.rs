@@ -249,6 +249,20 @@ fn font_px_of(style: &ComputedStyle) -> f64 {
 }
 
 impl ComputedStyle {
+    /// Style for an anonymous flow box. Inherited properties come from the
+    /// enclosing non-anonymous box; other properties take their initial value,
+    /// with the supplied formatting display. Registered custom properties obey
+    /// their inheritance flag. This does not run selectors or the cascade.
+    pub fn anonymous_flow(&self, display: Display) -> Self {
+        Self::compute(
+            &SpecifiedStyle::anonymous(self, display),
+            Some(self),
+            None,
+            false,
+            &ComputeContext::default(),
+        )
+    }
+
     /// The computed initial values (the style a root inherits from).
     pub fn initial() -> Self {
         compute_values(

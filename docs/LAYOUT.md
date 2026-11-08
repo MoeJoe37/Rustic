@@ -189,3 +189,76 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 4. REN-05/06/07: CPU raster reference, bounded decode, PNG `render` and reftests.
 
 No image output or whole REN-01 completion is claimed by this first slice.
+
+## Anonymous flow normalization (REN-01c)
+
+`FormattingTree::build(&principal, limits, cancellation)` derives a separate,
+borrowed formatting forest from the immutable principal snapshot. Source indexes
+map element boxes and text back to validated DOM identities; inline continuations
+share a source. Anonymous block wrappers have no invented DOM node. Formatting
+parents can differ from principal/DOM parents. Flat arenas avoid recursive walks
+and recursive destruction, including on an error.
+
+Static non-floating block, flow-root, inline and inline-block elements are
+supported. A block container with block children wraps its intervening inline
+runs in minimal anonymous blocks; a pure inline context needs no wrapper.
+Blocks inside inlines split each inline ancestor into before/after continuations
+and lift the block group to the containing block. Consecutive blocks, including
+ones separated only by collapsible whitespace, share the split. Empty leading
+and trailing inline pieces remain, with explicit original start/end edge flags
+for later decoration layout. Inline-blocks remain atomic outside and normalize
+inside; block descendants cannot escape that boundary.
+
+Anonymous blocks inherit supported inherited properties from their enclosing
+non-anonymous source, with other properties initially valued and `display:block`.
+Text is represented by anonymous inline style rather than copying its parent's
+background/borders. Initial `currentcolor` and border widths are computed through
+the existing value machinery. Custom properties follow registered inheritance
+flags; unregistered custom properties inherit. No selectors are rematched.
+`display:contents` text still inherits from the DOM parent saved by `BoxTree`.
+
+Only direct text runs consisting entirely of CSS collapsible ASCII whitespace
+under normal/nowrap are omitted at block boundaries. Their principal indexes are
+reported in `suppressed_whitespace()` and their original UTF-16 remains in the
+principal snapshot. Explicit empty inline boxes, preserved whitespace, NBSP,
+non-Latin text and lone surrogates remain. General whitespace transformation,
+segment-break handling, bidi, shaping, line breaking and inline positions await
+REN-03. No text-to-pixel metrics are guessed.
+
+`FormattingLimits` caps all arena allocations (100,000, including temporary text
+boxes later omitted), published depth (512 edges from a root), and work
+(16,000,000 source/arena visits, sequence entries and UTF-16 units). Limits are
+independent of principal-snapshot limits. Sequence bubbling through nested
+inlines can revisit entries; every visit consumes work, so expansion cannot run
+without a bound (TD-39). Cancellation is checked on work charges, including text
+scans. Failure returns no partial formatting tree. The budgets do not promise a
+total process memory cap or recovery from allocator exhaustion.
+
+`rustic dump-formatting <file>` uses the same local stylesheet loader as the
+other styled dumps. `--max-format-boxes`, `--max-format-depth` and
+`--max-format-steps` override its limits. Output contains parent/source/style
+indexes, roles, continuation edges and text-unit counts, without page text;
+`--max-output-bytes` caps the complete dump. Existing `dump-boxes` and
+`dump-layout` fixtures remain unchanged. The block geometry reference still
+requires its own static block-only input; normalized inline flow is not yet
+connected to used geometry.
+
+Sixteen normalization scenarios cover exact mixed trees, nested/multiple/empty
+splits, atomic inline-blocks, whitespace/inheritance/UTF-16, unsupported input,
+limits/cancellation/atomicity and deep expansion. A token-level block-group model
+checks all masks through six tokens with zero through three inline ancestors
+(508 trees), plus parent/preorder, homogeneous child roles and text-order
+invariants. A reviewed CLI fixture is checked at chunk sizes 1, 7 and 65,536,
+exact output limits, normalization limits and local stylesheet behavior.
+The `layout-formatting` fuzz target mutates HTML/styles and checks text
+partition/order, UTF-16 preservation, source mapping and child-role invariants.
+
+Specification basis, reviewed 2026-11-08: CSS 2.2
+[§9.2.1.1 anonymous blocks](https://www.w3.org/TR/CSS22/visuren.html#anonymous-block-level),
+[§9.2.2 inline-level boxes](https://www.w3.org/TR/CSS22/visuren.html#inline-boxes),
+CSS Display 3 [anonymous boxes](https://www.w3.org/TR/css-display-3/#anonymous)
+and CSS Text 3 [white-space processing](https://www.w3.org/TR/css-text-3/#white-space-phase-1).
+These are focused structural fixtures/model checks, not layout-WPT or browser
+comparison results. List markers, tables, flex/grid, floats/out-of-flow boxes,
+replaced/control/foreign elements, pseudo boxes and flattened shadow trees
+remain separate work and fail explicitly where required (TD-37/TD-39).

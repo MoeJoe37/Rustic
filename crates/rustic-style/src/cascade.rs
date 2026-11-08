@@ -44,6 +44,24 @@ fn index(property: PropertyId) -> usize {
 }
 
 impl SpecifiedStyle {
+    pub(crate) fn anonymous(parent: &ComputedStyle, display: rustic_css::Display) -> Self {
+        let mut values: Vec<_> = PropertyId::ALL
+            .iter()
+            .map(|&p| {
+                if p.inherited() {
+                    parent.get(p).clone()
+                } else {
+                    p.initial_value()
+                }
+            })
+            .collect();
+        values[index(PropertyId::Display)] = PropertyValue::Display(display);
+        Self {
+            values,
+            custom: parent.custom_properties().inherit_without_declarations(),
+        }
+    }
+
     /// Initial values for every longhand (the style of a root's parent).
     pub fn initial() -> Self {
         Self {

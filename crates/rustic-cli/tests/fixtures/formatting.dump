@@ -1,0 +1,28 @@
+format 0 parent=- source=0 style=0 kind=block
+format 1 parent=0 source=1 style=1 kind=block
+format 2 parent=1 source=2 style=2 kind=block
+format 3 parent=2 source=- style=2 kind=anonymous-block
+format 4 parent=3 source=3 style=3 kind=text text-units=1
+format 5 parent=3 source=4 style=4 kind=inline edges=s-
+format 6 parent=5 source=5 style=5 kind=text text-units=1
+format 7 parent=5 source=6 style=6 kind=inline edges=s-
+format 8 parent=7 source=7 style=7 kind=text text-units=1
+format 9 parent=2 source=8 style=8 kind=block
+format 10 parent=9 source=9 style=9 kind=text text-units=1
+format 11 parent=2 source=- style=2 kind=anonymous-block
+format 12 parent=11 source=4 style=4 kind=inline edges=-e
+format 13 parent=12 source=6 style=6 kind=inline edges=-e
+format 14 parent=13 source=10 style=10 kind=text text-units=1
+format 15 parent=12 source=11 style=11 kind=text text-units=1
+format 16 parent=11 source=12 style=12 kind=inline-block
+format 17 parent=16 source=- style=12 kind=anonymous-block
+format 18 parent=17 source=13 style=13 kind=text text-units=1
+format 19 parent=16 source=14 style=14 kind=block
+format 20 parent=16 source=- style=12 kind=anonymous-block
+format 21 parent=20 source=15 style=15 kind=text text-units=1
+format 22 parent=2 source=16 style=16 kind=block
+format 23 parent=2 source=18 style=18 kind=block
+format 24 parent=2 source=- style=2 kind=anonymous-block
+format 25 parent=24 source=19 style=19 kind=text text-units=1
+suppressed-space source=17
+suppressed-space source=20

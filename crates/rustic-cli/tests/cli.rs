@@ -410,3 +410,100 @@ fn dump_layout_collapsed_margins_match_the_checked_fixture_at_each_chunk_size() 
         assert!(output.stderr.is_empty());
     }
 }
+
+#[test]
+fn dump_formatting_matches_reviewed_structure_across_chunks_and_output_boundaries() {
+    let path = fixture("formatting.html");
+    let input = path.to_str().unwrap();
+    let expected = fs::read(fixture("formatting.dump")).unwrap();
+    for chunk in ["1", "7", "65536"] {
+        let output = rustic(&["dump-formatting", "--chunk-bytes", chunk, input]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(output.stdout, expected);
+        assert!(output.stderr.is_empty());
+    }
+    assert!(
+        rustic(&[
+            "dump-formatting",
+            "--max-output-bytes",
+            &expected.len().to_string(),
+            input
+        ])
+        .status
+        .success()
+    );
+    let output = rustic(&[
+        "dump-formatting",
+        "--max-output-bytes",
+        &(expected.len() - 1).to_string(),
+        input,
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    for option in [
+        "--max-format-boxes",
+        "--max-format-depth",
+        "--max-format-steps",
+    ] {
+        let output = rustic(&["dump-formatting", option, "1", input]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert!(stderr(&output).contains("formatting"));
+        assert_eq!(
+            rustic(&["dump-formatting", option, "0", input])
+                .status
+                .code(),
+            Some(2)
+        );
+    }
+    assert_eq!(
+        rustic(&["dump-formatting", "https://example.com/page"])
+            .status
+            .code(),
+        Some(2)
+    );
+}
+
+#[test]
+fn dump_formatting_shares_local_stylesheet_policy_and_reports_unsupported_without_stdout() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-formatting-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("flow.css"), "span {display:block}").unwrap();
+    let path = base.join("page.html");
+    fs::write(
+        &path,
+        "<link rel=stylesheet href=flow.css><main>a<span></span>b</main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-formatting", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout)
+            .matches("kind=anonymous-block")
+            .count(),
+        2
+    );
+    fs::write(base.join("flow.css"), "span {display:flex}").unwrap();
+    let output = rustic(&["dump-formatting", path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(stderr(&output).contains("unsupported formatting"));
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
+fn formatting_help_defaults_match_library_budgets() {
+    let output = rustic(&["--help"]);
+    let help = String::from_utf8(output.stdout).unwrap();
+    let limits = rustic_layout::FormattingLimits::default();
+    for (option, value) in [
+        ("--max-format-boxes", limits.max_boxes),
+        ("--max-format-depth", limits.max_depth),
+        ("--max-format-steps", limits.max_steps),
+    ] {
+        assert!(
+            help.lines()
+                .any(|line| line.contains(option) && line.contains(&format!("(default {value})")))
+        );
+    }
+}

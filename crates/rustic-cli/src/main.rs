@@ -20,6 +20,7 @@ Usage:
   rustic dump-dom [OPTIONS] [--] <file>
   rustic dump-style [OPTIONS] [--] <file>
   rustic dump-boxes [OPTIONS] [--] <file>
+  rustic dump-formatting [OPTIONS] [--] <file>
   rustic dump-layout [OPTIONS] [--] <file>
   rustic --help | --version
 
@@ -33,6 +34,9 @@ outside it are blocked. URLs are rejected as the file argument.
 
 dump-boxes loads the same styles and prints a principal-box snapshot (no
 anonymous/line boxes, layout positions or painting yet).
+dump-formatting prints normalized static flow boxes with anonymous blocks and
+split inline continuations, preserving unshaped text. Other formatting types,
+positioning/floats and special/replaced elements fail explicitly.
 dump-layout prints used content/padding/border rectangles for static non-replaced
 blocks with collapsed vertical margins and visible overflow. Inline/text layout and
 other unsupported formatting fail explicitly. No command paints pixels yet.
@@ -47,7 +51,12 @@ Options for all dump commands (positive integers; exceeding any limit except
   --max-diagnostics N    retained tokenizer and tree recoveries, each; later
                          recoveries are counted, not fatal (default 1024)
 
-Stylesheet options for dump-style, dump-boxes and dump-layout (exceeding one skips the sheet, never fatal):
+Normalization options for dump-formatting (exceeding one fails):
+  --max-format-boxes N      allocated boxes, including temporary (default 100000)
+  --max-format-depth N      formatting tree edges from a root (default 512)
+  --max-format-steps N      visits, sequence entries and text units (default 16000000)
+
+Stylesheet options for styled dump commands (exceeding one skips the sheet, never fatal):
   --max-stylesheets N       linked and imported sheets fetched (default 64)
   --max-stylesheet-bytes N  total bytes of those sheets (default 8388608)
   --max-import-depth N      @import nesting (default 16)";
@@ -71,7 +80,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes and block reference geometry via dump-layout; full layout, JavaScript, networking, and rendering: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting and block reference geometry via dump-layout; full layout, JavaScript, networking, and rendering: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -86,6 +95,9 @@ fn main() -> ExitCode {
     }
     if args[0] == "dump-layout" {
         return dump_command("dump-layout", &args[1..], loader::dump_layout);
+    }
+    if args[0] == "dump-formatting" {
+        return dump_command("dump-formatting", &args[1..], loader::dump_formatting);
     }
     eprintln!(
         "Unsupported command. Rendering and navigation are not implemented; see docs/ROADMAP.md."
@@ -160,6 +172,9 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
                 Some("--chunk-bytes") => Some(&mut limits.read_chunk_bytes),
                 Some("--max-nodes") => Some(&mut limits.parser.document.max_nodes),
                 Some("--max-depth") => Some(&mut limits.parser.document.max_depth),
+                Some("--max-format-boxes") => Some(&mut limits.formatting.max_boxes),
+                Some("--max-format-depth") => Some(&mut limits.formatting.max_depth),
+                Some("--max-format-steps") => Some(&mut limits.formatting.max_steps),
                 Some("--max-stylesheets") => Some(&mut limits.stylesheets.max_sheets),
                 Some("--max-stylesheet-bytes") => Some(&mut limits.stylesheets.max_total_bytes),
                 Some("--max-import-depth") => Some(&mut limits.stylesheets.max_import_depth),

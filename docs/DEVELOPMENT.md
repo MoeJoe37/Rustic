@@ -40,7 +40,9 @@ scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
 [HTML_TREE.md](HTML_TREE.md#local-dump-dom-command), and `dump-style`, which
 prints computed styles for the same input ([CSS.md](CSS.md#style-dump)),
 and `dump-boxes`, which prints an initial principal-box snapshot
-([LAYOUT.md](LAYOUT.md)) without positions or painting. `dump-layout` adds used
+([LAYOUT.md](LAYOUT.md)) without positions or painting. `dump-formatting`
+derives anonymous flow boxes and split inline continuations, with independent
+box/depth/work limits; it preserves unshaped UTF-16 text. `dump-layout` adds used
 rectangles and margin collapse for an explicitly limited static block subset; it rejects
 unsupported inline/text and other formatting rather than emitting partial output.
 While hosted Actions is unavailable, the maintainer has authorized sandbox-gated

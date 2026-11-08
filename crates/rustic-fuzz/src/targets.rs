@@ -46,6 +46,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(CssCascadeTarget),
         Box::new(CssMediaTarget),
         Box::new(CssInvalidationTarget),
+        Box::new(crate::formatting::FormattingTarget),
         Box::new(UrlTarget),
     ]
 }

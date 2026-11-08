@@ -1,7 +1,8 @@
 //! Iterative vertical block flow with checked adjoining-margin collapse.
 //!
 //! Unsupported content fails atomically instead of being assigned invented
-//! geometry. Inline and anonymous boxes arrive in later units.
+//! geometry. Normalized flow boxes are a separate structural path; their
+//! inline geometry awaits line layout.
 
 use rustic_base::CancellationToken;
 use rustic_css::{

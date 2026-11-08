@@ -32,7 +32,7 @@ impl Default for LayoutLimits {
 /// A principal element box or an unshaped UTF-16 text run.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BoxKind {
-    /// The computed display value. Formatting-context normalization is later work.
+    /// The computed display value, before separate formatting normalization.
     Element(Display),
     /// Text with no whitespace processing, glyph selection or line layout yet.
     Text,
@@ -87,8 +87,9 @@ impl BoxTree {
     /// children, and templates are inert. Text is copied as UTF-16. Styles must
     /// be unique, live element IDs in this document; each visible element needs
     /// one. No selectors or cascade run here. Visible shadow hosts fail until
-    /// flattened-tree/slot assignment exists (TD-37). Anonymous boxes, pseudo
-    /// boxes and formatting-context fixups are not yet constructed.
+    /// flattened-tree/slot assignment exists (TD-37). Anonymous flow boxes are
+    /// derived separately by `FormattingTree`; pseudo boxes and other
+    /// formatting-context fixups remain pending.
     pub fn build(
         document: &Document,
         root: NodeId,

@@ -763,6 +763,29 @@ steps complete; anonymous mixed inline/block flow remains planned. The full
 capability, general fragments, text layout, floats/clearance and image output
 are not marked complete. [LAYOUT.md](LAYOUT.md) defines the exact subset.
 
+## REN-01c — Anonymous flow boxes and inline continuations
+
+`FormattingTree` now derives a separate borrowed normal-flow forest from the
+principal snapshot. Mixed block/inline children get minimal anonymous blocks;
+block descendants split inline ancestors into source-linked continuations with
+open-edge metadata, including empty before/after pieces. Inline-blocks remain
+atomic outside while normalizing their own contents. Anonymous styles inherit
+supported inherited values, reset other values, and respect custom-property
+registration flags. Original UTF-16 stays in the principal snapshot; omitted
+collapsible boundary whitespace is reported by source index.
+
+Independent box/depth/work limits, cancellation and flat arenas bound expansion
+without recursive traversal or destruction. Sixteen scenarios include a 508-tree
+independent grouping model, deep splits, exact limits and atomic rejection;
+three CLI tests cover the reviewed fixture, local sheets and documented defaults.
+A new `layout-formatting` mutation target checks source/text partition and roles.
+`dump-formatting` is structural; `dump-layout` remains the block-only geometry
+reference. See [LAYOUT.md](LAYOUT.md) for the exact contract and TD-39's follow-up.
+
+Only the existing normalized-box step of `layout.boxes` advances, with source
+and test evidence. General fragments and mixed inline/block *used flow* remain
+planned until REN-03 supplies shaping/line layout. M3 is still in progress.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

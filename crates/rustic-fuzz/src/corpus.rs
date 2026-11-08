@@ -23,7 +23,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         .into_iter()
         .map(|(_, bytes)| bytes)
         .collect();
-    let family = if target.starts_with("html") {
+    let family = if target.starts_with("html") || target == "layout-formatting" {
         "html"
     } else if target == "css-cascade" || target == "css-invalidation" {
         "css"

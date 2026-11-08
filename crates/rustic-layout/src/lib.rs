@@ -3,13 +3,14 @@
 //!
 //! A block-only vertical reference now emits checked used rectangles and
 //! includes adjoining/parent-child/empty-block margin collapse. It is not yet
-//! a document renderer: anonymous/line boxes, text shaping, general fragments
-//! and painting remain unimplemented.
+//! a document renderer: flow-box normalization is separate from geometry; line
+//! boxes, text shaping, general fragments and painting remain unimplemented.
 //! The immutable box snapshot consumes M2 computed styles without recascading.
 
 #![warn(missing_docs)]
 
 mod flow;
+mod formatting;
 mod geometry;
 mod height;
 mod margins;
@@ -17,6 +18,9 @@ mod sizing;
 mod tree;
 
 pub use flow::{BlockFragment, BlockLayout, FlowError, UnsupportedFlow};
+pub use formatting::{
+    FormattingBox, FormattingError, FormattingKind, FormattingLimits, FormattingTree, InlineEdges,
+};
 pub use geometry::{
     CssPoint, CssPx, CssRect, CssSize, DevicePx, DeviceScale, GeometryError, MAX_CSS_PX,
 };

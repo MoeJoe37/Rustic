@@ -46,6 +46,7 @@ dependencies = [
  "rustic-css",
  "rustic-dom",
  "rustic-html",
+ "rustic-layout",
  "rustic-style",
  "rustic-url",
 ]

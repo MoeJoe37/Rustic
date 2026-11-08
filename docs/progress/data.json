@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "1dbc0f7712cd68792b6aab0148a8edad1881ccecab3f167aea8fa1cee8181f84",
-  "percent": "21.42",
+  "source_fingerprint": "cd12cc5ed067ce8c8406d2be24cca0ee5bcba67956853282b9877c3d97498f01",
+  "percent": "21.61",
   "verified_percent": "20.27",
-  "partial_percent": "1.15",
+  "partial_percent": "1.34",
   "completed": 36,
   "in_progress": 3,
   "total": 172,
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 0,
       "total": 17,
-      "percent": "7.59",
+      "percent": "9.19",
       "verified_percent": "0.00",
-      "partial_percent": "7.59"
+      "partial_percent": "9.19"
     },
     {
       "id": "M4",
@@ -1664,8 +1664,29 @@
             {
               "id": "normalized",
               "label": "Normalized principal and anonymous box tree",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/formatting.rs",
+                  "marker": "pub struct FormattingTree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/formatting.rs",
+                  "marker": "fn exhaustive_short_runs_match_an_independent_block_group_model"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/formatting.rs",
+                  "marker": "fn nested_inline_ancestors_split_and_keep_open_edges"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn dump_formatting_matches_reviewed_structure_across_chunks_and_output_boundaries"
+                }
+              ]
             },
             {
               "id": "fragments",
@@ -1674,7 +1695,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.58"
         },
         {
@@ -1846,10 +1867,10 @@
       "completed": 0,
       "in_progress": 2,
       "total": 10,
-      "contribution": "0.92",
-      "percent": "10.32",
+      "contribution": "1.12",
+      "percent": "12.50",
       "verified_percent": "0.00",
-      "partial_percent": "10.32"
+      "partial_percent": "12.50"
     },
     {
       "id": "paint",

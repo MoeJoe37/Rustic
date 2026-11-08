@@ -14,6 +14,8 @@ stylesheet, `<style>` attachment and a style dump (see
 [Computed style](#computed-style)). CSS-06 is under way: media queries are
 done (see [Media queries](#media-queries)); invalidation and custom properties
 follow.
+`<link rel=stylesheet>` and `@import` load over a caller-controlled fetcher
+(see [External stylesheets](#external-stylesheets)).
 
 ## Implemented behavior
 
@@ -291,8 +293,9 @@ declarations drop themselves, and each drop is a `StyleDiagnostic` with a span.
 block-nesting limit and read with an explicit stack, are flattened in place:
 each style rule records the media query lists it sits in (see
 [Media queries](#media-queries)) and its cascade layer (below). Other at-rules
-(`@import`, `@supports`, ...) and nested style rules are reported as
-unsupported for now, and a declaration directly inside a top-level `@media` or
+(`@supports`, ...) and nested style rules are reported as unsupported for
+now (so is `@import` by `StyleSheet::parse`; `StyleSheet::parse_with_imports`
+returns the valid ones for loading), and a declaration directly inside a top-level `@media` or
 `@layer` block is reported as misplaced. `parse_style_attribute` reads a
 `style` attribute.
 
@@ -435,7 +438,46 @@ and every HTML `<style>` element in tree order (not inside templates or
 foreign content). A `type` other than empty or `text/css` is skipped; a
 `media` attribute restricts the sheet with `StyleSheet::restrict_to`, so it
 applies only while its query list matches; each element is reported with its
-status and diagnostics. `<link rel=stylesheet>` needs fetching and is not loaded.
+status and diagnostics.
+`document_cascade` fetches nothing: `<link rel=stylesheet>` elements and
+`@import`s are reported as blocked. See
+[External stylesheets](#external-stylesheets) for loading them.
+
+### External stylesheets
+
+`document_cascade_with` adds `<link rel=stylesheet>` and `@import` to the same
+tree-order walk (HTML §4.2.4 and §4.6.7.17, CSS Cascade Level 5 §2.1). The
+style system never opens files or sockets: the embedder passes a
+`StylesheetFetcher` that owns the policy (which URLs may load, how bytes are
+read and decoded), and a `StyleLoader` that enforces budgets shared by the
+whole document.
+
+| Case | Behavior |
+| --- | --- |
+| Base URL | The first `<base href>` resolved against the document URL, else the document URL; relative URLs with no base are reported invalid |
+| `<link>` | HTML namespace, `rel` contains `stylesheet` (ASCII case-insensitive), nonempty `href`; `alternate` or `disabled` is reported and not applied; `type` is checked and `media` restricts the sheet like `<style>` |
+| `@import` | Only before every rule except `@charset`, `@layer` statements and other `@import`s; `url(...)`, `url("...")` or a string. Misplaced or malformed rules drop with `InvalidImportRule` |
+| Import conditions | A media list restricts the imported sheet and everything it imports (with `StyleSheet::restrict_to`), like a `media` attribute does for a whole `<link>` tree; `layer` and `supports()` are reported and the sheet is not loaded until cascade layers and `@supports` exist |
+| Order | Imported sheets precede the importing sheet, depth first, so the importing sheet wins ties; the whole group sits at the element's tree position |
+| URL resolution | An import resolves against the URL of the sheet that contains it |
+| Cycles | An import whose URL (fragment ignored) is already on the import chain is refused; repeating a sheet off the chain loads it again |
+| Budgets | `StyleLoadLimits`: 64 fetched sheets (failures count), 16 import levels, 8 MiB of sheet text counted at every inclusion; a fetcher returning more than it was offered counts as too large |
+| Failure | Every refusal is a per-sheet status (`InvalidUrl`, `Cycle`, `DepthLimit`, `LoadLimit`, `Fetch(..)`, ...), never fatal, and leaves the rest of the cascade intact |
+| Caching | A URL is fetched at most once per loader |
+
+The import tree is walked with an explicit stack, so even a 5,000-deep chain
+with unlimited budgets loads without recursion.
+
+`rustic dump-style` uses a local-only fetcher: the document's URL is the
+`file:` URL of its canonical path, and a sheet loads only if its `file:` URL
+names a regular file inside the document's directory tree, checked both
+lexically and after resolving symbolic links. Network, `data:` and other-host
+URLs and paths that leave the directory are blocked. Files are read in
+chunks within the remaining byte budget and decoded as UTF-8 (a BOM is
+stripped; `@charset` and legacy encodings are TD-28). The dump lists each
+`@link` with its `href` as written and each `@import` indented by depth, with
+statuses and dropped constructs. `--max-stylesheets`, `--max-stylesheet-bytes`
+and `--max-import-depth` set the budgets.
 
 ### Style dump
 
@@ -504,6 +546,18 @@ are planned after CSS-06's invalidation work.
   selectors over a 20,000-element list stay linear.
 * `rustic-cli/tests/cli.rs`: the `dump-style` snapshot at several chunk sizes,
   exact output budgets and URL rejection.
+* `rustic-style/tests/external.rs`: link and `<style>` interleaving, link
+  `rel`/`type`/`media`/`disabled`/`alternate` handling, `<base href>`,
+  missing base URLs, blocked loads without a fetcher, nested import order and
+  relative resolution, import conditions and placement, self and mutual import
+  cycles, fetch caching, exact depth, sheet-count and byte budgets, a fetcher
+  that ignores its budget, a 5,000-deep import chain, and diagnostic spans
+  inside imported sheets.
+* `rustic-cli/tests/cli.rs` and `stylesheets.rs` unit tests: the `linked.dump`
+  snapshot (BOM, cycles, blocked parent-directory and network URLs, missing
+  files) at several chunk sizes, the three budget options, symbolic links out
+  of the directory (Unix), and `file:` URL to path round trips with
+  percent-encoded separators and NUL rejected.
 * The `css-cascade` fuzz target also checks that computed font sizes stay
   finite and non-negative, no computed value serializes as NaN or infinity, and
   the dump always succeeds (300,000 executions before landing, no failures).

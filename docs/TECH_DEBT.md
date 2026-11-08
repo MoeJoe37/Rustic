@@ -75,6 +75,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
 | TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Open |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
+| TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Open, pay with the encoding layer |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -406,7 +407,9 @@ do not know a base URL yet. Nothing loads images, so no behavior depends on
 it today. **Pay:** record a base URL on each stylesheet and resolve `url()`
 values with `rustic-url` when computing. **Trigger:** external stylesheets
 (they have their own base URL) or the first image fetch, whichever comes
-first.
+first. External stylesheets have now landed (`css.queries` step 2):
+`StyleLoader` knows each fetched sheet's URL, so paying this means recording
+it on the `StyleSheet` it produces.
 
 ### TD-27 — `white-space` is a longhand instead of a shorthand
 
@@ -419,6 +422,18 @@ CSSOM serializes the shorthand from them. **Pay:** add the longhands, make
 `white-space` expand to them (with `pre`/`nowrap`/... as the documented
 combinations) and give text layout the longhands. **Trigger:** inline layout
 (REN) consuming white-space, or any page using the new longhands.
+
+### TD-28 — External stylesheets decode as UTF-8 only
+
+`dump-style`'s local fetcher decodes every linked or imported stylesheet as
+UTF-8: it strips a UTF-8 byte order mark and turns invalid sequences into
+U+FFFD. CSS Syntax §3.2 also honors a UTF-16 BOM, an `@charset` rule, the
+referring `<link charset>`/document encoding and legacy single-byte encodings.
+A Latin-1 sheet therefore shows replacement characters instead of its text;
+nothing is truncated, and the replaced text is still bounded by the byte
+budget. **Pay:** route fetched bytes through the encoding layer that DOC-06's
+encoding sniffing will provide, with the CSS fallback chain. **Trigger:** the
+encoding layer landing, or a real page fixture that needs a non-UTF-8 sheet.
 
 ## Reviewing new work
 

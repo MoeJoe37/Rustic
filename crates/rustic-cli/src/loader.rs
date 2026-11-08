@@ -1,8 +1,10 @@
 //! Local-only bounded HTML loading for development commands.
 //!
-//! The command line grants exactly one file path. Page content never names or
-//! opens another file, and nothing here performs network access, script
-//! execution, subresource loading or encoding detection. Input is read in fixed
+//! The command line grants exactly one file path. Page content may name other
+//! files only as stylesheets for `dump-style`, which load solely from that
+//! file's directory tree (see [`crate::stylesheets`]). Nothing here performs
+//! network access, script execution, other subresource loading or encoding
+//! detection. Input is read in fixed
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
@@ -14,13 +16,16 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use rustic_base::CancellationToken;
+use rustic_base::EscapedText;
 use rustic_css::CssParser;
 use rustic_dom::DumpError;
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
 use rustic_style::{
-    ComputeContext, MatchContext, StyleElementStatus, document_cascade, dump_computed_styles,
-    style_tree,
+    ComputeContext, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader,
+    StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
+
+use crate::stylesheets::{LocalStylesheetFetcher, file_url};
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -40,6 +45,8 @@ pub struct LoaderLimits {
     pub max_dump_bytes: usize,
     /// Token, document and diagnostic limits for the document parser.
     pub parser: ParserLimits,
+    /// External stylesheet budgets for `dump-style`.
+    pub stylesheets: StyleLoadLimits,
 }
 
 impl Default for LoaderLimits {
@@ -49,6 +56,7 @@ impl Default for LoaderLimits {
             read_chunk_bytes: DEFAULT_READ_CHUNK_BYTES,
             max_dump_bytes: DEFAULT_MAX_DUMP_BYTES,
             parser: ParserLimits::default(),
+            stylesheets: StyleLoadLimits::default(),
         }
     }
 }
@@ -194,37 +202,107 @@ fn check_regular_file(metadata: fs::Metadata, limits: LoaderLimits) -> Result<()
 }
 
 /// Deterministic preorder tree dump of the whole document, never HTML.
-pub fn dump_dom(parsed: &ParsedDocument, max_bytes: usize) -> Result<String, LoadError> {
+pub fn dump_dom(
+    parsed: &ParsedDocument,
+    _path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
     let document = parsed.document();
     document
-        .dump_tree(document.root(), max_bytes)
+        .dump_tree(document.root(), limits.max_dump_bytes)
         .map_err(LoadError::Dump)
 }
 
+fn status_text(status: SheetStatus) -> &'static str {
+    match status {
+        SheetStatus::Applied => "applied",
+        SheetStatus::NotCss => "skipped: not CSS",
+        SheetStatus::UnsupportedCondition => "skipped: layer() and supports() not supported",
+        SheetStatus::Disabled => "skipped: alternate or disabled",
+        SheetStatus::InvalidUrl => "skipped: invalid URL",
+        SheetStatus::Cycle => "skipped: import cycle",
+        SheetStatus::DepthLimit => "skipped: import depth limit",
+        SheetStatus::LoadLimit => "skipped: stylesheet budget exhausted",
+        SheetStatus::Fetch(FetchError::Blocked) => {
+            "skipped: blocked (only files beside the document load)"
+        }
+        SheetStatus::Fetch(FetchError::NotFound) => "skipped: not found",
+        SheetStatus::Fetch(FetchError::TooLarge) => "skipped: stylesheet budget exceeded",
+        SheetStatus::Fetch(FetchError::Failed) => "skipped: unreadable",
+        SheetStatus::Fetch(FetchError::Cancelled) => "skipped: cancelled",
+        SheetStatus::ResourceLimit => "skipped: CSS parser limit",
+    }
+}
+
+fn push_diagnostics(out: &mut String, indent: &str, diagnostics: &[rustic_style::StyleDiagnostic]) {
+    for diagnostic in diagnostics {
+        let range = diagnostic.span.range();
+        out.push_str(&format!(
+            "{indent}  dropped {:?} at bytes {}..{}\n",
+            diagnostic.kind, range.start, range.end
+        ));
+    }
+}
+
 /// Deterministic computed-style dump of the whole document: a line per
-/// `<style>` element with its status and dropped constructs, then every
-/// element with its non-initial computed values (see
-/// [`rustic_style::dump_computed_styles`]). Uses the HTML user-agent sheet and
-/// a 1280×720 viewport; external stylesheets are never loaded.
-pub fn dump_style(parsed: &ParsedDocument, max_bytes: usize) -> Result<String, LoadError> {
+/// `<style>` and `<link rel=stylesheet>` element with its status, its
+/// `@import`s and dropped constructs, then every element with its non-initial
+/// computed values (see [`rustic_style::dump_computed_styles`]). Uses the
+/// HTML user-agent sheet and a 1280×720 viewport.
+///
+/// External stylesheets load only from files inside the directory that
+/// contains `path` (see [`LocalStylesheetFetcher`]), within
+/// [`LoaderLimits::stylesheets`]. Hrefs and import URLs are printed as
+/// written, escaped, so the dump never depends on where the files live.
+pub fn dump_style(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
     let document = parsed.document();
     let node_error = |error| LoadError::Dump(DumpError::Node(error));
     let parser = CssParser::default();
-    let (cascade, sheets) = document_cascade(document, &parser).map_err(node_error)?;
+    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
+    let document_url = file_url(&canonical);
+    let mut local = canonical.parent().and_then(|root| {
+        LocalStylesheetFetcher::new(
+            root.to_path_buf(),
+            limits.read_chunk_bytes,
+            CancellationToken::default(),
+        )
+    });
+    let mut no_fetch = NoFetch;
+    let fetcher: &mut dyn StylesheetFetcher = match local.as_mut() {
+        Some(local) => local,
+        None => &mut no_fetch,
+    };
+    let mut loader = StyleLoader::new(fetcher, limits.stylesheets);
+    let (cascade, sheets) =
+        document_cascade_with(document, &parser, document_url.as_ref(), &mut loader)
+            .map_err(node_error)?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
-        let status = match sheet.status {
-            StyleElementStatus::Applied => "applied",
-            StyleElementStatus::NotCss => "skipped: not CSS",
-            StyleElementStatus::ResourceLimit => "skipped: CSS parser limit",
-        };
-        out.push_str(&format!("@style {}: {status}\n", index + 1));
-        for diagnostic in &sheet.diagnostics {
-            let range = diagnostic.span.range();
+        let status = status_text(sheet.status);
+        match &sheet.href {
+            Some(href) => out.push_str(&format!(
+                "@link {} {}: {status}\n",
+                index + 1,
+                EscapedText(href)
+            )),
+            None => out.push_str(&format!("@style {}: {status}\n", index + 1)),
+        }
+        push_diagnostics(&mut out, "", &sheet.diagnostics);
+        for import in &sheet.imports {
+            let indent = "  ".repeat(import.depth);
             out.push_str(&format!(
-                "  dropped {:?} at bytes {}..{}\n",
-                diagnostic.kind, range.start, range.end
+                "{indent}@import {}: {}\n",
+                EscapedText(&import.url),
+                status_text(import.status)
             ));
+            push_diagnostics(&mut out, &indent, &import.diagnostics);
+        }
+        if out.len() > limits.max_dump_bytes {
+            return Err(LoadError::Dump(DumpError::OutputLimit));
         }
     }
     let mut cx = MatchContext::html();
@@ -238,7 +316,8 @@ pub fn dump_style(parsed: &ParsedDocument, max_bytes: usize) -> Result<String, L
         &ComputeContext::default(),
     )
     .map_err(node_error)?;
-    let remaining = max_bytes
+    let remaining = limits
+        .max_dump_bytes
         .checked_sub(out.len())
         .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
     let elements = dump_computed_styles(document, &styles, remaining)
@@ -278,7 +357,7 @@ mod tests {
 
     fn dump(file: &TempFile, limits: LoaderLimits) -> Result<String, LoadError> {
         let parsed = load_document(&file.0, limits, CancellationToken::default())?;
-        dump_dom(&parsed, limits.max_dump_bytes)
+        dump_dom(&parsed, &file.0, limits)
     }
 
     #[test]

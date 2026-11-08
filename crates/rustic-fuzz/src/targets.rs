@@ -984,6 +984,10 @@ impl Target for CssCascadeTarget {
             b"auto",
             b"block",
             b"@namespace x url(y);",
+            b"@import 'a.css' screen;",
+            b"@import url(b) layer supports(x);",
+            b"@charset \"utf-8\";",
+            b"@layer a;",
             b"@media x {",
             b"@layer a, b;",
             b"@layer a {",
@@ -1008,6 +1012,15 @@ impl Target for CssCascadeTarget {
         let Ok((sheet, _)) = StyleSheet::parse(&parser, &text, Origin::Author) else {
             return Ok(()); // A resource limit is a legitimate outcome.
         };
+        // Collecting @import rules for loading never changes the style rules.
+        match StyleSheet::parse_with_imports(&parser, &text, Origin::Author) {
+            Ok((with_imports, imports, _)) if with_imports == sheet => {
+                if imports.iter().any(|i| text.get(i.span.range()).is_none()) {
+                    return Err("an @import span is outside the sheet".into());
+                }
+            }
+            _ => return Err("parse_with_imports disagreed with parse".into()),
+        }
         let mut single = Cascade::new();
         single.push(sheet.clone());
         let reference = cascade_styles(&single);

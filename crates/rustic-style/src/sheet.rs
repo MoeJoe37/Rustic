@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use rustic_base::SourceSpan;
 use rustic_css::{
-    AtRule, BlockItem, CssError, CssParser, MediaQueryList, NamespaceMap, PropertyDeclaration,
-    PropertyError, Rule, SelectorErrorKind, SelectorList, Token, Value, parse_block_contents,
-    parse_declaration, parse_media_query_list, parse_selector_list,
+    AtRule, BlockItem, ComponentValue, CssError, CssParser, MediaQueryList, NamespaceMap,
+    PropertyDeclaration, PropertyError, Rule, SelectorErrorKind, SelectorList, Token, Value,
+    parse_block_contents, parse_declaration, parse_media_query_list, parse_selector_list,
 };
 
 use crate::{LayerName, LayerSegment};
@@ -82,6 +82,9 @@ pub enum StyleDiagnosticKind {
     /// A declaration directly inside a grouping rule at the top level, such
     /// as `@media print { color: red }` or `@layer a { color: red }`.
     MisplacedDeclaration,
+    /// A malformed `@import` rule, one inside another rule, or one after a
+    /// rule other than `@charset`, `@layer` statements and other `@import`s.
+    InvalidImportRule,
 }
 
 /// A dropped construct and its byte range in the stylesheet source.
@@ -193,6 +196,77 @@ fn layer_names(prelude: &[Value]) -> Option<Vec<Vec<LayerSegment>>> {
         .collect()
 }
 
+/// An `@import` rule (CSS Cascade Level 5 §2.1), not yet fetched.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportRule {
+    /// The URL as written, before resolution against the sheet's URL.
+    pub url: String,
+    /// Whether a `layer` or `layer(...)` condition is present.
+    pub layer: bool,
+    /// Whether a `supports(...)` condition is present.
+    pub supports: bool,
+    /// The media query list, or `None` when there is none (all media).
+    pub media: Option<MediaQueryList>,
+    /// The whole rule in the stylesheet source.
+    pub span: SourceSpan,
+}
+
+/// `@import [<url> | <string>] [layer | layer(...)]? [supports(...)]?
+/// <media-query-list>?;`
+fn import_rule(at: &AtRule) -> Option<ImportRule> {
+    if at.block.is_some() {
+        return None;
+    }
+    let mut rest = at.prelude.as_slice();
+    fn skip_whitespace(rest: &[Value]) -> &[Value] {
+        let start = rest
+            .iter()
+            .position(|v| !v.is_whitespace())
+            .unwrap_or(rest.len());
+        &rest[start..]
+    }
+    rest = skip_whitespace(rest);
+    let url = match &rest.first()?.value {
+        ComponentValue::Token(Token::String(s) | Token::Url(s)) => s.clone(),
+        ComponentValue::Function { name, arguments } if name.eq_ignore_ascii_case("url") => {
+            let mut args = arguments.iter().filter(|v| !v.is_whitespace());
+            match (args.next().and_then(|v| v.token()), args.next()) {
+                (Some(Token::String(s)), None) => s.clone(),
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    rest = &rest[1..];
+    let is_function = |value: &Value, wanted: &str| {
+        matches!(&value.value, ComponentValue::Function { name, .. }
+            if name.eq_ignore_ascii_case(wanted))
+    };
+    rest = skip_whitespace(rest);
+    let layer = rest.first().is_some_and(|v| {
+        is_function(v, "layer")
+            || matches!(&v.value, ComponentValue::Token(Token::Ident(n))
+                if n.eq_ignore_ascii_case("layer"))
+    });
+    if layer {
+        rest = &rest[1..];
+    }
+    rest = skip_whitespace(rest);
+    let supports = rest.first().is_some_and(|v| is_function(v, "supports"));
+    if supports {
+        rest = &rest[1..];
+    }
+    rest = skip_whitespace(rest);
+    let media = (!rest.is_empty()).then(|| parse_media_query_list(rest));
+    Some(ImportRule {
+        url,
+        layer,
+        supports,
+        media,
+        span: at.span,
+    })
+}
+
 /// One level of grouping rules being read: the remaining items, the
 /// enclosing layer (an index into the sheet's layers) and the enclosing media
 /// conditions (indices into the sheet's media lists, outermost first).
@@ -209,6 +283,10 @@ struct Builder {
     namespaces: NamespaceMap,
     /// Whether an `@namespace` rule may still appear.
     namespaces_allowed: bool,
+    /// Collected `@import` rules; `None` reports them as unsupported.
+    imports: Option<Vec<ImportRule>>,
+    /// Whether an `@import` rule may still appear.
+    imports_allowed: bool,
     anonymous_layers: u32,
     /// Index of each layer in `sheet.layers`.
     layer_index: HashMap<LayerName, usize>,
@@ -294,6 +372,29 @@ impl StyleSheet {
         source: &str,
         origin: Origin,
     ) -> Result<(Self, Vec<StyleDiagnostic>), CssError> {
+        Self::parse_inner(parser, source, origin, false)
+            .map(|(sheet, _, diagnostics)| (sheet, diagnostics))
+    }
+
+    /// Like [`StyleSheet::parse`], but also returns the sheet's valid
+    /// `@import` rules in order, for the caller to fetch. Imported rules come
+    /// before the sheet's own rules in the cascade. Misplaced or malformed
+    /// `@import` rules are dropped with
+    /// [`StyleDiagnosticKind::InvalidImportRule`].
+    pub fn parse_with_imports(
+        parser: &CssParser,
+        source: &str,
+        origin: Origin,
+    ) -> Result<(Self, Vec<ImportRule>, Vec<StyleDiagnostic>), CssError> {
+        Self::parse_inner(parser, source, origin, true)
+    }
+
+    fn parse_inner(
+        parser: &CssParser,
+        source: &str,
+        origin: Origin,
+        collect_imports: bool,
+    ) -> Result<(Self, Vec<ImportRule>, Vec<StyleDiagnostic>), CssError> {
         let sheet = parser.stylesheet(source)?.value;
         let mut builder = Builder {
             sheet: StyleSheet {
@@ -303,6 +404,8 @@ impl StyleSheet {
             diagnostics: Vec::new(),
             namespaces: NamespaceMap::new(),
             namespaces_allowed: true,
+            imports: collect_imports.then(Vec::new),
+            imports_allowed: true,
             anonymous_layers: 0,
             layer_index: HashMap::new(),
         };
@@ -329,7 +432,23 @@ impl StyleSheet {
                     continue;
                 }
             };
+            let layer_statement = matches!(&rule, Rule::At(at)
+                if at.name.eq_ignore_ascii_case("layer") && at.block.is_none());
+            let keeps_imports = matches!(&rule, Rule::At(at)
+                if at.name.eq_ignore_ascii_case("charset") || at.name.eq_ignore_ascii_case("import"));
+            if !(top_level && (layer_statement || keeps_imports)) {
+                builder.imports_allowed = false;
+            }
             match rule {
+                Rule::At(at)
+                    if at.name.eq_ignore_ascii_case("import") && builder.imports.is_some() =>
+                {
+                    let import = import_rule(&at).filter(|_| top_level && builder.imports_allowed);
+                    match (import, builder.imports.as_mut()) {
+                        (Some(import), Some(imports)) => imports.push(import),
+                        _ => builder.diagnose(StyleDiagnosticKind::InvalidImportRule, at.span),
+                    }
+                }
                 Rule::At(at) if at.name.eq_ignore_ascii_case("namespace") => {
                     match namespace_rule(&at.prelude)
                         .filter(|_| top_level && builder.namespaces_allowed && at.block.is_none())
@@ -388,7 +507,8 @@ impl StyleSheet {
                 }
             }
         }
-        Ok((builder.sheet, builder.diagnostics))
+        let imports = builder.imports.unwrap_or_default();
+        Ok((builder.sheet, imports, builder.diagnostics))
     }
 
     /// Make every rule also depend on `media` (for example a `<style>`

@@ -12,9 +12,11 @@ publish.workspace = true
 rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
+rustic-url = { path = "../rustic-url" }
 
 [dev-dependencies]
 rustic-html = { path = "../rustic-html" }
+rustic-url = { path = "../rustic-url" }
 
 [lints]
 workspace = true

@@ -1,0 +1,53 @@
+@link 1 "css/main.css": applied
+  dropped UnsupportedAtRule at bytes 0..17
+  dropped UnknownProperty at bytes 134..145
+  @import "parts/base.css": applied
+    @import "../../../outside.css": skipped: blocked (only files beside the document load)
+  @import "parts/print.css": applied
+  @import "main.css": skipped: import cycle
+@link 2 "css/dark.css": skipped: alternate or disabled
+@link 3 "../outside.css": skipped: blocked (only files beside the document load)
+@link 4 "https://example.com/remote.css": skipped: blocked (only files beside the document load)
+@link 5 "missing.css": skipped: not found
+@style 6: applied
+  @import "css/parts/base.css": applied
+    @import "../../../outside.css": skipped: blocked (only files beside the document load)
+html
+  display: block
+  head
+    display: none
+    title
+      display: none
+    link
+      display: none
+    link
+      display: none
+    link
+      display: none
+    link
+      display: none
+    link
+      display: none
+    style
+      display: none
+  body
+    display: block
+    margin-top: 8px
+    margin-right: 8px
+    margin-bottom: 8px
+    margin-left: 8px
+    p#first.note
+      display: block
+      color: rgb(0, 128, 0)
+      margin-top: 4px
+      margin-bottom: 4px
+      line-height: 1.5
+    p.lead
+      display: block
+      color: rgb(0, 0, 128)
+      margin-top: 4px
+      margin-bottom: 4px
+      font-size: 24px
+      line-height: 1.5
+      b
+        font-weight: 700

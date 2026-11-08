@@ -238,3 +238,81 @@ fn dump_style_matches_the_checked_snapshot_and_budgets() {
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).starts_with("rustic dump-style:"));
 }
+
+#[test]
+fn dump_style_loads_linked_and_imported_sheets_beside_the_document() {
+    let input = fixture("linked/page.html");
+    let input = input.to_str().expect("UTF-8 fixture path");
+    let expected = fs::read(fixture("linked.dump")).expect("read snapshot");
+    for chunk in ["1", "5", "65536"] {
+        let output = rustic(&["dump-style", "--chunk-bytes", chunk, input]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&expected),
+            "chunk {chunk}"
+        );
+    }
+    let output = rustic(&[
+        "dump-style",
+        "--max-stylesheets",
+        "2",
+        "--max-import-depth",
+        "1",
+        input,
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dump = String::from_utf8_lossy(&output.stdout);
+    assert!(dump.contains("@import \"../../../outside.css\": skipped: import depth limit"));
+    assert!(dump.contains("@link 5 \"missing.css\": skipped: stylesheet budget exhausted"));
+    // 2 bytes cannot hold main.css, so nothing external applies.
+    let output = rustic(&["dump-style", "--max-stylesheet-bytes", "2", input]);
+    let dump = String::from_utf8_lossy(&output.stdout);
+    assert!(dump.starts_with("@link 1 \"css/main.css\": skipped: stylesheet budget exceeded\n"));
+    assert!(!dump.contains("rgb(0, 0, 128)"));
+}
+
+#[cfg(unix)]
+#[test]
+fn dump_style_never_follows_links_out_of_the_document_directory() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-escape-{}", std::process::id()));
+    let page_dir = base.join("site");
+    fs::create_dir_all(&page_dir).expect("create temp dirs");
+    fs::write(base.join("secret.css"), "p { width: 1px }").expect("write secret");
+    fs::write(page_dir.join("ok.css"), "p { height: 2px }").expect("write sheet");
+    let _ = fs::remove_file(page_dir.join("escape.css"));
+    std::os::unix::fs::symlink(base.join("secret.css"), page_dir.join("escape.css"))
+        .expect("symlink");
+    let _ = fs::remove_file(page_dir.join("inside.css"));
+    std::os::unix::fs::symlink(page_dir.join("ok.css"), page_dir.join("inside.css"))
+        .expect("symlink");
+    fs::write(
+        page_dir.join("page.html"),
+        "<link rel=stylesheet href=escape.css><link rel=stylesheet href=inside.css>\
+         <link rel=stylesheet href=file:///etc/hostname><link rel=stylesheet href=.>\
+         <p>x",
+    )
+    .expect("write page");
+    let page = page_dir.join("page.html");
+    let output = rustic(&["dump-style", page.to_str().expect("UTF-8 temp path")]);
+    let _ = fs::remove_dir_all(&base);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dump = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        dump.contains("@link 1 \"escape.css\": skipped: blocked"),
+        "{dump}"
+    );
+    assert!(dump.contains("@link 2 \"inside.css\": applied"), "{dump}");
+    assert!(
+        dump.contains("@link 3 \"file:///etc/hostname\": skipped: blocked"),
+        "{dump}"
+    );
+    assert!(
+        dump.contains("@link 4 \".\": skipped: unreadable"),
+        "{dump}"
+    );
+    assert!(
+        dump.contains("height: 2px") && !dump.contains("width: 1px"),
+        "{dump}"
+    );
+}

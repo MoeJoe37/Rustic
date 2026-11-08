@@ -9,9 +9,12 @@ use rustic_dom::{
     Document, DomError, HTML_NAMESPACE, MATHML_NAMESPACE, NodeId, NodeKind, SVG_NAMESPACE,
 };
 
+use rustic_url::Url;
+
 use crate::{
-    Cascade, ComputedStyle, DomElement, ElementStyle, ElementView, Origin, StyleDiagnostic,
-    StyleSheet, TreeContext, shadow_tree_context,
+    Cascade, ComputedStyle, DomElement, ElementStyle, ElementView, ImportReport, NoFetch, Origin,
+    SheetStatus, StyleDiagnostic, StyleLoadLimits, StyleLoader, StyleSheet, TreeContext,
+    shadow_tree_context,
 };
 
 /// The supported subset of the HTML user-agent stylesheet (HTML §15.3).
@@ -92,26 +95,24 @@ pub fn html_user_agent_sheet(parser: &CssParser) -> StyleSheet {
         })
 }
 
-/// What happened to one `<style>` element.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum StyleElementStatus {
-    /// Its sheet was added to the cascade.
-    Applied,
-    /// Its `type` attribute is not empty or `text/css`, so it is not CSS.
-    NotCss,
-    /// Its contents exceeded the CSS parser's limits.
-    ResourceLimit,
-}
+/// What happened to one `<style>` or `<link rel=stylesheet>` element's
+/// sheet (the name predates linked sheets).
+pub type StyleElementStatus = SheetStatus;
 
-/// One `<style>` element found by [`document_cascade`].
+/// One `<style>` or `<link rel=stylesheet>` element found by
+/// [`document_cascade`] or [`document_cascade_with`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyleElementSheet {
-    /// The `<style>` element.
+    /// The `<style>` or `<link>` element.
     pub node: NodeId,
+    /// For a `<link>`, its `href` attribute as written.
+    pub href: Option<String>,
     /// Whether its sheet was applied.
     pub status: StyleElementStatus,
     /// Constructs dropped from its sheet (spans are within its text).
     pub diagnostics: Vec<StyleDiagnostic>,
+    /// Its `@import` rules and theirs, in preorder.
+    pub imports: Vec<ImportReport>,
 }
 
 fn attribute(element: DomElement<'_>, name: &str) -> Option<String> {
@@ -138,20 +139,75 @@ fn child_text(document: &Document, id: NodeId) -> String {
     String::from_utf16_lossy(&units)
 }
 
-/// A cascade for an HTML document: the user-agent stylesheet, then the sheet
-/// of every HTML `<style>` element in shadow-including tree order (template
-/// contents are not searched), each reported in the returned list. A
-/// `<style>` inside a shadow tree styles that tree only: its sheet belongs to
-/// the tree's [`crate::shadow_tree_context`]. A `media` attribute restricts
-/// its sheet with [`StyleSheet::restrict_to`]. The cascade uses the default
-/// environment; change it with [`Cascade::set_environment`].
+/// A cascade for an HTML document without external stylesheets: the
+/// user-agent stylesheet, then the sheet of every HTML `<style>` element in
+/// tree order (template contents are not searched), each reported in the
+/// returned list.
 ///
-/// External stylesheets (`<link rel=stylesheet>`) need fetching and are not
-/// loaded.
+/// `<link rel=stylesheet>` elements and `@import` rules are reported as
+/// [`FetchError::Blocked`](crate::FetchError::Blocked); use [`document_cascade_with`] to load them.
 pub fn document_cascade(
     document: &Document,
     parser: &CssParser,
 ) -> Result<(Cascade, Vec<StyleElementSheet>), DomError> {
+    let mut fetcher = NoFetch;
+    let mut loader = StyleLoader::new(&mut fetcher, StyleLoadLimits::default());
+    document_cascade_with(document, parser, None, &mut loader)
+}
+
+/// Is `rel` a link-type list containing `stylesheet`, and also `alternate`?
+fn stylesheet_link(rel: &str) -> Option<bool> {
+    let mut stylesheet = false;
+    let mut alternate = false;
+    for token in rel.split(['\t', '\n', '\x0c', '\r', ' ']) {
+        stylesheet |= token.eq_ignore_ascii_case("stylesheet");
+        alternate |= token.eq_ignore_ascii_case("alternate");
+    }
+    stylesheet.then_some(alternate)
+}
+
+fn is_html(element: DomElement<'_>, name: &str) -> bool {
+    element.local_name() == name && element.namespace() == Some(HTML_NAMESPACE)
+}
+
+/// The document base URL (HTML §2.4.1): the first `<base href>` in tree
+/// order resolved against `document_url`, or `document_url` itself.
+fn base_url(document: &Document, document_url: Option<&Url>) -> Result<Option<Url>, DomError> {
+    for (id, _) in document.walk(document.root())? {
+        let Some(element) = DomElement::new(document, id) else {
+            continue;
+        };
+        if is_html(element, "base") {
+            if let Some(href) = attribute(element, "href") {
+                if let Ok(url) = Url::parse(&href, document_url) {
+                    return Ok(Some(url));
+                }
+                break;
+            }
+        }
+    }
+    Ok(document_url.cloned())
+}
+
+/// A cascade for an HTML document: the user-agent stylesheet, then the sheet
+/// of every HTML `<style>` and `<link rel=stylesheet>` element in
+/// shadow-including tree order (template contents are not searched; a sheet
+/// in a shadow tree styles that tree only, through its
+/// [`crate::shadow_tree_context`]), each preceded by the sheets it
+/// `@import`s, depth first.
+///
+/// Relative URLs resolve against the document base URL: the first
+/// `<base href>`, else `document_url`. Every external sheet is fetched
+/// through `loader`, which applies its fetcher's policy and its budgets; a
+/// sheet that cannot be loaded is reported and skipped, never fatal. Each
+/// element is reported in the returned list with its imports.
+pub fn document_cascade_with(
+    document: &Document,
+    parser: &CssParser,
+    document_url: Option<&Url>,
+    loader: &mut StyleLoader<'_>,
+) -> Result<(Cascade, Vec<StyleElementSheet>), DomError> {
+    let base = base_url(document, document_url)?;
     let mut cascade = Cascade::new();
     cascade.push(html_user_agent_sheet(parser));
     let mut reports = Vec::new();
@@ -174,39 +230,77 @@ pub fn document_cascade(
                 ));
             }
         }
-        if element.local_name() != "style" || element.namespace() != Some(HTML_NAMESPACE) {
-            continue;
-        }
+        let mut report = StyleElementSheet {
+            node: id,
+            href: None,
+            status: SheetStatus::Applied,
+            diagnostics: Vec::new(),
+            imports: Vec::new(),
+        };
         let css_type = attribute(element, "type").is_none_or(|t| {
             let t = trim_ascii_whitespace(&t);
             t.is_empty() || t.eq_ignore_ascii_case("text/css")
         });
-        let (status, diagnostics) = if !css_type {
-            (StyleElementStatus::NotCss, Vec::new())
-        } else {
-            let media = match attribute(element, "media") {
-                Some(media) => parser.media_query_list(&media).map(|m| Some(m.value)),
-                None => Ok(None),
-            };
-            match media.and_then(|media| {
-                StyleSheet::parse(parser, &child_text(document, id), Origin::Author)
-                    .map(|parsed| (media, parsed))
-            }) {
-                Ok((media, (mut sheet, diagnostics))) => {
-                    if let Some(media) = media {
-                        sheet.restrict_to(media);
-                    }
-                    cascade.push_in(sheet, context);
-                    (StyleElementStatus::Applied, diagnostics)
-                }
-                Err(_) => (StyleElementStatus::ResourceLimit, Vec::new()),
-            }
+        // A `media` attribute restricts the element's whole sheet tree.
+        let media = match attribute(element, "media") {
+            Some(media) => parser.media_query_list(&media).map(|m| Some(m.value)),
+            None => Ok(None),
         };
-        reports.push(StyleElementSheet {
-            node: id,
-            status,
-            diagnostics,
-        });
+        let loaded = if is_html(element, "style") {
+            if !css_type {
+                Err(SheetStatus::NotCss)
+            } else {
+                media
+                    .and_then(|media| {
+                        loader.load_tree(
+                            parser,
+                            &child_text(document, id),
+                            base.as_ref(),
+                            None,
+                            media,
+                        )
+                    })
+                    .map_err(|_| SheetStatus::ResourceLimit)
+            }
+        } else if is_html(element, "link") {
+            let Some(alternate) = attribute(element, "rel").and_then(|r| stylesheet_link(&r))
+            else {
+                continue;
+            };
+            // A link with no or an empty href does not create a sheet.
+            let Some(href) = attribute(element, "href").filter(|h| !h.is_empty()) else {
+                continue;
+            };
+            report.href = Some(href.clone());
+            if alternate || attribute(element, "disabled").is_some() {
+                Err(SheetStatus::Disabled)
+            } else if !css_type {
+                Err(SheetStatus::NotCss)
+            } else {
+                match (Url::parse(&href, base.as_ref()), media) {
+                    (Err(_), _) => Err(SheetStatus::InvalidUrl),
+                    (_, Err(_)) => Err(SheetStatus::ResourceLimit),
+                    (Ok(url), Ok(media)) => loader.fetch(&url).and_then(|text| {
+                        loader
+                            .load_tree(parser, &text, Some(&url), Some(&url), media)
+                            .map_err(|_| SheetStatus::ResourceLimit)
+                    }),
+                }
+            }
+        } else {
+            continue;
+        };
+        match loaded {
+            Ok((tree, diagnostics)) => {
+                report.diagnostics = diagnostics;
+                report.imports = tree.imports;
+                for sheet in tree.sheets {
+                    cascade.push_in(sheet, context);
+                }
+            }
+            Err(status) => report.status = status,
+        }
+        reports.push(report);
     }
     Ok((cascade, reports))
 }

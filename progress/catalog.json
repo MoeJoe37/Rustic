@@ -1196,8 +1196,29 @@
             },
             {
               "label": "External stylesheets: link rel=stylesheet and @import over controlled fetching",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/html.rs",
+                  "marker": "pub fn document_cascade_with("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/loading.rs",
+                  "marker": "pub trait StylesheetFetcher"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/external.rs",
+                  "marker": "fn imports_precede_their_sheet_and_resolve_against_it"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn dump_style_loads_linked_and_imported_sheets_beside_the_document"
+                }
+              ]
             },
             {
               "label": "Media queries (@media rules and media attributes) re-evaluated when the environment changes",

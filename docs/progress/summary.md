@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 16.85%** = 14.96% verified complete + 1.89% partial credit. 31/172 capabilities complete, 4 in progress.
+**Overall completion: 17.03%** = 14.96% verified complete + 2.07% partial credit. 31/172 capabilities complete, 4 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `48be369df37049f0a0fee3e315609d44fb56530604b4f53a960311188f1aaab3`.
+Catalog: `engine-v3`. Source fingerprint: `45038f9cb33aacb316672ef2dd75b19467dcb7f5787d0b8e62dd275d8464cabd`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `48be369df37049f0a0fee3e315609d44fb565
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 3/8 | 59.61% | 41.02% | 9.00% |
+| M2 CSS & computed style | 3/8 | 61.53% | 41.02% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `48be369df37049f0a0fee3e315609d44fb565
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 3/8 | 3 | 59.61% | 41.02% | 9% | 5.36 |
+| CSS & style | 3/8 | 3 | 61.53% | 41.02% | 9% | 5.53 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -123,9 +123,9 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Computed values that need font metrics (ex/ch/cap/ic from loaded fonts)
   - [ ] Custom properties and var() substitution
   - [ ] Dependency cycle handling for custom properties and font-relative units
-- **in progress 50.00%** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine
+- **in progress 75.00%** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine
   - [x] HTML user-agent stylesheet and document style element attachment ([source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [ ] External stylesheets: link rel=stylesheet and @import over controlled fetching
+  - [x] External stylesheets: link rel=stylesheet and @import over controlled fetching ([source](../../crates/rustic-style/src/html.rs), [source](../../crates/rustic-style/src/loading.rs), [test](../../crates/rustic-style/tests/external.rs), [test](../../crates/rustic-cli/tests/cli.rs))
   - [x] Media queries (@media rules and media attributes) re-evaluated when the environment changes ([source](../../crates/rustic-css/src/media.rs), [test](../../crates/rustic-style/tests/cascade.rs))
   - [ ] Container queries
 - **planned** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine

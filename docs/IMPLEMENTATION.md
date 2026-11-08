@@ -650,6 +650,22 @@ serialization bugs. Invalidation on DOM mutation, custom properties and
 container queries are the remaining CSS-06 work. See
 [CSS.md](CSS.md#media-queries).
 
+## External stylesheets — `<link rel=stylesheet>` and `@import`
+
+`document_cascade_with` loads linked and imported sheets in tree order through
+a caller-supplied `StylesheetFetcher`, so fetch policy stays with the embedder
+and `rustic-style` never touches files or the network. A `StyleLoader` applies
+document-wide budgets (fetched sheets, import depth, total bytes), refuses
+import cycles, caches fetches, resolves URLs against `<base href>` and each
+importing sheet, and orders imported sheets before their importer. Every
+refusal is a per-sheet status, never fatal. `rustic dump-style` now loads
+stylesheets with a local-only fetcher confined to the document's directory
+(lexical and symbolic-link checks), with three new budget options and a
+`linked.dump` snapshot. `rustic-style` now depends on `rustic-url`. UTF-8 is
+the only stylesheet encoding (TD-28). `css.queries` now has its
+external-sheet step; import media lists restrict imported sheets. See
+[CSS.md](CSS.md#external-stylesheets).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -709,6 +725,7 @@ must keep all tiers green.
 | CSS-05: computed values, attachment and style dump | Complete for the declared longhands: computed values, HTML UA sheet subset, `<style>` attachment, `dump-style` and a cached full-restyle path; font metrics, `var()` and media queries remain |
 | CSS-03c: property catalog | Complete for the declared set: positioning, overflow, visibility, opacity, text, decoration, font shorthand and backgrounds with computed values; gradients and system fonts remain |
 | CSS-03b: math functions | Complete for lengths, length-percentages and numbers: parsing, type checking, simplification, serialization, computed values; typed division and the newer math functions remain |
+| External stylesheets (`css.queries` step 2) | Complete: `<link rel=stylesheet>` and `@import` over a policy-owning fetcher with budgets and cycle refusal; `dump-style` loads local files beside the document only; non-UTF-8 sheets (TD-28) and layer/supports imports remain |
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |
 

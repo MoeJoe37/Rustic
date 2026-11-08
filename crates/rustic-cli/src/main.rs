@@ -6,8 +6,10 @@ use std::process::ExitCode;
 use rustic_base::{CancellationToken, EscapedText};
 use rustic_engine::Viewport;
 use rustic_html::ParsedDocument;
+use std::path::Path;
 
 mod loader;
+mod stylesheets;
 
 use loader::{LoadError, LoaderLimits};
 
@@ -21,9 +23,11 @@ Usage:
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
 prints a deterministic DOM tree dump. dump-style loads the file the same way,
-applies the HTML user-agent stylesheet and the document's <style> elements
-(external stylesheets are never fetched) and prints each element's computed
-style for a 1280x720 viewport. URLs are rejected.
+applies the HTML user-agent stylesheet, the document's <style> elements and
+its <link rel=stylesheet> and @import sheets, and prints each element's
+computed style for a 1280x720 viewport. Linked and imported sheets load only
+from files in the document's directory or below it; network URLs and paths
+outside it are blocked. URLs are rejected as the file argument.
 
 Options for both commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
@@ -33,7 +37,12 @@ Options for both commands (positive integers; exceeding any limit except
   --max-nodes N          document nodes, including the root (default 100000)
   --max-depth N          element nesting depth (default 256)
   --max-diagnostics N    retained tokenizer and tree recoveries, each; later
-                         recoveries are counted, not fatal (default 1024)";
+                         recoveries are counted, not fatal (default 1024)
+
+Options for dump-style only (exceeding one skips the sheet, never fatal):
+  --max-stylesheets N       linked and imported sheets fetched (default 64)
+  --max-stylesheet-bytes N  total bytes of those sheets (default 8388608)
+  --max-import-depth N      @import nesting (default 16)";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -73,7 +82,7 @@ fn main() -> ExitCode {
 fn dump_command(
     command: &str,
     args: &[OsString],
-    dump: fn(&ParsedDocument, usize) -> Result<String, LoadError>,
+    dump: fn(&ParsedDocument, &Path, LoaderLimits) -> Result<String, LoadError>,
 ) -> ExitCode {
     let (limits, path) = match parse_dump_args(args) {
         Ok(parsed) => parsed,
@@ -90,7 +99,7 @@ fn dump_command(
         }
     };
     let result = loader::load_document(&path, limits, CancellationToken::default())
-        .and_then(|parsed| dump(&parsed, limits.max_dump_bytes));
+        .and_then(|parsed| dump(&parsed, &path, limits));
     match result {
         Ok(dump) => {
             let mut stdout = io::stdout().lock();
@@ -137,6 +146,9 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
                 Some("--chunk-bytes") => Some(&mut limits.read_chunk_bytes),
                 Some("--max-nodes") => Some(&mut limits.parser.document.max_nodes),
                 Some("--max-depth") => Some(&mut limits.parser.document.max_depth),
+                Some("--max-stylesheets") => Some(&mut limits.stylesheets.max_sheets),
+                Some("--max-stylesheet-bytes") => Some(&mut limits.stylesheets.max_total_bytes),
+                Some("--max-import-depth") => Some(&mut limits.stylesheets.max_import_depth),
                 Some("--max-diagnostics") => {
                     Some(diagnostics.insert(limits.parser.max_tree_diagnostics))
                 }

@@ -15,7 +15,7 @@ FIELDS = (
     "href", "protocol", "username", "password", "host", "hostname", "port",
     "pathname", "search", "hash",
 )
-POLICY = "ascii-input-and-base-without-file-blob-or-percent-encoded-non-ascii-v1"
+POLICY = "ascii-input-and-base-without-blob-or-percent-encoded-non-ascii-v2"
 
 
 def exclusion(value: str) -> str | None:
@@ -28,8 +28,8 @@ def exclusion(value: str) -> str | None:
     cleaned = value.strip("".join(chr(code) for code in range(33)))
     cleaned = cleaned.replace("\t", "").replace("\r", "").replace("\n", "")
     match = re.match(r"([a-zA-Z][a-zA-Z0-9+.-]*):", cleaned)
-    if match and match.group(1).lower() in {"file", "blob"}:
-        return "file_or_blob"
+    if match and match.group(1).lower() == "blob":
+        return "blob"
     return None
 
 
@@ -112,7 +112,7 @@ def generate(source: bytes, revision: str) -> tuple[str, str]:
         "exclusion_reasons": excluded,
         "selected_array_indices": indices,
         "checked_fields": list(FIELDS) + ["origin when supplied upstream"],
-        "not_checked": ["URLSearchParams", "setters", "validation-error diagnostics", "legacy query encodings"],
+        "not_checked": ["URLSearchParams", "setters", "validation-error diagnostics (upstream records none)", "legacy query encodings"],
         "license": "BSD-3-Clause; WPT-LICENSE.md",
     }
     return rust, json.dumps(manifest, indent=2, sort_keys=True) + "\n"

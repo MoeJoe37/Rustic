@@ -267,8 +267,19 @@
           "label": "File URL and platform rules",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/parser.rs",
+              "marker": "fn file_host"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/url.rs",
+              "marker": "file_urls_follow_drive_letter_host_and_localhost_rules"
+            }
+          ]
         },
         {
           "id": "url.blob",
@@ -307,8 +318,19 @@
           "label": "Validation-error diagnostics and source locations",
           "size": 1,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/diagnostics.rs",
+              "marker": "pub enum ValidationError"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/diagnostics.rs",
+              "marker": "failures_name_the_standard_error_and_location"
+            }
+          ]
         },
         {
           "id": "url.policy",

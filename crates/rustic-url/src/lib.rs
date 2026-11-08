@@ -1,8 +1,10 @@
 //! Original URL parsing and origin records for Rustic.
 //!
-//! Supports special network schemes with ASCII domains, IPv4/IPv6, generic
-//! hierarchical URLs and opaque paths. File/blob URLs, Unicode IDNA processing,
-//! legacy query encodings and URL setters are not implemented. Parsing does not
+//! Supports special network schemes with ASCII domains, IPv4/IPv6, `file:` URLs
+//! with Windows drive-letter rules, generic hierarchical URLs and opaque paths.
+//! [`UrlParser::parse_with_diagnostics`] also reports standard validation errors
+//! with byte offsets. Blob URLs, Unicode IDNA processing, legacy query encodings
+//! and URL setters are not implemented. Parsing does not touch the file system,
 //! load resources, authorize navigation, or assign a document's inherited origin.
 //!
 //! ```
@@ -16,6 +18,7 @@
 
 #![warn(missing_docs)]
 
+mod diagnostics;
 mod encoding;
 mod error;
 mod host;
@@ -25,6 +28,7 @@ mod origin;
 mod parser;
 mod record;
 
+pub use diagnostics::{Diagnostic, MAX_DIAGNOSTICS, ParseReport, ValidationError};
 pub use error::ParseError;
 pub use host::Host;
 pub use origin::Origin;

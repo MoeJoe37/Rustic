@@ -10,7 +10,7 @@ use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
     ParseError, Token,
 };
-use rustic_url::Url;
+use rustic_url::{Url, UrlParser};
 
 use crate::fingerprint;
 
@@ -374,6 +374,8 @@ const URL_BASES: &[&str] = &[
     "non-spec:/a/b",
     "sc://host/path",
     "data:text/plain,opaque",
+    "file:///C:/dir/file?q",
+    "file://server/share/doc",
 ];
 
 impl Target for UrlTarget {
@@ -426,8 +428,25 @@ impl Target for UrlTarget {
             .iter()
             .map(|base| Url::parse(base, None).expect("pinned base parses"))
             .collect();
-        let mut results = vec![Url::parse(&text, None)];
-        results.extend(bases.iter().map(|base| Url::parse(&text, Some(base))));
+        let parser = UrlParser::default();
+        let mut results = Vec::new();
+        for base in std::iter::once(None).chain(bases.iter().map(Some)) {
+            let report = parser.parse_with_diagnostics(&text, base);
+            let plain = Url::parse(&text, base);
+            if report.result() != plain.as_ref().map_err(|error| *error) {
+                return Err("diagnostic parsing changed the result".into());
+            }
+            for diagnostic in report.diagnostics() {
+                if !text.is_char_boundary(diagnostic.offset()) {
+                    return Err(format!(
+                        "{} offset {} is not a char boundary of the input",
+                        diagnostic.kind(),
+                        diagnostic.offset()
+                    ));
+                }
+            }
+            results.push(plain);
+        }
         for url in results.into_iter().flatten() {
             let serialized = url.serialize();
             let reparsed = Url::parse(&serialized, None).map_err(|error| {

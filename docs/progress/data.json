@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "8020a441dc46d913b12a144943a85760984ba6a90df77ee57379d33d027888d3",
-  "percent": "9.79",
-  "verified_percent": "9.79",
+  "source_fingerprint": "003bb9ad2f469bc0a045a738c1fb1ae005598477819fca75621119a550743c5f",
+  "percent": "10.09",
+  "verified_percent": "10.09",
   "partial_percent": "0.00",
-  "completed": 24,
+  "completed": 26,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -15,10 +15,10 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 24,
+      "completed": 26,
       "total": 28,
-      "percent": "86.84",
-      "verified_percent": "86.84",
+      "percent": "89.51",
+      "verified_percent": "89.51",
       "partial_percent": "0.00"
     },
     {
@@ -367,9 +367,20 @@
           "label": "File URL and platform rules",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/parser.rs",
+              "marker": "fn file_host"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/url.rs",
+              "marker": "file_urls_follow_drive_letter_host_and_localhost_rules"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.20"
         },
         {
@@ -417,9 +428,20 @@
           "label": "Validation-error diagnostics and source locations",
           "size": 1,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/diagnostics.rs",
+              "marker": "pub enum ValidationError"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/diagnostics.rs",
+              "marker": "failures_name_the_standard_error_and_location"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.10"
         },
         {
@@ -444,12 +466,12 @@
         }
       ],
       "points": 30,
-      "completed": 3,
+      "completed": 5,
       "in_progress": 0,
       "total": 12,
-      "contribution": "0.70",
-      "percent": "23.33",
-      "verified_percent": "23.33",
+      "contribution": "1.00",
+      "percent": "33.33",
+      "verified_percent": "33.33",
       "partial_percent": "0.00"
     },
     {

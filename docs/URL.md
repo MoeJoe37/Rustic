@@ -16,6 +16,11 @@ Implemented in the initial DOC-02a slice:
 - Original short-form decimal/octal/hex IPv4 parsing and original IPv6 parsing/
   canonical compression, including strict dotted IPv4 tails inside IPv6.
 - Generic non-special hierarchical URLs, opaque hosts and opaque paths.
+- `file:` URLs (DOC-02b): empty and `localhost` hosts, UNC-style hosts, Windows
+  drive letters (`C|` normalized to `C:`, drive letters in the host position,
+  `..` never removing a lone drive letter) and resolution against file bases.
+- Validation-error diagnostics (DOC-02b) through `UrlParser::parse_with_diagnostics`,
+  using the standard's error names and byte offsets into the original input.
 - Relative references, same-scheme special references, authority replacement,
   encoded dot-segment recovery and special-scheme backslash behavior.
 - C0/space trimming, ASCII tab/newline preprocessing and component-specific UTF-8 percent encoding.
@@ -30,17 +35,57 @@ origin derivation. This is a partial implementation, not full URL conformance.
 
 ## Boundaries and pending work
 
-`file:` and `blob:` return explicit unsupported errors. Special URLs requiring
+`blob:` returns an explicit unsupported error. Special URLs requiring
 Unicode IDNA processing also return an unsupported error, with no guessed host
 or fallback authority. ASCII A-labels are processed under the reviewed standard's
 non-strict ASCII-domain behavior. Unicode paths/queries/fragments use UTF-8 percent
 encoding; non-special opaque hosts do not use IDNA.
 
-Pending: reviewed Unicode IDNA/data adapter, file/platform rules, blob registry
-and origin rules, validation-error diagnostics, legacy document query encodings,
+Pending: reviewed Unicode IDNA/data adapter, blob registry and origin rules,
+legacy document query encodings,
 URL setters and URLSearchParams. There is no public browser `URL` binding yet.
 Successful parsing does not mean a scheme is navigable, secure, allowed by policy,
 or supported by the future network service. FTP syntax support is not an FTP client.
+
+## File URLs
+
+File URLs follow the standard's file, file slash and file host states. The
+rules are the same on every platform: a Windows drive letter is recognized on
+Linux, macOS, Android and iOS too, because the URL Standard defines the syntax
+independently of the host OS. Parsing never touches the file system. A file URL
+always has a host, which is empty for local files; `localhost` becomes empty,
+any other host (including IPv4/IPv6) is kept, as in `file://server/share`.
+Relative references use only a `file:` base; a drive letter at the start of a
+reference replaces the whole base path, and `/path` keeps the base's drive.
+
+`Url::origin()` returns a fresh opaque origin for file URLs. The standard leaves
+this implementation-defined, and opaque is the restrictive choice: two local
+files are never same-origin by URL alone. Converting a file URL to a native path
+(UNC shares, drive letters, percent-decoding to the OS encoding, Android content
+providers or iOS sandboxes) is not URL parsing. It belongs to a later loader or
+platform layer, which must apply its own access policy; the local `dump-dom`
+loader still accepts paths, not file URLs.
+
+## Validation diagnostics
+
+`UrlParser::parse_with_diagnostics` returns a `ParseReport` holding exactly the
+result `parse` would return plus `Diagnostic` values (a `ValidationError` kind and
+a byte offset). Offsets index the original input before trimming and tab/newline
+removal and are always on `char` boundaries. Errors detected inside a host
+(IPv4, IPv6, forbidden code points) point at the start of that host. At most
+`MAX_DIAGNOSTICS` (64) are kept; `truncated()` reports any overflow. Diagnostics
+contain no input text, so they are safe to log; `ValidationError::name()` gives
+the standard's name, such as `invalid-URL-unit`.
+
+Reported kinds cover the URL parser (`invalid-URL-unit`, slash and reverse-solidus
+errors, `invalid-credentials`, `host-missing`, port errors, missing scheme and both
+file drive-letter errors), opaque and domain host code points, every IPv4 and IPv6
+error, and `domain-to-ASCII` when percent-decoded host bytes are not UTF-8. The
+remaining IDNA errors (`domain-to-ASCII` from IDNA processing, `domain-to-Unicode`)
+arrive with the IDNA adapter; the enum is non-exhaustive for that reason. Every
+expected failure in the pinned WPT subset produces at least one diagnostic.
+Upstream data records no expected validation errors, so kinds and offsets are
+pinned by Rustic's own tests in `tests/diagnostics.rs`, not by WPT.
 
 ## Usage and origin identity
 
@@ -90,12 +135,13 @@ components; it is not a watchdog or an interrupt for allocation.
 | Module | Responsibility |
 | --- | --- |
 | `record` | Immutable representation, accessors, URL/path serialization and safe debug output |
-| `parser` | Scheme/authority/path/reference orchestration, limits and checkpoints |
+| `parser` | Scheme/authority/path/file/reference orchestration, diagnostics, limits and checkpoints |
 | `host` | Domain/opaque/address host representation and host validation |
 | `ipv4` / `ipv6` | Address algorithms and IPv6 canonical serialization |
 | `encoding` | Component percent-encode sets and host percent decoding |
 | `origin` | Tuple keys, opaque identity, equality/hashing and serialization |
 | `error` | Input-independent errors and explicit unsupported features |
+| `diagnostics` | Validation-error kinds, offsets and the bounded parse report |
 
 Run the offline example:
 
@@ -105,26 +151,27 @@ cargo run --locked -p rustic-url --example resolve
 
 ## Pinned upstream evidence
 
-The offline integration test runs **685 selected cases** from the 899 test records
+The offline integration test runs **815 selected cases** from the 899 test records
 in WPT's `url/resources/urltestdata.json` at
 [revision 8c17bfeb3e66a2986be16b0e004f85ace68db647](https://github.com/web-platform-tests/wpt/blob/8c17bfeb3e66a2986be16b0e004f85ace68db647/url/resources/urltestdata.json).
 The fixed selection rule is defined before running Rustic: ASCII input/base,
-excluding file/blob schemes and percent-encoded non-ASCII octets in any component.
+excluding the blob scheme and percent-encoded non-ASCII octets in any component.
+File cases joined the selection with DOC-02b (policy v2); all 130 pass.
 The last rule is intentionally conservative and excludes some otherwise-supported
 encoded paths to keep this subset independent of IDNA.
 
 | Count | Meaning |
 | --- | --- |
 | 899 | All upstream test records; section-description strings are not cases |
-| 685 | Selected and executed with no unexpected failures |
-| 443 | Expected successful parses checked field by field and reparsed for record stability |
-| 242 | Expected parse rejections |
-| 214 | Excluded: 142 file/blob, 56 non-ASCII input/base, 16 encoded non-ASCII |
+| 815 | Selected and executed with no unexpected failures |
+| 564 | Expected successful parses checked field by field and reparsed for record stability |
+| 251 | Expected parse rejections, each also checked to produce a diagnostic |
+| 84 | Excluded: 12 blob, 56 non-ASCII input/base, 16 encoded non-ASCII |
 
 Every successful selected case checks href, protocol, username/password, host,
 hostname, port, pathname, search and hash, plus origin where supplied upstream.
 This does not execute URLSearchParams expectations, setters, legacy encodings,
-other WPT files or a full browser WPT harness. The 685-case result is a declared
+other WPT files or a full browser WPT harness. The 815-case result is a declared
 subset, not a whole-suite pass percentage. Crashes or unexpected errors fail it;
 cases are not dynamically skipped based on Rustic's results.
 

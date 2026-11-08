@@ -1,39 +1,59 @@
 use std::fmt::Write;
 
-use crate::ParseError;
+use crate::{ParseError, ValidationError};
 
 pub(crate) fn parse(input: &str) -> Result<[u16; 8], ParseError> {
+    analyze(input).map_err(|_| ParseError::InvalidIpv6)
+}
+
+/// The IPv6 parser, naming the standard validation error for each failure.
+pub(crate) fn analyze(input: &str) -> Result<[u16; 8], ValidationError> {
     let mut address = [0; 8];
     if let Some((left, right)) = input.split_once("::") {
-        if right.contains("::") {
-            return Err(ParseError::InvalidIpv6);
+        if right.contains("::") || right.starts_with(':') {
+            return Err(ValidationError::Ipv6MultipleCompression);
         }
         let mut tail = [0; 8];
         let head_len = pieces(left, &mut address, false)?;
         let tail_len = pieces(right, &mut tail, true)?;
         if head_len + tail_len >= 8 {
-            return Err(ParseError::InvalidIpv6);
+            return Err(ValidationError::Ipv6TooManyPieces);
         }
         address[8 - tail_len..].copy_from_slice(&tail[..tail_len]);
     } else if input.is_empty() || pieces(input, &mut address, true)? != 8 {
-        return Err(ParseError::InvalidIpv6);
+        return Err(ValidationError::Ipv6TooFewPieces);
     }
     Ok(address)
 }
 
-fn pieces(input: &str, output: &mut [u16; 8], allow_ipv4: bool) -> Result<usize, ParseError> {
+fn pieces(input: &str, output: &mut [u16; 8], allow_ipv4: bool) -> Result<usize, ValidationError> {
+    use ValidationError::{
+        Ipv4InIpv6InvalidCodePoint, Ipv4InIpv6OutOfRangePart, Ipv4InIpv6TooFewParts,
+        Ipv4InIpv6TooManyPieces, Ipv6InvalidCodePoint, Ipv6InvalidCompression, Ipv6TooManyPieces,
+    };
     if input.is_empty() {
         return Ok(0);
     }
     let mut count = 0;
     let mut parts = input.split(':').peekable();
     while let Some(part) = parts.next() {
-        if count >= 8 || part.is_empty() {
-            return Err(ParseError::InvalidIpv6);
+        if count >= 8 {
+            return Err(Ipv6TooManyPieces);
+        }
+        if part.is_empty() {
+            // Only a leading or trailing empty part survives the `::` split.
+            return Err(if count == 0 {
+                Ipv6InvalidCompression
+            } else {
+                Ipv6InvalidCodePoint
+            });
         }
         if part.contains('.') {
-            if !allow_ipv4 || parts.peek().is_some() || count > 6 {
-                return Err(ParseError::InvalidIpv6);
+            if !allow_ipv4 || parts.peek().is_some() {
+                return Err(Ipv4InIpv6InvalidCodePoint);
+            }
+            if count > 6 {
+                return Err(Ipv4InIpv6TooManyPieces);
             }
             let mut bytes = [0u8; 4];
             let mut byte_count = 0;
@@ -43,22 +63,24 @@ fn pieces(input: &str, output: &mut [u16; 8], allow_ipv4: bool) -> Result<usize,
                     || (decimal.len() > 1 && decimal.starts_with('0'))
                     || !decimal.bytes().all(|byte| byte.is_ascii_digit())
                 {
-                    return Err(ParseError::InvalidIpv6);
+                    return Err(Ipv4InIpv6InvalidCodePoint);
                 }
-                bytes[byte_count] = decimal.parse::<u8>().map_err(|_| ParseError::InvalidIpv6)?;
+                bytes[byte_count] = decimal
+                    .parse::<u8>()
+                    .map_err(|_| Ipv4InIpv6OutOfRangePart)?;
                 byte_count += 1;
             }
             if byte_count != 4 {
-                return Err(ParseError::InvalidIpv6);
+                return Err(Ipv4InIpv6TooFewParts);
             }
             output[count] = u16::from_be_bytes([bytes[0], bytes[1]]);
             output[count + 1] = u16::from_be_bytes([bytes[2], bytes[3]]);
             count += 2;
         } else {
             if part.len() > 4 || !part.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                return Err(ParseError::InvalidIpv6);
+                return Err(Ipv6InvalidCodePoint);
             }
-            output[count] = u16::from_str_radix(part, 16).map_err(|_| ParseError::InvalidIpv6)?;
+            output[count] = u16::from_str_radix(part, 16).map_err(|_| Ipv6InvalidCodePoint)?;
             count += 1;
         }
     }

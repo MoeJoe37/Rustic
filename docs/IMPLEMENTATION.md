@@ -180,6 +180,8 @@ explicit unsupported errors. Limits and cooperative cancellation are integrated;
 the supplied base is immutable even on failure. Debug/error output omits userinfo
 and private URL payloads.
 
+DOC-02b adds `file:` URLs and validation-error diagnostics; see the section below.
+
 Tuple origins compare canonical scheme/host/port. Opaque origins have unique
 process-local identity; `null` is never compared as authority. Each URL-origin
 derivation for a non-tuple URL is fresh, while cloning an assigned `Origin`
@@ -193,6 +195,25 @@ upstream records: 443 positive, 242 negative, 214 excluded. The exact revision,
 source/generated digests, indices, license, selection rules and untested fields
 are recorded; this is not whole-WPT or complete URL conformance. See [URL.md](URL.md)
 for contracts, evidence and the runnable `resolve` example.
+
+## DOC-02b — File URLs and URL validation diagnostics
+
+`rustic-url` now parses `file:` URLs with the standard's file, file slash and file
+host states: empty/`localhost` hosts, UNC-style hosts, Windows drive letters
+(including `C|` and drive letters in the host position) and resolution against
+file bases. The rules are platform-independent; parsing does not touch the file
+system, and file URLs get a fresh opaque origin. `ParseError::UnsupportedFile` is
+gone. Native path conversion and access policy remain loader/platform work.
+
+`UrlParser::parse_with_diagnostics` returns the unchanged parse result plus up to
+64 standard-named validation errors with byte offsets into the original input,
+covering the URL parser, host code points and all IPv4/IPv6 errors. IDNA-specific
+errors arrive with the IDNA adapter.
+
+Evidence: the pinned WPT subset grows from 685 to 815 cases (all 130 file cases
+pass, 84 excluded), every expected failure there yields a diagnostic, two new
+file tests and eight diagnostics tests in `rustic-url`, and the URL fuzz target
+now also uses file bases and checks diagnostic offsets and result equality.
 
 ## DOC-05a — Incremental HTML input, tag and declaration states
 
@@ -454,7 +475,8 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |
 | DOC-04c: node kinds, cloning, adoption and lifecycle | Complete: general fragments, PI/CDATA, clone, cross-document adoption with ID maps, `ReadyState`; mutation records pending |
-| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
+| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA and blob remain pending |
+| DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 815-case WPT subset, standard-named diagnostics with offsets |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |

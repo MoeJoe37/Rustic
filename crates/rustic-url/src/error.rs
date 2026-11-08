@@ -2,8 +2,9 @@ use std::fmt;
 
 /// A failed parse or an explicitly unsupported portion of the URL standard.
 ///
-/// Errors do not echo input, credentials or private paths. Validation errors
-/// with specified recovery are not currently exposed as separate diagnostics.
+/// Errors do not echo input, credentials or private paths. Use
+/// [`crate::UrlParser::parse_with_diagnostics`] for standard validation-error
+/// names and source offsets, including errors with specified recovery.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParseError {
     /// The input lacks a scheme and no usable base was supplied.
@@ -20,8 +21,6 @@ pub enum ParseError {
     InvalidPort,
     /// Unicode domain processing needs the future reviewed IDNA adapter.
     UnsupportedIdna,
-    /// File URL parsing and platform-specific rules are not implemented.
-    UnsupportedFile,
     /// Blob URL registry and origin rules are not implemented.
     UnsupportedBlob,
     /// Input, serialized output or stored path segments exceed configured limits.
@@ -40,7 +39,6 @@ impl fmt::Display for ParseError {
             Self::InvalidIpv6 => "invalid URL IPv6 address",
             Self::InvalidPort => "invalid URL port",
             Self::UnsupportedIdna => "Unicode domain processing is not implemented",
-            Self::UnsupportedFile => "file URLs are not implemented",
             Self::UnsupportedBlob => "blob URLs are not implemented",
             Self::LimitExceeded => "URL resource limit exceeded",
             Self::Cancelled => "URL parsing cancelled",

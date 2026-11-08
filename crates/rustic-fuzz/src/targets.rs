@@ -6,11 +6,14 @@
 //! same check from its bytes alone.
 
 use rustic_base::CancellationToken;
-use rustic_css::{BlockItem, CssParser, Rule, parse_block_contents};
+use rustic_css::{
+    BlockItem, CssParser, NamespaceMap, Parsed, Rule, SelectorList, parse_block_contents,
+};
 use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
     ParseError, Token,
 };
+use rustic_style::{MatchContext, query_selector_all};
 use rustic_url::{Url, UrlParser};
 
 use crate::fingerprint;
@@ -34,6 +37,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(HtmlDocumentTarget),
         Box::new(HtmlFragmentTarget),
         Box::new(CssTarget),
+        Box::new(CssSelectorTarget),
         Box::new(UrlTarget),
     ]
 }
@@ -577,6 +581,148 @@ impl Target for UrlTarget {
             }
             let _ = url.origin().serialize();
             let _ = format!("{url:?}");
+        }
+        Ok(())
+    }
+}
+
+/// Selector parsing, serialization and matching (`rustic-css` selectors and
+/// `rustic-style`).
+///
+/// Invariants: a valid selector list serializes to a fixed point with the
+/// same specificities, and the reparsed list selects exactly the same
+/// elements of a fixed document, in HTML, quirks and XML matching modes.
+pub struct CssSelectorTarget;
+
+const SELECTOR_DOCUMENT: &[u8] = b"<!doctype html><ul id=list class='a B'>\
+<li id=one class=x lang=en-US>1<li class='x y'><!--c--><li title='Hello World'>\
+<li><a href=/x id=link>l</a><li></ul><p id=Odd data-v=Abc><b></b><i></i><b></b></p>\
+<svg viewBox='0 0 1 1'><foreignObject><p></p></foreignObject><rect/></svg>\
+<table><tr><td>cell</td></tr></table><input type=TEXT>";
+
+fn select_all(
+    document: &rustic_dom::Document,
+    list: &SelectorList,
+) -> Vec<Vec<rustic_base::NodeId>> {
+    let mut quirks = MatchContext::html();
+    quirks.quirks = true;
+    [MatchContext::html(), quirks, MatchContext::xml()]
+        .iter()
+        .map(|cx| query_selector_all(document, document.root(), list, cx).unwrap_or_default())
+        .collect()
+}
+
+impl Target for CssSelectorTarget {
+    fn name(&self) -> &'static str {
+        "css-selector"
+    }
+
+    fn max_len(&self) -> usize {
+        1024
+    }
+
+    fn dictionary(&self) -> &'static [&'static [u8]] {
+        &[
+            b"*",
+            b"|",
+            b"*|",
+            b"svg|",
+            b"#",
+            b".",
+            b"[",
+            b"]",
+            b"=",
+            b"~=",
+            b"|=",
+            b"^=",
+            b"$=",
+            b"*=",
+            b" i]",
+            b" s]",
+            b"'",
+            b"\\",
+            b"\\31 ",
+            b" ",
+            b">",
+            b"+",
+            b"~",
+            b",",
+            b":",
+            b"::",
+            b"(",
+            b")",
+            b":is(",
+            b":where(",
+            b":not(",
+            b":nth-child(",
+            b":nth-last-of-type(",
+            b" of ",
+            b"2n+1",
+            b"-n+3",
+            b"odd",
+            b"even",
+            b":root",
+            b":empty",
+            b":scope",
+            b":first-child",
+            b":only-of-type",
+            b":any-link",
+            b":hover",
+            b"::before",
+            b":first-line",
+            b"li",
+            b"p",
+            b"rect",
+            b"foreignObject",
+            b"&",
+            b"||",
+            b"/**/",
+        ]
+    }
+
+    fn check(&self, input: &[u8]) -> Result<(), String> {
+        let text = String::from_utf8_lossy(input);
+        let namespaces = NamespaceMap::new().with_prefix("svg", "http://www.w3.org/2000/svg");
+        let parser = CssParser::default();
+        let Ok(parsed) = parser.selector_list(&text, &namespaces) else {
+            return Ok(()); // A resource limit is a legitimate outcome.
+        };
+        let Ok(list) = parsed.value else {
+            return Ok(());
+        };
+        let serialized = list.to_string();
+        let reparsed = match parser.selector_list(&serialized, &namespaces) {
+            Ok(Parsed {
+                value: Ok(list), ..
+            }) => list,
+            other => {
+                return Err(format!(
+                    "serialization {serialized:?} does not reparse: {other:?}"
+                ));
+            }
+        };
+        if reparsed.to_string() != serialized {
+            return Err(format!(
+                "serialization {serialized:?} is not a fixed point: {reparsed}"
+            ));
+        }
+        let specificities = |l: &SelectorList| {
+            l.selectors()
+                .iter()
+                .map(|s| s.specificity())
+                .collect::<Vec<_>>()
+        };
+        if specificities(&list) != specificities(&reparsed) {
+            return Err(format!("specificity changed through {serialized:?}"));
+        }
+        let mut document = HtmlDocumentParser::default();
+        document
+            .feed(SELECTOR_DOCUMENT)
+            .map_err(|e| format!("fixture: {e}"))?;
+        let document = document.finish().map_err(|e| format!("fixture: {e}"))?;
+        let document = document.document();
+        if select_all(document, &list) != select_all(document, &reparsed) {
+            return Err(format!("matching changed through {serialized:?}"));
         }
         Ok(())
     }

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 11.96%** = 11.96% verified complete + 0.00% partial credit. 29/172 capabilities complete, 0 in progress.
+**Overall completion: 12.83%** = 11.96% verified complete + 0.87% partial credit. 29/172 capabilities complete, 1 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `93fef760181d29eb2ac1f5b64d446098fdaf9d93516a8939cc6b6a2e322a4225`.
+Catalog: `engine-v3`. Source fingerprint: `6b50dce419d6d2f427ea873f0f6f70ee58aaf9049f307b479ba19a6ddeae49cf`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `93fef760181d29eb2ac1f5b64d446098fdaf9
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 1/8 | 7.69% | 7.69% | 9.00% |
+| M2 CSS & computed style | 1/8 | 17.30% | 7.69% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `93fef760181d29eb2ac1f5b64d446098fdaf9
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 0 | 52.94% | 52.94% | 6% | 3.17 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 1/8 | 0 | 7.69% | 7.69% | 9% | 0.69 |
+| CSS & style | 1/8 | 1 | 17.30% | 7.69% | 9% | 1.55 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -106,7 +106,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 ### CSS & style
 
 - **complete** `css.syntax` — CSS tokenizer/parser and recovery · size 3 · M2 · 0.69% of engine ([source](../../crates/rustic-css/src/tokenizer.rs), [source](../../crates/rustic-css/src/rules.rs), [source](../../tools/import_css_tests.py), [test](../../crates/rustic-css/tests/corpus.rs), [test](../../crates/rustic-css/tests/syntax.rs))
-- **planned** `css.selectors` — Required selectors and specificity · size 5 · M2 · 1.15% of engine
+- **in progress 75.00%** `css.selectors` — Required selectors and specificity · size 5 · M2 · 1.15% of engine
+  - [x] Selector syntax, specificity and CSSOM serialization (CSS-02 subset) ([source](../../crates/rustic-css/src/selector.rs), [test](../../crates/rustic-css/tests/selectors.rs))
+  - [x] An+B microsyntax (pinned css-parsing-tests An+B.json) ([source](../../crates/rustic-css/src/anb.rs), [test](../../crates/rustic-css/tests/an_plus_b.rs))
+  - [x] Selector matching over the DOM with HTML/quirks/XML case rules ([source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/matching.rs))
+  - [ ] Remaining required selectors: :has(), form-state, :lang()/:dir(), nesting & and pseudo-element states (CSS-07)
 - **planned** `css.properties` — Typed property grammar and supported property catalog · size 8 · M2 · 1.84% of engine
 - **planned** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine
 - **planned** `css.values` — Computed values, variables and cycle handling · size 5 · M2 · 1.15% of engine

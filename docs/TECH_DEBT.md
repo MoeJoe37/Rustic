@@ -67,6 +67,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
+| TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Open, pay with CSS-05 restyle |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -304,3 +305,14 @@ When reviewing a merge, check each new shortcut against the rules above. Add a
 ledger entry for deliberate debt in the same change that takes it, mark entries
 **Paid** with the paying change rather than deleting them, and keep the summary
 table in sync with the sections.
+
+### TD-20 — `:nth-*` matching recounts siblings on every test
+
+`rustic-style` (CSS-02) computes an element's position for `:nth-child()`,
+`:nth-of-type()` and their `last` forms by walking its siblings on every test,
+and `of S` re-matches `S` against each sibling. Matching every element of a
+parent with *n* children against such a selector is therefore O(*n*²), which
+is fine for the reference matcher and tests but not for full restyles of large
+lists. **Pay:** cache sibling indices per parent for the duration of a restyle
+(as browsers do) and reuse them across selectors. **Trigger:** CSS-05 full
+restyle, or a measured slowdown on a page with large sibling lists.

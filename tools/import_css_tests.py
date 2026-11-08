@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Vendor and verify the pinned CSS syntax parsing corpus, offline.
 
-The corpus is SimonSapin/css-parsing-tests (CC0-1.0). Only the CSS Syntax
-entry-point files are vendored; colour, An+B and byte-stream files belong to
-later tasks. Files are copied byte for byte; the Rust runner reads them.
+The corpus is SimonSapin/css-parsing-tests (CC0-1.0). The CSS Syntax
+entry-point files and the An+B microsyntax file are vendored; colour and
+byte-stream files belong to later tasks. Files are copied byte for byte; the Rust runner reads them.
 """
 
 import argparse
@@ -26,6 +26,7 @@ SUITE_FILES = (
     "one_rule.json",
     "rule_list.json",
     "stylesheet.json",
+    "An+B.json",
 )
 NOTICE = "LICENSE"
 

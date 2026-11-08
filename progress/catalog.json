@@ -894,8 +894,63 @@
           "label": "Required selectors and specificity",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Selector syntax, specificity and CSSOM serialization (CSS-02 subset)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/selector.rs",
+                  "marker": "pub fn parse_selector_list"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/selectors.rs",
+                  "marker": "fn valid_selectors_serialize_and_have_spec_specificity"
+                }
+              ]
+            },
+            {
+              "label": "An+B microsyntax (pinned css-parsing-tests An+B.json)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/anb.rs",
+                  "marker": "pub fn parse_an_plus_b"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/an_plus_b.rs",
+                  "marker": "fn pinned_an_plus_b_corpus_matches"
+                }
+              ]
+            },
+            {
+              "label": "Selector matching over the DOM with HTML/quirks/XML case rules",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/matching.rs",
+                  "marker": "pub fn matches_complex"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/matching.rs",
+                  "marker": "fn simple_selectors_and_case_rules"
+                }
+              ]
+            },
+            {
+              "label": "Remaining required selectors: :has(), form-state, :lang()/:dir(), nesting & and pseudo-element states (CSS-07)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.properties",

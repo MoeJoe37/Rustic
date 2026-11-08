@@ -6,6 +6,7 @@ use crate::rules::{self, Cursor};
 use crate::tokenizer::{self, Diagnostics, SpannedToken};
 use crate::values;
 use crate::{BlockItem, CssError, Declaration, Diagnostic, DiagnosticKind, Rule, Value};
+use crate::{NamespaceMap, SelectorError, SelectorList, parse_selector_list};
 
 /// Independent budgets for one parse.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -193,6 +194,20 @@ impl CssParser {
             }
         };
         Ok(Self::finish(value, d))
+    }
+
+    /// Parse a selector list, such as `querySelectorAll`'s argument.
+    ///
+    /// The outer `Result` reports fatal limits; the inner one whether the
+    /// input is a valid selector list.
+    pub fn selector_list(
+        &self,
+        source: &str,
+        namespaces: &NamespaceMap,
+    ) -> Result<Parsed<Result<SelectorList, SelectorError>>, CssError> {
+        let mut d = self.diagnostics();
+        let values = self.values(source, &mut d)?;
+        Ok(Self::finish(parse_selector_list(&values, namespaces), d))
     }
 
     /// Parse a list of component values (§5.3.10).

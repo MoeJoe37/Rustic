@@ -1,0 +1,17 @@
+*
+li
+#list > li.x
+ul li + li ~ li
+[lang|=en], [title~=World], [data-v=abc i], [type=text s]
+[title^=Hell][title$=rld][title*='o W']
+svg|rect, svg|*, *|*, |li, [*|viewBox], [|id]
+:root > body :first-child
+li:nth-child(2n+1 of .x), li:nth-last-child(-n+2)
+p > :nth-of-type(2), p > :only-of-type, b:last-of-type
+:is(ul, p) > :where(.x, b):not(:nth-child(1))
+:not(:not(:is(li > a:any-link)))
+:empty, :scope, :link, :visited, :hover, :focus-within
+p::before, li:first-line, ::marker
+.\31 23, #-\33x, [a="q\"x"]
+foreignObject, foreignobject, FOREIGNOBJECT
+:is(), :is(::before, li), :where(!!, td)

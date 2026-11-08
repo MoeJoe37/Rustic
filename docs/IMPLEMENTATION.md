@@ -441,6 +441,7 @@ default budgets plus a differential invariant:
 | `html-document` | The same feed plans yield the same dump or the same `ParseError`; completed trees always dump; a fresh parser never reports a lifecycle error; a cancelled parser never completes | Same as above |
 | `html-fragment` | The same feed-plan equality for fragment parsing, with one of 28 HTML/SVG/MathML contexts chosen from the input's fingerprint (added with DOC-06c) | Same as above |
 | `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01) | Checked-in sheet plus the css-parsing-tests inputs |
+| `css-selector` | Every valid selector list serializes to a fixed point with equal specificities and selects the same elements of a fixed document in HTML, quirks and XML modes (added with CSS-02) | Checked-in selectors plus the pinned `An+B` inputs |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -516,8 +517,30 @@ unicode-range cases excluded, 1 documented 2021-vs-Nesting difference) after the
 adaptations listed in [CSS.md](CSS.md). Eight focused tests cover spans,
 escapes, recovery, numbers, nested blocks, exact limits, cancellation and entry
 point errors; a fifth fuzz target, `css`, checks span coverage and totality
-(300,000 executions, no failures). Byte-stream encoding, selectors, properties
-and the cascade are later CSS tasks.
+(300,000 executions, no failures). Byte-stream encoding, properties and the
+cascade are later CSS tasks.
+
+## CSS-02 — Selectors, specificity and matching
+
+`rustic-css` now parses Selectors Level 4 syntax from component values: type,
+universal, ID, class and attribute selectors (all operators, `i`/`s` flags and
+`@namespace` prefixes), the four combinators, the structural pseudo-classes
+including `:nth-child(An+B of S)`, `:is()`/`:where()` (forgiving) and `:not()`,
+`:scope`, the link and user-action pseudo-classes, and five pseudo-elements.
+Unsupported syntax (`:has()`, `&`, `||`, form-state pseudo-classes and others)
+is rejected with an error kind and span. Specificity follows Selectors 4, and
+CSSOM serialization is a tested fixed point. `parse_an_plus_b` implements the
+CSS Syntax microsyntax on tokens: all **128** pinned `An+B.json` cases pass.
+
+The new `rustic-style` crate matches selectors over an `ElementView` trait, with
+`DomElement` for `rustic-dom` documents and `query_selector_all`. Matching
+honors HTML-document case rules (including HTML's legacy case-insensitive
+attribute values), quirks-mode IDs and classes, XML documents and `:scope`. It
+runs right to left with an explicit stack and restart pruning, so neither long
+selectors nor deep descendant chains recurse or backtrack exponentially. A sixth
+fuzz target, `css-selector`, checks serialization and matching invariants
+(600,000 executions, no failures). `:nth-*` sibling counting is uncached
+(TD-20). See [CSS.md](CSS.md#selectors).
 
 ## Queue status
 
@@ -570,13 +593,14 @@ must keep all tiers green.
 | DOC-06d: `selectedcontent` mirroring | Done: last four known tree failures fixed; 1,776/1,776 runnable records |
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
-| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
+| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and six fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
+| CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
-failures. CSS-01 has started M2. Next: CSS-02 selectors and specificity, then
-CSS-03 typed property parsers. All project crates remain safe
+failures. M2 has CSS-01 and CSS-02 done. Next: CSS-03 typed property parsers,
+then CSS-04 cascade. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

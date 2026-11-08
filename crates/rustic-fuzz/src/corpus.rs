@@ -37,6 +37,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         "html" => seeds.extend(html5lib_data(root)?),
         "url" => seeds.extend(wpt_url_strings(root)?),
         "css" => seeds.extend(css_corpus_inputs(root)?),
+        "css-selector" => seeds.extend(selector_inputs(root)?),
         _ => {}
     }
     Ok(seeds)
@@ -77,6 +78,24 @@ fn css_corpus_inputs(root: &Path) -> io::Result<Vec<Vec<u8>>> {
                     seeds.push(value.into_bytes());
                 }
             }
+        }
+    }
+    Ok(seeds)
+}
+
+/// One selector per line of `corpus/css-selector/*.sel`, plus every pinned
+/// `An+B` input wrapped in `:nth-child()`.
+fn selector_inputs(root: &Path) -> io::Result<Vec<Vec<u8>>> {
+    let fuzz = root.join("crates/rustic-fuzz/corpus/css-selector");
+    let mut seeds = Vec::new();
+    for (_, bytes) in read_dir_inputs(&fuzz)? {
+        let source = String::from_utf8_lossy(&bytes);
+        seeds.extend(source.lines().map(|line| line.as_bytes().to_vec()));
+    }
+    let anb = root.join("crates/rustic-css/tests/fixtures/css-parsing-tests/An+B.json");
+    for line in fs::read_to_string(anb)?.lines() {
+        if let Some((value, _)) = line.strip_prefix('"').and_then(json_string_body) {
+            seeds.push(format!(":nth-child({value})").into_bytes());
         }
     }
     Ok(seeds)

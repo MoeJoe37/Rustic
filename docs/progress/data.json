@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "93fef760181d29eb2ac1f5b64d446098fdaf9d93516a8939cc6b6a2e322a4225",
-  "percent": "11.96",
+  "source_fingerprint": "6b50dce419d6d2f427ea873f0f6f70ee58aaf9049f307b479ba19a6ddeae49cf",
+  "percent": "12.83",
   "verified_percent": "11.96",
-  "partial_percent": "0.00",
+  "partial_percent": "0.87",
   "completed": 29,
-  "in_progress": 0,
+  "in_progress": 1,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 1,
       "total": 8,
-      "percent": "7.69",
+      "percent": "17.30",
       "verified_percent": "7.69",
-      "partial_percent": "0.00"
+      "partial_percent": "9.61"
     },
     {
       "id": "M3",
@@ -1076,9 +1076,64 @@
           "label": "Required selectors and specificity",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Selector syntax, specificity and CSSOM serialization (CSS-02 subset)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/selector.rs",
+                  "marker": "pub fn parse_selector_list"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/selectors.rs",
+                  "marker": "fn valid_selectors_serialize_and_have_spec_specificity"
+                }
+              ]
+            },
+            {
+              "label": "An+B microsyntax (pinned css-parsing-tests An+B.json)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/anb.rs",
+                  "marker": "pub fn parse_an_plus_b"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/an_plus_b.rs",
+                  "marker": "fn pinned_an_plus_b_corpus_matches"
+                }
+              ]
+            },
+            {
+              "label": "Selector matching over the DOM with HTML/quirks/XML case rules",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/matching.rs",
+                  "marker": "pub fn matches_complex"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/matching.rs",
+                  "marker": "fn simple_selectors_and_case_rules"
+                }
+              ]
+            },
+            {
+              "label": "Remaining required selectors: :has(), form-state, :lang()/:dir(), nesting & and pseudo-element states (CSS-07)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "1.15"
         },
         {
@@ -1144,12 +1199,12 @@
       ],
       "points": 39,
       "completed": 1,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 8,
-      "contribution": "0.69",
-      "percent": "7.69",
+      "contribution": "1.55",
+      "percent": "17.30",
       "verified_percent": "7.69",
-      "partial_percent": "0.00"
+      "partial_percent": "9.61"
     },
     {
       "id": "text",

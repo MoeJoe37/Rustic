@@ -57,7 +57,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-07 | Deliberate | Process | Progress bot commits to `main`, so `feature` drifts | Open |
 | TD-08 | Watch | Docs | Hard-coded corpus and test counts repeated across docs | Open, rule 8 |
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Open, pay with the engine facade |
-| TD-10 | Deliberate | HTML parser | Scripting-on, processing instructions and `selectedcontent` pending | Open, M1 queue |
+| TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, M1 queue |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, M1 queue |
 | TD-12 | Deliberate | CI / platforms | No native ARM or 32-bit test runs; mobile is check-only | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
@@ -173,14 +173,12 @@ with unrelated helpers. **Pay:** fill it with the engine facade (navigation,
 document lifecycle) or fold `Viewport` into its first real consumer.
 **Trigger:** the first host-facing engine API (M2).
 
-### TD-10 — Scripting-on, processing instructions and `selectedcontent` pending
+### TD-10 — Scripting-on and processing instructions pending
 
-Document and fragment parsing (DOC-06c) pass 1,772 of 1,776 runnable html5lib
-tree records. Sixteen records are skipped because they need scripting or
-processing-instruction nodes, and 4 are known failures that need
-`selectedcontent` mirroring. Each exclusion carries a reason in the corpus
-runner ([HTML_TREE.md](HTML_TREE.md)). Tracked as DOC-06d in the
-[roadmap](ROADMAP.md).
+Document and fragment parsing pass all 1,776 runnable html5lib tree records;
+DOC-06d paid the `selectedcontent` part (the 4 former known failures). Sixteen
+records are still skipped because they need scripting or processing-instruction
+nodes, each with a reason in the corpus runner ([HTML_TREE.md](HTML_TREE.md)).
 
 ### TD-11 — `blob:` URLs return unsupported
 

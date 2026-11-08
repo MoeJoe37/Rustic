@@ -337,9 +337,10 @@ progress cannot bypass these gates.
 These are issue-ready tasks, not GitHub issues created by this commit. Work in
 order. Status reflects [implementation progress](IMPLEMENTATION.md) as of
 2026-11-08. DOC-06c (the HTML fragment parsing algorithm and all 192 html5lib
-fragment records) is also done. CSS-01 (CSS syntax) is done as the first M2 task. The queue continues
-with DOC-06d (`selectedcontent` mirroring), item 12 (owned by a separate
-thread), then CSS-02 onward in the M2 table.
+fragment records) is also done. CSS-01 (CSS syntax) is done as the first M2 task. DOC-06d
+(`selectedcontent` mirroring) is done too, so every runnable html5lib tree record
+passes. Item 12 is owned by a separate thread; this queue continues with CSS-02
+onward in the M2 table.
 
 | Order | Task / suggested issue title | Concrete completion test | Status |
 | --- | --- | --- | --- |
@@ -351,7 +352,7 @@ thread), then CSS-02 onward in the M2 table.
 | 6 | DOC-05a: Implement incremental tokenizer data/tag/comment states | Chunked/unbroken token sequences match for every fixture split | Done |
 | 7 | DOC-05b: Add entities, raw/RCDATA/script text and encoding cases | Pinned tokenizer subset with errors and malformed inputs | Done |
 | 8 | DOC-06a: Implement initial/before-html/head/body insertion modes | Implied-node and malformed nesting tree fixtures | Done |
-| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (1,580/1,584 records) |
+| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (all 1,584 document records, with DOC-06d) |
 | 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected | Done |
 | 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Done (fuzz smoke + all fragment records) |
 | 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Done (prototype; ADR 0012) |

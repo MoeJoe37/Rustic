@@ -141,3 +141,68 @@ fn frameset_replaces_an_unused_body_and_pre_skips_one_newline() {
         "element local=\"pre\"\ntext \"\\nx\"\nelement local=\"textarea\"\ntext \"y\""
     );
 }
+
+#[test]
+fn selectedcontent_mirrors_the_selected_option_when_it_is_popped() {
+    let mirror = |source: &str| {
+        let result = parse(source);
+        let doc = result.document();
+        let target = find(doc, doc.root(), "selectedcontent");
+        doc.dump_tree(target, 1 << 16)
+            .unwrap()
+            .lines()
+            .skip(1)
+            .map(str::trim)
+            .collect::<Vec<_>>()
+            .join("|")
+    };
+    let button = "<select><button><selectedcontent></button>";
+    assert_eq!(
+        mirror(&format!("{button}<option>A<option>B")),
+        "text \"A\""
+    );
+    assert_eq!(
+        mirror(&format!("{button}<option>A<option selected>B</option>")),
+        "text \"B\""
+    );
+    // The first non-disabled option is selected by default.
+    assert_eq!(
+        mirror(&format!("{button}<option disabled>A<option>B")),
+        "text \"B\""
+    );
+    // A multiple select has no enabled selectedcontent.
+    assert_eq!(
+        mirror("<select multiple><button><selectedcontent></button><option>A"),
+        ""
+    );
+    // Clones are deep and independent of the option's own nodes.
+    let result = parse(&format!("{button}<option><b>x</b>y</option>"));
+    let doc = result.document();
+    let target = find(doc, doc.root(), "selectedcontent");
+    let option = find(doc, doc.root(), "option");
+    let bold_in_target = find(doc, target, "b");
+    assert_ne!(bold_in_target, find(doc, option, "b"));
+    assert_eq!(doc.walk(target).unwrap().count(), 4);
+}
+
+#[test]
+fn selectedcontent_clones_consume_the_document_budget() {
+    let source = "<select><button><selectedcontent></button><option>A</option></select>";
+    // html, head, body, select, button, selectedcontent, option, two texts and the root.
+    let mut limits = ParserLimits::default();
+    limits.document.max_nodes = 9;
+    let mut parser = HtmlDocumentParser::new(limits, Default::default()).unwrap();
+    let result = parser
+        .feed(source.as_bytes())
+        .and_then(|()| parser.finish().map(drop));
+    assert_eq!(
+        result,
+        Err(rustic_html::ParseError::Document(
+            rustic_dom::DomError::NodeLimit
+        ))
+    );
+    limits.document.max_nodes = 10;
+    let mut parser = HtmlDocumentParser::new(limits, Default::default()).unwrap();
+    parser.feed(source.as_bytes()).unwrap();
+    assert!(parser.finish().is_ok());
+}

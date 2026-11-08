@@ -78,15 +78,7 @@ const FILES: &[(&str, &str)] = corpus![
 ];
 
 /// `(file, zero-based record index, reason)` for records expected to differ.
-const KNOWN_FAILURES: &[(&str, usize, &str)] = &[
-    ("webkit02.dat", 44, SELECTEDCONTENT),
-    ("webkit02.dat", 45, SELECTEDCONTENT),
-    ("webkit02.dat", 46, SELECTEDCONTENT),
-    ("webkit02.dat", 47, SELECTEDCONTENT),
-];
-
-const SELECTEDCONTENT: &str = "selectedcontent mirroring needs option selectedness and DOM node \
-     cloning, which are DOM element behavior rather than tree construction";
+const KNOWN_FAILURES: &[(&str, usize, &str)] = &[];
 
 struct Record {
     data: String,

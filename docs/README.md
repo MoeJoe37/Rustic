@@ -40,7 +40,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope, file URLs, diagnostics and 815 pinned cases](URL.md) |
 | Incremental UTF-8, tags/attributes, declarations, references and text modes | Implemented declared tokenizer scope | `rustic-html`; [53 focused tests and three pinned corpora](HTML.md) |
 | Token-at-a-time input drive and text-mode feedback | Implemented internal contract | Same-chunk feedback, queued-input, control/lifecycle tests; [ADR 0008](adr/0008-tokenizer-drive.md) |
-| Document tree construction: all 21 insertion modes, tables, formatting, templates and foreign content | Implemented for document parsing | [Scope and 1,772/1,776 runnable html5lib records, all 192 fragments included](HTML_TREE.md); scripting and `selectedcontent` pending |
+| Document tree construction: all 21 insertion modes, tables, formatting, templates and foreign content | Implemented for document parsing | [Scope and all 1,776 runnable html5lib records, including 192 fragments and `selectedcontent`](HTML_TREE.md); scripting pending |
 | HTML fragment parsing algorithm (scripting disabled) | Implemented | `HtmlFragmentParser`; html5lib fragment records and focused tests |
 | CSS syntax tokenizer, component values, rules, declarations and nested block contents | Implemented (CSS-01) | `rustic-css`; [139 pinned corpus cases and focused tests](CSS.md) |
 | Deterministic parser fuzz targets, seed replay and reproducers | Implemented blind mutation fuzzer | `rustic-fuzz`; required CI smoke job and nightly campaign |

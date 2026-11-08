@@ -374,6 +374,26 @@ splits, budgets, cancellation and lifecycle. A fourth fuzz target,
 found no failures. See [HTML_TREE.md](HTML_TREE.md). DOM-string/UTF-16 fragment
 input and `innerHTML` bindings remain future work.
 
+## DOC-06d — `selectedcontent` mirroring
+
+The tree builder now tracks option selectedness for single-selection selects
+(the last option inserted with `selected`, otherwise the first non-disabled
+option) and runs "maybe clone an option into selectedcontent" when an option
+leaves the stack of open elements, including the stop-parsing pops at EOF. The
+selected option's children are deep-cloned with `Document::clone_node` (DOC-04c)
+into the select's enabled `selectedcontent` (none for `multiple`, or when the
+first one sits in a nested select), replacing earlier mirrored contents. Clones
+consume the ordinary node and payload budgets; a limit failure is fatal like any
+other DOM failure. Selectedness is evaluated when the parser notices the pop, at
+the end of the token that caused it, which yields the same final tree.
+
+The four `webkit02.dat` records that were known failures now pass, so **all
+1,776 runnable html5lib tree records pass** at every split and `KNOWN_FAILURES`
+is empty. Two focused tests cover default/explicit/disabled selection,
+`multiple`, clone independence and exact node budgets with mirrored clones.
+Mirroring after parsing (user selection changes, script-set `selected`) is DOM
+element behavior for the bindings milestone.
+
 ## DOC-07 — Bounded local loader and `dump-dom`
 
 `rustic dump-dom [OPTIONS] [--] <file>` loads exactly one local file granted on the command line and prints the
@@ -545,7 +565,8 @@ must keep all tiers green.
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |
-| DOC-06b: tables/formatting/template/foreign tree rules | Done: 1,580/1,584 runnable html5lib document records at every split; `selectedcontent` pending |
+| DOC-06b: tables/formatting/template/foreign tree rules | Done: all 1,584 runnable html5lib document records at every split (with DOC-06d) |
+| DOC-06d: `selectedcontent` mirroring | Done: last four known tree failures fixed; 1,776/1,776 runnable records |
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
@@ -554,7 +575,7 @@ must keep all tiers green.
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
-`html.conformance` is complete. CSS-01 has started M2. Next: DOC-06d
-(`selectedcontent` mirroring, the last four known tree failures, built on the new
-`Document::clone_node`), then CSS-02 selectors. All project crates remain safe
+`html.conformance` is complete and DOC-06d removed the last known tree
+failures. CSS-01 has started M2. Next: CSS-02 selectors and specificity, then
+CSS-03 typed property parsers. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

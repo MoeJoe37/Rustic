@@ -16,7 +16,7 @@ are inert parsers with scripting disabled; neither is a browser or script host.
 | Body rules | Block, heading, list, definition, form, button, pre/listing (leading newline skipped), plaintext, ruby, void, `image` renaming and "any other" start/end tag rules with special-element and scope checks |
 | Formatting | List of active formatting elements with markers and the three-identical-entries limit, reconstruction, and the adoption agency algorithm including `a`/`nobr` start-tag recovery |
 | Tables | Table context clearing, implied `tbody`/`tr`/`colgroup`, pending table character tokens and foster parenting of misplaced text and elements |
-| Select | The current customizable-select rules: `select`, `option`, `optgroup`, `hr` and `input` recovery in body; there is no separate in-select mode |
+| Select | The current customizable-select rules: `select`, `option`, `optgroup`, `hr` and `input` recovery in body; there is no separate in-select mode. Option selectedness (last `selected`, else first non-disabled option) and `selectedcontent` mirroring: when a selected option is popped, including by stop-parsing at EOF, its children are deep-cloned into the select's enabled `selectedcontent` |
 | Templates | Template contents fragments, the template insertion-mode stack, and template-aware form/body/html handling |
 | Framesets | `frameset-ok` tracking, body replacement and frameset/noframes modes |
 | Foreign content | SVG and MathML namespaces, adjusted SVG tag/attribute case, MathML `definitionURL`, xlink/xml/xmlns attribute namespaces, integration points, breakout tags and allowed CDATA sections |
@@ -66,7 +66,7 @@ foster-parented locations.
 Scripting is always disabled: `noscript` uses the scripting-disabled rules and
 script end tags never prepare, run or block. There is no network, encoding sniff
 or restart, custom-element construction, form-owner
-association, `selectedcontent` mirroring, shadow tree, sanitizer, event dispatch
+association, shadow tree, sanitizer, event dispatch
 or rendering. Processing-instruction tokens still return
 `Unsupported(ProcessingInstructions)` because the DOM has no instruction nodes.
 
@@ -125,11 +125,10 @@ All 57 top-level html5lib `tree-construction/*.dat` files at revision
 notice and a per-file digest [manifest](../crates/rustic-html/tests/fixtures/tree/manifest.json).
 Of 1,792 records, **1,776 are runnable** (1,584 document and 192 fragment
 records) without scripting or processing instructions. The runner passes
-**1,772** of them, **including all 192 fragment records**: complete trees,
-namespaces, sorted attributes and template contents match the unchanged
-expectations for the unbroken input, **all 74,661 two-chunk byte splits** and
-one-byte feeds. The four known failures are document `selectedcontent` mirroring
-records, listed with that reason. The 16 skipped records need scripting (8) or
+**all 1,776**, including all 192 fragment records, with no known failures:
+complete trees, namespaces, sorted attributes and template contents match the
+unchanged expectations for the unbroken input, **all 74,661 two-chunk byte
+splits** and one-byte feeds. The 16 skipped records need scripting (8) or
 instruction nodes (8). Parse-error IDs/positions and compatibility-mode metadata
 are not compared. This is not a WPT conformance result.
 

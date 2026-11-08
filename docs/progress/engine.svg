@@ -313,6 +313,6 @@
 <rect x="370" y="716" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="390" y="727" fill="#c9d1d9" font-size="12">Planned</text>
 <text x="24" y="756" fill="#c9d1d9" font-size="12">100% requires every capability and final engine acceptance on Windows, macOS, Linux, Android and iOS.</text>
-<text x="24" y="780" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot ccc93640822b</text>
+<text x="24" y="780" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 9ef06dc76e41</text>
 </g>
 </svg>

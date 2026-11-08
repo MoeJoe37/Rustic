@@ -264,6 +264,33 @@ See [HTML_TREE.md](HTML_TREE.md) for exact boundaries.
 parsing algorithm, scripting/reentry, encoding restart, `selectedcontent`,
 processing-instruction nodes and the fuzz gate remain open.
 
+## DOC-06c — HTML fragment parsing algorithm
+
+`HtmlFragmentParser` runs the WHATWG fragment parsing algorithm for an HTML, SVG
+or MathML `FragmentContext` (with optional attributes), sharing the document
+parser's tree builder, budgets, lifecycle and failure atomicity through one
+private driver. The context selects the tokenizer state (no last start tag) and,
+standing in for the scratch `html` root, the reset insertion mode; a `template`
+context pushes "in template" and a `form` context is the form pointer. The
+adjusted current node now drives HTML/foreign dispatch, CDATA permission
+(including before the first token, a case the corpus does not cover) and foreign
+element namespaces. Fragment-case rules cover `</html>`, `</frameset>` and
+`input`/`select` in a `select` context; foreign breakout now reprocesses with
+the insertion mode's rules as the standard says. `ParsedFragment::root()` is the
+scratch `html` element whose children are the fragment; the detached context is
+destroyed at EOF.
+
+**All 192 html5lib fragment records** now pass for unbroken input, every
+two-chunk split and one-byte feeds, so the tree runner passes 1,772 of 1,776
+runnable records (74,661 splits); the four known failures remain document
+`selectedcontent` records and only 16 scripting/instruction records are
+skipped. Seven focused tests cover tokenizer states, the absent context node,
+table/template/select/form and foreign contexts, integration points, CDATA,
+splits, budgets, cancellation and lifecycle. A fourth fuzz target,
+`html-fragment`, picks one of 28 contexts per input; 300,000 mutated executions
+found no failures. See [HTML_TREE.md](HTML_TREE.md). DOM-string/UTF-16 fragment
+input and `innerHTML` bindings remain future work.
+
 ## DOC-07 — Bounded local loader and `dump-dom`
 
 `rustic dump-dom [OPTIONS] [--] <file>` loads exactly one local file granted on the command line and prints the
@@ -300,13 +327,14 @@ still grows with DOC-06.
 `rustic-fuzz` is a dependency-free, deterministic mutation fuzzer in safe,
 portable Rust (standard library only, so it builds on every supported host). It
 is blind, not coverage-guided: coverage engines and sanitizers stay behind the
-[dependency review](DEPENDENCIES.md). Three targets check crash-freedom at
+[dependency review](DEPENDENCIES.md). Four targets check crash-freedom at
 default budgets plus a differential invariant:
 
 | Target | Invariant beyond "no panic, no hang" | Seeds |
 | --- | --- | --- |
 | `html-tokenizer` | Tokens and diagnostics match the unbroken input for a two-chunk split, fixed-size chunks and (up to 512 bytes) one-byte feeds | Checked-in pages plus all 1,792 html5lib tree `#data` inputs |
 | `html-document` | The same feed plans yield the same dump or the same `ParseError`; completed trees always dump; a fresh parser never reports a lifecycle error; a cancelled parser never completes | Same as above |
+| `html-fragment` | The same feed-plan equality for fragment parsing, with one of 28 HTML/SVG/MathML contexts chosen from the input's fingerprint (added with DOC-06c) | Same as above |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -367,13 +395,13 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |
 | DOC-06b: tables/formatting/template/foreign tree rules | Done: 1,580/1,584 runnable html5lib document records at every split; `selectedcontent` pending |
+| DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
-| DOC-08: parser corpus/fuzzing | Partial (4/5 steps): tokenizer corpora, full html5lib document tree corpus at every split, exact limits, and fuzz targets with a required CI smoke job; html5lib fragment records pending (next) |
+| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Not started |
 
 M1 remains in progress. Cross-document adoption, node cloning and mutation records
-are still needed for the broader DOC-04 task. The next queue work is the HTML
-fragment parsing algorithm, which unlocks the 192 skipped html5lib fragment
-records and finishes DOC-08, followed by `selectedcontent` mirroring and then
-DOC-09. All project crates remain safe
+are still needed for the broader DOC-04 task. With DOC-06c and DOC-08 done,
+`html.conformance` is complete. The next queue work is DOC-06d (`selectedcontent`
+mirroring, the last four known tree failures), then DOC-09 and CSS-01. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

@@ -7,7 +7,7 @@ Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-07
-are complete for their declared scope and DOC-08 is four of five steps done;
+and DOC-08 are complete for their declared scope, including fragment parsing;
 M2–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
@@ -335,9 +335,9 @@ progress cannot bypass these gates.
 
 These are issue-ready tasks, not GitHub issues created by this commit. Work in
 order. Status reflects [implementation progress](IMPLEMENTATION.md) as of
-2026-11-08. After item 11, the queue continues with DOC-06c (HTML fragment
-parsing algorithm and the html5lib fragment records), DOC-06d (`selectedcontent`
-mirroring), item 12, then CSS-01.
+2026-11-08. DOC-06c (the HTML fragment parsing algorithm and all 192 html5lib
+fragment records) is also done. The queue continues with DOC-06d
+(`selectedcontent` mirroring), item 12, then CSS-01.
 
 | Order | Task / suggested issue title | Concrete completion test | Status |
 | --- | --- | --- | --- |
@@ -351,7 +351,7 @@ mirroring), item 12, then CSS-01.
 | 8 | DOC-06a: Implement initial/before-html/head/body insertion modes | Implied-node and malformed nesting tree fixtures | Done |
 | 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (1,580/1,584 records) |
 | 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected | Done |
-| 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Fuzz smoke done; fragment records next |
+| 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Done (fuzz smoke + all fragment records) |
 | 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Not started |
 
 For every issue include task ID, dependencies, specification section/revision,

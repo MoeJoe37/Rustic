@@ -73,7 +73,8 @@ tokenizer corpora at every split, the html5lib document tree corpus at every spl
 and exact node/depth/payload limits), adding **0.37%** partial credit for an
 **8.40%** total. Fragment-parsing records and fuzz targets remain open. The DOC-08
 fuzz step later completed with its own evidence (four of five steps, 0.50%
-partial credit); fragment-parsing records remain open.
+partial credit), and DOC-06c's fragment records completed the last step, so
+`html.conformance` is now complete (8.65%).
 
 ## engine-v2 scope change (2026-11-07)
 

@@ -216,11 +216,11 @@ impl TreeBuilder {
                             .iter()
                             .any(|a| matches!(a.name(), "color" | "face" | "size"))) =>
             {
-                return self.break_out();
+                return self.break_out(token);
             }
-            Tok::End("br" | "p") => return self.break_out(),
+            Tok::End("br" | "p") => return self.break_out(token),
             Tok::Start(tag) => {
-                let ns = self.ns(self.current());
+                let ns = self.ns(self.adjusted_current().expect("foreign content has a node"));
                 self.insert_element(tag, ns)?;
                 if tag.self_closing() {
                     // Scripting is disabled: an SVG script is never processed.
@@ -250,7 +250,7 @@ impl TreeBuilder {
         Ok(Step::Consumed)
     }
 
-    fn break_out(&mut self) -> Result<Step, ParseError> {
+    fn break_out(&mut self, token: Tok) -> Result<Step, ParseError> {
         self.diagnostic(ErrorKind::UnexpectedToken)?;
         while let Some(&id) = self.open.last() {
             if self.ns(id) == super::Ns::Html
@@ -262,6 +262,8 @@ impl TreeBuilder {
             }
             self.open.pop();
         }
-        Ok(Step::Reprocess)
+        // Reprocess with the insertion mode's HTML rules, not the dispatcher:
+        // in a foreign fragment context the adjusted current node stays foreign.
+        self.step(self.insertion_mode, token)
     }
 }

@@ -1,13 +1,13 @@
 //! Complete html5lib tree-construction documents, run against the pinned corpus.
 //!
-//! Every document record is run unless it needs fragment parsing, scripting
-//! or processing-instruction nodes; those are counted and skipped. Expected
+//! Every document and fragment record is run unless it needs scripting or
+//! processing-instruction nodes; those are counted and skipped. Expected
 //! failures must be listed explicitly in `KNOWN_FAILURES` with a reason.
 
 use std::fmt::Write;
 
 use rustic_dom::{Document, DomString, NodeId, NodeKind};
-use rustic_html::HtmlDocumentParser;
+use rustic_html::{FragmentContext, HtmlDocumentParser, HtmlFragmentParser};
 
 macro_rules! corpus {
     ($($name:literal),* $(,)?) => {
@@ -91,7 +91,8 @@ const SELECTEDCONTENT: &str = "selectedcontent mirroring needs option selectedne
 struct Record {
     data: String,
     document: String,
-    fragment: bool,
+    /// `#document-fragment` context, such as `td` or `svg path`.
+    context: Option<String>,
     script_on: bool,
 }
 
@@ -109,19 +110,19 @@ fn records(source: &str) -> Vec<Record> {
         let mut current = "#data";
         let mut data = String::new();
         let mut document = String::new();
-        let mut fragment = false;
+        let mut context = None;
         let mut script_on = false;
         for line in block.split_inclusive('\n') {
             let header = line.trim_end_matches('\n');
             if headers.contains(&header) {
                 current = header;
-                fragment |= header == "#document-fragment";
                 script_on |= header == "#script-on";
                 continue;
             }
             match current {
                 "#data" => data.push_str(line),
                 "#document" => document.push_str(line),
+                "#document-fragment" => context = Some(header.to_owned()),
                 _ => {}
             }
         }
@@ -130,7 +131,7 @@ fn records(source: &str) -> Vec<Record> {
         result.push(Record {
             data,
             document,
-            fragment,
+            context,
             script_on,
         });
     }
@@ -154,10 +155,10 @@ fn namespace_prefix(namespace: Option<&str>) -> Option<&'static str> {
 
 /// Serialize in the html5lib tree format, including template contents,
 /// with an explicit stack instead of recursion.
-fn serialize(document: &Document) -> String {
+fn serialize(document: &Document, parent: NodeId) -> String {
     let mut output = String::new();
     let mut stack: Vec<(NodeId, usize)> = document
-        .children(document.root())
+        .children(parent)
         .unwrap()
         .map(|id| (id, 0))
         .collect();
@@ -229,29 +230,63 @@ fn serialize(document: &Document) -> String {
     output
 }
 
-fn parse(input: &[u8], sizes: impl IntoIterator<Item = usize>) -> Result<String, String> {
-    let mut parser = HtmlDocumentParser::default();
+/// Map an html5lib context (`td`, `svg path`, `math mi`) to a context element.
+fn context(name: &str) -> FragmentContext {
+    match name.split_once(' ') {
+        Some(("svg", local)) => FragmentContext::svg(local),
+        Some(("math", local)) => FragmentContext::mathml(local),
+        _ => FragmentContext::html(name),
+    }
+}
+
+fn parse(
+    record: &Record,
+    input: &[u8],
+    sizes: impl IntoIterator<Item = usize>,
+) -> Result<String, String> {
+    enum Parser {
+        Document(HtmlDocumentParser),
+        Fragment(HtmlFragmentParser),
+    }
+    let mut parser = match &record.context {
+        None => Parser::Document(HtmlDocumentParser::default()),
+        Some(name) => Parser::Fragment(
+            HtmlFragmentParser::new(&context(name), Default::default(), Default::default())
+                .map_err(|e| e.to_string())?,
+        ),
+    };
+    let mut feed = |bytes: &[u8]| match &mut parser {
+        Parser::Document(parser) => parser.feed(bytes),
+        Parser::Fragment(parser) => parser.feed(bytes),
+    };
     // Upstream input is Unicode, separate from the byte decoder's transport BOM.
-    parser.feed(b"\xef\xbb\xbf").map_err(|e| e.to_string())?;
+    feed(b"\xef\xbb\xbf").map_err(|e| e.to_string())?;
     let mut offset = 0;
     for size in sizes {
-        parser
-            .feed(&input[offset..offset + size])
-            .map_err(|e| e.to_string())?;
+        feed(&input[offset..offset + size]).map_err(|e| e.to_string())?;
         offset += size;
     }
     assert_eq!(offset, input.len());
-    let result = parser.finish().map_err(|e| e.to_string())?;
-    Ok(serialize(result.document()))
+    match parser {
+        Parser::Document(mut parser) => {
+            let result = parser.finish().map_err(|e| e.to_string())?;
+            Ok(serialize(result.document(), result.document().root()))
+        }
+        Parser::Fragment(mut parser) => {
+            let result = parser.finish().map_err(|e| e.to_string())?;
+            Ok(serialize(result.document(), result.root()))
+        }
+    }
 }
 
 fn runnable(record: &Record) -> bool {
-    !record.fragment && !record.script_on && !record.data.contains("<?")
+    !record.script_on && !record.data.contains("<?")
 }
 
 #[test]
 fn html5lib_tree_construction_documents() {
     let mut passed = 0;
+    let mut fragments = 0;
     let mut skipped = 0;
     let mut splits = 0;
     let mut failures = Vec::new();
@@ -262,23 +297,24 @@ fn html5lib_tree_construction_documents() {
                 continue;
             }
             let bytes = record.data.as_bytes();
-            let actual = parse(bytes, [bytes.len()]);
+            let actual = parse(record, bytes, [bytes.len()]);
             let known = KNOWN_FAILURES
                 .iter()
                 .any(|(f, i, _)| f == file && *i == index);
             match (actual.as_deref() == Ok(record.document.as_str()), known) {
                 (true, false) => {
                     passed += 1;
+                    fragments += usize::from(record.context.is_some());
                     // Feed boundaries must not change the tree: every
                     // two-chunk split and one-byte feeds.
                     for split in 0..=bytes.len() {
-                        let split_result = parse(bytes, [split, bytes.len() - split]);
+                        let split_result = parse(record, bytes, [split, bytes.len() - split]);
                         if split_result != actual {
                             failures.push(format!("{file} #{index}: differs at split {split}"));
                         }
                         splits += 1;
                     }
-                    if parse(bytes, std::iter::repeat_n(1, bytes.len())) != actual {
+                    if parse(record, bytes, std::iter::repeat_n(1, bytes.len())) != actual {
                         failures.push(format!("{file} #{index}: differs with one-byte feeds"));
                     }
                 }
@@ -294,8 +330,8 @@ fn html5lib_tree_construction_documents() {
         }
     }
     eprintln!(
-        "html5lib tree documents: {passed} passed, {} known failures, {skipped} skipped, \
-         {splits} two-chunk splits",
+        "html5lib tree records: {passed} passed ({fragments} fragments), {} known failures, \
+         {skipped} skipped, {splits} two-chunk splits",
         KNOWN_FAILURES.len()
     );
     if !failures.is_empty() {

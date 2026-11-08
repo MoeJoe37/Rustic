@@ -60,8 +60,9 @@ mod tokenizer;
 pub use error::{Diagnostic, DiagnosticKind, HtmlError};
 pub use input::Utf8Input;
 pub use parser::{
-    DocumentMode, HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits, TreeDiagnostic,
-    TreeDiagnosticKind, UnsupportedFeature,
+    ContextNamespace, DocumentMode, FragmentContext, HtmlDocumentParser, HtmlFragmentParser,
+    ParseError, ParsedDocument, ParsedFragment, ParserLimits, TreeDiagnostic, TreeDiagnosticKind,
+    UnsupportedFeature,
 };
 pub use token::{Attribute, Doctype, ProcessingInstruction, Tag, Token};
 pub use tokenizer::{HtmlTokenizer, TokenizerLimits, TokenizerMode};

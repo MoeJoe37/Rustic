@@ -251,6 +251,8 @@ impl TreeBuilder {
                 self.frameset_ok = false;
                 self.insertion_mode = InsertionMode::InTable;
             }
+            // Fragment case: inside a select context these are ignored.
+            "input" | "select" if self.context_is("select") => return self.ignore(),
             "area" | "br" | "embed" | "img" | "keygen" | "wbr" | "input" => {
                 if name == "input" && self.in_scope("select", Scope::Default) {
                     self.diagnostic(ErrorKind::UnexpectedToken)?;

@@ -1,10 +1,11 @@
 # HTML document construction
 
 `HtmlDocumentParser` in `rustic-html` turns UTF-8 bytes into an owned DOM using
-the WHATWG tree-construction algorithm for complete documents. It uses Rustic's
-original tokenizer and the checked `rustic-dom` mutation API. No existing engine
-or JavaScript VM is embedded. This is an inert local document parser with
-scripting disabled; it is not a browser, fragment parser or script host.
+the WHATWG tree-construction algorithm for complete documents, and
+`HtmlFragmentParser` runs the fragment parsing algorithm for a context element
+(as `innerHTML` would). Both use Rustic's original tokenizer and the checked
+`rustic-dom` mutation API. No existing engine or JavaScript VM is embedded. These
+are inert parsers with scripting disabled; neither is a browser or script host.
 
 ## Implemented rules
 
@@ -21,6 +22,36 @@ scripting disabled; it is not a browser, fragment parser or script host.
 | Foreign content | SVG and MathML namespaces, adjusted SVG tag/attribute case, MathML `definitionURL`, xlink/xml/xmlns attribute namespaces, integration points, breakout tags and allowed CDATA sections |
 | Text modes | RCDATA (title, textarea), RAWTEXT (style, xmp, iframe, noembed, noframes), script data and plaintext, selected at the start-tag delivery boundary |
 
+## Fragment parsing
+
+`HtmlFragmentParser::new(&FragmentContext, ParserLimits, CancellationToken)` follows
+WHATWG [parsing HTML fragments](https://html.spec.whatwg.org/multipage/parsing.html#parsing-html-fragments).
+`FragmentContext::html`, `::svg` and `::mathml` name the context element, with
+optional attributes (`encoding` matters for `annotation-xml`). The context is
+standalone: it has no ancestors, so there is no ancestor form, and the fragment
+is parsed in no-quirks mode.
+
+The parser creates a scratch document with a root `html` element and a detached
+context element. The context selects the initial tokenizer state (RCDATA for
+title/textarea, RAWTEXT for style/xmp/iframe/noembed/noframes, script data,
+plaintext; `noscript` stays data because scripting is disabled) with no last
+start tag. A `template` context pushes "in template"; a `form` context becomes
+the form element pointer. The insertion mode is reset using the context in place
+of the root, and the adjusted current node (the context while only the root is
+open) drives the HTML/foreign dispatch, CDATA permission (including before the
+first token) and foreign element namespaces. Fragment-case rules ignore `</html>`
+after body, keep the root after `</frameset>`, and ignore `input`/`select` start
+tags in a `select` context. Foreign breakout reprocesses with the insertion mode's
+HTML rules, as the standard says, rather than through the dispatcher.
+
+`finish` destroys the context element and returns `ParsedFragment`, whose
+`root()` is the scratch `html` element: its children are the fragment. Budgets,
+diagnostics, lifecycle and failure atomicity match the document parser; the
+detached context and root count toward the node limit while parsing. Input is
+UTF-8 bytes; DOM-string/UTF-16 fragment input remains separate future work.
+
+## Tokenizer feedback
+
 The tree builder tells the tokenizer after every token whether CDATA sections are
 allowed (the adjusted current node is not HTML). Markup flushes earlier text, so
 the tree builder has processed all prior tokens before that decision is needed.
@@ -34,7 +65,7 @@ foster-parented locations.
 
 Scripting is always disabled: `noscript` uses the scripting-disabled rules and
 script end tags never prepare, run or block. There is no network, encoding sniff
-or restart, fragment parsing algorithm, custom-element construction, form-owner
+or restart, custom-element construction, form-owner
 association, `selectedcontent` mirroring, shadow tree, sanitizer, event dispatch
 or rendering. Processing-instruction tokens still return
 `Unsupported(ProcessingInstructions)` because the DOM has no instruction nodes.
@@ -89,12 +120,13 @@ open `select`.
 All 57 top-level html5lib `tree-construction/*.dat` files at revision
 `9329e64694e7835d0dcff9811e22856ef6ad16f9` are vendored with the existing MIT
 notice and a per-file digest [manifest](../crates/rustic-html/tests/fixtures/tree/manifest.json).
-Of 1,792 records, **1,584 are document records** without scripting or processing
-instructions. The runner passes **1,580** of them: complete trees, namespaces,
-sorted attributes and template contents match the unchanged expectations for the
-unbroken input, **all 70,993 two-chunk byte splits** and one-byte feeds. The four
-known failures are `selectedcontent` mirroring records, listed with that reason.
-The 208 skipped records need the fragment algorithm (192), scripting (8) or
+Of 1,792 records, **1,776 are runnable** (1,584 document and 192 fragment
+records) without scripting or processing instructions. The runner passes
+**1,772** of them, **including all 192 fragment records**: complete trees,
+namespaces, sorted attributes and template contents match the unchanged
+expectations for the unbroken input, **all 74,661 two-chunk byte splits** and
+one-byte feeds. The four known failures are document `selectedcontent` mirroring
+records, listed with that reason. The 16 skipped records need scripting (8) or
 instruction nodes (8). Parse-error IDs/positions and compatibility-mode metadata
 are not compared. This is not a WPT conformance result.
 
@@ -102,9 +134,13 @@ Focused Rust tests additionally cover template contents ownership and deep
 nesting, CDATA permission, foreign name/attribute adjustment, foster parenting,
 adoption, framesets, newline skipping, mode selection, attribute merge order,
 exact budgets, cancellation, processing-instruction rejection and lifecycle.
+Seven fragment tests cover context tokenizer states, the absent context node,
+table/template/select/form contexts, foreign contexts and integration points,
+CDATA before the first token, every split, budgets, cancellation and lifecycle.
+The `html-fragment` fuzz target picks one of 28 contexts per input.
 
 ```sh
-cargo test --locked -p rustic-html --test document --test tree_construction --test tree_rules
+cargo test --locked -p rustic-html --test document --test tree_construction --test tree_rules --test fragment
 cargo run --locked -p rustic-html --example document
 python3 tools/import_html_tree_tests.py --check
 ```

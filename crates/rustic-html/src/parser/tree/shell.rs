@@ -240,6 +240,7 @@ impl TreeBuilder {
             Tok::Comment(text) => self.comment(Some(self.open[0]), text)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
+            Tok::End("html") if self.fragment() => return self.ignore(),
             Tok::End("html") => self.insertion_mode = InsertionMode::AfterAfterBody,
             Tok::Eof => self.done = true,
             _ => {
@@ -269,7 +270,7 @@ impl TreeBuilder {
                     return self.ignore();
                 }
                 self.open.pop();
-                if !self.current_is("frameset") {
+                if !self.fragment() && !self.current_is("frameset") {
                     self.insertion_mode = InsertionMode::AfterFrameset;
                 }
             }

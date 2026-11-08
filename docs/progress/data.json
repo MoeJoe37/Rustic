@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "bee07f45ed7832edc1965648da841f73289be254d0aecf5cd138e68e71731823",
-  "percent": "8.53",
-  "verified_percent": "8.03",
-  "partial_percent": "0.50",
-  "completed": 20,
-  "in_progress": 1,
+  "source_fingerprint": "fa7b45bd260c66495e4b8832865d13cdc2a5c11f6da60ddbc6a7b5b65608255b",
+  "percent": "8.65",
+  "verified_percent": "8.65",
+  "partial_percent": "0.00",
+  "completed": 21,
+  "in_progress": 0,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -15,11 +15,11 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 20,
+      "completed": 21,
       "total": 28,
-      "percent": "75.70",
-      "verified_percent": "71.29",
-      "partial_percent": "4.41"
+      "percent": "76.80",
+      "verified_percent": "76.80",
+      "partial_percent": "0.00"
     },
     {
       "id": "M2",
@@ -842,101 +842,56 @@
           "label": "Parser corpora, chunk invariance and fuzz gate",
           "size": 3,
           "milestone": "M1",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Pinned tokenizer corpora at every two-chunk split",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/import_html_tests.py",
-                  "marker": "SUITE_FILES"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/corpus.rs",
-                  "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
-                }
-              ]
+              "kind": "source",
+              "path": "tools/import_html_tests.py",
+              "marker": "SUITE_FILES"
             },
             {
-              "label": "html5lib document tree corpus at every split",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/import_html_tree_tests.py",
-                  "marker": "REVISION"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/tree_construction.rs",
-                  "marker": "fn html5lib_tree_construction_documents"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-html/tests/corpus.rs",
+              "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
             },
             {
-              "label": "Exact node, depth and payload limits",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-dom/src/document.rs",
-                  "marker": "pub max_depth"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/document.rs",
-                  "marker": "fn exact_node_depth_and_utf16_payload_limits_include_implied_nodes_and_text_merges"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/fragment.rs",
+              "marker": "pub struct HtmlFragmentParser"
             },
             {
-              "label": "html5lib fragment-parsing records",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
             },
             {
-              "label": "Parser fuzz targets and CI smoke job",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-fuzz/src/targets.rs",
-                  "marker": "pub struct HtmlDocumentTarget"
-                },
-                {
-                  "kind": "source",
-                  "path": ".github/workflows/ci.yml",
-                  "marker": "name: Parser fuzz smoke"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-fuzz/tests/harness.rs",
-                  "marker": "fn campaign_finds_mutated_failure_and_saves_a_replayable_reproducer"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-fuzz/tests/harness.rs",
-                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-html/tests/fragment.rs",
+              "marker": "fn foreign_contexts_use_the_adjusted_current_node"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/targets.rs",
+              "marker": "pub struct HtmlFragmentTarget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-fuzz/tests/harness.rs",
+              "marker": "fn every_target_replays_its_seed_corpus_cleanly"
             }
           ],
-          "credit": "80.00",
+          "credit": "100.00",
           "engine_share": "0.62"
         }
       ],
       "points": 29,
-      "completed": 8,
-      "in_progress": 1,
+      "completed": 9,
+      "in_progress": 0,
       "total": 10,
-      "contribution": "5.25",
-      "percent": "87.58",
-      "verified_percent": "79.31",
-      "partial_percent": "8.27"
+      "contribution": "5.37",
+      "percent": "89.65",
+      "verified_percent": "89.65",
+      "partial_percent": "0.00"
     },
     {
       "id": "css",

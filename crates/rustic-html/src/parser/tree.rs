@@ -6,8 +6,8 @@ use rustic_dom::{
 use crate::{Diagnostic, Doctype, Tag, Token, TokenizerMode};
 
 use super::{
-    DocumentMode, ParseError, ParsedDocument, TreeDiagnostic, TreeDiagnosticKind as ErrorKind,
-    UnsupportedFeature,
+    ContextNamespace, DocumentMode, FragmentContext, ParseError, ParsedDocument, ParsedFragment,
+    TreeDiagnostic, TreeDiagnosticKind as ErrorKind, UnsupportedFeature,
 };
 
 mod body;
@@ -130,6 +130,8 @@ pub(super) struct TreeBuilder {
     token_index: usize,
     done: bool,
     self_closing_acknowledged: bool,
+    /// Detached fragment-parsing context element; `None` for documents.
+    context: Option<NodeId>,
 }
 
 impl TreeBuilder {
@@ -155,7 +157,69 @@ impl TreeBuilder {
             token_index: 0,
             done: false,
             self_closing_acknowledged: false,
+            context: None,
         })
+    }
+
+    /// Set up the HTML fragment parsing algorithm for `context`.
+    ///
+    /// The document gets a root `html` element whose children become the
+    /// fragment. The context element is created detached (it is never part of
+    /// the result) so namespace and integration-point checks can inspect it.
+    /// Returns the tokenizer state the context selects (scripting disabled).
+    pub(super) fn new_fragment(
+        limits: DocumentLimits,
+        max_diagnostics: usize,
+        context: &FragmentContext,
+    ) -> Result<(Self, TokenizerMode), ParseError> {
+        let mut builder = Self::new(limits, max_diagnostics)?;
+        let html = builder.create_element(&Tag::implied("html"), Ns::Html)?;
+        let root = builder.document.root();
+        builder.attach_or_destroy(root, None, html)?;
+        builder.open.push(html);
+        let ns = match context.namespace() {
+            ContextNamespace::Html => Ns::Html,
+            ContextNamespace::Svg => Ns::Svg,
+            ContextNamespace::MathMl => Ns::MathMl,
+        };
+        let element = builder.create_element(&context.tag(), ns)?;
+        builder.context = Some(element);
+        let name = builder.html_name(element).map(str::to_owned);
+        if name.as_deref() == Some("template") {
+            builder.template_modes.push(InsertionMode::InTemplate);
+        }
+        if name.as_deref() == Some("form") {
+            builder.form = Some(element);
+        }
+        builder.reset_insertion_mode();
+        let mode = match name.as_deref() {
+            Some("title" | "textarea") => TokenizerMode::Rcdata,
+            Some("style" | "xmp" | "iframe" | "noembed" | "noframes") => TokenizerMode::Rawtext,
+            Some("script") => TokenizerMode::ScriptData,
+            Some("plaintext") => TokenizerMode::Plaintext,
+            // `noscript` stays in data: scripting is disabled.
+            _ => TokenizerMode::Data,
+        };
+        Ok((builder, mode))
+    }
+
+    /// Whether this builder runs the fragment parsing algorithm.
+    fn fragment(&self) -> bool {
+        self.context.is_some()
+    }
+
+    /// Whether the fragment context is the HTML element `name`.
+    fn context_is(&self, name: &str) -> bool {
+        self.context.is_some_and(|id| self.is_html(id, name))
+    }
+
+    /// The standard's adjusted current node: the context element when only
+    /// the fragment's root `html` element is open, otherwise the current node.
+    fn adjusted_current(&self) -> Option<NodeId> {
+        match self.context {
+            Some(context) if self.open.len() == 1 => Some(context),
+            _ => self.open.last().copied(),
+        }
     }
 
     pub(super) fn process(&mut self, token: &Token) -> Result<Option<TokenizerMode>, ParseError> {
@@ -198,7 +262,8 @@ impl TreeBuilder {
 
     /// Whether the tokenizer may recognize CDATA sections before the next token.
     pub(super) fn cdata_allowed(&self) -> bool {
-        self.open.last().is_some_and(|id| self.ns(*id) != Ns::Html)
+        self.adjusted_current()
+            .is_some_and(|id| self.ns(id) != Ns::Html)
     }
 
     pub(super) fn into_result(self, tokenizer_diagnostics: Vec<Diagnostic>) -> ParsedDocument {
@@ -209,6 +274,26 @@ impl TreeBuilder {
             tokenizer_diagnostics,
             tree_diagnostics: self.diagnostics,
         }
+    }
+
+    pub(super) fn into_fragment(
+        mut self,
+        tokenizer_diagnostics: Vec<Diagnostic>,
+    ) -> Result<ParsedFragment, ParseError> {
+        assert!(self.done, "result requires successfully processed EOF");
+        let context = self.context.take().expect("fragment builder has a context");
+        self.document.destroy_subtree(context)?;
+        let root = self
+            .document
+            .node(self.document.root())?
+            .first_child()
+            .expect("fragment root html element");
+        Ok(ParsedFragment {
+            document: self.document,
+            root,
+            tokenizer_diagnostics,
+            tree_diagnostics: self.diagnostics,
+        })
     }
 
     /// The tree construction dispatcher. Reprocessing advances a finite chain
@@ -227,7 +312,7 @@ impl TreeBuilder {
     }
 
     fn html_rules(&self, token: Tok) -> bool {
-        let Some(&current) = self.open.last() else {
+        let Some(current) = self.adjusted_current() else {
             return true;
         };
         match self.ns(current) {

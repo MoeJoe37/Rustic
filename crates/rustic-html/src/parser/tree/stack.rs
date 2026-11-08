@@ -251,7 +251,10 @@ impl TreeBuilder {
     pub(super) fn reset_insertion_mode(&mut self) {
         for index in (0..self.open.len()).rev() {
             let last = index == 0;
-            let id = self.open[index];
+            let id = match self.context {
+                Some(context) if last => context,
+                _ => self.open[index],
+            };
             let mode = match self.html_name(id) {
                 Some("td" | "th") if !last => InsertionMode::InCell,
                 Some("tr") => InsertionMode::InRow,

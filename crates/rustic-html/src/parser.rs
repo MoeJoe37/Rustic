@@ -4,10 +4,12 @@ use rustic_dom::{Document, DocumentLimits};
 use crate::{Diagnostic, HtmlTokenizer, Token, TokenizerLimits};
 
 mod error;
+mod fragment;
 mod mode;
 mod tree;
 
 pub use error::{ParseError, TreeDiagnostic, TreeDiagnosticKind, UnsupportedFeature};
+pub use fragment::{ContextNamespace, FragmentContext, HtmlFragmentParser, ParsedFragment};
 pub use mode::DocumentMode;
 use tree::TreeBuilder;
 
@@ -83,9 +85,7 @@ enum Lifecycle {
 /// the parser. Rejected calls after successful completion preserve that state.
 #[derive(Debug)]
 pub struct HtmlDocumentParser {
-    tokenizer: HtmlTokenizer,
-    tree: Option<TreeBuilder>,
-    lifecycle: Lifecycle,
+    driver: Driver,
 }
 
 impl Default for HtmlDocumentParser {
@@ -99,17 +99,39 @@ impl HtmlDocumentParser {
     /// Create a parser with explicit independent budgets and cancellation.
     pub fn new(limits: ParserLimits, cancellation: CancellationToken) -> Result<Self, ParseError> {
         Ok(Self {
-            tokenizer: HtmlTokenizer::new(limits.tokenizer, cancellation)?,
-            tree: Some(TreeBuilder::new(
-                limits.document,
-                limits.max_tree_diagnostics,
-            )?),
-            lifecycle: Lifecycle::Active,
+            driver: Driver {
+                tokenizer: HtmlTokenizer::new(limits.tokenizer, cancellation)?,
+                tree: Some(TreeBuilder::new(
+                    limits.document,
+                    limits.max_tree_diagnostics,
+                )?),
+                lifecycle: Lifecycle::Active,
+            },
         })
     }
 
     /// Consume bytes through token/tree boundaries; feed splits do not change trees.
     pub fn feed(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
+        self.driver.feed(bytes)
+    }
+
+    /// Close input, construct implied nodes and return the completed owned tree.
+    pub fn finish(&mut self) -> Result<ParsedDocument, ParseError> {
+        let (tree, diagnostics) = self.driver.finish()?;
+        Ok(tree.into_result(diagnostics))
+    }
+}
+
+/// Tokenizer/tree-builder pump and lifecycle shared by document and fragment parsing.
+#[derive(Debug)]
+struct Driver {
+    tokenizer: HtmlTokenizer,
+    tree: Option<TreeBuilder>,
+    lifecycle: Lifecycle,
+}
+
+impl Driver {
+    fn feed(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
         self.ensure_active()?;
         let result = self
             .tokenizer
@@ -119,8 +141,7 @@ impl HtmlDocumentParser {
         self.record_failure(result)
     }
 
-    /// Close input, construct implied nodes and return the completed owned tree.
-    pub fn finish(&mut self) -> Result<ParsedDocument, ParseError> {
+    fn finish(&mut self) -> Result<(TreeBuilder, Vec<Diagnostic>), ParseError> {
         self.ensure_active()?;
         let result = self
             .tokenizer
@@ -130,7 +151,7 @@ impl HtmlDocumentParser {
         self.record_failure(result)?;
         self.lifecycle = Lifecycle::Finished;
         let tree = self.tree.take().expect("active tree after successful EOF");
-        Ok(tree.into_result(self.tokenizer.diagnostics().to_vec()))
+        Ok((tree, self.tokenizer.diagnostics().to_vec()))
     }
 
     fn pump(&mut self) -> Result<(), ParseError> {

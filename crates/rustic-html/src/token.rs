@@ -25,6 +25,15 @@ pub struct Tag {
 }
 
 impl Tag {
+    /// A tag with no attributes, for implied elements and fragment contexts.
+    pub(crate) fn implied(name: &str) -> Self {
+        Self {
+            name: name.into(),
+            attributes: Vec::new(),
+            self_closing: false,
+        }
+    }
+
     /// Tag name with ASCII uppercase letters lowercased.
     pub fn name(&self) -> &str {
         &self.name

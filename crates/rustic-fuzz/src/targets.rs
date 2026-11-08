@@ -6,7 +6,10 @@
 //! same check from its bytes alone.
 
 use rustic_base::CancellationToken;
-use rustic_html::{Diagnostic, HtmlDocumentParser, HtmlError, HtmlTokenizer, ParseError, Token};
+use rustic_html::{
+    Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
+    ParseError, Token,
+};
 use rustic_url::Url;
 
 use crate::fingerprint;
@@ -28,6 +31,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
     vec![
         Box::new(HtmlTokenizerTarget),
         Box::new(HtmlDocumentTarget),
+        Box::new(HtmlFragmentTarget),
         Box::new(UrlTarget),
     ]
 }
@@ -252,6 +256,103 @@ impl Target for HtmlDocumentTarget {
         cancellation.cancel();
         if parser.feed(input).is_ok() && parser.finish().is_ok() {
             return Err("cancelled parser completed a document".into());
+        }
+        Ok(())
+    }
+}
+
+/// Fragment parsing must also terminate in budget and ignore feed boundaries.
+///
+/// The context element comes from the input's fingerprint, covering tokenizer
+/// states, table/template/select modes and foreign integration points.
+pub struct HtmlFragmentTarget;
+
+fn fragment_context(input: &[u8]) -> FragmentContext {
+    const HTML: &[&str] = &[
+        "body",
+        "div",
+        "html",
+        "head",
+        "table",
+        "tbody",
+        "tr",
+        "td",
+        "caption",
+        "colgroup",
+        "select",
+        "template",
+        "form",
+        "frameset",
+        "title",
+        "textarea",
+        "style",
+        "script",
+        "plaintext",
+        "noscript",
+        "iframe",
+        "xmp",
+    ];
+    let pick = (fingerprint(input) >> 8) as usize % (HTML.len() + 6);
+    match pick.checked_sub(HTML.len()) {
+        None => FragmentContext::html(HTML[pick]),
+        Some(0) => FragmentContext::svg("svg"),
+        Some(1) => FragmentContext::svg("foreignObject"),
+        Some(2) => FragmentContext::svg("desc"),
+        Some(3) => FragmentContext::mathml("mi"),
+        Some(4) => {
+            FragmentContext::mathml("annotation-xml").with_attribute("encoding", "text/html")
+        }
+        Some(_) => FragmentContext::mathml("math"),
+    }
+}
+
+fn build_fragment(context: &FragmentContext, chunks: &[&[u8]]) -> Result<DocumentRun, String> {
+    let mut parser = HtmlFragmentParser::new(context, Default::default(), Default::default())
+        .map_err(|error| format!("default limits rejected: {error}"))?;
+    for chunk in chunks {
+        if let Err(error) = parser.feed(chunk) {
+            return Ok(DocumentRun::Rejected(error));
+        }
+    }
+    let parsed = match parser.finish() {
+        Ok(parsed) => parsed,
+        Err(error) => return Ok(DocumentRun::Rejected(error)),
+    };
+    parsed
+        .document()
+        .dump_tree(parsed.root(), MAX_DUMP_BYTES)
+        .map(DocumentRun::Parsed)
+        .map_err(|error| format!("completed fragment could not be dumped: {error}"))
+}
+
+impl Target for HtmlFragmentTarget {
+    fn name(&self) -> &'static str {
+        "html-fragment"
+    }
+
+    fn max_len(&self) -> usize {
+        4096
+    }
+
+    fn dictionary(&self) -> &'static [&'static [u8]] {
+        HTML_DICTIONARY
+    }
+
+    fn check(&self, input: &[u8]) -> Result<(), String> {
+        let context = fragment_context(input);
+        let whole = build_fragment(&context, &[input])?;
+        for plan in feeds(input) {
+            let split = build_fragment(&context, &plan)?;
+            if split != whole {
+                return Err(format!(
+                    "fragment for {} {:?} differs from unbroken input with {}: {} vs {}",
+                    context.local_name(),
+                    context.namespace(),
+                    describe(&plan),
+                    summary(&split),
+                    summary(&whole)
+                ));
+            }
         }
         Ok(())
     }

@@ -101,8 +101,8 @@ write/end/finish after input closure returns `AlreadyFinished`, while queued inp
 can still be consumed. Cancellation/fatal parse errors poison future reads and
 writes. `feed`/`finish` collect tokens for fixed-context consumers; use the pull
 driver for feedback within a chunk. `with_context` supplies an explicit initial
-mode and bounded last-start-tag name for tests and future fragment integration.
-It still consumes UTF-8 bytes and is not a DOM-string fragment parser.
+mode and bounded last-start-tag name; `HtmlFragmentParser` uses it to start in
+the context's state. It consumes UTF-8 bytes and is not a DOM-string parser.
 
 The decoder's owned normalized output moves into a queued-input buffer when
 possible. Consumed prefixes compact only after sufficient progress, avoiding a
@@ -165,13 +165,13 @@ stream; another feed/finish returns `AlreadyFinished`.
 
 The [inert document parser](HTML_TREE.md) now implements complete document tree
 construction with scripting disabled, including foreign content and CDATA.
-Encoding sniffing, legacy decoders, restart, parser/script execution/reentry and
-fragment parsing remain planned. DOM-string/UTF-16 fragment input is also
-separate from the current UTF-8 byte interface.
+The fragment parsing algorithm is implemented over UTF-8 bytes. Encoding
+sniffing, legacy decoders, restart and parser/script execution/reentry remain
+planned. DOM-string/UTF-16 fragment input is separate from the UTF-8 interface.
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
-DOC-05b now has reference expansion and all four text modes; broader encoding work,
-fragment parsing and the fuzz gate remain open.
+DOC-05b now has reference expansion and all four text modes; broader encoding work
+remains open. Fragment parsing and the parser fuzz gate are complete (DOC-06c, DOC-08).
 
 ## Evidence and references
 

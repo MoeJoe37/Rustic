@@ -339,9 +339,10 @@ The file is read in fixed chunks (default 64 KiB) and never buffered whole. Its
 byte limit (default 8 MiB) is checked from metadata and enforced while reading,
 and also becomes the tokenizer's raw input budget. Parser token/node/depth/
 payload/diagnostic limits keep their defaults, and dump output is capped at
-64 MiB. Because exceeding any parser limit fails the whole load, messy pages can
-raise `--max-nodes`, `--max-depth` (default 256) and `--max-diagnostics`
-(default 1,024, applied to tokenizer and tree recoveries separately);
+64 MiB. Because exceeding a parser resource limit fails the whole load, large or
+deep pages can raise `--max-nodes` and `--max-depth` (default 256).
+`--max-diagnostics` (default 1,024, applied to tokenizer and tree recoveries
+separately) only bounds retained recoveries; later ones are counted, not fatal;
 `--max-input-bytes`, `--max-output-bytes` and `--chunk-bytes` set the rest. Cancellation is checked between reads. Any failure prints nothing on
 stdout: usage/URL errors exit 2, load/parse/budget failures exit 1. Unsupported
 constructs (processing instructions) fail explicitly rather than dumping a partial

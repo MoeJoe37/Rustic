@@ -20,13 +20,15 @@ Usage:
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
 prints a deterministic DOM tree dump. URLs are rejected.
 
-dump-dom options (positive integers; exceeding any limit fails the load):
+dump-dom options (positive integers; exceeding any limit except
+--max-diagnostics fails the load):
   --max-input-bytes N    file and tokenizer input bytes (default 8388608)
   --max-output-bytes N   dump output bytes (default 67108864)
   --chunk-bytes N        bytes read per step (default 65536)
   --max-nodes N          document nodes, including the root (default 100000)
   --max-depth N          element nesting depth (default 256)
-  --max-diagnostics N    retained tokenizer and tree recoveries, each (default 1024)";
+  --max-diagnostics N    retained tokenizer and tree recoveries, each; later
+                         recoveries are counted, not fatal (default 1024)";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();

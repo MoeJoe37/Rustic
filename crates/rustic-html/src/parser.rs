@@ -20,7 +20,8 @@ pub struct ParserLimits {
     pub tokenizer: TokenizerLimits,
     /// Connected/detached node, edge-depth and payload limits.
     pub document: DocumentLimits,
-    /// Maximum retained tree-construction recovery diagnostics.
+    /// Maximum retained tree-construction recovery diagnostics. Later
+    /// recoveries are counted in `dropped_diagnostics`, never fatal.
     pub max_tree_diagnostics: usize,
 }
 
@@ -41,6 +42,14 @@ pub struct ParsedDocument {
     mode: DocumentMode,
     tokenizer_diagnostics: Vec<Diagnostic>,
     tree_diagnostics: Vec<TreeDiagnostic>,
+    dropped_diagnostics: usize,
+}
+
+/// Tokenizer diagnostics handed from the driver to a finished tree builder.
+#[derive(Debug)]
+pub(crate) struct TokenizerDiagnostics {
+    pub(crate) retained: Vec<Diagnostic>,
+    pub(crate) dropped: usize,
 }
 
 impl ParsedDocument {
@@ -67,6 +76,12 @@ impl ParsedDocument {
     /// Bounded tree recoveries with zero-based delivered-token indexes.
     pub fn tree_diagnostics(&self) -> &[TreeDiagnostic] {
         &self.tree_diagnostics
+    }
+
+    /// Tokenizer and tree recoveries that exceeded the retention limits
+    /// (saturating); they were recovered from but not recorded.
+    pub fn dropped_diagnostics(&self) -> usize {
+        self.dropped_diagnostics
     }
 }
 
@@ -141,7 +156,7 @@ impl Driver {
         self.record_failure(result)
     }
 
-    fn finish(&mut self) -> Result<(TreeBuilder, Vec<Diagnostic>), ParseError> {
+    fn finish(&mut self) -> Result<(TreeBuilder, TokenizerDiagnostics), ParseError> {
         self.ensure_active()?;
         let result = self
             .tokenizer
@@ -151,7 +166,11 @@ impl Driver {
         self.record_failure(result)?;
         self.lifecycle = Lifecycle::Finished;
         let tree = self.tree.take().expect("active tree after successful EOF");
-        Ok((tree, self.tokenizer.diagnostics().to_vec()))
+        let diagnostics = TokenizerDiagnostics {
+            retained: self.tokenizer.diagnostics().to_vec(),
+            dropped: self.tokenizer.dropped_diagnostics(),
+        };
+        Ok((tree, diagnostics))
     }
 
     fn pump(&mut self) -> Result<(), ParseError> {

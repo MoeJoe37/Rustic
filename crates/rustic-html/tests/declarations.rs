@@ -383,14 +383,23 @@ fn declaration_tokens_diagnostics_and_raw_input_remain_globally_bounded() {
         },
         HtmlError::TokenLimit,
     );
-    assert_fatal(
-        "<!--a--!>",
+    // Diagnostics beyond the retention limit are counted, never fatal (TD-01).
+    let mut tokenizer = HtmlTokenizer::new(
         TokenizerLimits {
             max_diagnostics: 0,
             ..limits
         },
-        HtmlError::DiagnosticLimit,
+        CancellationToken::default(),
+    )
+    .unwrap();
+    assert!(
+        tokenizer
+            .feed(b"<!--a--!>")
+            .and_then(|_| tokenizer.finish())
+            .is_ok()
     );
+    assert!(tokenizer.diagnostics().is_empty());
+    assert_eq!(tokenizer.dropped_diagnostics(), 1);
     assert_fatal(
         "<!DOCTYPE html SYSTEM '' ignored>",
         TokenizerLimits {

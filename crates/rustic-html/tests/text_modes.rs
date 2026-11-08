@@ -459,7 +459,14 @@ fn text_driver_limits_and_cancellation_poison_future_reads_and_writes() {
     .unwrap();
     tokenizer.write(b"<!--").unwrap();
     tokenizer.end().unwrap();
-    assert_eq!(tokenizer.next_token(), Err(HtmlError::DiagnosticLimit));
+    // EOF in escaped script text is recovered; the diagnostic is only counted.
+    assert!(matches!(
+        tokenizer.next_token(),
+        Ok(Some(Token::Characters(_)))
+    ));
+    assert_eq!(tokenizer.next_token(), Ok(Some(Token::Eof)));
+    assert!(tokenizer.diagnostics().is_empty());
+    assert_eq!(tokenizer.dropped_diagnostics(), 1);
     let cancellation = CancellationToken::default();
     let mut tokenizer = HtmlTokenizer::default();
     assert_eq!(tokenizer.finish().unwrap(), [Token::Eof]);

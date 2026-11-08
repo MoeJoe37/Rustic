@@ -3,11 +3,11 @@ use rustic_dom::{
     SVG_NAMESPACE,
 };
 
-use crate::{Diagnostic, Doctype, Tag, Token, TokenizerMode};
+use crate::{Doctype, Tag, Token, TokenizerMode};
 
 use super::{
     ContextNamespace, DocumentMode, FragmentContext, ParseError, ParsedDocument, ParsedFragment,
-    TreeDiagnostic, TreeDiagnosticKind as ErrorKind, UnsupportedFeature,
+    TokenizerDiagnostics, TreeDiagnostic, TreeDiagnosticKind as ErrorKind, UnsupportedFeature,
 };
 
 mod body;
@@ -127,6 +127,7 @@ pub(super) struct TreeBuilder {
     text_mode: Option<TokenizerMode>,
     diagnostics: Vec<TreeDiagnostic>,
     max_diagnostics: usize,
+    dropped_diagnostics: usize,
     token_index: usize,
     done: bool,
     self_closing_acknowledged: bool,
@@ -154,6 +155,7 @@ impl TreeBuilder {
             text_mode: None,
             diagnostics: Vec::new(),
             max_diagnostics,
+            dropped_diagnostics: 0,
             token_index: 0,
             done: false,
             self_closing_acknowledged: false,
@@ -266,19 +268,20 @@ impl TreeBuilder {
             .is_some_and(|id| self.ns(id) != Ns::Html)
     }
 
-    pub(super) fn into_result(self, tokenizer_diagnostics: Vec<Diagnostic>) -> ParsedDocument {
+    pub(super) fn into_result(self, tokenizer: TokenizerDiagnostics) -> ParsedDocument {
         assert!(self.done, "result requires successfully processed EOF");
         ParsedDocument {
             document: self.document,
             mode: self.document_mode,
-            tokenizer_diagnostics,
+            tokenizer_diagnostics: tokenizer.retained,
             tree_diagnostics: self.diagnostics,
+            dropped_diagnostics: tokenizer.dropped.saturating_add(self.dropped_diagnostics),
         }
     }
 
     pub(super) fn into_fragment(
         mut self,
-        tokenizer_diagnostics: Vec<Diagnostic>,
+        tokenizer: TokenizerDiagnostics,
     ) -> Result<ParsedFragment, ParseError> {
         assert!(self.done, "result requires successfully processed EOF");
         let context = self.context.take().expect("fragment builder has a context");
@@ -291,8 +294,9 @@ impl TreeBuilder {
         Ok(ParsedFragment {
             document: self.document,
             root,
-            tokenizer_diagnostics,
+            tokenizer_diagnostics: tokenizer.retained,
             tree_diagnostics: self.diagnostics,
+            dropped_diagnostics: tokenizer.dropped.saturating_add(self.dropped_diagnostics),
         })
     }
 
@@ -430,8 +434,10 @@ impl TreeBuilder {
     }
 
     fn diagnostic(&mut self, kind: ErrorKind) -> Result<(), ParseError> {
-        if self.diagnostics.len() == self.max_diagnostics {
-            return Err(ParseError::TreeDiagnosticLimit);
+        if self.diagnostics.len() >= self.max_diagnostics {
+            // Recovery continues; only the retained list is bounded (TD-01).
+            self.dropped_diagnostics = self.dropped_diagnostics.saturating_add(1);
+            return Ok(());
         }
         self.diagnostics
             .try_reserve(1)

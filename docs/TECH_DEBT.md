@@ -48,7 +48,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 
 | ID | Kind | Area | Summary | Status |
 | --- | --- | --- | --- | --- |
-| TD-01 | Bad | HTML parser | Diagnostic count limits make error-heavy pages fail | Fixing |
+| TD-01 | Bad | HTML parser | Diagnostic count limits made error-heavy pages fail | Paid |
 | TD-02 | Deliberate | DOM / parser | Depth and node budgets abort the whole parse | Open, pay before real-page loading |
 | TD-03 | Watch | DOM | Every insert walks the moved subtree to measure height | Open, no measured blowup |
 | TD-04 | Deliberate | All crates | Invariant `expect`/indexing in library code | Open, governed by rule 6 |
@@ -64,18 +64,22 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / base | HTML diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 
-### TD-01 — Diagnostic count limits make error-heavy pages fail
+### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
 `TokenizerLimits::max_diagnostics` and `ParserLimits::max_tree_diagnostics`
-(both 1,024) are fatal: the 1,025th recorded parse error discards the tree
+(both 1,024) were fatal: the 1,025th recorded parse error discards the tree
 (`HtmlError::DiagnosticLimit`, `ParseError::TreeDiagnosticLimit`). Parse
 errors never stop a conforming HTML parser, and ordinary pages routinely have
-thousands, so this limit rejects valid-to-load content to protect a vector of
+thousands, so this limit rejected valid-to-load content to protect a vector of
 diagnostics that the tree does not depend on.
 
-**Why bad:** it makes the web less loadable for no resource benefit beyond the
-diagnostic list itself. **Pay:** keep the first N diagnostics, count the rest
-as dropped, expose the dropped count, and keep loading. **Trigger:** now.
+**Why bad:** it made the web less loadable for no resource benefit beyond the
+diagnostic list itself. **Paid:** the tokenizer and tree builder keep the first
+N diagnostics and count the rest; `HtmlTokenizer::dropped_diagnostics`,
+`ParsedDocument::dropped_diagnostics` and `ParsedFragment::dropped_diagnostics`
+expose the count, and both fatal error variants are gone. A test parses a page
+with over 3,000 recoveries at default limits and checks that the tree does not
+depend on the retention limit.
 
 ### TD-02 — Depth and node budgets abort the whole parse
 

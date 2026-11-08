@@ -164,19 +164,12 @@ fn dump_dom_parser_limits_are_configurable() {
     let noisy = Path::new(directory).join("rustic-cli-noisy.html");
     fs::write(&noisy, "<!doctype html>".to_owned() + &"</span>".repeat(20)).expect("write fixture");
     let noisy = noisy.to_str().expect("UTF-8 path");
-    assert!(rustic(&["dump-dom", noisy]).status.success());
+    let full = rustic(&["dump-dom", noisy]);
+    assert!(full.status.success());
+    // Parse errors beyond the retention limit are counted, never fatal.
     let output = rustic(&["dump-dom", "--max-diagnostics", "5", noisy]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(
-        stderr(&output).contains("diagnostic limit"),
-        "{}",
-        stderr(&output)
-    );
-    assert!(
-        rustic(&["dump-dom", "--max-diagnostics", "40", noisy])
-            .status
-            .success()
-    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(output.stdout, full.stdout);
 
     let path = fixture("malformed.html");
     let path = path.to_str().expect("UTF-8 fixture path");

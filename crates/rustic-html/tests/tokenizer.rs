@@ -288,7 +288,23 @@ fn exact_resource_boundaries_are_enforced_before_further_output() {
         },
         HtmlError::AttributeLimit,
     );
-    assert_fatal(b"\0", limits, HtmlError::DiagnosticLimit);
+    // Diagnostics beyond the retention limit are counted, never fatal (TD-01).
+    let mut tokenizer = HtmlTokenizer::new(
+        TokenizerLimits {
+            max_diagnostics: 0,
+            ..limits
+        },
+        CancellationToken::default(),
+    )
+    .unwrap();
+    assert!(
+        tokenizer
+            .feed(b"\0")
+            .and_then(|_| tokenizer.finish())
+            .is_ok()
+    );
+    assert!(tokenizer.diagnostics().is_empty());
+    assert_eq!(tokenizer.dropped_diagnostics(), 1);
     assert_fatal(
         b"abcd",
         TokenizerLimits {

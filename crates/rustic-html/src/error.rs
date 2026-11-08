@@ -15,8 +15,6 @@ pub enum HtmlError {
     TokenBytesLimit,
     /// Too many attributes were encountered in a tag, including duplicates.
     AttributeLimit,
-    /// The bounded diagnostic collection is full.
-    DiagnosticLimit,
     /// Text chunk size is zero or exceeds the token byte limit.
     InvalidLimits,
     /// Cooperative cancellation was requested.
@@ -36,7 +34,6 @@ impl fmt::Display for HtmlError {
             Self::TokenLimit => "HTML token count limit exceeded",
             Self::TokenBytesLimit => "HTML token data limit exceeded",
             Self::AttributeLimit => "HTML attribute count limit exceeded",
-            Self::DiagnosticLimit => "HTML diagnostic count limit exceeded",
             Self::InvalidLimits => "invalid HTML tokenizer limits",
             Self::Cancelled => "HTML processing cancelled",
             Self::AlreadyFinished => "HTML input is already closed",

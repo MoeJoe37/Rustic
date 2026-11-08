@@ -129,7 +129,7 @@ longest-match lookahead does not move that location to a later mismatch.
 | Markup token data | 64 KiB | UTF-8 payload per tag/comment/doctype/instruction, including discarded tag duplicates |
 | Character chunk | 16 KiB | Maximum retained character-token bytes; positive and no larger than markup-data limit |
 | Attributes | 128 | Occurrences per tag, including duplicates |
-| Diagnostics | 1,024 | Retained recoverable conditions per stream |
+| Diagnostics | 1,024 | Retained recoverable conditions per stream; later ones are counted by `dropped_diagnostics()`, never fatal |
 
 `TokenizerLimits` allows explicit caller budgets. Zero input/attribute/diagnostic
 budgets are supported; zero tokens cannot successfully emit EOF. Markup accounting

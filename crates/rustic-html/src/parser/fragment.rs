@@ -93,6 +93,7 @@ pub struct ParsedFragment {
     pub(super) root: NodeId,
     pub(super) tokenizer_diagnostics: Vec<Diagnostic>,
     pub(super) tree_diagnostics: Vec<TreeDiagnostic>,
+    pub(super) dropped_diagnostics: usize,
 }
 
 impl ParsedFragment {
@@ -119,6 +120,12 @@ impl ParsedFragment {
     /// Bounded tree recoveries with zero-based delivered-token indexes.
     pub fn tree_diagnostics(&self) -> &[TreeDiagnostic] {
         &self.tree_diagnostics
+    }
+
+    /// Tokenizer and tree recoveries that exceeded the retention limits
+    /// (saturating); they were recovered from but not recorded.
+    pub fn dropped_diagnostics(&self) -> usize {
+        self.dropped_diagnostics
     }
 }
 

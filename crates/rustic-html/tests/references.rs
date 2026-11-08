@@ -255,14 +255,23 @@ fn expanded_payloads_and_reference_errors_respect_resource_limits() {
         },
         HtmlError::TokenLimit,
     );
-    assert_fatal(
-        "&amp",
+    // Diagnostics beyond the retention limit are counted, never fatal (TD-01).
+    let mut tokenizer = HtmlTokenizer::new(
         TokenizerLimits {
             max_diagnostics: 0,
             ..limits
         },
-        HtmlError::DiagnosticLimit,
+        CancellationToken::default(),
+    )
+    .unwrap();
+    assert!(
+        tokenizer
+            .feed(b"&amp")
+            .and_then(|_| tokenizer.finish())
+            .is_ok()
     );
+    assert!(tokenizer.diagnostics().is_empty());
+    assert_eq!(tokenizer.dropped_diagnostics(), 1);
     assert_fatal(
         "&amp;",
         TokenizerLimits {

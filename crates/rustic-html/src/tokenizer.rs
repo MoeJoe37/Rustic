@@ -37,7 +37,8 @@ pub struct TokenizerLimits {
     pub max_text_chunk_bytes: usize,
     /// Attribute occurrences per tag; duplicates also consume this limit.
     pub max_attributes: usize,
-    /// Maximum retained recoverable diagnostics.
+    /// Maximum retained recoverable diagnostics. Later diagnostics are
+    /// counted, not retained; parse errors never stop tokenization.
     pub max_diagnostics: usize,
 }
 
@@ -116,6 +117,7 @@ pub struct HtmlTokenizer {
     tokens: Budget,
     text: String,
     diagnostics: Vec<Diagnostic>,
+    dropped_diagnostics: usize,
     normalized_offset: usize,
     finished: bool,
     poisoned: bool,
@@ -161,6 +163,7 @@ impl HtmlTokenizer {
             tokens: Budget::new(limits.max_tokens),
             text: String::new(),
             diagnostics: Vec::new(),
+            dropped_diagnostics: 0,
             normalized_offset: 0,
             finished: false,
             poisoned: false,
@@ -170,6 +173,12 @@ impl HtmlTokenizer {
     /// Bounded recoverable diagnostics in processing order.
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
+    }
+
+    /// Recoverable diagnostics seen after the retained list was full
+    /// (saturating).
+    pub fn dropped_diagnostics(&self) -> usize {
+        self.dropped_diagnostics
     }
 
     fn ensure_active(&self) -> Result<(), HtmlError> {
@@ -514,7 +523,10 @@ impl HtmlTokenizer {
         normalized_offset: usize,
     ) -> Result<(), HtmlError> {
         if self.diagnostics.len() >= self.limits.max_diagnostics {
-            return Err(HtmlError::DiagnosticLimit);
+            // Parse errors are recoverable: keep tokenizing and only count
+            // what no longer fits (docs/TECH_DEBT.md TD-01).
+            self.dropped_diagnostics = self.dropped_diagnostics.saturating_add(1);
+            return Ok(());
         }
         self.diagnostics.push(Diagnostic {
             kind,

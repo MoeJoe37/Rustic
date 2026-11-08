@@ -19,8 +19,6 @@ pub enum ParseError {
     Tokenizer(HtmlError),
     /// A checked document operation or allocation failed.
     Document(DomError),
-    /// Recoverable tree errors exceeded the configured collection bound.
-    TreeDiagnosticLimit,
     /// Required tree-construction behavior is outside the implemented subset.
     Unsupported(UnsupportedFeature),
     /// A successful EOF already transferred the document to the caller.
@@ -46,7 +44,6 @@ impl fmt::Display for ParseError {
         match self {
             Self::Tokenizer(error) => write!(f, "HTML tokenizer: {error}"),
             Self::Document(error) => write!(f, "HTML document: {error}"),
-            Self::TreeDiagnosticLimit => f.write_str("HTML tree diagnostic limit exceeded"),
             Self::Unsupported(feature) => {
                 write!(f, "unsupported HTML tree construction: {feature:?}")
             }

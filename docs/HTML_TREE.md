@@ -86,9 +86,12 @@ caller-created nodes. Template contents are separate roots, so their nesting is
 bounded by node and token budgets rather than edge depth; construction,
 completion, dumps and destruction are iterative.
 
-Exceeding a budget is fatal: a document deeper than `max_depth`, or with more
-recovery diagnostics than `max_tree_diagnostics`, fails rather than being
-truncated. Callers parsing untrusted pages should size those limits explicitly.
+Exceeding a resource budget is fatal: a document deeper than `max_depth` fails
+rather than being truncated ([TD-02](TECH_DEBT.md#td-02--depth-and-node-budgets-abort-the-whole-parse)).
+Diagnostic limits only bound what is retained: parse errors never stop parsing,
+and recoveries past `max_tree_diagnostics` or the tokenizer's `max_diagnostics`
+are counted by `dropped_diagnostics()` on the parsed document or fragment. The
+tree is identical whatever the retention limits are.
 
 The parser owns all construction state and exposes no partial DOM. `feed` pumps
 available tokens, pausing to apply mode changes before more tokenization.

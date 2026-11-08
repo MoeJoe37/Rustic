@@ -345,18 +345,23 @@ fn diagnostics_have_separate_exact_budgets_and_stable_delivery_indexes() {
     };
     let result = parse(b"", limits).unwrap();
     assert_eq!(result.tree_diagnostics()[0].token_index, 0);
+    assert_eq!(result.dropped_diagnostics(), 0);
+    // Exceeding a retention limit keeps parsing and counts the rest (TD-01).
     limits.max_tree_diagnostics = 0;
+    let result = parse(b"", limits).unwrap();
+    assert!(result.tree_diagnostics().is_empty());
+    assert_eq!(result.dropped_diagnostics(), 1);
     assert_eq!(
-        parse(b"", limits).unwrap_err(),
-        ParseError::TreeDiagnosticLimit
+        parse(b"<!doctype html>", limits)
+            .unwrap()
+            .dropped_diagnostics(),
+        0
     );
-    assert!(parse(b"<!doctype html>", limits).is_ok());
     limits.max_tree_diagnostics = 8;
     limits.tokenizer.max_diagnostics = 0;
-    assert_eq!(
-        parse(b"<p>\0", limits).unwrap_err(),
-        ParseError::Tokenizer(HtmlError::DiagnosticLimit)
-    );
+    let result = parse(b"<p>\0", limits).unwrap();
+    assert!(result.tokenizer_diagnostics().is_empty());
+    assert!(result.dropped_diagnostics() >= 1);
     let source = b"<!doctype html><body>\0\0";
     limits.tokenizer.max_diagnostics = 2;
     limits.max_tree_diagnostics = 2;
@@ -367,10 +372,34 @@ fn diagnostics_have_separate_exact_budgets_and_stable_delivery_indexes() {
         result.tree_diagnostics()[1].token_index
     );
     limits.max_tree_diagnostics = 1;
+    let truncated = parse(source, limits).unwrap();
     assert_eq!(
-        parse(source, limits).unwrap_err(),
-        ParseError::TreeDiagnosticLimit
+        truncated.tree_diagnostics(),
+        &result.tree_diagnostics()[..1]
     );
+    assert_eq!(
+        truncated.dropped_diagnostics(),
+        result.dropped_diagnostics() + 1
+    );
+    // The tree never depends on how many diagnostics were retained.
+    assert_eq!(
+        truncated
+            .document()
+            .dump_tree(truncated.document().root(), 1 << 16),
+        result
+            .document()
+            .dump_tree(result.document().root(), 1 << 16)
+    );
+}
+
+#[test]
+fn error_heavy_documents_load_with_default_limits() {
+    // Far more recoverable errors than the default retention limits.
+    let source = "<p>\0</b>".repeat(3000);
+    let result = parse(source.as_bytes(), ParserLimits::default()).unwrap();
+    assert_eq!(result.tokenizer_diagnostics().len(), 1024);
+    assert_eq!(result.tree_diagnostics().len(), 1024);
+    assert!(result.dropped_diagnostics() > 3000);
 }
 
 #[test]

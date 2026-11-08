@@ -29,7 +29,10 @@ mod storage;
 mod string;
 mod traversal;
 
-pub use document::{Adopted, Document, DocumentLimits, ReadyState};
+pub use document::tracing::{
+    CollectionStats, HostHeap, HostHeapError, HostHeapLimits, HostObjectId, Traced,
+};
+pub use document::{Adopted, Document, DocumentLimits, InvariantViolation, ReadyState};
 pub use dump::DumpError;
 pub use error::DomError;
 pub use name::{HTML_NAMESPACE, MATHML_NAMESPACE, QualifiedName, SVG_NAMESPACE};

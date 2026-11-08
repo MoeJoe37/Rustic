@@ -126,6 +126,9 @@ impl TreeBuilder {
         let id = self.create_element(tag, ns)?;
         self.attach_or_destroy(place.parent, place.before, id)?;
         self.open.push(id);
+        if ns == Ns::Html && tag.name() == "option" {
+            self.option_inserted(id);
+        }
         Ok(id)
     }
 

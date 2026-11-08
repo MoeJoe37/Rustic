@@ -8,7 +8,7 @@ when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-07
 and DOC-08 are complete for their declared scope, including fragment parsing;
-M2–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
+M2 has started with CSS-01; M3–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
@@ -78,6 +78,7 @@ not scheduled automation created by this commit.
 - [x] Define CI for formatting, Clippy, docs, builds/tests, and repository checks.
 - [x] Configure weekly Dependabot checks for Cargo and GitHub Actions.
 - [x] Include Android/iOS in the architecture and configure early shared-core cross-checks; see [mobile plan](MOBILE.md).
+- [x] Support any device that can run a browser: native x64/ARM64 tests on Linux, Windows and macOS, emulated 32-bit ARM/x86, RISC-V and big-endian tests, and further cross-checks; see [platform support](PLATFORMS.md) and ADR 0013.
 - [x] Record a successful baseline CI run ([run](https://github.com/MoeJoe37/Rustic/actions/runs/42371959628)).
 - [x] Proceed with the baseline design following maintainer authorization to execute the plan.
 - [ ] Configure repository rules requiring the CI gate after it has run once.
@@ -115,7 +116,7 @@ Do not label a happy-path tag splitter an HTML implementation.
 
 | Task | Work and deliverable | Prerequisite |
 | --- | --- | --- |
-| CSS-01 | CSS syntax tokenizer/parser, escapes, comments, blocks, bad-token recovery, source locations | DOC-01 |
+| CSS-01 | **Done** ([CSS.md](CSS.md)): CSS syntax tokenizer/parser, escapes, comments, blocks, bad-token recovery, source locations | DOC-01 |
 | CSS-02 | Type/universal/ID/class/attribute selectors, combinators, specificity, initial pseudo-classes | CSS-01, DOM views |
 | CSS-03 | Typed property parsers: display, box model, color, font basics, lengths/percentages | CSS-01 |
 | CSS-04 | UA/user/author origins, importance, inline styles, source order, inheritance and CSS-wide values | CSS-02, CSS-03 |
@@ -336,8 +337,10 @@ progress cannot bypass these gates.
 These are issue-ready tasks, not GitHub issues created by this commit. Work in
 order. Status reflects [implementation progress](IMPLEMENTATION.md) as of
 2026-11-08. DOC-06c (the HTML fragment parsing algorithm and all 192 html5lib
-fragment records) is also done. The queue continues with DOC-06d
-(`selectedcontent` mirroring), item 12, then CSS-01.
+fragment records) is also done. CSS-01 (CSS syntax) is done as the first M2 task. DOC-06d
+(`selectedcontent` mirroring) is done too, so every runnable html5lib tree record
+passes. Item 12 is owned by a separate thread; this queue continues with CSS-02
+onward in the M2 table.
 
 | Order | Task / suggested issue title | Concrete completion test | Status |
 | --- | --- | --- | --- |
@@ -349,10 +352,10 @@ fragment records) is also done. The queue continues with DOC-06d
 | 6 | DOC-05a: Implement incremental tokenizer data/tag/comment states | Chunked/unbroken token sequences match for every fixture split | Done |
 | 7 | DOC-05b: Add entities, raw/RCDATA/script text and encoding cases | Pinned tokenizer subset with errors and malformed inputs | Done |
 | 8 | DOC-06a: Implement initial/before-html/head/body insertion modes | Implied-node and malformed nesting tree fixtures | Done |
-| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (1,580/1,584 records) |
+| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (all 1,584 document records, with DOC-06d) |
 | 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected | Done |
 | 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Done (fuzz smoke + all fragment records) |
-| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Not started |
+| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Done (prototype; ADR 0012) |
 
 For every issue include task ID, dependencies, specification section/revision,
 in/out scope, input/output contract, acceptance fixtures, budget behavior, and

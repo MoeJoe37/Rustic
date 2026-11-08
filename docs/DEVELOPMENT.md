@@ -60,15 +60,19 @@ to refresh generated README assets and dispatch CI for its bot commit.
 | Job | Environment | Checks |
 | --- | --- | --- |
 | `Quality` | Ubuntu 24.04, pinned toolchain | rustfmt, Clippy with denied warnings, rustdoc with denied warnings |
-| `Test (OS)` | Ubuntu 24.04, Windows 2022, macOS 15; pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run |
+| `Test (platform)` | Linux x64/ARM64 (Ubuntu 24.04), Windows x64 (2022)/ARM64 (11), macOS ARM64/x64 (15); pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run |
+| `Emulated test (target)` | Ubuntu 24.04 with cross linkers and QEMU user mode | All-target tests and CLI smoke run for 32-bit ARM, 32-bit x86, RISC-V 64 and big-endian s390x |
+| `Cross-check (target)` | Ubuntu 24.04 | `cargo check --all-targets` for ARMv6, musl ARM64/x64, Windows ARM64 (gnullvm) and 32-bit, POWER, LoongArch and FreeBSD |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |
-| `Mobile core (target)` | Ubuntu for Android ARM64/x86-64; macOS for iOS ARM64 device/simulator | Check all workspace libraries with pinned Rust; no application linking or device execution |
+| `Mobile core (target)` | Ubuntu for Android ARM64/ARMv7/x86-64/x86; macOS for iOS ARM64 device/simulator and x86-64 simulator | Check all workspace libraries with pinned Rust; no application linking or device execution |
 | `Repository checks` | Ubuntu 24.04, Python 3.11+ | Local Markdown file links, whitespace, TOML/JSON parse, manifest/toolchain consistency |
 | `CI` | Aggregate gate | Fails if any prerequisite fails, is cancelled, or is unexpectedly skipped |
 | `Publish progress` | Successful default-branch CI only | Regenerates README/chart; safely pushes changed outputs and dispatches bot-commit validation |
 
+The target matrix and portability rules are in [PLATFORMS.md](PLATFORMS.md).
 Checkout is pinned to the verified v7.0.1 commit. Rust toolchains are installed
-with rustup already present on GitHub-hosted runners. No additional third-party
+with rustup already present on GitHub-hosted runners (the test job installs
+rustup first on any image that lacks it). No additional third-party
 action is needed for setup or caching. The exact Rust release is intentionally
 duplicated in workflow env and the toolchain file, and the repository check
 verifies they agree. Update the pin and lockfile/tooling in a reviewed change;

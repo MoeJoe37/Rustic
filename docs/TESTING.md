@@ -6,7 +6,7 @@ The current suite has viewport boundary/error tests, CLI subprocess tests, a
 rustdoc example, shared primitive boundary/concurrency tests, DOM hierarchy and
 payload tests, seeded mutations against an independent ordered-tree model, repository
 consistency checks, and compiler/linter checks.
-URL parsing now adds focused host/origin/limit, file URL and diagnostics tests and an 815-case pinned WPT
+URL parsing now adds focused host/origin/limit, file URL and diagnostics tests and an 887-case pinned WPT
 URL-data subset; see [scope and provenance](URL.md). HTML input/tokenization adds
 53 focused tests plus 1,079 selected declaration cases and all 4,626 cases in the
 pinned html5lib reference files, with token fields, diagnostic order and chunk
@@ -93,7 +93,7 @@ serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
 `rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing for the HTML tokenizer, document and fragment parsers and the URL parser, with seed replay,
+fuzzing for the HTML tokenizer, document and fragment parsers, the CSS parser and the URL parser, with seed replay,
 minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
 campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
 cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a

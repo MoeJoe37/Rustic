@@ -174,9 +174,10 @@ parser-backed `dump-dom` command arrived with DOC-07.
 ## DOC-02a — URL records, parsing and origins
 
 `rustic-url` now implements immutable URL records, original special/generic URL
-and reference parsing, ASCII hosts, IPv4/IPv6, encoding/serialization and structured
-origins. It depends only on `rustic-base`. File/blob URLs and Unicode IDNA return
-explicit unsupported errors. Limits and cooperative cancellation are integrated;
+and reference parsing, ASCII and Unicode (UTS #46 IDNA) hosts, IPv4/IPv6,
+encoding/serialization and structured origins. It depends only on `rustic-base`;
+IDNA uses generated Unicode 17.0.0 tables (see [URL.md](URL.md)). File/blob URLs
+return explicit unsupported errors. Limits and cooperative cancellation are integrated;
 the supplied base is immutable even on failure. Debug/error output omits userinfo
 and private URL payloads.
 
@@ -210,8 +211,9 @@ gone. Native path conversion and access policy remain loader/platform work.
 covering the URL parser, host code points and all IPv4/IPv6 errors. IDNA-specific
 errors arrive with the IDNA adapter.
 
-Evidence: the pinned WPT subset grows from 685 to 815 cases (all 130 file cases
-pass, 84 excluded), every expected failure there yields a diagnostic, two new
+Evidence: the pinned WPT subset grew from 685 to 815 cases (all 130 file cases
+pass), then to 887 once IDNA allowed the 72 non-ASCII records (only 12 blob
+records remain excluded), every expected failure there yields a diagnostic, two new
 file tests and eight diagnostics tests in `rustic-url`, and the URL fuzz target
 now also uses file bases and checks diagnostic offsets and result equality.
 
@@ -373,6 +375,26 @@ splits, budgets, cancellation and lifecycle. A fourth fuzz target,
 found no failures. See [HTML_TREE.md](HTML_TREE.md). DOM-string/UTF-16 fragment
 input and `innerHTML` bindings remain future work.
 
+## DOC-06d — `selectedcontent` mirroring
+
+The tree builder now tracks option selectedness for single-selection selects
+(the last option inserted with `selected`, otherwise the first non-disabled
+option) and runs "maybe clone an option into selectedcontent" when an option
+leaves the stack of open elements, including the stop-parsing pops at EOF. The
+selected option's children are deep-cloned with `Document::clone_node` (DOC-04c)
+into the select's enabled `selectedcontent` (none for `multiple`, or when the
+first one sits in a nested select), replacing earlier mirrored contents. Clones
+consume the ordinary node and payload budgets; a limit failure is fatal like any
+other DOM failure. Selectedness is evaluated when the parser notices the pop, at
+the end of the token that caused it, which yields the same final tree.
+
+The four `webkit02.dat` records that were known failures now pass, so **all
+1,776 runnable html5lib tree records pass** at every split and `KNOWN_FAILURES`
+is empty. Two focused tests cover default/explicit/disabled selection,
+`multiple`, clone independence and exact node budgets with mirrored clones.
+Mirroring after parsing (user selection changes, script-set `selected`) is DOM
+element behavior for the bindings milestone.
+
 ## DOC-07 — Bounded local loader and `dump-dom`
 
 `rustic dump-dom [OPTIONS] [--] <file>` loads exactly one local file granted on the command line and prints the
@@ -410,7 +432,7 @@ still grows with DOC-06.
 `rustic-fuzz` is a dependency-free, deterministic mutation fuzzer in safe,
 portable Rust (standard library only, so it builds on every supported host). It
 is blind, not coverage-guided: coverage engines and sanitizers stay behind the
-[dependency review](DEPENDENCIES.md). Four targets check crash-freedom at
+[dependency review](DEPENDENCIES.md). Five targets check crash-freedom at
 default budgets plus a differential invariant:
 
 | Target | Invariant beyond "no panic, no hang" | Seeds |
@@ -418,6 +440,7 @@ default budgets plus a differential invariant:
 | `html-tokenizer` | Tokens and diagnostics match the unbroken input for a two-chunk split, fixed-size chunks and (up to 512 bytes) one-byte feeds | Checked-in pages plus all 1,792 html5lib tree `#data` inputs |
 | `html-document` | The same feed plans yield the same dump or the same `ParseError`; completed trees always dump; a fresh parser never reports a lifecycle error; a cancelled parser never completes | Same as above |
 | `html-fragment` | The same feed-plan equality for fragment parsing, with one of 28 HTML/SVG/MathML contexts chosen from the input's fingerprint (added with DOC-06c) | Same as above |
+| `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01) | Checked-in sheet plus the css-parsing-tests inputs |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -441,6 +464,61 @@ decoding. Before landing, 1.2 million mutated executions over five seeds found
 no failures, so `regressions/` is empty. That is evidence of robustness at the
 tested depth, not proof of absence of defects.
 
+## DOC-09 — DOM/host tracing prototype and DOM conformance gate
+
+`HostHeap` (`crates/rustic-dom/src/document/tracing.rs`) is a stop-the-world,
+nonmoving mark/sweep model of the future JS heap, bound to one document, so the
+DOM side of the tracing contract is tested before a runtime exists
+([ADR 0012](adr/0012-dom-tracing-prototype.md), [DOM.md](DOM.md)). Objects have
+generation-checked `HostObjectId`s; node → object, object → node and
+object → object edges and counted node/object roots are registered explicitly
+and bounded by `HostHeapLimits`. Holding any node keeps its whole tree; a
+template and its contents keep each other; the document's tree is always live.
+`collect` reserves all temporary storage first, marks iteratively, destroys
+unreachable parentless trees through `destroy_subtree` (their IDs go stale),
+frees unreachable objects, and prunes entries naming nodes destroyed or adopted
+away by the engine.
+
+The gate half adds `Document::check_invariants`, a linear structural checker,
+and `tests/conformance.rs`, which runs all 25,230 (parent, node, reference
+child) combinations over a fixture with every node kind, connected and detached
+trees, template contents and four free fragments against an oracle transcribed
+from the DOM Standard's pre-insert steps (reviewed 2026-11-08). It checks the
+exception class and step precedence, resulting child order, unchanged trees after
+a rejection and invariants after every call. It found and this change fixes two
+gaps in `insert_before`: the document node was rejected before the ancestor and
+reference steps, and re-inserting the existing document element or doctype into
+the document was accepted as a reorder instead of `HierarchyRequestError`. The
+`html-document` and `html-fragment` fuzz targets now also check invariants on
+every completed tree; 600,000 mutated executions found no violations.
+
+Ten tracing tests cover rooted detached trees, wrapper/listener cycles, connected
+nodes keeping objects, template liveness both ways, engine destruction and
+adoption pruning, foreign/stale/node-to-node rejections, exact limits, a
+100,000-object ring through a 256-deep chain, and 200 seeded graphs compared with
+an independent fixpoint model. A unit test corrupts links, kinds, accounting,
+parent cycles and document order to show the checker detects each. Not covered:
+a real JS heap, multi-document heaps, incremental collection, replace/remove
+algorithms (no such APIs yet) and web-platform-tests, which need bindings.
+## CSS-01 — CSS syntax tokenizer and parser
+
+`rustic-css` implements CSS Syntax Level 3 tokenization, component values and
+the stylesheet/rule-list/rule/declaration/block-contents/component-value entry
+points, with CSS Nesting's block contents (declarations, at-rules and nested
+qualified rules) and byte spans on every token, value, rule, declaration and
+diagnostic. Rule blocks stay raw component values; `parse_block_contents` reads
+them on demand. Input/token/nesting limits and cancellation are fatal with no
+partial result; diagnostics are bounded with a dropped count. The algorithms are
+iterative and the nesting limit bounds result depth.
+
+The vendored CC0 css-parsing-tests corpus passes **139 of 149** cases (9
+unicode-range cases excluded, 1 documented 2021-vs-Nesting difference) after the
+adaptations listed in [CSS.md](CSS.md). Eight focused tests cover spans,
+escapes, recovery, numbers, nested blocks, exact limits, cancellation and entry
+point errors; a fifth fuzz target, `css`, checks span coverage and totality
+(300,000 executions, no failures). Byte-stream encoding, selectors, properties
+and the cascade are later CSS tasks.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -462,9 +540,17 @@ earns no completion credit; the reweighting is recorded in [PROGRESS.md](PROGRES
 
 Platform scope now includes Windows, macOS, Linux, Android and iOS/iPadOS, with
 Mozilla/Firefox/Gecko and SpiderMonkey explicitly excluded as engine foundations.
-MOB-01 configures four shared-library cross-checks; see [MOBILE.md](MOBILE.md) and
+MOB-01 configures seven shared-library cross-checks; see [MOBILE.md](MOBILE.md) and
 [ADR 0006](adr/0006-desktop-and-mobile-platforms.md). Native mobile hosts,
 link/package checks, runtime tests and device support remain planned.
+
+Rustic must support any device that can run a browser ([ADR 0013](adr/0013-any-capable-device.md),
+[PLATFORMS.md](PLATFORMS.md)). CI now runs the full suite natively on Linux,
+Windows and macOS for both x64 and ARM64, under QEMU for 32-bit ARM, RISC-V and
+big-endian s390x (32-bit x86 natively), and cross-checks eight more targets. The
+first 32-bit run found a DOM test that built a multi-gigabyte dump, impossible in
+a 32-bit address space; TD-18's linear dump format removes it. Every later task
+must keep all tiers green.
 
 | First implementation queue item | Status |
 | --- | --- |
@@ -475,19 +561,22 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |
 | DOC-04c: node kinds, cloning, adoption and lifecycle | Complete: general fragments, PI/CDATA, clone, cross-document adoption with ID maps, `ReadyState`; mutation records pending |
-| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA and blob remain pending |
-| DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 815-case WPT subset, standard-named diagnostics with offsets |
+| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset plus UTS #46 IDNA (all 6,389 Unicode IdnaTestV2 cases); blob remains pending |
+| DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 887-case WPT subset (all but 12 blob records), standard-named diagnostics with offsets |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |
-| DOC-06b: tables/formatting/template/foreign tree rules | Done: 1,580/1,584 runnable html5lib document records at every split; `selectedcontent` pending |
+| DOC-06b: tables/formatting/template/foreign tree rules | Done: all 1,584 runnable html5lib document records at every split (with DOC-06d) |
+| DOC-06d: `selectedcontent` mirroring | Done: last four known tree failures fixed; 1,776/1,776 runnable records |
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
-| DOC-09: traced node/JS ownership prototype | Not started |
+| DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
+| CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
-`html.conformance` is complete. The next queue work is DOC-06d (`selectedcontent`
-mirroring, the last four known tree failures), then DOC-09 and CSS-01. All project crates remain safe
+`html.conformance` is complete and DOC-06d removed the last known tree
+failures. CSS-01 has started M2. Next: CSS-02 selectors and specificity, then
+CSS-03 typed property parsers. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

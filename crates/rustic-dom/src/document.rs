@@ -8,6 +8,10 @@ use crate::{
 
 mod adoption;
 mod character_data;
+mod invariants;
+pub(crate) mod tracing;
+
+pub use invariants::InvariantViolation;
 
 pub use adoption::Adopted;
 
@@ -252,9 +256,6 @@ impl Document {
     ) -> Result<(), DomError> {
         let parent_node = self.node(parent)?;
         let child_node = self.node(child)?;
-        if child == self.root {
-            return Err(DomError::ProtectedRoot);
-        }
         if !matches!(
             parent_node.kind(),
             NodeKind::Document | NodeKind::Element(_) | NodeKind::DocumentFragment
@@ -263,6 +264,12 @@ impl Document {
         }
         // DOM "ensure pre-insert validity" order: host-including ancestors
         // (hopping from template contents to their template) before the reference.
+        // A child with no children and no template contents can only be its own
+        // ancestor, so hopping is skipped; this keeps the parser's insertion of a
+        // fresh template into nested contents linear instead of quadratic.
+        let child_is_leaf = child_node.first_child().is_none()
+            && !matches!(child_node.kind(), NodeKind::Element(element)
+                if element.template_contents().is_some());
         let mut depth = 0usize;
         let mut in_parent_tree = true;
         let mut ancestor = Some(parent);
@@ -276,6 +283,7 @@ impl Document {
                     depth += usize::from(in_parent_tree);
                     Some(next)
                 }
+                None if child_is_leaf => None,
                 None => {
                     in_parent_tree = false;
                     node.template_host()
@@ -286,6 +294,11 @@ impl Document {
             if self.node(reference)?.parent() != Some(parent) {
                 return Err(DomError::InvalidReference);
             }
+        }
+        // Step 4: a document node is never insertable. A connected parent
+        // already failed the ancestor check above with `Cycle`.
+        if child == self.root {
+            return Err(DomError::ProtectedRoot);
         }
         let fragment = matches!(child_node.kind(), NodeKind::DocumentFragment);
         let mut moved = Vec::new();
@@ -544,6 +557,19 @@ impl Document {
         inserted: &[NodeId],
         before: Option<NodeId>,
     ) -> Result<(), DomError> {
+        // The DOM counts the node itself ("parent has an element/doctype
+        // child"), so re-inserting the document element or doctype is rejected
+        // rather than treated as a reorder.
+        if inserted.iter().any(|id| {
+            let node = self.live(*id);
+            node.parent() == Some(self.root)
+                && matches!(
+                    node.kind(),
+                    NodeKind::Element(_) | NodeKind::DocumentType(_)
+                )
+        }) {
+            return Err(DomError::InvalidHierarchy);
+        }
         let mut element_seen = false;
         let mut doctype_seen = false;
         let mut check = |id| {

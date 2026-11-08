@@ -14,6 +14,7 @@ mod body;
 mod foreign;
 mod formatting;
 mod insert;
+mod select;
 mod shell;
 mod stack;
 mod table;
@@ -133,6 +134,10 @@ pub(super) struct TreeBuilder {
     self_closing_acknowledged: bool,
     /// Detached fragment-parsing context element; `None` for documents.
     context: Option<NodeId>,
+    /// `(select, option)` with selectedness, one entry per single-selection select.
+    selected_options: Vec<(NodeId, NodeId)>,
+    /// Inserted options in a select, not yet popped and mirrored.
+    pending_options: Vec<(NodeId, NodeId)>,
 }
 
 impl TreeBuilder {
@@ -160,6 +165,8 @@ impl TreeBuilder {
             done: false,
             self_closing_acknowledged: false,
             context: None,
+            selected_options: Vec::new(),
+            pending_options: Vec::new(),
         })
     }
 
@@ -250,6 +257,7 @@ impl TreeBuilder {
             }
             Token::Eof => self.dispatch(Tok::Eof)?,
         }
+        self.mirror_popped_options(self.done)?;
         if matches!(token, Token::StartTag(tag) if tag.self_closing() && !self.self_closing_acknowledged)
         {
             self.diagnostic(ErrorKind::UnacknowledgedSelfClosing)?;

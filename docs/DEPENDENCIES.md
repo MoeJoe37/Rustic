@@ -28,7 +28,7 @@ recommendations, or compatibility guarantees.
 | --- | --- | --- |
 | TLS | Maintained Rust TLS library such as rustls with reviewed crypto/provider/root strategy | Certificate error behavior, HTTPS policy and broker authority |
 | HTTP transport | Reviewed HTTP library such as hyper, with a bounded async runtime if needed | Fetch, redirects, CORS, cookies, cache, MIME and response visibility |
-| Unicode/IDNA | Maintained Unicode/IDNA data library; pin data versions | URL/origin algorithms and string/index semantics |
+| Unicode/IDNA | Chosen at M1: original UTS #46/NFC code over tables generated from pinned Unicode data (`tools/generate_idna_data.py`), no library | URL/origin algorithms, data updates and string/index semantics |
 | Font parsing/shaping | Reviewed Rust font parser and shaping library; OS font discovery adapter | Font selection, CSS metrics, bidi/line breaking integration, layout |
 | Image codecs | Maintained bounded decoder libraries | Input/output limits, resource accounting, sandbox isolation and color handling |
 | Raster/GPU | Original CPU display-list interpreter; GPU adapter such as wgpu later | Paint semantics, scene correctness, device loss and CPU fallback |

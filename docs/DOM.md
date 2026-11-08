@@ -75,7 +75,9 @@ cannot be detached or destroyed by itself, and `walk` does not enter it.
 Inserting it moves its children out, like any fragment. Destroying the template
 destroys its contents, including arbitrarily nested templates, without
 recursion. `dump_tree` prints contents as `#template-contents` after the
-template's attributes. Inert template owner documents are not implemented; see
+template's attributes. Indentation stops at 64 levels; deeper lines (reachable
+only through nested template contents) start with `@<depth> ` so dump size stays
+linear in node count. Inert template owner documents are not implemented; see
 [ADR 0010](adr/0010-template-contents.md) and [ADR 0011](adr/0011-fragments-cloning-adoption.md).
 
 ## Node kinds, fragments, cloning and adoption
@@ -105,6 +107,48 @@ work iteratively and roll back on any node, data, depth or allocation failure,
 leaving both documents, their IDs and accounting unchanged. Live ranges,
 mutation records, custom element adopting steps and shadow roots are not
 implemented.
+
+## Tracing prototype (DOC-09)
+
+`HostHeap` models the host side of the DOM/JS tracing contract before a
+JavaScript runtime exists; [ADR 0012](adr/0012-dom-tracing-prototype.md) records
+the decision and its hand-off to JS-03. It is bound to one document.
+
+| Operation | Behavior |
+| --- | --- |
+| `allocate()` | New unrooted object with a generation-checked `HostObjectId` |
+| `add_edge(doc, from, to)` / `remove_edge` | Register node → object, object → node or object → object edges; node → node is rejected because the tree owns it |
+| `root(doc, target)` / `unroot` | Counted roots for nodes or objects (host handles) |
+| `collect(&mut doc)` | Stop-the-world mark/sweep; returns `CollectionStats` |
+
+Reachability is per tree: holding any node keeps its whole tree, a template and
+its contents keep each other, and the document's own tree is always live.
+Collection destroys unreachable parentless trees through `destroy_subtree`, so
+their IDs become stale, frees unreachable objects, and prunes roots and edges that
+name nodes the engine destroyed explicitly. Every temporary buffer is reserved
+before the first change, so an error leaves the heap and document untouched.
+Marking and destruction are iterative. `HostHeapLimits` bounds live objects and
+edges plus distinct rooted nodes.
+
+## Structural invariants and the conformance gate
+
+`Document::check_invariants` checks the whole document in linear time: mirrored
+parent/child/sibling links, acyclic parent chains, the depth limit, permitted
+parent and child kinds, document child order, single ownership of parentless
+template contents, and node/payload accounting. It is a test and fuzz oracle;
+checked mutation APIs already maintain these rules.
+
+`tests/conformance.rs` is the DOM conformance gate for insertion. It runs every
+(parent, node, reference child) combination over a fixture with each node kind,
+connected and detached trees and template contents, and compares the result with
+an oracle transcribed from the DOM Standard's
+[ensure pre-insert validity](https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity)
+and pre-insert steps (reviewed 2026-11-08): exception class and step precedence
+(`InvalidHierarchy`, `Cycle` and `ProtectedRoot` map to `HierarchyRequestError`;
+`InvalidReference` maps to `NotFoundError`), resulting child order, unchanged
+trees after a rejection, and invariants after every call. Engine depth and node
+limits are not spec behavior and are tested separately. No web-platform-tests
+have been run; they need script bindings.
 
 ## Regression evidence
 

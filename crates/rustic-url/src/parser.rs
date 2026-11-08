@@ -455,6 +455,15 @@ impl<'p> Run<'p> {
             Err(ParseError::InvalidHost) if input.is_empty() => Some(ValidationError::HostMissing),
             Err(ParseError::InvalidHost) if !special => Some(ValidationError::HostInvalidCodePoint),
             Err(ParseError::InvalidHost) => Some(match encoding::decode_host(input) {
+                // A non-ASCII domain that UTS #46 rejects (or maps to nothing)
+                // fails in domain-to-ASCII, before forbidden code points.
+                Ok(decoded)
+                    if !decoded.is_ascii()
+                        && crate::idna::to_ascii(&decoded).is_ok_and(|ascii| !ascii.is_empty()) =>
+                {
+                    ValidationError::DomainInvalidCodePoint
+                }
+                Ok(decoded) if !decoded.is_ascii() => ValidationError::DomainToAscii,
                 Ok(_) => ValidationError::DomainInvalidCodePoint,
                 Err(_) => ValidationError::DomainToAscii,
             }),

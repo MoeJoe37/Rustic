@@ -259,8 +259,29 @@
           "label": "Unicode IDNA and data adapter",
           "size": 3,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/idna/mod.rs",
+              "marker": "pub fn to_ascii"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/host.rs",
+              "marker": "fn domain_parser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn unicode_idna_test_v2_to_ascii"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn wpt_toascii_through_url_parser"
+            }
+          ]
         },
         {
           "id": "url.file",
@@ -512,8 +533,34 @@
           "label": "Tracing integration and DOM conformance gate",
           "size": 5,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/tracing.rs",
+              "marker": "pub fn collect"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn unreachable_node_object_cycles_disappear_and_rooted_ones_survive"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn seeded_graphs_match_an_independent_reachability_model"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/invariants.rs",
+              "marker": "pub fn check_invariants"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/conformance.rs",
+              "marker": "fn every_pre_insert_combination_matches_the_dom_standard"
+            }
+          ]
         }
       ]
     },
@@ -813,8 +860,34 @@
           "label": "CSS tokenizer/parser and recovery",
           "size": 3,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/tokenizer.rs",
+              "marker": "pub(crate) fn tokenize"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/rules.rs",
+              "marker": "pub(crate) fn block_contents"
+            },
+            {
+              "kind": "source",
+              "path": "tools/import_css_tests.py",
+              "marker": "SUITE_FILES"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/corpus.rs",
+              "marker": "fn pinned_css_parsing_corpus_matches_after_documented_adaptations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/syntax.rs",
+              "marker": "fn limits_are_exact_and_fatal"
+            }
+          ]
         },
         {
           "id": "css.selectors",

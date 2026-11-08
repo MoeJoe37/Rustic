@@ -6,15 +6,20 @@ Rustic is an independent browser engine being built from scratch in Rust. The
 goal is a standards-oriented, embeddable engine with its own HTML/CSS pipeline,
 DOM, layout, painting, JavaScript runtime, and web platform integration.
 
-The target platforms are **Windows, macOS, Linux, Android, and iOS/iPadOS**. The
-shared engine is being designed for desktop and mobile hosts from the beginning.
-Mobile core cross-compilation is checked in CI; device shells, rendering, input,
-and runtime validation are still planned. See the [mobile plan](docs/MOBILE.md).
+Rustic must run on **any device that can run a browser**. The release platforms
+are **Windows, macOS, Linux, Android, and iOS/iPadOS** on every CPU they ship
+on: x86-64, ARM64, 32-bit ARM and 32-bit x86, with RISC-V, big-endian and other
+architectures kept working too. CI runs the full test suite natively on x64 and
+ARM64 Linux, Windows and macOS, under emulation on 32-bit ARM, 32-bit x86,
+RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets.
+Device shells, rendering, input, and runtime validation are still planned. See
+[platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: early M1 document-core implementation.** This repository contains the project
+**Current stage: late M1 document core, with M2 styles started.** This repository contains the project
 architecture, implementation plan, shared engine primitives, and continuous
-integration. Bounded DOM/URL foundations, HTML tokenization and an
-[initial document-construction subset](docs/HTML_TREE.md) are implemented.
+integration. Bounded DOM/URL foundations, HTML tokenization,
+[document and fragment tree construction](docs/HTML_TREE.md), parser fuzzing and
+[CSS syntax parsing](docs/CSS.md) are implemented.
 It does not yet execute JavaScript, fetch web pages, or render content.
 A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
@@ -25,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 10.09%** (10.09% verified complete + 0.00% partial credit) — 26/172 capabilities complete and 0 in progress across 21 subsystems. Current milestone: **M1 Document core**, 89.51% done.
+**Overall engine completion: 11.96%** (11.96% verified complete + 0.00% partial credit) — 29/172 capabilities complete and 0 in progress across 21 subsystems. Current milestone: **M2 CSS & computed style**, 7.69% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -41,7 +46,9 @@ engineering effort; milestones below describe targets, not existing support.
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
 | [Progress graph methodology](docs/PROGRESS.md) | Whole-engine completion criteria, weights, evidence and automatic commit updates |
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
+| [CSS syntax](docs/CSS.md) | CSS tokenizer/parser scope, recovery, limits and pinned corpus evidence |
 | [HTML input and tokenization](docs/HTML.md) | Streaming UTF-8 and initial tokenizer subset, limits, evidence and remaining states |
+| [Platform and device support](docs/PLATFORMS.md) | Any device that can run a browser: portability rules and the CI target matrix |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
 | [Roadmap](docs/ROADMAP.md) | Dependency-ordered milestones, acceptance gates, first tasks, and risks |
@@ -91,6 +98,7 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 [UTF-16 text edits](docs/DOM.md)),
 `rustic-url` (URL records, parsing and origins),
 `rustic-html` (streaming tokens and full WHATWG document tree construction),
+`rustic-css` (CSS syntax tokenization and parsing),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

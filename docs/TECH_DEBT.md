@@ -57,13 +57,15 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-07 | Deliberate | Process | Progress bot commits to `main`, so `feature` drifts | Open |
 | TD-08 | Watch | Docs | Hard-coded corpus and test counts repeated across docs | Open, rule 8 |
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Open, pay with the engine facade |
-| TD-10 | Deliberate | HTML parser | Scripting-on, processing instructions and `selectedcontent` pending | Open, M1 queue |
-| TD-11 | Deliberate | URL | `blob:` URLs and Unicode IDNA return unsupported (`file:` paid by DOC-02b) | Open, M1 queue |
+| TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, M1 queue |
+| TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, M1 queue |
 | TD-12 | Deliberate | CI / platforms | No native ARM or 32-bit test runs; mobile is check-only | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
+| TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
+| TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -171,21 +173,27 @@ with unrelated helpers. **Pay:** fill it with the engine facade (navigation,
 document lifecycle) or fold `Viewport` into its first real consumer.
 **Trigger:** the first host-facing engine API (M2).
 
-### TD-10 — Scripting-on, processing instructions and `selectedcontent` pending
+### TD-10 — Scripting-on and processing instructions pending
 
-Document and fragment parsing (DOC-06c) pass 1,772 of 1,776 runnable html5lib
-tree records. Sixteen records are skipped because they need scripting or
-processing-instruction nodes, and 4 are known failures that need
-`selectedcontent` mirroring. Each exclusion carries a reason in the corpus
-runner ([HTML_TREE.md](HTML_TREE.md)). Tracked as DOC-06d in the
-[roadmap](ROADMAP.md).
+Document and fragment parsing pass all 1,776 runnable html5lib tree records;
+DOC-06d paid the `selectedcontent` part (the 4 former known failures). Sixteen
+records are still skipped because they need scripting or processing-instruction
+nodes, each with a reason in the corpus runner ([HTML_TREE.md](HTML_TREE.md)).
 
-### TD-11 — `blob:` URLs and IDNA return unsupported
+### TD-11 — `blob:` URLs return unsupported
 
 The URL parser returns explicit unsupported errors rather than guessing
 ([URL.md](URL.md)). Honest failure, tracked in the M1 queue. The `file:` part
 was paid by DOC-02b, which implements the standard's file states; converting a
 file URL to a native path is loader/platform work, not URL debt.
+
+The Unicode IDNA half is paid: `url.idna` implements UTS #46 over generated,
+pinned Unicode data and `ParseError::UnsupportedIdna` is gone. What remains
+there is deliberate and documented in [URL.md](URL.md): strict (`beStrict`)
+domain validation is only needed by conformance checkers, and Punycode labels
+past 2,000 bytes / 1,000 code points fail to bound quadratic work. The pinned
+WPT `urltestdata.json` subset now includes all non-ASCII records (887 of 899;
+only blob cases are excluded).
 
 ### TD-12 — No native ARM or 32-bit test runs; mobile is check-only
 
@@ -241,7 +249,33 @@ IDs fail as `InvalidNode`. **Why deliberate:** moving slots between arenas would
 break per-document budgets and generation checks. **Pay:** when JS wrappers
 exist, the binding layer must retarget every wrapper through the map in the same
 operation (or wrappers must hold a stable cross-document identity). **Trigger:**
-the first script-visible node wrapper (DOC-09 prototype or WEB-02).
+the first script-visible node wrapper (WEB-02). The DOC-09 prototype heap prunes adopted IDs rather than retargeting them (TD-17).
+
+### TD-17 — Prototype host heap lives in the DOM crate, one document only
+
+`HostHeap` (ADR 0012) stands in for the JS heap so DOC-09 could test roots,
+detached-tree retention and node/object cycles before a runtime exists. ADR 0002
+says the runtime owns its heap without depending on the DOM crate, so this type
+is not the final home. It is bound to one document: edges to another document's
+nodes are rejected, and adoption prunes the source heap's entries (TD-16) rather
+than retargeting them. Its edge registry is a flat vector sorted per collection,
+and collection is stop-the-world. **Why deliberate:** it is the smallest thing
+that tests the contract, it fails loudly instead of leaking, and the DOM side
+(per-tree marking, sweep through `destroy_subtree`) is what carries forward.
+**Pay:** JS-03 owns objects and roots; the DOM keeps tree-closure marking and
+exposes it to a shared marking phase across documents; adoption retargets edges
+through `Adopted::ids`. **Trigger:** JS-03, or a second document sharing a heap.
+
+### TD-18 — Tree dumps grew quadratically with nested template contents (Paid)
+
+`Document::dump_tree` indented every nested template-contents level by two more
+spaces. Template nesting is content-controlled and not bounded by `max_depth`,
+so output was quadratic in nesting: the 20,000-level regression test built a
+1.6 GB string and took about 43 s in debug CI (already true at `b9595a5`). The
+caller's byte cap bounded memory, but `dump-dom` hit it on small adversarial
+inputs. Reported by the milestone M1 work. Paid by indenting at most 64 levels;
+deeper lines start with an `@<depth> ` marker, so output is linear in node count.
+The test now runs in well under a second and checks the threshold.
 
 ## Reviewing new work
 

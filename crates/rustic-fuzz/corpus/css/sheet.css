@@ -1,0 +1,3 @@
+@media (min-width: 1px) { a:hover > b[c="d"] { color: red !important; --x: { y }; } }
+@import url(a.css) screen;
+.x\31 { background: url( "q" ) } /* c */ <!-- -->

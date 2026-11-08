@@ -464,7 +464,21 @@ fn deeply_nested_template_contents_dump_and_destroy_without_recursion() {
         doc.append_child(parent, template).unwrap();
         parent = doc.create_template_contents(template).unwrap();
     }
-    assert!(doc.dump_tree(root, usize::MAX).unwrap().lines().count() > 40_000);
+    let dump = doc.dump_tree(root, usize::MAX).unwrap();
+    assert!(dump.lines().count() > 40_000);
+    // Indentation stops at 64 levels; deeper lines carry a depth marker, so
+    // output stays linear in node count (TD-18) instead of ~1.6 GB here.
+    let line = |depth: usize| {
+        dump.lines().find(|line| {
+            let indent = line.len() - line.trim_start().len();
+            indent == 2 * depth && !line.trim_start().starts_with('@')
+        })
+    };
+    assert!(line(64).is_some());
+    assert!(line(65).is_none());
+    assert!(dump.lines().any(|line| line.starts_with("@65 ")));
+    assert!(dump.lines().any(|line| line.starts_with("@40001 ")));
+    assert!(dump.len() < 64 * dump.lines().count() + 200 * 64);
     doc.destroy_subtree(root).unwrap();
     assert_eq!(doc.node_count(), baseline);
 }

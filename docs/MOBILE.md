@@ -59,7 +59,7 @@ release; missing approvals cannot be represented as successful runtime support.
 
 | Task | Milestone | Deliverable and acceptance evidence |
 | --- | --- | --- |
-| MOB-01 | M1 | Shared library cross-checks for Android ARM64/x86-64 and iOS device/ARM64 simulator, required by CI |
+| MOB-01 | M1 | Shared library cross-checks for Android ARM64/ARMv7/x86-64/x86 and iOS device plus ARM64/x86-64 simulator, required by CI |
 | MOB-02 | M1–M3 | Audit native dependencies for both mobile systems, licenses, SDK/NDK and thread/resource requirements |
 | MOB-03 | M3 | Android local-fixture CPU surface through an unstable JNI/native bridge; compare pixels with headless output |
 | MOB-04 | M3 | iOS local-fixture CPU surface and C/Swift bridge; link/run in Simulator and on a signed development device where allowed |
@@ -115,11 +115,15 @@ distribution permission is asserted by this repository.
 
 ## CI and runtime gates
 
-Four `Mobile core` jobs run `cargo check --locked --workspace --lib --target`.
+Seven `Mobile core` jobs run `cargo check --locked --workspace --lib --target`:
+Android `aarch64`, `armv7`, `x86_64` and `i686`, and iOS `aarch64` device,
+`aarch64` Simulator and `x86_64` Simulator. Rustic must run on any device that
+can run a browser, so older 32-bit Android phones and Intel Macs' simulators
+are covered alongside current hardware; see [PLATFORMS.md](PLATFORMS.md).
 Android checks run on Ubuntu and iOS checks on macOS with Xcode SDK selection.
 They compile the shared libraries without linking an app or running target tests;
 the desktop CLI/subprocess tests are excluded. The aggregate `CI` gate requires
-all four checks to succeed.
+all seven checks to succeed.
 
 For example, check Android's shared library code locally with the pinned toolchain:
 

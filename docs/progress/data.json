@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "003bb9ad2f469bc0a045a738c1fb1ae005598477819fca75621119a550743c5f",
-  "percent": "10.09",
-  "verified_percent": "10.09",
+  "source_fingerprint": "9b588dcc9142d9cc8a52d4ce1a0be1041b1fd19095598f4ef0d646a8e1564bb2",
+  "percent": "11.96",
+  "verified_percent": "11.96",
   "partial_percent": "0.00",
-  "completed": 26,
+  "completed": 29,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -15,20 +15,20 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 26,
+      "completed": 28,
       "total": 28,
-      "percent": "89.51",
-      "verified_percent": "89.51",
+      "percent": "100.00",
+      "verified_percent": "100.00",
       "partial_percent": "0.00"
     },
     {
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 0,
+      "completed": 1,
       "total": 8,
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "percent": "7.69",
+      "verified_percent": "7.69",
       "partial_percent": "0.00"
     },
     {
@@ -357,9 +357,30 @@
           "label": "Unicode IDNA and data adapter",
           "size": 3,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/idna/mod.rs",
+              "marker": "pub fn to_ascii"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/host.rs",
+              "marker": "fn domain_parser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn unicode_idna_test_v2_to_ascii"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn wpt_toascii_through_url_parser"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.30"
         },
         {
@@ -466,12 +487,12 @@
         }
       ],
       "points": 30,
-      "completed": 5,
+      "completed": 6,
       "in_progress": 0,
       "total": 12,
-      "contribution": "1.00",
-      "percent": "33.33",
-      "verified_percent": "33.33",
+      "contribution": "1.30",
+      "percent": "43.33",
+      "verified_percent": "43.33",
       "partial_percent": "0.00"
     },
     {
@@ -654,19 +675,45 @@
           "label": "Tracing integration and DOM conformance gate",
           "size": 5,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/tracing.rs",
+              "marker": "pub fn collect"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn unreachable_node_object_cycles_disappear_and_rooted_ones_survive"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn seeded_graphs_match_an_independent_reachability_model"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/invariants.rs",
+              "marker": "pub fn check_invariants"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/conformance.rs",
+              "marker": "fn every_pre_insert_combination_matches_the_dom_standard"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.88"
         }
       ],
       "points": 34,
-      "completed": 5,
+      "completed": 6,
       "in_progress": 0,
       "total": 10,
-      "contribution": "2.29",
-      "percent": "38.23",
-      "verified_percent": "38.23",
+      "contribution": "3.17",
+      "percent": "52.94",
+      "verified_percent": "52.94",
       "partial_percent": "0.00"
     },
     {
@@ -993,9 +1040,35 @@
           "label": "CSS tokenizer/parser and recovery",
           "size": 3,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/tokenizer.rs",
+              "marker": "pub(crate) fn tokenize"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/rules.rs",
+              "marker": "pub(crate) fn block_contents"
+            },
+            {
+              "kind": "source",
+              "path": "tools/import_css_tests.py",
+              "marker": "SUITE_FILES"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/corpus.rs",
+              "marker": "fn pinned_css_parsing_corpus_matches_after_documented_adaptations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/syntax.rs",
+              "marker": "fn limits_are_exact_and_fatal"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.69"
         },
         {
@@ -1070,12 +1143,12 @@
         }
       ],
       "points": 39,
-      "completed": 0,
+      "completed": 1,
       "in_progress": 0,
       "total": 8,
-      "contribution": "0.00",
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "contribution": "0.69",
+      "percent": "7.69",
+      "verified_percent": "7.69",
       "partial_percent": "0.00"
     },
     {

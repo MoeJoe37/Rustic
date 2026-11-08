@@ -125,8 +125,8 @@ fn valid_declarations_parse_to_typed_longhands() {
 fn invalid_declarations_are_rejected() {
     use PropertyError::*;
     let cases = [
-        ("float: left", UnknownProperty),
-        ("font: 12px serif", UnknownProperty),
+        ("transform: none", UnknownProperty),
+        ("cursor: pointer", UnknownProperty),
         ("--x: 1", UnknownProperty),
         ("display: block inline", InvalidValue),
         ("display: inline-block flow", InvalidValue),
@@ -185,7 +185,17 @@ fn every_longhand_has_an_initial_value_that_reparses() {
             "font-weight",
             "font-style",
             "font-family",
-            "line-height"
+            "line-height",
+            "font-variant-caps",
+            "font-stretch",
+            "visibility",
+            "direction",
+            "text-align",
+            "text-indent",
+            "text-transform",
+            "letter-spacing",
+            "word-spacing",
+            "white-space",
         ]
     );
 }

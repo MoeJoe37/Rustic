@@ -285,7 +285,7 @@ fn style_elements_are_attached_in_tree_order() {
         "display: block\ncolor: rgb(255, 0, 0)\nmargin-top: 16px\nmargin-bottom: 16px\n\
          border-top-color: rgb(255, 0, 0)\nborder-right-color: rgb(255, 0, 0)\n\
          border-bottom-color: rgb(255, 0, 0)\nborder-left-color: rgb(255, 0, 0)\n\
-         width: 5px\nheight: 2px\n"
+         width: 5px\nheight: 2px\ntext-decoration-color: rgb(255, 0, 0)\n"
     );
 }
 
@@ -353,4 +353,48 @@ html
 ";
     assert_eq!(dump, expected);
     assert_eq!(dump_computed_styles(doc, &styles, 10), None);
+}
+
+#[test]
+fn catalog_properties_compute() {
+    let html = "<div id=p><span id=a></span><span id=b></span><p id=c></p></div>";
+    let sheet = "#p { font-size: 10px; line-height: 20px; direction: rtl; color: green } \
+                 #a { float: left; overflow-x: visible; overflow-y: hidden; opacity: 2; \
+                 top: -1em; text-indent: 2em; letter-spacing: 0.1em; vertical-align: 50%; \
+                 text-decoration: underline; font-stretch: condensed; \
+                 background: url(x) right 10px bottom 20% / 2em auto, center / 50% 1em } \
+                 #b { position: absolute; float: right; overflow: clip scroll; opacity: -1; \
+                 background-position: left 1em top, 3em } \
+                 #c { text-align: match-parent; word-spacing: calc(1em + 10%) }";
+    let c = |id, property| computed(html, sheet, id, property);
+    assert_eq!(c("a", "display"), "block");
+    assert_eq!(c("a", "float"), "left");
+    assert_eq!(c("a", "overflow-x"), "auto");
+    assert_eq!(c("a", "overflow-y"), "hidden");
+    assert_eq!(c("a", "opacity"), "1");
+    assert_eq!(c("a", "top"), "-10px");
+    assert_eq!(c("a", "text-indent"), "20px");
+    assert_eq!(c("a", "letter-spacing"), "1px");
+    assert_eq!(c("a", "vertical-align"), "10px");
+    assert_eq!(c("a", "text-decoration-color"), "rgb(0, 128, 0)");
+    assert_eq!(c("a", "font-stretch"), "75%");
+    assert_eq!(
+        c("a", "background-position"),
+        "calc(100% - 10px) 80%, 50% 50%"
+    );
+    assert_eq!(c("a", "background-size"), "20px, 50% 10px");
+    assert_eq!(c("b", "display"), "block");
+    assert_eq!(c("b", "float"), "none");
+    assert_eq!(c("b", "overflow-x"), "hidden");
+    assert_eq!(c("b", "overflow-y"), "scroll");
+    assert_eq!(c("b", "opacity"), "0");
+    assert_eq!(c("b", "background-position"), "10px 0%, 30px 50%");
+    // Inherited text properties carry computed values.
+    assert_eq!(c("c", "text-align"), "right");
+    assert_eq!(c("c", "direction"), "rtl");
+    assert_eq!(c("c", "word-spacing"), "calc(10% + 10px)");
+    assert_eq!(c("c", "letter-spacing"), "normal");
+    assert_eq!(c("p", "text-indent"), "0px");
+    let sheet = "#p { text-indent: 2em; font-size: 10px } #c { font-size: 20px }";
+    assert_eq!(computed(html, sheet, "c", "text-indent"), "20px");
 }

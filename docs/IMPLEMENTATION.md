@@ -570,6 +570,22 @@ censored (NaN to 0, infinities to the largest finite value). Typed division,
 the Level 4 stepped/trigonometric/exponential functions and math functions in
 colors are not supported yet. See [CSS.md](CSS.md#math-functions).
 
+## CSS-03c — Property catalog
+
+`rustic-css` adds typed longhands for positioning (`position`, the four
+offsets, `z-index`, `float`, `clear`), `overflow-x`/`-y`, `visibility`,
+`opacity`, `vertical-align`, text (`direction`, `text-align`, `text-indent`,
+`text-transform`, `letter-spacing`, `word-spacing`, `white-space`,
+`text-decoration-line`/`-style`/`-color`), fonts (`font-variant-caps`,
+`font-stretch`) and the seven list-valued background longhands, with the
+`inset`, `overflow`, `text-decoration`, `font` and `background` shorthands
+(67 longhands in all). `rustic-style` computes them (blockification of floats
+and absolutely positioned boxes, overflow pairing, `match-parent`, background
+positions as offsets) and the HTML user-agent sheet uses them for `pre`,
+links, decorations, `sub`/`sup`, table alignment and `dir`. Gradients, system
+fonts, the Text 4 `white-space` longhands (TD-27) and `url()` resolution
+(TD-26) remain. See [CSS.md](CSS.md#property-values).
+
 ## CSS-04 — Cascade and inheritance
 
 `rustic-style` turns stylesheets into cascade-ready rules (`StyleSheet::parse`,
@@ -691,6 +707,7 @@ must keep all tiers green.
 | CSS-04: cascade and inheritance | Complete: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins added by CSS-07b |
 | CSS-07b: cascade layers, shadow contexts, animation origins | Complete: `@layer` and layered `revert-layer`, DOM shadow roots, per-tree sheets with `:host`, context precedence, animation/transition tiers; slots, `::slotted()`/`::part()` and `@import layer()` pending |
 | CSS-05: computed values, attachment and style dump | Complete for the declared longhands: computed values, HTML UA sheet subset, `<style>` attachment, `dump-style` and a cached full-restyle path; font metrics, `var()` and media queries remain |
+| CSS-03c: property catalog | Complete for the declared set: positioning, overflow, visibility, opacity, text, decoration, font shorthand and backgrounds with computed values; gradients and system fonts remain |
 | CSS-03b: math functions | Complete for lengths, length-percentages and numbers: parsing, type checking, simplification, serialization, computed values; typed division and the newer math functions remain |
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |

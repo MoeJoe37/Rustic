@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 16.39%** = 13.11% verified complete + 3.28% partial credit. 30/172 capabilities complete, 5 in progress.
+**Overall completion: 16.85%** = 14.96% verified complete + 1.89% partial credit. 31/172 capabilities complete, 4 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `2eec6beee5c8d476670666f206dad25bb6d15ce8559faa45e77afe7f28e22d9b`.
+Catalog: `engine-v3`. Source fingerprint: `48be369df37049f0a0fee3e315609d44fb56530604b4f53a960311188f1aaab3`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `2eec6beee5c8d476670666f206dad25bb6d15
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 2/8 | 54.48% | 20.51% | 9.00% |
+| M2 CSS & computed style | 3/8 | 59.61% | 41.02% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `2eec6beee5c8d476670666f206dad25bb6d15
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 2/8 | 4 | 54.48% | 20.51% | 9% | 4.90 |
+| CSS & style | 3/8 | 3 | 59.61% | 41.02% | 9% | 5.36 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -115,11 +115,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] An+B microsyntax (pinned css-parsing-tests An+B.json) ([source](../../crates/rustic-css/src/anb.rs), [test](../../crates/rustic-css/tests/an_plus_b.rs))
   - [x] Selector matching over the DOM with HTML/quirks/XML case rules ([source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/matching.rs))
   - [ ] Remaining required selectors: :has(), form-state, :lang()/:dir(), nesting & and pseudo-element states (CSS-07)
-- **in progress 75.00%** `css.properties` — Typed property grammar and supported property catalog · size 8 · M2 · 1.84% of engine
-  - [x] <color> values (pinned css-parsing-tests Color 3/4 files) ([source](../../crates/rustic-css/src/color.rs), [test](../../crates/rustic-css/tests/color.rs))
-  - [x] Lengths, percentages and the CSS-03 longhands and shorthands with initial values and inheritance ([source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/properties.rs))
-  - [x] Math functions: calc(), min(), max(), clamp() (CSS-03b) ([source](../../crates/rustic-css/src/calc.rs), [test](../../crates/rustic-css/tests/calc.rs))
-  - [ ] Property catalog for layout, text, backgrounds, positioning and the font shorthand
+- **complete** `css.properties` — Typed property grammar and supported property catalog · size 8 · M2 · 1.84% of engine ([source](../../crates/rustic-css/src/color.rs), [test](../../crates/rustic-css/tests/color.rs), [source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/properties.rs), [source](../../crates/rustic-css/src/calc.rs), [test](../../crates/rustic-css/tests/calc.rs), [source](../../crates/rustic-css/src/background.rs), [source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/catalog.rs), [test](../../crates/rustic-style/tests/computed.rs))
 - **complete** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/layer.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/layers.rs), [test](../../crates/rustic-style/tests/layers.rs), [source](../../crates/rustic-style/src/cascade.rs), [source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/shadow.rs), [test](../../crates/rustic-style/tests/layers.rs))
 - **in progress 40.00%** `css.values` — Computed values, variables and cycle handling · size 5 · M2 · 1.15% of engine
   - [x] Computed values for the CSS-03 longhands: absolute lengths, font sizes, weights, currentcolor, border widths, root blockification, computed inheritance ([source](../../crates/rustic-style/src/computed.rs), [test](../../crates/rustic-style/tests/computed.rs))

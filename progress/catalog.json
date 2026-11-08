@@ -990,61 +990,57 @@
           "label": "Typed property grammar and supported property catalog",
           "size": 8,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "<color> values (pinned css-parsing-tests Color 3/4 files)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/color.rs",
-                  "marker": "pub fn parse(value: &Value)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/color.rs",
-                  "marker": "fn pinned_color_corpus_matches"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/color.rs",
+              "marker": "pub fn parse(value: &Value)"
             },
             {
-              "label": "Lengths, percentages and the CSS-03 longhands and shorthands with initial values and inheritance",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/properties.rs",
-                  "marker": "pub fn parse_declaration"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/properties.rs",
-                  "marker": "fn every_longhand_has_an_initial_value_that_reparses"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-css/tests/color.rs",
+              "marker": "fn pinned_color_corpus_matches"
             },
             {
-              "label": "Math functions: calc(), min(), max(), clamp() (CSS-03b)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/calc.rs",
-                  "marker": "pub fn parse_length_percentage"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/calc.rs",
-                  "marker": "fn length_percentage_calculations_simplify_and_serialize"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/properties.rs",
+              "marker": "pub fn parse_declaration"
             },
             {
-              "label": "Property catalog for layout, text, backgrounds, positioning and the font shorthand",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-css/tests/properties.rs",
+              "marker": "fn every_longhand_has_an_initial_value_that_reparses"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/calc.rs",
+              "marker": "pub fn parse_length_percentage"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/calc.rs",
+              "marker": "fn length_percentage_calculations_simplify_and_serialize"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/background.rs",
+              "marker": "pub(crate) fn shorthand"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/properties.rs",
+              "marker": "fn font(parts"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/catalog.rs",
+              "marker": "fn catalog_declarations_parse_to_typed_longhands"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn catalog_properties_compute"
             }
           ]
         },

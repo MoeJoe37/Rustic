@@ -179,7 +179,43 @@ properties return `UnknownProperty` and values outside the grammar return
 | `font-style` | `normal`, `italic`, `oblique` (angles later) |
 | `font-family` | Comma-separated strings, identifier sequences and generic families |
 | `line-height` | `normal`, nonnegative number or nonnegative `<length-percentage>` |
-| Shorthands | `margin`, `padding`, `border-width`, `border-style`, `border-color` (1–4 values), `border-top`/`-right`/`-bottom`/`-left` and `border` (width, style and color in any order) |
+| `font-variant-caps` | `normal`, `small-caps`, `all-small-caps`, `petite-caps`, `all-petite-caps`, `unicase`, `titling-caps` |
+| `font-stretch` | Width keyword (`ultra-condensed` … `ultra-expanded`) or nonnegative percentage |
+| `position` | `static`, `relative`, `absolute`, `fixed`, `sticky` |
+| `top`, `right`, `bottom`, `left` | `auto` or `<length-percentage>` |
+| `z-index` | `auto` or `<integer>` (saturating to 32 bits; math functions round) |
+| `float` | `none`, `left`, `right`, `inline-start`, `inline-end` |
+| `clear` | `none`, `left`, `right`, `both`, `inline-start`, `inline-end` |
+| `overflow-x`, `overflow-y` | `visible`, `hidden`, `clip`, `scroll`, `auto` |
+| `visibility` | `visible`, `hidden`, `collapse` |
+| `opacity` | `<number>` or `<percentage>` (stored as a number; any value, clamped when computed) |
+| `vertical-align` | `baseline`, `sub`, `super`, `text-top`, `text-bottom`, `middle`, `top`, `bottom` or `<length-percentage>` |
+| `direction` | `ltr`, `rtl` |
+| `text-align` | `start`, `end`, `left`, `right`, `center`, `justify`, `match-parent` |
+| `text-indent` | `<length-percentage>` (`hanging` and `each-line` later) |
+| `text-transform` | `none` or `[capitalize \| uppercase \| lowercase] \|\| full-width \|\| full-size-kana` |
+| `letter-spacing`, `word-spacing` | `normal` or `<length-percentage>` |
+| `white-space` | `normal`, `pre`, `nowrap`, `pre-wrap`, `break-spaces`, `pre-line` (a longhand for now, TD-27) |
+| `text-decoration-line` | `none` or any of `underline`, `overline`, `line-through`, `blink` |
+| `text-decoration-style` | `solid`, `double`, `dotted`, `dashed`, `wavy` |
+| `text-decoration-color` | `<color>` |
+| `background-image` | Comma-separated `none` or `url()` (gradients and other images later; URLs stay unresolved, TD-26) |
+| `background-position` | Comma-separated `<bg-position>`: 1–4 values with keywords, offsets and side-relative offsets (`right 10px bottom 20%`) |
+| `background-size` | Comma-separated `cover`, `contain` or one or two of `auto` / nonnegative `<length-percentage>` |
+| `background-repeat` | Comma-separated `repeat-x`, `repeat-y` or one or two of `repeat`, `space`, `round`, `no-repeat` |
+| `background-attachment` | Comma-separated `scroll`, `fixed`, `local` |
+| `background-origin`, `background-clip` | Comma-separated `border-box`, `padding-box`, `content-box` |
+| Shorthands | `margin`, `padding`, `border-width`, `border-style`, `border-color`, `inset` (1–4 values), `border-top`/`-right`/`-bottom`/`-left` and `border` (width, style and color in any order), `overflow` (one or two values), `text-decoration` (line, style and color in any order), `font` and `background` (below) |
+
+The `font` shorthand (CSS Fonts 4 §2.8) takes up to four of a style, `small-caps`,
+a weight and a width keyword (or `normal`) in any order, then the size, an
+optional `/ line-height` and the family list, and resets the seven font
+longhands; system font keywords (`caption`, `menu`, ...) are not supported yet.
+The `background` shorthand (CSS Backgrounds 3 §3.10) takes comma-separated
+layers of image, position with optional `/ size`, repeat, attachment and one or
+two boxes (one box sets both origin and clip) in any order, with a color only
+in the last layer, and sets all eight background longhands with one entry per
+layer. These are the CSS-03c catalog.
 
 Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 `rex`, `ch`, `rch`, `cap`, `rcap`, `ic`, `ric`, `lh`, `rlh`) and the viewport
@@ -229,11 +265,14 @@ pixels.
   **all 8,041 cases pass**, 7,965 of them byte for byte. The other 76 differ only
   in the sixth decimal, because the expectations were computed with 32-bit
   floats, so the runner compares numbers with a 1e-4 relative tolerance.
-* `tests/properties.rs`: 32 valid declarations with their expected longhands,
-  22 invalid ones with their error, and a check that every longhand's initial
+* `tests/properties.rs`: 44 valid declarations with their expected longhands,
+  26 invalid ones with their error, and a check that every longhand's initial
   value serializes and reparses to itself.
 * The `css` fuzz target now also checks that every typed longhand it parses
   serializes to a fixed point.
+* `tests/catalog.rs` (CSS-03c): 75 valid declarations of the new longhands
+  and shorthands with their expected longhands, a fixed-point check of every
+  expected longhand, and 60 invalid declarations.
 * `tests/calc.rs` (CSS-03b): 28 simplification/serialization cases, 30
   invalid expressions, number evaluation and censoring, resolution against
   lengths and percentages, the exact depth and node limits, and a
@@ -364,6 +403,16 @@ Cascade 5 §4.4, with each property's "computed value" line):
 | Colors | `currentcolor` becomes the element's `color` (for `color` itself, the parent's) |
 | Border widths | Pixels (`thin` 1, `medium` 3, `thick` 5), and 0 when that side's style is `none` or `hidden` |
 | `display` | Blockified on the root element |
+| `float`, `display` | `float` is `none` for `position: absolute`/`fixed`; floated and absolutely positioned boxes are blockified like the root |
+| `overflow-x`, `overflow-y` | If one axis is `visible`/`clip` and the other is not, `visible` becomes `auto` and `clip` becomes `hidden` |
+| `opacity` | Clamped to 0–1 |
+| `vertical-align` | Lengths and percentages (of the line height) become pixels |
+| `text-align` | `match-parent` takes the parent's value with `start`/`end` resolved against the parent's `direction` |
+| `text-indent`, `letter-spacing`, `word-spacing`, `top`/`right`/`bottom`/`left` | Lengths become pixels (negative allowed); percentages stay |
+| `text-decoration-color` | `currentcolor` becomes the element's `color` |
+| `font-stretch` | A percentage (`condensed` is 75%) |
+| `background-position` | Each layer becomes left and top offsets: `center` is 50%, `right 10px` is `calc(100% - 10px)` |
+| `background-size` | Lengths become pixels |
 | Math functions | Lengths become pixels and the tree is simplified again; one value becomes a plain length or percentage clamped to the property's range, a pixel/percentage mix stays a calculation (CSS-03b) |
 
 Fonts are not loaded yet, so `ex` and `ch` use the specification's 0.5em
@@ -376,7 +425,10 @@ element and inherits computed values.
 `HTML_USER_AGENT_STYLESHEET` is the supported subset of the HTML Rendering
 section's sheet: hidden elements, block and list-item display, table display
 types, body margin, paragraph, heading, list and blockquote spacing, heading
-sizes and weights, and phrase elements (`b`, `strong`, `em`, `code`, ...).
+sizes and weights, and phrase elements (`b`, `strong`, `em`, `code`, ...),
+plus since CSS-03c `white-space` for `pre`-like elements and `nobr`, link and
+`u`/`ins`/`s`/`strike`/`del` decorations, `sub`/`sup` and table-part vertical
+alignment, `dir` attribute directions and the table `text-indent` reset.
 Logical margins and padding are written as their left-to-right physical sides
 until writing modes exist. `document_cascade` builds a cascade from that sheet
 and every HTML `<style>` element in tree order (not inside templates or
@@ -391,7 +443,8 @@ status and diagnostics. `<link rel=stylesheet>` needs fetching and is not loaded
 and, indented below it, each computed value the element does not simply get by
 default: an inherited property that differs from the parent's computed value,
 or another property that differs from its initial value. Border colors are
-omitted on sides with no border. Output is bounded by a byte limit.
+omitted on sides with no border, and `text-decoration-color` when no
+decoration line is set. Output is bounded by a byte limit.
 `rustic dump-style <file>` loads a local HTML file with the same limits as
 `dump-dom`, lists each `<style>` element's status and dropped constructs, then
 prints the dump. The fixture `crates/rustic-cli/tests/fixtures/styled.html` and

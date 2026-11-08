@@ -73,6 +73,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-23 | Deliberate | Style | Light children of a shadow host inherit from the host, not a slot | Open, pay with slot assignment |
 | TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Open, pay with the custom element registry |
 | TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
+| TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Open |
+| TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -394,6 +396,29 @@ pages that declare the same layer in competing conditional blocks. **Pay:**
 record each layer declaration with its media conditions and rebuild the layer
 order when `Cascade::set_environment` changes a result. **Trigger:** a WPT
 layer-in-media case, or a site report.
+### TD-26 — `url()` values stay unresolved until stylesheets carry a base URL
+
+`background-image: url(a.png)` keeps the URL text as written (CSS-03c). CSS
+says the computed value is the absolute URL, resolved against the
+stylesheet's base URL (the document for `<style>` and `style` attributes, the
+sheet's own URL for external sheets), but `StyleSheet` and `ComputeContext`
+do not know a base URL yet. Nothing loads images, so no behavior depends on
+it today. **Pay:** record a base URL on each stylesheet and resolve `url()`
+values with `rustic-url` when computing. **Trigger:** external stylesheets
+(they have their own base URL) or the first image fetch, whichever comes
+first.
+
+### TD-27 — `white-space` is a longhand instead of a shorthand
+
+CSS Text 4 makes `white-space` a shorthand for `white-space-collapse`,
+`text-wrap-mode` and `white-space-trim`; Rustic parses it as one longhand
+with the six Level 3 keywords (CSS-03c), which is enough for the HTML
+user-agent sheet and line breaking's needs. The cost appears when the
+longhands are exposed: values set through one must show in the other, and
+CSSOM serializes the shorthand from them. **Pay:** add the longhands, make
+`white-space` expand to them (with `pre`/`nowrap`/... as the documented
+combinations) and give text layout the longhands. **Trigger:** inline layout
+(REN) consuming white-space, or any page using the new longhands.
 
 ## Reviewing new work
 

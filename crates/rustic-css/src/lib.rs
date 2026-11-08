@@ -20,6 +20,7 @@
 #![warn(missing_docs)]
 
 mod anb;
+mod background;
 mod calc;
 mod color;
 mod error;
@@ -35,6 +36,10 @@ mod tokenizer;
 mod values;
 
 pub use anb::parse_an_plus_b;
+pub use background::{
+    Attachment, BackgroundRepeat, BackgroundSize, Image, PositionComponent, PositionSide,
+    PositionValue, RepeatStyle, VisualBox,
+};
 pub use calc::{Calc, CalcKind, CalcNode, MAX_CALC_DEPTH, MAX_CALC_NODES};
 pub use color::{Color, LabSpace, PredefinedSpace};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
@@ -46,10 +51,12 @@ pub use media::{
 };
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
-    BorderStyle, BorderWidth, BoxSizing, CssWideKeyword, DeclaredValue, Display, FamilyName,
-    FontSize, FontSizeKeyword, FontStyle, FontWeight, GenericFamily, LengthPercentageOrAuto,
-    LineHeight, MaxSize, PropertyDeclaration, PropertyError, PropertyId, PropertyValue,
-    parse_declaration,
+    BorderStyle, BorderWidth, BoxSizing, Clear, CssWideKeyword, DeclaredValue, Direction, Display,
+    FamilyName, Float, FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle,
+    FontVariantCaps, FontWeight, GenericFamily, LengthPercentageOrAuto, LineHeight, MaxSize,
+    Overflow, Position, PropertyDeclaration, PropertyError, PropertyId, PropertyValue, Spacing,
+    TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign,
+    VerticalAlignKeyword, Visibility, WhiteSpace, ZIndex, parse_declaration,
 };
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{

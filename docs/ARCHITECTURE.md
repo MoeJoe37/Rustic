@@ -35,7 +35,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | Proposed crate | Responsibilities | Primary dependencies | First milestone |
 | --- | --- | --- | --- |
 | `rustic-base` | Typed IDs, checked geometry, byte budgets, cancellation, clocks, diagnostics | std, reviewed utility crates | M1 |
-| `rustic-url` | WHATWG URL parsing/serialization, origin records, relative resolution | base, Unicode/IDNA data adapter | M1 |
+| `rustic-url` | WHATWG URL parsing/serialization, origin records, relative resolution, UTS #46 IDNA | base; generated Unicode IDNA/NFC tables | M1 |
 | `rustic-html` | Encoding integration, incremental tokenizer, tree builder, recovery | base, DOM mutation interface | M1 |
 | `rustic-dom` | Document/node graph, mutation, names, events, traversal, tracing integration | base, URL | M1 |
 | `rustic-css` | Syntax tokens, stylesheet/declaration parsing, selectors, value syntax | base | M2 |

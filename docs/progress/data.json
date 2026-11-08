@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "003bb9ad2f469bc0a045a738c1fb1ae005598477819fca75621119a550743c5f",
-  "percent": "10.09",
-  "verified_percent": "10.09",
+  "source_fingerprint": "c062e9d35dcdddedf40fa45cb2a95e9301d883a887f527cdc299b39aa607624d",
+  "percent": "10.39",
+  "verified_percent": "10.39",
   "partial_percent": "0.00",
-  "completed": 26,
+  "completed": 27,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -15,10 +15,10 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 26,
+      "completed": 27,
       "total": 28,
-      "percent": "89.51",
-      "verified_percent": "89.51",
+      "percent": "92.17",
+      "verified_percent": "92.17",
       "partial_percent": "0.00"
     },
     {
@@ -357,9 +357,30 @@
           "label": "Unicode IDNA and data adapter",
           "size": 3,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/idna/mod.rs",
+              "marker": "pub fn to_ascii"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/host.rs",
+              "marker": "fn domain_parser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn unicode_idna_test_v2_to_ascii"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn wpt_toascii_through_url_parser"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.30"
         },
         {
@@ -466,12 +487,12 @@
         }
       ],
       "points": 30,
-      "completed": 5,
+      "completed": 6,
       "in_progress": 0,
       "total": 12,
-      "contribution": "1.00",
-      "percent": "33.33",
-      "verified_percent": "33.33",
+      "contribution": "1.30",
+      "percent": "43.33",
+      "verified_percent": "43.33",
       "partial_percent": "0.00"
     },
     {

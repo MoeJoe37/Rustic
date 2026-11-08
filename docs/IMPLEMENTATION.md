@@ -174,9 +174,10 @@ parser-backed `dump-dom` command arrived with DOC-07.
 ## DOC-02a — URL records, parsing and origins
 
 `rustic-url` now implements immutable URL records, original special/generic URL
-and reference parsing, ASCII hosts, IPv4/IPv6, encoding/serialization and structured
-origins. It depends only on `rustic-base`. File/blob URLs and Unicode IDNA return
-explicit unsupported errors. Limits and cooperative cancellation are integrated;
+and reference parsing, ASCII and Unicode (UTS #46 IDNA) hosts, IPv4/IPv6,
+encoding/serialization and structured origins. It depends only on `rustic-base`;
+IDNA uses generated Unicode 17.0.0 tables (see [URL.md](URL.md)). File/blob URLs
+return explicit unsupported errors. Limits and cooperative cancellation are integrated;
 the supplied base is immutable even on failure. Debug/error output omits userinfo
 and private URL payloads.
 
@@ -475,7 +476,7 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |
 | DOC-04c: node kinds, cloning, adoption and lifecycle | Complete: general fragments, PI/CDATA, clone, cross-document adoption with ID maps, `ReadyState`; mutation records pending |
-| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA and blob remain pending |
+| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset plus UTS #46 IDNA (all 6,389 Unicode IdnaTestV2 cases); blob remains pending |
 | DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 815-case WPT subset, standard-named diagnostics with offsets |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |

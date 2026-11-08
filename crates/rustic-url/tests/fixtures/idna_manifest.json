@@ -1,0 +1,78 @@
+{
+  "idna_test_v2": {
+    "ignored_statuses": [
+      "A4_1",
+      "A4_2",
+      "U1",
+      "V2",
+      "V3",
+      "X4_2"
+    ],
+    "selected_cases": 6389,
+    "skipped_ill_formed_utf16": 2,
+    "to_ascii_failure": 5551,
+    "to_ascii_success": 838,
+    "upstream_cases": 6391
+  },
+  "license": "Unicode License v3 (crates/rustic-url/UNICODE-LICENSE.md); WPT BSD-3-Clause (WPT-LICENSE.md)",
+  "normalization_test": {
+    "nfc_checks": 37671
+  },
+  "outputs": {
+    "crates/rustic-url/src/idna/tables.rs": "042e5b299e3b692aa6aa5f403ff7e06c9b00b81423ec141f2c9de0d25ecd0ba1",
+    "crates/rustic-url/tests/fixtures/idna_cases.rs": "c974dfe4f7c99cd3da70e0745a68cba050b80eb70839971d90972fbfbbf6e6d8",
+    "crates/rustic-url/tests/fixtures/nfc_cases.rs": "cdacad23a9fdee225589621dab46b52b742dcee85c0ff3655c4b3cdf6041e87d",
+    "crates/rustic-url/tests/fixtures/toascii_cases.rs": "2db2438ab6676afa7028c40008c7c8808352b3beb34816f9aec6e76b15a24086"
+  },
+  "sources": {
+    "DerivedBidiClass.txt": {
+      "sha256": "4867b4b7f0731ed1bfcd34cc6251211ff1542541fce0734b6fbda139ee80b3a4",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/extracted/DerivedBidiClass.txt"
+    },
+    "DerivedJoiningType.txt": {
+      "sha256": "f39ebe974825d6736aee15582250307aa532b2cfab3caf3f86bd23fddc9c5c4d",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/extracted/DerivedJoiningType.txt"
+    },
+    "DerivedNormalizationProps.txt": {
+      "sha256": "71fd6a206a2c0cdd41feb6b7f656aa31091db45e9cedc926985d718397f9e488",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/DerivedNormalizationProps.txt"
+    },
+    "IdnaMappingTable.txt": {
+      "sha256": "87f05505dc026fdb2bff16132bdc68a8014675836882a9a2b1844540ad3be382",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/idna/17.0.0/IdnaMappingTable.txt"
+    },
+    "IdnaTestV2.txt": {
+      "sha256": "beb5d0be20e896189b03209a82fdc34f06351502bbd4b8e2523583fc2954d9cf",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/idna/17.0.0/IdnaTestV2.txt"
+    },
+    "NormalizationTest.txt": {
+      "sha256": "5019ffd530751a741900c849c0e010332f142a3612234639bd200b82138a87db",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/NormalizationTest.txt"
+    },
+    "UnicodeData.txt": {
+      "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/UnicodeData.txt"
+    },
+    "toascii.json": {
+      "sha256": "644eba9d5b593df8095cfa307222f3014542ff9cc02d555f8e5660059d80470f",
+      "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/57bbaa12ff3515848cc0b3d3791791086a563047/url/resources/toascii.json"
+    }
+  },
+  "tables": {
+    "bidi_runs": 1252,
+    "combining_class_runs": 403,
+    "compositions": 961,
+    "decompositions": 2081,
+    "idna_mapping_bytes": 12976,
+    "idna_status_runs": 8201,
+    "joining_runs": 524,
+    "mark_runs": 327
+  },
+  "unicode_version": "17.0.0",
+  "unicodetools_revision": "63aff0ca8dea894a057d04e7aef7ae1241757680",
+  "wpt_revision": "57bbaa12ff3515848cc0b3d3791791086a563047",
+  "wpt_toascii": {
+    "toascii_cases": 87,
+    "toascii_failures": 19
+  }
+}

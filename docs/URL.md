@@ -11,8 +11,11 @@ Implemented in the initial DOC-02a slice:
 
 - Immutable records with scheme, userinfo, optional host/port, structured path,
   and distinct absent/empty query and fragment values.
-- `http`, `https`, `ws`, `wss` and `ftp` network URLs, ASCII domains and default-port normalization.
-- Percent-decoded special hosts, forbidden-host checks and lowercase ASCII domains.
+- `http`, `https`, `ws`, `wss` and `ftp` network URLs and default-port normalization.
+- Percent-decoded special hosts, the non-strict domain parser (ASCII domains are
+  lowercased; others go through UTS #46 ToASCII) and forbidden-domain checks.
+- Original UTS #46 IDNA processing (`rustic_url::idna`): mapping, NFC, Punycode,
+  ContextJ and the RFC 5893 Bidi Rule over generated Unicode 17.0.0 tables.
 - Original short-form decimal/octal/hex IPv4 parsing and original IPv6 parsing/
   canonical compression, including strict dotted IPv4 tails inside IPv6.
 - Generic non-special hierarchical URLs, opaque hosts and opaque paths.
@@ -35,13 +38,15 @@ origin derivation. This is a partial implementation, not full URL conformance.
 
 ## Boundaries and pending work
 
-`blob:` returns an explicit unsupported error. Special URLs requiring
-Unicode IDNA processing also return an unsupported error, with no guessed host
-or fallback authority. ASCII A-labels are processed under the reviewed standard's
-non-strict ASCII-domain behavior. Unicode paths/queries/fragments use UTF-8 percent
-encoding; non-special opaque hosts do not use IDNA.
+`blob:` returns an explicit unsupported error. A special URL whose host fails
+the domain parser is rejected with `InvalidHost`; there is no guessed host or
+fallback authority. ASCII domains, including malformed A-labels such as `xn--a`,
+follow the standard's non-strict rule and are only lowercased. Unicode
+paths/queries/fragments use UTF-8 percent encoding; non-special opaque hosts do
+not use IDNA.
 
-Pending: reviewed Unicode IDNA/data adapter, blob registry and origin rules,
+Pending: strict (`beStrict`) domain validation for conformance checkers and the
+`domain-to-ASCII` validation error, blob registry and origin rules,
 legacy document query encodings,
 URL setters and URLSearchParams. There is no public browser `URL` binding yet.
 Successful parsing does not mean a scheme is navigable, secure, allowed by policy,
@@ -136,7 +141,8 @@ components; it is not a watchdog or an interrupt for allocation.
 | --- | --- |
 | `record` | Immutable representation, accessors, URL/path serialization and safe debug output |
 | `parser` | Scheme/authority/path/file/reference orchestration, diagnostics, limits and checkpoints |
-| `host` | Domain/opaque/address host representation and host validation |
+| `host` | Domain/opaque/address host representation, domain parser and host validation |
+| `idna` | UTS #46 ToASCII/ToUnicode, NFC, Punycode, ContextJ and Bidi Rule; generated `tables` |
 | `ipv4` / `ipv6` | Address algorithms and IPv6 canonical serialization |
 | `encoding` | Component percent-encode sets and host percent decoding |
 | `origin` | Tuple keys, opaque identity, equality/hashing and serialization |
@@ -190,3 +196,56 @@ Omit `--check` only for a deliberate fixture update. Review revision, selection,
 digest, denominator and behavior changes together; do not shrink the selection
 or rewrite expected results merely to hide a regression. Normal CI is offline
 with respect to the fixture source and needs no upstream checkout.
+
+## Unicode IDNA data
+
+`rustic_url::idna` is an original UTS #46 implementation with the URL Standard's
+non-strict options: CheckHyphens, UseSTD3ASCIIRules and VerifyDnsLength false,
+CheckBidi and CheckJoiners true, nontransitional processing and no
+IgnoreInvalidPunycode. Only non-ASCII domains reach it; the host parser applies
+the empty-result and forbidden-domain-code-point checks afterwards, then the
+IPv4 "ends in a number" rule, so full-width digits can still form an IPv4 host.
+
+`src/idna/tables.rs` is generated, never hand-edited. It holds the IDNA mapping
+status runs, canonical decompositions and primary composites with
+Full_Composition_Exclusion applied, combining classes, General_Category=Mark,
+Bidi_Class (with `@missing` defaults) and the Joining_Type values ContextJ uses.
+Lookups are binary searches over sorted runs; Hangul uses the algorithmic
+mapping. The inputs are Unicode 17.0.0 files from
+[unicode-org/unicodetools 63aff0ca8dea894a057d04e7aef7ae1241757680](https://github.com/unicode-org/unicodetools/tree/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data)
+(a mirror of `unicode.org/Public`) plus WPT's `url/resources/toascii.json` at
+[57bbaa12ff3515848cc0b3d3791791086a563047](https://github.com/web-platform-tests/wpt/blob/57bbaa12ff3515848cc0b3d3791791086a563047/url/resources/toascii.json).
+The [manifest](../crates/rustic-url/tests/fixtures/idna_manifest.json) lists every
+source URL with its SHA-256 and the digest of every generated file, and
+`tools/check_repository.py` rejects a generated file that no longer matches it.
+The data is under the [Unicode License v3](../crates/rustic-url/UNICODE-LICENSE.md).
+
+Download the eight files named in the manifest into one directory, then:
+
+```sh
+python3 tools/generate_idna_data.py --source-dir /path/to/files --check
+cargo test --locked -p rustic-url --test idna
+```
+
+Updating Unicode means changing the pinned revision/version in the generator,
+running it with `--repin`, and reviewing both the table diff and the test results.
+The generator rejects unknown statuses, overlapping or missing ranges and pool
+overflows rather than guessing.
+
+| Evidence | Result |
+| --- | --- |
+| Unicode `IdnaTestV2.txt` | All 6,389 well-formed cases pass for ToASCII and ToUnicode; 2 lines with unpaired surrogates cannot be expressed as Rust strings |
+| Unicode `NormalizationTest.txt` | 37,671 NFC pairs generated; the 31,032 whose code points are IDNA-valid are checked through ToUnicode |
+| WPT `toascii.json` | All 87 cases pass through `Url::parse` |
+
+IdnaTestV2 statuses V2, V3, U1, A4_1, A4_2 and X4_2 are ignored because they
+belong to options the URL Standard turns off (UTS #46 lists them per flag).
+
+**Decision: Punycode work limits.** Punycode decoding and encoding are quadratic
+in label length, and hosts are content-controlled. Rustic rejects a label whose
+Punycode part exceeds 2,000 bytes or whose encoding input exceeds 1,000 code
+points (`IdnaError::LabelTooLong`). DNS limits labels to 63 octets, so this only
+rejects hosts that can never resolve; it is a deliberate, tested deviation from
+the unbounded algorithm. Other work is linear apart from sorting each run of
+combining marks, which is O(n log n).
+

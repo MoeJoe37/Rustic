@@ -259,8 +259,29 @@
           "label": "Unicode IDNA and data adapter",
           "size": 3,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/idna/mod.rs",
+              "marker": "pub fn to_ascii"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/host.rs",
+              "marker": "fn domain_parser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn unicode_idna_test_v2_to_ascii"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/idna.rs",
+              "marker": "fn wpt_toascii_through_url_parser"
+            }
+          ]
         },
         {
           "id": "url.file",

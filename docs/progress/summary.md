@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 10.09%** = 10.09% verified complete + 0.00% partial credit. 26/172 capabilities complete, 0 in progress.
+**Overall completion: 10.39%** = 10.39% verified complete + 0.00% partial credit. 27/172 capabilities complete, 0 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `003bb9ad2f469bc0a045a738c1fb1ae005598477819fca75621119a550743c5f`.
+Catalog: `engine-v3`. Source fingerprint: `c062e9d35dcdddedf40fa45cb2a95e9301d883a887f527cdc299b39aa607624d`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -10,7 +10,7 @@ Catalog: `engine-v3`. Source fingerprint: `003bb9ad2f469bc0a045a738c1fb1ae005598
 
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
-| M1 Document core | 26/28 | 89.51% | 89.51% | 11.27% |
+| M1 Document core | 27/28 | 92.17% | 92.17% | 11.27% |
 | M2 CSS & computed style | 0/8 | 0.00% | 0.00% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
@@ -26,7 +26,7 @@ Catalog: `engine-v3`. Source fingerprint: `003bb9ad2f469bc0a045a738c1fb1ae005598
 | Subsystem | Completed | In progress | Progress | Verified | Engine weight | Engine points |
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 6/8 | 0 | 62.50% | 62.50% | 2% | 1.25 |
-| URLs & encoding | 5/12 | 0 | 33.33% | 33.33% | 3% | 1.00 |
+| URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 5/10 | 0 | 38.23% | 38.23% | 6% | 2.29 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 0/8 | 0 | 0.00% | 0.00% | 9% | 0.00 |
@@ -67,7 +67,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `url.records` — Declared ASCII URL/reference parsing subset · size 3 · M1 · 0.30% of engine ([source](../../crates/rustic-url/src/parser.rs), [test](../../crates/rustic-url/tests/wpt.rs))
 - **complete** `url.addresses` — IPv4/IPv6 host parsing and canonicalization · size 2 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/ipv6.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **complete** `url.origins` — Tuple and process-local opaque origin identity · size 2 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/origin.rs), [test](../../crates/rustic-url/tests/url.rs))
-- **planned** `url.idna` — Unicode IDNA and data adapter · size 3 · M1 · 0.30% of engine
+- **complete** `url.idna` — Unicode IDNA and data adapter · size 3 · M1 · 0.30% of engine ([source](../../crates/rustic-url/src/idna/mod.rs), [source](../../crates/rustic-url/src/host.rs), [test](../../crates/rustic-url/tests/idna.rs), [test](../../crates/rustic-url/tests/idna.rs))
 - **complete** `url.file` — File URL and platform rules · size 2 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/parser.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **planned** `url.blob` — Blob registry and origin rules · size 2 · M9 · 0.20% of engine
 - **planned** `url.setters` — URL setters and URLSearchParams · size 2 · M9 · 0.20% of engine

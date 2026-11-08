@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::encoding::{self, EncodeSet};
-use crate::{ParseError, ipv4, ipv6};
+use crate::{ParseError, idna, ipv4, ipv6};
 
 /// Canonical validated host; construction is restricted to the URL parser.
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -42,15 +42,7 @@ impl Host {
             ))));
         }
         let decoded = encoding::decode_host(input)?;
-        if decoded.chars().any(|value| {
-            forbidden_host(value) || value <= '\u{1f}' || value == '\u{7f}' || value == '%'
-        }) {
-            return Err(ParseError::InvalidHost);
-        }
-        if !decoded.is_ascii() {
-            return Err(ParseError::UnsupportedIdna);
-        }
-        let domain = decoded.to_ascii_lowercase();
+        let domain = domain_parser(&decoded)?;
         if ipv4::ends_in_number(&domain) {
             return ipv4::parse(&domain).map(|address| Self(HostKind::Ipv4(address)));
         }
@@ -100,6 +92,26 @@ impl fmt::Debug for Host {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }
+}
+
+/// The URL Standard's non-strict domain parser (section 3.3 IDNA).
+///
+/// An ASCII domain is only lowercased, whatever UTS #46 would say about it;
+/// the standard keeps this for web compatibility (for example `xn--a`).
+fn domain_parser(domain: &str) -> Result<String, ParseError> {
+    let result = if domain.is_ascii() {
+        domain.to_ascii_lowercase()
+    } else {
+        idna::to_ascii(domain).map_err(|_| ParseError::InvalidHost)?
+    };
+    if result.is_empty() || result.chars().any(forbidden_domain) {
+        return Err(ParseError::InvalidHost);
+    }
+    Ok(result)
+}
+
+fn forbidden_domain(value: char) -> bool {
+    forbidden_host(value) || value <= '\u{1f}' || value == '%' || value == '\u{7f}'
 }
 
 fn forbidden_host(value: char) -> bool {

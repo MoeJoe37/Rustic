@@ -201,6 +201,20 @@ def main() -> int:
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
             error(url_manifest, f"invalid WPT fixture metadata: {exc}")
 
+    idna_manifest = ROOT / "crates/rustic-url/tests/fixtures/idna_manifest.json"
+    try:
+        manifest = json.loads(idna_manifest.read_text(encoding="utf-8"))
+        for output, digest in manifest["outputs"].items():
+            if hashlib.sha256((ROOT / output).read_bytes()).hexdigest() != digest:
+                error(ROOT / output, "generated IDNA output differs from its manifest; rerun tools/generate_idna_data.py")
+        if not (ROOT / "crates/rustic-url/UNICODE-LICENSE.md").is_file():
+            error(idna_manifest, "missing Unicode license for generated IDNA data")
+        for key in ("unicodetools_revision", "wpt_revision"):
+            if not re.fullmatch(r"[0-9a-f]{40}", manifest[key]):
+                error(idna_manifest, f"{key} must be a full commit SHA")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        error(idna_manifest, f"invalid IDNA data manifest: {exc}")
+
     check_debt_markers(files)
     check_html_fixture("html5lib")
     check_html_fixture("references")

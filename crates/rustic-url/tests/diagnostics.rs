@@ -170,6 +170,21 @@ fn failures_name_the_standard_error_and_location() {
             vec![(V::DomainToAscii, 8)],
         ),
         (
+            "https://a\u{200C}b/",
+            ParseError::InvalidHost,
+            vec![(V::DomainToAscii, 8)],
+        ),
+        (
+            "https://\u{AD}/",
+            ParseError::InvalidHost,
+            vec![(V::DomainToAscii, 8)],
+        ),
+        (
+            "https://a\u{FF0F}b/",
+            ParseError::InvalidHost,
+            vec![(V::DomainInvalidCodePoint, 8)],
+        ),
+        (
             "sc://a<b/",
             ParseError::InvalidHost,
             vec![(V::HostInvalidCodePoint, 5)],

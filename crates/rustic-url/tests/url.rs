@@ -250,12 +250,12 @@ fn explicit_unsupported_features_and_invalid_hosts_fail_without_fallback() {
         Err(ParseError::UnsupportedBlob)
     );
     assert_eq!(
-        Url::parse("https://مثال.test/", None),
-        Err(ParseError::UnsupportedIdna)
+        parse("https://مثال.test/").serialize(),
+        "https://xn--mgbh0fb.test/"
     );
     assert_eq!(
-        Url::parse("https://%C3%A9.test/", None),
-        Err(ParseError::UnsupportedIdna)
+        parse("https://%C3%A9.test/").serialize(),
+        "https://xn--9ca.test/"
     );
     for host in [
         "",

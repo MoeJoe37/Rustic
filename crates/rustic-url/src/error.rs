@@ -19,8 +19,6 @@ pub enum ParseError {
     InvalidIpv6,
     /// A port is not decimal or is outside 0–65535.
     InvalidPort,
-    /// Unicode domain processing needs the future reviewed IDNA adapter.
-    UnsupportedIdna,
     /// Blob URL registry and origin rules are not implemented.
     UnsupportedBlob,
     /// Input, serialized output or stored path segments exceed configured limits.
@@ -38,7 +36,6 @@ impl fmt::Display for ParseError {
             Self::InvalidIpv4 => "invalid URL IPv4 address",
             Self::InvalidIpv6 => "invalid URL IPv6 address",
             Self::InvalidPort => "invalid URL port",
-            Self::UnsupportedIdna => "Unicode domain processing is not implemented",
             Self::UnsupportedBlob => "blob URLs are not implemented",
             Self::LimitExceeded => "URL resource limit exceeded",
             Self::Cancelled => "URL parsing cancelled",

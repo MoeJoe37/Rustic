@@ -76,6 +76,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Open |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
 | TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Open, pay with the encoding layer |
+| TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Open, pay with text shaping (M3) |
+| TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
+| TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -434,6 +437,43 @@ nothing is truncated, and the replaced text is still bounded by the byte
 budget. **Pay:** route fetched bytes through the encoding layer that DOC-06's
 encoding sniffing will provide, with the CSS fallback chain. **Trigger:** the
 encoding layer landing, or a real page fixture that needs a non-UTF-8 sheet.
+### TD-29 — `:dir()` reads Bidi_Class from the IDNA tables
+
+HTML directionality (`dir=auto`, `bdi`, `:dir()`) needs each character's strong
+bidirectional type. The only pinned Bidi_Class data is the table
+`tools/generate_idna_data.py` generates for the IDNA Bidi Rule, so
+`rustic-url` exposes `idna::strong_direction` and `rustic-style` depends on
+`rustic-url` for it. The data is exact (Unicode 17.0.0), but it lives in the
+wrong crate. **Pay:** move the Bidi_Class table to a shared Unicode data crate
+(or `rustic-base`) and point both users at it. **Trigger:** the bidi algorithm
+or text shaping in M3, or any second user of Unicode properties.
+
+### TD-30 — Multi-compound `:has()` arguments walk the subtree per anchor
+
+`:has()` arguments with a single compound (`:has(.x)`, `:has(> img)`,
+`:has(+ p)`) are memoized per (compound, element), so a restyle costs time
+linear in the tree. An argument with combinators inside it, such as
+`:has(> a b)` or `:has(~ section em)`, depends on the anchor and is checked by
+matching every candidate in the anchor's subtree (or following siblings and
+their subtrees), so styling every element of a *d*-deep chain costs O(*d*²)
+matches. Results are memoized per (`:has()` list, anchor), so no anchor is
+evaluated twice. **Why watch:** a page can make this quadratic but not
+exponential; 3,000-deep documents style in well under a second. **Pay:** use
+per-element ancestor/sibling bloom filters or the invalidation-time `:has()`
+indexes that engines use. **Trigger:** CSS-06 invalidation work on `:has()`, or
+a measured slow page.
+
+### TD-31 — Form owners ignore the parser's form element pointer
+
+`:default`, `:checked` and `:indeterminate` need form owners (default buttons,
+radio groups). Rustic resolves an owner from the `form` attribute or the
+nearest form ancestor. The HTML parser also associates controls with the
+form element pointer when they are not descendants (`<table><form><tr><td>
+<input>`), but the DOM does not record that association yet, so such
+controls get no owner. **Pay:** record parser-set form owners on the element
+when form association (`HTMLFormElement.elements`) is implemented.
+**Trigger:** WEB-series form APIs, or the first test that needs parser
+association.
 
 ## Reviewing new work
 

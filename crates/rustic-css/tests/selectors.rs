@@ -132,9 +132,9 @@ fn invalid_selectors_report_a_reason() {
         ("[a==b]", InvalidAttribute),
         ("ns|a", UnknownNamespacePrefix),
         ("[ns|a]", UnknownNamespacePrefix),
-        (":has(a)", UnsupportedPseudoClass),
+        (":user-invalid", UnsupportedPseudoClass),
         (":hovered", UnsupportedPseudoClass),
-        ("::selection", UnsupportedPseudoElement),
+        ("::cue", UnsupportedPseudoElement),
         (":marker", UnsupportedPseudoClass),
         ("::before.a", MisplacedPseudoElement),
         ("::before a", MisplacedPseudoElement),
@@ -144,7 +144,6 @@ fn invalid_selectors_report_a_reason() {
         (":nth-child(foo)", InvalidAnPlusB),
         (":nth-child(2n of)", InvalidAnPlusB),
         (":nth-of-type(2n of a)", InvalidAnPlusB),
-        ("& a", Unsupported),
         ("a || b", Unsupported),
     ];
     let mut failures = Vec::new();

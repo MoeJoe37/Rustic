@@ -15,3 +15,10 @@ p::before, li:first-line, ::marker
 .\31 23, #-\33x, [a="q\"x"]
 foreignObject, foreignobject, FOREIGNOBJECT
 :is(), :is(::before, li), :where(!!, td)
+p:has(> b, + i), ul:has(~ p li.x), :has(+ ul .y)
+:not(:has(*)), :is(p:has(b)) ~ svg
+input:checked, :indeterminate, :default, option:enabled, :disabled
+:required, :optional, input:read-only, :read-write, :placeholder-shown
+:lang(en), li:lang("*-US", ""), :dir(rtl), :dir(ltr) > bdi, :dir(up)
+& > li, li&.x, :is(&) b
+input::placeholder, ::selection, dialog::backdrop, p::before:hover:not(:focus)

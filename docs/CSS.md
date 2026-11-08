@@ -16,6 +16,9 @@ done (see [Media queries](#media-queries)); invalidation and custom properties
 follow.
 `<link rel=stylesheet>` and `@import` load over a caller-controlled fetcher
 (see [External stylesheets](#external-stylesheets)).
+CSS-07a completed the required selectors: `:has()`, form states, `:lang()`,
+`:dir()`, the nesting selector `&` with nested style rules, and pseudo-element
+states.
 
 ## Implemented behavior
 
@@ -90,13 +93,16 @@ matching.
 | Simple selectors | Type and universal with `ns\|`, `*\|` and `\|` prefixes and the default namespace; `#id`; `.class`; `[attr]` with `=`, `~=`, `\|=`, `^=`, `$=`, `*=` and the `i`/`s` flags |
 | Combinators | Descendant, `>`, `+`, `~` |
 | Structural | `:root`, `:empty`, `:scope`, `:first-child`, `:last-child`, `:only-child`, `:first-of-type`, `:last-of-type`, `:only-of-type`, `:nth-child(An+B [of S])`, `:nth-last-child(An+B [of S])`, `:nth-of-type()`, `:nth-last-of-type()` |
-| Logical | `:is()` and `:where()` (forgiving lists), `:not()`; nesting is limited to 32 levels |
+| Logical | `:is()` and `:where()` (forgiving lists), `:not()`, and `:has()` with an unforgiving relative selector list (`:has(> img, + p)`); `:has()` may not nest, even through `:is()`, and takes no pseudo-elements; nesting is limited to 32 levels |
 | Links and states | `:any-link`, `:link` (every link, since history is never exposed), `:visited` (never matches); `:hover`, `:active`, `:focus`, `:focus-visible`, `:focus-within` and `:target` come from the element view and are off until an interaction model exists |
-| Pseudo-elements | `::before`, `::after`, `::first-line`, `::first-letter` (also with one colon) and `::marker`, last in a top-level selector only |
+| Form states | `:enabled`, `:disabled`, `:checked`, `:indeterminate`, `:default`, `:required`, `:optional`, `:read-only`, `:read-write`, `:placeholder-shown` (HTML §4.16.3; see [Element states](#element-states)) |
+| Language and direction | `:lang()` with idents or strings (extended filtering, so `:lang(de-DE)` matches `de-Latn-DE` and `"*-CH"` works); `:dir()` with any ident, where only `ltr` and `rtl` can match |
+| Nesting | `&` anywhere in a compound (after any type selector). In a nested style rule it is the parent's selectors as `:is()`, with the parent's highest specificity; elsewhere it is `:scope` with zero specificity |
+| Pseudo-elements | `::before`, `::after`, `::first-line`, `::first-letter` (also with one colon), `::marker`, `::placeholder`, `::file-selector-button`, `::backdrop`, and the highlight pseudo-elements `::selection`, `::target-text`, `::spelling-error` and `::grammar-error`, last in a top-level selector only. Tree-abiding ones may be followed by user-action pseudo-classes (`::before:hover`, also inside `:is()`/`:where()`/`:not()`); highlight ones by nothing |
 | Shadow trees | `:host` and `:host(<compound>)`, which match only the host, from its shadow tree's sheets (see [Shadow trees](#shadow-trees)) |
-| Rejected for now | `:has()`, `:host-context()`, form-state and language pseudo-classes, other pseudo-elements (including `::slotted()` and `::part()`), pseudo-classes after a pseudo-element, the nesting selector `&` and the column combinator `\|\|` (CSS-07) |
+| Rejected for now | Constraint-validation states (`:valid`, `:invalid`, `:in-range`, `:out-of-range`, `:user-valid`, `:user-invalid`), `:open`, `:modal`, `:defined`, media-state pseudo-classes, `:host-context()`, `::part()`, `::slotted()`, `::highlight()`, `::cue` and the column combinator `\|\|` |
 
-Specificity follows Selectors Level 4 §17: `:is()`, `:not()` and
+Specificity follows Selectors Level 4 §17: `:is()`, `:not()`, `:has()` and
 `:nth-child(of S)` take their most specific argument, `:where()` adds
 nothing, and `:host(S)` is a pseudo-class plus its argument. `Display` serializes selectors as CSSOM does (identifiers and strings
 escaped, `An+B` normalized, an implicit `*` dropped), and serializing again is a
@@ -125,6 +131,54 @@ sibling's, so matching every child of a long list is linear rather than
 quadratic (TD-20, paid with CSS-05). A restyle (`style_tree`) and
 `query_selector_all` share one cache for the whole walk.
 
+### Nested style rules
+
+`parse_nested_selector_list` reads a nested rule's selectors (CSS Nesting,
+Editor's Draft reviewed 2026-11-08). Each entry is relative: one that starts
+with a combinator or contains no `&` gets `& ` and the combinator in front, so
+`> li` becomes `& > li` and serializes that way. The parent's pseudo-element
+selectors are dropped from `&`. Every `&` shares the parent list through an
+`Arc`, so a deep chain of nested rules stays linear in size, and the parent's
+own nesting depth counts against the 32-level limit.
+
+`StyleSheet::parse` expands nested style rules in the order the cascade sees
+them: the rule with the declarations before its first nested rule, then each
+nested rule (depth-first), and every later run of declarations as a "nested
+declarations rule" with the parent's selectors. A nested `@media` adds its
+media condition, and its declarations and relative rules keep the parent's
+selectors. Other nested at-rules, and nested rules in `style` attributes, are
+dropped with `UnsupportedNestedRule` until those at-rules exist.
+
+### Element states
+
+`rustic-style` derives HTML element states from content attributes and the
+tree, since there is no user interaction or script yet (HTML Standard,
+reviewed 2026-11-08):
+
+| State | Rule |
+| --- | --- |
+| `:enabled` / `:disabled` | Buttons, inputs, selects, textareas, optgroups, options and fieldsets; actually disabled through `disabled`, a disabled `optgroup` parent (options), or a disabled fieldset ancestor unless inside its first `legend` child |
+| `:checked` | Checkboxes and radios with `checked` (only the last checked radio of a group, as inserting it unchecks the others) and selected options: in a single-line select, the last option with `selected`, or the first non-disabled option when none has it |
+| `:indeterminate` | Radios whose group has no checked radio, and `progress` without `value` (a checkbox is indeterminate only through script) |
+| `:default` | Each form's first submit button, and checkboxes, radios and options with `checked`/`selected` |
+| `:required` / `:optional` | Selects, textareas and inputs whose type takes `required`, with or without it |
+| `:read-write` / `:read-only` | Mutable text-like inputs and textareas (not `readonly`, not disabled) and `contenteditable` editing hosts and their editable descendants; everything else is read-only |
+| `:placeholder-shown` | Text-like inputs with `placeholder` whose sanitized value is empty (`number` values that are not valid floats sanitize to empty) and textareas with `placeholder` and no text |
+| Content language | The nearest `xml:lang`, or `lang` on an HTML, SVG or MathML element, else the last `<meta http-equiv=content-language>` without a comma; `lang=""` means unknown and matches only `:lang("")` |
+| Directionality | `dir=ltr`/`rtl`; `dir=auto` and `bdi` use the first strong character (inputs and textareas their value; other elements their text, skipping `bdi`, `script`, `style`, `textarea` and elements with `dir`) and inherit when there is none; `input type=tel` is `ltr`; otherwise the parent's, `ltr` at the root |
+
+Radio groups use the form owner from the `form` attribute or the nearest form
+ancestor; parser association of non-descendant controls is not recorded yet
+(TD-31). Strong characters come from the pinned Unicode 17.0.0 Bidi_Class
+table shared with IDNA (TD-29). Whole-tree facts (IDs, radio groups, default
+buttons, the pragma-set language) are built once per match or restyle on first
+use, and directionality is memoized per element.
+
+`:has()` arguments with one compound are memoized per (compound, element), so
+`div:has(.leaf)` over a 3,000-deep chain matches in linear time; arguments with
+inner combinators walk the anchor's subtree or following siblings (TD-30).
+Pseudo-element states ask the element view, whose default is "no state".
+
 ### Selector evidence
 
 * `An+B.json` from css-parsing-tests (same pinned revision): **128 of 128**
@@ -138,10 +192,22 @@ quadratic (TD-20, paid with CSS-05). A restyle (`style_tree`) and
   brute-force check of `:nth-child()` over 91 `An+B` values, and pathological
   selectors (a 40-compound descendant chain over 100 nested elements and a
   20,000-compound selector).
+* `tests/selectors_level4.rs` (CSS-07a): 27 more valid selectors with
+  serialization and specificity, 24 invalid ones, typed values, 10 nested
+  selectors resolved against a parent (each a serialization fixed point) and
+  the nesting limit through `&` chains.
+* `rustic-style/tests/selectors_level4.rs`: `:has()` in every combinator
+  form, the single-compound fast paths checked against the general walk on a
+  300-element generated tree, a 3,000-deep linear-time case, every form state
+  on one form, `:lang()` extended filtering, inheritance and the pragma-set
+  language, `:dir()` with `auto`, `bdi`, `tel` inputs and textareas, nested
+  style rules through the cascade, and pseudo-element states.
 * The `css-selector` fuzz target checks that every valid selector list
   serializes to a fixed point with the same specificities and selects the same
   elements of a fixed document in HTML, quirks and XML modes. 600,000 executions
-  before landing found no defects.
+  before landing found no defects; with CSS-07a's syntax, seeds and a fixture
+  with form controls, `dir=auto` and `lang`, 400,000 more (plus 40,000
+  `css-cascade` runs with nested rules) found none.
 
 ```sh
 cargo test --locked -p rustic-css -p rustic-style
@@ -292,9 +358,10 @@ declarations drop themselves, and each drop is a `StyleDiagnostic` with a span.
 `@media` and `@layer` rules, nested in each other to the parser's
 block-nesting limit and read with an explicit stack, are flattened in place:
 each style rule records the media query lists it sits in (see
-[Media queries](#media-queries)) and its cascade layer (below). Other at-rules
-(`@supports`, ...) and nested style rules are reported as unsupported for
-now (so is `@import` by `StyleSheet::parse`; `StyleSheet::parse_with_imports`
+[Media queries](#media-queries)) and its cascade layer (below). Nested style
+rules expand after their parent (see [Nested style rules](#nested-style-rules)).
+Other at-rules
+(`@supports`, ...) are reported as unsupported for now (so is `@import` by `StyleSheet::parse`; `StyleSheet::parse_with_imports`
 returns the valid ones for loading), and a declaration directly inside a top-level `@media` or
 `@layer` block is reported as misplaced. `parse_style_attribute` reads a
 `style` attribute.

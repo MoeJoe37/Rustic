@@ -3,12 +3,14 @@
 //! diagnostics for everything dropped.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use rustic_base::SourceSpan;
 use rustic_css::{
-    AtRule, BlockItem, ComponentValue, CssError, CssParser, MediaQueryList, NamespaceMap,
-    PropertyDeclaration, PropertyError, Rule, SelectorErrorKind, SelectorList, Token, Value,
-    parse_block_contents, parse_declaration, parse_media_query_list, parse_selector_list,
+    AtRule, BlockItem, ComponentValue, CssError, CssParser, Declaration, MediaQueryList,
+    NamespaceMap, PropertyDeclaration, PropertyError, Rule, SelectorErrorKind, SelectorList, Token,
+    Value, parse_block_contents, parse_declaration, parse_media_query_list,
+    parse_nested_selector_list, parse_selector_list,
 };
 
 use crate::{LayerName, LayerSegment};
@@ -26,6 +28,11 @@ pub enum Origin {
 }
 
 /// A style rule: a selector list and its typed declarations in order.
+///
+/// A nested style rule appears as its own `StyleRule` after its parent, with
+/// `&` resolved to the parent's selectors; declarations that follow a nested
+/// rule (or sit in a nested `@media`) become another `StyleRule` with the
+/// parent's selectors.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyleRule {
     /// The rule's selectors.
@@ -68,7 +75,8 @@ pub enum StyleDiagnosticKind {
     UnknownProperty,
     /// A declaration's value does not match its property's grammar.
     InvalidValue,
-    /// A nested style rule (CSS Nesting) is not implemented yet.
+    /// A nested at-rule other than `@media` inside a style rule, or a nested
+    /// rule in a `style` attribute, which is not implemented yet.
     UnsupportedNestedRule,
     /// An at-rule that is not implemented yet, such as `@import`.
     UnsupportedAtRule,
@@ -96,6 +104,32 @@ pub struct StyleDiagnostic {
     pub span: SourceSpan,
 }
 
+fn rule_span(rule: &Rule) -> SourceSpan {
+    match rule {
+        Rule::Qualified(q) => q.span,
+        Rule::At(a) => a.span,
+    }
+}
+
+/// Type one declaration, appending its longhands or a diagnostic.
+fn declaration(
+    declaration: &Declaration,
+    out: &mut Vec<PropertyDeclaration>,
+    diagnostics: &mut Vec<StyleDiagnostic>,
+) {
+    match parse_declaration(declaration) {
+        Ok(longhands) => out.extend(longhands),
+        Err(error) => diagnostics.push(StyleDiagnostic {
+            kind: match error {
+                PropertyError::UnknownProperty => StyleDiagnosticKind::UnknownProperty,
+                PropertyError::InvalidValue => StyleDiagnosticKind::InvalidValue,
+            },
+            span: declaration.span,
+        }),
+    }
+}
+
+/// A block's declarations, with any nested rule dropped (style attributes).
 fn declarations(
     block: &[Value],
     diagnostics: &mut Vec<StyleDiagnostic>,
@@ -103,26 +137,51 @@ fn declarations(
     let mut out = Vec::new();
     for item in parse_block_contents(block, 0).value {
         match item {
-            BlockItem::Declaration(declaration) => match parse_declaration(&declaration) {
-                Ok(longhands) => out.extend(longhands),
-                Err(error) => diagnostics.push(StyleDiagnostic {
-                    kind: match error {
-                        PropertyError::UnknownProperty => StyleDiagnosticKind::UnknownProperty,
-                        PropertyError::InvalidValue => StyleDiagnosticKind::InvalidValue,
-                    },
-                    span: declaration.span,
-                }),
-            },
+            BlockItem::Declaration(d) => declaration(&d, &mut out, diagnostics),
             BlockItem::Rule(rule) => diagnostics.push(StyleDiagnostic {
                 kind: StyleDiagnosticKind::UnsupportedNestedRule,
-                span: match &rule {
-                    Rule::Qualified(q) => q.span,
-                    Rule::At(a) => a.span,
-                },
+                span: rule_span(&rule),
             }),
         }
     }
     out
+}
+
+/// One style rule (or `@media` block nested in one) being expanded: its
+/// selectors, media conditions, block items and the declarations gathered
+/// since the last nested rule.
+struct NestingFrame {
+    selectors: Arc<SelectorList>,
+    media: Vec<usize>,
+    items: std::vec::IntoIter<BlockItem>,
+    pending: Vec<PropertyDeclaration>,
+    emitted: bool,
+}
+
+impl NestingFrame {
+    fn new(selectors: Arc<SelectorList>, media: Vec<usize>, block: &[Value]) -> Self {
+        Self {
+            selectors,
+            media,
+            items: parse_block_contents(block, 0).value.into_iter(),
+            pending: Vec::new(),
+            emitted: false,
+        }
+    }
+
+    /// Emit the rule itself the first time, then a nested declarations rule
+    /// for each later run of declarations.
+    fn flush(&mut self, rules: &mut Vec<StyleRule>, layer: Option<usize>) {
+        if !self.pending.is_empty() || !self.emitted {
+            rules.push(StyleRule {
+                selectors: SelectorList::clone(&self.selectors),
+                declarations: std::mem::take(&mut self.pending),
+                media: self.media.clone(),
+                layer,
+            });
+            self.emitted = true;
+        }
+    }
 }
 
 /// `@namespace <prefix>? [<string> | <url>];`
@@ -327,6 +386,68 @@ impl Builder {
         })
     }
 
+    /// Append a style rule and its nested rules (CSS Nesting §3, Editor's
+    /// Draft reviewed 2026-11-08) in the order the cascade sees them: the
+    /// rule with the declarations before its first nested rule, then each
+    /// nested rule (expanded the same way, depth-first), with every later run
+    /// of declarations as a nested declarations rule that has the parent's
+    /// selectors. A nested `@media` adds its condition and keeps the
+    /// parent's selectors for its declarations and relative rules. All of
+    /// them stay in `layer`. The expansion is iterative; block nesting is
+    /// bounded by the parser.
+    fn expand(
+        &mut self,
+        selectors: SelectorList,
+        layer: Option<usize>,
+        media: Vec<usize>,
+        block: &[Value],
+    ) {
+        let mut stack = vec![NestingFrame::new(Arc::new(selectors), media, block)];
+        while let Some(frame) = stack.last_mut() {
+            let Some(item) = frame.items.next() else {
+                frame.flush(&mut self.sheet.rules, layer);
+                stack.pop();
+                continue;
+            };
+            match item {
+                BlockItem::Declaration(d) => {
+                    declaration(&d, &mut frame.pending, &mut self.diagnostics);
+                }
+                BlockItem::Rule(Rule::Qualified(q)) => {
+                    match parse_nested_selector_list(&q.prelude, &self.namespaces, &frame.selectors)
+                    {
+                        Ok(nested) => {
+                            frame.flush(&mut self.sheet.rules, layer);
+                            let media = frame.media.clone();
+                            stack.push(NestingFrame::new(Arc::new(nested), media, &q.block));
+                        }
+                        Err(error) => {
+                            self.diagnose(StyleDiagnosticKind::InvalidSelector(error.kind), q.span);
+                        }
+                    }
+                }
+                BlockItem::Rule(Rule::At(at)) if at.name.eq_ignore_ascii_case("media") => {
+                    let Some(block) = at.block else {
+                        self.diagnose(StyleDiagnosticKind::InvalidMediaRule, at.span);
+                        continue;
+                    };
+                    frame.flush(&mut self.sheet.rules, layer);
+                    let index = self.sheet.media.len();
+                    self.sheet.media.push(parse_media_query_list(&at.prelude));
+                    let mut media = frame.media.clone();
+                    media.push(index);
+                    let mut child = NestingFrame::new(Arc::clone(&frame.selectors), media, &block);
+                    // Only declarations inside it make a rule.
+                    child.emitted = true;
+                    stack.push(child);
+                }
+                BlockItem::Rule(rule) => {
+                    self.diagnose(StyleDiagnosticKind::UnsupportedNestedRule, rule_span(&rule));
+                }
+            }
+        }
+    }
+
     /// `@layer`: declare the named layers, or return the frame for a block.
     fn layer_rule(&mut self, at: AtRule, parent: Option<usize>, media: &[usize]) -> Option<Frame> {
         let names = layer_names(&at.prelude);
@@ -365,8 +486,9 @@ impl StyleSheet {
     /// `@namespace` rules before the first style rule build the namespace
     /// map. `@media` rules attach their media conditions to their style
     /// rules, and `@layer` statements and blocks assign rules to cascade
-    /// layers; both nest to any depth the parser allows. Other at-rules and
-    /// nested style rules are reported as unsupported.
+    /// layers; both nest to any depth the parser allows. Nested style rules
+    /// expand after their parent (see [`StyleRule`]), and `@media` may also
+    /// nest inside them. Other at-rules are reported as unsupported.
     pub fn parse(
         parser: &CssParser,
         source: &str,
@@ -492,15 +614,7 @@ impl StyleSheet {
                 Rule::Qualified(q) => {
                     builder.namespaces_allowed = false;
                     match parse_selector_list(&q.prelude, &builder.namespaces) {
-                        Ok(selectors) => {
-                            let declarations = declarations(&q.block, &mut builder.diagnostics);
-                            builder.sheet.rules.push(StyleRule {
-                                selectors,
-                                declarations,
-                                media,
-                                layer,
-                            });
-                        }
+                        Ok(selectors) => builder.expand(selectors, layer, media, &q.block),
                         Err(error) => builder
                             .diagnose(StyleDiagnosticKind::InvalidSelector(error.kind), q.span),
                     }

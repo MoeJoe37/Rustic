@@ -2,14 +2,18 @@
 
 use rustic_css::{
     AttributeCase, AttributeOperator, AttributeSelector, Combinator, ComplexSelector, Compound,
-    NamespaceSelector, Nth, NthKind, PseudoClass, SelectorList, SimpleSelector,
+    NamespaceSelector, Nth, NthKind, PseudoClass, PseudoElement, RelativeSelector,
+    RelativeSelectorList, SelectorList, SimpleSelector,
 };
 use rustic_dom::HTML_NAMESPACE;
+use rustic_url::idna::StrongDirection;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::ElementView;
+use crate::html_state::{self, Descendants, TreeFacts};
 use crate::text;
 
 /// Document facts that change how selectors match.
@@ -55,6 +59,7 @@ pub fn matches<E: ElementView>(list: &SelectorList, element: E, cx: &MatchContex
         cx,
         cache: &cache,
         host: None,
+        anchor: None,
     };
     list.selectors()
         .iter()
@@ -95,7 +100,16 @@ pub(crate) fn matches_in_tree<E: ElementView>(
     cache: &MatchCache<E>,
     host: Option<E>,
 ) -> bool {
-    complex(selector, element, &Matcher { cx, cache, host })
+    complex(
+        selector,
+        element,
+        &Matcher {
+            cx,
+            cache,
+            host,
+            anchor: None,
+        },
+    )
 }
 
 /// Which sibling count an `:nth-*` position uses, plus the address of its
@@ -112,9 +126,16 @@ type NthKey = (u8, usize);
 /// child of an *n*-child parent against `:nth-child()` costs O(*n*²) (TD-20).
 /// Keys use selector-list addresses, so a cache must not outlive the
 /// selectors it was filled from: callers keep it for one match or restyle.
+///
+/// It also holds `:has()` subtree results per (compound, element), each
+/// element's directionality, and whole-tree facts (IDs, radio groups,
+/// default buttons, the pragma-set language) built on first use.
 pub(crate) struct MatchCache<E> {
     lists: RefCell<HashMap<(usize, E), bool>>,
     positions: RefCell<HashMap<(NthKey, E), u64>>,
+    subtrees: RefCell<HashMap<(usize, E), bool>>,
+    pub(crate) directions: RefCell<HashMap<E, StrongDirection>>,
+    pub(crate) tree: RefCell<Option<Rc<TreeFacts<E>>>>,
 }
 
 impl<E> Default for MatchCache<E> {
@@ -122,16 +143,21 @@ impl<E> Default for MatchCache<E> {
         Self {
             lists: RefCell::new(HashMap::new()),
             positions: RefCell::new(HashMap::new()),
+            subtrees: RefCell::new(HashMap::new()),
+            directions: RefCell::new(HashMap::new()),
+            tree: RefCell::new(None),
         }
     }
 }
 
-/// One match: the context plus the cache it shares, and the shadow host
-/// when matching a shadow tree's selector.
+/// One match: the context plus the cache it shares, the shadow host when
+/// matching a shadow tree's selector, and the `:has()` anchor while a
+/// relative selector is being matched.
 struct Matcher<'c, E> {
     cx: &'c MatchContext<E>,
     cache: &'c MatchCache<E>,
     host: Option<E>,
+    anchor: Option<E>,
 }
 
 impl<E: ElementView> Matcher<'_, E> {
@@ -146,9 +172,121 @@ impl<E: ElementView> Matcher<'_, E> {
         self.cache.lists.borrow_mut().insert(key, result);
         result
     }
+
+    /// Whether `e` anchors any relative selector of a `:has()` list,
+    /// memoized by the list's address (the result never depends on an outer
+    /// anchor: `RelativeAnchor` only appears in the list's own selectors).
+    fn has(&self, list: &RelativeSelectorList, e: E) -> bool {
+        let key = (std::ptr::from_ref(list) as usize, e);
+        if let Some(&known) = self.cache.lists.borrow().get(&key) {
+            return known;
+        }
+        let result = list.selectors().iter().any(|r| self.relative(r, e));
+        self.cache.lists.borrow_mut().insert(key, result);
+        result
+    }
+
+    fn relative(&self, relative: &RelativeSelector, anchor: E) -> bool {
+        let selector = relative.selector();
+        let compounds = selector.compounds();
+        let inner = &selector.combinators()[1..];
+        // One written compound: no anchor-dependent state, so the
+        // descendant case shares subtree results across anchors.
+        if compounds.len() == 2 {
+            let compound = &compounds[1];
+            let mut siblings =
+                std::iter::successors(anchor.next_sibling_element(), |s| s.next_sibling_element());
+            return match relative.leading_combinator() {
+                Combinator::Child => std::iter::successors(anchor.first_child_element(), |c| {
+                    c.next_sibling_element()
+                })
+                .any(|c| compound_matches(compound, c, self)),
+                Combinator::Descendant => self.subtree_any(compound, anchor),
+                Combinator::NextSibling => anchor
+                    .next_sibling_element()
+                    .is_some_and(|s| compound_matches(compound, s, self)),
+                Combinator::SubsequentSibling => {
+                    siblings.any(|s| compound_matches(compound, s, self))
+                }
+            };
+        }
+        // Otherwise try every element the subject could be (TD-30).
+        let anchored = Matcher {
+            cx: self.cx,
+            cache: self.cache,
+            host: self.host,
+            anchor: Some(anchor),
+        };
+        let descends = inner
+            .iter()
+            .any(|c| matches!(c, Combinator::Child | Combinator::Descendant));
+        let test = |candidate: E| complex(selector, candidate, &anchored);
+        match relative.leading_combinator() {
+            Combinator::Child if !descends => {
+                std::iter::successors(anchor.first_child_element(), |c| c.next_sibling_element())
+                    .any(test)
+            }
+            Combinator::Child | Combinator::Descendant => Descendants::new(anchor).any(test),
+            Combinator::NextSibling | Combinator::SubsequentSibling => {
+                let mut siblings = std::iter::successors(anchor.next_sibling_element(), |s| {
+                    s.next_sibling_element()
+                });
+                siblings.any(|s| test(s) || (descends && Descendants::new(s).any(test)))
+            }
+        }
+    }
+
+    /// Whether some descendant of `root` matches `compound`, memoized per
+    /// (compound, element) so that `:has(x)` over a whole restyle costs time
+    /// linear in the tree. The walk is iterative.
+    fn subtree_any(&self, compound: &Compound, root: E) -> bool {
+        let address = std::ptr::from_ref(compound) as usize;
+        if let Some(&known) = self.cache.subtrees.borrow().get(&(address, root)) {
+            return known;
+        }
+        // Frames: (element, next child to visit, found so far).
+        let mut stack = vec![(root, root.first_child_element(), false)];
+        loop {
+            let top = stack.last_mut().expect("nonempty stack");
+            if let Some(child) = top.1 {
+                top.1 = child.next_sibling_element();
+                if top.2 {
+                    continue;
+                }
+                if compound_matches(compound, child, self) {
+                    stack.last_mut().expect("nonempty stack").2 = true;
+                    continue;
+                }
+                let known = self.cache.subtrees.borrow().get(&(address, child)).copied();
+                match known {
+                    Some(found) => stack.last_mut().expect("nonempty stack").2 |= found,
+                    None => stack.push((child, child.first_child_element(), false)),
+                }
+            } else {
+                let (element, _, found) = stack.pop().expect("nonempty stack");
+                self.cache
+                    .subtrees
+                    .borrow_mut()
+                    .insert((address, element), found);
+                match stack.last_mut() {
+                    Some(parent) => parent.2 |= found,
+                    None => return found,
+                }
+            }
+        }
+    }
 }
 
 fn complex<E: ElementView>(selector: &ComplexSelector, element: E, m: &Matcher<'_, E>) -> bool {
+    if let Some(pseudo) = selector.pseudo_element() {
+        if !selector
+            .pseudo_element_states()
+            .iter()
+            .all(|state| pseudo_state_matches(state, pseudo, element))
+        {
+            return false;
+        }
+    }
     let compounds = selector.compounds();
     let combinators = selector.combinators();
     let last = compounds.len() - 1;
@@ -293,6 +431,34 @@ fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, m: &Matcher<'_,
         }
         SimpleSelector::Attribute(attribute) => attribute_matches(attribute, e, m),
         SimpleSelector::PseudoClass(class) => pseudo_class_matches(class, e, m),
+        SimpleSelector::Nesting(Some(parent)) => m.list(parent, e),
+        SimpleSelector::Nesting(None) => scope_matches(e, m),
+        SimpleSelector::RelativeAnchor => m.anchor == Some(e),
+    }
+}
+
+fn scope_matches<E: ElementView>(e: E, m: &Matcher<'_, E>) -> bool {
+    m.cx.scope.map_or_else(|| e.is_root(), |scope| scope == e)
+}
+
+/// A user-action pseudo-class after a pseudo-element, tested against the
+/// pseudo-element's state (the parser allows nothing else there).
+fn pseudo_state_matches<E: ElementView>(class: &PseudoClass, pseudo: PseudoElement, e: E) -> bool {
+    let compound_holds = |list: &SelectorList| {
+        list.selectors().iter().any(|s| {
+            s.compounds().iter().all(|c| {
+                c.simple_selectors().iter().all(|simple| match simple {
+                    SimpleSelector::PseudoClass(inner) => pseudo_state_matches(inner, pseudo, e),
+                    _ => false,
+                })
+            })
+        })
+    };
+    match class {
+        PseudoClass::State(state) => e.pseudo_element_in_state(pseudo, *state),
+        PseudoClass::Is(list) | PseudoClass::Where(list) => compound_holds(list),
+        PseudoClass::Not(list) => !compound_holds(list),
+        _ => false,
     }
 }
 
@@ -467,7 +633,7 @@ fn pseudo_class_matches<E: ElementView>(class: &PseudoClass, e: E, m: &Matcher<'
     match class {
         PseudoClass::Root => e.is_root(),
         PseudoClass::Empty => e.is_empty(),
-        PseudoClass::Scope => m.cx.scope.map_or_else(|| e.is_root(), |scope| scope == e),
+        PseudoClass::Scope => scope_matches(e, m),
         PseudoClass::OnlyChild => {
             e.previous_sibling_element().is_none() && e.next_sibling_element().is_none()
         }
@@ -498,9 +664,18 @@ fn pseudo_class_matches<E: ElementView>(class: &PseudoClass, e: E, m: &Matcher<'
                         cx: m.cx,
                         cache: m.cache,
                         host: None,
+                        anchor: m.anchor,
                     };
                     plain.list(list, e)
                 })
         }
+        PseudoClass::Has(list) => m.has(list, e),
+        PseudoClass::Form(state) => html_state::form_state(*state, e, m.cache),
+        PseudoClass::Lang(ranges) => html_state::lang_matches(ranges, e, m.cache),
+        PseudoClass::Dir(dir) => match dir.as_str() {
+            "ltr" => html_state::directionality(e, m.cache) == StrongDirection::Ltr,
+            "rtl" => html_state::directionality(e, m.cache) == StrongDirection::Rtl,
+            _ => false,
+        },
     }
 }

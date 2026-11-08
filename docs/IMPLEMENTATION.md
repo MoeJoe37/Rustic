@@ -727,12 +727,14 @@ must keep all tiers green.
 | CSS-03b: math functions | Complete for lengths, length-percentages and numbers: parsing, type checking, simplification, serialization, computed values; typed division and the newer math functions remain |
 | External stylesheets (`css.queries` step 2) | Complete: `<link rel=stylesheet>` and `@import` over a policy-owning fetcher with budgets and cycle refusal; `dump-style` loads local files beside the document only; non-UTF-8 sheets (TD-28) and layer/supports imports remain |
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
-| CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |
+| CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style` |
+| CSS-07a: remaining required selectors | Complete: `:has()` (linear for single-compound arguments, TD-30), HTML form states, `:lang()`, `:dir()` (Bidi_Class via TD-29), `&` with nested style rules expanded by `StyleSheet::parse`, more pseudo-elements and user-action states after them; `css.selectors` is complete. Constraint-validation states and form owners set by the parser (TD-31) remain |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
-failures. M2 has CSS-01 through CSS-05 done and CSS-06 under way (media
-queries landed). Next: style invalidation, custom properties and `var()`, then
-container queries. All project crates remain safe
+failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
+under way (media queries landed). Next: style invalidation, custom properties
+and `var()`, then container queries; math functions, the property catalog,
+external stylesheets and cascade layers run alongside. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

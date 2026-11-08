@@ -7,6 +7,7 @@
   .card > h2 { margin: 0; font-size: 150%; color: rgb(0 0 128) }
   ul li:nth-child(odd of .x) { font-weight: lighter }
   p:has(b) { color: red }
+  em { &:lang(en):dir(ltr) { font-weight: 700 } }
   @media print { p { color: green } }
   @media (max-width: 600px) { .card { width: auto } }
   @media screen and (min-width: 1000px) { @media (hover) { .card > h2 { font-weight: 900 } } }

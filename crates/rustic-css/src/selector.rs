@@ -1,17 +1,21 @@
-//! Selectors Level 4 syntax and specificity (the CSS-02 subset).
+//! Selectors Level 4 syntax and specificity (the CSS-02 and CSS-07a subsets).
 //!
 //! Supported: type and universal selectors with namespace prefixes, ID,
 //! class and attribute selectors (all six operators and the `i`/`s` flags),
 //! the four combinators, the structural pseudo-classes (including
-//! `:nth-child(An+B of S)`), `:is()`, `:where()`, `:not()`, `:scope`, the
-//! link and user-action pseudo-classes, and the `::before`, `::after`,
-//! `::first-line`, `::first-letter` and `::marker` pseudo-elements.
+//! `:nth-child(An+B of S)`), `:is()`, `:where()`, `:not()`, `:has()`,
+//! `:scope`, the link, user-action, form-state, `:lang()` and `:dir()`
+//! pseudo-classes, the CSS Nesting selector `&`, and the tree-abiding and
+//! highlight pseudo-elements listed on [`PseudoElement`], optionally followed
+//! by user-action pseudo-classes.
 //!
-//! Anything else, such as `:has()`, the nesting selector `&` or the column
-//! combinator, is rejected with a [`SelectorErrorKind`] instead of being
-//! accepted and silently never matching. Matching lives in `rustic-style`.
+//! Anything else, such as the column combinator `||`, is rejected with a
+//! [`SelectorErrorKind`] instead of being accepted and silently never
+//! matching. Matching lives in `rustic-style`.
 
+use std::cell::Cell;
 use std::fmt::{self, Write};
+use std::sync::Arc;
 
 use rustic_base::SourceSpan;
 
@@ -88,12 +92,17 @@ pub enum SelectorErrorKind {
     InvalidAnPlusB,
     /// A pseudo-element that is not at the end of a top-level selector.
     MisplacedPseudoElement,
-    /// Pseudo-class arguments nested beyond [`MAX_SELECTOR_NESTING`].
+    /// Pseudo-class arguments (or `&` parent selectors) nested beyond
+    /// [`MAX_SELECTOR_NESTING`].
     NestingLimit,
-    /// The nesting selector `&` or column combinator `||` (not implemented).
+    /// The column combinator `||` (not implemented).
     Unsupported,
     /// A `:host()` argument that is not one compound selector.
     InvalidHostArgument,
+    /// A pseudo-class after a pseudo-element that does not allow it (only
+    /// user-action pseudo-classes may follow a tree-abiding pseudo-element,
+    /// and nothing may follow a highlight pseudo-element).
+    InvalidPseudoElementState,
 }
 
 /// A selector parse error and the source range it was found at.
@@ -314,6 +323,12 @@ pub enum ElementState {
 }
 
 impl ElementState {
+    /// Whether this is a user-action pseudo-class, which may follow a
+    /// tree-abiding pseudo-element (Selectors Level 4 §3.6.3).
+    pub fn is_user_action(self) -> bool {
+        !matches!(self, Self::Target)
+    }
+
     fn name(self) -> &'static str {
         match self {
             Self::Hover => "hover",
@@ -323,6 +338,102 @@ impl ElementState {
             Self::FocusWithin => "focus-within",
             Self::Target => "target",
         }
+    }
+}
+
+/// HTML form-state pseudo-classes (HTML Standard §4.16.3, "Pseudo-classes").
+///
+/// Matching derives each state from content attributes and the tree, since
+/// there is no user interaction or script yet.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FormState {
+    /// `:enabled`.
+    Enabled,
+    /// `:disabled`.
+    Disabled,
+    /// `:checked`.
+    Checked,
+    /// `:indeterminate`.
+    Indeterminate,
+    /// `:default`.
+    Default,
+    /// `:required`.
+    Required,
+    /// `:optional`.
+    Optional,
+    /// `:read-only`.
+    ReadOnly,
+    /// `:read-write`.
+    ReadWrite,
+    /// `:placeholder-shown`.
+    PlaceholderShown,
+}
+
+impl FormState {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Enabled => "enabled",
+            Self::Disabled => "disabled",
+            Self::Checked => "checked",
+            Self::Indeterminate => "indeterminate",
+            Self::Default => "default",
+            Self::Required => "required",
+            Self::Optional => "optional",
+            Self::ReadOnly => "read-only",
+            Self::ReadWrite => "read-write",
+            Self::PlaceholderShown => "placeholder-shown",
+        }
+    }
+
+    fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "enabled" => Self::Enabled,
+            "disabled" => Self::Disabled,
+            "checked" => Self::Checked,
+            "indeterminate" => Self::Indeterminate,
+            "default" => Self::Default,
+            "required" => Self::Required,
+            "optional" => Self::Optional,
+            "read-only" => Self::ReadOnly,
+            "read-write" => Self::ReadWrite,
+            "placeholder-shown" => Self::PlaceholderShown,
+            _ => return None,
+        })
+    }
+}
+
+/// A relative selector, an argument of `:has()`: a complex selector whose
+/// first compound is the anchor ([`SimpleSelector::RelativeAnchor`]), joined
+/// to the written selector by the leading combinator (descendant if none
+/// was written).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelativeSelector {
+    selector: ComplexSelector,
+}
+
+impl RelativeSelector {
+    /// The combinator between the anchor and the written selector.
+    pub fn leading_combinator(&self) -> Combinator {
+        self.selector.combinators[0]
+    }
+
+    /// The anchored selector: compound 0 is the anchor alone.
+    pub fn selector(&self) -> &ComplexSelector {
+        &self.selector
+    }
+}
+
+/// The argument list of `:has()`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelativeSelectorList {
+    selectors: Vec<RelativeSelector>,
+    height: usize,
+}
+
+impl RelativeSelectorList {
+    /// The relative selectors in source order (never empty).
+    pub fn selectors(&self) -> &[RelativeSelector] {
+        &self.selectors
     }
 }
 
@@ -367,6 +478,15 @@ pub enum PseudoClass {
     /// shadow host, seen from inside its shadow tree. The argument, when
     /// present, is a list of exactly one single-compound selector.
     Host(Option<Box<SelectorList>>),
+    /// `:has(<relative-selector-list>)`.
+    Has(RelativeSelectorList),
+    /// An HTML form-control state.
+    Form(FormState),
+    /// `:lang()` with its language ranges as written (idents or strings).
+    Lang(Vec<String>),
+    /// `:dir()` with its argument ASCII-lowercased; only `ltr` and `rtl`
+    /// can match.
+    Dir(String),
 }
 
 /// A supported pseudo-element.
@@ -382,6 +502,20 @@ pub enum PseudoElement {
     FirstLetter,
     /// `::marker`.
     Marker,
+    /// `::placeholder`.
+    Placeholder,
+    /// `::file-selector-button`.
+    FileSelectorButton,
+    /// `::backdrop`.
+    Backdrop,
+    /// `::selection` (a highlight pseudo-element).
+    Selection,
+    /// `::target-text` (a highlight pseudo-element).
+    TargetText,
+    /// `::spelling-error` (a highlight pseudo-element).
+    SpellingError,
+    /// `::grammar-error` (a highlight pseudo-element).
+    GrammarError,
 }
 
 impl PseudoElement {
@@ -392,6 +526,13 @@ impl PseudoElement {
             Self::FirstLine => "first-line",
             Self::FirstLetter => "first-letter",
             Self::Marker => "marker",
+            Self::Placeholder => "placeholder",
+            Self::FileSelectorButton => "file-selector-button",
+            Self::Backdrop => "backdrop",
+            Self::Selection => "selection",
+            Self::TargetText => "target-text",
+            Self::SpellingError => "spelling-error",
+            Self::GrammarError => "grammar-error",
         }
     }
 
@@ -401,10 +542,27 @@ impl PseudoElement {
             "after" => Self::After,
             "first-line" => Self::FirstLine,
             "first-letter" => Self::FirstLetter,
-            "marker" if !legacy_only => Self::Marker,
+            _ if legacy_only => return None,
+            "marker" => Self::Marker,
+            "placeholder" => Self::Placeholder,
+            "file-selector-button" => Self::FileSelectorButton,
+            "backdrop" => Self::Backdrop,
+            "selection" => Self::Selection,
+            "target-text" => Self::TargetText,
+            "spelling-error" => Self::SpellingError,
+            "grammar-error" => Self::GrammarError,
             _ => return None,
         };
         Some(pe)
+    }
+
+    /// Whether this is a highlight pseudo-element (CSS Pseudo-Elements
+    /// Level 4 §3), which no pseudo-class may follow.
+    pub fn is_highlight(self) -> bool {
+        matches!(
+            self,
+            Self::Selection | Self::TargetText | Self::SpellingError | Self::GrammarError
+        )
     }
 }
 
@@ -431,6 +589,13 @@ pub enum SimpleSelector {
     Attribute(AttributeSelector),
     /// `:pseudo-class`.
     PseudoClass(PseudoClass),
+    /// The CSS Nesting selector `&`: the parent style rule's selectors
+    /// (as `:is()`, pseudo-element selectors dropped), or `:scope` with zero
+    /// specificity outside a nested rule.
+    Nesting(Option<Arc<SelectorList>>),
+    /// The `:has()` anchor element. Never written: it is the first compound
+    /// of every [`RelativeSelector`] and serializes as nothing.
+    RelativeAnchor,
 }
 
 /// A sequence of simple selectors with no combinator between them.
@@ -467,6 +632,7 @@ pub struct ComplexSelector {
     compounds: Vec<Compound>,
     combinators: Vec<Combinator>,
     pseudo_element: Option<PseudoElement>,
+    pseudo_element_states: Vec<PseudoClass>,
     specificity: Specificity,
 }
 
@@ -486,6 +652,13 @@ impl ComplexSelector {
         self.pseudo_element
     }
 
+    /// User-action pseudo-classes written after the pseudo-element (such as
+    /// `::before:hover`); each is [`PseudoClass::State`] or an `:is()`,
+    /// `:where()` or `:not()` of compounds made only of those.
+    pub fn pseudo_element_states(&self) -> &[PseudoClass] {
+        &self.pseudo_element_states
+    }
+
     /// Specificity per Selectors Level 4 §17.
     pub fn specificity(&self) -> Specificity {
         self.specificity
@@ -496,6 +669,9 @@ impl ComplexSelector {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SelectorList {
     selectors: Vec<ComplexSelector>,
+    /// How many nested selector lists (pseudo-class arguments and `&`
+    /// parents) deep this list goes; bounds matching recursion.
+    height: usize,
 }
 
 impl SelectorList {
@@ -533,11 +709,102 @@ pub fn parse_selector_list(
     values: &[Value],
     namespaces: &NamespaceMap,
 ) -> Result<SelectorList, SelectorError> {
-    Parser { namespaces }.list(values, 0, true, false)
+    Parser::new(namespaces, None).list(values, 0, true, false)
+}
+
+/// Parse the selector list of a style rule nested in a style rule whose
+/// selectors are `parent` (CSS Nesting §2-3, Editor's Draft reviewed
+/// 2026-11-08).
+///
+/// Each entry is a relative selector. An entry that starts with a combinator
+/// or contains no `&` is made relative to the parent by prefixing `&` and the
+/// combinator (a descendant combinator if none was written), so `> .a`
+/// becomes `& > .a` and `.b` becomes `& .b`. Every `&` represents the
+/// parent's selectors as `:is()` would, with pseudo-element selectors
+/// dropped. One invalid entry invalidates the list.
+///
+/// ```
+/// use std::sync::Arc;
+/// use rustic_css::{CssParser, NamespaceMap, parse_nested_selector_list, parse_selector_list};
+/// let parser = CssParser::default();
+/// let namespaces = NamespaceMap::new();
+/// let parent = parse_selector_list(&parser.component_values("ul, #menu").unwrap().value, &namespaces)
+///     .unwrap();
+/// let nested = parser.component_values("> li, &.open").unwrap().value;
+/// let list = parse_nested_selector_list(&nested, &namespaces, &Arc::new(parent)).unwrap();
+/// assert_eq!(list.to_string(), "& > li, &.open");
+/// // `&` takes the parent's highest specificity, (1, 0, 0) from `#menu`.
+/// assert_eq!(list.selectors()[0].specificity().ids, 1);
+/// ```
+pub fn parse_nested_selector_list(
+    values: &[Value],
+    namespaces: &NamespaceMap,
+    parent: &Arc<SelectorList>,
+) -> Result<SelectorList, SelectorError> {
+    let parent = if parent.selectors.iter().any(|s| s.pseudo_element.is_some()) {
+        let selectors: Vec<ComplexSelector> = parent
+            .selectors
+            .iter()
+            .filter(|s| s.pseudo_element.is_none())
+            .cloned()
+            .collect();
+        Arc::new(SelectorList {
+            selectors,
+            height: parent.height,
+        })
+    } else {
+        Arc::clone(parent)
+    };
+    Parser::new(namespaces, Some(parent)).list(values, 0, true, false)
 }
 
 struct Parser<'a> {
     namespaces: &'a NamespaceMap,
+    /// The parent rule's selectors, for `&` in a nested rule.
+    parent: Option<Arc<SelectorList>>,
+    /// Whether the selector being parsed has used `&` so far.
+    saw_nesting: Cell<bool>,
+    /// Whether parsing is inside `:has()`, which may not nest.
+    in_has: Cell<bool>,
+}
+
+/// The nesting height a list adds through one simple selector.
+fn simple_height(simple: &SimpleSelector) -> usize {
+    let list = |l: &SelectorList| l.height + 1;
+    match simple {
+        SimpleSelector::PseudoClass(class) => pseudo_class_height(class),
+        SimpleSelector::Nesting(Some(parent)) => list(parent),
+        _ => 0,
+    }
+}
+
+fn pseudo_class_height(class: &PseudoClass) -> usize {
+    match class {
+        PseudoClass::Is(l) | PseudoClass::Where(l) | PseudoClass::Not(l) => l.height + 1,
+        PseudoClass::Nth {
+            nth: Nth { of: Some(l), .. },
+            ..
+        } => l.height + 1,
+        PseudoClass::Has(l) => l.height + 1,
+        PseudoClass::Host(Some(l)) => l.height + 1,
+        _ => 0,
+    }
+}
+
+fn complex_height(selector: &ComplexSelector) -> usize {
+    selector
+        .compounds
+        .iter()
+        .flat_map(|c| c.simple.iter())
+        .map(simple_height)
+        .chain(
+            selector
+                .pseudo_element_states
+                .iter()
+                .map(pseudo_class_height),
+        )
+        .max()
+        .unwrap_or(0)
 }
 
 fn span_at(values: &[Value], index: usize) -> SourceSpan {
@@ -577,7 +844,7 @@ fn split_commas(values: &[Value]) -> Vec<&[Value]> {
     values.split(|v| v.token() == Some(&Token::Comma)).collect()
 }
 
-impl Parser<'_> {
+impl<'a> Parser<'a> {
     fn list(
         &self,
         values: &[Value],
@@ -589,8 +856,15 @@ impl Parser<'_> {
             return err(SelectorErrorKind::NestingLimit, values, 0);
         }
         let mut selectors = Vec::new();
+        // Only the entries of a nested rule's own list are relative.
+        let nested_top = depth == 0 && self.parent.is_some();
         for entry in split_commas(values) {
-            match self.complex(entry, depth, allow_pseudo_element) {
+            let parsed = if nested_top {
+                self.nested_entry(entry)
+            } else {
+                self.complex(entry, depth, allow_pseudo_element)
+            };
+            match parsed {
                 Ok(selector) => selectors.push(selector),
                 // A nesting overflow is a resource limit, never forgiven.
                 Err(e) if forgiving && e.kind != SelectorErrorKind::NestingLimit => {}
@@ -600,7 +874,101 @@ impl Parser<'_> {
         if selectors.is_empty() && !forgiving {
             return err(SelectorErrorKind::Empty, values, 0);
         }
-        Ok(SelectorList { selectors })
+        let height = selectors.iter().map(complex_height).max().unwrap_or(0);
+        Ok(SelectorList { selectors, height })
+    }
+
+    fn new(namespaces: &'a NamespaceMap, parent: Option<Arc<SelectorList>>) -> Self {
+        Self {
+            namespaces,
+            parent,
+            saw_nesting: Cell::new(false),
+            in_has: Cell::new(false),
+        }
+    }
+
+    /// A leading `>`, `+` or `~` at `i` (after whitespace), and the index of
+    /// the selector after it.
+    fn leading_combinator(values: &[Value], i: usize) -> (Option<Combinator>, usize) {
+        let combinator = match token_at(values, i) {
+            Some(Token::Delim('>')) => Combinator::Child,
+            Some(Token::Delim('+')) => Combinator::NextSibling,
+            Some(Token::Delim('~')) => Combinator::SubsequentSibling,
+            _ => return (None, i),
+        };
+        (Some(combinator), skip_whitespace(values, i + 1))
+    }
+
+    /// One entry of a nested rule's selector list (CSS Nesting §2.1).
+    fn nested_entry(&self, entry: &[Value]) -> Result<ComplexSelector, SelectorError> {
+        let start = skip_whitespace(entry, 0);
+        let (leading, rest) = Self::leading_combinator(entry, start);
+        if leading.is_some() && rest == entry.len() {
+            return err(SelectorErrorKind::DanglingCombinator, entry, start);
+        }
+        self.saw_nesting.set(false);
+        let selector = self.complex(&entry[rest..], 0, true)?;
+        if leading.is_none() && self.saw_nesting.get() {
+            return Ok(selector);
+        }
+        let parent = self.parent.clone().expect("nested parser has a parent");
+        if parent.height + 1 > MAX_SELECTOR_NESTING {
+            return err(SelectorErrorKind::NestingLimit, entry, start);
+        }
+        let specificity = parent.max_specificity();
+        let anchor = Compound {
+            simple: vec![SimpleSelector::Nesting(Some(parent))],
+        };
+        Ok(prefix(
+            anchor,
+            leading.unwrap_or(Combinator::Descendant),
+            specificity,
+            selector,
+        ))
+    }
+
+    /// `:has()` arguments: an unforgiving relative selector list.
+    fn relative_list(
+        &self,
+        values: &[Value],
+        depth: usize,
+        span: SourceSpan,
+    ) -> Result<RelativeSelectorList, SelectorError> {
+        if depth > MAX_SELECTOR_NESTING {
+            return err(SelectorErrorKind::NestingLimit, values, 0);
+        }
+        let mut selectors = Vec::new();
+        for entry in split_commas(values) {
+            let start = skip_whitespace(entry, 0);
+            if start == entry.len() {
+                return Err(SelectorError {
+                    kind: SelectorErrorKind::Empty,
+                    span,
+                });
+            }
+            let (leading, rest) = Self::leading_combinator(entry, start);
+            if rest == entry.len() {
+                return err(SelectorErrorKind::DanglingCombinator, entry, start);
+            }
+            let selector = self.complex(&entry[rest..], depth, false)?;
+            let anchor = Compound {
+                simple: vec![SimpleSelector::RelativeAnchor],
+            };
+            selectors.push(RelativeSelector {
+                selector: prefix(
+                    anchor,
+                    leading.unwrap_or(Combinator::Descendant),
+                    Specificity::default(),
+                    selector,
+                ),
+            });
+        }
+        let height = selectors
+            .iter()
+            .map(|r| complex_height(&r.selector))
+            .max()
+            .unwrap_or(0);
+        Ok(RelativeSelectorList { selectors, height })
     }
 
     fn complex(
@@ -616,17 +984,32 @@ impl Parser<'_> {
         let mut compounds = Vec::new();
         let mut combinators = Vec::new();
         let mut specificity = Specificity::default();
+        let mut pseudo_element_states = Vec::new();
         let pseudo_element = loop {
-            let (compound, compound_specificity, pseudo_element, next) =
+            let (compound, compound_specificity, pseudo_element, mut next) =
                 self.compound(values, i, depth, allow_pseudo_element)?;
             compounds.push(compound);
             specificity = specificity.add(compound_specificity);
+            if let Some(pe) = pseudo_element {
+                specificity = specificity.add(Specificity::TYPE);
+                while token_at(values, next) == Some(&Token::Colon) {
+                    if token_at(values, next + 1) == Some(&Token::Colon) {
+                        return err(SelectorErrorKind::MisplacedPseudoElement, values, next);
+                    }
+                    let (class, class_specificity) = self.pseudo_class(values, next + 1, depth)?;
+                    if pe.is_highlight() || !is_user_action_state(&class) {
+                        return err(SelectorErrorKind::InvalidPseudoElementState, values, next);
+                    }
+                    specificity = specificity.add(class_specificity);
+                    pseudo_element_states.push(class);
+                    next += 2;
+                }
+            }
             let after_space = skip_whitespace(values, next);
             if pseudo_element.is_some() {
                 if after_space != values.len() {
                     return err(SelectorErrorKind::MisplacedPseudoElement, values, next);
                 }
-                specificity = specificity.add(Specificity::TYPE);
                 break pseudo_element;
             }
             if after_space == values.len() {
@@ -661,6 +1044,7 @@ impl Parser<'_> {
             compounds,
             combinators,
             pseudo_element,
+            pseudo_element_states,
             specificity,
         })
     }
@@ -792,7 +1176,16 @@ impl Parser<'_> {
                     return err(SelectorErrorKind::UnexpectedToken, values, i);
                 }
                 ComponentValue::Token(Token::Delim('&')) => {
-                    return err(SelectorErrorKind::Unsupported, values, i);
+                    self.saw_nesting.set(true);
+                    let parent = self.parent.clone();
+                    if let Some(parent) = &parent {
+                        if depth + parent.height + 1 > MAX_SELECTOR_NESTING {
+                            return err(SelectorErrorKind::NestingLimit, values, i);
+                        }
+                        specificity = specificity.add(parent.max_specificity());
+                    }
+                    i += 1;
+                    SimpleSelector::Nesting(parent)
                 }
                 _ => break,
             };
@@ -934,7 +1327,10 @@ impl Parser<'_> {
                 "focus-within" => PseudoClass::State(ElementState::FocusWithin),
                 "target" => PseudoClass::State(ElementState::Target),
                 "host" => PseudoClass::Host(None),
-                _ => return unsupported(),
+                other => match FormState::from_name(other) {
+                    Some(state) => PseudoClass::Form(state),
+                    None => return unsupported(),
+                },
             },
             ComponentValue::Function { name, arguments } => {
                 let span_err = |e: SelectorError| {
@@ -984,6 +1380,43 @@ impl Parser<'_> {
                         }
                         let s = Specificity::CLASS.add(list.max_specificity());
                         return Ok((PseudoClass::Host(Some(Box::new(list))), s));
+                    }
+                    "has" => {
+                        if self.in_has.get() {
+                            return unsupported();
+                        }
+                        self.in_has.set(true);
+                        let list = self.relative_list(arguments, depth + 1, value.span);
+                        self.in_has.set(false);
+                        let list = list?;
+                        let s = list
+                            .selectors
+                            .iter()
+                            .map(|r| r.selector.specificity)
+                            .max()
+                            .unwrap_or_default();
+                        return Ok((PseudoClass::Has(list), s));
+                    }
+                    "lang" => {
+                        lang_arguments(arguments)
+                            .map(PseudoClass::Lang)
+                            .ok_or(SelectorError {
+                                kind: SelectorErrorKind::UnexpectedToken,
+                                span: value.span,
+                            })?
+                    }
+                    "dir" => {
+                        let words: Vec<&Value> =
+                            arguments.iter().filter(|v| !v.is_whitespace()).collect();
+                        match words.as_slice() {
+                            [word] => match word.token() {
+                                Some(Token::Ident(dir)) => {
+                                    PseudoClass::Dir(dir.to_ascii_lowercase())
+                                }
+                                _ => return err(SelectorErrorKind::UnexpectedToken, values, i),
+                            },
+                            _ => return err(SelectorErrorKind::UnexpectedToken, values, i),
+                        }
                     }
                     "nth-child" => self.nth(NthKind::Child, arguments, value.span, depth)?,
                     "nth-last-child" => {
@@ -1052,6 +1485,53 @@ impl Parser<'_> {
     }
 }
 
+/// `anchor <combinator> selector`, with `specificity` added for the anchor.
+fn prefix(
+    anchor: Compound,
+    combinator: Combinator,
+    specificity: Specificity,
+    mut selector: ComplexSelector,
+) -> ComplexSelector {
+    selector.compounds.insert(0, anchor);
+    selector.combinators.insert(0, combinator);
+    selector.specificity = selector.specificity.add(specificity);
+    selector
+}
+
+/// Whether `class` may follow a tree-abiding pseudo-element: a user-action
+/// state, or `:is()`/`:where()`/`:not()` of compounds of only those.
+fn is_user_action_state(class: &PseudoClass) -> bool {
+    match class {
+        PseudoClass::State(state) => state.is_user_action(),
+        PseudoClass::Is(list) | PseudoClass::Where(list) | PseudoClass::Not(list) => {
+            list.selectors.iter().all(|s| {
+                s.compounds.len() == 1
+                    && s.compounds[0].simple.iter().all(|simple| {
+                        matches!(simple, SimpleSelector::PseudoClass(c) if is_user_action_state(c))
+                    })
+            })
+        }
+        _ => false,
+    }
+}
+
+/// `:lang()` arguments: a comma-separated list of idents or strings.
+fn lang_arguments(arguments: &[Value]) -> Option<Vec<String>> {
+    split_commas(arguments)
+        .into_iter()
+        .map(|entry| {
+            let words: Vec<&Value> = entry.iter().filter(|v| !v.is_whitespace()).collect();
+            match words.as_slice() {
+                [word] => match word.token() {
+                    Some(Token::Ident(range) | Token::String(range)) => Some(range.clone()),
+                    _ => None,
+                },
+                _ => None,
+            }
+        })
+        .collect()
+}
+
 fn write_namespace(f: &mut impl Write, namespace: &NamespaceSelector) -> fmt::Result {
     match namespace {
         NamespaceSelector::Implicit(_) => Ok(()),
@@ -1113,6 +1593,8 @@ impl fmt::Display for SimpleSelector {
                 f.write_char(']')
             }
             Self::PseudoClass(class) => write!(f, "{class}"),
+            Self::Nesting(_) => f.write_char('&'),
+            Self::RelativeAnchor => Ok(()),
         }
     }
 }
@@ -1152,6 +1634,26 @@ impl fmt::Display for PseudoClass {
             Self::State(state) => f.write_str(state.name()),
             Self::Host(None) => f.write_str("host"),
             Self::Host(Some(list)) => write!(f, "host({list})"),
+            Self::Has(list) => write!(f, "has({list})"),
+            Self::Form(state) => f.write_str(state.name()),
+            Self::Lang(ranges) => {
+                f.write_str("lang(")?;
+                for (index, range) in ranges.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    // CSSOM serializes each range as a string unless it is a
+                    // valid identifier written as one; strings are always
+                    // a fixed point.
+                    serialize_string(f, range)?;
+                }
+                f.write_char(')')
+            }
+            Self::Dir(dir) => {
+                f.write_str("dir(")?;
+                serialize_identifier(f, dir)?;
+                f.write_char(')')
+            }
         }
     }
 }
@@ -1175,10 +1677,11 @@ impl fmt::Display for Compound {
     }
 }
 
-impl fmt::Display for ComplexSelector {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (index, compound) in self.compounds.iter().enumerate() {
-            if index > 0 {
+impl ComplexSelector {
+    /// Serialize compounds from `first` on (1 skips a relative anchor).
+    fn write_from(&self, f: &mut impl Write, first: usize) -> fmt::Result {
+        for (index, compound) in self.compounds.iter().enumerate().skip(first) {
+            if index > first {
                 f.write_str(match self.combinators[index - 1] {
                     Combinator::Descendant => " ",
                     Combinator::Child => " > ",
@@ -1190,6 +1693,39 @@ impl fmt::Display for ComplexSelector {
         }
         if let Some(pe) = self.pseudo_element {
             write!(f, "::{}", pe.name())?;
+        }
+        for state in &self.pseudo_element_states {
+            write!(f, "{state}")?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for ComplexSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_from(f, 0)
+    }
+}
+
+impl fmt::Display for RelativeSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self.leading_combinator() {
+            Combinator::Descendant => "",
+            Combinator::Child => "> ",
+            Combinator::NextSibling => "+ ",
+            Combinator::SubsequentSibling => "~ ",
+        })?;
+        self.selector.write_from(f, 1)
+    }
+}
+
+impl fmt::Display for RelativeSelectorList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (index, selector) in self.selectors.iter().enumerate() {
+            if index > 0 {
+                f.write_str(", ")?;
+            }
+            write!(f, "{selector}")?;
         }
         Ok(())
     }

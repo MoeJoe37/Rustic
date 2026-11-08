@@ -29,7 +29,7 @@ fn shape(result: &ParsedDocument) -> String {
                 "doctype {:?}",
                 String::from_utf16(value.name.as_units()).unwrap()
             ),
-            NodeKind::Document => unreachable!(),
+            NodeKind::Document | NodeKind::DocumentFragment => unreachable!(),
         };
         lines.push(format!("{depth}:{label}"));
     }
@@ -284,13 +284,9 @@ fn compatibility_modes_cover_legacy_ids_case_and_missing_vs_empty_system_id() {
 #[test]
 fn unsupported_constructs_drop_partial_documents_and_poison_the_stream() {
     for (source, unsupported) in [
-        ("<body>before<table>", U::BodyElement),
-        ("<b>", U::BodyElement),
-        ("<svg>", U::BodyElement),
-        ("<textarea>", U::BodyElement),
-        ("<template>", U::Templates),
-        ("<frameset>", U::Framesets),
         ("<?target value?>", U::ProcessingInstructions),
+        ("<body><table><b><?target?>", U::ProcessingInstructions),
+        ("<svg><?target?>", U::ProcessingInstructions),
     ] {
         let mut parser = HtmlDocumentParser::default();
         assert_eq!(

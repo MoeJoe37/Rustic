@@ -379,3 +379,49 @@ fn invalid_chunk_limits_are_rejected_but_zero_other_budgets_are_usable() {
         HtmlError::TokenLimit,
     );
 }
+
+#[test]
+fn cdata_sections_require_tree_builder_permission_and_recover_at_eof() {
+    let run = |source: &str, allowed: bool| {
+        let mut tokenizer = HtmlTokenizer::default();
+        tokenizer.set_cdata_allowed(allowed);
+        let mut tokens = tokenizer.feed(source.as_bytes()).unwrap();
+        tokens.extend(tokenizer.finish().unwrap());
+        let kinds = tokenizer
+            .diagnostics()
+            .iter()
+            .map(|d| d.kind)
+            .collect::<Vec<_>>();
+        (tokens, kinds)
+    };
+    assert_eq!(
+        run("a<![CDATA[x<b>&amp;]]]>y", true),
+        // Markup flushes earlier text, so the tree builder has processed it
+        // before deciding whether CDATA is allowed.
+        (
+            vec![character("a"), character("x<b>&amp;]y"), Token::Eof],
+            vec![]
+        )
+    );
+    assert_eq!(
+        run("<![CDATA[x]]>", false),
+        (
+            vec![Token::Comment("[CDATA[x]]".to_owned()), Token::Eof],
+            vec![DiagnosticKind::CdataInHtmlContent]
+        )
+    );
+    for (source, text) in [
+        ("<![CDATA[a", "a"),
+        ("<![CDATA[a]", "a]"),
+        ("<![CDATA[a]]", "a]]"),
+    ] {
+        assert_eq!(
+            run(source, true),
+            (
+                vec![character(text), Token::Eof],
+                vec![DiagnosticKind::EofInCdata]
+            )
+        );
+    }
+    assert_eq!(run("<![CDATA[]]>", true), (vec![Token::Eof], vec![]));
+}

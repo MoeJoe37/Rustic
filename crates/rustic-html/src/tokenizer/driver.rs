@@ -233,6 +233,7 @@ impl HtmlTokenizer {
                 self.instruction = None;
             }
             State::Text(state) => self.finish_text(state, output)?,
+            State::Cdata(state) => self.finish_cdata(state, output)?,
             _ => {
                 self.diagnostic(DiagnosticKind::EofInTag)?;
                 self.tag = None;

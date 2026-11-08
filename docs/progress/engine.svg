@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="804" viewBox="0 0 1000 804" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 7.84%</title>
+<title id="title">Rustic engine completion: 9.04%</title>
 <desc id="desc">Green cells are completed, evidence-backed capabilities; amber is work in progress and gray is planned. Overall completion weights every engine subsystem, including final five-platform release gates.</desc>
 <rect width="1000" height="804" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24" y="36" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine subsystem progress</text>
-<text x="976" y="39" fill="#3fb950" font-size="28" font-weight="700" text-anchor="end">7.84%</text>
+<text x="976" y="39" fill="#3fb950" font-size="28" font-weight="700" text-anchor="end">9.04%</text>
 <rect x="24" y="56" width="952" height="10" rx="5" fill="#30363d"/>
-<rect x="24" y="56" width="74.64" height="10" rx="5" fill="#3fb950"/>
-<text x="24" y="91" fill="#8b949e" font-size="12">18/172 capabilities complete · 21 subsystems · engine-v2</text>
+<rect x="24" y="56" width="86.06" height="10" rx="5" fill="#3fb950"/>
+<text x="24" y="91" fill="#8b949e" font-size="12">20/172 capabilities complete · 21 subsystems · engine-v2</text>
 <g><title>Foundation: 5/8 capabilities, 2% of engine scope</title>
 <rect x="24" y="110" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
 <text x="36" y="132" fill="#f0f6fc" font-size="13" font-weight="600">Foundation</text>
@@ -56,21 +56,21 @@
 <rect x="833.00" y="144" width="14.00" height="12" rx="2" fill="#30363d"><title>Tracing integration and DOM conformance gate: planned</title></rect>
 <text x="680" y="172" fill="#8b949e" font-size="10">3/10 complete · scope weight 6%</text>
 </g>
-<g><title>HTML: 6/10 capabilities, 6% of engine scope</title>
+<g><title>HTML: 8/10 capabilities, 6% of engine scope</title>
 <rect x="24" y="194" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
 <text x="36" y="216" fill="#f0f6fc" font-size="13" font-weight="600">HTML</text>
-<text x="320" y="216" fill="#8b949e" text-anchor="end" font-size="12">60.00%</text>
+<text x="320" y="216" fill="#8b949e" text-anchor="end" font-size="12">80.00%</text>
 <rect x="36.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Bounded incremental UTF-8 decoding and input preprocessing: complete</title></rect>
 <rect x="53.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Declared data/tag/attribute tokenizer subset: complete</title></rect>
 <rect x="70.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Full named/numeric character references: complete</title></rect>
 <rect x="87.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Comments, doctypes and declaration recovery: complete</title></rect>
 <rect x="104.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>RCDATA, RAWTEXT, script and plaintext modes: complete</title></rect>
-<rect x="121.00" y="228" width="14.00" height="12" rx="2" fill="#d29922"><title>Core insertion modes and malformed-tree recovery: in_progress</title></rect>
-<rect x="138.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Table, formatting, template and foreign content rules: planned</title></rect>
+<rect x="121.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Core insertion modes and malformed-tree recovery: complete</title></rect>
+<rect x="138.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Table, formatting, template and foreign content rules: complete</title></rect>
 <rect x="155.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Parser/script reentry and encoding restart: planned</title></rect>
 <rect x="172.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Bounded local loader and dump-dom command: complete</title></rect>
 <rect x="189.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Parser corpora, chunk invariance and fuzz gate: planned</title></rect>
-<text x="36" y="256" fill="#8b949e" font-size="10">6/10 complete · scope weight 6%</text>
+<text x="36" y="256" fill="#8b949e" font-size="10">8/10 complete · scope weight 6%</text>
 </g>
 <g><title>CSS &amp; style: 0/8 capabilities, 9% of engine scope</title>
 <rect x="346" y="194" width="308" height="74" rx="6" fill="#161b22" stroke="#30363d"/>
@@ -313,6 +313,6 @@
 <rect x="370" y="716" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="390" y="727" fill="#c9d1d9" font-size="12">Planned</text>
 <text x="24" y="756" fill="#c9d1d9" font-size="12">100% requires every capability and final engine acceptance on Windows, macOS, Linux, Android and iOS.</text>
-<text x="24" y="780" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot a440e65cd093</text>
+<text x="24" y="780" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 17800c1cfded</text>
 </g>
 </svg>

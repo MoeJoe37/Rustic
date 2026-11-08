@@ -6,6 +6,7 @@ use crate::{
     Utf8Input,
 };
 
+mod cdata;
 mod comment;
 mod declaration;
 mod doctype;
@@ -14,6 +15,7 @@ mod instruction;
 mod reference;
 mod text;
 
+use cdata::CdataState;
 use comment::CommentState;
 use doctype::DoctypeState;
 use driver::DecodedInput;
@@ -72,6 +74,7 @@ enum State {
     Instruction(InstructionState),
     Reference(ReferenceState),
     Text(TextState),
+    Cdata(CdataState),
 }
 
 #[derive(Debug)]
@@ -87,7 +90,7 @@ struct BuildingTag {
 ///
 /// Feed boundaries do not change token grouping. Text mode selection belongs to
 /// the caller/tree builder through the pull driver. Tree construction is separate;
-/// foreign-content context integration remains unimplemented. Syntax errors are diagnosed;
+/// the caller also allows foreign-content CDATA per token. Syntax errors are diagnosed;
 /// fatal conditions poison the stream instead of allowing a retry.
 #[derive(Debug)]
 pub struct HtmlTokenizer {
@@ -106,6 +109,7 @@ pub struct HtmlTokenizer {
     pending: VecDeque<Token>,
     input_closed: bool,
     mode_opportunity: bool,
+    cdata_allowed: bool,
     last_start_tag: Option<String>,
     text_probe: String,
     text_probe_matches: bool,
@@ -150,6 +154,7 @@ impl HtmlTokenizer {
             pending: VecDeque::new(),
             input_closed: false,
             mode_opportunity: false,
+            cdata_allowed: false,
             last_start_tag: None,
             text_probe: String::new(),
             text_probe_matches: false,
@@ -351,6 +356,7 @@ impl HtmlTokenizer {
             State::Instruction(state) => return self.instruction_step(state, value, output),
             State::Reference(state) => return self.reference_step(state, value, output),
             State::Text(state) => return self.text_step(state, value, output),
+            State::Cdata(state) => return self.cdata_step(state, value, output),
         }
         Ok(false)
     }

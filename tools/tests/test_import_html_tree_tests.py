@@ -14,29 +14,28 @@ class TreeImporterTests(unittest.TestCase):
         self.assertEqual(cases[0]['#document'], '| <html>\n')
         self.assertIn('#script-off', cases[0])
 
-    def test_selection_is_independent_of_parser_results_and_conservatively_closed(self):
-        for data, reason in [('<table>', 'outside_element_whitelist'), ('<svg>', 'outside_element_whitelist'), ('<?target?>', 'processing_instruction'), ('<script>"<b>"</script>', 'outside_element_whitelist')]:
+    def test_exclusions_depend_only_on_record_metadata(self):
+        for data, reason in [('<table>', None), ('<svg>', None), ('<?target?>', 'processing_instruction')]:
             self.assertEqual(importer.exclusion({'#data': data, '#document': '| <html>\n'}), reason)
-        self.assertIsNone(importer.exclusion({'#data': '<DIV><span>x</span>', '#document': '| <html>\n|   <div>\n'}))
         self.assertEqual(importer.exclusion({'#data': '', '#document': '| <html>\n', '#document-fragment': 'div'}), 'fragment_context')
         self.assertEqual(importer.exclusion({'#data': '', '#document': '| <html>\n', '#script-on': ''}), 'scripting_enabled')
+        self.assertIsNone(importer.exclusion({'#data': '', '#document': '| <html>\n', '#script-off': ''}))
 
     def test_malformed_records_are_rejected_instead_of_dropped(self):
         for source in ['', '#data\nx\n#errors\n', '#data\nx\n#errors\n#errors\n#document\n']:
             with self.assertRaises(ValueError):
                 importer.records(source)
 
-    def test_checked_in_source_regenerates_with_complete_selection_accounting(self):
+    def test_vendored_corpus_matches_manifest_with_complete_accounting(self):
         importer.check()
-        raw = (importer.FIXTURES / 'tree_tests1.dat').read_bytes()
-        rust, manifest = importer.generate(raw)
-        metadata = json.loads(manifest)
-        self.assertEqual(metadata['upstream_cases'], 112)
-        self.assertEqual(metadata['selected_cases'], 45)
-        self.assertEqual(metadata['selected_cases'] + metadata['excluded_cases'], metadata['upstream_cases'])
-        self.assertEqual(sum(metadata['exclusion_reasons'].values()), metadata['excluded_cases'])
-        self.assertEqual(len(metadata['selected_array_indices']), 45)
-        self.assertIn('#[rustfmt::skip]', rust)
+        metadata = json.loads(importer.MANIFEST.read_text())
+        self.assertEqual(metadata['upstream_revision'], importer.REVISION)
+        self.assertEqual(len(metadata['files']), 57)
+        for entry in metadata['files']:
+            excluded = sum(entry['exclusion_reasons'].values())
+            self.assertEqual(entry['runnable_cases'] + excluded, entry['upstream_cases'])
+        self.assertEqual(metadata['runnable_cases'], sum(f['runnable_cases'] for f in metadata['files']))
+        self.assertEqual(metadata['runnable_cases'], 1584)
 
 
 if __name__ == '__main__':

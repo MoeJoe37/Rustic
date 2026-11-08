@@ -32,7 +32,7 @@ impl Default for ParserLimits {
     }
 }
 
-/// A completed inert document from the explicitly supported construction subset.
+/// A completed inert document built with scripting disabled.
 #[derive(Debug)]
 pub struct ParsedDocument {
     document: Document,
@@ -75,10 +75,10 @@ enum Lifecycle {
     Failed,
 }
 
-/// Incremental UTF-8 document parser for the declared initial/head/body subset.
+/// Incremental UTF-8 parser implementing WHATWG document tree construction.
 ///
 /// Scripting is disabled; no script, network request or subresource is executed.
-/// Unsupported tree constructs fail explicitly. The parser owns its document
+/// Processing-instruction tokens, which have no DOM node yet, fail explicitly. The parser owns its document
 /// until successful EOF; any fatal error discards the partial tree and poisons
 /// the parser. Rejected calls after successful completion preserve that state.
 #[derive(Debug)]
@@ -139,6 +139,7 @@ impl HtmlDocumentParser {
             if let Some(mode) = tree.process(&token)? {
                 self.tokenizer.set_text_mode(mode)?;
             }
+            self.tokenizer.set_cdata_allowed(tree.cdata_allowed());
             if matches!(token, Token::Eof) {
                 break;
             }

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 7.84%** · 18/172 capabilities complete.
+**Overall completion: 9.04%** · 20/172 capabilities complete.
 
-Catalog: `engine-v2`. Source fingerprint: `a440e65cd0934ba17046386bcc0ebc55cd6460ab7459d27f8a274a6d65270e66`.
+Catalog: `engine-v2`. Source fingerprint: `17800c1cfded49aaf1e65bea148eeb51cf579a396b3ca15a58f8fa0d340fd2a0`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 
@@ -11,7 +11,7 @@ Catalog: `engine-v2`. Source fingerprint: `a440e65cd0934ba17046386bcc0ebc55cd646
 | Foundation | 5/8 | 62.50% | 2% |
 | URLs & encoding | 3/12 | 25.00% | 3% |
 | DOM | 3/10 | 30.00% | 6% |
-| HTML | 6/10 | 60.00% | 6% |
+| HTML | 8/10 | 80.00% | 6% |
 | CSS & style | 0/8 | 0.00% | 9% |
 | Text & fonts | 0/6 | 0.00% | 4% |
 | Layout | 0/10 | 0.00% | 9% |
@@ -78,8 +78,8 @@ Catalog: `engine-v2`. Source fingerprint: `a440e65cd0934ba17046386bcc0ebc55cd646
 - **complete** `html.references` — Full named/numeric character references ([source](../../crates/rustic-html/src/tokenizer/reference.rs), [test](../../crates/rustic-html/tests/references.rs), [test](../../crates/rustic-html/tests/references.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.declarations` — Comments, doctypes and declaration recovery ([source](../../crates/rustic-html/src/tokenizer/comment.rs), [source](../../crates/rustic-html/src/tokenizer/doctype.rs), [source](../../crates/rustic-html/src/tokenizer/instruction.rs), [test](../../crates/rustic-html/tests/declarations.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes ([source](../../crates/rustic-html/src/tokenizer/text.rs), [source](../../crates/rustic-html/src/tokenizer/driver.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/corpus.rs))
-- **in_progress** `html.tree` — Core insertion modes and malformed-tree recovery ([source](../../crates/rustic-html/src/parser/tree.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_corpus.rs))
-- **planned** `html.tables` — Table, formatting, template and foreign content rules
+- **complete** `html.tree` — Core insertion modes and malformed-tree recovery ([source](../../crates/rustic-html/src/parser/tree.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
+- **complete** `html.tables` — Table, formatting, template and foreign content rules ([source](../../crates/rustic-html/src/parser/tree/formatting.rs), [source](../../crates/rustic-html/src/parser/tree/table.rs), [source](../../crates/rustic-html/src/parser/tree/foreign.rs), [test](../../crates/rustic-html/tests/tree_rules.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
 - **planned** `html.scripts` — Parser/script reentry and encoding restart
 - **complete** `html.loader` — Bounded local loader and dump-dom command ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **planned** `html.conformance` — Parser corpora, chunk invariance and fuzz gate

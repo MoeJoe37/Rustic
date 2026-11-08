@@ -1,5 +1,6 @@
 use rustic_dom::{
-    Document, DocumentLimits, DocumentType, DomError, NodeId, NodeKind, QualifiedName,
+    Document, DocumentLimits, DocumentType, DomError, Element, MATHML_NAMESPACE, NodeId, NodeKind,
+    SVG_NAMESPACE,
 };
 
 use crate::{Diagnostic, Doctype, Tag, Token, TokenizerMode};
@@ -10,8 +11,14 @@ use super::{
 };
 
 mod body;
-mod characters;
-mod head;
+mod foreign;
+mod formatting;
+mod insert;
+mod shell;
+mod stack;
+mod table;
+
+use formatting::Entry;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum InsertionMode {
@@ -23,14 +30,81 @@ enum InsertionMode {
     AfterHead,
     InBody,
     Text,
+    InTable,
+    InTableText,
+    InCaption,
+    InColumnGroup,
+    InTableBody,
+    InRow,
+    InCell,
+    InTemplate,
     AfterBody,
+    InFrameset,
+    AfterFrameset,
     AfterAfterBody,
+    AfterAfterFrameset,
+}
+
+/// Element namespaces that tree construction distinguishes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Ns {
+    Html,
+    MathMl,
+    Svg,
+}
+
+/// Character-token class. Grouped tokenizer text is split into homogeneous
+/// runs so each insertion mode sees the standard per-character distinction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Chars {
+    Space,
+    Null,
+    Other,
+}
+
+/// A borrowed token view; character data is one homogeneous run.
+#[derive(Clone, Copy, Debug)]
+enum Tok<'a> {
+    Text(Chars, &'a str),
+    Start(&'a Tag),
+    End(&'a str),
+    Comment(&'a str),
+    Doctype(&'a Doctype),
+    Eof,
 }
 
 enum Step {
     Consumed,
     Reprocess,
-    TextMode(TokenizerMode),
+}
+
+fn space(value: char) -> bool {
+    matches!(value, '\t' | '\n' | '\u{c}' | '\r' | ' ')
+}
+
+fn class(value: char) -> Chars {
+    if value == '\0' {
+        Chars::Null
+    } else if space(value) {
+        Chars::Space
+    } else {
+        Chars::Other
+    }
+}
+
+/// Split text into maximal runs of one character class.
+fn runs(text: &str) -> impl Iterator<Item = (Chars, &str)> {
+    let mut rest = text;
+    std::iter::from_fn(move || {
+        let first = class(rest.chars().next()?);
+        let end = rest
+            .char_indices()
+            .find(|(_, value)| class(*value) != first)
+            .map_or(rest.len(), |(index, _)| index);
+        let (run, tail) = rest.split_at(end);
+        rest = tail;
+        Some((first, run))
+    })
 }
 
 /// Owns all construction state; the tokenizer never edits a node directly.
@@ -40,8 +114,17 @@ pub(super) struct TreeBuilder {
     document_mode: DocumentMode,
     insertion_mode: InsertionMode,
     original_mode: InsertionMode,
+    template_modes: Vec<InsertionMode>,
     open: Vec<NodeId>,
+    formatting: Vec<Entry>,
     head: Option<NodeId>,
+    form: Option<NodeId>,
+    frameset_ok: bool,
+    foster_parenting: bool,
+    pending_table_text: String,
+    pending_table_text_other: bool,
+    skip_newline: bool,
+    text_mode: Option<TokenizerMode>,
     diagnostics: Vec<TreeDiagnostic>,
     max_diagnostics: usize,
     token_index: usize,
@@ -56,8 +139,17 @@ impl TreeBuilder {
             document_mode: DocumentMode::NoQuirks,
             insertion_mode: InsertionMode::Initial,
             original_mode: InsertionMode::Initial,
+            template_modes: Vec::new(),
             open: Vec::new(),
+            formatting: Vec::new(),
             head: None,
+            form: None,
+            frameset_ok: true,
+            foster_parenting: false,
+            pending_table_text: String::new(),
+            pending_table_text_other: false,
+            skip_newline: false,
+            text_mode: None,
             diagnostics: Vec::new(),
             max_diagnostics,
             token_index: 0,
@@ -68,36 +160,29 @@ impl TreeBuilder {
 
     pub(super) fn process(&mut self, token: &Token) -> Result<Option<TokenizerMode>, ParseError> {
         self.self_closing_acknowledged = false;
-        let mut selected_mode = None;
-        if let Token::Characters(text) = token {
-            self.characters(text)?;
-        } else {
-            // Reprocessing advances a finite insertion-mode chain; no recursion
-            // or token cloning, including EOF through all implied shell elements.
-            loop {
-                let step = match self.insertion_mode {
-                    InsertionMode::Initial => self.initial(token)?,
-                    InsertionMode::BeforeHtml => self.before_html(token)?,
-                    InsertionMode::BeforeHead => self.before_head(token)?,
-                    InsertionMode::InHead => {
-                        self.in_head(token, self.current(), InsertionMode::InHead)?
-                    }
-                    InsertionMode::InHeadNoscript => self.in_head_noscript(token)?,
-                    InsertionMode::AfterHead => self.after_head(token)?,
-                    InsertionMode::InBody => self.in_body(token)?,
-                    InsertionMode::Text => self.text_end(token)?,
-                    InsertionMode::AfterBody => self.after_body(token)?,
-                    InsertionMode::AfterAfterBody => self.after_after_body(token)?,
+        self.text_mode = None;
+        let skip_newline = std::mem::take(&mut self.skip_newline);
+        match token {
+            Token::Characters(text) => {
+                let text = if skip_newline {
+                    text.strip_prefix('\n').unwrap_or(text)
+                } else {
+                    text
                 };
-                match step {
-                    Step::Consumed => break,
-                    Step::Reprocess => continue,
-                    Step::TextMode(mode) => {
-                        selected_mode = Some(mode);
-                        break;
-                    }
+                for (class, run) in runs(text) {
+                    self.dispatch(Tok::Text(class, run))?;
                 }
             }
+            Token::StartTag(tag) => self.dispatch(Tok::Start(tag))?,
+            Token::EndTag(name) => self.dispatch(Tok::End(name))?,
+            Token::Comment(text) => self.dispatch(Tok::Comment(text))?,
+            Token::Doctype(doctype) => self.dispatch(Tok::Doctype(doctype))?,
+            Token::ProcessingInstruction(_) => {
+                return Err(ParseError::Unsupported(
+                    UnsupportedFeature::ProcessingInstructions,
+                ));
+            }
+            Token::Eof => self.dispatch(Tok::Eof)?,
         }
         if matches!(token, Token::StartTag(tag) if tag.self_closing() && !self.self_closing_acknowledged)
         {
@@ -108,7 +193,12 @@ impl TreeBuilder {
             .token_index
             .checked_add(1)
             .ok_or(ParseError::Tokenizer(crate::HtmlError::TokenLimit))?;
-        Ok(selected_mode)
+        Ok(self.text_mode.take())
+    }
+
+    /// Whether the tokenizer may recognize CDATA sections before the next token.
+    pub(super) fn cdata_allowed(&self) -> bool {
+        self.open.last().is_some_and(|id| self.ns(*id) != Ns::Html)
     }
 
     pub(super) fn into_result(self, tokenizer_diagnostics: Vec<Diagnostic>) -> ParsedDocument {
@@ -121,73 +211,66 @@ impl TreeBuilder {
         }
     }
 
-    fn initial(&mut self, token: &Token) -> Result<Step, ParseError> {
-        match token {
-            Token::Comment(text) => self.comment(self.document.root(), text)?,
-            Token::ProcessingInstruction(_) => {
-                return Err(ParseError::Unsupported(
-                    UnsupportedFeature::ProcessingInstructions,
-                ));
-            }
-            Token::Doctype(doctype) => {
-                self.doctype(doctype)?;
-                self.insertion_mode = InsertionMode::BeforeHtml;
-            }
-            _ => {
-                self.missing_doctype()?;
-                return Ok(Step::Reprocess);
+    /// The tree construction dispatcher. Reprocessing advances a finite chain
+    /// of insertion modes or pops open elements; no token is cloned.
+    fn dispatch(&mut self, token: Tok) -> Result<(), ParseError> {
+        loop {
+            let step = if self.html_rules(token) {
+                self.step(self.insertion_mode, token)?
+            } else {
+                self.foreign(token)?
+            };
+            if let Step::Consumed = step {
+                return Ok(());
             }
         }
-        Ok(Step::Consumed)
     }
 
-    fn before_html(&mut self, token: &Token) -> Result<Step, ParseError> {
-        match token {
-            Token::Comment(text) => self.comment(self.document.root(), text)?,
-            Token::Doctype(_) => self.diagnostic(ErrorKind::UnexpectedToken)?,
-            Token::ProcessingInstruction(_) => {
-                return Err(ParseError::Unsupported(
-                    UnsupportedFeature::ProcessingInstructions,
-                ));
-            }
-            Token::StartTag(tag) if tag.name() == "html" => {
-                self.insert(self.document.root(), tag, true)?;
-                self.insertion_mode = InsertionMode::BeforeHead;
-            }
-            Token::EndTag(name) if !matches!(name.as_str(), "head" | "body" | "html" | "br") => {
-                self.diagnostic(ErrorKind::UnexpectedToken)?
-            }
-            _ => {
-                self.imply_html()?;
-                return Ok(Step::Reprocess);
+    fn html_rules(&self, token: Tok) -> bool {
+        let Some(&current) = self.open.last() else {
+            return true;
+        };
+        match self.ns(current) {
+            Ns::Html => true,
+            _ if matches!(token, Tok::Eof) => true,
+            ns => {
+                let start = |name: &str| matches!(token, Tok::Start(tag) if tag.name() == name);
+                let text_point = ns == Ns::MathMl
+                    && matches!(self.local(current), "mi" | "mo" | "mn" | "ms" | "mtext");
+                (text_point
+                    && (matches!(token, Tok::Text(..))
+                        || matches!(token, Tok::Start(tag) if !matches!(tag.name(), "mglyph" | "malignmark"))))
+                    || (ns == Ns::MathMl && self.local(current) == "annotation-xml" && start("svg"))
+                    || (self.html_integration_point(current)
+                        && matches!(token, Tok::Start(_) | Tok::Text(..)))
             }
         }
-        Ok(Step::Consumed)
     }
 
-    fn before_head(&mut self, token: &Token) -> Result<Step, ParseError> {
-        match token {
-            Token::Comment(text) => self.comment(self.current(), text)?,
-            Token::Doctype(_) => self.diagnostic(ErrorKind::UnexpectedToken)?,
-            Token::ProcessingInstruction(_) => {
-                return Err(ParseError::Unsupported(
-                    UnsupportedFeature::ProcessingInstructions,
-                ));
-            }
-            Token::StartTag(tag) if tag.name() == "html" => self.html_tag(tag)?,
-            Token::StartTag(tag) if tag.name() == "head" => {
-                self.head = Some(self.insert(self.current(), tag, true)?);
-                self.insertion_mode = InsertionMode::InHead;
-            }
-            Token::EndTag(name) if !matches!(name.as_str(), "head" | "body" | "html" | "br") => {
-                self.diagnostic(ErrorKind::UnexpectedToken)?
-            }
-            _ => {
-                self.imply_head()?;
-                return Ok(Step::Reprocess);
-            }
+    fn step(&mut self, mode: InsertionMode, token: Tok) -> Result<Step, ParseError> {
+        match mode {
+            InsertionMode::Initial => self.initial(token),
+            InsertionMode::BeforeHtml => self.before_html(token),
+            InsertionMode::BeforeHead => self.before_head(token),
+            InsertionMode::InHead => self.in_head(token),
+            InsertionMode::InHeadNoscript => self.in_head_noscript(token),
+            InsertionMode::AfterHead => self.after_head(token),
+            InsertionMode::InBody => self.in_body(token),
+            InsertionMode::Text => self.text(token),
+            InsertionMode::InTable => self.in_table(token),
+            InsertionMode::InTableText => self.in_table_text(token),
+            InsertionMode::InCaption => self.in_caption(token),
+            InsertionMode::InColumnGroup => self.in_column_group(token),
+            InsertionMode::InTableBody => self.in_table_body(token),
+            InsertionMode::InRow => self.in_row(token),
+            InsertionMode::InCell => self.in_cell(token),
+            InsertionMode::InTemplate => self.in_template(token),
+            InsertionMode::AfterBody => self.after_body(token),
+            InsertionMode::InFrameset => self.in_frameset(token),
+            InsertionMode::AfterFrameset => self.after_frameset(token),
+            InsertionMode::AfterAfterBody => self.after_after_body(token),
+            InsertionMode::AfterAfterFrameset => self.after_after_frameset(token),
         }
-        Ok(Step::Consumed)
     }
 
     fn doctype(&mut self, token: &Doctype) -> Result<(), ParseError> {
@@ -204,33 +287,8 @@ impl TreeBuilder {
             public_id: token.public_id().unwrap_or("").into(),
             system_id: token.system_id().unwrap_or("").into(),
         })?;
-        self.attach_or_destroy(self.document.root(), id)?;
+        self.attach_or_destroy(self.document.root(), None, id)?;
         self.document_mode = super::mode::classify(token);
-        Ok(())
-    }
-
-    fn missing_doctype(&mut self) -> Result<(), ParseError> {
-        self.diagnostic(ErrorKind::MissingDoctype)?;
-        self.document_mode = DocumentMode::Quirks;
-        self.insertion_mode = InsertionMode::BeforeHtml;
-        Ok(())
-    }
-
-    fn imply_html(&mut self) -> Result<(), ParseError> {
-        self.insert_implied(self.document.root(), "html")?;
-        self.insertion_mode = InsertionMode::BeforeHead;
-        Ok(())
-    }
-
-    fn imply_head(&mut self) -> Result<(), ParseError> {
-        self.head = Some(self.insert_implied(self.current(), "head")?);
-        self.insertion_mode = InsertionMode::InHead;
-        Ok(())
-    }
-
-    fn imply_body(&mut self) -> Result<(), ParseError> {
-        self.insert_implied(self.current(), "body")?;
-        self.insertion_mode = InsertionMode::InBody;
         Ok(())
     }
 
@@ -241,10 +299,48 @@ impl TreeBuilder {
             .expect("insertion mode requires a current element")
     }
 
-    fn name(&self, id: NodeId) -> &str {
+    fn element(&self, id: NodeId) -> &Element {
         match self.document.node(id).expect("live parser node").kind() {
-            NodeKind::Element(element) => element.name().local(),
-            _ => unreachable!("open stack only contains elements"),
+            NodeKind::Element(element) => element,
+            _ => unreachable!("open stack and formatting list only contain elements"),
+        }
+    }
+
+    fn ns(&self, id: NodeId) -> Ns {
+        match self.element(id).name().namespace() {
+            Some(SVG_NAMESPACE) => Ns::Svg,
+            Some(MATHML_NAMESPACE) => Ns::MathMl,
+            _ => Ns::Html,
+        }
+    }
+
+    fn local(&self, id: NodeId) -> &str {
+        self.element(id).name().local()
+    }
+
+    /// The local name of an HTML element, or `None` for foreign elements.
+    fn html_name(&self, id: NodeId) -> Option<&str> {
+        (self.ns(id) == Ns::Html).then(|| self.local(id))
+    }
+
+    fn is_html(&self, id: NodeId, name: &str) -> bool {
+        self.html_name(id) == Some(name)
+    }
+
+    fn html_integration_point(&self, id: NodeId) -> bool {
+        match self.ns(id) {
+            Ns::Svg => matches!(self.local(id), "foreignObject" | "desc" | "title"),
+            Ns::MathMl if self.local(id) == "annotation-xml" => {
+                self.element(id).attributes().iter().any(|attribute| {
+                    attribute.name().namespace().is_none()
+                        && attribute.name().local() == "encoding"
+                        && String::from_utf16(attribute.value().as_units()).is_ok_and(|value| {
+                            value.eq_ignore_ascii_case("text/html")
+                                || value.eq_ignore_ascii_case("application/xhtml+xml")
+                        })
+                })
+            }
+            _ => false,
         }
     }
 
@@ -262,88 +358,17 @@ impl TreeBuilder {
         Ok(())
     }
 
-    fn insert_implied(&mut self, parent: NodeId, name: &str) -> Result<NodeId, ParseError> {
-        self.insert(
-            parent,
-            &Tag {
-                name: name.into(),
-                attributes: Vec::new(),
-                self_closing: false,
-            },
-            true,
-        )
+    /// Diagnose and ignore each NUL character of a run.
+    fn ignore_nulls(&mut self, run: &str) -> Result<Step, ParseError> {
+        for _ in run.chars() {
+            self.diagnostic(ErrorKind::UnexpectedNull)?;
+        }
+        Ok(Step::Consumed)
     }
 
-    fn insert(&mut self, parent: NodeId, tag: &Tag, push: bool) -> Result<NodeId, ParseError> {
-        if push {
-            self.open
-                .try_reserve(1)
-                .map_err(|_| DomError::AllocationFailed)?;
-        }
-        let id = self
-            .document
-            .create_element(QualifiedName::html(tag.name())?)?;
-        if let Err(error) = self.add_missing_attributes(id, tag) {
-            self.document
-                .destroy_subtree(id)
-                .expect("unattached new element");
-            return Err(error);
-        }
-        self.attach_or_destroy(parent, id)?;
-        if push {
-            self.open.push(id);
-        } else if tag.self_closing() {
-            self.self_closing_acknowledged = true;
-        }
-        Ok(id)
-    }
-
-    fn add_missing_attributes(&mut self, id: NodeId, tag: &Tag) -> Result<(), ParseError> {
-        for attribute in tag.attributes() {
-            let exists = match self.document.node(id)?.kind() {
-                NodeKind::Element(element) => element.attributes().iter().any(|a| {
-                    a.name().namespace().is_none() && a.name().local() == attribute.name()
-                }),
-                _ => unreachable!("attribute target is an element"),
-            };
-            if !exists {
-                self.document.set_attribute(
-                    id,
-                    QualifiedName::from_parsed(None, None, attribute.name())?,
-                    attribute.value(),
-                )?;
-            }
-        }
-        Ok(())
-    }
-
-    fn attach_or_destroy(&mut self, parent: NodeId, id: NodeId) -> Result<(), ParseError> {
-        if let Err(error) = self.document.append_child(parent, id) {
-            self.document
-                .destroy_subtree(id)
-                .expect("new unattached parser node");
-            return Err(error.into());
-        }
-        Ok(())
-    }
-
-    fn comment(&mut self, parent: NodeId, text: &str) -> Result<(), ParseError> {
-        let id = self.document.create_comment(text)?;
-        self.attach_or_destroy(parent, id)
-    }
-
-    fn insert_text(&mut self, parent: NodeId, text: &str) -> Result<(), ParseError> {
-        if text.is_empty() {
-            return Ok(());
-        }
-        let last = self.document.node(parent)?.last_child();
-        if let Some(id) = last {
-            if matches!(self.document.node(id)?.kind(), NodeKind::Text(_)) {
-                self.document.append_utf8_character_data(id, text)?;
-                return Ok(());
-            }
-        }
-        let id = self.document.create_text(text)?;
-        self.attach_or_destroy(parent, id)
+    /// Record a misplaced/ignored token recovery and consume the token.
+    fn ignore(&mut self) -> Result<Step, ParseError> {
+        self.diagnostic(ErrorKind::UnexpectedToken)?;
+        Ok(Step::Consumed)
     }
 }

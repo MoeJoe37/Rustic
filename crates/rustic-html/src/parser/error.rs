@@ -6,13 +6,8 @@ use crate::HtmlError;
 
 /// Construction families deliberately rejected until their tree rules exist.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum UnsupportedFeature {
-    /// Body start tags outside the documented small supported set.
-    BodyElement,
-    /// Template contents and template insertion-mode stacks.
-    Templates,
-    /// Frameset construction and body replacement.
-    Framesets,
     /// The DOM storage layer does not yet have processing-instruction nodes.
     ProcessingInstructions,
 }

@@ -32,8 +32,9 @@ token, including for empty input.
 Comments include the ordinary, nested-opening, malformed-closing and bogus
 recovery states. Unknown or incomplete declaration openings become bogus comments
 without losing buffered characters. In HTML context, `<![CDATA[` is diagnosed and
-recovers as a bogus comment containing `[CDATA[`. Foreign-content CDATA awaits
-the future tree builder's adjusted-current-node context.
+recovers as a bogus comment containing `[CDATA[`. When the tree builder allows
+CDATA (`set_cdata_allowed`, for a non-HTML adjusted current node), the section's
+characters become text until `]]>`; EOF inside it is diagnosed as `EofInCdata`.
 
 Doctype tokens preserve missing versus empty names/identifiers, ASCII-lowercase
 names, case-preserved public/system identifiers, and the tokenizer's force-quirks
@@ -162,15 +163,15 @@ stream; another feed/finish returns `AlreadyFinished`.
 
 ## Deliberate remaining scope
 
-The [inert document parser](HTML_TREE.md) now selects modes in a declared
-initial/head/body subset and rejects unsupported tree constructs. Encoding sniffing,
-legacy decoders, restart, parser/script execution/reentry, foreign content and
-complete HTML recovery remain planned. DOM-string/UTF-16 fragment input is also
+The [inert document parser](HTML_TREE.md) now implements complete document tree
+construction with scripting disabled, including foreign content and CDATA.
+Encoding sniffing, legacy decoders, restart, parser/script execution/reentry and
+fragment parsing remain planned. DOM-string/UTF-16 fragment input is also
 separate from the current UTF-8 byte interface.
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
 DOC-05b now has reference expansion and all four text modes; broader encoding work,
-the remaining DOC-06 rules and the broader corpus/fuzz gate remain open.
+fragment parsing and the fuzz gate remain open.
 
 ## Evidence and references
 

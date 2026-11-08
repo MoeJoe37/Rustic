@@ -376,3 +376,96 @@ fn seeded_mutation_sequences_match_an_independent_ordered_tree_model() {
         }
     }
 }
+
+fn html(document: &mut Document, name: &str) -> NodeId {
+    document
+        .create_element(QualifiedName::html(name).unwrap())
+        .unwrap()
+}
+
+#[test]
+fn template_contents_are_a_separate_owned_root_destroyed_with_their_template() {
+    let mut doc = document();
+    let baseline = doc.node_count();
+    let div = html(&mut doc, "div");
+    assert_eq!(
+        doc.create_template_contents(div),
+        Err(DomError::WrongNodeKind)
+    );
+    let svg_template = doc
+        .create_element(
+            QualifiedName::from_parsed(Some(rustic_dom::SVG_NAMESPACE), None, "template").unwrap(),
+        )
+        .unwrap();
+    assert_eq!(
+        doc.create_template_contents(svg_template),
+        Err(DomError::WrongNodeKind)
+    );
+    doc.destroy_subtree(svg_template).unwrap();
+    let template = html(&mut doc, "template");
+    doc.append_child(div, template).unwrap();
+    let contents = doc.create_template_contents(template).unwrap();
+    assert_eq!(
+        doc.create_template_contents(template),
+        Err(DomError::InvalidHierarchy)
+    );
+    let NodeKind::Element(value) = doc.node(template).unwrap().kind() else {
+        unreachable!()
+    };
+    assert_eq!(value.template_contents(), Some(contents));
+    assert!(matches!(
+        doc.node(contents).unwrap().kind(),
+        NodeKind::DocumentFragment
+    ));
+    assert_eq!(doc.node(contents).unwrap().parent(), None);
+
+    // Contents accept ordinary children but are never children themselves.
+    let inner = html(&mut doc, "template");
+    doc.append_child(contents, inner).unwrap();
+    let nested = doc.create_template_contents(inner).unwrap();
+    let text = doc.create_text("x").unwrap();
+    doc.append_child(nested, text).unwrap();
+    assert_eq!(
+        doc.append_child(div, contents),
+        Err(DomError::InvalidHierarchy)
+    );
+    assert_eq!(doc.detach(contents), Err(DomError::InvalidHierarchy));
+    assert_eq!(
+        doc.destroy_subtree(contents),
+        Err(DomError::InvalidHierarchy)
+    );
+    assert_eq!(doc.walk(div).unwrap().count(), 2);
+    assert_eq!(
+        doc.dump_tree(div, 4096).unwrap(),
+        concat!(
+            "element namespace=\"http://www.w3.org/1999/xhtml\" prefix=null local=\"div\"\n",
+            "  element namespace=\"http://www.w3.org/1999/xhtml\" prefix=null local=\"template\"\n",
+            "    #template-contents\n",
+            "      element namespace=\"http://www.w3.org/1999/xhtml\" prefix=null local=\"template\"\n",
+            "        #template-contents\n",
+            "          text \"x\"\n",
+        )
+    );
+
+    doc.destroy_subtree(div).unwrap();
+    assert_eq!(doc.node_count(), baseline);
+    for id in [div, template, contents, inner, nested, text] {
+        assert_eq!(doc.node(id).unwrap_err(), DomError::InvalidNode);
+    }
+}
+
+#[test]
+fn deeply_nested_template_contents_dump_and_destroy_without_recursion() {
+    let mut doc = document();
+    let baseline = doc.node_count();
+    let root = html(&mut doc, "template");
+    let mut parent = doc.create_template_contents(root).unwrap();
+    for _ in 0..20_000 {
+        let template = html(&mut doc, "template");
+        doc.append_child(parent, template).unwrap();
+        parent = doc.create_template_contents(template).unwrap();
+    }
+    assert!(doc.dump_tree(root, usize::MAX).unwrap().lines().count() > 40_000);
+    doc.destroy_subtree(root).unwrap();
+    assert_eq!(doc.node_count(), baseline);
+}

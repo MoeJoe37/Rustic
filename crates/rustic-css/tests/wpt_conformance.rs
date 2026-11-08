@@ -29,6 +29,13 @@ use rustic_css::{CssParser, NamespaceMap, PropertyError, PropertyName, parse_dec
 const CASES: &str = include_str!("fixtures/wpt-css/cases.json");
 const EXPECTED_FAILURES: &str = include_str!("fixtures/wpt-css/expected_failures.json");
 
+/// The gate's denominator, pinned. Scope follows property support, so adding
+/// or removing a supported property moves cases in or out of scope; this
+/// makes every such change deliberate and visible instead of silently
+/// growing or shrinking the denominator (docs/TECH_DEBT.md, TD-35).
+const IN_SCOPE: usize = 1455;
+const OUT_OF_SCOPE: usize = 1461;
+
 fn string(json: &Json) -> &str {
     match json {
         Json::String(s) => s,
@@ -284,4 +291,10 @@ fn wpt_css_parsing_cases_match_the_declared_expectations() {
         stale.join("\n")
     );
     assert_eq!(expected.len(), failed.len(), "every listed key failed");
+    assert_eq!(
+        (in_scope, out_of_scope),
+        (IN_SCOPE, OUT_OF_SCOPE),
+        "the in-scope/out-of-scope split changed: update IN_SCOPE, OUT_OF_SCOPE and \
+         the counts in docs/CSS.md together, and say why in the commit"
+    );
 }

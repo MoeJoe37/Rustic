@@ -81,6 +81,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Open |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
+| TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
+| TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -527,6 +529,31 @@ chain is a regression test (`chained_variables_are_computed_once_and_shared`)
 that checks the paragraphs share storage. Elements with different parents but
 equal values still compute separately (no interning by content); that costs
 time per distinct parent, not per element.
+
+### TD-34 — Container query cost per element and rule
+
+The cascade tested every `@container` condition before the rule's selector,
+so each element paid an ancestor walk (and, for `style()` queries, a `var()`
+substitution and two serializations) for every container rule, even rules
+whose selector could never match it. With 2,000 `@container` rules, a
+250-deep `<div>` chain and 3,000 `<p>` siblings, release `dump-style` took 6.0 s.
+**Partly paid:** selectors are now tested first, so that input takes 0.39 s with
+identical output. Still open: each matching rule still finds its nearest
+eligible container by walking the ancestors, so cost is elements × matching
+container rules × depth. **Pay:** cache the nearest container per (element,
+name, axes) and the `style()` results per container for one restyle.
+**Trigger:** a profile showing container lookup, or container-heavy pages.
+
+### TD-35 — The CSS conformance denominator follows property support
+
+The CSS-08 WPT gate counts a value case as in scope only when `rustic-css`
+supports its property. That keeps the gate meaningful while the property
+catalog grows, but it means removing a property, or failing to add one, would
+quietly move cases out of scope. At the gate's introduction 1,461 of 2,916
+cases were out of scope against 1,455 in scope. **Guarded:** the gate pins both
+counts, so any change in scope fails until the constants and `docs/CSS.md` are
+updated together. Shorthand value cases still check acceptance only (no
+longhand-to-shorthand serialization), which the gate documents.
 
 ## Reviewing new work
 

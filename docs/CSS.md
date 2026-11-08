@@ -874,7 +874,10 @@ skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
 
 Of 2,916 cases, 1,455 are in scope and **1,073 pass** (invalid-selector
 102/104, invalid-value 470/471, valid-selector 108/199, valid-value 393/681).
-Every other in-scope case is listed in `expected_failures.json` with a reason,
+The other 1,461 are out of scope: properties `rustic-css` does not support yet,
+and tentative files. Both counts are pinned in the gate, so supporting or
+dropping a property changes them deliberately. Every other in-scope case is
+listed in `expected_failures.json` with a reason,
 and the list is a ratchet: an unlisted failure fails the gate, and so does a
 listed case that now passes, or a listed case that no longer exists. The
 largest groups of known failures are features outside M2's declared scope:

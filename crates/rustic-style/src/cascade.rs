@@ -455,15 +455,6 @@ impl Cascade {
                 if !StyleSheet::rule_applies(rule, media) {
                     continue;
                 }
-                if !sheet.containers.is_empty()
-                    && !rule.media.iter().all(|&i| {
-                        sheet.container_at(i).is_none_or(|list| {
-                            container_list_matches(list, inputs.containers, &self.environment)
-                        })
-                    })
-                {
-                    continue;
-                }
                 let specificity = rule
                     .selectors
                     .selectors()
@@ -477,6 +468,18 @@ impl Cascade {
                 let Some(specificity) = specificity else {
                     continue;
                 };
+                // Container conditions walk the ancestors and may substitute
+                // `var()`, so test them only for rules whose selector matched
+                // (TD-34); both must hold either way.
+                if !sheet.containers.is_empty()
+                    && !rule.media.iter().all(|&i| {
+                        sheet.container_at(i).is_none_or(|list| {
+                            container_list_matches(list, inputs.containers, &self.environment)
+                        })
+                    })
+                {
+                    continue;
+                }
                 let rank = Self::rank(ranks, placement, rule.layer);
                 for (declaration_index, declaration) in rule.declarations.iter().enumerate() {
                     let important = declaration.important;

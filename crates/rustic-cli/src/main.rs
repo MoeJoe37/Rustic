@@ -20,6 +20,7 @@ Usage:
   rustic dump-dom [OPTIONS] [--] <file>
   rustic dump-style [OPTIONS] [--] <file>
   rustic dump-boxes [OPTIONS] [--] <file>
+  rustic dump-layout [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
@@ -32,6 +33,9 @@ outside it are blocked. URLs are rejected as the file argument.
 
 dump-boxes loads the same styles and prints a principal-box snapshot (no
 anonymous/line boxes, layout positions or painting yet).
+dump-layout prints used content/padding/border rectangles for static non-replaced
+blocks with zero vertical margins and visible overflow. Inline/text layout and
+other unsupported formatting fail explicitly. No command paints pixels yet.
 
 Options for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
@@ -43,7 +47,7 @@ Options for all dump commands (positive integers; exceeding any limit except
   --max-diagnostics N    retained tokenizer and tree recoveries, each; later
                          recoveries are counted, not fatal (default 1024)
 
-Stylesheet options for dump-style and dump-boxes (exceeding one skips the sheet, never fatal):
+Stylesheet options for dump-style, dump-boxes and dump-layout (exceeding one skips the sheet, never fatal):
   --max-stylesheets N       linked and imported sheets fetched (default 64)
   --max-stylesheet-bytes N  total bytes of those sheets (default 8388608)
   --max-import-depth N      @import nesting (default 16)";
@@ -67,7 +71,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes; full layout, JavaScript, networking, and rendering: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes and block reference geometry via dump-layout; full layout, JavaScript, networking, and rendering: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -79,6 +83,9 @@ fn main() -> ExitCode {
     }
     if args[0] == "dump-boxes" {
         return dump_command("dump-boxes", &args[1..], loader::dump_boxes);
+    }
+    if args[0] == "dump-layout" {
+        return dump_command("dump-layout", &args[1..], loader::dump_layout);
     }
     eprintln!(
         "Unsupported command. Rendering and navigation are not implemented; see docs/ROADMAP.md."

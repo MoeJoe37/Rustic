@@ -77,6 +77,7 @@ cargo run --locked -p rustic-html --example text_modes
 cargo run --locked -p rustic-html --example document
 cargo run --locked -p rustic-cli -- dump-style crates/rustic-cli/tests/fixtures/styled.html
 cargo run --locked -p rustic-cli -- dump-boxes crates/rustic-cli/tests/fixtures/boxes.html
+cargo run --locked -p rustic-cli -- dump-layout crates/rustic-cli/tests/fixtures/layout.html
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
@@ -86,8 +87,9 @@ the 2024 edition. The commands are `rustic info`, `--help`, `--version` and
 node and output budgets and prints a deterministic DOM dump, and
 `rustic dump-style <file>`, which prints each element's computed style for the
 same file. `rustic dump-boxes <file>` exposes M3's initial principal-box
-snapshot; [geometry and block-width measurement](docs/LAYOUT.md) have started,
-while vertical flow, text layout and image output remain pending. URLs and other
+snapshot; `rustic dump-layout <file>` adds [used block rectangles](docs/LAYOUT.md)
+for an explicit margin-free static subset. General block/inline flow, text
+shaping and image output remain pending. URLs and other
 arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints

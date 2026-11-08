@@ -1,16 +1,20 @@
 //! Initial M3 layout contracts: checked geometry, principal box construction
 //! and non-replaced normal-flow block width measurement.
 //!
-//! This is not yet a document renderer. Anonymous/line boxes, vertical flow,
-//! margin collapse, fragments, text shaping and painting remain unimplemented.
+//! A block-only vertical reference now emits checked used rectangles. It is
+//! not yet a document renderer: anonymous/line boxes, margin collapse, text
+//! shaping, general fragments and painting remain unimplemented.
 //! The immutable box snapshot consumes M2 computed styles without recascading.
 
 #![warn(missing_docs)]
 
+mod flow;
 mod geometry;
+mod height;
 mod sizing;
 mod tree;
 
+pub use flow::{BlockFragment, BlockLayout, FlowError, UnsupportedFlow};
 pub use geometry::{
     CssPoint, CssPx, CssRect, CssSize, DevicePx, DeviceScale, GeometryError, MAX_CSS_PX,
 };

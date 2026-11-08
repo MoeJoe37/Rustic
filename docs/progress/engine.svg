@@ -911,6 +911,6 @@
 <rect x="640" y="1126" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1137" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1164" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1184" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 53bc7dd341ec</text>
+<text x="24.00" y="1184" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot d51e97cf3ec3</text>
 </g>
 </svg>

@@ -1,36 +1,17 @@
 use rustic_base::CancellationToken;
 use rustic_css::{CssParser, Direction, Display, PropertyId};
 use rustic_dom::{Document, NodeKind, ShadowRootMode};
-use rustic_html::HtmlDocumentParser;
 use rustic_layout::{
     BoxKind, BoxTree, CssPoint, CssPx, CssRect, CssSize, DeviceScale, LayoutError, LayoutLimits,
     MeasureError, measure_block_width,
 };
 use rustic_style::{
-    ComputeContext, ComputedStyle, ElementStyle, MatchContext, Origin, StyleSheet,
-    document_cascade, style_tree,
+    ComputeContext, ComputedStyle, ElementStyle, MatchContext, document_cascade, style_tree,
 };
 
-fn page(html: &str, css: &str) -> (Document, Vec<ElementStyle>) {
-    let mut parser = HtmlDocumentParser::default();
-    parser.feed(html.as_bytes()).unwrap();
-    let doc = parser.finish().unwrap().into_document();
-    let parser = CssParser::default();
-    let (mut cascade, _) = document_cascade(&doc, &parser).unwrap();
-    let (sheet, diagnostics) = StyleSheet::parse(&parser, css, Origin::Author).unwrap();
-    assert!(diagnostics.is_empty(), "{diagnostics:?}");
-    cascade.push(sheet);
-    let styles = style_tree(
-        &doc,
-        doc.root(),
-        &cascade,
-        &parser,
-        &MatchContext::html(),
-        &ComputeContext::default(),
-    )
-    .unwrap();
-    (doc, styles)
-}
+mod common;
+use common::page;
+
 fn style(css: &str) -> ComputedStyle {
     let (_, styles) = page("<div></div>", &format!("div {{ {css} }}"));
     styles.last().unwrap().computed.clone()

@@ -728,6 +728,23 @@ through the existing local HTML/stylesheet loader. [LAYOUT.md](LAYOUT.md) specif
 the supported width algorithm and exact limits. Anonymous boxes, vertical flow,
 fragments, text layout and painted images remain pending; REN-01 is partial.
 
+## REN-01b — Initial block-only used geometry (partial)
+
+`BlockLayout::compute` now emits physical content/padding/border rectangles
+through an iterative top-down/bottom-up reference pass. It handles nested
+non-replaced blocks, auto/fixed/min/max heights, border-box adjustment, definite
+and indefinite percentage heights, calc, horizontal positioning and resize.
+`rustic dump-layout` exposes a deterministic geometry fixture through the same
+local HTML/style loader. Fourteen flow scenarios include an independent prefix-
+sum model, depth/budget/overflow boundaries and atomic failure; CLI tests check
+chunking, exact output limits, linked CSS and unsupported text.
+
+This is a margin-free static block subset (TD-38). General normalization,
+anonymous/inline boxes, margin collapse, special/replaced content, positioning,
+overflow semantics and shaped text remain pending. Unsupported input returns
+explicit errors, and no full block/fragment progress gate is claimed. See
+[LAYOUT.md](LAYOUT.md) for the exact contract and follow-up units.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

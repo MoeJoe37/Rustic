@@ -153,7 +153,9 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 
 **Current slice:** REN-01a implements checked CSS/device geometry, bounded
 principal-box snapshots, horizontal block width measurement and `dump-boxes`.
-Anonymous boxes, vertical flow and the final box/fragment tree are pending.
+The first REN-01b block-only pass adds used rectangles and `dump-layout` for
+a margin-free static subset. Anonymous boxes, full vertical flow/margin collapse
+and the final box/fragment tree remain pending.
 See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin

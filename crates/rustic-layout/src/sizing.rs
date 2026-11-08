@@ -64,7 +64,7 @@ impl fmt::Display for MeasureError {
 }
 impl Error for MeasureError {}
 
-fn lp(value: &LengthPercentage, basis: f64) -> Result<f64, MeasureError> {
+pub(crate) fn lp(value: &LengthPercentage, basis: f64) -> Result<f64, MeasureError> {
     let n = match value {
         LengthPercentage::Length(l) if l.unit == LengthUnit::Px => l.value,
         LengthPercentage::Percentage(p) => basis * (p / 100.0),

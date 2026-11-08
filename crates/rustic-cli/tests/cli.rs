@@ -341,3 +341,55 @@ fn dump_boxes_matches_snapshot_across_chunks_and_enforces_output_limit() {
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
 }
+
+#[test]
+fn dump_layout_matches_used_geometry_at_every_fixture_chunk_and_enforces_exact_output_budget() {
+    let input = fixture("layout.html");
+    let input = input.to_str().unwrap();
+    let expected = fs::read(fixture("layout.dump")).unwrap();
+    for chunk in ["1", "7", "65536"] {
+        let output = rustic(&["dump-layout", "--chunk-bytes", chunk, input]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(output.stdout, expected);
+        assert!(output.stderr.is_empty());
+    }
+    let exact = expected.len().to_string();
+    let short = (expected.len() - 1).to_string();
+    assert!(
+        rustic(&["dump-layout", "--max-output-bytes", &exact, input])
+            .status
+            .success()
+    );
+    let output = rustic(&["dump-layout", "--max-output-bytes", &short, input]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let output = rustic(&["dump-layout", "https://example.com/page"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
+fn dump_layout_loads_local_css_and_rejects_unsupported_text_without_partial_stdout() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-block-layout-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("block.css"), "main {height:15px;width:100px}").unwrap();
+    let path = base.join("page.html");
+    fs::write(
+        &path,
+        "<link rel=stylesheet href=block.css><style>* {margin:0}</style><main></main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("content=(0,0,100,15)"));
+    fs::write(
+        &path,
+        "<style>* {margin:0}</style><main>unshaped text</main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output).contains("TextLayout"));
+    assert!(output.stdout.is_empty());
+    fs::remove_dir_all(base).unwrap();
+}

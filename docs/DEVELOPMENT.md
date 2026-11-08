@@ -40,7 +40,13 @@ scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
 [HTML_TREE.md](HTML_TREE.md#local-dump-dom-command), and `dump-style`, which
 prints computed styles for the same input ([CSS.md](CSS.md#style-dump)),
 and `dump-boxes`, which prints an initial principal-box snapshot
-([LAYOUT.md](LAYOUT.md)) without positions or painting.
+([LAYOUT.md](LAYOUT.md)) without positions or painting. `dump-layout` adds used
+rectangles for an explicitly limited margin-free block subset; it rejects
+unsupported inline/text and other formatting rather than emitting partial output.
+While hosted Actions is unavailable, the maintainer has authorized sandbox-gated
+merges: run the local gates and compatibility/compile checks, record their
+actual scope, push the checked source to `feature`, and then merge that exact
+source into `main`. Hosted runner results remain separate evidence.
 
 The DOM `tree` example constructs nodes through the storage API, then emits an
 inspection dump. It is a runnable check of document ownership and traversal, not

@@ -85,6 +85,8 @@ pub enum LoadError {
     Dump(DumpError),
     /// Principal box construction failed or exceeded its limits.
     Layout(rustic_layout::LayoutError),
+    /// The block-only reference layout failed.
+    Flow(rustic_layout::FlowError),
 }
 
 impl fmt::Display for LoadError {
@@ -101,6 +103,7 @@ impl fmt::Display for LoadError {
             Self::Parse(error) => error.fmt(f),
             Self::Dump(error) => error.fmt(f),
             Self::Layout(error) => error.fmt(f),
+            Self::Flow(error) => error.fmt(f),
         }
     }
 }
@@ -112,6 +115,7 @@ impl Error for LoadError {
             Self::Parse(error) => Some(error),
             Self::Dump(error) => Some(error),
             Self::Layout(error) => Some(error),
+            Self::Flow(error) => Some(error),
             _ => None,
         }
     }
@@ -354,21 +358,55 @@ pub fn dump_boxes(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
+    box_tree(parsed, path, limits)?
+        .dump(limits.max_dump_bytes)
+        .map_err(LoadError::Layout)
+}
+
+fn box_tree(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<rustic_layout::BoxTree, LoadError> {
     let (styles, _) = compute_styles(parsed, path, limits)?;
-    let tree = rustic_layout::BoxTree::build(
+    rustic_layout::BoxTree::build(
         parsed.document(),
         parsed.document().root(),
         &styles,
-        rustic_layout::LayoutLimits {
-            max_nodes: limits.parser.document.max_nodes,
-            max_boxes: limits.parser.document.max_nodes,
-            max_depth: limits.parser.document.max_depth,
-            ..rustic_layout::LayoutLimits::default()
-        },
+        layout_limits(limits),
         &CancellationToken::default(),
     )
-    .map_err(LoadError::Layout)?;
-    tree.dump(limits.max_dump_bytes).map_err(LoadError::Layout)
+    .map_err(LoadError::Layout)
+}
+
+fn layout_limits(limits: LoaderLimits) -> rustic_layout::LayoutLimits {
+    rustic_layout::LayoutLimits {
+        max_nodes: limits.parser.document.max_nodes,
+        max_boxes: limits.parser.document.max_nodes,
+        max_depth: limits.parser.document.max_depth,
+        ..rustic_layout::LayoutLimits::default()
+    }
+}
+
+/// Compute used block rectangles for the explicit margin-free reference subset.
+/// Unsupported formatting returns no partial output; this does not paint pixels.
+pub fn dump_layout(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
+    let tree = box_tree(parsed, path, limits)?;
+    let compute = ComputeContext::default();
+    let viewport = rustic_layout::CssSize::new(compute.viewport_width, compute.viewport_height)
+        .map_err(|error| LoadError::Flow(error.into()))?;
+    let layout = rustic_layout::BlockLayout::compute(
+        &tree,
+        viewport,
+        layout_limits(limits),
+        &CancellationToken::default(),
+    )
+    .map_err(LoadError::Flow)?;
+    layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
 #[cfg(test)]

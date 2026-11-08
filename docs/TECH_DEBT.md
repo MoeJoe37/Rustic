@@ -82,6 +82,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
+| TD-38 | Deliberate | Layout | Initial vertical flow accepts margin-free static blocks only | Open, REN-01b/REN-02 |
 | TD-37 | Deliberate | Layout | Principal snapshots precede normalized/anonymous and flattened trees | Open, REN-01b |
 | TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
@@ -598,3 +599,18 @@ flattened tree are available. `dump-boxes` labels the result a principal
 snapshot and never claims positions or pixels. **Pay:** implement normalization
 with mixed inline/block fixtures and a flattened-tree input contract.
 **Trigger:** vertical flow/inline layout; shadow rendering before M5.
+
+### TD-38 — Margin-free block-only vertical reference
+
+The first vertical layout pass emits used content/padding/border rectangles for
+static non-replaced block/flow-root boxes with visible overflow and zero vertical
+margins. Normal/nowrap runs consisting entirely of CSS collapsible whitespace
+produce no fragment. Every other text run, inline/list/flex/grid/table context,
+non-static position, float, nonzero vertical margin, non-visible overflow and
+special/replaced/control/foreign element returns a typed unsupported error.
+This avoids inventing line metrics, dropping text or adding margins that should
+collapse. `dump-layout` documents the restricted reference contract.
+**Pay:** normalized/anonymous boxes and inline layout in REN-01b/REN-03; adjoining
+and parent-child margin collapse, positioning and overflow in REN-02.
+**Trigger:** expanding the renderer beyond controlled block fixtures. No full
+block-flow/fragment progress step is credited for this subset.

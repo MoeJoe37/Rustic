@@ -46,6 +46,7 @@ pub struct BoxSnapshot {
     kind: BoxKind,
     style: Option<ComputedStyle>,
     text: Vec<u16>,
+    special_layout: bool,
 }
 impl BoxSnapshot {
     /// Source node identity, validated while the snapshot was constructed.
@@ -67,6 +68,10 @@ impl BoxSnapshot {
     /// Original UTF-16 text, including lone surrogates; empty for elements.
     pub fn text(&self) -> &[u16] {
         &self.text
+    }
+
+    pub(crate) fn requires_special_layout(&self) -> bool {
+        self.special_layout
     }
 }
 
@@ -127,6 +132,38 @@ impl BoxTree {
             let parent = parents.last().and_then(|&(_, parent, _)| parent);
             let inherited = parents.last().and_then(|&(_, _, style)| style);
             let node = document.node(id)?;
+            // A computed `display:block` cannot turn a replaced element, a
+            // native control or foreign content into a generic CSS block.
+            let special_layout = match node.kind() {
+                NodeKind::Element(element) => {
+                    element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE)
+                        || matches!(
+                            element.name().local().to_ascii_lowercase().as_str(),
+                            "img"
+                                | "video"
+                                | "audio"
+                                | "iframe"
+                                | "embed"
+                                | "object"
+                                | "canvas"
+                                | "input"
+                                | "textarea"
+                                | "select"
+                                | "button"
+                                | "meter"
+                                | "progress"
+                                | "br"
+                                | "wbr"
+                                | "fieldset"
+                                | "legend"
+                                | "details"
+                                | "summary"
+                                | "dialog"
+                                | "slot"
+                        )
+                }
+                _ => false,
+            };
             let (kind, style, text) = match node.kind() {
                 NodeKind::Element(element) => {
                     let style = *index.get(&id).ok_or(LayoutError::MissingStyle(id))?;
@@ -174,6 +211,7 @@ impl BoxTree {
                 kind,
                 style,
                 text,
+                special_layout,
             });
             parents.push((depth, Some(current), index.get(&id).copied().or(inherited)));
         }

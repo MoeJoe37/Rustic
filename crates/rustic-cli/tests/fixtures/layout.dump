@@ -1,0 +1,5 @@
+fragment 0 parent=- box=0 node=2:1 content=(0,0,1280,96) padding=(0,0,1280,96) border=(0,0,1280,96)
+fragment 1 parent=0 box=1 node=6:1 content=(0,0,1280,96) padding=(0,0,1280,96) border=(0,0,1280,96)
+fragment 2 parent=1 box=2 node=7:1 content=(12,12,200,72) padding=(2,2,220,92) border=(0,0,224,96)
+fragment 3 parent=2 box=4 node=9:1 content=(16,16,100,30) padding=(13,13,106,36) border=(12,12,108,38)
+fragment 4 parent=2 box=6 node=11:1 content=(39,57,146,20) padding=(34,52,156,30) border=(32,50,160,34)

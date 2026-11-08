@@ -14,7 +14,7 @@ invariance checked. See [HTML evidence](HTML.md) for
 the pinned revision, selection policy and untested fields. Text-mode tests add
 109 records expanded into 282 initial contexts and exercise pull feedback,
 queued input, raw-byte boundaries, probe budgets and Unicode fixture adaptation.
-Full browser conformance, rendering, fuzzing, GC stress, integration servers and benchmarks are planned;
+Full browser conformance, rendering, coverage-guided fuzzing, GC stress, integration servers and benchmarks are planned;
 they do not run in the initial CI. Add each harness with the subsystem it tests.
 
 | Layer | What it proves | First milestone / execution |
@@ -92,8 +92,12 @@ Targets: URL/HTML/CSS/JS parsers, DOM mutation sequences, image/font adapters,
 serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
-Use cargo-fuzz/libFuzzer and sanitizers as candidate tools after a version/toolchain
-review; the initial workflow does not install or claim to run them.
+`rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
+fuzzing for the HTML tokenizer, document parser and URL parser, with seed replay,
+minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
+campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
+cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a
+version/toolchain review; no workflow installs or claims to run them.
 
 Triage order: reproducible crash/security issue, unexpected conformance regression,
 deterministic functional failure, flaky result, performance regression. Minimize

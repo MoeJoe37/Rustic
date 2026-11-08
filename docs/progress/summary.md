@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 8.40%** = 8.03% verified complete + 0.37% partial credit. 20/172 capabilities complete, 1 in progress.
+**Overall completion: 8.53%** = 8.03% verified complete + 0.50% partial credit. 20/172 capabilities complete, 1 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `1d2f1110f132059d371d6a0f36d4fc9717cc9b89c911b170a6eb88b7d53eccdf`.
+Catalog: `engine-v3`. Source fingerprint: `bee07f45ed7832edc1965648da841f73289be254d0aecf5cd138e68e71731823`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -10,7 +10,7 @@ Catalog: `engine-v3`. Source fingerprint: `1d2f1110f132059d371d6a0f36d4fc9717cc9
 
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
-| M1 Document core | 20/28 | 74.60% | 71.29% | 11.27% |
+| M1 Document core | 20/28 | 75.70% | 71.29% | 11.27% |
 | M2 CSS & computed style | 0/8 | 0.00% | 0.00% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
@@ -28,7 +28,7 @@ Catalog: `engine-v3`. Source fingerprint: `1d2f1110f132059d371d6a0f36d4fc9717cc9
 | Foundation | 5/8 | 0 | 50.00% | 50.00% | 2% | 1.00 |
 | URLs & encoding | 3/12 | 0 | 23.33% | 23.33% | 3% | 0.70 |
 | DOM | 3/10 | 0 | 23.52% | 23.52% | 6% | 1.41 |
-| HTML | 8/10 | 1 | 85.51% | 79.31% | 6% | 5.13 |
+| HTML | 8/10 | 1 | 87.58% | 79.31% | 6% | 5.25 |
 | CSS & style | 0/8 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
@@ -101,12 +101,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `html.tables` — Table, formatting, template and foreign content rules · size 5 · M1 · 1.03% of engine ([source](../../crates/rustic-html/src/parser/tree/formatting.rs), [source](../../crates/rustic-html/src/parser/tree/table.rs), [source](../../crates/rustic-html/src/parser/tree/foreign.rs), [test](../../crates/rustic-html/tests/tree_rules.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
 - **planned** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.62% of engine
 - **complete** `html.loader` — Bounded local loader and dump-dom command · size 2 · M1 · 0.41% of engine ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-- **in progress 60.00%** `html.conformance` — Parser corpora, chunk invariance and fuzz gate · size 3 · M1 · 0.62% of engine
+- **in progress 80.00%** `html.conformance` — Parser corpora, chunk invariance and fuzz gate · size 3 · M1 · 0.62% of engine
   - [x] Pinned tokenizer corpora at every two-chunk split ([source](../../tools/import_html_tests.py), [test](../../crates/rustic-html/tests/corpus.rs))
   - [x] html5lib document tree corpus at every split ([source](../../tools/import_html_tree_tests.py), [test](../../crates/rustic-html/tests/tree_construction.rs))
   - [x] Exact node, depth and payload limits ([source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-html/tests/document.rs))
   - [ ] html5lib fragment-parsing records
-  - [ ] Parser fuzz targets and CI smoke job
+  - [x] Parser fuzz targets and CI smoke job ([source](../../crates/rustic-fuzz/src/targets.rs), [source](../../.github/workflows/ci.yml), [test](../../crates/rustic-fuzz/tests/harness.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
 
 ### CSS & style
 

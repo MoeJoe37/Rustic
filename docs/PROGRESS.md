@@ -71,7 +71,9 @@ items such as the JS heap and CSS property catalog remain open. `html.conformanc
 is the first in-progress capability, with three of five verified steps (pinned
 tokenizer corpora at every split, the html5lib document tree corpus at every split,
 and exact node/depth/payload limits), adding **0.37%** partial credit for an
-**8.40%** total. Fragment-parsing records and fuzz targets remain open.
+**8.40%** total. Fragment-parsing records and fuzz targets remain open. The DOC-08
+fuzz step later completed with its own evidence (four of five steps, 0.50%
+partial credit); fragment-parsing records remain open.
 
 ## engine-v2 scope change (2026-11-07)
 

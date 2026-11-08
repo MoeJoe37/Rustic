@@ -6,7 +6,8 @@ The outcome is a new engine, not a wrapper around an existing renderer or JS VM.
 Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
-M0 has a verified repository baseline. M1 implementation has started with DOC-01;
+M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-07
+are complete for their declared scope and DOC-08 is four of five steps done;
 M2–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
@@ -332,23 +333,26 @@ progress cannot bypass these gates.
 
 ## 14. First implementation queue
 
-These are issue-ready tasks, not GitHub issues created by this commit. First
-review M0 and confirm the selected original-engine scope. Then work in order:
+These are issue-ready tasks, not GitHub issues created by this commit. Work in
+order. Status reflects [implementation progress](IMPLEMENTATION.md) as of
+2026-11-08. After item 11, the queue continues with DOC-06c (HTML fragment
+parsing algorithm and the html5lib fragment records), DOC-06d (`selectedcontent`
+mirroring), item 12, then CSS-01.
 
-| Order | Task / suggested issue title | Concrete completion test |
-| --- | --- | --- |
-| 1 | DOC-01a: Add typed document/node IDs with generation validation | Reusing an arena slot cannot revive a stale node handle |
-| 2 | DOC-01b: Add input/node/depth budgets and cancellation | Exact limit accepted, next value rejected, cancellation terminates work |
-| 3 | DOC-03: Implement minimal document arena and node kinds | Parent/child invariants survive insert/remove and invalid operations |
-| 4 | DOC-04a: Add DOM mutation and deterministic tree serializer | Same tree emits identical bytes; moves cannot create cycles |
-| 5 | DOC-02a: Implement URL records and tuple/opaque origin types | Relative resolution/serialization fixtures and opaque identity tests |
-| 6 | DOC-05a: Implement incremental tokenizer data/tag/comment states | Chunked/unbroken token sequences match for every fixture split |
-| 7 | DOC-05b: Add entities, raw/RCDATA/script text and encoding cases | Pinned tokenizer subset with errors and malformed inputs |
-| 8 | DOC-06a: Implement initial/before-html/head/body insertion modes | Implied-node and malformed nesting tree fixtures |
-| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus |
-| 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected |
-| 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers |
-| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear |
+| Order | Task / suggested issue title | Concrete completion test | Status |
+| --- | --- | --- | --- |
+| 1 | DOC-01a: Add typed document/node IDs with generation validation | Reusing an arena slot cannot revive a stale node handle | Done |
+| 2 | DOC-01b: Add input/node/depth budgets and cancellation | Exact limit accepted, next value rejected, cancellation terminates work | Done |
+| 3 | DOC-03: Implement minimal document arena and node kinds | Parent/child invariants survive insert/remove and invalid operations | Done |
+| 4 | DOC-04a: Add DOM mutation and deterministic tree serializer | Same tree emits identical bytes; moves cannot create cycles | Done |
+| 5 | DOC-02a: Implement URL records and tuple/opaque origin types | Relative resolution/serialization fixtures and opaque identity tests | Done (declared subset) |
+| 6 | DOC-05a: Implement incremental tokenizer data/tag/comment states | Chunked/unbroken token sequences match for every fixture split | Done |
+| 7 | DOC-05b: Add entities, raw/RCDATA/script text and encoding cases | Pinned tokenizer subset with errors and malformed inputs | Done |
+| 8 | DOC-06a: Implement initial/before-html/head/body insertion modes | Implied-node and malformed nesting tree fixtures | Done |
+| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (1,580/1,584 records) |
+| 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected | Done |
+| 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Fuzz smoke done; fragment records next |
+| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Not started |
 
 For every issue include task ID, dependencies, specification section/revision,
 in/out scope, input/output contract, acceptance fixtures, budget behavior, and

@@ -730,8 +730,29 @@
             },
             {
               "label": "Parser fuzz targets and CI smoke job",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/targets.rs",
+                  "marker": "pub struct HtmlDocumentTarget"
+                },
+                {
+                  "kind": "source",
+                  "path": ".github/workflows/ci.yml",
+                  "marker": "name: Parser fuzz smoke"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn campaign_finds_mutated_failure_and_saves_a_replayable_reproducer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
             }
           ]
         }

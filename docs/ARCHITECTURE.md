@@ -27,7 +27,8 @@ The required product scope includes GPU/Wasm, a native MV2 extension ecosystem
 and a Rustic uBlock Origin port, with comparative security/privacy and performance
 gates. See [PRODUCT.md](PRODUCT.md) and [ADR 0007](adr/0007-product-scope.md).
 
-`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-html`, `rustic-engine` and `rustic-cli` now exist; see
+`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-html`, `rustic-engine`, `rustic-cli` and the
+`rustic-fuzz` development tool now exist; see
 [implementation progress](IMPLEMENTATION.md) for their actual scope. The following
 is the target decomposition, not a requirement to create empty crates today.
 

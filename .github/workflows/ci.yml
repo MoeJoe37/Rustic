@@ -62,6 +62,29 @@ jobs:
       - name: CLI smoke test
         run: cargo run --locked -p rustic-cli -- info
 
+  fuzz:
+    name: Parser fuzz smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal
+      - name: Replay seeds and run fixed-seed mutations
+        # Fixed seed and iteration count keep this required gate deterministic;
+        # the scheduled Fuzz workflow explores fresh seeds.
+        run: cargo run --locked --release -p rustic-fuzz -- run --all --seed 1 --iterations 20000 --timeout-ms 10000 --artifacts fuzz-artifacts
+      - name: Retain reproducers
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-reproducers
+          path: fuzz-artifacts
+          if-no-files-found: ignore
+          retention-days: 30
+
   compatibility:
     name: Compatibility (${{ matrix.toolchain }})
     runs-on: ubuntu-24.04
@@ -140,7 +163,7 @@ jobs:
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, compatibility, repository, mobile]
+    needs: [quality, test, fuzz, compatibility, repository, mobile]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -148,11 +171,12 @@ jobs:
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          FUZZ_RESULT: ${{ needs.fuzz.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
           REPOSITORY_RESULT: ${{ needs.repository.result }}
           MOBILE_RESULT: ${{ needs.mobile.result }}
         run: |
-          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT"; do
+          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$FUZZ_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT"; do
             if [ "$result" != success ]; then
               echo "A required job did not succeed: $result"
               exit 1

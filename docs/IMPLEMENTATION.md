@@ -295,6 +295,41 @@ snapshot for 19 chunk sizes and check URL rejection, usage errors, exact budgets
 configurable depth/diagnostic/node limits and clean failures. `html.loader` is complete for this scope; tree coverage
 still grows with DOC-06.
 
+## DOC-08 — Parser fuzz targets and CI smoke job
+
+`rustic-fuzz` is a dependency-free, deterministic mutation fuzzer in safe,
+portable Rust (standard library only, so it builds on every supported host). It
+is blind, not coverage-guided: coverage engines and sanitizers stay behind the
+[dependency review](DEPENDENCIES.md). Three targets check crash-freedom at
+default budgets plus a differential invariant:
+
+| Target | Invariant beyond "no panic, no hang" | Seeds |
+| --- | --- | --- |
+| `html-tokenizer` | Tokens and diagnostics match the unbroken input for a two-chunk split, fixed-size chunks and (up to 512 bytes) one-byte feeds | Checked-in pages plus all 1,792 html5lib tree `#data` inputs |
+| `html-document` | The same feed plans yield the same dump or the same `ParseError`; completed trees always dump; a fresh parser never reports a lifecycle error; a cancelled parser never completes | Same as above |
+| `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
+
+Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
+same check alone. Each input runs on a fresh worker thread with a time limit;
+panics are caught at the thread boundary and a timeout abandons the worker and
+fails the run. A campaign replays every seed and saved regression, then applies
+seeded SplitMix64 byte mutations (bit flips, interesting bytes, range
+deletion/duplication/reversal, cross-seed splicing and target dictionaries). The
+first failure is minimized by chunk deletion (timeouts are kept as found) and
+saved as `<target>/<kind>-<fingerprint>.bin` with a note holding the seed,
+iteration and replay command. `rustic-fuzz replay` re-runs any saved file.
+
+The required CI job **Parser fuzz smoke** replays all seeds and runs 20,000
+fixed-seed mutations per target, uploading reproducers on failure; a separate
+nightly/dispatchable `Fuzz` workflow runs ten-minute campaigns per target with a
+fresh seed and is not a merge gate. Five harness tests inject panicking,
+violating and hanging targets to check classification, minimization, reproducer
+contents, seed-first stopping and per-seed determinism, and replay every seed of
+every target; unit tests pin the generator, mutation bounds and literal
+decoding. Before landing, 1.2 million mutated executions over five seeds found
+no failures, so `regressions/` is empty. That is evidence of robustness at the
+tested depth, not proof of absence of defects.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -333,9 +368,12 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |
 | DOC-06b: tables/formatting/template/foreign tree rules | Done: 1,580/1,584 runnable html5lib document records at every split; `selectedcontent` pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
-| DOC-08: parser corpus/fuzzing | Partial: tokenizer corpora and the full html5lib document tree corpus with chunk splits; fragment records and fuzz targets pending |
+| DOC-08: parser corpus/fuzzing | Partial (4/5 steps): tokenizer corpora, full html5lib document tree corpus at every split, exact limits, and fuzz targets with a required CI smoke job; html5lib fragment records pending (next) |
 | DOC-09: traced node/JS ownership prototype | Not started |
 
 M1 remains in progress. Cross-document adoption, node cloning and mutation records
-are still needed for the broader DOC-04 task. All project crates remain safe
+are still needed for the broader DOC-04 task. The next queue work is the HTML
+fragment parsing algorithm, which unlocks the 192 skipped html5lib fragment
+records and finishes DOC-08, followed by `selectedcontent` mirroring and then
+DOC-09. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

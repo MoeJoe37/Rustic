@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "1d2f1110f132059d371d6a0f36d4fc9717cc9b89c911b170a6eb88b7d53eccdf",
-  "percent": "8.40",
+  "source_fingerprint": "bee07f45ed7832edc1965648da841f73289be254d0aecf5cd138e68e71731823",
+  "percent": "8.53",
   "verified_percent": "8.03",
-  "partial_percent": "0.37",
+  "partial_percent": "0.50",
   "completed": 20,
   "in_progress": 1,
   "total": 172,
@@ -17,9 +17,9 @@
       "share": "11.27",
       "completed": 20,
       "total": 28,
-      "percent": "74.60",
+      "percent": "75.70",
       "verified_percent": "71.29",
-      "partial_percent": "3.31"
+      "partial_percent": "4.41"
     },
     {
       "id": "M2",
@@ -900,11 +900,32 @@
             },
             {
               "label": "Parser fuzz targets and CI smoke job",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/targets.rs",
+                  "marker": "pub struct HtmlDocumentTarget"
+                },
+                {
+                  "kind": "source",
+                  "path": ".github/workflows/ci.yml",
+                  "marker": "name: Parser fuzz smoke"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn campaign_finds_mutated_failure_and_saves_a_replayable_reproducer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
             }
           ],
-          "credit": "60.00",
+          "credit": "80.00",
           "engine_share": "0.62"
         }
       ],
@@ -912,10 +933,10 @@
       "completed": 8,
       "in_progress": 1,
       "total": 10,
-      "contribution": "5.13",
-      "percent": "85.51",
+      "contribution": "5.25",
+      "percent": "87.58",
       "verified_percent": "79.31",
-      "partial_percent": "6.20"
+      "partial_percent": "8.27"
     },
     {
       "id": "css",

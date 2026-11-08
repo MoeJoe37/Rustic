@@ -1,0 +1,57 @@
+name: Fuzz
+
+# Longer exploratory campaigns with a fresh seed per run. Not a required check:
+# a finding here is triaged, fixed and its reproducer added to
+# crates/rustic-fuzz/regressions/ so the required CI smoke job replays it.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Mutation seconds per target
+        default: "600"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.99.1"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  campaign:
+    name: Campaign (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [html-tokenizer, html-document, url]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal
+      - name: Run seeded campaign
+        env:
+          TARGET: ${{ matrix.target }}
+          SECONDS_PER_TARGET: ${{ github.event.inputs.seconds || '600' }}
+          SEED: ${{ github.run_id }}
+        run: |
+          echo "Reproduce with: cargo run --locked --release -p rustic-fuzz -- run --target $TARGET --seed $SEED"
+          cargo run --locked --release -p rustic-fuzz -- run --target "$TARGET" --seed "$SEED" \
+            --iterations 100000000 --seconds "$SECONDS_PER_TARGET" --timeout-ms 10000 --artifacts fuzz-artifacts
+      - name: Retain reproducers
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-reproducers-${{ matrix.target }}
+          path: fuzz-artifacts
+          if-no-files-found: ignore
+          retention-days: 30

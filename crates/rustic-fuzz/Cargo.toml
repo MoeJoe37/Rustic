@@ -1,0 +1,22 @@
+[package]
+name = "rustic-fuzz"
+description = "Dependency-free deterministic mutation fuzzing for Rustic's parsers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "rustic-fuzz"
+path = "src/main.rs"
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-dom = { path = "../rustic-dom" }
+rustic-html = { path = "../rustic-html" }
+rustic-url = { path = "../rustic-url" }
+
+[lints]
+workspace = true

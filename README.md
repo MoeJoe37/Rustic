@@ -25,7 +25,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 8.40%** (8.03% verified complete + 0.37% partial credit) — 20/172 capabilities complete and 1 in progress across 21 subsystems. Current milestone: **M1 Document core**, 74.60% done.
+**Overall engine completion: 8.53%** (8.03% verified complete + 0.50% partial credit) — 20/172 capabilities complete and 1 in progress across 21 subsystems. Current milestone: **M1 Document core**, 75.70% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -90,9 +90,9 @@ The current crates are `rustic-base` (identity, budgets, cancellation, source sp
 and clocks), `rustic-dom` (bounded node storage, checked tree mutation and
 [UTF-16 text edits](docs/DOM.md)),
 `rustic-url` (URL records, parsing and origins),
-`rustic-html` (streaming tokens and bounded initial/head/body construction),
-`rustic-engine` (bounded viewport configuration), and `rustic-cli`
-(development entry point). Future crates listed in the architecture
+`rustic-html` (streaming tokens and full WHATWG document tree construction),
+`rustic-engine` (bounded viewport configuration), `rustic-cli`
+(development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.
 
 ## Development direction

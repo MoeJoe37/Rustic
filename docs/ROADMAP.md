@@ -123,7 +123,7 @@ Do not label a happy-path tag splitter an HTML implementation.
 | CSS-03c | **Done** ([CSS.md](CSS.md#property-values)): positioning, overflow, visibility, opacity, text and decoration longhands, `font` and `background` shorthands, with computed values | CSS-03b |
 | CSS-04 | **Done** ([CSS.md](CSS.md#cascade)): UA/user/author origins, importance, inline styles, source order, inheritance and CSS-wide values | CSS-02, CSS-03 |
 | CSS-05 | **Done** ([CSS.md](CSS.md#computed-style)): computed values, stylesheet attachment, style dump, full-restyle reference implementation | CSS-04, DOC-07 |
-| CSS-06 | **Done** ([CSS.md](CSS.md#media-queries)): media queries, mutation/viewport invalidation, custom properties with `var()` and cycle handling, and container queries (sizes supplied by the caller until layout) | CSS-05 |
+| CSS-06 | **Done** ([CSS.md](CSS.md#media-queries)): media queries, mutation/viewport invalidation, custom properties with `var()` and cycle handling, `@property` registration with font-relative unit cycles, and container queries (sizes supplied by the caller until layout). Font-metric units (`ex`/`ch`/`cap`/`ic`) use spec fallbacks until REN-03 loads fonts | CSS-05 |
 | CSS-07 | Expand selectors and cascade layers with isolated WPT selections and negative grammar tests. **CSS-07a done** ([CSS.md](CSS.md#selectors)): `:has()`, form states, `:lang()`/`:dir()`, nesting `&` and nested rules, pseudo-element states; cascade layers remain | CSS-05 |
 | CSS-08 | **Done** ([CSS.md](CSS.md#conformance-gate)): declared conformance gate over pinned WPT parsing cases for selectors and supported properties, with a reviewed ratchet expectation list | CSS-07a |
 
@@ -141,7 +141,7 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | --- | --- | --- |
 | REN-01 | Typed CSS/device geometry, box tree, anonymous boxes, block flow, margins/padding/borders | CSS-05 |
 | REN-02 | Intrinsic sizing, replaced elements, overflow, positioning, floats and margin collapse | REN-01 |
-| REN-03 | Font adapter, bundled test fonts, shaping, bidi, line breaking, inline layout and baselines | CSS font values, REN-01 |
+| REN-03 | Font adapter, bundled test fonts, shaping, bidi, line breaking, inline layout and baselines; computed `ex`/`ch`/`cap`/`ic` from loaded font metrics (moved from M2 css.values) | CSS font values, REN-01 |
 | REN-04 | Fragments, stacking contexts, paint order, clips, glyph/image display-list commands | REN-02, REN-03 |
 | REN-05 | CPU raster reference backend and bounded image decode; sRGB/alpha conventions | REN-04 |
 | REN-06 | `render` headless command, PNG output, layout/display-list dumps, resize and hit testing | REN-05 |

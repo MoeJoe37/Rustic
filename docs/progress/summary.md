@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 20.06%** = 17.96% verified complete + 2.10% partial credit. 34/172 capabilities complete, 3 in progress.
+**Overall completion: 20.26%** = 19.11% verified complete + 1.15% partial credit. 35/172 capabilities complete, 2 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `d7c1bf26e0c4f1b911e74bdecf0722d075c0d5e664b6acecb7c013201384636b`.
+Catalog: `engine-v3`. Source fingerprint: `f7543b497be0481c852b4b8ed8af86fd41d60c08e61c422117ffec8bd6c17e97`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `d7c1bf26e0c4f1b911e74bdecf0722d075c0d
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 6/8 | 95.29% | 74.35% | 9.00% |
+| M2 CSS & computed style | 7/8 | 97.43% | 87.17% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `d7c1bf26e0c4f1b911e74bdecf0722d075c0d
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 6/8 | 2 | 95.29% | 74.35% | 9% | 8.57 |
+| CSS & style | 7/8 | 1 | 97.43% | 87.17% | 9% | 8.76 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -113,13 +113,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `css.selectors` — Required selectors and specificity · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-css/src/selector.rs), [test](../../crates/rustic-css/tests/selectors.rs), [source](../../crates/rustic-css/src/anb.rs), [test](../../crates/rustic-css/tests/an_plus_b.rs), [source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/matching.rs), [source](../../crates/rustic-css/src/selector.rs), [test](../../crates/rustic-css/tests/selectors_level4.rs), [source](../../crates/rustic-style/src/html_state.rs), [test](../../crates/rustic-style/tests/selectors_level4.rs), [test](../../crates/rustic-style/tests/selectors_level4.rs), [test](../../crates/rustic-style/tests/selectors_level4.rs))
 - **complete** `css.properties` — Typed property grammar and supported property catalog · size 8 · M2 · 1.84% of engine ([source](../../crates/rustic-css/src/color.rs), [test](../../crates/rustic-css/tests/color.rs), [source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/properties.rs), [source](../../crates/rustic-css/src/calc.rs), [test](../../crates/rustic-css/tests/calc.rs), [source](../../crates/rustic-css/src/background.rs), [source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/catalog.rs), [test](../../crates/rustic-style/tests/computed.rs))
 - **complete** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/layer.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/layers.rs), [test](../../crates/rustic-style/tests/layers.rs), [source](../../crates/rustic-style/src/cascade.rs), [source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/shadow.rs), [test](../../crates/rustic-style/tests/layers.rs))
-- **in progress 83.33%** `css.values` — Computed values, variables and cycle handling · size 5 · M2 · 1.15% of engine
-  - [x] Computed values for the CSS-03 longhands: absolute lengths, font sizes, weights, currentcolor, border widths, root blockification, computed inheritance ([source](../../crates/rustic-style/src/computed.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [x] Computed values of math functions: pixel simplification and range clamping (CSS-03b) ([source](../../crates/rustic-css/src/calc.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [ ] Computed values that need font metrics (ex/ch/cap/ic from loaded fonts)
-  - [x] Custom properties and var() substitution with fallbacks, invalid-at-computed-value-time as unset, and bounded expansion ([source](../../crates/rustic-css/src/custom.rs), [test](../../crates/rustic-style/tests/variables.rs))
-  - [x] Dependency cycle handling for custom properties ([source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/variables.rs))
-  - [x] Registered custom properties (@property) and their font-relative unit cycles ([source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/registered.rs))
+- **complete** `css.values` — Computed values, variables, registered properties and cycle handling · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/computed.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-css/src/calc.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-css/src/custom.rs), [test](../../crates/rustic-style/tests/variables.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/variables.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/registered.rs))
 - **complete** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine ([source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-style/src/html.rs), [source](../../crates/rustic-style/src/loading.rs), [test](../../crates/rustic-style/tests/external.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-css/src/media.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-css/src/container.rs), [source](../../crates/rustic-style/src/containers.rs), [test](../../crates/rustic-style/tests/containers.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/containers.rs))
 - **in progress 80.00%** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine
   - [x] Incremental restyle from attribute, child-list and text mutations, checked against the full-restyle reference (tests and fuzz target) ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
@@ -131,7 +125,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Text & fonts
 
-- **planned** `text.fonts` — Font selection/discovery and metrics · size 3 · M3 · 0.54% of engine
+- **planned** `text.fonts` — Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts · size 3 · M3 · 0.54% of engine
 - **planned** `text.shaping` — Shaping, fallback and glyph clusters · size 5 · M3 · 0.90% of engine
 - **planned** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.54% of engine
 - **planned** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.54% of engine

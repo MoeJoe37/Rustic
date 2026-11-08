@@ -487,7 +487,8 @@ Cascade 5 §4.4, with each property's "computed value" line):
 
 Fonts are not loaded yet, so `ex` and `ch` use the specification's 0.5em
 fallback, `cap` 0.7em and `ic` 1em, and `normal` line height counts as 1.2 for
-`lh`. `style_tree` returns both the specified and computed style of each
+`lh`. Computing them from loaded font metrics is planned for M3 with font
+loading (REN-03, catalog `text.fonts`). `style_tree` returns both the specified and computed style of each
 element and inherits computed values.
 
 ### User-agent stylesheet and `<style>` elements

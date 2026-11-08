@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "d7c1bf26e0c4f1b911e74bdecf0722d075c0d5e664b6acecb7c013201384636b",
-  "percent": "20.06",
-  "verified_percent": "17.96",
-  "partial_percent": "2.10",
-  "completed": 34,
-  "in_progress": 3,
+  "source_fingerprint": "f7543b497be0481c852b4b8ed8af86fd41d60c08e61c422117ffec8bd6c17e97",
+  "percent": "20.26",
+  "verified_percent": "19.11",
+  "partial_percent": "1.15",
+  "completed": 35,
+  "in_progress": 2,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -25,11 +25,11 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 6,
+      "completed": 7,
       "total": 8,
-      "percent": "95.29",
-      "verified_percent": "74.35",
-      "partial_percent": "20.94"
+      "percent": "97.43",
+      "verified_percent": "87.17",
+      "partial_percent": "10.26"
     },
     {
       "id": "M3",
@@ -1309,99 +1309,63 @@
         },
         {
           "id": "css.values",
-          "label": "Computed values, variables and cycle handling",
+          "label": "Computed values, variables, registered properties and cycle handling",
           "size": 5,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Computed values for the CSS-03 longhands: absolute lengths, font sizes, weights, currentcolor, border widths, root blockification, computed inheritance",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/computed.rs",
-                  "marker": "pub fn compute("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn font_sizes_resolve_against_the_parent_and_root"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/computed.rs",
+              "marker": "pub fn compute("
             },
             {
-              "label": "Computed values of math functions: pixel simplification and range clamping (CSS-03b)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/calc.rs",
-                  "marker": "pub fn compute("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn math_functions_compute_with_pixel_lengths"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn font_sizes_resolve_against_the_parent_and_root"
             },
             {
-              "label": "Computed values that need font metrics (ex/ch/cap/ic from loaded fonts)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-css/src/calc.rs",
+              "marker": "pub fn compute("
             },
             {
-              "label": "Custom properties and var() substitution with fallbacks, invalid-at-computed-value-time as unset, and bounded expansion",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/custom.rs",
-                  "marker": "pub fn substitute<'a>("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/variables.rs",
-                  "marker": "fn fallbacks_and_invalid_at_computed_value_time"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn math_functions_compute_with_pixel_lengths"
             },
             {
-              "label": "Dependency cycle handling for custom properties",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/variables.rs",
-                  "marker": "fn strongly_connected_components("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/variables.rs",
-                  "marker": "fn cycles_make_every_member_invalid"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/custom.rs",
+              "marker": "pub fn substitute<'a>("
             },
             {
-              "label": "Registered custom properties (@property) and their font-relative unit cycles",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/variables.rs",
-                  "marker": "fn compute_custom_properties<"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/registered.rs",
-                  "marker": "fn font_size_cycles_through_em_make_both_unset"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/variables.rs",
+              "marker": "fn fallbacks_and_invalid_at_computed_value_time"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/variables.rs",
+              "marker": "fn strongly_connected_components("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/variables.rs",
+              "marker": "fn cycles_make_every_member_invalid"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/variables.rs",
+              "marker": "fn compute_custom_properties<"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/registered.rs",
+              "marker": "fn font_size_cycles_through_em_make_both_unset"
             }
           ],
-          "credit": "83.33",
+          "credit": "100.00",
           "engine_share": "1.15"
         },
         {
@@ -1599,13 +1563,13 @@
         }
       ],
       "points": 39,
-      "completed": 6,
-      "in_progress": 2,
+      "completed": 7,
+      "in_progress": 1,
       "total": 8,
-      "contribution": "8.57",
-      "percent": "95.29",
-      "verified_percent": "74.35",
-      "partial_percent": "20.94"
+      "contribution": "8.76",
+      "percent": "97.43",
+      "verified_percent": "87.17",
+      "partial_percent": "10.26"
     },
     {
       "id": "text",
@@ -1614,7 +1578,7 @@
       "features": [
         {
           "id": "text.fonts",
-          "label": "Font selection/discovery and metrics",
+          "label": "Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts",
           "size": 3,
           "milestone": "M3",
           "status": "planned",

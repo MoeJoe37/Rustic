@@ -81,7 +81,8 @@ are included. The `text_modes` example uses token-at-a-time feedback for
 RCDATA/raw text/script/plaintext contexts. Tree building remains pending.
 
 The current crates are `rustic-base` (identity, budgets, cancellation, source spans
-and clocks), `rustic-dom` (bounded node storage and checked tree mutation),
+and clocks), `rustic-dom` (bounded node storage, checked tree mutation and
+[UTF-16 text edits](docs/DOM.md)),
 `rustic-url` (URL records, parsing and origins),
 `rustic-html` (streaming UTF-8, tags/attributes, comments and declarations),
 `rustic-engine` (bounded viewport configuration), and `rustic-cli`

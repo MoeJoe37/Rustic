@@ -66,6 +66,26 @@ node allocations stable even when the slot table grows. Resource limits are
 checked before logical mutation; process-wide allocation failure is not a
 recoverable guarantee.
 
+## DOC-04b — Checked character-data storage edits
+
+Text/comment values now support UTF-16 range replacement, raw-unit append and
+direct UTF-8 append, with checked offsets, clamped counts and overflow handling.
+The document preflights its shared payload budget and reserves capacity before
+changing content/accounting. Private growable storage reuses capacity for parser
+text coalescing; it preserves lone surrogates, cloned snapshots, node identity
+and links. Existing whole-value replacement keeps its return-value contract.
+
+Eight focused tests cover exact shared budgets, rejected edits, detached-node
+charges, deletion/destruction, invalid handles/kinds/offsets, surrogate edits and
+4,096 chunked appends. A 2,500-operation independent UTF-16 model checks accepted
+and rejected edits after every step; a separate arithmetic test covers impossible
+length/byte overflow without large allocations. [DOM.md](DOM.md) defines the
+contract, specification reference, capacity accounting and remaining web APIs.
+
+This is a tree-builder prerequisite, not a completed tree builder or full
+`CharacterData` implementation. Live ranges, mutation records/observers and
+bindings remain pending. No additional whole-engine capability gate is completed.
+
 ## DOC-04a — Deterministic inspection
 
 `Document::dump_tree` now emits a preorder diagnostic dump of one valid subtree,
@@ -220,6 +240,7 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; integrated into URL parsing and initial HTML tokenization |
 | DOC-03: minimal document arena and node kinds | Complete internal subset described above |
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
+| DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |
 | DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
@@ -228,6 +249,6 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-08: parser corpus/fuzzing | Partial: pinned declaration corpus and chunk splits; tree corpus and fuzz targets pending |
 | DOC-09: traced node/JS ownership prototype | Not started |
 
-M1 remains in progress. Cross-document adoption, cloning and mutation records
+M1 remains in progress. Cross-document adoption, node cloning and mutation records
 are still needed for the broader DOC-04 task. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

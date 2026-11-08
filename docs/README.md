@@ -30,6 +30,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | CLI information/help/version and rejection of unsupported commands | Implemented | `rustic-cli` and subprocess tests |
 | Document/node identity, budgets, cancellation, byte spans and clocks | Implemented | `rustic-base` and boundary/concurrency tests; DOC-01 |
 | Bounded DOM node storage, names/attributes, UTF-16 data, checked moves and destruction | Implemented internal subset | `rustic-dom`; DOC-03 and first DOC-04 slice |
+| Checked UTF-16 text/comment edits and direct UTF-8 append | Implemented storage subset | [DOM contracts and model/budget tests](DOM.md); observers/ranges/bindings pending |
 | Bounded deterministic subtree dump and executable tree example | Implemented diagnostic tool | `rustic-dom` example and golden/escaping/boundary tests |
 | Android/iOS shared-library cross-compilation | Configured | Four mobile target checks; runtime and host work in [mobile plan](MOBILE.md) |
 | URL records, parser, tuple and opaque origins | Implemented declared subset | `rustic-url`; [scope and 685 pinned cases](URL.md) |

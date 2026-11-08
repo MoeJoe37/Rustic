@@ -5,6 +5,8 @@ use crate::{
     Attribute, DocumentType, DomError, DomString, Element, Node, NodeKind, QualifiedName, Walk,
 };
 
+mod character_data;
+
 /// Per-document limits, covering connected and detached nodes alike.
 ///
 /// String accounting includes UTF-8 name bytes and UTF-16 text/attribute/doctype
@@ -230,26 +232,6 @@ impl Document {
             current = parent.expect("non-root destruction node has parent");
         }
         Ok(())
-    }
-
-    /// Replace text/comment data atomically with respect to the payload budget.
-    pub fn set_character_data(
-        &mut self,
-        id: NodeId,
-        value: impl Into<DomString>,
-    ) -> Result<DomString, DomError> {
-        if !matches!(
-            self.node(id)?.kind(),
-            NodeKind::Text(_) | NodeKind::Comment(_)
-        ) {
-            return Err(DomError::WrongNodeKind);
-        }
-        let value = value.into();
-        self.arena.resize_data(id, value.data_bytes())?;
-        match &mut self.live_mut(id).kind {
-            NodeKind::Text(old) | NodeKind::Comment(old) => Ok(std::mem::replace(old, value)),
-            _ => unreachable!("kind validated before accounting"),
-        }
     }
 
     /// Set an attribute by expanded name; replacement keeps its insertion order.

@@ -107,7 +107,16 @@ impl Arena {
         Ok(NodeId::from_parts(self.id, index, generation))
     }
 
+    pub(crate) fn check_data_resize(&self, id: NodeId, bytes: usize) -> Result<(), DomError> {
+        let old = self.get(id)?.data_bytes;
+        if bytes > old && bytes - old > self.data.remaining() {
+            return Err(DomError::DataLimit);
+        }
+        Ok(())
+    }
+
     pub(crate) fn resize_data(&mut self, id: NodeId, bytes: usize) -> Result<(), DomError> {
+        self.check_data_resize(id, bytes)?;
         let old = self.get(id)?.data_bytes;
         if bytes > old {
             self.data

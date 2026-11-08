@@ -79,7 +79,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Open, pay with text shaping (M3) |
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
-| TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Open |
+| TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
@@ -479,7 +479,7 @@ when form association (`HTMLFormElement.elements`) is implemented.
 **Trigger:** WEB-series form APIs, or the first test that needs parser
 association.
 
-### TD-32 — `:has()` and element states invalidate the whole document
+### TD-32 — `:has()` and element states invalidate the whole document (Paid)
 
 `StyledDocument` (CSS-06) restyles only what a mutation can affect, except
 when the cascade uses `:has()` or an HTML element state that reads
@@ -494,6 +494,19 @@ buttons, the subtree under a changed `lang`/`dir`/`disabled` fieldset, text
 changes only under `dir=auto` ancestors). **Trigger:** script-driven DOM
 mutation (JS-series) or a measured restyle cost on a page using these
 selectors.
+
+**Paid:** `InvalidationMap` records where `:has()` sits, how far its relative
+selectors reach upward, whether they use sibling combinators, which attributes
+and states their arguments test, and which states are used where. A mutation
+now restyles the possible anchors (ancestors within reach and their preceding
+siblings) and the elements a state change reaches (subtrees under `lang`,
+`dir`, `disabled`, `contenteditable`; the outermost `dir=auto` ancestor of
+changed text; all `input`, `button` and `option` elements for group-level form
+changes). Remaining full restyles: a pragma language change, and states
+inside a nested list's ancestor position of a `:has()` argument. Descendant
+`:has()` outside the subject compound still restyles from the root down,
+because the root is always a possible anchor; evaluating anchors before and
+after the change would narrow it.
 
 ### TD-33 — `var()` substitution budget is per element (Paid)
 

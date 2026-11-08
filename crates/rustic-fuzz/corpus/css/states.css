@@ -1,0 +1,4 @@
+input:checked { width: 7px } input:checked + input { color: red } :default { height: 3px }
+form:has(:checked) { color: blue } :indeterminate, :disabled + input { margin: 1px }
+p:dir(rtl) { color: green } :has(+ .x) { width: 2px } div:has(> p .x) b { color: red }
+:lang(de) span, :read-write { height: 1px } :placeholder-shown, :enabled ~ input { width: 4px }

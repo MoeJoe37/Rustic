@@ -664,8 +664,10 @@ and text mutations, an `InvalidationMap` built from the cascade's selectors
 picks the affected elements (the element, its subtree, following siblings,
 siblings and parent for structural selectors), and the walk reuses every other
 style, restyling children only when a parent's computed style changed. `:has()`
-and HTML element states fall back to a full restyle for the mutations they can
-see (TD-32). A ninth fuzz target, `css-invalidation`, checks incremental
+and HTML element states first fell back to a full restyle for the mutations
+they can see (TD-32); targeted invalidation later restyles only the possible
+`:has()` anchors and the elements a state change reaches (see
+[CSS.md](CSS.md#invalidation)). A ninth fuzz target, `css-invalidation`, checks incremental
 results against full restyles after scripted mutations.
 
 Custom properties (`--*`) and `var()` come next. Custom values are kept as
@@ -770,6 +772,7 @@ must keep all tiers green.
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style` |
 | CSS-07a: remaining required selectors | Complete: `:has()` (linear for single-compound arguments, TD-30), HTML form states, `:lang()`, `:dir()` (Bidi_Class via TD-29), `&` with nested style rules expanded by `StyleSheet::parse`, more pseudo-elements and user-action states after them; `css.selectors` is complete. Constraint-validation states and form owners set by the parser (TD-31) remain |
 | CSS-08: declared CSS conformance gate | Complete: pinned WPT parsing cases for selectors and supported properties, 1,073/1,455 in scope pass, the rest listed with reasons in a ratchet; shorthand serialization, named-color keywords and `calc()` wrappers in specified values remain |
+| TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,

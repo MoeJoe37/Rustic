@@ -271,27 +271,240 @@ fn text_changes_matter_for_empty() {
     assert_eq!(page.color("p"), "rgb(255, 0, 0)");
 }
 
+/// A page with `n` filler paragraphs after `html`, so that a full restyle
+/// is easy to tell apart from a targeted one.
+fn padded(html: &str) -> String {
+    format!(
+        "<!doctype html><body>{html}{}",
+        "<p class=filler>filler</p>".repeat(40)
+    )
+}
+
+impl Page {
+    fn width(&self, id: &str) -> String {
+        let node = by_id(&self.document, id);
+        self.styled
+            .style(node)
+            .unwrap()
+            .computed
+            .get(rustic_css::PropertyId::Width)
+            .to_string()
+    }
+
+    fn append(&mut self, parent: &str, tag: &str, attributes: &[(&str, &str)]) -> NodeId {
+        let parent = by_id(&self.document, parent);
+        let child = self
+            .document
+            .create_element(QualifiedName::html(tag).unwrap())
+            .unwrap();
+        for (local, value) in attributes {
+            self.document
+                .set_attribute(child, attribute(local), *value)
+                .unwrap();
+        }
+        self.document.append_child(parent, child).unwrap();
+        self.styled
+            .note(&self.document, Mutation::Children { parent });
+        child
+    }
+
+    fn set_text(&mut self, id: &str, text: &str) {
+        let element = by_id(&self.document, id);
+        let node = self.document.children(element).unwrap().next().unwrap();
+        self.document.set_character_data(node, text).unwrap();
+        self.styled.note(&self.document, Mutation::Text { node });
+    }
+}
+
+/// Fewer than the 40 fillers: the restyle was targeted.
+fn targeted(stats: RestyleStats) {
+    assert!(stats.recomputed < 20, "{stats:?}");
+}
+
 #[test]
-fn element_states_and_has_restyle_conservatively() {
-    let mut page = Page::new(
-        "<!doctype html><form><input id=i type=checkbox><input id=r1 type=radio name=g checked>\
-         <input id=r2 type=radio name=g></form><div id=d><span id=s></span></div>",
-        "input:checked { width: 7px } input:disabled { color: gray } div:has(.on) { color: red }",
-    );
-    page.set("i", "checked", "");
-    page.restyle();
-    page.set("r2", "checked", "");
-    // Checking r2 unchecks r1: a whole-tree fact.
-    page.restyle();
-    page.set("i", "disabled", "");
-    page.restyle();
-    assert_eq!(page.color("i"), "rgb(128, 128, 128)");
-    page.set("s", "class", "on");
-    page.restyle();
+fn has_restyles_the_anchors_not_the_document() {
+    let html = padded("<div id=d><section id=s><span id=t></span></section></div>");
+    let mut page = Page::new(&html, "div:has(.on) { color: red }");
+    page.set("t", "class", "on");
+    targeted(page.restyle());
     assert_eq!(page.color("d"), "rgb(255, 0, 0)");
-    page.remove("s", "class");
-    page.restyle();
+    page.remove("t", "class");
+    targeted(page.restyle());
     assert_eq!(page.color("d"), "rgb(0, 0, 0)");
+
+    // Inserting and removing a matching element.
+    let span = page.append("s", "span", &[("class", "on")]);
+    targeted(page.restyle());
+    assert_eq!(page.color("d"), "rgb(255, 0, 0)");
+    let section = by_id(&page.document, "s");
+    page.document.detach(span).unwrap();
+    page.styled
+        .note(&page.document, Mutation::Children { parent: section });
+    targeted(page.restyle());
+    assert_eq!(page.color("d"), "rgb(0, 0, 0)");
+
+    // `:empty` inside the argument depends on text.
+    let html = padded("<div id=d><p id=p>x</p></div>");
+    let mut page = Page::new(&html, "div:has(> p:empty) { color: red }");
+    page.set_text("p", "");
+    targeted(page.restyle());
+    assert_eq!(page.color("d"), "rgb(255, 0, 0)");
+}
+
+#[test]
+fn has_with_siblings_reaches_preceding_siblings() {
+    let html = padded("<ul><li id=a></li><li id=b></li><li id=c><b id=x></b></li></ul>");
+    let mut page = Page::new(
+        &html,
+        "li:has(+ .on) { color: red } li:has(~ li .on) { width: 3px }",
+    );
+    page.set("b", "class", "on");
+    targeted(page.restyle());
+    assert_eq!(page.color("a"), "rgb(255, 0, 0)");
+    assert_eq!(page.color("b"), "rgb(0, 0, 0)");
+    page.set("x", "class", "on");
+    targeted(page.restyle());
+    assert_eq!(page.width("a"), "3px");
+    assert_eq!(page.width("b"), "3px");
+    assert_eq!(page.width("c"), "auto");
+
+    // Removing a sibling changes what follows the earlier ones.
+    let b = by_id(&page.document, "b");
+    let list = page.document.node(b).unwrap().parent().unwrap();
+    page.document.detach(b).unwrap();
+    page.styled
+        .note(&page.document, Mutation::Children { parent: list });
+    targeted(page.restyle());
+    assert_eq!(page.color("a"), "rgb(0, 0, 0)");
+}
+
+#[test]
+fn has_outside_the_subject_restyles_anchor_subtrees() {
+    let html = "<!doctype html><div id=d><p id=p></p><i id=i></i></div><p id=q></p>";
+    let mut page = Page::new(html, "div:has(.on) p, div:has(.on) + p { color: red }");
+    page.set("i", "class", "on");
+    page.restyle();
+    assert_eq!(page.color("p"), "rgb(255, 0, 0)");
+    assert_eq!(page.color("q"), "rgb(255, 0, 0)");
+}
+
+#[test]
+fn has_with_nested_complex_arguments_looks_above_the_anchor() {
+    let html = padded("<section id=sec><div id=d><span class=t></span></div></section>");
+    let mut page = Page::new(&html, "div:has(:is(.on .t)) { color: red }");
+    page.set("sec", "class", "on");
+    targeted(page.restyle());
+    assert_eq!(page.color("d"), "rgb(255, 0, 0)");
+}
+
+#[test]
+fn radio_groups_and_default_buttons_restyle_their_controls() {
+    let html = padded(
+        "<form id=f><input id=r1 type=radio name=g checked><input id=r2 type=radio name=g>\
+         <input id=c type=checkbox><button id=b1>go</button></form>",
+    );
+    let mut page = Page::new(
+        &html,
+        "input:checked { width: 7px } :default { color: red } input:checked + input { height: 2px }",
+    );
+    assert_eq!(page.width("r1"), "7px");
+    page.set("r2", "checked", "");
+    // Checking r2 unchecks r1.
+    targeted(page.restyle());
+    assert_eq!(page.width("r1"), "auto");
+    assert_eq!(page.width("r2"), "7px");
+    page.set("r1", "name", "h");
+    targeted(page.restyle());
+    assert_eq!(page.width("r1"), "7px");
+
+    // A submit button inserted before the default button takes over.
+    let form = by_id(&page.document, "f");
+    let first = page
+        .document
+        .create_element(QualifiedName::html("button").unwrap())
+        .unwrap();
+    page.document
+        .set_attribute(first, attribute("id"), "b0")
+        .unwrap();
+    let r1 = by_id(&page.document, "r1");
+    page.document.insert_before(form, first, Some(r1)).unwrap();
+    page.styled
+        .note(&page.document, Mutation::Children { parent: form });
+    targeted(page.restyle());
+    assert_eq!(page.color("b0"), "rgb(255, 0, 0)");
+    assert_eq!(page.color("b1"), "rgb(0, 0, 0)");
+}
+
+#[test]
+fn fieldsets_and_editing_hosts_restyle_their_subtrees() {
+    let html = padded(
+        "<fieldset id=f><legend><input id=l></legend><div><input id=i></div></fieldset>\
+         <div id=e><span id=s></span></div>",
+    );
+    let mut page = Page::new(
+        &html,
+        "input:disabled { color: gray } :read-write { width: 1px }",
+    );
+    page.set("f", "disabled", "");
+    targeted(page.restyle());
+    assert_eq!(page.color("i"), "rgb(128, 128, 128)");
+    assert_eq!(page.color("l"), "rgb(0, 0, 0)");
+    page.set("e", "contenteditable", "");
+    targeted(page.restyle());
+    assert_eq!(page.width("s"), "1px");
+
+    let html = padded("<textarea id=t placeholder=hint>x</textarea>");
+    let mut page = Page::new(&html, ":placeholder-shown { color: red }");
+    page.set_text("t", "");
+    targeted(page.restyle());
+    assert_eq!(page.color("t"), "rgb(255, 0, 0)");
+}
+
+#[test]
+fn language_and_direction_restyle_what_they_reach() {
+    let html = padded(
+        "<div id=d><p id=p>x</p></div><div id=auto dir=auto><span id=s>abc</span><b id=b></b></div>",
+    );
+    let mut page = Page::new(&html, ":lang(de) { color: red } :dir(rtl) { width: 5px }");
+    page.set("d", "lang", "de");
+    targeted(page.restyle());
+    assert_eq!(page.color("p"), "rgb(255, 0, 0)");
+
+    // dir=auto follows the first strong character below it.
+    page.set_text("s", "\u{5d0}");
+    targeted(page.restyle());
+    assert_eq!(page.width("b"), "5px");
+    page.set("s", "dir", "ltr");
+    // The span's text no longer counts for the auto ancestor.
+    targeted(page.restyle());
+    assert_eq!(page.width("b"), "auto");
+
+    // A pragma-set default language applies everywhere.
+    let head = page
+        .document
+        .walk(page.document.root())
+        .unwrap()
+        .map(|(node, _)| node)
+        .find(|&node| match page.document.node(node).unwrap().kind() {
+            NodeKind::Element(e) => e.name().local() == "head",
+            _ => false,
+        })
+        .unwrap();
+    let meta = page
+        .document
+        .create_element(QualifiedName::html("meta").unwrap())
+        .unwrap();
+    page.document
+        .set_attribute(meta, attribute("http-equiv"), "content-language")
+        .unwrap();
+    page.document
+        .set_attribute(meta, attribute("content"), "de")
+        .unwrap();
+    page.document.append_child(head, meta).unwrap();
+    page.styled
+        .note(&page.document, Mutation::Children { parent: head });
+    page.restyle();
+    assert_eq!(page.color("b"), "rgb(255, 0, 0)");
 }
 
 #[test]

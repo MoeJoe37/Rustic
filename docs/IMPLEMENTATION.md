@@ -519,9 +519,17 @@ earns no completion credit; the reweighting is recorded in [PROGRESS.md](PROGRES
 
 Platform scope now includes Windows, macOS, Linux, Android and iOS/iPadOS, with
 Mozilla/Firefox/Gecko and SpiderMonkey explicitly excluded as engine foundations.
-MOB-01 configures four shared-library cross-checks; see [MOBILE.md](MOBILE.md) and
+MOB-01 configures seven shared-library cross-checks; see [MOBILE.md](MOBILE.md) and
 [ADR 0006](adr/0006-desktop-and-mobile-platforms.md). Native mobile hosts,
 link/package checks, runtime tests and device support remain planned.
+
+Rustic must support any device that can run a browser ([ADR 0013](adr/0013-any-capable-device.md),
+[PLATFORMS.md](PLATFORMS.md)). CI now runs the full suite natively on Linux,
+Windows and macOS for both x64 and ARM64, under QEMU for 32-bit ARM, RISC-V and
+big-endian s390x (32-bit x86 natively), and cross-checks eight more targets. The
+first 32-bit run found a DOM test that built a multi-gigabyte dump, impossible in
+a 32-bit address space; TD-18's linear dump format removes it. Every later task
+must keep all tiers green.
 
 | First implementation queue item | Status |
 | --- | --- |

@@ -6,10 +6,14 @@ Rustic is an independent browser engine being built from scratch in Rust. The
 goal is a standards-oriented, embeddable engine with its own HTML/CSS pipeline,
 DOM, layout, painting, JavaScript runtime, and web platform integration.
 
-The target platforms are **Windows, macOS, Linux, Android, and iOS/iPadOS**. The
-shared engine is being designed for desktop and mobile hosts from the beginning.
-Mobile core cross-compilation is checked in CI; device shells, rendering, input,
-and runtime validation are still planned. See the [mobile plan](docs/MOBILE.md).
+Rustic must run on **any device that can run a browser**. The release platforms
+are **Windows, macOS, Linux, Android, and iOS/iPadOS** on every CPU they ship
+on: x86-64, ARM64, 32-bit ARM and 32-bit x86, with RISC-V, big-endian and other
+architectures kept working too. CI runs the full test suite natively on x64 and
+ARM64 Linux, Windows and macOS, under emulation on 32-bit ARM, 32-bit x86,
+RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets.
+Device shells, rendering, input, and runtime validation are still planned. See
+[platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
 **Current stage: late M1 document core, with M2 styles started.** This repository contains the project
 architecture, implementation plan, shared engine primitives, and continuous
@@ -44,6 +48,7 @@ engineering effort; milestones below describe targets, not existing support.
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
 | [CSS syntax](docs/CSS.md) | CSS tokenizer/parser scope, recovery, limits and pinned corpus evidence |
 | [HTML input and tokenization](docs/HTML.md) | Streaming UTF-8 and initial tokenizer subset, limits, evidence and remaining states |
+| [Platform and device support](docs/PLATFORMS.md) | Any device that can run a browser: portability rules and the CI target matrix |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
 | [Roadmap](docs/ROADMAP.md) | Dependency-ordered milestones, acceptance gates, first tasks, and risks |

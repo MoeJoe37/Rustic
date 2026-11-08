@@ -1,0 +1,4 @@
+.card { color: red; > h2 { margin: 0; &:hover { color: blue } } & + & { width: 1px } height: 2px; }
+ul { li { :has(> b) & { font-weight: 700 } } @media print { color: green } }
+& p, :is(&) i { font-size: 2em }
+p:lang(en):dir(ltr), input:checked + b, :disabled, :placeholder-shown::placeholder { color: inherit }

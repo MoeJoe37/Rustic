@@ -26,6 +26,36 @@ use std::fmt;
 /// Unicode version of the IDNA mapping, normalization and property data.
 pub const UNICODE_VERSION: &str = tables::UNICODE_VERSION;
 
+/// A strong bidirectional type (Unicode Bidi_Class L, or R and AL).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StrongDirection {
+    /// Bidi_Class L.
+    Ltr,
+    /// Bidi_Class R or AL.
+    Rtl,
+}
+
+/// The strong bidirectional type of `value` from the pinned Bidi_Class data,
+/// or `None` for weak and neutral characters.
+///
+/// The table is generated for IDNA's Bidi Rule; HTML directionality
+/// (`dir=auto`, `:dir()`) shares it until a shared Unicode data crate exists
+/// (TD-29).
+///
+/// ```
+/// use rustic_url::idna::{StrongDirection, strong_direction};
+/// assert_eq!(strong_direction('a'), Some(StrongDirection::Ltr));
+/// assert_eq!(strong_direction('\u{5D0}'), Some(StrongDirection::Rtl));
+/// assert_eq!(strong_direction('1'), None);
+/// ```
+pub fn strong_direction(value: char) -> Option<StrongDirection> {
+    match bidi::bidi_class(value) {
+        bidi::BidiClass::L => Some(StrongDirection::Ltr),
+        bidi::BidiClass::R | bidi::BidiClass::Al => Some(StrongDirection::Rtl),
+        _ => None,
+    }
+}
+
 /// The first UTS #46 error recorded while processing a domain.
 ///
 /// Errors carry no input text, so they are safe to log.

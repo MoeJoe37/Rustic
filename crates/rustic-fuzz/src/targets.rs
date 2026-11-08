@@ -636,7 +636,12 @@ const SELECTOR_DOCUMENT: &[u8] = b"<!doctype html><ul id=list class='a B'>\
 <li id=one class=x lang=en-US>1<li class='x y'><!--c--><li title='Hello World'>\
 <li><a href=/x id=link>l</a><li></ul><p id=Odd data-v=Abc><b></b><i></i><b></b></p>\
 <svg viewBox='0 0 1 1'><foreignObject><p></p></foreignObject><rect/></svg>\
-<table><tr><td>cell</td></tr></table><input type=TEXT>";
+<table><tr><td>cell</td></tr></table><input type=TEXT>\
+<form id=f><input type=checkbox checked><input type=radio name=g checked>\
+<input type=radio name=g form=f><button></button><select><option disabled>a<option>b</select>\
+<textarea placeholder=t></textarea><fieldset disabled><legend><input></legend><input readonly>\
+</fieldset></form><div dir=auto lang=he>\xd7\xa9<bdi>x</bdi></div><p contenteditable>e</p>\
+<progress></progress>";
 
 fn select_all(
     document: &rustic_dom::Document,
@@ -715,6 +720,33 @@ impl Target for CssSelectorTarget {
             b"&",
             b"||",
             b"/**/",
+            b":has(",
+            b":has(> ",
+            b":has(+ ",
+            b":has(~ ",
+            b":lang(",
+            b"\"*-US\"",
+            b"en",
+            b":dir(",
+            b"ltr",
+            b"rtl",
+            b":checked",
+            b":disabled",
+            b":enabled",
+            b":indeterminate",
+            b":default",
+            b":required",
+            b":optional",
+            b":read-only",
+            b":read-write",
+            b":placeholder-shown",
+            b"::placeholder",
+            b"::selection",
+            b"::backdrop",
+            b"::after:hover",
+            b"input",
+            b"option",
+            b"fieldset",
         ]
     }
 

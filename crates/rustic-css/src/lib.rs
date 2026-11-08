@@ -61,9 +61,10 @@ pub use properties::{
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{
     AttributeCase, AttributeOperator, AttributeSelector, AttributeValue, Combinator,
-    ComplexSelector, Compound, ElementState, MAX_SELECTOR_NESTING, NamespaceMap, NamespaceSelector,
-    Nth, NthKind, PseudoClass, PseudoElement, SelectorError, SelectorErrorKind, SelectorList,
-    SimpleSelector, Specificity, parse_selector_list,
+    ComplexSelector, Compound, ElementState, FormState, MAX_SELECTOR_NESTING, NamespaceMap,
+    NamespaceSelector, Nth, NthKind, PseudoClass, PseudoElement, RelativeSelector,
+    RelativeSelectorList, SelectorError, SelectorErrorKind, SelectorList, SimpleSelector,
+    Specificity, parse_nested_selector_list, parse_selector_list,
 };
 pub use serialize::{serialize_identifier, serialize_string};
 pub use token::{Numeric, Token};

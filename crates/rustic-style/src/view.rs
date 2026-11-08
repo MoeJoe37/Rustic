@@ -1,6 +1,6 @@
 //! The read-only element interface selector matching needs.
 
-use rustic_css::ElementState;
+use rustic_css::{ElementState, PseudoElement};
 
 /// One attribute of an element.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -11,6 +11,15 @@ pub struct AttributeRef<'a> {
     pub local: &'a str,
     /// Attribute value as UTF-16 code units.
     pub value: &'a [u16],
+}
+
+/// A child node of an element, as selector matching sees it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChildRef<'a, E> {
+    /// An element child.
+    Element(E),
+    /// A text (or CDATA section) child's data as UTF-16 code units.
+    Text(&'a [u16]),
 }
 
 /// A copyable, read-only handle to an element in some tree.
@@ -37,6 +46,19 @@ pub trait ElementView: Copy + Eq + std::hash::Hash {
     /// Whether the parent is a document (the `:root` test).
     fn is_root(&self) -> bool;
 
+    /// The element's children that are elements or text, in tree order
+    /// (comments and processing instructions are skipped). Template contents
+    /// are not children.
+    fn children(&self) -> impl Iterator<Item = ChildRef<'_, Self>>;
+
+    /// The first child that is an element.
+    fn first_child_element(&self) -> Option<Self> {
+        self.children().find_map(|child| match child {
+            ChildRef::Element(e) => Some(e),
+            ChildRef::Text(_) => None,
+        })
+    }
+
     /// The element's local name.
     fn local_name(&self) -> &str;
 
@@ -55,6 +77,13 @@ pub trait ElementView: Copy + Eq + std::hash::Hash {
     /// interaction model, nothing is.
     fn in_state(&self, state: ElementState) -> bool {
         let _ = state;
+        false
+    }
+
+    /// Whether the element's `pseudo` pseudo-element is in a user-action
+    /// state (`::before:hover`). Without an interaction model, none is.
+    fn pseudo_element_in_state(&self, pseudo: PseudoElement, state: ElementState) -> bool {
+        let _ = (pseudo, state);
         false
     }
 }

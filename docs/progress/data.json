@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "45038f9cb33aacb316672ef2dd75b19467dcb7f5787d0b8e62dd275d8464cabd",
-  "percent": "17.03",
-  "verified_percent": "14.96",
-  "partial_percent": "2.07",
-  "completed": 31,
-  "in_progress": 4,
+  "source_fingerprint": "e0007e7d8e2b9f33a0969137f6982a135bf11879778c60dace0157d2568a4233",
+  "percent": "17.31",
+  "verified_percent": "16.11",
+  "partial_percent": "1.20",
+  "completed": 32,
+  "in_progress": 3,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -25,11 +25,11 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 3,
+      "completed": 4,
       "total": 8,
-      "percent": "61.53",
-      "verified_percent": "41.02",
-      "partial_percent": "20.51"
+      "percent": "64.74",
+      "verified_percent": "53.84",
+      "partial_percent": "10.90"
     },
     {
       "id": "M3",
@@ -1109,64 +1109,70 @@
           "label": "Required selectors and specificity",
           "size": 5,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Selector syntax, specificity and CSSOM serialization (CSS-02 subset)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/selector.rs",
-                  "marker": "pub fn parse_selector_list"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/selectors.rs",
-                  "marker": "fn valid_selectors_serialize_and_have_spec_specificity"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/selector.rs",
+              "marker": "pub fn parse_selector_list"
             },
             {
-              "label": "An+B microsyntax (pinned css-parsing-tests An+B.json)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/anb.rs",
-                  "marker": "pub fn parse_an_plus_b"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/an_plus_b.rs",
-                  "marker": "fn pinned_an_plus_b_corpus_matches"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-css/tests/selectors.rs",
+              "marker": "fn valid_selectors_serialize_and_have_spec_specificity"
             },
             {
-              "label": "Selector matching over the DOM with HTML/quirks/XML case rules",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/matching.rs",
-                  "marker": "pub fn matches_complex"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/matching.rs",
-                  "marker": "fn simple_selectors_and_case_rules"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/anb.rs",
+              "marker": "pub fn parse_an_plus_b"
             },
             {
-              "label": "Remaining required selectors: :has(), form-state, :lang()/:dir(), nesting & and pseudo-element states (CSS-07)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-css/tests/an_plus_b.rs",
+              "marker": "fn pinned_an_plus_b_corpus_matches"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/matching.rs",
+              "marker": "pub fn matches_complex"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/matching.rs",
+              "marker": "fn simple_selectors_and_case_rules"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/selector.rs",
+              "marker": "pub fn parse_nested_selector_list"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/selectors_level4.rs",
+              "marker": "fn nested_selectors_resolve_against_the_parent"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/html_state.rs",
+              "marker": "pub(crate) fn form_state"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/selectors_level4.rs",
+              "marker": "fn form_states_follow_html"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/selectors_level4.rs",
+              "marker": "fn has_fast_paths_agree_with_the_general_walk"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/selectors_level4.rs",
+              "marker": "fn dir_follows_html_directionality"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "1.15"
         },
         {
@@ -1457,13 +1463,13 @@
         }
       ],
       "points": 39,
-      "completed": 3,
-      "in_progress": 3,
+      "completed": 4,
+      "in_progress": 2,
       "total": 8,
-      "contribution": "5.53",
-      "percent": "61.53",
-      "verified_percent": "41.02",
-      "partial_percent": "20.51"
+      "contribution": "5.82",
+      "percent": "64.74",
+      "verified_percent": "53.84",
+      "partial_percent": "10.90"
     },
     {
       "id": "text",

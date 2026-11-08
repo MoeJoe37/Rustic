@@ -5,7 +5,7 @@ use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
 
 use crate::matching::{MatchCache, matches_complex_cached};
 use crate::{
-    AttributeRef, Cascade, ComputeContext, ComputedStyle, ElementView, MatchContext,
+    AttributeRef, Cascade, ChildRef, ComputeContext, ComputedStyle, ElementView, MatchContext,
     SpecifiedStyle, StyleDiagnostic, StyleInputs, TreeContext, TreeScope, parse_style_attribute,
 };
 
@@ -107,6 +107,26 @@ impl ElementView for DomElement<'_> {
             local: a.name().local(),
             value: a.value().as_units(),
         })
+    }
+
+    fn children(&self) -> impl Iterator<Item = ChildRef<'_, Self>> {
+        let document = self.document;
+        document
+            .children(self.id)
+            .into_iter()
+            .flatten()
+            .filter_map(move |child| match document.node(child).ok()?.kind() {
+                NodeKind::Element(_) => Self::new(document, child).map(ChildRef::Element),
+                NodeKind::Text(data) | NodeKind::CdataSection(data) => {
+                    Some(ChildRef::Text(data.as_units()))
+                }
+                _ => None,
+            })
+    }
+
+    fn first_child_element(&self) -> Option<Self> {
+        let first = self.document.node(self.id).ok()?.first_child();
+        self.element_at(first, Node::next_sibling)
     }
 
     fn is_empty(&self) -> bool {

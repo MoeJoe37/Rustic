@@ -42,6 +42,7 @@ mod cascade;
 mod computed;
 mod dom;
 mod html;
+mod html_state;
 mod layer;
 mod loading;
 mod matching;
@@ -66,4 +67,4 @@ pub use sheet::{
     ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
     parse_style_attribute,
 };
-pub use view::{AttributeRef, ElementView};
+pub use view::{AttributeRef, ChildRef, ElementView};

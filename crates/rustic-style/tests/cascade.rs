@@ -260,10 +260,10 @@ fn revert_rolls_back_to_the_previous_origin() {
 fn stylesheet_diagnostics_drop_only_the_broken_parts() {
     let parser = CssParser::default();
     let source = "@namespace svg url(http://www.w3.org/2000/svg);\n\
-                  p:has(a) { color: red }\n\
+                  p:user-invalid { color: red }\n\
                   svg|rect, p { color: blue; colour: red; width: -1px }\n\
                   @supports (color: red) { p { color: green } }\n\
-                  div { & p { color: red } height: 1px }\n\
+                  div { & p { color: red } @supports (x) { p { color: red } } height: 1px }\n\
                   @namespace late url(x);";
     let (sheet, diagnostics) = StyleSheet::parse(&parser, source, Origin::Author).unwrap();
     let kinds: Vec<_> = diagnostics.iter().map(|d| d.kind).collect();
@@ -280,11 +280,23 @@ fn stylesheet_diagnostics_drop_only_the_broken_parts() {
             StyleDiagnosticKind::InvalidNamespaceRule,
         ]
     );
-    assert_eq!(sheet.rules.len(), 2);
     assert!(sheet.media.is_empty());
-    assert_eq!(sheet.rules[0].selectors.to_string(), "svg|rect, p");
-    assert_eq!(sheet.rules[0].declarations.len(), 1);
-    assert_eq!(sheet.rules[1].declarations.len(), 1);
+    // The nested rule expands after its parent, and the declaration after
+    // it becomes a nested declarations rule with the parent's selectors.
+    let rules: Vec<(String, usize)> = sheet
+        .rules
+        .iter()
+        .map(|r| (r.selectors.to_string(), r.declarations.len()))
+        .collect();
+    assert_eq!(
+        rules,
+        [
+            ("svg|rect, p".to_owned(), 1),
+            ("div".to_owned(), 0),
+            ("& p".to_owned(), 1),
+            ("div".to_owned(), 1),
+        ]
+    );
     assert_eq!(&source[diagnostics[1].span.range()], "colour: red");
 }
 

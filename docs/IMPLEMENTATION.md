@@ -239,8 +239,7 @@ corpus/fuzz gate remain unfinished. No new completion credit is awarded yet.
 
 ## DOC-07 — Bounded local loader and `dump-dom`
 
-`rustic dump-dom [--max-input-bytes N] [--max-output-bytes N] [--chunk-bytes N] [--] <file>`
-loads exactly one local file granted on the command line and prints the
+`rustic dump-dom [OPTIONS] [--] <file>` loads exactly one local file granted on the command line and prints the
 deterministic `Document::dump_tree` output. The loader lives in
 `rustic-cli/src/loader.rs` and only calls the public `HtmlDocumentParser`
 feed/finish API; it adds no tree-construction rules of its own.
@@ -253,7 +252,10 @@ The file is read in fixed chunks (default 64 KiB) and never buffered whole. Its
 byte limit (default 8 MiB) is checked from metadata and enforced while reading,
 and also becomes the tokenizer's raw input budget. Parser token/node/depth/
 payload/diagnostic limits keep their defaults, and dump output is capped at
-64 MiB. Cancellation is checked between reads. Any failure prints nothing on
+64 MiB. Because exceeding any parser limit fails the whole load, messy pages can
+raise `--max-nodes`, `--max-depth` (default 256) and `--max-diagnostics`
+(default 1,024, applied to tokenizer and tree recoveries separately);
+`--max-input-bytes`, `--max-output-bytes` and `--chunk-bytes` set the rest. Cancellation is checked between reads. Any failure prints nothing on
 stdout: usage/URL errors exit 2, load/parse/budget failures exit 1. Unsupported
 constructs from the DOC-06 subset fail explicitly rather than dumping a partial
 tree. No network, script, subresource, encoding sniffing or base-URL resolution occurs.
@@ -261,9 +263,9 @@ tree. No network, script, subresource, encoding sniffing or base-URL resolution 
 Nine loader unit tests cover URL/path classification, exact file and dump byte
 limits, chunk-size invariance at every size up to the input length, parser
 budgets, unsupported markup, directories, `/dev/zero`, missing files, zero limits
-and cancellation. Seven CLI tests compare a malformed fixture against a checked
-snapshot for 19 chunk sizes and check URL rejection, usage errors, exact budgets
-and clean failures. `html.loader` is complete for this scope; tree coverage
+and cancellation. Eight CLI tests compare a malformed fixture against a checked
+snapshot for 19 chunk sizes and check URL rejection, usage errors, exact budgets,
+configurable depth/diagnostic/node limits and clean failures. `html.loader` is complete for this scope; tree coverage
 still grows with DOC-06.
 
 ## Queue status

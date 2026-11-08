@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlsplit
 import import_html_entities
 import import_html_tests
 import import_html_tree_tests
+import import_css_tests
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -220,6 +221,11 @@ def main() -> int:
     check_html_fixture("references")
     check_html_fixture("text")
     check_entities()
+    try:
+        import_css_tests.check()
+    except (OSError, ValueError) as exc:
+        error(import_css_tests.MANIFEST, str(exc))
+
     try:
         import_html_tree_tests.check()
     except (OSError, ValueError) as exc:

@@ -40,6 +40,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Token-at-a-time input drive and text-mode feedback | Implemented internal contract | Same-chunk feedback, queued-input, control/lifecycle tests; [ADR 0008](adr/0008-tokenizer-drive.md) |
 | Document tree construction: all 21 insertion modes, tables, formatting, templates and foreign content | Implemented for document parsing | [Scope and 1,772/1,776 runnable html5lib records, all 192 fragments included](HTML_TREE.md); scripting and `selectedcontent` pending |
 | HTML fragment parsing algorithm (scripting disabled) | Implemented | `HtmlFragmentParser`; html5lib fragment records and focused tests |
+| CSS syntax tokenizer, component values, rules, declarations and nested block contents | Implemented (CSS-01) | `rustic-css`; [139 pinned corpus cases and focused tests](CSS.md) |
 | Deterministic parser fuzz targets, seed replay and reproducers | Implemented blind mutation fuzzer | `rustic-fuzz`; required CI smoke job and nightly campaign |
 | Cross-platform build/test, formatting, Clippy, rustdoc, repository checks | Configured | [CI workflow](../.github/workflows/ci.yml) |
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |

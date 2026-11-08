@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 10.39%** = 10.39% verified complete + 0.00% partial credit. 27/172 capabilities complete, 0 in progress.
+**Overall completion: 11.08%** = 11.08% verified complete + 0.00% partial credit. 28/172 capabilities complete, 0 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `c062e9d35dcdddedf40fa45cb2a95e9301d883a887f527cdc299b39aa607624d`.
+Catalog: `engine-v3`. Source fingerprint: `1e55c6f2001cdaf9f0ada00c8c2c10a7a0d3fd44580252250bb9ed1d069a51f3`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `c062e9d35dcdddedf40fa45cb2a95e9301d88
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 27/28 | 92.17% | 92.17% | 11.27% |
-| M2 CSS & computed style | 0/8 | 0.00% | 0.00% | 9.00% |
+| M2 CSS & computed style | 1/8 | 7.69% | 7.69% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `c062e9d35dcdddedf40fa45cb2a95e9301d88
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 5/10 | 0 | 38.23% | 38.23% | 6% | 2.29 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 0/8 | 0 | 0.00% | 0.00% | 9% | 0.00 |
+| CSS & style | 1/8 | 0 | 7.69% | 7.69% | 9% | 0.69 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -105,7 +105,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### CSS & style
 
-- **planned** `css.syntax` — CSS tokenizer/parser and recovery · size 3 · M2 · 0.69% of engine
+- **complete** `css.syntax` — CSS tokenizer/parser and recovery · size 3 · M2 · 0.69% of engine ([source](../../crates/rustic-css/src/tokenizer.rs), [source](../../crates/rustic-css/src/rules.rs), [source](../../tools/import_css_tests.py), [test](../../crates/rustic-css/tests/corpus.rs), [test](../../crates/rustic-css/tests/syntax.rs))
 - **planned** `css.selectors` — Required selectors and specificity · size 5 · M2 · 1.15% of engine
 - **planned** `css.properties` — Typed property grammar and supported property catalog · size 8 · M2 · 1.84% of engine
 - **planned** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine

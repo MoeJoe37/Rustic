@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "c062e9d35dcdddedf40fa45cb2a95e9301d883a887f527cdc299b39aa607624d",
-  "percent": "10.39",
-  "verified_percent": "10.39",
+  "source_fingerprint": "1e55c6f2001cdaf9f0ada00c8c2c10a7a0d3fd44580252250bb9ed1d069a51f3",
+  "percent": "11.08",
+  "verified_percent": "11.08",
   "partial_percent": "0.00",
-  "completed": 27,
+  "completed": 28,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -25,10 +25,10 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 0,
+      "completed": 1,
       "total": 8,
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "percent": "7.69",
+      "verified_percent": "7.69",
       "partial_percent": "0.00"
     },
     {
@@ -1014,9 +1014,35 @@
           "label": "CSS tokenizer/parser and recovery",
           "size": 3,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/tokenizer.rs",
+              "marker": "pub(crate) fn tokenize"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/rules.rs",
+              "marker": "pub(crate) fn block_contents"
+            },
+            {
+              "kind": "source",
+              "path": "tools/import_css_tests.py",
+              "marker": "SUITE_FILES"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/corpus.rs",
+              "marker": "fn pinned_css_parsing_corpus_matches_after_documented_adaptations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/syntax.rs",
+              "marker": "fn limits_are_exact_and_fatal"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.69"
         },
         {
@@ -1091,12 +1117,12 @@
         }
       ],
       "points": 39,
-      "completed": 0,
+      "completed": 1,
       "in_progress": 0,
       "total": 8,
-      "contribution": "0.00",
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "contribution": "0.69",
+      "percent": "7.69",
+      "verified_percent": "7.69",
       "partial_percent": "0.00"
     },
     {

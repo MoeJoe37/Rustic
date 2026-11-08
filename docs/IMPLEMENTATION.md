@@ -411,7 +411,7 @@ still grows with DOC-06.
 `rustic-fuzz` is a dependency-free, deterministic mutation fuzzer in safe,
 portable Rust (standard library only, so it builds on every supported host). It
 is blind, not coverage-guided: coverage engines and sanitizers stay behind the
-[dependency review](DEPENDENCIES.md). Four targets check crash-freedom at
+[dependency review](DEPENDENCIES.md). Five targets check crash-freedom at
 default budgets plus a differential invariant:
 
 | Target | Invariant beyond "no panic, no hang" | Seeds |
@@ -419,6 +419,7 @@ default budgets plus a differential invariant:
 | `html-tokenizer` | Tokens and diagnostics match the unbroken input for a two-chunk split, fixed-size chunks and (up to 512 bytes) one-byte feeds | Checked-in pages plus all 1,792 html5lib tree `#data` inputs |
 | `html-document` | The same feed plans yield the same dump or the same `ParseError`; completed trees always dump; a fresh parser never reports a lifecycle error; a cancelled parser never completes | Same as above |
 | `html-fragment` | The same feed-plan equality for fragment parsing, with one of 28 HTML/SVG/MathML contexts chosen from the input's fingerprint (added with DOC-06c) | Same as above |
+| `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01) | Checked-in sheet plus the css-parsing-tests inputs |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -441,6 +442,25 @@ every target; unit tests pin the generator, mutation bounds and literal
 decoding. Before landing, 1.2 million mutated executions over five seeds found
 no failures, so `regressions/` is empty. That is evidence of robustness at the
 tested depth, not proof of absence of defects.
+
+## CSS-01 — CSS syntax tokenizer and parser
+
+`rustic-css` implements CSS Syntax Level 3 tokenization, component values and
+the stylesheet/rule-list/rule/declaration/block-contents/component-value entry
+points, with CSS Nesting's block contents (declarations, at-rules and nested
+qualified rules) and byte spans on every token, value, rule, declaration and
+diagnostic. Rule blocks stay raw component values; `parse_block_contents` reads
+them on demand. Input/token/nesting limits and cancellation are fatal with no
+partial result; diagnostics are bounded with a dropped count. The algorithms are
+iterative and the nesting limit bounds result depth.
+
+The vendored CC0 css-parsing-tests corpus passes **139 of 149** cases (9
+unicode-range cases excluded, 1 documented 2021-vs-Nesting difference) after the
+adaptations listed in [CSS.md](CSS.md). Eight focused tests cover spans,
+escapes, recovery, numbers, nested blocks, exact limits, cancellation and entry
+point errors; a fifth fuzz target, `css`, checks span coverage and totality
+(300,000 executions, no failures). Byte-stream encoding, selectors, properties
+and the cascade are later CSS tasks.
 
 ## Queue status
 
@@ -485,10 +505,12 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
-| DOC-09: traced node/JS ownership prototype | Not started |
+| DOC-09: traced node/JS ownership prototype | Owned by a separate thread |
+| CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
-`html.conformance` is complete. The next queue work is DOC-06d (`selectedcontent`
-mirroring, the last four known tree failures), then DOC-09 and CSS-01. All project crates remain safe
+`html.conformance` is complete. CSS-01 has started M2. Next: DOC-06d
+(`selectedcontent` mirroring, the last four known tree failures, built on the new
+`Document::clone_node`), then CSS-02 selectors. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

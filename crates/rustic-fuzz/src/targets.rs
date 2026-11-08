@@ -6,6 +6,7 @@
 //! same check from its bytes alone.
 
 use rustic_base::CancellationToken;
+use rustic_css::{BlockItem, CssParser, Rule, parse_block_contents};
 use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
     ParseError, Token,
@@ -32,6 +33,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(HtmlTokenizerTarget),
         Box::new(HtmlDocumentTarget),
         Box::new(HtmlFragmentTarget),
+        Box::new(CssTarget),
         Box::new(UrlTarget),
     ]
 }
@@ -362,6 +364,111 @@ fn summary(run: &DocumentRun) -> String {
     match run {
         DocumentRun::Parsed(dump) => format!("tree of {} dump bytes", dump.len()),
         DocumentRun::Rejected(error) => format!("error `{error}`"),
+    }
+}
+
+/// CSS parsing must be total, with ordered spans that cover all non-comment input.
+pub struct CssTarget;
+
+impl Target for CssTarget {
+    fn name(&self) -> &'static str {
+        "css"
+    }
+
+    fn max_len(&self) -> usize {
+        4096
+    }
+
+    fn dictionary(&self) -> &'static [&'static [u8]] {
+        &[
+            b"/*",
+            b"*/",
+            b"{",
+            b"}",
+            b"(",
+            b")",
+            b"[",
+            b"]",
+            b";",
+            b":",
+            b"!important",
+            b"@media ",
+            b"@import ",
+            b"url(",
+            b"url( 'x' )",
+            b"\\",
+            b"\\41 ",
+            b"\"",
+            b"'",
+            b"#",
+            b"-->",
+            b"<!--",
+            b"--x:",
+            b"1e3",
+            b"+.5",
+            b"-",
+            b"%",
+            b"px",
+            b"\r\n",
+            b"\x0c",
+            b"\0",
+            b"&",
+            b"a:hover",
+            b"rgb(",
+            b"U+26",
+        ]
+    }
+
+    fn check(&self, input: &[u8]) -> Result<(), String> {
+        let text = String::from_utf8_lossy(input);
+        let parser = CssParser::default();
+        let tokens = parser
+            .tokenize(&text)
+            .map_err(|e| format!("default limits: {e}"))?;
+        let mut pos = 0;
+        for token in &tokens.value {
+            let range = token.span.range();
+            if range.start < pos || range.is_empty() || token.span.slice_str(&text).is_none() {
+                return Err(format!("bad token span {range:?} after {pos}"));
+            }
+            let gap = &text[pos..range.start];
+            if !gap.is_empty() && !gap.starts_with("/*") {
+                return Err(format!("uncovered input {gap:?} before {range:?}"));
+            }
+            pos = range.end;
+        }
+        let tail = &text[pos..];
+        if !tail.is_empty() && !tail.starts_with("/*") {
+            return Err(format!("uncovered trailing input {tail:?}"));
+        }
+        let sheet = match parser.stylesheet(&text) {
+            Ok(sheet) => sheet,
+            // Depth and token limits are legitimate outcomes for hostile input.
+            Err(_) => return Ok(()),
+        };
+        let mut blocks: Vec<Vec<rustic_css::Value>> = sheet
+            .value
+            .rules
+            .iter()
+            .filter_map(|rule| match rule {
+                Rule::Qualified(q) => Some(q.block.clone()),
+                Rule::At(a) => a.block.clone(),
+            })
+            .collect();
+        // Read nested blocks iteratively, as a style engine would.
+        while let Some(block) = blocks.pop() {
+            for item in parse_block_contents(&block, 64).value {
+                if let BlockItem::Rule(Rule::Qualified(q)) = item {
+                    blocks.push(q.block);
+                } else if let BlockItem::Rule(Rule::At(a)) = item {
+                    blocks.extend(a.block);
+                }
+            }
+        }
+        if parser.stylesheet(&text).ok() != Some(sheet) {
+            return Err("stylesheet parsing is not deterministic".into());
+        }
+        Ok(())
     }
 }
 

@@ -834,8 +834,34 @@
           "label": "CSS tokenizer/parser and recovery",
           "size": 3,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/tokenizer.rs",
+              "marker": "pub(crate) fn tokenize"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/rules.rs",
+              "marker": "pub(crate) fn block_contents"
+            },
+            {
+              "kind": "source",
+              "path": "tools/import_css_tests.py",
+              "marker": "SUITE_FILES"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/corpus.rs",
+              "marker": "fn pinned_css_parsing_corpus_matches_after_documented_adaptations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/syntax.rs",
+              "marker": "fn limits_are_exact_and_fatal"
+            }
+          ]
         },
         {
           "id": "css.selectors",

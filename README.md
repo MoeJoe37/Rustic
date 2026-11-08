@@ -11,10 +11,11 @@ shared engine is being designed for desktop and mobile hosts from the beginning.
 Mobile core cross-compilation is checked in CI; device shells, rendering, input,
 and runtime validation are still planned. See the [mobile plan](docs/MOBILE.md).
 
-**Current stage: early M1 document-core implementation.** This repository contains the project
+**Current stage: late M1 document core, with M2 styles started.** This repository contains the project
 architecture, implementation plan, shared engine primitives, and continuous
-integration. Bounded DOM/URL foundations, HTML tokenization and an
-[initial document-construction subset](docs/HTML_TREE.md) are implemented.
+integration. Bounded DOM/URL foundations, HTML tokenization,
+[document and fragment tree construction](docs/HTML_TREE.md), parser fuzzing and
+[CSS syntax parsing](docs/CSS.md) are implemented.
 It does not yet execute JavaScript, fetch web pages, or render content.
 A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
@@ -25,7 +26,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 10.39%** (10.39% verified complete + 0.00% partial credit) — 27/172 capabilities complete and 0 in progress across 21 subsystems. Current milestone: **M1 Document core**, 92.17% done.
+**Overall engine completion: 11.08%** (11.08% verified complete + 0.00% partial credit) — 28/172 capabilities complete and 0 in progress across 21 subsystems. Current milestone: **M1 Document core**, 92.17% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -41,6 +42,7 @@ engineering effort; milestones below describe targets, not existing support.
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
 | [Progress graph methodology](docs/PROGRESS.md) | Whole-engine completion criteria, weights, evidence and automatic commit updates |
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
+| [CSS syntax](docs/CSS.md) | CSS tokenizer/parser scope, recovery, limits and pinned corpus evidence |
 | [HTML input and tokenization](docs/HTML.md) | Streaming UTF-8 and initial tokenizer subset, limits, evidence and remaining states |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
@@ -91,6 +93,7 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 [UTF-16 text edits](docs/DOM.md)),
 `rustic-url` (URL records, parsing and origins),
 `rustic-html` (streaming tokens and full WHATWG document tree construction),
+`rustic-css` (CSS syntax tokenization and parsing),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

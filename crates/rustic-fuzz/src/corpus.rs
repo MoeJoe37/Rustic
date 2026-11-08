@@ -36,6 +36,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
     match family {
         "html" => seeds.extend(html5lib_data(root)?),
         "url" => seeds.extend(wpt_url_strings(root)?),
+        "css" => seeds.extend(css_corpus_inputs(root)?),
         _ => {}
     }
     Ok(seeds)
@@ -57,6 +58,55 @@ fn html5lib_data(root: &Path) -> io::Result<Vec<Vec<u8>>> {
         }
     }
     Ok(seeds)
+}
+
+/// Input strings of the vendored css-parsing-tests files (every even entry).
+fn css_corpus_inputs(root: &Path) -> io::Result<Vec<Vec<u8>>> {
+    let directory = root.join("crates/rustic-css/tests/fixtures/css-parsing-tests");
+    let mut seeds = Vec::new();
+    for entry in read_dir_inputs(&directory)? {
+        let (path, bytes) = entry;
+        if path.extension().is_none_or(|ext| ext != "json") || path.ends_with("manifest.json") {
+            continue;
+        }
+        let source = String::from_utf8_lossy(&bytes);
+        // Inputs sit at the start of a line as `"...",`; expectations are nested.
+        for line in source.lines() {
+            if let Some(rest) = line.strip_prefix('"') {
+                if let Some((value, _)) = json_string_body(rest) {
+                    seeds.push(value.into_bytes());
+                }
+            }
+        }
+    }
+    Ok(seeds)
+}
+
+/// Decode a JSON string body up to its closing quote (`\uXXXX` pairs included).
+fn json_string_body(source: &str) -> Option<(String, &str)> {
+    let mut value = String::new();
+    let mut chars = source.char_indices();
+    while let Some((index, c)) = chars.next() {
+        match c {
+            '"' => return Some((value, &source[index + 1..])),
+            '\\' => match chars.next()?.1 {
+                'n' => value.push('\n'),
+                't' => value.push('\t'),
+                'r' => value.push('\r'),
+                'f' => value.push('\u{c}'),
+                'u' => {
+                    let hex: String = (0..4)
+                        .filter_map(|_| chars.next().map(|(_, c)| c))
+                        .collect();
+                    let unit = u32::from_str_radix(&hex, 16).ok()?;
+                    value.push(char::from_u32(unit).unwrap_or('\u{fffd}'));
+                }
+                other => value.push(other),
+            },
+            c => value.push(c),
+        }
+    }
+    None
 }
 
 fn wpt_url_strings(root: &Path) -> io::Result<Vec<Vec<u8>>> {

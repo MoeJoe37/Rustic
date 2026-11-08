@@ -2,7 +2,7 @@
 
 **Overall completion: 7.24%** · 17/172 capabilities complete.
 
-Catalog: `engine-v2`. Source fingerprint: `9ef06dc76e41eaaaad1795a0032f99094f209594b65fdc1304e6894b1b2c3aef`.
+Catalog: `engine-v2`. Source fingerprint: `ca876e8de24549a2f05d7b000ae5d8defde2e3b38e8b440ba80e19f94081a43c`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 
@@ -78,7 +78,7 @@ Catalog: `engine-v2`. Source fingerprint: `9ef06dc76e41eaaaad1795a0032f99094f209
 - **complete** `html.references` — Full named/numeric character references ([source](../../crates/rustic-html/src/tokenizer/reference.rs), [test](../../crates/rustic-html/tests/references.rs), [test](../../crates/rustic-html/tests/references.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.declarations` — Comments, doctypes and declaration recovery ([source](../../crates/rustic-html/src/tokenizer/comment.rs), [source](../../crates/rustic-html/src/tokenizer/doctype.rs), [source](../../crates/rustic-html/src/tokenizer/instruction.rs), [test](../../crates/rustic-html/tests/declarations.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes ([source](../../crates/rustic-html/src/tokenizer/text.rs), [source](../../crates/rustic-html/src/tokenizer/driver.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/corpus.rs))
-- **planned** `html.tree` — Core insertion modes and malformed-tree recovery
+- **in_progress** `html.tree` — Core insertion modes and malformed-tree recovery ([source](../../crates/rustic-html/src/parser/tree.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_corpus.rs))
 - **planned** `html.tables` — Table, formatting, template and foreign content rules
 - **planned** `html.scripts` — Parser/script reentry and encoding restart
 - **planned** `html.loader` — Bounded local loader and dump-dom command

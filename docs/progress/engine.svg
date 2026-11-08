@@ -65,7 +65,7 @@
 <rect x="70.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Full named/numeric character references: complete</title></rect>
 <rect x="87.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>Comments, doctypes and declaration recovery: complete</title></rect>
 <rect x="104.00" y="228" width="14.00" height="12" rx="2" fill="#3fb950"><title>RCDATA, RAWTEXT, script and plaintext modes: complete</title></rect>
-<rect x="121.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Core insertion modes and malformed-tree recovery: planned</title></rect>
+<rect x="121.00" y="228" width="14.00" height="12" rx="2" fill="#d29922"><title>Core insertion modes and malformed-tree recovery: in_progress</title></rect>
 <rect x="138.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Table, formatting, template and foreign content rules: planned</title></rect>
 <rect x="155.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Parser/script reentry and encoding restart: planned</title></rect>
 <rect x="172.00" y="228" width="14.00" height="12" rx="2" fill="#30363d"><title>Bounded local loader and dump-dom command: planned</title></rect>
@@ -313,6 +313,6 @@
 <rect x="370" y="716" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="390" y="727" fill="#c9d1d9" font-size="12">Planned</text>
 <text x="24" y="756" fill="#c9d1d9" font-size="12">100% requires every capability and final engine acceptance on Windows, macOS, Linux, Android and iOS.</text>
-<text x="24" y="780" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 9ef06dc76e41</text>
+<text x="24" y="780" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot ca876e8de245</text>
 </g>
 </svg>

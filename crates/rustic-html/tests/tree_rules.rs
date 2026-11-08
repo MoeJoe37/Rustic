@@ -157,10 +157,7 @@ fn selectedcontent_mirrors_the_selected_option_when_it_is_popped() {
             .join("|")
     };
     let button = "<select><button><selectedcontent></button>";
-    assert_eq!(
-        mirror(&format!("{button}<option>A<option>B")),
-        "text \"A\""
-    );
+    assert_eq!(mirror(&format!("{button}<option>A<option>B")), "text \"A\"");
     assert_eq!(
         mirror(&format!("{button}<option>A<option selected>B</option>")),
         "text \"B\""

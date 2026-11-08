@@ -25,7 +25,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         .collect();
     let family = if target.starts_with("html") {
         "html"
-    } else if target == "css-cascade" {
+    } else if target == "css-cascade" || target == "css-invalidation" {
         "css"
     } else {
         target

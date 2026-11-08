@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "e0007e7d8e2b9f33a0969137f6982a135bf11879778c60dace0157d2568a4233",
-  "percent": "17.31",
+  "source_fingerprint": "54f9c961a08c587f86f4956616ec7982dbe75c9294e93376d6925b45b71f3397",
+  "percent": "17.89",
   "verified_percent": "16.11",
-  "partial_percent": "1.20",
+  "partial_percent": "1.78",
   "completed": 32,
-  "in_progress": 3,
+  "in_progress": 4,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 4,
       "total": 8,
-      "percent": "64.74",
+      "percent": "71.15",
       "verified_percent": "53.84",
-      "partial_percent": "10.90"
+      "partial_percent": "17.31"
     },
     {
       "id": "M3",
@@ -1446,9 +1446,53 @@
           "label": "Correct incremental invalidation against reference path",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Incremental restyle from attribute, child-list and text mutations, checked against the full-restyle reference (tests and fuzz target)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/invalidation.rs",
+                  "marker": "pub struct StyledDocument"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn inserted_removed_and_moved_elements"
+                }
+              ]
+            },
+            {
+              "label": "Media environment changes (viewport resize, preferences) restyle only when a query result changes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "pub fn set_environment"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn environment_changes_restyle_through_the_cascade"
+                }
+              ]
+            },
+            {
+              "label": "Targeted invalidation for :has() and element states instead of full restyles (TD-32)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Invalidation for custom property and container query dependencies",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "1.15"
         },
         {
@@ -1464,12 +1508,12 @@
       ],
       "points": 39,
       "completed": 4,
-      "in_progress": 2,
+      "in_progress": 3,
       "total": 8,
-      "contribution": "5.82",
-      "percent": "64.74",
+      "contribution": "6.40",
+      "percent": "71.15",
       "verified_percent": "53.84",
-      "partial_percent": "10.90"
+      "partial_percent": "17.31"
     },
     {
       "id": "text",

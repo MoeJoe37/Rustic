@@ -43,6 +43,7 @@ mod computed;
 mod dom;
 mod html;
 mod html_state;
+mod invalidation;
 mod layer;
 mod loading;
 mod matching;
@@ -57,6 +58,7 @@ pub use html::{
     HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,
     document_cascade_with, dump_computed_styles, html_user_agent_sheet,
 };
+pub use invalidation::{InvalidationMap, Mutation, RestyleStats, StyledDocument};
 pub use layer::{LayerName, LayerSegment};
 pub use loading::{
     DEFAULT_MAX_EXTERNAL_BYTES, DEFAULT_MAX_EXTERNAL_SHEETS, DEFAULT_MAX_IMPORT_DEPTH, FetchError,

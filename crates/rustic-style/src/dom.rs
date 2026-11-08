@@ -1,5 +1,7 @@
 //! [`ElementView`] for `rustic-dom` documents.
 
+use std::collections::{HashMap, HashSet};
+
 use rustic_css::{CssParser, SelectorList};
 use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
 
@@ -219,10 +221,76 @@ pub fn style_tree<'a>(
     cx: &MatchContext<DomElement<'a>>,
     compute: &ComputeContext,
 ) -> Result<Vec<ElementStyle>, DomError> {
+    style_walk(document, root, cascade, parser, cx, compute, None).map(|walk| walk.styles)
+}
+
+/// Styles kept from an earlier walk and what has to be recomputed; see
+/// [`crate::StyledDocument`].
+pub(crate) struct Reuse<'r> {
+    /// The earlier styles with the style parent (parent element or host)
+    /// each had then.
+    pub previous: HashMap<NodeId, (ElementStyle, Option<NodeId>)>,
+    pub dirty: &'r Dirty,
+}
+
+/// Elements whose styles may be stale.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Dirty {
+    /// Everything.
+    pub all: bool,
+    /// These elements themselves.
+    pub elements: HashSet<NodeId>,
+    /// These elements and everything below them (shadow trees included).
+    pub subtrees: HashSet<NodeId>,
+    /// Children were inserted or moved somewhere: walk the tree to find
+    /// elements without a style or with a new style parent.
+    pub children: bool,
+}
+
+impl Dirty {
+    pub fn is_clean(&self) -> bool {
+        !self.all && !self.children && self.elements.is_empty() && self.subtrees.is_empty()
+    }
+}
+
+pub(crate) struct Walked {
+    pub styles: Vec<ElementStyle>,
+    /// Style parents in the same order as `styles`.
+    pub parents: Vec<Option<NodeId>>,
+    /// How many elements went through the cascade.
+    pub recomputed: usize,
+}
+
+/// One styled ancestor on the current path.
+#[derive(Clone, Copy)]
+struct PathEntry {
+    depth: usize,
+    index: usize,
+    /// Everything below must be recomputed (a dirty subtree).
+    subtree: bool,
+    /// Its computed style changed, so its children must be recomputed.
+    changed: bool,
+}
+
+/// The walk behind [`style_tree`]; with `reuse`, an element keeps its
+/// earlier style unless it is dirty, has a new style parent, or its parent
+/// (or the root) got a different computed style.
+pub(crate) fn style_walk<'a>(
+    document: &'a Document,
+    root: NodeId,
+    cascade: &Cascade,
+    parser: &CssParser,
+    cx: &MatchContext<DomElement<'a>>,
+    compute: &ComputeContext,
+    mut reuse: Option<Reuse<'_>>,
+) -> Result<Walked, DomError> {
     let mut out: Vec<ElementStyle> = Vec::new();
-    // (depth, index into `out`) of the styled ancestors on the current path.
-    let mut path: Vec<(usize, usize)> = Vec::new();
+    let mut parents: Vec<Option<NodeId>> = Vec::new();
+    let mut recomputed = 0usize;
+    let mut path: Vec<PathEntry> = Vec::new();
     let mut root_style: Option<usize> = None;
+    // A changed root style changes `rem` and friends everywhere.
+    let mut root_changed = false;
     // The tree and the cascade stay borrowed and unchanged for the whole
     // restyle, so match results can be shared.
     let cache = MatchCache::default();
@@ -243,51 +311,100 @@ pub fn style_tree<'a>(
             continue; // The shadow root itself, standing in for its host.
         }
         let (scope, depth) = (tree.scope, tree.base + depth);
-        while path.last().is_some_and(|&(d, _)| d >= depth) {
+        while path.last().is_some_and(|e| e.depth >= depth) {
             path.pop();
         }
         let Some(element) = DomElement::new(document, id) else {
             continue;
         };
-        let style_attribute = element
-            .attributes()
-            .find(|a| a.namespace.is_none() && a.local == "style")
-            .map(|a| String::from_utf16_lossy(a.value));
-        let (inline, inline_diagnostics) = match style_attribute {
-            Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
-            None => Default::default(),
-        };
-        let shadow_root = element.element.shadow_root();
-        let inputs = StyleInputs {
-            style_attribute: &inline,
-            scope,
-            shadow_root: shadow_root.map(shadow_tree_context),
-            ..StyleInputs::document()
-        };
         // Only a direct parent element (or host) passes its style on.
-        let parent = path
-            .last()
-            .filter(|&&(d, _)| d + 1 == depth)
-            .map(|&(_, i)| &out[i].computed);
-        let specified = cascade.specified_style_cached(element, cx, &inputs, parent, &cache);
-        let root_computed = root_style.map(|i| &out[i].computed);
-        let computed = ComputedStyle::compute(
-            &specified,
-            parent,
-            root_computed,
-            element.is_root() || root_style.is_none(),
-            compute,
-        );
+        let parent_entry = path.last().copied().filter(|e| e.depth + 1 == depth);
+        let parent_id = parent_entry.map(|e| out[e.index].node);
+        let shadow_root = element.element.shadow_root();
+
+        let mut subtree = parent_entry.is_some_and(|e| e.subtree);
+        let kept = match reuse.as_mut() {
+            None => None,
+            Some(reuse) => {
+                subtree |= reuse.dirty.subtrees.contains(&id);
+                let must = reuse.dirty.all
+                    || subtree
+                    || root_changed
+                    || parent_entry.is_some_and(|e| e.changed)
+                    || reuse.dirty.elements.contains(&id);
+                match reuse.previous.remove(&id) {
+                    Some((style, old_parent)) if !must && old_parent == parent_id => {
+                        Some(Ok(style))
+                    }
+                    Some((style, old_parent)) => {
+                        // A moved element is styled afresh, with its subtree.
+                        subtree |= old_parent != parent_id;
+                        Some(Err(Some(style)))
+                    }
+                    None => {
+                        subtree = true;
+                        Some(Err(None))
+                    }
+                }
+            }
+        };
+        let (style, changed) = match kept {
+            Some(Ok(style)) => (style, false),
+            other => {
+                let previous = match other {
+                    Some(Err(previous)) => previous,
+                    _ => None,
+                };
+                recomputed += 1;
+                let style_attribute = element
+                    .attributes()
+                    .find(|a| a.namespace.is_none() && a.local == "style")
+                    .map(|a| String::from_utf16_lossy(a.value));
+                let (inline, inline_diagnostics) = match style_attribute {
+                    Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
+                    None => Default::default(),
+                };
+                let inputs = StyleInputs {
+                    style_attribute: &inline,
+                    scope,
+                    shadow_root: shadow_root.map(shadow_tree_context),
+                    ..StyleInputs::document()
+                };
+                let parent = parent_entry.map(|e| &out[e.index].computed);
+                let specified =
+                    cascade.specified_style_cached(element, cx, &inputs, parent, &cache);
+                let root_computed = root_style.map(|i| &out[i].computed);
+                let computed = ComputedStyle::compute(
+                    &specified,
+                    parent,
+                    root_computed,
+                    element.is_root() || root_style.is_none(),
+                    compute,
+                );
+                let changed = previous.as_ref().is_none_or(|p| p.computed != computed);
+                (
+                    ElementStyle {
+                        node: id,
+                        specified,
+                        computed,
+                        inline_diagnostics,
+                    },
+                    changed,
+                )
+            }
+        };
         if root_style.is_none() {
             root_style = Some(out.len());
+            root_changed = changed && reuse.is_some();
         }
-        path.push((depth, out.len()));
-        out.push(ElementStyle {
-            node: id,
-            specified,
-            computed,
-            inline_diagnostics,
+        path.push(PathEntry {
+            depth,
+            index: out.len(),
+            subtree,
+            changed,
         });
+        out.push(style);
+        parents.push(parent_id);
         if let Some(shadow_root) = shadow_root {
             walks.push(TreeWalk {
                 walk: document.walk(shadow_root)?,
@@ -301,5 +418,9 @@ pub fn style_tree<'a>(
             });
         }
     }
-    Ok(out)
+    Ok(Walked {
+        styles: out,
+        parents,
+        recomputed,
+    })
 }

@@ -79,6 +79,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Open, pay with text shaping (M3) |
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
+| TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -474,6 +475,22 @@ controls get no owner. **Pay:** record parser-set form owners on the element
 when form association (`HTMLFormElement.elements`) is implemented.
 **Trigger:** WEB-series form APIs, or the first test that needs parser
 association.
+
+### TD-32 — `:has()` and element states invalidate the whole document
+
+`StyledDocument` (CSS-06) restyles only what a mutation can affect, except
+when the cascade uses `:has()` or an HTML element state that reads
+whole-tree facts (`:checked`, `:default`, `:indeterminate`, `:disabled`,
+`:read-write`, `:placeholder-shown`, `:lang()`, `:dir()`, ...). Then any
+child-list or text change, and any change to an attribute those read, restyles
+every element. That is correct but costs a full restyle per mutation on pages
+that use them. **Pay:** invalidation sets for `:has()` (walk up from the
+mutated element to anchors whose arguments can match, as browsers do) and
+targeted state invalidation (a radio group's members, a form's submit
+buttons, the subtree under a changed `lang`/`dir`/`disabled` fieldset, text
+changes only under `dir=auto` ancestors). **Trigger:** script-driven DOM
+mutation (JS-series) or a measured restyle cost on a page using these
+selectors.
 
 ## Reviewing new work
 

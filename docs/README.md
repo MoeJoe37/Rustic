@@ -46,6 +46,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Colors, lengths and typed values for display, box model and font basics | Implemented declared set (CSS-03) | `rustic-css`; [8,041 pinned color cases and property tests](CSS.md#property-values) |
 | Cascade: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance | Implemented for unlayered styles (CSS-04) | `rustic-style`; [cascade tests and fuzz target](CSS.md#cascade) |
 | Media queries: parsing, serialization, evaluation, `@media` rules and `<style media>` | Implemented Media Queries 4 with Level 5 features (CSS-06) | `rustic-css`, `rustic-style`; [media tests and fuzz target](CSS.md#media-queries) |
+| Incremental restyle after DOM mutations, checked against full restyles | Implemented; `:has()` and element states restyle everything (TD-32) | `rustic-style`; [invalidation tests and fuzz target](CSS.md#invalidation) |
 | Computed values, HTML user-agent sheet, `<style>` attachment and `rustic dump-style` | Implemented for the declared longhands (CSS-05) | `rustic-style`, `rustic-cli`; [computed-style tests and snapshot](CSS.md#computed-style) |
 | Selector syntax, specificity, An+B and selector matching over the DOM | Implemented declared subset (CSS-02) | `rustic-css` and `rustic-style`; [128 An+B cases, syntax and matching tests](CSS.md#selectors) |
 | Deterministic parser fuzz targets, seed replay and reproducers | Implemented blind mutation fuzzer | `rustic-fuzz`; required CI smoke job and nightly campaign |

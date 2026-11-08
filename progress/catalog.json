@@ -1254,8 +1254,52 @@
           "label": "Correct incremental invalidation against reference path",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Incremental restyle from attribute, child-list and text mutations, checked against the full-restyle reference (tests and fuzz target)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/invalidation.rs",
+                  "marker": "pub struct StyledDocument"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn inserted_removed_and_moved_elements"
+                }
+              ]
+            },
+            {
+              "label": "Media environment changes (viewport resize, preferences) restyle only when a query result changes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "pub fn set_environment"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn environment_changes_restyle_through_the_cascade"
+                }
+              ]
+            },
+            {
+              "label": "Targeted invalidation for :has() and element states instead of full restyles (TD-32)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Invalidation for custom property and container query dependencies",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.conformance",

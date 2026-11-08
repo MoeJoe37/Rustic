@@ -443,6 +443,7 @@ default budgets plus a differential invariant:
 | `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01); typed longhands serialize to a fixed point (CSS-03) | Checked-in sheet plus the css-parsing-tests inputs |
 | `css-selector` | Every valid selector list serializes to a fixed point with equal specificities and selects the same elements of a fixed document in HTML, quirks and XML modes (added with CSS-02) | Checked-in selectors plus the pinned `An+B` inputs |
 | `css-cascade` | Styling a fixed document with an arbitrary author sheet is total and unchanged by splitting the sheet, repeating it or adding an empty user sheet (added with CSS-04); computed values stay finite and the style dump always succeeds (CSS-05) | The `css` seeds |
+| `css-invalidation` | A fixed document styled with an arbitrary sheet and mutated by a script of up to 96 attribute, insertion, removal, move and text changes restyles incrementally to exactly a full restyle (added with CSS-06) | The `css` seeds |
 | `css-media` | Media query list serialization is a fixed point after one round and the reparsed list matches the same desktop, phone, print and zero-size environments (added with CSS-06) | `corpus/css-media` |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
@@ -637,7 +638,7 @@ from the previous counted sibling, so long lists match in linear time. The
 `css.queries` each have one of four steps; variables, media queries and
 external sheets remain. See [CSS.md](CSS.md#computed-style).
 
-## CSS-06 (in progress) — Media queries
+## CSS-06 (in progress) — Media queries and invalidation
 
 `rustic-css` parses, serializes and evaluates Media Queries 4 lists (with the
 Level 5 preference and capability features), including range syntax,
@@ -646,9 +647,18 @@ Level 5 preference and capability features), including range syntax,
 media conditions; `<style media>` restricts a whole sheet. A `Cascade` holds a
 `MediaEnvironment`, caches query results and reports from `set_environment`
 whether any changed. An eighth fuzz target, `css-media`, found and pinned two
-serialization bugs. Invalidation on DOM mutation, custom properties and
+serialization bugs.
+
+`StyledDocument` restyles incrementally: callers report attribute, child-list
+and text mutations, an `InvalidationMap` built from the cascade's selectors
+picks the affected elements (the element, its subtree, following siblings,
+siblings and parent for structural selectors), and the walk reuses every other
+style, restyling children only when a parent's computed style changed. `:has()`
+and HTML element states fall back to a full restyle for the mutations they can
+see (TD-32). A ninth fuzz target, `css-invalidation`, checks incremental
+results against full restyles after scripted mutations. Custom properties and
 container queries are the remaining CSS-06 work. See
-[CSS.md](CSS.md#media-queries).
+[CSS.md](CSS.md#media-queries) and [CSS.md](CSS.md#invalidation).
 
 ## External stylesheets — `<link rel=stylesheet>` and `@import`
 
@@ -717,7 +727,7 @@ must keep all tiers green.
 | DOC-06d: `selectedcontent` mirroring | Done: last four known tree failures fixed; 1,776/1,776 runnable records |
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
-| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and eight fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
+| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and nine fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 | CSS-04: cascade and inheritance | Complete: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins added by CSS-07b |

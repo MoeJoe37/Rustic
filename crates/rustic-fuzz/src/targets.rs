@@ -15,8 +15,8 @@ use rustic_html::{
     ParseError, Token,
 };
 use rustic_style::{
-    Cascade, ComputeContext, LayerSegment, MatchContext, Origin, StyleSheet, dump_computed_styles,
-    query_selector_all, style_tree,
+    Cascade, ComputeContext, LayerSegment, MatchContext, Mutation, Origin, StyleSheet,
+    StyledDocument, dump_computed_styles, query_selector_all, style_tree,
 };
 use rustic_url::{Url, UrlParser};
 
@@ -44,6 +44,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(CssSelectorTarget),
         Box::new(CssCascadeTarget),
         Box::new(CssMediaTarget),
+        Box::new(CssInvalidationTarget),
         Box::new(UrlTarget),
     ]
 }
@@ -937,6 +938,275 @@ impl Target for CssMediaTarget {
             }
         }
         Ok(())
+    }
+}
+
+/// Incremental restyling: a fixed document styled with an arbitrary author
+/// sheet, then mutated by a script of attribute, child-list and text
+/// changes, must match a full restyle at every checkpoint.
+///
+/// Input up to the first NUL byte is the sheet and the rest the script; an
+/// input without NUL uses its own bytes as both.
+pub struct CssInvalidationTarget;
+
+const INVALIDATION_DOCUMENT: &[u8] = b"<!doctype html><html lang=en><body>\
+<div id=a class='x y'><p id=b class=x>one<span>two</span></p><p dir=auto>\
+<b></b><i style='margin: inherit'></i></p></div><ul><li><li class=y><li></ul>\
+<form><input type=checkbox><input type=radio name=g checked><input type=radio name=g>\
+<button>go</button><fieldset disabled><legend><input></legend><input></fieldset></form>\
+<a href=x>link</a><p></p><dialog></dialog>";
+
+const MUTATION_ATTRIBUTES: &[&str] = &[
+    "class",
+    "id",
+    "style",
+    "disabled",
+    "checked",
+    "lang",
+    "dir",
+    "hidden",
+    "data-x",
+    "type",
+    "value",
+    "href",
+    "open",
+    "name",
+    "selected",
+    "placeholder",
+];
+const MUTATION_VALUES: &[&str] = &[
+    "",
+    "x",
+    "y",
+    "x y",
+    "a",
+    "rtl",
+    "auto",
+    "de",
+    "color: red",
+    "font-size: 2em",
+    "radio",
+    "checkbox",
+    "width: 1rem",
+    "\u{5d0}",
+];
+const MUTATION_TAGS: &[&str] = &["div", "p", "li", "span", "input", "b", "ul", "html"];
+
+fn invalidation_elements(document: &rustic_dom::Document) -> Vec<rustic_dom::NodeId> {
+    document
+        .walk(document.root())
+        .map(|walk| {
+            walk.filter(|&(id, _)| {
+                matches!(
+                    document.node(id).map(|n| n.kind()),
+                    Ok(rustic_dom::NodeKind::Element(_))
+                )
+            })
+            .map(|(id, _)| id)
+            .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn invalidation_texts(document: &rustic_dom::Document) -> Vec<rustic_dom::NodeId> {
+    document
+        .walk(document.root())
+        .map(|walk| {
+            walk.filter(|&(id, _)| {
+                matches!(
+                    document.node(id).map(|n| n.kind()),
+                    Ok(rustic_dom::NodeKind::Text(_))
+                )
+            })
+            .map(|(id, _)| id)
+            .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Apply one scripted mutation and return what to report (nothing when the
+/// DOM refused it); `None` when the script ran out.
+fn apply_mutation(
+    document: &mut rustic_dom::Document,
+    script: &mut impl Iterator<Item = u8>,
+) -> Option<Vec<Mutation>> {
+    use rustic_dom::QualifiedName;
+    let op = script.next()?;
+    let pick = |script: &mut dyn Iterator<Item = u8>, len: usize| {
+        script.next().map(|b| usize::from(b) % len.max(1))
+    };
+    let elements = invalidation_elements(document);
+    let mutation = match op % 6 {
+        0 | 1 => {
+            let element = *elements.get(pick(script, elements.len())?)?;
+            let local = MUTATION_ATTRIBUTES[pick(script, MUTATION_ATTRIBUTES.len())?];
+            let name = QualifiedName::from_parsed(None, None, local).ok()?;
+            let done = if op % 6 == 0 {
+                let value = MUTATION_VALUES[pick(script, MUTATION_VALUES.len())?];
+                document.set_attribute(element, name, value).is_ok()
+            } else {
+                document.remove_attribute(element, None, local).is_ok()
+            };
+            done.then(|| Mutation::Attribute {
+                element,
+                local: local.into(),
+            })
+        }
+        2 => {
+            let parent = *elements.get(pick(script, elements.len())?)?;
+            let tag = MUTATION_TAGS[pick(script, MUTATION_TAGS.len())?];
+            let child = document
+                .create_element(QualifiedName::html(tag).ok()?)
+                .ok()?;
+            document
+                .append_child(parent, child)
+                .is_ok()
+                .then_some(Mutation::Children { parent })
+        }
+        3 => {
+            // Skip the root element so the document keeps one.
+            let element = *elements.get(1 + pick(script, elements.len().saturating_sub(1))?)?;
+            let parent = document.node(element).ok()?.parent()?;
+            document
+                .detach(element)
+                .is_ok()
+                .then_some(Mutation::Children { parent })
+        }
+        4 => {
+            let element = *elements.get(1 + pick(script, elements.len().saturating_sub(1))?)?;
+            let target = *elements.get(pick(script, elements.len())?)?;
+            let old_parent = document.node(element).ok()?.parent()?;
+            if document.append_child(target, element).is_err() {
+                return Some(Vec::new());
+            }
+            return Some(vec![
+                Mutation::Children { parent: old_parent },
+                Mutation::Children { parent: target },
+            ]);
+        }
+        _ => {
+            let texts = invalidation_texts(document);
+            let text = *texts.get(pick(script, texts.len())?)?;
+            let value = if script.next()? % 2 == 0 {
+                ""
+            } else {
+                "x\u{5d0}"
+            };
+            document
+                .set_character_data(text, value)
+                .is_ok()
+                .then_some(Mutation::Text { node: text })
+        }
+    };
+    Some(mutation.into_iter().collect())
+}
+
+impl Target for CssInvalidationTarget {
+    fn name(&self) -> &'static str {
+        "css-invalidation"
+    }
+
+    fn max_len(&self) -> usize {
+        1024
+    }
+
+    fn dictionary(&self) -> &'static [&'static [u8]] {
+        &[
+            b"\0",
+            b"{",
+            b"}",
+            b".x",
+            b"#a",
+            b"[hidden]",
+            b"[data-x]",
+            b" > ",
+            b" + ",
+            b" ~ ",
+            b":nth-child(odd)",
+            b":empty",
+            b":has(.x)",
+            b":checked",
+            b":disabled",
+            b":lang(de)",
+            b":dir(rtl)",
+            b":first-child",
+            b"color: red",
+            b"font-size: 2em",
+            b"width: inherit",
+            b"\x00\x00\x00\x00",
+            b"\x02\x03\x04",
+        ]
+    }
+
+    fn check(&self, input: &[u8]) -> Result<(), String> {
+        let (sheet_bytes, script_bytes) = match input.iter().position(|&b| b == 0) {
+            Some(nul) => (&input[..nul], &input[nul + 1..]),
+            None => (input, input),
+        };
+        let text = String::from_utf8_lossy(sheet_bytes);
+        let parser = CssParser::default();
+        let Ok((sheet, _)) = StyleSheet::parse(&parser, &text, Origin::Author) else {
+            return Ok(());
+        };
+        let mut html = HtmlDocumentParser::default();
+        if html.feed(INVALIDATION_DOCUMENT).is_err() {
+            return Ok(());
+        }
+        let Ok(parsed) = html.finish() else {
+            return Ok(());
+        };
+        let mut document = parsed.into_document();
+        let Ok((mut cascade, _)) = rustic_style::document_cascade(&document, &parser) else {
+            return Ok(());
+        };
+        cascade.push(sheet);
+        let cx = MatchContext::html();
+        let compute = ComputeContext::default();
+        let Ok(mut styled) = StyledDocument::new(&document, &cascade, &parser, &cx, &compute)
+        else {
+            return Ok(());
+        };
+        let mut script = script_bytes.iter().copied().take(96);
+        let mut step = 0usize;
+        let check = |styled: &mut StyledDocument,
+                     document: &rustic_dom::Document,
+                     step: usize|
+         -> Result<(), String> {
+            let cx = MatchContext::html();
+            styled
+                .restyle(document, &cascade, &parser, &cx, &compute)
+                .map_err(|e| format!("restyle failed: {e}"))?;
+            let full = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)
+                .map_err(|e| format!("full restyle failed: {e}"))?;
+            if full.len() != styled.styles().len() {
+                return Err(format!(
+                    "step {step}: {} incremental styles, {} full",
+                    styled.styles().len(),
+                    full.len()
+                ));
+            }
+            for (a, b) in styled.styles().iter().zip(&full) {
+                if a != b {
+                    return Err(format!(
+                        "step {step}: element {:?} differs from a full restyle:\n{}---\n{}",
+                        a.node,
+                        a.computed.dump_non_initial(),
+                        b.computed.dump_non_initial()
+                    ));
+                }
+            }
+            Ok(())
+        };
+        while let Some(mutations) = apply_mutation(&mut document, &mut script) {
+            step += 1;
+            for mutation in mutations {
+                styled.note(&document, mutation);
+            }
+            if step % 3 == 0 {
+                check(&mut styled, &document, step)?;
+            }
+        }
+        check(&mut styled, &document, step)
     }
 }
 

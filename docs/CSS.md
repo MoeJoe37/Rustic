@@ -11,9 +11,9 @@ values for colors, lengths, the box model, `display` and font basics (see
 [Property values](#property-values)), CSS-04 the cascade (see
 [Cascade](#cascade)), and CSS-05 computed values, the HTML user-agent
 stylesheet, `<style>` attachment and a style dump (see
-[Computed style](#computed-style)). CSS-06 is under way: media queries are
-done (see [Media queries](#media-queries)); invalidation and custom properties
-follow.
+[Computed style](#computed-style)). CSS-06 is under way: media queries (see
+[Media queries](#media-queries)) and incremental invalidation (see
+[Invalidation](#invalidation)) are done; custom properties follow.
 `<link rel=stylesheet>` and `@import` load over a caller-controlled fetcher
 (see [External stylesheets](#external-stylesheets)).
 CSS-07a completed the required selectors: `:has()`, form states, `:lang()`,
@@ -559,6 +559,35 @@ decoration line is set. Output is bounded by a byte limit.
 prints the dump. The fixture `crates/rustic-cli/tests/fixtures/styled.html` and
 its snapshot `styled.dump` cover it.
 
+### Computed style evidence
+
+* `rustic-style/tests/computed.rs`: font-size keywords, percentages, `em`,
+  `rem` and root `rem`; absolute, font-relative, `lh` and viewport units;
+  line-height percentages versus numbers under inheritance; relative font
+  weights; `currentcolor` and border widths with `none` styles; root
+  blockification; a clean parse of the user-agent sheet; `<style>` attachment
+  (type, media, templates, foreign content, diagnostics); and an exact dump.
+* `rustic-style/tests/matching.rs`: cached `:nth-*` positions agree with fresh
+  matching for nine selectors including nested `of S` lists, and four `:nth-*`
+  selectors over a 20,000-element list stay linear.
+* `rustic-cli/tests/cli.rs`: the `dump-style` snapshot at several chunk sizes,
+  exact output budgets and URL rejection.
+* `rustic-style/tests/external.rs`: link and `<style>` interleaving, link
+  `rel`/`type`/`media`/`disabled`/`alternate` handling, `<base href>`,
+  missing base URLs, blocked loads without a fetcher, nested import order and
+  relative resolution, import conditions and placement, self and mutual import
+  cycles, fetch caching, exact depth, sheet-count and byte budgets, a fetcher
+  that ignores its budget, a 5,000-deep import chain, and diagnostic spans
+  inside imported sheets.
+* `rustic-cli/tests/cli.rs` and `stylesheets.rs` unit tests: the `linked.dump`
+  snapshot (BOM, cycles, blocked parent-directory and network URLs, missing
+  files) at several chunk sizes, the three budget options, symbolic links out
+  of the directory (Unix), and `file:` URL to path round trips with
+  percent-encoded separators and NUL rejected.
+* The `css-cascade` fuzz target also checks that computed font sizes stay
+  finite and non-negative, no computed value serializes as NaN or infinity, and
+  the dump always succeeds (300,000 executions before landing, no failures).
+
 ## Media queries
 
 `rustic-css` parses [Media Queries Level 4](https://drafts.csswg.org/mediaqueries-4/)
@@ -600,31 +629,50 @@ are planned after CSS-06's invalidation work.
   and whitespace split by a comment), both fixed and kept as regression inputs;
   then 900,000 further executions found nothing.
 
-### Computed style evidence
+## Invalidation
 
-* `rustic-style/tests/computed.rs`: font-size keywords, percentages, `em`,
-  `rem` and root `rem`; absolute, font-relative, `lh` and viewport units;
-  line-height percentages versus numbers under inheritance; relative font
-  weights; `currentcolor` and border widths with `none` styles; root
-  blockification; a clean parse of the user-agent sheet; `<style>` attachment
-  (type, media, templates, foreign content, diagnostics); and an exact dump.
-* `rustic-style/tests/matching.rs`: cached `:nth-*` positions agree with fresh
-  matching for nine selectors including nested `of S` lists, and four `:nth-*`
-  selectors over a 20,000-element list stay linear.
-* `rustic-cli/tests/cli.rs`: the `dump-style` snapshot at several chunk sizes,
-  exact output budgets and URL rejection.
-* `rustic-style/tests/external.rs`: link and `<style>` interleaving, link
-  `rel`/`type`/`media`/`disabled`/`alternate` handling, `<base href>`,
-  missing base URLs, blocked loads without a fetcher, nested import order and
-  relative resolution, import conditions and placement, self and mutual import
-  cycles, fetch caching, exact depth, sheet-count and byte budgets, a fetcher
-  that ignores its budget, a 5,000-deep import chain, and diagnostic spans
-  inside imported sheets.
-* `rustic-cli/tests/cli.rs` and `stylesheets.rs` unit tests: the `linked.dump`
-  snapshot (BOM, cycles, blocked parent-directory and network URLs, missing
-  files) at several chunk sizes, the three budget options, symbolic links out
-  of the directory (Unix), and `file:` URL to path round trips with
-  percent-encoded separators and NUL rejected.
-* The `css-cascade` fuzz target also checks that computed font sizes stay
-  finite and non-negative, no computed value serializes as NaN or infinity, and
-  the dump always succeeds (300,000 executions before landing, no failures).
+`StyledDocument` keeps every element's style from a full `style_tree` walk and
+restyles incrementally. The caller reports each DOM change after making it
+(`note` with a `Mutation`: an attribute, a child list, character data, or
+everything), and `restyle` recomputes only what those changes can affect,
+reusing every other element's style. An `InvalidationMap` built from the
+cascade's selectors decides the scope:
+
+| Change | Restyled |
+| --- | --- |
+| Attribute no selector tests | Nothing (`style` restyles its own element) |
+| Attribute tested only in subject compounds (`.x`, `#id`, `[a]`, `:any-link`'s `href`) | The element |
+| Attribute tested in an ancestor or sibling position | The element's subtree, and with `+`/`~` the following siblings' subtrees |
+| Children inserted, removed or moved | Inserted and moved elements with their subtrees (found because they have no style or a new style parent); with structural selectors (`:nth-*`, `:*-child`, `:*-of-type`, `:empty`) or sibling combinators also the siblings and the parent |
+| Text | The parent, when a selector uses `:empty` |
+| Anything, with `:has()` or HTML element states (`:checked`, `:default`, `:disabled`, `:lang()`, `:dir()`, ...) in the cascade, that those can read | Everything (TD-32) |
+| Stylesheets or the media environment (`cascade_changed`) | Everything |
+
+During the walk an element whose computed style changed restyles its children
+(inheritance, and `inherit` on non-inherited properties), which stops where
+the children's styles come out equal; a changed root style restyles everything
+(`rem`, `rlh`). Whole-tree facts (radio groups, default buttons, the pragma
+language, IDs referenced by `form`) are what force the conservative full
+restyle for element states, and `:has()` can make any ancestor or earlier
+sibling depend on a change. The `Element states` facts in
+[Selectors](#element-states) list what each state reads.
+
+The result always equals a fresh `style_tree` walk (`matches_full_restyle`
+checks it). A `<style>` element's text or a loaded external sheet changes the
+cascade itself: rebuild it and call `cascade_changed`. A newly attached shadow
+root is `Mutation::Everything`.
+
+### Invalidation evidence
+
+* `rustic-style/tests/invalidation.rs`: ten scenarios, each checked against a
+  full restyle after every change: unrelated attributes restyle nothing and
+  `style` one element; subject versus ancestor classes; inherited changes
+  stopping where children's styles stay equal; sibling combinators; inserted,
+  moved and removed elements; structural selectors and `:empty`; text; form
+  states, radio groups and `:has()`; root font size and `rem`; and a media
+  environment change.
+* The `css-invalidation` fuzz target styles a fixed document (forms, lists,
+  `dir=auto`, links, a dialog) with an arbitrary sheet, applies up to 96
+  scripted attribute, insertion, removal, move and text mutations, and checks
+  the incremental styles against a full restyle every third step and at the
+  end (320,000 executions before landing, no failures).

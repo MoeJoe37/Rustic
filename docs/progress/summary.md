@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 17.31%** = 16.11% verified complete + 1.20% partial credit. 32/172 capabilities complete, 3 in progress.
+**Overall completion: 17.89%** = 16.11% verified complete + 1.78% partial credit. 32/172 capabilities complete, 4 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `e0007e7d8e2b9f33a0969137f6982a135bf11879778c60dace0157d2568a4233`.
+Catalog: `engine-v3`. Source fingerprint: `54f9c961a08c587f86f4956616ec7982dbe75c9294e93376d6925b45b71f3397`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `e0007e7d8e2b9f33a0969137f6982a135bf11
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 4/8 | 64.74% | 53.84% | 9.00% |
+| M2 CSS & computed style | 4/8 | 71.15% | 53.84% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `e0007e7d8e2b9f33a0969137f6982a135bf11
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 4/8 | 2 | 64.74% | 53.84% | 9% | 5.82 |
+| CSS & style | 4/8 | 3 | 71.15% | 53.84% | 9% | 6.40 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -124,7 +124,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] External stylesheets: link rel=stylesheet and @import over controlled fetching ([source](../../crates/rustic-style/src/html.rs), [source](../../crates/rustic-style/src/loading.rs), [test](../../crates/rustic-style/tests/external.rs), [test](../../crates/rustic-cli/tests/cli.rs))
   - [x] Media queries (@media rules and media attributes) re-evaluated when the environment changes ([source](../../crates/rustic-css/src/media.rs), [test](../../crates/rustic-style/tests/cascade.rs))
   - [ ] Container queries
-- **planned** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine
+- **in progress 50.00%** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine
+  - [x] Incremental restyle from attribute, child-list and text mutations, checked against the full-restyle reference (tests and fuzz target) ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
+  - [x] Media environment changes (viewport resize, preferences) restyle only when a query result changes ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
+  - [ ] Targeted invalidation for :has() and element states instead of full restyles (TD-32)
+  - [ ] Invalidation for custom property and container query dependencies
 - **planned** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 1.15% of engine
 
 ### Text & fonts

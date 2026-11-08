@@ -1,12 +1,117 @@
 {
-  "schema_version": 1,
-  "catalog_version": "engine-v2",
-  "source_fingerprint": "17800c1cfded49aaf1e65bea148eeb51cf579a396b3ca15a58f8fa0d340fd2a0",
-  "percent": "9.04",
+  "schema_version": 2,
+  "catalog_version": "engine-v3",
+  "source_fingerprint": "1d2f1110f132059d371d6a0f36d4fc9717cc9b89c911b170a6eb88b7d53eccdf",
+  "percent": "8.40",
+  "verified_percent": "8.03",
+  "partial_percent": "0.37",
   "completed": 20,
+  "in_progress": 1,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
+  "milestones": [
+    {
+      "id": "M1",
+      "label": "Document core",
+      "share": "11.27",
+      "completed": 20,
+      "total": 28,
+      "percent": "74.60",
+      "verified_percent": "71.29",
+      "partial_percent": "3.31"
+    },
+    {
+      "id": "M2",
+      "label": "CSS & computed style",
+      "share": "9.00",
+      "completed": 0,
+      "total": 8,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M3",
+      "label": "Static renderer",
+      "share": "12.22",
+      "completed": 0,
+      "total": 17,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M4",
+      "label": "ECMAScript runtime",
+      "share": "10.68",
+      "completed": 0,
+      "total": 13,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M5",
+      "label": "Scripted documents",
+      "share": "7.46",
+      "completed": 0,
+      "total": 11,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M6",
+      "label": "Networking & services",
+      "share": "5.12",
+      "completed": 0,
+      "total": 12,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M7",
+      "label": "Isolation & security",
+      "share": "4.46",
+      "completed": 0,
+      "total": 8,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M8",
+      "label": "Desktop & mobile alpha",
+      "share": "10.83",
+      "completed": 0,
+      "total": 20,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M9",
+      "label": "Compatibility expansion",
+      "share": "25.38",
+      "completed": 0,
+      "total": 46,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M10",
+      "label": "Embedding & release",
+      "share": "3.53",
+      "completed": 0,
+      "total": 9,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    }
+  ],
   "groups": [
     {
       "id": "base",
@@ -16,6 +121,8 @@
         {
           "id": "base.identity",
           "label": "Document/node identity and stale-handle contracts",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -28,11 +135,15 @@
               "path": "crates/rustic-dom/tests/tree.rs",
               "marker": "stale_forged_and_foreign_handles"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.25"
         },
         {
           "id": "base.budgets",
           "label": "Checked resource accounting",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -45,11 +156,15 @@
               "path": "crates/rustic-base/src/budget.rs",
               "marker": "overflow_and_zero_capacity_are_checked"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.25"
         },
         {
           "id": "base.cancellation",
           "label": "Cooperative cancellation",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -62,11 +177,15 @@
               "path": "crates/rustic-base/src/cancellation.rs",
               "marker": "clones_share_cancellation_across_threads"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.25"
         },
         {
           "id": "base.spans",
           "label": "Checked source byte spans",
+          "size": 1,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -79,11 +198,15 @@
               "path": "crates/rustic-base/src/source.rs",
               "marker": "rejects_reversed_out_of_bounds"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.12"
         },
         {
           "id": "base.clocks",
           "label": "Injectable monotonic clocks",
+          "size": 1,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -96,30 +219,49 @@
               "path": "crates/rustic-base/src/clock.rs",
               "marker": "advances_deterministically"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.12"
         },
         {
           "id": "base.geometry",
           "label": "Typed CSS/device geometry and checked surface allocation",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         },
         {
           "id": "base.diagnostics",
           "label": "Structured source/revision diagnostics and redaction",
+          "size": 2,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.25"
         },
         {
           "id": "base.lifecycle",
           "label": "Coordinated lifecycle, shutdown and resource ownership",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         }
       ],
+      "points": 16,
       "completed": 5,
+      "in_progress": 0,
       "total": 8,
-      "percent": "62.50"
+      "contribution": "1.00",
+      "percent": "50.00",
+      "verified_percent": "50.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "url",
@@ -129,6 +271,8 @@
         {
           "id": "url.records",
           "label": "Declared ASCII URL/reference parsing subset",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -141,11 +285,15 @@
               "path": "crates/rustic-url/tests/wpt.rs",
               "marker": "pinned_upstream_url_subset"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.30"
         },
         {
           "id": "url.addresses",
           "label": "IPv4/IPv6 host parsing and canonicalization",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -158,11 +306,15 @@
               "path": "crates/rustic-url/tests/url.rs",
               "marker": "ipv6_uses_first_longest_zero_run"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.20"
         },
         {
           "id": "url.origins",
           "label": "Tuple and process-local opaque origin identity",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -175,66 +327,109 @@
               "path": "crates/rustic-url/tests/url.rs",
               "marker": "null_serialization_never_merges"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.20"
         },
         {
           "id": "url.idna",
           "label": "Unicode IDNA and data adapter",
+          "size": 3,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
         },
         {
           "id": "url.file",
           "label": "File URL and platform rules",
+          "size": 2,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.20"
         },
         {
           "id": "url.blob",
           "label": "Blob registry and origin rules",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.20"
         },
         {
           "id": "url.setters",
           "label": "URL setters and URLSearchParams",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.20"
         },
         {
           "id": "url.encoding",
           "label": "Required legacy decoders and charset selection",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "url.restart",
           "label": "Encoding sniff/restart integration",
+          "size": 2,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.20"
         },
         {
           "id": "url.diagnostics",
           "label": "Validation-error diagnostics and source locations",
+          "size": 1,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.10"
         },
         {
           "id": "url.policy",
           "label": "Navigation origin inheritance and policy integration",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
         },
         {
           "id": "url.conformance",
           "label": "Complete declared URL/encoding conformance gate",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
         }
       ],
+      "points": 30,
       "completed": 3,
+      "in_progress": 0,
       "total": 12,
-      "percent": "25.00"
+      "contribution": "0.70",
+      "percent": "23.33",
+      "verified_percent": "23.33",
+      "partial_percent": "0.00"
     },
     {
       "id": "dom",
@@ -244,6 +439,8 @@
         {
           "id": "dom.storage",
           "label": "Bounded document-owned node storage",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -256,11 +453,15 @@
               "path": "crates/rustic-dom/src/storage.rs",
               "marker": "exhausted_slot_generation_is_retired"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.52"
         },
         {
           "id": "dom.mutation",
           "label": "Checked same-document mutation and traversal",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -273,11 +474,15 @@
               "path": "crates/rustic-dom/tests/tree.rs",
               "marker": "seeded_mutation_sequences_match"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.52"
         },
         {
           "id": "dom.values",
           "label": "Namespace/attribute identity and UTF-16 values",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -290,54 +495,89 @@
               "path": "crates/rustic-dom/tests/tree.rs",
               "marker": "attributes_preserve_expanded_name"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.35"
         },
         {
           "id": "dom.nodekinds",
           "label": "Fragments, processing instructions and full node kinds",
+          "size": 2,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.35"
         },
         {
           "id": "dom.adoption",
           "label": "Adoption, cloning and document lifecycle",
+          "size": 3,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.52"
         },
         {
           "id": "dom.events",
           "label": "DOM event propagation and default actions",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.88"
         },
         {
           "id": "dom.observers",
           "label": "Mutation records and observers",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.52"
         },
         {
           "id": "dom.ranges",
           "label": "Ranges, live collections and traversal APIs",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.52"
         },
         {
           "id": "dom.shadow",
           "label": "Shadow DOM and custom element lifecycle",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.88"
         },
         {
           "id": "dom.tracing",
           "label": "Tracing integration and DOM conformance gate",
+          "size": 5,
+          "milestone": "M1",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.88"
         }
       ],
+      "points": 34,
       "completed": 3,
+      "in_progress": 0,
       "total": 10,
-      "percent": "30.00"
+      "contribution": "1.41",
+      "percent": "23.52",
+      "verified_percent": "23.52",
+      "partial_percent": "0.00"
     },
     {
       "id": "html",
@@ -347,6 +587,8 @@
         {
           "id": "html.input",
           "label": "Bounded incremental UTF-8 decoding and input preprocessing",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -364,11 +606,15 @@
               "path": "crates/rustic-html/tests/input.rs",
               "marker": "fn every_two_byte_input_matches_an_independent_lossy_decode"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.41"
         },
         {
           "id": "html.tags",
           "label": "Declared data/tag/attribute tokenizer subset",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -391,11 +637,15 @@
               "path": "crates/rustic-html/tests/tokenizer.rs",
               "marker": "fn exact_resource_boundaries_are_enforced_before_further_output"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.62"
         },
         {
           "id": "html.references",
           "label": "Full named/numeric character references",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -418,11 +668,15 @@
               "path": "crates/rustic-html/tests/corpus.rs",
               "marker": "fn pinned_reference_corpus_and_all_input_splits_have_no_unexpected_failures"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.41"
         },
         {
           "id": "html.declarations",
           "label": "Comments, doctypes and declaration recovery",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -450,11 +704,15 @@
               "path": "crates/rustic-html/tests/corpus.rs",
               "marker": "fn pinned_declaration_corpus_and_all_input_splits_have_no_unexpected_failures"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.41"
         },
         {
           "id": "html.textmodes",
           "label": "RCDATA, RAWTEXT, script and plaintext modes",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -482,11 +740,15 @@
               "path": "crates/rustic-html/tests/corpus.rs",
               "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.41"
         },
         {
           "id": "html.tree",
           "label": "Core insertion modes and malformed-tree recovery",
+          "size": 5,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -504,11 +766,15 @@
               "path": "crates/rustic-html/tests/tree_construction.rs",
               "marker": "fn html5lib_tree_construction_documents"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "1.03"
         },
         {
           "id": "html.tables",
           "label": "Table, formatting, template and foreign content rules",
+          "size": 5,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -536,17 +802,25 @@
               "path": "crates/rustic-html/tests/tree_construction.rs",
               "marker": "fn html5lib_tree_construction_documents"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "1.03"
         },
         {
           "id": "html.scripts",
           "label": "Parser/script reentry and encoding restart",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.62"
         },
         {
           "id": "html.loader",
           "label": "Bounded local loader and dump-dom command",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -559,18 +833,89 @@
               "path": "crates/rustic-cli/tests/cli.rs",
               "marker": "fn dump_dom_matches_the_checked_snapshot_for_every_chunk_size"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.41"
         },
         {
           "id": "html.conformance",
           "label": "Parser corpora, chunk invariance and fuzz gate",
-          "status": "planned",
-          "evidence": []
+          "size": 3,
+          "milestone": "M1",
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Pinned tokenizer corpora at every two-chunk split",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/import_html_tests.py",
+                  "marker": "SUITE_FILES"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/corpus.rs",
+                  "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
+                }
+              ]
+            },
+            {
+              "label": "html5lib document tree corpus at every split",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/import_html_tree_tests.py",
+                  "marker": "REVISION"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/tree_construction.rs",
+                  "marker": "fn html5lib_tree_construction_documents"
+                }
+              ]
+            },
+            {
+              "label": "Exact node, depth and payload limits",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document.rs",
+                  "marker": "pub max_depth"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/document.rs",
+                  "marker": "fn exact_node_depth_and_utf16_payload_limits_include_implied_nodes_and_text_merges"
+                }
+              ]
+            },
+            {
+              "label": "html5lib fragment-parsing records",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Parser fuzz targets and CI smoke job",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "60.00",
+          "engine_share": "0.62"
         }
       ],
+      "points": 29,
       "completed": 8,
+      "in_progress": 1,
       "total": 10,
-      "percent": "80.00"
+      "contribution": "5.13",
+      "percent": "85.51",
+      "verified_percent": "79.31",
+      "partial_percent": "6.20"
     },
     {
       "id": "css",
@@ -580,55 +925,92 @@
         {
           "id": "css.syntax",
           "label": "CSS tokenizer/parser and recovery",
+          "size": 3,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         },
         {
           "id": "css.selectors",
           "label": "Required selectors and specificity",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.15"
         },
         {
           "id": "css.properties",
           "label": "Typed property grammar and supported property catalog",
+          "size": 8,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.84"
         },
         {
           "id": "css.cascade",
           "label": "Complete cascade/origins/layers and inheritance",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.15"
         },
         {
           "id": "css.values",
           "label": "Computed values, variables and cycle handling",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.15"
         },
         {
           "id": "css.queries",
           "label": "Media/container queries and style attachment",
+          "size": 3,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         },
         {
           "id": "css.invalidation",
           "label": "Correct incremental invalidation against reference path",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.15"
         },
         {
           "id": "css.conformance",
           "label": "Declared CSS conformance and regression gate",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.15"
         }
       ],
+      "points": 39,
       "completed": 0,
+      "in_progress": 0,
       "total": 8,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "text",
@@ -638,43 +1020,72 @@
         {
           "id": "text.fonts",
           "label": "Font selection/discovery and metrics",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.54"
         },
         {
           "id": "text.shaping",
           "label": "Shaping, fallback and glyph clusters",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.90"
         },
         {
           "id": "text.bidi",
           "label": "Bidi and mixed-direction text",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.54"
         },
         {
           "id": "text.breaking",
           "label": "Line breaking and grapheme navigation",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.54"
         },
         {
           "id": "text.writing",
           "label": "Writing modes, vertical text and font loading",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.90"
         },
         {
           "id": "text.conformance",
           "label": "Text/font conformance and platform parity",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.54"
         }
       ],
+      "points": 22,
       "completed": 0,
+      "in_progress": 0,
       "total": 6,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "layout",
@@ -684,67 +1095,112 @@
         {
           "id": "layout.boxes",
           "label": "Box/fragment trees and checked geometry",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.58"
         },
         {
           "id": "layout.block",
           "label": "Block flow, margins and anonymous boxes",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.inline",
           "label": "Inline formatting, line boxes and baselines",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.sizing",
           "label": "Intrinsic and replaced-element sizing",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.58"
         },
         {
           "id": "layout.position",
           "label": "Floats, positioning and overflow",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.flex",
           "label": "Flexbox",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.grid",
           "label": "Grid",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.tables",
           "label": "Tables",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.fragmentation",
           "label": "Fragmentation, printing and advanced formatting",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         },
         {
           "id": "layout.incremental",
           "label": "Incremental/full-layout parity and conformance",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.97"
         }
       ],
+      "points": 46,
       "completed": 0,
+      "in_progress": 0,
       "total": 10,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "paint",
@@ -754,49 +1210,82 @@
         {
           "id": "paint.display",
           "label": "Immutable display lists and paint order",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.66"
         },
         {
           "id": "paint.stacking",
           "label": "Stacking, clips and transforms",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.66"
         },
         {
           "id": "paint.raster",
           "label": "Deterministic CPU reference rasterizer",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.11"
         },
         {
           "id": "paint.images",
           "label": "Bounded images, color/alpha and resource lifecycle",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.66"
         },
         {
           "id": "paint.hit",
           "label": "Hit testing and resize/zoom geometry",
+          "size": 2,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.44"
         },
         {
           "id": "paint.formats",
           "label": "SVG/MathML painting integration and Canvas 2D",
+          "size": 8,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.77"
         },
         {
           "id": "paint.conformance",
           "label": "Reftest output, damage and paint conformance",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.66"
         }
       ],
+      "points": 27,
       "completed": 0,
+      "in_progress": 0,
       "total": 7,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "js",
@@ -806,97 +1295,162 @@
         {
           "id": "js.parser",
           "label": "Lexer/parser, ASI, early errors and UTF-16",
+          "size": 5,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.82"
         },
         {
           "id": "js.values",
           "label": "Values, coercions, references and completions",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.objects",
           "label": "Object methods, descriptors and prototypes",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.heap",
           "label": "Rooted traced heap and host-object cycle collection",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.31"
         },
         {
           "id": "js.interpreter",
           "label": "Original interpreter/bytecode and control flow",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.31"
         },
         {
           "id": "js.functions",
           "label": "Functions, closures, call/construct and exceptions",
+          "size": 5,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.82"
         },
         {
           "id": "js.builtins",
           "label": "Core built-ins and collections",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.31"
         },
         {
           "id": "js.jobs",
           "label": "Promises, jobs and realms",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.modules",
           "label": "Modules and host loading hooks",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.advanced",
           "label": "BigInt, RegExp, proxies, generators and async",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.31"
         },
         {
           "id": "js.buffers",
           "label": "Buffers, typed arrays and memory semantics",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.intl",
           "label": "Intl and required Unicode semantics",
+          "size": 5,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.82"
         },
         {
           "id": "js.wasm",
           "label": "JavaScript/WebAssembly identity, conversions and tracing integration",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.limits",
           "label": "Cancellation, stack/heap limits and GC stress",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.49"
         },
         {
           "id": "js.conformance",
           "label": "Declared full Test262 and runtime correctness gate",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.82"
         }
       ],
+      "points": 73,
       "completed": 0,
+      "in_progress": 0,
       "total": 15,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "wasm",
@@ -906,55 +1460,92 @@
         {
           "id": "wasm.decode",
           "label": "Bounded binary decoder and malformed-module handling",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.23"
         },
         {
           "id": "wasm.validate",
           "label": "Complete selected type/instruction/module validation",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.35"
         },
         {
           "id": "wasm.execute",
           "label": "Original interpreter, numerics, control flow and traps",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.58"
         },
         {
           "id": "wasm.instances",
           "label": "Memories, tables, globals, instances and resource limits",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.35"
         },
         {
           "id": "wasm.web",
           "label": "Streaming Web API, MIME/CSP and capability-safe imports",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.35"
         },
         {
           "id": "wasm.features",
           "label": "Required reference/GC, exception, SIMD, shared-memory and baseline features",
+          "size": 8,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.94"
         },
         {
           "id": "wasm.accelerate",
           "label": "Reviewed acceleration with interpreter fallback on mobile/desktop",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.58"
         },
         {
           "id": "wasm.conformance",
           "label": "Core/JS/Web suites, fuzzing and five-platform acceptance",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.58"
         }
       ],
+      "points": 34,
       "completed": 0,
+      "in_progress": 0,
       "total": 8,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "web",
@@ -964,55 +1555,92 @@
         {
           "id": "web.idl",
           "label": "Web IDL tooling, conversions and rooted wrappers",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.93"
         },
         {
           "id": "web.window",
           "label": "Window/Document/Element bindings and identity",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.93"
         },
         {
           "id": "web.scheduler",
           "label": "Tasks, microtasks and rendering opportunities",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.56"
         },
         {
           "id": "web.scripts",
           "label": "Classic/module script lifecycle and readiness",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.56"
         },
         {
           "id": "web.input",
           "label": "Forms, focus, editing and user input",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.93"
         },
         {
           "id": "web.observers",
           "label": "Timers, animation frames and observer APIs",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.56"
         },
         {
           "id": "web.streams",
           "label": "Streams, messaging and structured clone",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.93"
         },
         {
           "id": "web.conformance",
           "label": "Exposed web API conformance and reentry gate",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.56"
         }
       ],
+      "points": 32,
       "completed": 0,
+      "in_progress": 0,
       "total": 8,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "network",
@@ -1022,49 +1650,82 @@
         {
           "id": "network.transport",
           "label": "Reviewed TLS/HTTP transport with cancellation",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.68"
         },
         {
           "id": "network.navigation",
           "label": "Navigation/history state machine and redirects",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.68"
         },
         {
           "id": "network.fetch",
           "label": "Fetch, CORS and response filtering",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.68"
         },
         {
           "id": "network.cookies",
           "label": "Cookies and partitioned HTTP cache",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "network.policy",
           "label": "CSP, MIME, secure contexts and mixed-content policy",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "network.protocols",
           "label": "Required HTTP versions, WebSockets and referrer rules",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.68"
         },
         {
           "id": "network.conformance",
           "label": "Network policy and navigation conformance gate",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         }
       ],
+      "points": 29,
       "completed": 0,
+      "in_progress": 0,
       "total": 7,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "storage",
@@ -1074,49 +1735,82 @@
         {
           "id": "storage.profiles",
           "label": "Ephemeral/persistent profiles and private mode",
+          "size": 2,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.27"
         },
         {
           "id": "storage.partition",
           "label": "Storage keys, quotas and schema recovery",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
         },
         {
           "id": "storage.webstorage",
           "label": "Local/session storage",
+          "size": 1,
+          "milestone": "M6",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.13"
         },
         {
           "id": "storage.indexeddb",
           "label": "IndexedDB transactions and crash recovery",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.68"
         },
         {
           "id": "storage.workers",
           "label": "Worker agents, lifetimes and messaging",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
         },
         {
           "id": "storage.offline",
           "label": "Service workers and Cache API",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.68"
         },
         {
           "id": "storage.conformance",
           "label": "Persistence/offline/worker isolation and conformance",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
         }
       ],
+      "points": 22,
       "completed": 0,
+      "in_progress": 0,
       "total": 7,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "security",
@@ -1126,73 +1820,122 @@
         {
           "id": "security.ipc",
           "label": "Bounded versioned hostile-peer-safe IPC",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "security.authority",
           "label": "Browser-assigned authority and capability brokering",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "security.isolation",
           "label": "Site/agent/process assignment and origin separation",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         },
         {
           "id": "security.desktop",
           "label": "Verified Windows/macOS/Linux sandboxing",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         },
         {
           "id": "security.mobile",
           "label": "Verified Android/iOS process and broker restrictions",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         },
         {
           "id": "security.permissions",
           "label": "Trusted permissions, activation, files and downloads",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "security.recovery",
           "label": "Renderer/service crash recovery without stale authority",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "security.brave",
           "label": "Versioned Brave security comparison and independent review",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "security.privacy",
           "label": "Default tracking/bounce/fingerprinting defenses and privacy matrix",
+          "size": 5,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         },
         {
           "id": "security.updates",
           "label": "Authenticated updates, incident response and vulnerability triage",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.41"
         },
         {
           "id": "security.audit",
           "label": "Fuzz/native-memory review and security release gate",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.69"
         }
       ],
+      "points": 43,
       "completed": 0,
+      "in_progress": 0,
       "total": 11,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "compositor",
@@ -1202,31 +1945,52 @@
         {
           "id": "compositor.scene",
           "label": "Incremental scene submission and scrolling",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.92"
         },
         {
           "id": "compositor.backend",
           "label": "Mobile/desktop GPU adapters and CPU fallback",
+          "size": 5,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.53"
         },
         {
           "id": "compositor.recovery",
           "label": "Surface/device loss and resource recovery",
+          "size": 2,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.61"
         },
         {
           "id": "compositor.parity",
           "label": "GPU/reference parity, performance and energy gates",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.92"
         }
       ],
+      "points": 13,
       "completed": 0,
+      "in_progress": 0,
       "total": 4,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "platform",
@@ -1236,6 +2000,8 @@
         {
           "id": "platform.crosschecks",
           "label": "Android/iOS shared-core cross-compilation",
+          "size": 1,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -1248,60 +2014,99 @@
               "path": ".github/workflows/ci.yml",
               "marker": "cargo check --locked --workspace --lib --target"
             }
-          ]
+          ],
+          "credit": "100.00",
+          "engine_share": "0.16"
         },
         {
           "id": "platform.linux",
           "label": "Linux runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.windows",
           "label": "Windows runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.macos",
           "label": "macOS runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.android",
           "label": "Android runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.ios",
           "label": "iOS/iPadOS runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.lifecycle",
           "label": "Surface, touch/IME and background lifecycle parity",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.native",
           "label": "Native font/codec/OS service adapters",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         },
         {
           "id": "platform.device",
           "label": "Linked artifacts, device/simulator suites and OS policy",
+          "size": 2,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.33"
         }
       ],
+      "points": 24,
       "completed": 1,
+      "in_progress": 0,
       "total": 9,
-      "percent": "11.11"
+      "contribution": "0.16",
+      "percent": "4.16",
+      "verified_percent": "4.16",
+      "partial_percent": "0.00"
     },
     {
       "id": "a11y",
@@ -1311,31 +2116,52 @@
         {
           "id": "a11y.semantics",
           "label": "Semantic roles, names and state tree",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.42"
         },
         {
           "id": "a11y.bridges",
           "label": "Desktop and mobile accessibility bridges",
+          "size": 5,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.71"
         },
         {
           "id": "a11y.editing",
           "label": "Keyboard/IME, focus and assistive editing flows",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.42"
         },
         {
           "id": "a11y.acceptance",
           "label": "Assistive-technology and accessibility acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.42"
         }
       ],
+      "points": 14,
       "completed": 0,
+      "in_progress": 0,
       "total": 4,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "devtools",
@@ -1345,31 +2171,52 @@
         {
           "id": "devtools.inspection",
           "label": "DOM/style/layout inspection and console",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
         },
         {
           "id": "devtools.debugger",
           "label": "Source debugging, breakpoints and network diagnostics",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
         },
         {
           "id": "devtools.automation",
           "label": "Secure headless automation and profiling protocol",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
         },
         {
           "id": "devtools.acceptance",
           "label": "Debugger privacy, authority and diagnostic acceptance",
+          "size": 1,
+          "milestone": "M8",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.10"
         }
       ],
+      "points": 10,
       "completed": 0,
+      "in_progress": 0,
       "total": 4,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "extensions",
@@ -1379,67 +2226,112 @@
         {
           "id": "extensions.manifest",
           "label": "Rustic-native Manifest V2 schema and API version contract",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.25"
         },
         {
           "id": "extensions.packages",
           "label": "Package identity, signatures and hostile archive validation",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         },
         {
           "id": "extensions.worlds",
           "label": "Isolated content-script worlds and extension principals",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.62"
         },
         {
           "id": "extensions.background",
           "label": "MV2 background pages and mobile lifecycle",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         },
         {
           "id": "extensions.messaging",
           "label": "Attributed bounded messaging and storage APIs",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         },
         {
           "id": "extensions.ui",
           "label": "Actions, options, permissions and developer diagnostics",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         },
         {
           "id": "extensions.requests",
           "label": "Blocking webRequest and reviewed response filtering",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.62"
         },
         {
           "id": "extensions.updates",
           "label": "Signed updates, revocation and rollback protection",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.25"
         },
         {
           "id": "extensions.platforms",
           "label": "Native desktop/Android/iOS extension acceptance",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         },
         {
           "id": "extensions.conformance",
           "label": "Supported-API parity and hostile-extension security gate",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         }
       ],
+      "points": 32,
       "completed": 0,
+      "in_progress": 0,
       "total": 10,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "filtering",
@@ -1449,55 +2341,92 @@
         {
           "id": "filtering.inventory",
           "label": "Pinned uBlock Origin port feature/license inventory",
+          "size": 1,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.11"
         },
         {
           "id": "filtering.network",
           "label": "Reference static/dynamic network rules and exceptions",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.55"
         },
         {
           "id": "filtering.cosmetic",
           "label": "Cosmetic/procedural filters, packaged scriptlets and resources",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.55"
         },
         {
           "id": "filtering.broker",
           "label": "Redirect/cache/worker/WebSocket and request-policy integration",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.33"
         },
         {
           "id": "filtering.port",
           "label": "Rustic uBO port dashboard, logger, picker and advanced controls",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.55"
         },
         {
           "id": "filtering.lists",
           "label": "Bounded transactional filter-list updates and rollback",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.22"
         },
         {
           "id": "filtering.optimize",
           "label": "Rust acceleration/reference parity and measured budgets",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.33"
         },
         {
           "id": "filtering.acceptance",
           "label": "Full declared uBO feature, mobile and security acceptance",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.33"
         }
       ],
+      "points": 27,
       "completed": 0,
+      "in_progress": 0,
       "total": 8,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "release",
@@ -1507,43 +2436,72 @@
         {
           "id": "release.embedding",
           "label": "Versioned ownership/thread/cancellation embedding contract",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.27"
         },
         {
           "id": "release.compatibility",
           "label": "Representative sites and complete declared conformance gates",
+          "size": 5,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.45"
         },
         {
           "id": "release.performance",
           "label": "Measured time, memory, reliability and energy budgets",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.27"
         },
         {
           "id": "release.artifacts",
           "label": "Reproducible signed desktop/mobile artifacts and updates",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.27"
         },
         {
           "id": "release.comparison",
           "label": "Controlled Chrome/Firefox speed, memory and energy comparison gates",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.27"
         },
         {
           "id": "release.complete",
           "label": "Final full-engine acceptance across all five target platforms",
+          "size": 5,
+          "milestone": "M10",
           "status": "planned",
-          "evidence": []
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.45"
         }
       ],
+      "points": 22,
       "completed": 0,
+      "in_progress": 0,
       "total": 6,
-      "percent": "0.00"
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
     }
   ]
 }

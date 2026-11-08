@@ -1,7 +1,49 @@
 {
-  "schema_version": 1,
-  "catalog_version": "engine-v2",
+  "schema_version": 2,
+  "catalog_version": "engine-v3",
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
+  "milestones": [
+    {
+      "id": "M1",
+      "label": "Document core"
+    },
+    {
+      "id": "M2",
+      "label": "CSS & computed style"
+    },
+    {
+      "id": "M3",
+      "label": "Static renderer"
+    },
+    {
+      "id": "M4",
+      "label": "ECMAScript runtime"
+    },
+    {
+      "id": "M5",
+      "label": "Scripted documents"
+    },
+    {
+      "id": "M6",
+      "label": "Networking & services"
+    },
+    {
+      "id": "M7",
+      "label": "Isolation & security"
+    },
+    {
+      "id": "M8",
+      "label": "Desktop & mobile alpha"
+    },
+    {
+      "id": "M9",
+      "label": "Compatibility expansion"
+    },
+    {
+      "id": "M10",
+      "label": "Embedding & release"
+    }
+  ],
   "groups": [
     {
       "id": "base",
@@ -11,6 +53,8 @@
         {
           "id": "base.identity",
           "label": "Document/node identity and stale-handle contracts",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -28,6 +72,8 @@
         {
           "id": "base.budgets",
           "label": "Checked resource accounting",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -45,6 +91,8 @@
         {
           "id": "base.cancellation",
           "label": "Cooperative cancellation",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -62,6 +110,8 @@
         {
           "id": "base.spans",
           "label": "Checked source byte spans",
+          "size": 1,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -79,6 +129,8 @@
         {
           "id": "base.clocks",
           "label": "Injectable monotonic clocks",
+          "size": 1,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -96,18 +148,24 @@
         {
           "id": "base.geometry",
           "label": "Typed CSS/device geometry and checked surface allocation",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "base.diagnostics",
           "label": "Structured source/revision diagnostics and redaction",
+          "size": 2,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "base.lifecycle",
           "label": "Coordinated lifecycle, shutdown and resource ownership",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         }
@@ -121,6 +179,8 @@
         {
           "id": "url.records",
           "label": "Declared ASCII URL/reference parsing subset",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -138,6 +198,8 @@
         {
           "id": "url.addresses",
           "label": "IPv4/IPv6 host parsing and canonicalization",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -155,6 +217,8 @@
         {
           "id": "url.origins",
           "label": "Tuple and process-local opaque origin identity",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -172,54 +236,72 @@
         {
           "id": "url.idna",
           "label": "Unicode IDNA and data adapter",
+          "size": 3,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.file",
           "label": "File URL and platform rules",
+          "size": 2,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.blob",
           "label": "Blob registry and origin rules",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.setters",
           "label": "URL setters and URLSearchParams",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.encoding",
           "label": "Required legacy decoders and charset selection",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.restart",
           "label": "Encoding sniff/restart integration",
+          "size": 2,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.diagnostics",
           "label": "Validation-error diagnostics and source locations",
+          "size": 1,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.policy",
           "label": "Navigation origin inheritance and policy integration",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "url.conformance",
           "label": "Complete declared URL/encoding conformance gate",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -233,6 +315,8 @@
         {
           "id": "dom.storage",
           "label": "Bounded document-owned node storage",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -250,6 +334,8 @@
         {
           "id": "dom.mutation",
           "label": "Checked same-document mutation and traversal",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -267,6 +353,8 @@
         {
           "id": "dom.values",
           "label": "Namespace/attribute identity and UTF-16 values",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -284,42 +372,56 @@
         {
           "id": "dom.nodekinds",
           "label": "Fragments, processing instructions and full node kinds",
+          "size": 2,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "dom.adoption",
           "label": "Adoption, cloning and document lifecycle",
+          "size": 3,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "dom.events",
           "label": "DOM event propagation and default actions",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "dom.observers",
           "label": "Mutation records and observers",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "dom.ranges",
           "label": "Ranges, live collections and traversal APIs",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "dom.shadow",
           "label": "Shadow DOM and custom element lifecycle",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "dom.tracing",
           "label": "Tracing integration and DOM conformance gate",
+          "size": 5,
+          "milestone": "M1",
           "status": "planned",
           "evidence": []
         }
@@ -333,6 +435,8 @@
         {
           "id": "html.input",
           "label": "Bounded incremental UTF-8 decoding and input preprocessing",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -355,6 +459,8 @@
         {
           "id": "html.tags",
           "label": "Declared data/tag/attribute tokenizer subset",
+          "size": 3,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -382,6 +488,8 @@
         {
           "id": "html.references",
           "label": "Full named/numeric character references",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -409,6 +517,8 @@
         {
           "id": "html.declarations",
           "label": "Comments, doctypes and declaration recovery",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -441,6 +551,8 @@
         {
           "id": "html.textmodes",
           "label": "RCDATA, RAWTEXT, script and plaintext modes",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -473,6 +585,8 @@
         {
           "id": "html.tree",
           "label": "Core insertion modes and malformed-tree recovery",
+          "size": 5,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -495,6 +609,8 @@
         {
           "id": "html.tables",
           "label": "Table, formatting, template and foreign content rules",
+          "size": 5,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -527,12 +643,16 @@
         {
           "id": "html.scripts",
           "label": "Parser/script reentry and encoding restart",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "html.loader",
           "label": "Bounded local loader and dump-dom command",
+          "size": 2,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -550,8 +670,70 @@
         {
           "id": "html.conformance",
           "label": "Parser corpora, chunk invariance and fuzz gate",
-          "status": "planned",
-          "evidence": []
+          "size": 3,
+          "milestone": "M1",
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Pinned tokenizer corpora at every two-chunk split",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/import_html_tests.py",
+                  "marker": "SUITE_FILES"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/corpus.rs",
+                  "marker": "fn pinned_text_modes_and_all_input_splits_have_no_unexpected_failures"
+                }
+              ]
+            },
+            {
+              "label": "html5lib document tree corpus at every split",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/import_html_tree_tests.py",
+                  "marker": "REVISION"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/tree_construction.rs",
+                  "marker": "fn html5lib_tree_construction_documents"
+                }
+              ]
+            },
+            {
+              "label": "Exact node, depth and payload limits",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document.rs",
+                  "marker": "pub max_depth"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/document.rs",
+                  "marker": "fn exact_node_depth_and_utf16_payload_limits_include_implied_nodes_and_text_merges"
+                }
+              ]
+            },
+            {
+              "label": "html5lib fragment-parsing records",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Parser fuzz targets and CI smoke job",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         }
       ]
     },
@@ -563,48 +745,64 @@
         {
           "id": "css.syntax",
           "label": "CSS tokenizer/parser and recovery",
+          "size": 3,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.selectors",
           "label": "Required selectors and specificity",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.properties",
           "label": "Typed property grammar and supported property catalog",
+          "size": 8,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.cascade",
           "label": "Complete cascade/origins/layers and inheritance",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.values",
           "label": "Computed values, variables and cycle handling",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.queries",
           "label": "Media/container queries and style attachment",
+          "size": 3,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.invalidation",
           "label": "Correct incremental invalidation against reference path",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "css.conformance",
           "label": "Declared CSS conformance and regression gate",
+          "size": 5,
+          "milestone": "M2",
           "status": "planned",
           "evidence": []
         }
@@ -618,36 +816,48 @@
         {
           "id": "text.fonts",
           "label": "Font selection/discovery and metrics",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "text.shaping",
           "label": "Shaping, fallback and glyph clusters",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "text.bidi",
           "label": "Bidi and mixed-direction text",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "text.breaking",
           "label": "Line breaking and grapheme navigation",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "text.writing",
           "label": "Writing modes, vertical text and font loading",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "text.conformance",
           "label": "Text/font conformance and platform parity",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -661,60 +871,80 @@
         {
           "id": "layout.boxes",
           "label": "Box/fragment trees and checked geometry",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.block",
           "label": "Block flow, margins and anonymous boxes",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.inline",
           "label": "Inline formatting, line boxes and baselines",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.sizing",
           "label": "Intrinsic and replaced-element sizing",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.position",
           "label": "Floats, positioning and overflow",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.flex",
           "label": "Flexbox",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.grid",
           "label": "Grid",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.tables",
           "label": "Tables",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.fragmentation",
           "label": "Fragmentation, printing and advanced formatting",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "layout.incremental",
           "label": "Incremental/full-layout parity and conformance",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -728,42 +958,56 @@
         {
           "id": "paint.display",
           "label": "Immutable display lists and paint order",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "paint.stacking",
           "label": "Stacking, clips and transforms",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "paint.raster",
           "label": "Deterministic CPU reference rasterizer",
+          "size": 5,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "paint.images",
           "label": "Bounded images, color/alpha and resource lifecycle",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "paint.hit",
           "label": "Hit testing and resize/zoom geometry",
+          "size": 2,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "paint.formats",
           "label": "SVG/MathML painting integration and Canvas 2D",
+          "size": 8,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "paint.conformance",
           "label": "Reftest output, damage and paint conformance",
+          "size": 3,
+          "milestone": "M3",
           "status": "planned",
           "evidence": []
         }
@@ -777,90 +1021,120 @@
         {
           "id": "js.parser",
           "label": "Lexer/parser, ASI, early errors and UTF-16",
+          "size": 5,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.values",
           "label": "Values, coercions, references and completions",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.objects",
           "label": "Object methods, descriptors and prototypes",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.heap",
           "label": "Rooted traced heap and host-object cycle collection",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.interpreter",
           "label": "Original interpreter/bytecode and control flow",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.functions",
           "label": "Functions, closures, call/construct and exceptions",
+          "size": 5,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.builtins",
           "label": "Core built-ins and collections",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.jobs",
           "label": "Promises, jobs and realms",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.modules",
           "label": "Modules and host loading hooks",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.advanced",
           "label": "BigInt, RegExp, proxies, generators and async",
+          "size": 8,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.buffers",
           "label": "Buffers, typed arrays and memory semantics",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.intl",
           "label": "Intl and required Unicode semantics",
+          "size": 5,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.wasm",
           "label": "JavaScript/WebAssembly identity, conversions and tracing integration",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.limits",
           "label": "Cancellation, stack/heap limits and GC stress",
+          "size": 3,
+          "milestone": "M4",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "js.conformance",
           "label": "Declared full Test262 and runtime correctness gate",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -874,48 +1148,64 @@
         {
           "id": "wasm.decode",
           "label": "Bounded binary decoder and malformed-module handling",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.validate",
           "label": "Complete selected type/instruction/module validation",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.execute",
           "label": "Original interpreter, numerics, control flow and traps",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.instances",
           "label": "Memories, tables, globals, instances and resource limits",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.web",
           "label": "Streaming Web API, MIME/CSP and capability-safe imports",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.features",
           "label": "Required reference/GC, exception, SIMD, shared-memory and baseline features",
+          "size": 8,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.accelerate",
           "label": "Reviewed acceleration with interpreter fallback on mobile/desktop",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "wasm.conformance",
           "label": "Core/JS/Web suites, fuzzing and five-platform acceptance",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -929,48 +1219,64 @@
         {
           "id": "web.idl",
           "label": "Web IDL tooling, conversions and rooted wrappers",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.window",
           "label": "Window/Document/Element bindings and identity",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.scheduler",
           "label": "Tasks, microtasks and rendering opportunities",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.scripts",
           "label": "Classic/module script lifecycle and readiness",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.input",
           "label": "Forms, focus, editing and user input",
+          "size": 5,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.observers",
           "label": "Timers, animation frames and observer APIs",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.streams",
           "label": "Streams, messaging and structured clone",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "web.conformance",
           "label": "Exposed web API conformance and reentry gate",
+          "size": 3,
+          "milestone": "M5",
           "status": "planned",
           "evidence": []
         }
@@ -984,42 +1290,56 @@
         {
           "id": "network.transport",
           "label": "Reviewed TLS/HTTP transport with cancellation",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "network.navigation",
           "label": "Navigation/history state machine and redirects",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "network.fetch",
           "label": "Fetch, CORS and response filtering",
+          "size": 5,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "network.cookies",
           "label": "Cookies and partitioned HTTP cache",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "network.policy",
           "label": "CSP, MIME, secure contexts and mixed-content policy",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "network.protocols",
           "label": "Required HTTP versions, WebSockets and referrer rules",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "network.conformance",
           "label": "Network policy and navigation conformance gate",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         }
@@ -1033,42 +1353,56 @@
         {
           "id": "storage.profiles",
           "label": "Ephemeral/persistent profiles and private mode",
+          "size": 2,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "storage.partition",
           "label": "Storage keys, quotas and schema recovery",
+          "size": 3,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "storage.webstorage",
           "label": "Local/session storage",
+          "size": 1,
+          "milestone": "M6",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "storage.indexeddb",
           "label": "IndexedDB transactions and crash recovery",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "storage.workers",
           "label": "Worker agents, lifetimes and messaging",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "storage.offline",
           "label": "Service workers and Cache API",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "storage.conformance",
           "label": "Persistence/offline/worker isolation and conformance",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -1082,66 +1416,88 @@
         {
           "id": "security.ipc",
           "label": "Bounded versioned hostile-peer-safe IPC",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.authority",
           "label": "Browser-assigned authority and capability brokering",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.isolation",
           "label": "Site/agent/process assignment and origin separation",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.desktop",
           "label": "Verified Windows/macOS/Linux sandboxing",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.mobile",
           "label": "Verified Android/iOS process and broker restrictions",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.permissions",
           "label": "Trusted permissions, activation, files and downloads",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.recovery",
           "label": "Renderer/service crash recovery without stale authority",
+          "size": 3,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.brave",
           "label": "Versioned Brave security comparison and independent review",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.privacy",
           "label": "Default tracking/bounce/fingerprinting defenses and privacy matrix",
+          "size": 5,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.updates",
           "label": "Authenticated updates, incident response and vulnerability triage",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "security.audit",
           "label": "Fuzz/native-memory review and security release gate",
+          "size": 5,
+          "milestone": "M7",
           "status": "planned",
           "evidence": []
         }
@@ -1155,24 +1511,32 @@
         {
           "id": "compositor.scene",
           "label": "Incremental scene submission and scrolling",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "compositor.backend",
           "label": "Mobile/desktop GPU adapters and CPU fallback",
+          "size": 5,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "compositor.recovery",
           "label": "Surface/device loss and resource recovery",
+          "size": 2,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "compositor.parity",
           "label": "GPU/reference parity, performance and energy gates",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         }
@@ -1186,6 +1550,8 @@
         {
           "id": "platform.crosschecks",
           "label": "Android/iOS shared-core cross-compilation",
+          "size": 1,
+          "milestone": "M1",
           "status": "complete",
           "evidence": [
             {
@@ -1203,48 +1569,64 @@
         {
           "id": "platform.linux",
           "label": "Linux runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.windows",
           "label": "Windows runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.macos",
           "label": "macOS runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.android",
           "label": "Android runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.ios",
           "label": "iOS/iPadOS runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.lifecycle",
           "label": "Surface, touch/IME and background lifecycle parity",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.native",
           "label": "Native font/codec/OS service adapters",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "platform.device",
           "label": "Linked artifacts, device/simulator suites and OS policy",
+          "size": 2,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         }
@@ -1258,24 +1640,32 @@
         {
           "id": "a11y.semantics",
           "label": "Semantic roles, names and state tree",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "a11y.bridges",
           "label": "Desktop and mobile accessibility bridges",
+          "size": 5,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "a11y.editing",
           "label": "Keyboard/IME, focus and assistive editing flows",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "a11y.acceptance",
           "label": "Assistive-technology and accessibility acceptance",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         }
@@ -1289,24 +1679,32 @@
         {
           "id": "devtools.inspection",
           "label": "DOM/style/layout inspection and console",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "devtools.debugger",
           "label": "Source debugging, breakpoints and network diagnostics",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "devtools.automation",
           "label": "Secure headless automation and profiling protocol",
+          "size": 3,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "devtools.acceptance",
           "label": "Debugger privacy, authority and diagnostic acceptance",
+          "size": 1,
+          "milestone": "M8",
           "status": "planned",
           "evidence": []
         }
@@ -1320,60 +1718,80 @@
         {
           "id": "extensions.manifest",
           "label": "Rustic-native Manifest V2 schema and API version contract",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.packages",
           "label": "Package identity, signatures and hostile archive validation",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.worlds",
           "label": "Isolated content-script worlds and extension principals",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.background",
           "label": "MV2 background pages and mobile lifecycle",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.messaging",
           "label": "Attributed bounded messaging and storage APIs",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.ui",
           "label": "Actions, options, permissions and developer diagnostics",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.requests",
           "label": "Blocking webRequest and reviewed response filtering",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.updates",
           "label": "Signed updates, revocation and rollback protection",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.platforms",
           "label": "Native desktop/Android/iOS extension acceptance",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "extensions.conformance",
           "label": "Supported-API parity and hostile-extension security gate",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -1387,48 +1805,64 @@
         {
           "id": "filtering.inventory",
           "label": "Pinned uBlock Origin port feature/license inventory",
+          "size": 1,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.network",
           "label": "Reference static/dynamic network rules and exceptions",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.cosmetic",
           "label": "Cosmetic/procedural filters, packaged scriptlets and resources",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.broker",
           "label": "Redirect/cache/worker/WebSocket and request-policy integration",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.port",
           "label": "Rustic uBO port dashboard, logger, picker and advanced controls",
+          "size": 5,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.lists",
           "label": "Bounded transactional filter-list updates and rollback",
+          "size": 2,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.optimize",
           "label": "Rust acceleration/reference parity and measured budgets",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "filtering.acceptance",
           "label": "Full declared uBO feature, mobile and security acceptance",
+          "size": 3,
+          "milestone": "M9",
           "status": "planned",
           "evidence": []
         }
@@ -1442,36 +1876,48 @@
         {
           "id": "release.embedding",
           "label": "Versioned ownership/thread/cancellation embedding contract",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "release.compatibility",
           "label": "Representative sites and complete declared conformance gates",
+          "size": 5,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "release.performance",
           "label": "Measured time, memory, reliability and energy budgets",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "release.artifacts",
           "label": "Reproducible signed desktop/mobile artifacts and updates",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "release.comparison",
           "label": "Controlled Chrome/Firefox speed, memory and energy comparison gates",
+          "size": 3,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "release.complete",
           "label": "Final full-engine acceptance across all five target platforms",
+          "size": 5,
+          "milestone": "M10",
           "status": "planned",
           "evidence": []
         }

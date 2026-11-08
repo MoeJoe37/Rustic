@@ -298,10 +298,11 @@ still grows with DOC-06.
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
-21-subsystem, 172-capability engine-v2 catalog includes unfinished libraries, all five native
+21-subsystem, 172-capability engine-v3 catalog (sized capabilities, roadmap
+milestones and evidence-backed partial credit) includes unfinished libraries, all five native
 platform acceptance targets and final release/security/conformance gates. Source
 and test references are validated; score calculations and safe Git publication
-have eight Python regression tests. See [PROGRESS.md](PROGRESS.md) for definitions
+have Python regression tests. See [PROGRESS.md](PROGRESS.md) for definitions
 and the automatic post-CI default-branch update path. Reporting infrastructure
 does not itself add engine completion credit.
 

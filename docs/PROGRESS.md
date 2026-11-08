@@ -1,6 +1,6 @@
 # Engine progress reporting
 
-The README's green/gray subsystem map is inspired visually by
+The README's progress map is inspired visually by
 [AnyPS5's progress map](https://github.com/boykopovar/AnyPS5). Rustic's generator
 and measurement model are original. The figure is a native SVG stored in the
 repository, so private repositories do not need public Pages hosting or an
@@ -8,12 +8,26 @@ external badge service to display it.
 
 ## What the number means
 
-[progress/catalog.json](../progress/catalog.json) defines `engine-v2`: 21 weighted
-subsystems and 172 concrete capabilities covering the whole engine plan. Within
-a subsystem, each capability has equal weight. Overall progress is the sum of
-`subsystem weight × completed capabilities / subsystem capabilities`. The weights
-sum to 100. Use the [generated table and evidence](progress/summary.md) to inspect
-every capability, including unfinished libraries which have no crate yet.
+[progress/catalog.json](../progress/catalog.json) defines `engine-v3`: 21 weighted
+subsystems and 172 concrete capabilities covering the whole engine plan. Subsystem
+weights sum to 100. Inside a subsystem each capability has a **size** of 1, 2, 3,
+5 or 8 points describing its relative scope, so finishing the CSS property
+catalog (8) moves the bar more than finishing the CSS tokenizer (3). Each
+capability also names the [roadmap](ROADMAP.md) **milestone** (M1–M10) that
+delivers it.
+
+A capability earns **credit** of 1 when complete, a verified step fraction when
+in progress (see below), and 0 otherwise. Then:
+
+- subsystem progress = Σ(size × credit) / Σ size;
+- overall progress = Σ(subsystem weight × subsystem progress);
+- a capability's engine share = subsystem weight × size / Σ size, and a
+  milestone's progress is the share-weighted credit of its capabilities.
+
+Every report states the overall figure as **verified complete + partial
+credit**, so in-progress work can never hide inside the headline number. Use the
+[generated tables and evidence](progress/summary.md) to inspect every capability,
+including unfinished libraries which have no crate yet.
 
 **100% means all catalog capabilities and final full-engine acceptance are
 complete**, including JavaScript/GC, rendering/layout, standards and site gates,
@@ -25,12 +39,39 @@ or the first milestone. The final acceptance gate remains open until the actual
 engine and required platform evidence are ready.
 
 This is a weighted delivery model, not a measured percentage of all web standards,
-code lines, elapsed effort, or time remaining. Weights are engineering scope
-allocations documented in the catalog. The living web evolves; a scope change
+code lines, elapsed effort, or time remaining. Weights and sizes are engineering
+scope allocations documented in the catalog. The living web evolves; a scope change
 requires a reviewed catalog version update and an explanation of denominator/
-weight changes. Do not remove unfinished work or rename partial implementations
-to raise the number. Each capability is deliberately narrow enough that an early
-tested subset can complete one item while the larger subsystem remains unfinished.
+weight changes. Do not remove unfinished work, shrink sizes or rename partial
+implementations to raise the number.
+
+## Reading the chart
+
+- **Header:** the overall percentage and one stacked bar: green is verified
+  complete, blue is partial credit, gray is remaining.
+- **Scope map:** one block per subsystem, its width equal to the subsystem's
+  engine weight and its fill equal to that subsystem's progress. The total filled
+  area is exactly the overall percentage, so a large unfinished area such as
+  JavaScript is visible at a glance.
+- **Roadmap milestones:** progress per milestone and the share of the engine
+  scheduled in it. The README names the earliest unfinished milestone.
+- **Subsystems:** weight, progress bar, percentage, a cell per capability whose
+  width is its size, and engine points (weight × progress; all points add up to
+  the overall percentage). An outlined cell is in progress; its blue fill is its
+  verified step fraction.
+
+## engine-v3 measurement change (2026-11-08)
+
+engine-v3 keeps every capability ID, subsystem and weight from engine-v2. It adds
+capability sizes, milestone assignments and evidence-backed partial credit; the
+scope did not change. With the same 20 completed capabilities, engine-v2 measured
+**9.04%** and engine-v3 measures **8.03% verified**: early work finished many
+small foundation, URL and DOM items, which equal weighting overstated, while large
+items such as the JS heap and CSS property catalog remain open. `html.conformance`
+is the first in-progress capability, with three of five verified steps (pinned
+tokenizer corpora at every split, the html5lib document tree corpus at every split,
+and exact node/depth/payload limits), adding **0.37%** partial credit for an
+**8.40%** total. Fragment-parsing records and fuzz targets remain open.
 
 ## engine-v2 scope change (2026-11-07)
 
@@ -78,11 +119,15 @@ do not compare percentages across catalog versions without their weights/scope.
 - **Green / complete:** the declared behavior exists, focused tests cover it, and
   the catalog points to source and test files with checked markers. Required CI
   must pass before the automation publishes a changed chart.
-- **Amber / in progress:** work is underway but contributes no completion credit.
+- **Blue / partial:** an `in_progress` capability may list two or more `steps`.
+  Each complete step needs its own source and test evidence with checked markers,
+  exactly like a complete capability. Credit is the fraction of complete steps.
+  An in-progress capability without steps earns nothing, and one whose steps are
+  all complete must be marked complete instead.
 - **Gray / planned:** the capability is unfinished and contributes no credit.
 
 The generator validates schema, all 21 subsystem identities, positive weights,
-unique capability IDs, mandatory final/platform/conformance gates, and complete
+capability sizes and milestones, step rules, unique capability IDs, mandatory final/platform/conformance gates, and complete
 items' evidence paths/markers. It does not prove semantics by reading source.
 Maintainers must review the exact claim and tests; an empty function or placeholder
 never qualifies. Full correctness cannot be inferred from a grep match. Evidence
@@ -92,7 +137,9 @@ checks provide the execution evidence in CI.
 
 Percentages are calculated with exact rational arithmetic and truncated to two
 decimals, so an incomplete engine cannot round up to 100%. The number of green
-cells is not itself the overall percentage: subsystem weights differ. Mobile
+cells is not itself the overall percentage: subsystem weights and capability
+sizes differ. Displayed verified and partial values are truncated so they add
+up exactly to the shown total. Mobile
 cross-compilation completes only its small build-check capability; native mobile
 runtime acceptance remains separately pending.
 

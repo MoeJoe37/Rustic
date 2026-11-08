@@ -23,9 +23,9 @@ engineering effort; milestones below describe targets, not existing support.
 
 ## Engine progress
 
-[![Rustic engine subsystem progress](docs/progress/engine.svg)](docs/progress/summary.md)
+[![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 9.04%** — 20/172 capabilities complete across 21 subsystems.
+**Overall engine completion: 8.40%** (8.03% verified complete + 0.37% partial credit) — 20/172 capabilities complete and 1 in progress across 21 subsystems. Current milestone: **M1 Document core**, 74.60% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

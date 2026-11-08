@@ -24,6 +24,7 @@ class ProgressTests(unittest.TestCase):
             for feature in group["features"]:
                 feature["status"] = "planned"
                 feature["evidence"] = []
+                feature.pop("steps", None)
         (self.root / "source.rs").write_text("pub fn implementation() {}\n")
         (self.root / "tests.rs").write_text("#[test] fn behavior_is_verified() {}\n")
         (self.root / "README.md").write_text("# Test engine\n\n" + progress.START + "\nold output\n" + progress.END + "\n")
@@ -39,7 +40,9 @@ class ProgressTests(unittest.TestCase):
         self.complete(self.catalog["groups"][0]["features"][0])
         progress.validate(self.catalog, self.root)
         data = progress.measure(self.catalog, "0" * 64)
-        self.assertEqual(data["percent"], "0.25")  # One of eight foundation gates, weighted at 2%.
+        self.assertEqual(data["percent"], "0.25")  # Size 2 of 16 foundation points, weighted at 2%.
+        self.assertEqual(data["verified_percent"], "0.25")
+        self.assertEqual(data["partial_percent"], "0.00")
         self.assertFalse(data["fully_complete"])
         self.assertEqual(progress.percent(Fraction(999999, 10000)), "99.99")
         for group in self.catalog["groups"]:
@@ -88,9 +91,11 @@ class ProgressTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", svg)
         self.assertIn("aria-labelledby", svg)
         self.assertIn("21 subsystems", svg)
-        self.assertEqual(tree.attrib["height"], "804")
+        height = float(tree.attrib["height"])
         ns = {"svg": "http://www.w3.org/2000/svg"}
-        self.assertTrue(all(float(node.attrib["y"]) < 804 for node in tree.findall(".//svg:text", ns)))
+        self.assertTrue(all(float(node.attrib["y"]) < height for node in tree.findall(".//svg:text", ns)))
+        self.assertTrue(all(float(node.attrib["x"]) + float(node.attrib["width"]) <= 976.01
+                            for node in tree.findall(".//svg:rect", ns) if node.attrib.get("width", "").replace(".", "").isdigit() and float(node.attrib["width"]) < 1000))
 
     def test_generated_files_do_not_change_fingerprint_but_source_changes_do(self):
         before = progress.source_fingerprint(self.root)
@@ -102,6 +107,68 @@ class ProgressTests(unittest.TestCase):
         self.assertEqual(progress.source_fingerprint(self.root), before)
         (self.root / "source.rs").write_text("pub fn changed_behavior() {}\n")
         self.assertNotEqual(progress.source_fingerprint(self.root), before)
+
+    def test_capability_size_weights_progress_within_subsystem(self):
+        group = next(group for group in self.catalog["groups"] if group["id"] == "css")
+        properties = next(feature for feature in group["features"] if feature["id"] == "css.properties")
+        syntax = next(feature for feature in group["features"] if feature["id"] == "css.syntax")
+        self.complete(properties)
+        large = progress.measure(self.catalog, "0" * 64)
+        properties["status"], properties["evidence"] = "planned", []
+        self.complete(syntax)
+        small = progress.measure(self.catalog, "0" * 64)
+        self.assertEqual(large["percent"], "1.84")  # 8 of 39 points of a 9% subsystem.
+        self.assertEqual(small["percent"], "0.69")  # 3 of 39 points.
+
+    def in_progress(self, feature, done, total):
+        feature["status"] = "in_progress"
+        feature["steps"] = [{"label": f"step {index}", "status": "planned", "evidence": []} for index in range(total)]
+        for step in feature["steps"][:done]:
+            self.complete(step)
+
+    def test_partial_credit_counts_only_verified_steps_and_is_reported_separately(self):
+        feature = self.catalog["groups"][0]["features"][0]
+        self.in_progress(feature, 1, 4)
+        progress.validate(self.catalog, self.root)
+        data = progress.measure(self.catalog, "0" * 64)
+        self.assertEqual(data["percent"], "0.06")  # 2% × 2/16 × 1/4, truncated.
+        self.assertEqual(data["verified_percent"], "0.00")
+        self.assertEqual(data["partial_percent"], "0.06")
+        self.assertEqual(data["in_progress"], 1)
+        self.assertEqual(data["groups"][0]["features"][0]["credit"], "25.00")
+        feature["status"] = "in_progress"
+        feature.pop("steps")
+        self.assertEqual(progress.measure(self.catalog, "0" * 64)["percent"], "0.00")
+
+    def test_step_rules_are_enforced(self):
+        feature = self.catalog["groups"][0]["features"][0]
+        for setup, message in [
+            (lambda: (self.in_progress(feature, 1, 2), feature["steps"][0].update(evidence=[])), "step needs source and test"),
+            (lambda: self.in_progress(feature, 2, 2), "mark the capability complete"),
+            (lambda: self.in_progress(feature, 0, 1), "two or more steps"),
+            (lambda: (self.in_progress(feature, 1, 3), feature.update(status="planned")), "two or more steps"),
+            (lambda: (self.in_progress(feature, 1, 3), feature["steps"][0]["evidence"][1].update(marker="gone")), "missing evidence marker"),
+        ]:
+            catalog_feature = copy.deepcopy(feature)
+            setup()
+            with self.assertRaisesRegex(ValueError, message):
+                progress.validate(self.catalog, self.root)
+            feature.clear()
+            feature.update(catalog_feature)
+
+    def test_sizes_and_milestones_are_validated_and_milestones_sum_to_engine(self):
+        for edit, message in [(lambda feature: feature.update(size=4), "size"), (lambda feature: feature.update(milestone="M99"), "milestone")]:
+            catalog = copy.deepcopy(self.catalog)
+            edit(catalog["groups"][0]["features"][0])
+            with self.assertRaisesRegex(ValueError, message):
+                progress.validate(catalog, self.root)
+        for group in self.catalog["groups"]:
+            for feature in group["features"]:
+                self.complete(feature)
+        data = progress.measure(self.catalog, "0" * 64)
+        self.assertTrue(all(milestone["percent"] == "100.00" for milestone in data["milestones"]))
+        total = sum(Fraction(milestone["share"]) for milestone in data["milestones"])
+        self.assertLessEqual(abs(total - 100), Fraction(len(data["milestones"]), 100))
 
 
 if __name__ == "__main__":

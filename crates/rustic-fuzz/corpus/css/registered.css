@@ -1,0 +1,13 @@
+@property --len{syntax:'<length>';inherits:false;initial-value:5px}
+@property --col{syntax:"<color>#";inherits:true;initial-value:red,blue}
+@property --any{syntax:'*';inherits:false}
+@property --pick{syntax:'big | small | <integer>+';inherits:true;initial-value:big}
+@property --bad{syntax:'<angle>';inherits:false;initial-value:1deg}
+@property --rel{syntax:'<length-percentage>';inherits:false;initial-value:1em}
+@layer l{@property --n{syntax:'<number>';inherits:true;initial-value:1.5}}
+@media screen{@property --m{syntax:'*';inherits:true}}
+:root{--len:2rem;font-size:var(--len);--rel:50%}
+div{--len:1em;font-size:var(--len);--any:x y;--col:lime,#0f0c}
+p{--len:2lh;line-height:var(--len);width:var(--len);--pick:1 2 3}
+span{--a:var(--len);--len:var(--a);height:var(--a,4px);--n:calc(2*3)}
+b{--len:red;--col:initial;--pick:unset;margin:var(--len) var(--col)}

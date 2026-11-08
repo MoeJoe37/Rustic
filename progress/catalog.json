@@ -1198,8 +1198,19 @@
             },
             {
               "label": "Registered custom properties (@property) and their font-relative unit cycles",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/variables.rs",
+                  "marker": "fn compute_custom_properties<"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/registered.rs",
+                  "marker": "fn font_size_cycles_through_em_make_both_unset"
+                }
+              ]
             }
           ]
         },

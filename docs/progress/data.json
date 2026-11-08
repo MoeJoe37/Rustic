@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "450ac364ece1ad7f2d5efc6efd6bbd89a49a5eeea9a332d12a58515421d7f1f6",
-  "percent": "18.72",
+  "source_fingerprint": "31c70b25f6987c282dd0b492bfb2b233348008e47f5e10da6d5f874615d2160d",
+  "percent": "18.91",
   "verified_percent": "16.81",
-  "partial_percent": "1.91",
+  "partial_percent": "2.10",
   "completed": 33,
   "in_progress": 3,
   "total": 172,
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 5,
       "total": 8,
-      "percent": "80.34",
+      "percent": "82.47",
       "verified_percent": "61.53",
-      "partial_percent": "18.81"
+      "partial_percent": "20.94"
     },
     {
       "id": "M3",
@@ -1386,11 +1386,22 @@
             },
             {
               "label": "Registered custom properties (@property) and their font-relative unit cycles",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/variables.rs",
+                  "marker": "fn compute_custom_properties<"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/registered.rs",
+                  "marker": "fn font_size_cycles_through_em_make_both_unset"
+                }
+              ]
             }
           ],
-          "credit": "66.66",
+          "credit": "83.33",
           "engine_share": "1.15"
         },
         {
@@ -1565,10 +1576,10 @@
       "completed": 5,
       "in_progress": 2,
       "total": 8,
-      "contribution": "7.23",
-      "percent": "80.34",
+      "contribution": "7.42",
+      "percent": "82.47",
       "verified_percent": "61.53",
-      "partial_percent": "18.81"
+      "partial_percent": "20.94"
     },
     {
       "id": "text",

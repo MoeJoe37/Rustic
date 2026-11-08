@@ -75,5 +75,5 @@ pub use sheet::{
     ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
     parse_style_attribute,
 };
-pub use variables::CustomProperties;
+pub use variables::{CustomProperties, PropertyRegistration};
 pub use view::{AttributeRef, ChildRef, ElementView};

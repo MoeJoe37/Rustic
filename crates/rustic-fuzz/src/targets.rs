@@ -1438,6 +1438,7 @@ impl Target for CssCascadeTarget {
                 media: sheet.media.clone(),
                 containers: sheet.containers.clone(),
                 layers: sheet.layers.clone(),
+                properties: sheet.properties.clone(),
             });
             split.push(StyleSheet {
                 origin: Origin::Author,
@@ -1445,6 +1446,7 @@ impl Target for CssCascadeTarget {
                 media: sheet.media.clone(),
                 containers: sheet.containers.clone(),
                 layers: sheet.layers.clone(),
+                properties: sheet.properties.clone(),
             });
             if cascade_styles(&split) != reference {
                 return Err("splitting the sheet changed the cascade".into());

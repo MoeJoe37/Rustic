@@ -23,7 +23,10 @@ use rustic_css::{
 use crate::containers::{ContainerInfo, container_list_matches};
 use crate::layer::{LayerOrder, UNLAYERED};
 use crate::matching::{MatchCache, matches_in_tree};
-use crate::variables::{CustomOutcome, CustomProperties};
+use crate::variables::{
+    CustomOutcome, CustomProperties, CustomResult, FontDependencies, PropertyRegistration,
+    Registry, RegistryRef,
+};
 use crate::{ComputedStyle, ElementView, MatchContext, Origin, StyleSheet};
 
 /// The specified value of every supported longhand for one element.
@@ -275,6 +278,9 @@ pub struct Cascade {
     /// Layer trees and their ranks, per origin and tree (derived from the
     /// sheets and placements).
     layers: HashMap<(Origin, TreeContext), (LayerOrder, Vec<u32>)>,
+    /// Custom properties registered with `@property` (derived from the
+    /// sheets; a later registration of a name wins).
+    registry: RegistryRef,
 }
 
 impl PartialEq for Cascade {
@@ -322,6 +328,13 @@ impl Cascade {
             .collect();
         *ranks = order.ranks();
         self.media_results.push(evaluate(&sheet, &self.environment));
+        if !sheet.properties.is_empty() {
+            let mut registry: Registry = self.registry.0.as_deref().cloned().unwrap_or_default();
+            for registration in &sheet.properties {
+                registry.insert(registration.name.clone(), registration.clone());
+            }
+            self.registry = RegistryRef(Some(std::sync::Arc::new(registry)));
+        }
         self.sheets.push(sheet);
         self.placements.push(Placement {
             context,
@@ -332,6 +345,11 @@ impl Cascade {
     /// The stylesheets in order.
     pub fn sheets(&self) -> &[StyleSheet] {
         &self.sheets
+    }
+
+    /// The custom property registration in effect for `name`, if any.
+    pub fn registration(&self, name: &str) -> Option<&PropertyRegistration> {
+        self.registry.0.as_deref().and_then(|r| r.get(name))
     }
 
     /// Whether any sheet has `@container` rules.
@@ -533,6 +551,7 @@ impl Cascade {
     ) -> SpecifiedStyle {
         let candidates = self.candidates(element, cx, inputs, cache);
         let initial;
+        let is_root = parent.is_none();
         let parent = match parent {
             Some(parent) => parent,
             None => {
@@ -561,15 +580,35 @@ impl Cascade {
                 let outcome = match resolve(by_name[name].iter().copied()) {
                     Resolved::Declared(DeclaredValue::Custom(value)) => CustomOutcome::Value(value),
                     Resolved::Initial => CustomOutcome::Initial,
-                    _ => CustomOutcome::Inherit,
+                    Resolved::Inherit => CustomOutcome::Inherit,
+                    Resolved::Declared(_) | Resolved::Unset => CustomOutcome::Unset,
                 };
                 (name, outcome)
             })
             .collect();
-        let custom = cache
-            .substitution
-            .borrow_mut()
-            .custom_properties(&parent.custom, outcomes);
+        let unparsed = |property: PropertyId| match resolve(
+            candidates
+                .iter()
+                .filter(|c| c.declaration.property == property),
+        ) {
+            Resolved::Declared(DeclaredValue::Unparsed(unparsed)) => Some(&**unparsed),
+            _ => None,
+        };
+        let font = FontDependencies {
+            font_size: unparsed(PropertyId::FontSize),
+            line_height: unparsed(PropertyId::LineHeight),
+            root: is_root,
+        };
+        let CustomResult {
+            custom,
+            font_size_cycle,
+            line_height_cycle,
+        } = cache.substitution.borrow_mut().custom_properties(
+            &parent.custom,
+            outcomes,
+            &self.registry,
+            font,
+        );
         let values = PropertyId::ALL
             .iter()
             .map(|&property| {
@@ -581,6 +620,14 @@ impl Cascade {
                         property.initial_value()
                     }
                 };
+                let in_cycle = match property {
+                    PropertyId::FontSize => font_size_cycle,
+                    PropertyId::LineHeight => line_height_cycle,
+                    _ => false,
+                };
+                if in_cycle {
+                    return unset();
+                }
                 let resolved = resolve(
                     candidates
                         .iter()

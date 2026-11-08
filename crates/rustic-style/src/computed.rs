@@ -265,7 +265,8 @@ impl ComputedStyle {
         &self.values[index(property)]
     }
 
-    /// The computed custom properties (all of which inherit).
+    /// The computed custom properties (registered ones that do not inherit
+    /// included).
     pub fn custom_properties(&self) -> &CustomProperties {
         &self.custom
     }
@@ -597,6 +598,9 @@ fn compute_values(
         .collect();
     ComputedStyle {
         values,
-        custom: specified.custom_properties().clone(),
+        // Registered lengths compute to pixels, against this element.
+        custom: specified
+            .custom_properties()
+            .absolutize(&|lp| basis.lp(lp, false)),
     }
 }

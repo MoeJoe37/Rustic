@@ -32,6 +32,7 @@ mod length;
 mod media;
 mod parser;
 mod properties;
+mod registered;
 mod rules;
 mod selector;
 mod serialize;
@@ -70,6 +71,9 @@ pub use properties::{
     PropertyError, PropertyId, PropertyName, PropertyValue, Spacing, TextAlign, TextCase,
     TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign, VerticalAlignKeyword,
     Visibility, WhiteSpace, ZIndex, parse_declaration,
+};
+pub use registered::{
+    PropertySyntax, RegisteredItem, RegisteredValue, SyntaxComponent, SyntaxMultiplier, SyntaxType,
 };
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{

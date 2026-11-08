@@ -7,13 +7,14 @@ use std::sync::Arc;
 
 use rustic_base::SourceSpan;
 use rustic_css::{
-    AtRule, BlockItem, ComponentValue, ContainerQueryList, CssError, CssParser, Declaration,
-    MediaQueryList, NamespaceMap, PropertyDeclaration, PropertyError, Rule, SelectorErrorKind,
-    SelectorList, Token, Value, parse_block_contents, parse_container_query_list,
-    parse_declaration, parse_media_query_list, parse_nested_selector_list, parse_selector_list,
+    AtRule, BlockItem, ComponentValue, ContainerQueryList, CssError, CssParser, CustomValue,
+    Declaration, MediaQueryList, NamespaceMap, PropertyDeclaration, PropertyError, PropertySyntax,
+    Rule, SelectorErrorKind, SelectorList, Token, Value, parse_block_contents,
+    parse_container_query_list, parse_declaration, parse_media_query_list,
+    parse_nested_selector_list, parse_selector_list,
 };
 
-use crate::{LayerName, LayerSegment};
+use crate::{LayerName, LayerSegment, PropertyRegistration};
 
 /// Where a stylesheet comes from (CSS Cascade Level 5 §6.2).
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -69,6 +70,9 @@ pub struct StyleSheet {
     /// first declaration (`@layer` statements and blocks alike). Layer
     /// order follows this list; style rules refer to it by index.
     pub layers: Vec<LayerName>,
+    /// Custom properties registered by valid `@property` rules, in source
+    /// order (a later registration of a name wins).
+    pub properties: Vec<PropertyRegistration>,
 }
 
 /// Why part of a stylesheet was dropped.
@@ -100,6 +104,10 @@ pub enum StyleDiagnosticKind {
     /// A malformed `@import` rule, one inside another rule, or one after a
     /// rule other than `@charset`, `@layer` statements and other `@import`s.
     InvalidImportRule,
+    /// An `@property` rule that is malformed (a missing or invalid
+    /// `syntax`, `inherits` or `initial-value`, or an unsupported syntax),
+    /// or that is inside a conditional rule or a style rule.
+    InvalidPropertyRule,
 }
 
 /// A dropped construct and its byte range in the stylesheet source.
@@ -641,6 +649,15 @@ impl StyleSheet {
                         stack.push(frame);
                     }
                 }
+                Rule::At(at) if at.name.eq_ignore_ascii_case("property") => {
+                    builder.namespaces_allowed = false;
+                    // Top level or in `@layer` blocks only: a registration
+                    // is global, so it cannot depend on a condition.
+                    match property_rule(&at).filter(|_| media.is_empty()) {
+                        Some(registration) => builder.sheet.properties.push(registration),
+                        None => builder.diagnose(StyleDiagnosticKind::InvalidPropertyRule, at.span),
+                    }
+                }
                 Rule::At(at) => {
                     if !at.name.eq_ignore_ascii_case("charset")
                         && !at.name.eq_ignore_ascii_case("import")
@@ -688,6 +705,89 @@ impl StyleSheet {
             .iter()
             .all(|&i| media_results.get(i).copied().unwrap_or(false))
     }
+}
+
+/// The values without whitespace tokens.
+fn significant(values: &[Value]) -> impl Iterator<Item = &Value> {
+    values
+        .iter()
+        .filter(|v| !matches!(v.token(), Some(Token::Whitespace)))
+}
+
+/// A registration from an `@property` rule (CSS Properties and Values API
+/// Level 1 §3), or `None` if the rule is invalid. Unknown descriptors are
+/// ignored; for a repeated descriptor the last one counts.
+fn property_rule(at: &AtRule) -> Option<PropertyRegistration> {
+    let mut prelude = significant(&at.prelude);
+    let name = match prelude.next()?.token()? {
+        Token::Ident(name) if rustic_css::is_custom_property_name(name) => name.clone(),
+        _ => return None,
+    };
+    if prelude.next().is_some() {
+        return None;
+    }
+    let mut syntax = None;
+    let mut inherits = None;
+    let mut initial: Option<Vec<Value>> = None;
+    for item in parse_block_contents(at.block.as_deref()?, 0).value {
+        let BlockItem::Declaration(d) = item else {
+            continue;
+        };
+        if d.important {
+            return None;
+        }
+        let name = d.name.to_ascii_lowercase();
+        match name.as_str() {
+            "syntax" => {
+                let mut values = significant(&d.value);
+                syntax = match (values.next().and_then(|v| v.token()), values.next()) {
+                    (Some(Token::String(s)), None) => Some(PropertySyntax::parse(s)?),
+                    _ => return None,
+                };
+            }
+            "inherits" => {
+                let mut values = significant(&d.value);
+                inherits = match (values.next().and_then(|v| v.token()), values.next()) {
+                    (Some(Token::Ident(i)), None) if i.eq_ignore_ascii_case("true") => Some(true),
+                    (Some(Token::Ident(i)), None) if i.eq_ignore_ascii_case("false") => Some(false),
+                    _ => return None,
+                };
+            }
+            "initial-value" => initial = Some(d.value),
+            _ => {}
+        }
+    }
+    let syntax = syntax?;
+    let inherits = inherits?;
+    let initial = match initial.map(|v| CustomValue::new(&v)) {
+        None => None,
+        Some(None) => return None,
+        Some(Some(value)) if value.has_references() => return None,
+        Some(Some(value)) if value.values().is_empty() => None,
+        Some(Some(value)) => Some(value),
+    };
+    let initial = match (&syntax, initial) {
+        (PropertySyntax::Universal, initial) => initial,
+        (_, None) => return None,
+        (syntax, Some(value)) => {
+            let parsed = syntax.parse_value(&value)?;
+            if !parsed.is_computationally_independent() {
+                return None;
+            }
+            Some(CustomValue::new(
+                &CssParser::default()
+                    .component_values(&parsed.to_string())
+                    .ok()?
+                    .value,
+            )?)
+        }
+    };
+    Some(PropertyRegistration {
+        name,
+        syntax,
+        inherits,
+        initial,
+    })
 }
 
 /// Parse a `style` attribute's value as declarations (CSS Style Attributes).

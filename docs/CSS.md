@@ -779,10 +779,45 @@ tokens: `var(--a)var(--a)` serializes with an empty comment between the copies.
 
 Computed custom properties live on `ComputedStyle::custom_properties()`. Both
 style dumps list them after the longhands in name order. `dump-style` lists them
-where they differ from the parent, cutting values at 256 bytes. Not yet supported: `@property` registration
-(typed, non-inherited or animatable custom properties), `env()`, `attr()`, and
-CSS-wide keywords produced by substitution, which are currently invalid
-instead of applying.
+where they differ from the parent, cutting values at 256 bytes. Not yet
+supported: `env()`, `attr()`, animating registered properties, and CSS-wide
+keywords produced by substitution, which are currently invalid instead of
+applying.
+
+### Registered custom properties
+
+An `@property --name { syntax: ...; inherits: ...; initial-value: ... }` rule
+registers a custom property (CSS Properties and Values API Level 1). It is
+valid at the top level and inside `@layer` blocks, and the last valid
+registration of a name in the cascade wins (`Cascade::registration`).
+`syntax` (a string) and `inherits` (`true` or `false`) are required.
+`initial-value` is required unless the syntax is `*`; it must match the
+syntax, contain no `var()` and be computationally independent (no relative
+lengths). Unknown descriptors are ignored. Anything else drops the rule with
+an `InvalidPropertyRule` diagnostic, as does a rule inside `@media`,
+`@container` or a style rule. Valid rules are in `StyleSheet::properties`.
+
+Supported syntax components are `<length>`, `<number>`, `<percentage>`,
+`<length-percentage>`, `<color>`, `<integer>`, `<custom-ident>` and literal
+identifiers, each with an optional `+` or `#` multiplier, joined with `|`,
+plus the universal `*`. A syntax that uses another data type such as
+`<angle>` is not supported yet, so its rule is dropped.
+
+A registered property starts from its initial value at the root. A
+non-inherited one takes its initial value on every element that does not
+declare it, and `unset` follows `inherits`. After substitution, a value is
+checked against the syntax and stored in canonical form (`0` becomes `0px`,
+colors become `rgb()`). A value that does not match is invalid at
+computed-value time and acts as `unset`. Relative lengths compute to pixels
+against the element that declares them, so descendants inherit pixels.
+
+A registered value with `em`, `ex`, `cap`, `ch`, `ic` or `lh` depends on the
+element's `font-size`, and `lh` also on `line-height`; on the root, the
+root-relative units count too. When `font-size` or `line-height` uses such a
+property through `var()`, directly or through other custom properties, the
+dependency graph has a cycle. Every custom property in the cycle and the
+longhand then act as `unset`. Unregistered values stay tokens and never form
+these cycles.
 
 ### Custom property evidence
 
@@ -799,9 +834,17 @@ instead of applying.
   2,000-paragraph doubling chain that must share one computed map (TD-33).
 * `rustic-style/tests/invalidation.rs`: changing an ancestor's custom
   property restyles the elements that use it, matching a full restyle.
+* `rustic-css/tests/registered.rs`: syntax parsing and serialization,
+  rejected syntaxes, value matching and canonical forms, font-relative units
+  and computational independence.
+* `rustic-style/tests/registered.rs`: initial values, non-inheritance,
+  invalid and substituted values, CSS-wide keywords, pixel computation of
+  relative lengths, `em`, `lh` and root `rem` cycles through `font-size` and
+  `line-height`, invalid `@property` rules and the last registration winning.
 * `rustic-style/src/variables.rs` unit tests: component order and a
   200,000-node cycle without recursion.
 * The `css`, `css-cascade` and `css-invalidation` fuzz targets cover the new
-  `corpus/css/variables.css` seed and the custom-property mutation values.
+  `corpus/css/variables.css` and `corpus/css/registered.css` seeds and the
+  custom-property mutation values.
   The `css` target's typed-declaration round trip now includes custom and
   `var()` declarations.

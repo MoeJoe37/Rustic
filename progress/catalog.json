@@ -1165,12 +1165,39 @@
               "evidence": []
             },
             {
-              "label": "Custom properties and var() substitution",
-              "status": "planned",
-              "evidence": []
+              "label": "Custom properties and var() substitution with fallbacks, invalid-at-computed-value-time as unset, and bounded expansion",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/custom.rs",
+                  "marker": "pub fn substitute<'a>("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/variables.rs",
+                  "marker": "fn fallbacks_and_invalid_at_computed_value_time"
+                }
+              ]
             },
             {
-              "label": "Dependency cycle handling for custom properties and font-relative units",
+              "label": "Dependency cycle handling for custom properties",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/variables.rs",
+                  "marker": "fn strongly_connected_components("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/variables.rs",
+                  "marker": "fn cycles_make_every_member_invalid"
+                }
+              ]
+            },
+            {
+              "label": "Registered custom properties (@property) and their font-relative unit cycles",
               "status": "planned",
               "evidence": []
             }
@@ -1295,7 +1322,23 @@
               "evidence": []
             },
             {
-              "label": "Invalidation for custom property and container query dependencies",
+              "label": "Invalidation for custom property dependencies (var() users restyle when an inherited custom property changes)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/variables.rs",
+                  "marker": "pub struct CustomProperties"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn custom_property_changes_flow_to_var_users"
+                }
+              ]
+            },
+            {
+              "label": "Invalidation for container query dependencies",
               "status": "planned",
               "evidence": []
             }

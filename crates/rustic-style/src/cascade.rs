@@ -16,18 +16,20 @@
 use std::collections::HashMap;
 
 use rustic_css::{
-    CssWideKeyword, DeclaredValue, MediaEnvironment, PropertyDeclaration, PropertyId,
-    PropertyValue, Specificity,
+    CssWideKeyword, DeclaredValue, MAX_SUBSTITUTED_VALUES, MediaEnvironment, PropertyDeclaration,
+    PropertyId, PropertyValue, Specificity,
 };
 
 use crate::layer::{LayerOrder, UNLAYERED};
 use crate::matching::{MatchCache, matches_in_tree};
+use crate::variables::{CustomOutcome, CustomProperties, compute_custom_properties};
 use crate::{ComputedStyle, ElementView, MatchContext, Origin, StyleSheet};
 
 /// The specified value of every supported longhand for one element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpecifiedStyle {
     values: Vec<PropertyValue>,
+    custom: CustomProperties,
 }
 
 fn index(property: PropertyId) -> usize {
@@ -42,6 +44,7 @@ impl SpecifiedStyle {
     pub fn initial() -> Self {
         Self {
             values: PropertyId::ALL.iter().map(|p| p.initial_value()).collect(),
+            custom: CustomProperties::default(),
         }
     }
 
@@ -50,8 +53,14 @@ impl SpecifiedStyle {
         &self.values[index(property)]
     }
 
+    /// The element's computed custom properties.
+    pub fn custom_properties(&self) -> &CustomProperties {
+        &self.custom
+    }
+
     /// `property: value` lines for every longhand that differs from its
-    /// initial value, in [`PropertyId::ALL`] order.
+    /// initial value, in [`PropertyId::ALL`] order, then every custom
+    /// property in name order.
     ///
     /// A value equal to the *computed* initial value (such as the `16px`
     /// font size a root passes down by inheritance) also counts as initial.
@@ -66,6 +75,11 @@ impl SpecifiedStyle {
                 out.push('\n');
             }
         }
+        out.push_str(
+            &self
+                .custom
+                .dump_differences(&CustomProperties::default(), ""),
+        );
         out
     }
 }
@@ -507,6 +521,35 @@ impl Cascade {
                 &initial
             }
         };
+        // Custom properties first: longhands may refer to them.
+        let mut by_name: HashMap<&str, Vec<&Candidate<'_>>> = HashMap::new();
+        let mut names: Vec<&str> = Vec::new();
+        for candidate in &candidates {
+            if let Some(name) = candidate.declaration.property.custom() {
+                by_name
+                    .entry(name)
+                    .or_insert_with(|| {
+                        names.push(name);
+                        Vec::new()
+                    })
+                    .push(candidate);
+            }
+        }
+        names.sort_unstable();
+        let outcomes = names
+            .iter()
+            .map(|&name| {
+                let outcome = match resolve(by_name[name].iter().copied()) {
+                    Resolved::Declared(DeclaredValue::Custom(value)) => CustomOutcome::Value(value),
+                    Resolved::Initial => CustomOutcome::Initial,
+                    _ => CustomOutcome::Inherit,
+                };
+                (name, outcome)
+            })
+            .collect();
+        let mut budget = MAX_SUBSTITUTED_VALUES;
+        let custom = compute_custom_properties(&parent.custom, outcomes, &mut budget);
+        let lookup = |name: &str| custom.get(name);
         let values = PropertyId::ALL
             .iter()
             .map(|&property| {
@@ -518,49 +561,71 @@ impl Cascade {
                         property.initial_value()
                     }
                 };
-                // `revert`: origins at or above this level are skipped.
-                let mut ceiling: Option<RevertLevel> = None;
-                // `revert-layer`: candidates at or above this are skipped.
-                let mut floor: Option<Priority> = None;
-                // `revert-layer` in an important style attribute: style
-                // attribute and animation declarations are skipped.
-                let mut skip_attached = false;
-                for candidate in candidates
-                    .iter()
-                    .filter(|c| c.declaration.property == property)
-                {
-                    if ceiling.is_some_and(|c| candidate.level >= c)
-                        || floor.is_some_and(|f| candidate.priority >= f)
-                        || (skip_attached
-                            && (candidate.priority.inline
-                                || candidate.priority.tier == ANIMATION_TIER))
-                    {
-                        continue;
-                    }
-                    match &candidate.declaration.value {
-                        DeclaredValue::Value(value) => return value.clone(),
-                        DeclaredValue::CssWide(CssWideKeyword::Initial) => {
-                            return property.initial_value();
-                        }
-                        DeclaredValue::CssWide(CssWideKeyword::Inherit) => return inherit(),
-                        DeclaredValue::CssWide(CssWideKeyword::Unset) => return unset(),
-                        DeclaredValue::CssWide(CssWideKeyword::Revert) => {
-                            if candidate.level == RevertLevel::UserAgent {
-                                return unset();
-                            }
-                            ceiling = Some(candidate.level);
-                        }
-                        DeclaredValue::CssWide(CssWideKeyword::RevertLayer) => {
-                            match candidate.revert_layer_floor() {
-                                Some(f) => floor = Some(f),
-                                None => skip_attached = true,
-                            }
-                        }
-                    }
+                let resolved = resolve(
+                    candidates
+                        .iter()
+                        .filter(|c| c.declaration.property == property),
+                );
+                match resolved {
+                    Resolved::Declared(DeclaredValue::Value(value)) => value.clone(),
+                    Resolved::Declared(DeclaredValue::Unparsed(unparsed)) => unparsed
+                        .resolve(property, &lookup, &mut budget)
+                        .unwrap_or_else(unset),
+                    Resolved::Initial => property.initial_value(),
+                    Resolved::Inherit => inherit(),
+                    Resolved::Declared(_) | Resolved::Unset => unset(),
                 }
-                unset()
             })
             .collect();
-        SpecifiedStyle { values }
+        SpecifiedStyle { values, custom }
     }
+}
+
+/// The cascade's decision for one property.
+enum Resolved<'a> {
+    /// The winning declaration's value (never a CSS-wide keyword).
+    Declared(&'a DeclaredValue),
+    Initial,
+    Inherit,
+    Unset,
+}
+
+/// Pick the winner among one property's `candidates` (highest priority
+/// first), resolving `revert` and `revert-layer` by skipping candidates.
+fn resolve<'a, 'b: 'a>(candidates: impl Iterator<Item = &'a Candidate<'b>>) -> Resolved<'b> {
+    // `revert`: origins at or above this level are skipped.
+    let mut ceiling: Option<RevertLevel> = None;
+    // `revert-layer`: candidates at or above this are skipped.
+    let mut floor: Option<Priority> = None;
+    // `revert-layer` in an important style attribute: style attribute and
+    // animation declarations are skipped.
+    let mut skip_attached = false;
+    for candidate in candidates {
+        if ceiling.is_some_and(|c| candidate.level >= c)
+            || floor.is_some_and(|f| candidate.priority >= f)
+            || (skip_attached
+                && (candidate.priority.inline || candidate.priority.tier == ANIMATION_TIER))
+        {
+            continue;
+        }
+        match &candidate.declaration.value {
+            DeclaredValue::CssWide(CssWideKeyword::Initial) => return Resolved::Initial,
+            DeclaredValue::CssWide(CssWideKeyword::Inherit) => return Resolved::Inherit,
+            DeclaredValue::CssWide(CssWideKeyword::Unset) => return Resolved::Unset,
+            DeclaredValue::CssWide(CssWideKeyword::Revert) => {
+                if candidate.level == RevertLevel::UserAgent {
+                    return Resolved::Unset;
+                }
+                ceiling = Some(candidate.level);
+            }
+            DeclaredValue::CssWide(CssWideKeyword::RevertLayer) => {
+                match candidate.revert_layer_floor() {
+                    Some(f) => floor = Some(f),
+                    None => skip_attached = true,
+                }
+            }
+            value => return Resolved::Declared(value),
+        }
+    }
+    Resolved::Unset
 }

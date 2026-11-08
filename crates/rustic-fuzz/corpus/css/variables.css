@@ -1,0 +1,8 @@
+:root{--gap:4px;--Main:#f00;--empty:;--block:{a;b};--x:initial}
+p{margin:var(--gap) calc(var(--gap)*2);color:var(--Main,blue);width:var(--missing,var(--also,3px))}
+div{--a:var(--b);--b:var(--c,1px);--c:var(--a);--self:var(--self,2px);height:var(--a,5px)}
+li{--v0:x x x x;--v1:var(--v0) var(--v0);--v2:var(--v1) var(--v1);--v3:var(--v2) var(--v2)}
+span{border:var(--w,1px) solid var(--col);font:var(--f);--sp:  a   b  ;padding:VAR(--gap)}
+b{--n:1;--m:var(--n)var(--n);z-index:var(--m);--u:2e1px;width:var(--u)}
+i{--q:"str";--url:url(x);background-image:var(--url);content:var(--q);--bad:var(x)}
+a{--e:inherit;--f:unset;--g:revert;--h:revert-layer;width:var(--e,var(--f,var(--g,1px)))}

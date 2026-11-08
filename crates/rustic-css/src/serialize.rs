@@ -127,9 +127,17 @@ fn write_value(out: &mut impl Write, value: &Value) -> fmt::Result {
 }
 
 fn write_unit(out: &mut impl Write, unit: &str) -> fmt::Result {
-    // A unit starting with `e` could read back as an exponent.
-    match unit.chars().next() {
-        Some(c @ ('e' | 'E')) => {
+    // A unit starting with `e` and a digit (or a sign and a digit) would
+    // read back as an exponent.
+    let mut chars = unit.chars();
+    let first = chars.next();
+    let exponent_like = match (chars.next(), chars.next()) {
+        (Some(d), _) if d.is_ascii_digit() => true,
+        (Some('+' | '-'), Some(d)) => d.is_ascii_digit(),
+        _ => false,
+    };
+    match first {
+        Some(c @ ('e' | 'E')) if exponent_like => {
             escape_code_point(out, c)?;
             serialize_identifier_rest(out, &unit[1..])
         }

@@ -127,7 +127,7 @@ fn invalid_declarations_are_rejected() {
     let cases = [
         ("transform: none", UnknownProperty),
         ("cursor: pointer", UnknownProperty),
-        ("--x: 1", UnknownProperty),
+        ("cursor: var(--x)", UnknownProperty),
         ("display: block inline", InvalidValue),
         ("display: inline-block flow", InvalidValue),
         ("width: -1px", InvalidValue),
@@ -150,7 +150,12 @@ fn invalid_declarations_are_rejected() {
         ("font-family: 12px", InvalidValue),
         ("line-height: -1", InvalidValue),
         ("color: inherit inherit", InvalidValue),
-        ("color: var(--x)", InvalidValue),
+        ("color: var(x)", InvalidValue),
+        ("color: var()", InvalidValue),
+        ("color: var(--x --y)", InvalidValue),
+        ("color: var(--x) ]", InvalidValue),
+        ("color: calc(var(1px))", InvalidValue),
+        ("--x: a ]", InvalidValue),
     ];
     let failures: Vec<_> = cases
         .iter()

@@ -49,6 +49,7 @@ mod loading;
 mod matching;
 mod sheet;
 mod text;
+mod variables;
 mod view;
 
 pub use cascade::{Cascade, SpecifiedStyle, StyleInputs, TreeContext, TreeScope};
@@ -69,4 +70,5 @@ pub use sheet::{
     ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
     parse_style_attribute,
 };
+pub use variables::CustomProperties;
 pub use view::{AttributeRef, ChildRef, ElementView};

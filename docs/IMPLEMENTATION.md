@@ -638,7 +638,7 @@ from the previous counted sibling, so long lists match in linear time. The
 `css.queries` each have one of four steps; variables, media queries and
 external sheets remain. See [CSS.md](CSS.md#computed-style).
 
-## CSS-06 (in progress) — Media queries and invalidation
+## CSS-06 (in progress) — Media queries, invalidation and custom properties
 
 `rustic-css` parses, serializes and evaluates Media Queries 4 lists (with the
 Level 5 preference and capability features), including range syntax,
@@ -656,9 +656,18 @@ siblings and parent for structural selectors), and the walk reuses every other
 style, restyling children only when a parent's computed style changed. `:has()`
 and HTML element states fall back to a full restyle for the mutations they can
 see (TD-32). A ninth fuzz target, `css-invalidation`, checks incremental
-results against full restyles after scripted mutations. Custom properties and
-container queries are the remaining CSS-06 work. See
-[CSS.md](CSS.md#media-queries) and [CSS.md](CSS.md#invalidation).
+results against full restyles after scripted mutations.
+
+Custom properties (`--*`) and `var()` come next. Custom values are kept as
+component values, and declarations that use `var()` are kept unparsed until
+computed-value time. Each element's custom properties are resolved in
+dependency order, with every cycle member guaranteed-invalid. Each `var()`
+longhand is then substituted and parsed, and a failure acts as `unset`. Each
+element has a substitution budget and a nesting limit. Serialization no
+longer escapes an `e`-leading unit unless it could read back as an exponent
+(`2em` stays `2em`). Container queries are the remaining CSS-06 work. See
+[CSS.md](CSS.md#media-queries), [CSS.md](CSS.md#invalidation) and
+[CSS.md](CSS.md#custom-properties).
 
 ## External stylesheets — `<link rel=stylesheet>` and `@import`
 
@@ -744,7 +753,7 @@ M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
 failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
-under way (media queries landed). Next: style invalidation, custom properties
-and `var()`, then container queries; math functions, the property catalog,
+under way (media queries, invalidation and custom properties landed). Next:
+container queries; math functions, the property catalog,
 external stylesheets and cascade layers run alongside. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

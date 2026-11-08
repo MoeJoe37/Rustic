@@ -290,8 +290,8 @@ Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 units including the small/large/dynamic variants, plus unitless zero. Every
 longhand reports `initial_value()` and `inherited()`. `color`'s initial value is
 `CanvasText` and `font-family`'s depends on the user agent; Rustic uses opaque
-black and `serif` until system colors and font settings exist. `var()` and
-custom properties are later tasks (CSS-06).
+black and `serif` until system colors and font settings exist. Custom
+properties and `var()` are described under [Custom properties](#custom-properties).
 
 ### Math functions
 
@@ -664,15 +664,79 @@ root is `Mutation::Everything`.
 
 ### Invalidation evidence
 
-* `rustic-style/tests/invalidation.rs`: ten scenarios, each checked against a
+* `rustic-style/tests/invalidation.rs`: eleven scenarios, each checked against a
   full restyle after every change: unrelated attributes restyle nothing and
   `style` one element; subject versus ancestor classes; inherited changes
   stopping where children's styles stay equal; sibling combinators; inserted,
   moved and removed elements; structural selectors and `:empty`; text; form
-  states, radio groups and `:has()`; root font size and `rem`; and a media
-  environment change.
+  states, radio groups and `:has()`; root font size and `rem`; custom
+  properties used through `var()`; and a media environment change.
 * The `css-invalidation` fuzz target styles a fixed document (forms, lists,
   `dir=auto`, links, a dialog) with an arbitrary sheet, applies up to 96
   scripted attribute, insertion, removal, move and text mutations, and checks
   the incremental styles against a full restyle every third step and at the
   end (320,000 executions before landing, no failures).
+
+## Custom properties
+
+A declaration whose name starts with `--` is a custom property. Its name keeps
+its case, and its value keeps its component values with the surrounding
+whitespace trimmed. An empty value is allowed. The value is rejected at parse
+time only for a malformed `var()`, a bad string, a bad URL or an unmatched
+closing bracket. CSS-wide keywords apply as usual (`initial` makes the value
+guaranteed-invalid). `parse_declaration` returns these as
+`PropertyName::Custom` with `DeclaredValue::Custom`.
+
+An ordinary declaration whose value contains `var()` anywhere, including inside
+other functions and with any letter case, is accepted at parse time when every
+`var()` has the form `var(--name)` or `var(--name, fallback)`. Each longhand,
+including every longhand of a shorthand, gets the same
+`DeclaredValue::Unparsed`. That value is parsed against the declared property's
+grammar after substitution.
+
+For each element, the cascade picks the winning declaration of each custom
+property (with `revert` and `revert-layer` as usual). Custom properties all
+inherit, so an element that declares none shares its parent's map. Declared
+values that contain `var()` are resolved in dependency order using Tarjan's
+algorithm without recursion. Every member of a dependency cycle becomes
+guaranteed-invalid; references in fallbacks count as dependencies. A property
+that only refers to a cycle member is not part of the cycle, so its fallback
+applies. Then each `Unparsed` longhand is substituted and parsed. Any failure
+makes the longhand invalid at computed-value time, and it acts as `unset`. The
+failures are a missing reference without a fallback, a grammar mismatch and an
+exceeded limit. Substituted tokens keep their own units, so `2em` set on an
+ancestor resolves against the font size of the element that uses it.
+
+Two limits bound the work. Each element gets a budget of `MAX_SUBSTITUTED_VALUES`
+(65,536) component values across all of its substitutions, which stops
+exponential doubling chains. A substituted value may nest at most
+`MAX_SUBSTITUTION_DEPTH` (128) functions and blocks. Substitution never merges
+tokens: `var(--a)var(--a)` serializes with an empty comment between the copies.
+
+Computed custom properties live on `ComputedStyle::custom_properties()`. Both
+style dumps list them after the longhands in name order. `dump-style` lists them
+where they differ from the parent. Not yet supported: `@property` registration
+(typed, non-inherited or animatable custom properties), `env()`, `attr()`, and
+CSS-wide keywords produced by substitution, which are currently invalid
+instead of applying.
+
+### Custom property evidence
+
+* `rustic-css/tests/custom.rs`: name case, trimming, empty values, nested
+  blocks and escapes; `var()` in shorthands and nested functions; references
+  and fallbacks; token separation; the size and depth limits.
+* `rustic-css/tests/properties.rs`: malformed `var()` and invalid custom
+  values are rejected, and an unknown property with `var()` stays unknown.
+* `rustic-style/tests/variables.rs`: inheritance and substitution into
+  shorthands and `calc()`; case-sensitive names; fallbacks and
+  invalid-at-computed-value-time (`unset`); CSS-wide keywords; cycles, self
+  references and references to cycle members; style attributes; late
+  resolution of relative units; exponential expansion; and dumps.
+* `rustic-style/tests/invalidation.rs`: changing an ancestor's custom
+  property restyles the elements that use it, matching a full restyle.
+* `rustic-style/src/variables.rs` unit tests: component order and a
+  200,000-node cycle without recursion.
+* The `css`, `css-cascade` and `css-invalidation` fuzz targets cover the new
+  `corpus/css/variables.css` seed and the custom-property mutation values.
+  The `css` target's typed-declaration round trip now includes custom and
+  `var()` declarations.

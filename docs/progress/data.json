@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "54f9c961a08c587f86f4956616ec7982dbe75c9294e93376d6925b45b71f3397",
-  "percent": "17.89",
+  "source_fingerprint": "9bb54e39d8ded5e219ad093bdb594e6ac40293420b4cf6db480ae00dd8f0cc3e",
+  "percent": "18.31",
   "verified_percent": "16.11",
-  "partial_percent": "1.78",
+  "partial_percent": "2.20",
   "completed": 32,
   "in_progress": 4,
   "total": 172,
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 4,
       "total": 8,
-      "percent": "71.15",
+      "percent": "75.85",
       "verified_percent": "53.84",
-      "partial_percent": "17.31"
+      "partial_percent": "22.01"
     },
     {
       "id": "M3",
@@ -1353,17 +1353,44 @@
               "evidence": []
             },
             {
-              "label": "Custom properties and var() substitution",
-              "status": "planned",
-              "evidence": []
+              "label": "Custom properties and var() substitution with fallbacks, invalid-at-computed-value-time as unset, and bounded expansion",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/custom.rs",
+                  "marker": "pub fn substitute<'a>("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/variables.rs",
+                  "marker": "fn fallbacks_and_invalid_at_computed_value_time"
+                }
+              ]
             },
             {
-              "label": "Dependency cycle handling for custom properties and font-relative units",
+              "label": "Dependency cycle handling for custom properties",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/variables.rs",
+                  "marker": "fn strongly_connected_components("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/variables.rs",
+                  "marker": "fn cycles_make_every_member_invalid"
+                }
+              ]
+            },
+            {
+              "label": "Registered custom properties (@property) and their font-relative unit cycles",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "40.00",
+          "credit": "66.66",
           "engine_share": "1.15"
         },
         {
@@ -1487,12 +1514,28 @@
               "evidence": []
             },
             {
-              "label": "Invalidation for custom property and container query dependencies",
+              "label": "Invalidation for custom property dependencies (var() users restyle when an inherited custom property changes)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/variables.rs",
+                  "marker": "pub struct CustomProperties"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn custom_property_changes_flow_to_var_users"
+                }
+              ]
+            },
+            {
+              "label": "Invalidation for container query dependencies",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "60.00",
           "engine_share": "1.15"
         },
         {
@@ -1510,10 +1553,10 @@
       "completed": 4,
       "in_progress": 3,
       "total": 8,
-      "contribution": "6.40",
-      "percent": "71.15",
+      "contribution": "6.82",
+      "percent": "75.85",
       "verified_percent": "53.84",
-      "partial_percent": "17.31"
+      "partial_percent": "22.01"
     },
     {
       "id": "text",

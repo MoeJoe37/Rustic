@@ -21,7 +21,7 @@ use rustic_css::{
     PropertyId, PropertyValue, Spacing, TextAlign, VerticalAlign,
 };
 
-use crate::SpecifiedStyle;
+use crate::{CustomProperties, SpecifiedStyle};
 
 /// The environment computed values depend on.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -50,6 +50,7 @@ impl Default for ComputeContext {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComputedStyle {
     values: Vec<PropertyValue>,
+    pub(crate) custom: CustomProperties,
 }
 
 fn index(property: PropertyId) -> usize {
@@ -264,13 +265,19 @@ impl ComputedStyle {
         &self.values[index(property)]
     }
 
+    /// The computed custom properties (all of which inherit).
+    pub fn custom_properties(&self) -> &CustomProperties {
+        &self.custom
+    }
+
     /// The computed font size in pixels.
     pub fn font_size_px(&self) -> f64 {
         font_px_of(self)
     }
 
     /// `property: value` lines for every longhand whose computed value differs
-    /// from the computed initial value, in [`PropertyId::ALL`] order.
+    /// from the computed initial value, in [`PropertyId::ALL`] order, then
+    /// every custom property in name order.
     pub fn dump_non_initial(&self) -> String {
         let initial = Self::initial();
         let mut out = String::new();
@@ -282,6 +289,11 @@ impl ComputedStyle {
                 out.push('\n');
             }
         }
+        out.push_str(
+            &self
+                .custom
+                .dump_differences(&CustomProperties::default(), ""),
+        );
         out
     }
 
@@ -583,5 +595,8 @@ fn compute_values(
             }
         })
         .collect();
-    ComputedStyle { values }
+    ComputedStyle {
+        values,
+        custom: specified.custom_properties().clone(),
+    }
 }

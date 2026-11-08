@@ -15,7 +15,9 @@
 //! and the `An+B` microsyntax are parsed from component values here, as are
 //! typed values for the CSS-03 property set (colors, lengths, box model,
 //! display and font basics) and the math functions `calc()`, `min()`, `max()`
-//! and `clamp()` ([`Calc`]). Selector matching and the cascade live elsewhere.
+//! and `clamp()` ([`Calc`]), custom properties and bounded `var()`
+//! substitution ([`CustomValue`], [`UnparsedValue`]). Selector matching and
+//! the cascade live elsewhere.
 
 #![warn(missing_docs)]
 
@@ -23,6 +25,7 @@ mod anb;
 mod background;
 mod calc;
 mod color;
+mod custom;
 mod error;
 mod length;
 mod media;
@@ -42,6 +45,10 @@ pub use background::{
 };
 pub use calc::{Calc, CalcKind, CalcNode, MAX_CALC_DEPTH, MAX_CALC_NODES};
 pub use color::{Color, LabSpace, PredefinedSpace};
+pub use custom::{
+    CustomValue, MAX_SUBSTITUTED_VALUES, MAX_SUBSTITUTION_DEPTH, UnparsedValue,
+    is_custom_property_name,
+};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
 pub use length::{Length, LengthPercentage, LengthUnit};
 pub use media::{
@@ -54,9 +61,10 @@ pub use properties::{
     BorderStyle, BorderWidth, BoxSizing, Clear, CssWideKeyword, DeclaredValue, Direction, Display,
     FamilyName, Float, FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle,
     FontVariantCaps, FontWeight, GenericFamily, LengthPercentageOrAuto, LineHeight, MaxSize,
-    Overflow, Position, PropertyDeclaration, PropertyError, PropertyId, PropertyValue, Spacing,
-    TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign,
-    VerticalAlignKeyword, Visibility, WhiteSpace, ZIndex, parse_declaration,
+    Overflow, Position, PropertyDeclaration, PropertyError, PropertyId, PropertyName,
+    PropertyValue, Spacing, TextAlign, TextCase, TextDecorationLine, TextDecorationStyle,
+    TextTransform, VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, ZIndex,
+    parse_declaration,
 };
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{

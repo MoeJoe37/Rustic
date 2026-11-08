@@ -342,7 +342,8 @@ fn is_zero_width(value: &PropertyValue) -> bool {
 /// property where it differs from its initial value. A border color is listed
 /// only when that side's border width is not zero, since it has no effect
 /// otherwise, and `text-decoration-color` only when a decoration line is
-/// set.
+/// set. Custom properties (which all inherit) follow, in name order, where
+/// they differ from the parent's.
 ///
 /// Returns `None` once the dump would exceed `max_bytes`.
 pub fn dump_computed_styles(
@@ -400,6 +401,12 @@ pub fn dump_computed_styles(
                 out.push('\n');
             }
         }
+        out.push_str(
+            &style
+                .computed
+                .custom
+                .dump_differences(&inherited_from.custom, &format!("{indent}  ")),
+        );
         if out.len() > max_bytes {
             return None;
         }

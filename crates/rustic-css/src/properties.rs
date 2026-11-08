@@ -26,13 +26,17 @@
 //! `var()` substitution is a later task; such values are rejected for now.
 
 use std::fmt;
+use std::sync::Arc;
 
 use crate::background::{
     self, Attachment, BackgroundRepeat, BackgroundSize, Image, PositionValue, VisualBox, write_list,
 };
 use crate::calc::{censor, is_math_function};
 use crate::color::write_number;
-use crate::serialize::serialize_string;
+use crate::custom::{
+    CustomValue, UnparsedValue, has_references, is_custom_property_name, valid_for_substitution,
+};
+use crate::serialize::{serialize_identifier, serialize_string};
 use crate::{
     Calc, Color, ComponentValue, Declaration, Length, LengthPercentage, LengthUnit, Token, Value,
 };
@@ -791,20 +795,74 @@ impl PropertyId {
     }
 }
 
-/// A declared longhand value: a CSS-wide keyword or a typed value.
+/// A declared value: a CSS-wide keyword, a typed value, a value waiting
+/// for `var()` substitution, or a custom property's value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DeclaredValue {
     /// A CSS-wide keyword, resolved by the cascade.
     CssWide(CssWideKeyword),
     /// A typed value.
     Value(PropertyValue),
+    /// A longhand value containing `var()`, parsed after substitution.
+    Unparsed(Arc<UnparsedValue>),
+    /// A custom property's value.
+    Custom(CustomValue),
 }
 
-/// One typed longhand declaration.
+/// The property a declaration sets: a supported longhand or a custom
+/// property (whose name keeps its case and leading `--`).
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum PropertyName {
+    /// A supported longhand.
+    Longhand(PropertyId),
+    /// A custom property.
+    Custom(Arc<str>),
+}
+
+impl PropertyName {
+    /// The longhand, if this is one.
+    pub fn longhand(&self) -> Option<PropertyId> {
+        match self {
+            Self::Longhand(id) => Some(*id),
+            Self::Custom(_) => None,
+        }
+    }
+
+    /// The custom property name, if this is one.
+    pub fn custom(&self) -> Option<&str> {
+        match self {
+            Self::Longhand(_) => None,
+            Self::Custom(name) => Some(name),
+        }
+    }
+}
+
+impl From<PropertyId> for PropertyName {
+    fn from(id: PropertyId) -> Self {
+        Self::Longhand(id)
+    }
+}
+
+impl PartialEq<PropertyId> for PropertyName {
+    fn eq(&self, other: &PropertyId) -> bool {
+        *self == Self::Longhand(*other)
+    }
+}
+
+impl fmt::Display for PropertyName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Longhand(id) => f.write_str(id.name()),
+            Self::Custom(name) => serialize_identifier(f, name),
+        }
+    }
+}
+
+/// One typed longhand or custom property declaration.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PropertyDeclaration {
-    /// The longhand.
-    pub property: PropertyId,
+    /// The longhand or custom property.
+    pub property: PropertyName,
     /// Its declared value.
     pub value: DeclaredValue,
     /// Whether the source declaration was `!important`.
@@ -816,8 +874,8 @@ pub struct PropertyDeclaration {
 pub enum PropertyError {
     /// The property is not supported (or does not exist).
     UnknownProperty,
-    /// The value does not match the property's grammar (or uses syntax that
-    /// is not implemented yet, such as `var()`).
+    /// The value does not match the property's grammar (or holds a
+    /// malformed `var()`).
     InvalidValue,
 }
 
@@ -835,7 +893,9 @@ impl std::error::Error for PropertyError {}
 /// Parse a declaration into typed longhand declarations.
 ///
 /// A shorthand expands to all of its longhands; a CSS-wide keyword applies
-/// to each of them.
+/// to each of them. A custom property (`--name`) keeps its component values.
+/// A value containing `var()` is checked only for well-formed `var()`
+/// functions and becomes [`DeclaredValue::Unparsed`] for every longhand.
 ///
 /// ```
 /// use rustic_css::{CssParser, PropertyId, parse_declaration};
@@ -854,7 +914,6 @@ pub fn parse_declaration(
         .iter()
         .filter(|v| !v.is_whitespace())
         .collect();
-    let name = declaration.name.to_ascii_lowercase();
     let wide = match parts.as_slice() {
         [only] => match only.token() {
             Some(Token::Ident(ident)) => CssWideKeyword::from_name(ident),
@@ -862,13 +921,38 @@ pub fn parse_declaration(
         },
         _ => None,
     };
-    let longhands = longhands_of(&name).ok_or(PropertyError::UnknownProperty)?;
     let important = declaration.important;
-    let make = |property, value| PropertyDeclaration {
-        property,
+    if is_custom_property_name(&declaration.name) {
+        let value = match wide {
+            Some(keyword) => DeclaredValue::CssWide(keyword),
+            None => DeclaredValue::Custom(
+                CustomValue::new(&declaration.value).ok_or(PropertyError::InvalidValue)?,
+            ),
+        };
+        return Ok(vec![PropertyDeclaration {
+            property: PropertyName::Custom(declaration.name.as_str().into()),
+            value,
+            important,
+        }]);
+    }
+    let name = declaration.name.to_ascii_lowercase();
+    let longhands = longhands_of(&name).ok_or(PropertyError::UnknownProperty)?;
+    let make = |property: PropertyId, value| PropertyDeclaration {
+        property: property.into(),
         value,
         important,
     };
+    if wide.is_none() && has_references(&declaration.value) {
+        if !valid_for_substitution(&declaration.value) {
+            return Err(PropertyError::InvalidValue);
+        }
+        let value = CustomValue::new(&declaration.value).ok_or(PropertyError::InvalidValue)?;
+        let unparsed = Arc::new(UnparsedValue::new(name, value));
+        return Ok(longhands
+            .iter()
+            .map(|&p| make(p, DeclaredValue::Unparsed(Arc::clone(&unparsed))))
+            .collect());
+    }
     if let Some(keyword) = wide {
         return Ok(longhands
             .iter()
@@ -891,7 +975,7 @@ pub fn parse_declaration(
 }
 
 /// Longhands of a property name (one for a longhand, several for a shorthand).
-fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
+pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     use PropertyId as P;
     const MARGIN: &[P] = &[P::MarginTop, P::MarginRight, P::MarginBottom, P::MarginLeft];
     const PADDING: &[P] = &[
@@ -1371,7 +1455,7 @@ fn font(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
 }
 
 /// Parse a longhand value from its non-whitespace component values.
-fn longhand(property: PropertyId, parts: &[&Value]) -> Option<PropertyValue> {
+pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<PropertyValue> {
     use PropertyId as P;
     if property == P::Display {
         return display(parts).map(PropertyValue::Display);
@@ -1521,7 +1605,7 @@ fn four<T: Clone>(items: Vec<T>) -> Option<Vec<T>> {
     Some(items)
 }
 
-fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValue>> {
     let each = |f: &dyn Fn(&Value) -> Option<PropertyValue>| -> Option<Vec<PropertyValue>> {
         four(parts.iter().map(|v| f(v)).collect::<Option<Vec<_>>>()?)
     };
@@ -1702,13 +1786,15 @@ impl fmt::Display for DeclaredValue {
         match self {
             Self::CssWide(keyword) => f.write_str(keyword.name()),
             Self::Value(value) => write!(f, "{value}"),
+            Self::Unparsed(value) => write!(f, "{value}"),
+            Self::Custom(value) => write!(f, "{value}"),
         }
     }
 }
 
 impl fmt::Display for PropertyDeclaration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.property.name(), self.value)?;
+        write!(f, "{}: {}", self.property, self.value)?;
         if self.important {
             f.write_str(" !important")?;
         }

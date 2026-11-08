@@ -989,6 +989,9 @@ const MUTATION_VALUES: &[&str] = &[
     "checkbox",
     "width: 1rem",
     "\u{5d0}",
+    "--v: 3px",
+    "--v: var(--w); --w: var(--v)",
+    "width: var(--v, 2px); --w: calc(var(--v) * 2)",
 ];
 const MUTATION_TAGS: &[&str] = &["div", "p", "li", "span", "input", "b", "ul", "html"];
 

@@ -326,3 +326,21 @@ fn environment_changes_restyle_through_the_cascade() {
     page.restyle();
     assert_eq!(page.color("a"), "rgb(255, 0, 0)");
 }
+
+#[test]
+fn custom_property_changes_flow_to_var_users() {
+    let mut page = Page::new(
+        LIST,
+        ".dark { --fg: red } .loop { --fg: var(--bg); --bg: var(--fg) } li { color: var(--fg, blue) }",
+    );
+    assert_eq!(page.color("a"), "rgb(0, 0, 255)");
+    page.set("outer", "class", "dark");
+    page.restyle();
+    assert_eq!(page.color("b"), "rgb(255, 0, 0)");
+    page.set("list", "class", "loop");
+    page.restyle();
+    assert_eq!(page.color("c"), "rgb(0, 0, 255)");
+    page.set("b", "style", "--fg: green");
+    assert_eq!(page.restyle().recomputed, 1);
+    assert_eq!(page.color("b"), "rgb(0, 128, 0)");
+}

@@ -66,15 +66,17 @@ Specification basis, reviewed 2026-11-08: CSS 2.2
 [box sizing](https://www.w3.org/TR/css-sizing-3/#box-sizing). This is a focused
 algorithm/fixture claim, not a layout-WPT conformance result.
 
-## Initial vertical block reference (REN-01b, partial)
+## Static vertical block reference (REN-01b / REN-02a)
 
 `BlockLayout::compute(tree, viewport, limits, cancellation)` now produces an
 immutable preorder list of physical `BlockFragment`s: source node/box, parent
 fragment and checked content, padding and border rectangles. It consumes the
-existing snapshot and never reads or mutates the live DOM. An explicit stack
-opens blocks top down and resolves auto heights bottom up; a fixed-height
-parent advances following siblings by its own used border height, even when
-its children visibly overflow it. Widths use the REN-01a reference algorithm.
+existing snapshot and never reads or mutates the live DOM. Three bounded
+iterative passes measure containing-block constraints top down, resolve heights
+and collapsed margins bottom up, then place absolute rectangles top down.
+Relative child positions avoid repeatedly translating completed subtrees.
+A fixed-height parent advances following siblings by its own used border height,
+even when its children visibly overflow it. Widths use the REN-01a algorithm.
 
 Supported height behavior includes fixed and automatic content heights,
 min/max-height (minimum wins), border-box subtraction, percentages and calc.
@@ -87,19 +89,18 @@ units/media conditions change; layout itself re-resolves containing-block
 percentages. The geometry test exercises both resize paths.
 
 The accepted subset is explicit (TD-38): static non-replaced block/flow-root
-boxes, visible overflow and **zero vertical margins**. Horizontal margins
-(including auto/negative values) remain supported. Pure CSS collapsible
+boxes and visible overflow. Horizontal margins (including auto/negative values)
+and collapsed vertical margins are supported. Pure CSS collapsible
 whitespace under normal/nowrap produces no fragment. Preserved whitespace,
 non-whitespace text, inline/list/flex/grid/table contexts, positioning/floats,
-nonzero vertical margins, overflow clipping/scrolling, replaced elements,
+overflow clipping/scrolling, replaced elements,
 native controls, special HTML layout and foreign content fail atomically with
 a typed reason. Empty inline boxes are not silently treated as empty blocks.
-No shaping metrics, anonymous line boxes or margin-collapse approximations are
-invented. This is useful for inspecting controlled nested block fixtures; it
+No shaping metrics or anonymous line boxes are invented. This is useful for inspecting controlled nested block fixtures; it
 is not yet arbitrary article layout.
 
 Layout checks its own node/fragment/depth/text limits, cancellation during
-traversal, long whitespace runs and frame completion, and geometry bounds
+traversal, long whitespace runs and all geometry passes, and coordinate bounds
 before returning a result. Failure leaves the input snapshot and any earlier
 layout unchanged. Dumps check the full next line before appending. The
 reference uses no content-controlled recursion and no platform dependency.
@@ -109,21 +110,57 @@ positions, definite/indefinite percentage heights, min/max and box sizing,
 calc, RTL, resize, whitespace semantics, unsupported content, atomic failure,
 exact budgets, coordinate overflow, an independent 64-block prefix-sum model
 and a 200-level auto-height chain. This complements the existing thirteen
-geometry/snapshot/width tests. No full block-flow or fragment catalog step is
-credited until its remaining algorithms land.
+geometry/snapshot/width tests. The additional margin fixtures and independent
+model below complete the normal block-flow and collapse steps of
+`layout.block`; mixed inline/block anonymous flow and the general box/fragment
+capability remain unfinished.
 
 Specification basis, reviewed 2026-11-08: CSS 2.2
 [normal flow](https://www.w3.org/TR/CSS22/visuren.html#normal-flow),
 [§10.5–10.7 heights](https://www.w3.org/TR/CSS22/visudet.html#the-height-property)
 and [margin collapse](https://www.w3.org/TR/CSS22/box.html#collapsing-margins).
-Margin collapse is deliberately refused, not claimed implemented. These are
-focused reference cases, not a layout-WPT result.
+These are focused reference cases, not a layout-WPT result. Clearance awaits
+floats, which the reference still explicitly refuses.
+
+## Adjoining margin collapse (REN-02a)
+
+`margins.rs` retains a margin strut as its greatest positive and most negative
+member; its resolved size is their sum. It never adds a new margin to an already
+resolved pair, which would lose the original extrema. Adjacent siblings join
+struts, parent top/bottom margins join eligible first/last in-flow children, and
+empty zero/auto-height blocks can pass a strut through themselves. Root edges,
+flow-root contexts, borders, padding and fixed heights enforce the specified
+collapse boundaries. A nonzero minimum height handles the special all-through
+child case without letting that child's margin escape both parent edges.
+
+An empty block's border position is computed as if it had a bottom border unless
+its margin joins the parent's top; its own bottom margin still influences later
+siblings. Negative margins can move boxes above earlier boxes, and a negative
+automatic content height clamps to zero. Percentage margins use containing
+width. The fragment's `margin()` accessor retains resolved values before
+collapse; its rectangles include the collapsed positioning effects.
+
+Ten regression scenarios cover signs, parent/child and empty-through behavior,
+border/padding/flow-root boundaries, min/max/fixed heights, the root exception,
+percentage bases and a 200-level chain. A separate adjacency-graph model checks
+192 sixteen-sibling layouts (3,072 child positions), including virtual bottom
+borders for empty-box positioning; it uses component relabeling rather than the
+implementation's strut algorithm. A unit test independently checks all 125
+three-margin combinations for grouping/order invariance. Existing zero-margin
+geometry remains unchanged. `margins.html` adds a checked CLI snapshot with
+signed sibling margins, an empty block and parent-child collapse.
+
+The specification basis is CSS 2.2
+[§8.3.1](https://www.w3.org/TR/CSS22/box.html#collapsing-margins), reviewed
+2026-11-08, together with §10.6–10.7 height rules. No browser/WPT pass count is
+inferred from these focused fixtures. No dependency or browser engine was added.
 
 ## Inspect a local fixture
 
 ```sh
 cargo run --locked -p rustic-cli -- dump-boxes crates/rustic-cli/tests/fixtures/boxes.html
 cargo run --locked -p rustic-cli -- dump-layout crates/rustic-cli/tests/fixtures/layout.html
+cargo run --locked -p rustic-cli -- dump-layout crates/rustic-cli/tests/fixtures/margins.html
 cargo test --locked -p rustic-layout
 ```
 
@@ -146,7 +183,8 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 
 1. Finish REN-01b: normalize principal/anonymous boxes and mixed inline/block
    content, then expand the initial block geometry reference.
-2. REN-02: intrinsic/replaced sizing, margin collapse, overflow, positioning and floats.
+2. Finish REN-02: intrinsic/replaced sizing, overflow, positioning, floats and
+   clearance; static in-flow margin collapse is implemented.
 3. REN-03/04: font adapter, shaping/bidi/line layout, fragments and paint order.
 4. REN-05/06/07: CPU raster reference, bounded decode, PNG `render` and reftests.
 

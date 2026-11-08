@@ -206,7 +206,7 @@ fn whitespace_only_runs_vanish_but_preserved_or_non_css_whitespace_needs_inline_
 }
 
 #[test]
-fn unsupported_contexts_controls_and_vertical_margins_return_typed_errors() {
+fn unsupported_contexts_controls_and_overflow_return_typed_errors() {
     for css in [
         "display:inline",
         "display:flex",
@@ -225,13 +225,6 @@ fn unsupported_contexts_controls_and_vertical_margins_return_typed_errors() {
             "<main></main>",
             &format!("main {{{css}}}"),
             UnsupportedFlow::Positioning,
-        );
-    }
-    for css in ["margin-top:1px", "margin-bottom:-1px"] {
-        unsupported(
-            "<main></main>",
-            &format!("main {{{css}}}"),
-            UnsupportedFlow::VerticalMargins,
         );
     }
     unsupported(

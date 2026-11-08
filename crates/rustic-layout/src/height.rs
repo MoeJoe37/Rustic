@@ -85,6 +85,18 @@ impl HeightConstraint {
         }
     }
 
+    pub(crate) fn is_auto(&self) -> bool {
+        self.specified.is_none()
+    }
+
+    pub(crate) fn minimum(&self) -> CssPx {
+        self.minimum
+    }
+
+    pub(crate) fn can_collapse_through(&self) -> bool {
+        self.minimum == CssPx::ZERO && self.specified.is_none_or(|height| height == CssPx::ZERO)
+    }
+
     pub(crate) fn definite(&self) -> Option<CssPx> {
         self.specified.map(|_| self.used(CssPx::ZERO))
     }

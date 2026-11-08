@@ -157,8 +157,9 @@ Start with a correct full restyle/reflow before selective invalidation.
 
 Layout consumes a stable style snapshot. REN-01a starts this boundary in
 `rustic-layout` with checked unit geometry, principal snapshots and block width
-measurement; the initial REN-01b block-only reference now emits used geometry
-without live DOM access. See [LAYOUT.md](LAYOUT.md). Full normalization, general
+measurement; REN-01b/REN-02a emit used static-block geometry and collapsed
+margins through bounded top-down/bottom-up/top-down passes without live DOM
+access. See [LAYOUT.md](LAYOUT.md). Full normalization, general
 vertical flow and fragments remain pending. Generate a box tree distinct from DOM,
 then fragments for block/inline formatting, anonymous boxes, line boxes, replaced
 elements, and later fragmentation. Distinguish CSS pixels, device pixels, logical

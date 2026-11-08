@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 20.93%** (20.27% verified complete + 0.66% partial credit) — 36/172 capabilities complete and 3 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 3.59% done.
+**Overall engine completion: 21.42%** (20.27% verified complete + 1.15% partial credit) — 36/172 capabilities complete and 3 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 7.59% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -88,7 +88,7 @@ node and output budgets and prints a deterministic DOM dump, and
 `rustic dump-style <file>`, which prints each element's computed style for the
 same file. `rustic dump-boxes <file>` exposes M3's initial principal-box
 snapshot; `rustic dump-layout <file>` adds [used block rectangles](docs/LAYOUT.md)
-for an explicit margin-free static subset. General block/inline flow, text
+for a static block subset with adjoining-margin collapse. General block/inline flow, text
 shaping and image output remain pending. URLs and other
 arguments return an error instead of implying navigation.
 

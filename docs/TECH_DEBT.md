@@ -82,7 +82,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
-| TD-38 | Deliberate | Layout | Initial vertical flow accepts margin-free static blocks only | Open, REN-01b/REN-02 |
+| TD-38 | Deliberate | Layout | Static block subset; margin-free restriction removed by REN-02a | Partly paid |
 | TD-37 | Deliberate | Layout | Principal snapshots precede normalized/anonymous and flattened trees | Open, REN-01b |
 | TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
@@ -614,3 +614,13 @@ collapse. `dump-layout` documents the restricted reference contract.
 and parent-child margin collapse, positioning and overflow in REN-02.
 **Trigger:** expanding the renderer beyond controlled block fixtures. No full
 block-flow/fragment progress step is credited for this subset.
+
+#### TD-38 update — REN-02a margin restriction paid
+
+The former nonzero-vertical-margin refusal is removed. The block reference now
+implements sibling, parent-child and empty-through collapse, negative struts,
+root/flow-root/border/padding boundaries and the min-height exception. Static
+vertical flow and margin-collapse catalog steps have source/test evidence.
+Inline/anonymous normalization, text shaping, positioning/floats, overflow
+semantics and special/replaced content remain explicit unsupported cases; those
+portions of TD-38 stay open. The earlier paragraph records the initial subset.

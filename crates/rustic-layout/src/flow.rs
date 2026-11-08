@@ -1,7 +1,7 @@
-//! Iterative vertical flow for an explicit, margin-free block subset.
+//! Iterative vertical block flow with checked adjoining-margin collapse.
 //!
 //! Unsupported content fails atomically instead of being assigned invented
-//! geometry. Inline/anonymous boxes and margin collapse arrive in later units.
+//! geometry. Inline and anonymous boxes arrive in later units.
 
 use rustic_base::CancellationToken;
 use rustic_css::{
@@ -28,8 +28,6 @@ pub enum UnsupportedFlow {
     SpecialElement,
     /// Floats or non-static positioning.
     Positioning,
-    /// Nonzero vertical margins need adjoining/parent-child collapse.
-    VerticalMargins,
     /// Scrolling, clipping or overflow propagation.
     Overflow,
 }
@@ -71,7 +69,7 @@ impl BlockFragment {
     pub const fn border(self) -> CssRect {
         self.border
     }
-    /// Used physical margins; vertical margins are zero in this subset.
+    /// Resolved margins before collapse; the rectangles include collapse effects.
     pub const fn margin(self) -> Edges {
         self.margin
     }
@@ -83,17 +81,18 @@ pub struct BlockLayout {
     fragments: Vec<BlockFragment>,
 }
 
-struct Frame<'a> {
+struct WorkBlock<'a> {
     source: usize,
-    fragment: usize,
     parent: Option<usize>,
     node: NodeId,
     style: &'a ComputedStyle,
     measure: BlockMeasure,
-    border_origin: CssPoint,
-    content_origin: CssPoint,
     height: HeightConstraint,
-    cursor: CssPx,
+    depth: usize,
+    children: Vec<usize>,
+    relative_y: CssPx,
+    content_height: CssPx,
+    collapse: crate::margins::CollapseChild,
 }
 
 fn direction(style: &ComputedStyle) -> Result<Direction, FlowError> {
@@ -149,82 +148,165 @@ fn ignorable_text(b: &BoxSnapshot, cancellation: &CancellationToken) -> Result<b
     Ok(true)
 }
 
-fn open<'a>(
-    b: &'a BoxSnapshot,
-    source: usize,
-    fragment: usize,
-    parent: Option<&Frame<'_>>,
-    root_cursor: CssPx,
+fn build_blocks<'a>(
+    tree: &'a BoxTree,
     viewport: CssSize,
-) -> Result<Frame<'a>, FlowError> {
-    let style = supported_box(b)?;
-    let (width, basis_height, containing_direction, origin) = match parent {
-        Some(parent) => (
-            parent.measure.content_width,
-            parent.height.definite(),
-            direction(parent.style)?,
-            CssPoint {
-                x: parent.content_origin.x,
-                y: parent.content_origin.y.checked_add(parent.cursor)?,
-            },
-        ),
-        None => (
-            viewport.width(),
-            Some(viewport.height()),
-            direction(style)?,
-            CssPoint {
-                x: CssPx::ZERO,
-                y: root_cursor,
-            },
-        ),
-    };
-    let measure = measure_block_width(style, width, containing_direction)?;
-    if measure.margin.top != CssPx::ZERO || measure.margin.bottom != CssPx::ZERO {
-        return Err(FlowError::Unsupported {
+    limits: LayoutLimits,
+    cancellation: &CancellationToken,
+) -> Result<Vec<WorkBlock<'a>>, FlowError> {
+    let mut work: Vec<WorkBlock<'_>> = Vec::new();
+    let mut index: Vec<Option<usize>> = Vec::with_capacity(tree.boxes().len());
+    let mut text_units = 0usize;
+    for (source, b) in tree.boxes().iter().enumerate() {
+        cancellation.check().map_err(|_| FlowError::Cancelled)?;
+        let parent = match b.parent() {
+            Some(p) => Some(
+                index
+                    .get(p)
+                    .copied()
+                    .flatten()
+                    .ok_or(FlowError::InvalidSnapshot)?,
+            ),
+            None => None,
+        };
+        let depth = match parent {
+            Some(p) => work[p].depth.checked_add(1).ok_or(FlowError::DepthLimit)?,
+            None => 0,
+        };
+        if depth > limits.max_depth {
+            return Err(FlowError::DepthLimit);
+        }
+        if b.kind() == BoxKind::Text {
+            text_units = text_units
+                .checked_add(b.text().len())
+                .filter(|&n| n <= limits.max_text_units)
+                .ok_or(FlowError::TextLimit)?;
+            if !ignorable_text(b, cancellation)? {
+                return Err(FlowError::Unsupported {
+                    node: b.node(),
+                    reason: UnsupportedFlow::TextLayout,
+                });
+            }
+            index.push(None);
+            continue;
+        }
+        if work.len() >= limits.max_boxes {
+            return Err(FlowError::BoxLimit);
+        }
+        let style = supported_box(b)?;
+        let (width, basis_height, containing_direction) = match parent {
+            Some(p) => (
+                work[p].measure.content_width,
+                work[p].height.definite(),
+                direction(work[p].style)?,
+            ),
+            None => (viewport.width(), Some(viewport.height()), direction(style)?),
+        };
+        let measure = measure_block_width(style, width, containing_direction)?;
+        let extras = measure
+            .border
+            .top
+            .checked_add(measure.padding.top)?
+            .checked_add(measure.padding.bottom)?
+            .checked_add(measure.border.bottom)?;
+        let height = HeightConstraint::new(style, basis_height, extras)?;
+        let current = work.len();
+        work.push(WorkBlock {
+            source,
+            parent,
             node: b.node(),
-            reason: UnsupportedFlow::VerticalMargins,
+            style,
+            measure,
+            height,
+            depth,
+            children: Vec::new(),
+            relative_y: CssPx::ZERO,
+            content_height: CssPx::ZERO,
+            collapse: crate::margins::CollapseChild {
+                before: crate::margins::MarginStrut::default(),
+                after: crate::margins::MarginStrut::default(),
+                through: false,
+                border_height: CssPx::ZERO,
+            },
         });
+        if let Some(p) = parent {
+            work[p].children.push(current);
+        }
+        index.push(Some(current));
     }
-    let border_origin = CssPoint {
-        x: origin.x.checked_add(measure.margin.left)?,
-        y: origin.y,
-    };
+    Ok(work)
+}
+
+fn resolve_blocks(
+    work: &mut [WorkBlock<'_>],
+    cancellation: &CancellationToken,
+) -> Result<(), FlowError> {
+    use crate::margins::{CollapseChild, CollapseInput, collapse_block};
+    for i in (0..work.len()).rev() {
+        cancellation.check().map_err(|_| FlowError::Cancelled)?;
+        let b = &work[i];
+        let m = b.measure;
+        let boundary =
+            b.parent.is_none() || matches!(b.style.get(P::Display), V::Display(Display::FlowRoot));
+        let top_clear = m.border.top == CssPx::ZERO && m.padding.top == CssPx::ZERO;
+        let bottom_clear = m.border.bottom == CssPx::ZERO && m.padding.bottom == CssPx::ZERO;
+        let mut child_data = Vec::with_capacity(b.children.len());
+        for &child in &b.children {
+            cancellation.check().map_err(|_| FlowError::Cancelled)?;
+            child_data.push(work[child].collapse);
+        }
+        let result = collapse_block(
+            CollapseInput {
+                top: m.margin.top,
+                bottom: m.margin.bottom,
+                open_top: !boundary && top_clear,
+                open_bottom: !boundary && bottom_clear && b.height.is_auto(),
+                can_through: !boundary
+                    && top_clear
+                    && bottom_clear
+                    && b.height.can_collapse_through(),
+                nonzero_minimum: b.height.minimum() != CssPx::ZERO,
+            },
+            &child_data,
+            cancellation,
+        )?;
+        let content_height = b.height.used(result.natural_height);
+        let border_height = content_height
+            .checked_add(m.border.top)?
+            .checked_add(m.padding.top)?
+            .checked_add(m.padding.bottom)?
+            .checked_add(m.border.bottom)?;
+        for (child_offset, &position) in result.child_positions.iter().enumerate() {
+            cancellation.check().map_err(|_| FlowError::Cancelled)?;
+            let child = work[i].children[child_offset];
+            work[child].relative_y = position;
+        }
+        work[i].content_height = content_height;
+        work[i].collapse = CollapseChild {
+            before: result.before,
+            after: result.after,
+            through: result.through,
+            border_height,
+        };
+    }
+    Ok(())
+}
+
+fn finish(b: &WorkBlock<'_>, border_origin: CssPoint) -> Result<BlockFragment, FlowError> {
+    let m = b.measure;
     let content_origin = CssPoint {
         x: border_origin
             .x
-            .checked_add(measure.border.left)?
-            .checked_add(measure.padding.left)?,
+            .checked_add(m.border.left)?
+            .checked_add(m.padding.left)?,
         y: border_origin
             .y
-            .checked_add(measure.border.top)?
-            .checked_add(measure.padding.top)?,
+            .checked_add(m.border.top)?
+            .checked_add(m.padding.top)?,
     };
-    let extras = measure
-        .border
-        .top
-        .checked_add(measure.padding.top)?
-        .checked_add(measure.padding.bottom)?
-        .checked_add(measure.border.bottom)?;
-    let height = HeightConstraint::new(style, basis_height, extras)?;
-    Ok(Frame {
-        source,
-        fragment,
-        parent: parent.map(|f| f.fragment),
-        node: b.node(),
-        style,
-        measure,
-        border_origin,
-        content_origin,
-        height,
-        cursor: CssPx::ZERO,
-    })
-}
-
-fn finish(frame: Frame<'_>) -> Result<BlockFragment, FlowError> {
-    let m = frame.measure;
-    let h = frame.height.used(frame.cursor);
+    let h = b.content_height;
     let content = CssRect::new(
-        frame.content_origin,
+        content_origin,
         CssSize::new(m.content_width.get(), h.get())?,
     )?;
     let padding_size = CssSize::new(
@@ -237,8 +319,8 @@ fn finish(frame: Frame<'_>) -> Result<BlockFragment, FlowError> {
             .get(),
     )?;
     let padding_origin = CssPoint {
-        x: frame.border_origin.x.checked_add(m.border.left)?,
-        y: frame.border_origin.y.checked_add(m.border.top)?,
+        x: border_origin.x.checked_add(m.border.left)?,
+        y: border_origin.y.checked_add(m.border.top)?,
     };
     let padding = CssRect::new(padding_origin, padding_size)?;
     let border_size = CssSize::new(
@@ -247,17 +329,13 @@ fn finish(frame: Frame<'_>) -> Result<BlockFragment, FlowError> {
             .checked_add(m.border.left)?
             .checked_add(m.border.right)?
             .get(),
-        padding_size
-            .height()
-            .checked_add(m.border.top)?
-            .checked_add(m.border.bottom)?
-            .get(),
+        b.collapse.border_height.get(),
     )?;
-    let border = CssRect::new(frame.border_origin, border_size)?;
+    let border = CssRect::new(border_origin, border_size)?;
     Ok(BlockFragment {
-        node: frame.node,
-        source_box: frame.source,
-        parent: frame.parent,
+        node: b.node,
+        source_box: b.source,
+        parent: b.parent,
         content,
         padding,
         border,
@@ -265,28 +343,48 @@ fn finish(frame: Frame<'_>) -> Result<BlockFragment, FlowError> {
     })
 }
 
-fn close(
-    stack: &mut Vec<Frame<'_>>,
-    fragments: &mut [Option<BlockFragment>],
-    root_cursor: &mut CssPx,
-) -> Result<(), FlowError> {
-    let frame = stack.pop().ok_or(FlowError::InvalidSnapshot)?;
-    let index = frame.fragment;
-    let fragment = finish(frame)?;
-    let cursor = match stack.last_mut() {
-        Some(parent) => &mut parent.cursor,
-        None => root_cursor,
-    };
-    *cursor = cursor.checked_add(fragment.border.size().height())?;
-    *fragments.get_mut(index).ok_or(FlowError::InvalidSnapshot)? = Some(fragment);
-    Ok(())
+fn place_blocks(
+    work: &[WorkBlock<'_>],
+    cancellation: &CancellationToken,
+) -> Result<Vec<BlockFragment>, FlowError> {
+    let mut fragments: Vec<BlockFragment> = Vec::with_capacity(work.len());
+    let mut root_cursor = CssPx::ZERO;
+    for b in work {
+        cancellation.check().map_err(|_| FlowError::Cancelled)?;
+        let border_origin = match b.parent {
+            Some(p) => {
+                let parent = fragments
+                    .get(p)
+                    .ok_or(FlowError::InvalidSnapshot)?
+                    .content
+                    .origin();
+                CssPoint {
+                    x: parent.x.checked_add(b.measure.margin.left)?,
+                    y: parent.y.checked_add(b.relative_y)?,
+                }
+            }
+            None => CssPoint {
+                x: b.measure.margin.left,
+                y: root_cursor.checked_add(b.collapse.before.value()?)?,
+            },
+        };
+        let fragment = finish(b, border_origin)?;
+        if b.parent.is_none() {
+            root_cursor = border_origin
+                .y
+                .checked_add(b.collapse.border_height)?
+                .checked_add(b.collapse.after.value()?)?;
+        }
+        fragments.push(fragment);
+    }
+    Ok(fragments)
 }
 
 impl BlockLayout {
     /// Lay out a principal snapshot in CSS pixels without touching the DOM.
     ///
-    /// Supports static, non-replaced block/flow-root boxes with visible overflow
-    /// and zero vertical margins. Auto/fixed/min/max heights and percentages
+    /// Supports static, non-replaced block/flow-root boxes with visible overflow,
+    /// including sibling/parent-child/empty-block margin collapse. Auto/fixed/min/max heights and percentages
     /// against definite containing heights are resolved. Pure collapsible
     /// whitespace runs under normal/nowrap produce no fragment; all other text,
     /// inline contexts and unsupported semantics return a typed error (TD-38).
@@ -302,58 +400,10 @@ impl BlockLayout {
         if tree.boxes().len() > limits.max_nodes {
             return Err(FlowError::NodeLimit);
         }
-        let mut fragments = Vec::new();
-        let mut stack: Vec<Frame<'_>> = Vec::new();
-        let mut root_cursor = CssPx::ZERO;
-        let mut text_units = 0usize;
-        for (source, b) in tree.boxes().iter().enumerate() {
-            cancellation.check().map_err(|_| FlowError::Cancelled)?;
-            while stack.last().is_some_and(|f| Some(f.source) != b.parent()) {
-                cancellation.check().map_err(|_| FlowError::Cancelled)?;
-                close(&mut stack, &mut fragments, &mut root_cursor)?;
-            }
-            if stack.last().map(|f| f.source) != b.parent() {
-                return Err(FlowError::InvalidSnapshot);
-            }
-            if stack.len() > limits.max_depth {
-                return Err(FlowError::DepthLimit);
-            }
-            if b.kind() == BoxKind::Text {
-                text_units = text_units
-                    .checked_add(b.text().len())
-                    .filter(|&n| n <= limits.max_text_units)
-                    .ok_or(FlowError::TextLimit)?;
-                if ignorable_text(b, cancellation)? {
-                    continue;
-                }
-                return Err(FlowError::Unsupported {
-                    node: b.node(),
-                    reason: UnsupportedFlow::TextLayout,
-                });
-            }
-            if fragments.len() >= limits.max_boxes {
-                return Err(FlowError::BoxLimit);
-            }
-            let frame = open(
-                b,
-                source,
-                fragments.len(),
-                stack.last(),
-                root_cursor,
-                viewport,
-            )?;
-            fragments.push(None);
-            stack.push(frame);
-        }
-        while !stack.is_empty() {
-            cancellation.check().map_err(|_| FlowError::Cancelled)?;
-            close(&mut stack, &mut fragments, &mut root_cursor)?;
-        }
+        let mut work = build_blocks(tree, viewport, limits, cancellation)?;
+        resolve_blocks(&mut work, cancellation)?;
         Ok(Self {
-            fragments: fragments
-                .into_iter()
-                .collect::<Option<Vec<_>>>()
-                .ok_or(FlowError::InvalidSnapshot)?,
+            fragments: place_blocks(&work, cancellation)?,
         })
     }
 

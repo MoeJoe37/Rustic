@@ -393,3 +393,20 @@ fn dump_layout_loads_local_css_and_rejects_unsupported_text_without_partial_stdo
     assert!(output.stdout.is_empty());
     fs::remove_dir_all(base).unwrap();
 }
+
+#[test]
+fn dump_layout_collapsed_margins_match_the_checked_fixture_at_each_chunk_size() {
+    let input = fixture("margins.html");
+    let expected = fs::read(fixture("margins.dump")).unwrap();
+    for chunk in ["1", "7", "65536"] {
+        let output = rustic(&[
+            "dump-layout",
+            "--chunk-bytes",
+            chunk,
+            input.to_str().unwrap(),
+        ]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(output.stdout, expected);
+        assert!(output.stderr.is_empty());
+    }
+}

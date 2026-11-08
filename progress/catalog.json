@@ -1479,14 +1479,51 @@
             {
               "id": "flow",
               "label": "Vertical block flow and used geometry",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow.rs",
+                  "marker": "pub fn compute"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/flow.rs",
+                  "marker": "fn nested_block_flow_has_exact_content_padding_border_and_sibling_geometry"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/flow.rs",
+                  "marker": "fn sequential_blocks_match_an_independent_prefix_sum_model"
+                }
+              ]
             },
             {
               "id": "margins",
               "label": "Adjoining and parent-child margin collapse",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/margins.rs",
+                  "marker": "pub(crate) fn collapse_block"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/margins.rs",
+                  "marker": "fn parent_child_margins_escape_until_a_padding_border_or_flow_root_boundary"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/margins.rs",
+                  "marker": "fn flat_sibling_layout_matches_an_independent_margin_adjacency_graph"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/margins.rs",
+                  "marker": "fn empty_descendants_with_minimum_height_do_not_escape_both_parent_edges"
+                }
+              ]
             },
             {
               "id": "anonymous",

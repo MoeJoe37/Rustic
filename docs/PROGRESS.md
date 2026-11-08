@@ -76,6 +76,17 @@ fuzz step later completed with its own evidence (four of five steps, 0.50%
 partial credit), and DOC-06c's fragment records completed the last step, so
 `html.conformance` is now complete (8.65%).
 
+## REN-02a checkpoint (2026-11-08)
+
+The same `engine-v3` denominator, weights, sizes and step definitions are kept.
+`layout.block` advances from one of four steps (widths) to three of four
+(widths, normal vertical block flow and adjoining/parent-child margin collapse).
+Source and test markers cover used geometry, an independent sibling adjacency
+model and boundary/empty/min-height regressions. Mixed inline/block anonymous
+flow remains planned; no whole block, fragment or M3 capability is marked done.
+As in the prior M3 commits, run `tools/progress.py --write` to regenerate the
+README block and SVG/JSON/Markdown outputs, then validate with `--check`.
+
 ## engine-v2 scope change (2026-11-07)
 
 [ADR 0007](adr/0007-product-scope.md) adds required WebAssembly, Rustic-only

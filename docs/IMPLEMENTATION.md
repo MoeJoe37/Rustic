@@ -739,11 +739,29 @@ local HTML/style loader. Fourteen flow scenarios include an independent prefix-
 sum model, depth/budget/overflow boundaries and atomic failure; CLI tests check
 chunking, exact output limits, linked CSS and unsupported text.
 
-This is a margin-free static block subset (TD-38). General normalization,
+That initial slice was a margin-free static block subset (TD-38); REN-02a
+below removes the margin restriction. General normalization,
 anonymous/inline boxes, margin collapse, special/replaced content, positioning,
 overflow semantics and shaped text remain pending. Unsupported input returns
 explicit errors, and no full block/fragment progress gate is claimed. See
 [LAYOUT.md](LAYOUT.md) for the exact contract and follow-up units.
+
+## REN-02a — Static block margin collapse
+
+The block reference now resolves adjoining sibling, parent-child and empty-
+through margins, including negative values, root/flow-root and border/padding
+boundaries, fixed/min/max heights and the nonzero-minimum-height exception.
+Three iterative passes separate measured constraints, bottom-up collapsed
+struts/relative positions, and absolute geometry; no completed subtree needs
+repeated translation. The former `VerticalMargins` refusal is removed.
+
+Ten margin scenarios, an independent adjacency-graph model over 192 generated
+sixteen-sibling layouts, strut grouping tests, deep/budget/overflow cases and a
+new CLI golden fixture provide evidence. The original zero-margin fixture is
+unchanged. `layout.block` now has width, vertical flow and margin-collapse
+steps complete; anonymous mixed inline/block flow remains planned. The full
+capability, general fragments, text layout, floats/clearance and image output
+are not marked complete. [LAYOUT.md](LAYOUT.md) defines the exact subset.
 
 ## Queue status
 

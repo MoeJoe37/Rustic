@@ -41,7 +41,7 @@ scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
 prints computed styles for the same input ([CSS.md](CSS.md#style-dump)),
 and `dump-boxes`, which prints an initial principal-box snapshot
 ([LAYOUT.md](LAYOUT.md)) without positions or painting. `dump-layout` adds used
-rectangles for an explicitly limited margin-free block subset; it rejects
+rectangles and margin collapse for an explicitly limited static block subset; it rejects
 unsupported inline/text and other formatting rather than emitting partial output.
 While hosted Actions is unavailable, the maintainer has authorized sandbox-gated
 merges: run the local gates and compatibility/compile checks, record their

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 20.93%** = 20.27% verified complete + 0.66% partial credit. 36/172 capabilities complete, 3 in progress.
+**Overall completion: 21.42%** = 20.27% verified complete + 1.15% partial credit. 36/172 capabilities complete, 3 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `d51e97cf3ec32d5d20fc1474205ae3ef0e311876aa63a7a145e4c2630e5f9102`.
+Catalog: `engine-v3`. Source fingerprint: `1dbc0f7712cd68792b6aab0148a8edad1881ccecab3f167aea8fa1cee8181f84`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `d51e97cf3ec32d5d20fc1474205ae3ef0e311
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 0/17 | 3.59% | 0.00% | 12.22% |
+| M3 Static renderer | 0/17 | 7.59% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -31,7 +31,7 @@ Catalog: `engine-v3`. Source fingerprint: `d51e97cf3ec32d5d20fc1474205ae3ef0e311
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
-| Layout | 0/10 | 2 | 4.89% | 0.00% | 9% | 0.44 |
+| Layout | 0/10 | 2 | 10.32% | 0.00% | 9% | 0.92 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -133,10 +133,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Checked CSS/device units and geometry arithmetic ([source](../../crates/rustic-layout/src/geometry.rs), [test](../../crates/rustic-layout/tests/reference.rs))
   - [ ] Normalized principal and anonymous box tree
   - [ ] Fragment tree with layout geometry
-- **in progress 25.00%** `layout.block` — Block flow, margins and anonymous boxes · size 5 · M3 · 0.97% of engine
+- **in progress 75.00%** `layout.block` — Block flow, margins and anonymous boxes · size 5 · M3 · 0.97% of engine
   - [x] Normal-flow non-replaced horizontal width equation ([source](../../crates/rustic-layout/src/sizing.rs), [test](../../crates/rustic-layout/tests/reference.rs))
-  - [ ] Vertical block flow and used geometry
-  - [ ] Adjoining and parent-child margin collapse
+  - [x] Vertical block flow and used geometry ([source](../../crates/rustic-layout/src/flow.rs), [test](../../crates/rustic-layout/tests/flow.rs), [test](../../crates/rustic-layout/tests/flow.rs))
+  - [x] Adjoining and parent-child margin collapse ([source](../../crates/rustic-layout/src/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs))
   - [ ] Mixed block/inline flow through anonymous boxes
 - **planned** `layout.inline` — Inline formatting, line boxes and baselines · size 5 · M3 · 0.97% of engine
 - **planned** `layout.sizing` — Intrinsic and replaced-element sizing · size 3 · M3 · 0.58% of engine

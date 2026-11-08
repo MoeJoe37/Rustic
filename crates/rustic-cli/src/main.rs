@@ -34,7 +34,7 @@ outside it are blocked. URLs are rejected as the file argument.
 dump-boxes loads the same styles and prints a principal-box snapshot (no
 anonymous/line boxes, layout positions or painting yet).
 dump-layout prints used content/padding/border rectangles for static non-replaced
-blocks with zero vertical margins and visible overflow. Inline/text layout and
+blocks with collapsed vertical margins and visible overflow. Inline/text layout and
 other unsupported formatting fail explicitly. No command paints pixels yet.
 
 Options for all dump commands (positive integers; exceeding any limit except

@@ -388,7 +388,7 @@ fn layout_limits(limits: LoaderLimits) -> rustic_layout::LayoutLimits {
     }
 }
 
-/// Compute used block rectangles for the explicit margin-free reference subset.
+/// Compute used block rectangles with adjoining-margin collapse for the static subset.
 /// Unsupported formatting returns no partial output; this does not paint pixels.
 pub fn dump_layout(
     parsed: &ParsedDocument,

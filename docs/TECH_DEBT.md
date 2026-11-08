@@ -69,6 +69,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
 | TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Paid |
+| TD-22 | Watch | CI | Emulated tests run serially to dodge a rare QEMU crash | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -346,6 +347,17 @@ test `nested_logical_pseudo_classes_stay_polynomial` matches eight nested
 `:is(… *)` levels, the `:not(:not(…))` and `:nth-child(of …)` forms on a
 100-deep chain in milliseconds, and the new `css-cascade` fuzz target styles a
 document with arbitrary stylesheets.
+
+### TD-22 — Emulated tests run serially to dodge a rare QEMU crash
+
+In the sandbox, `qemu-s390x` crashed with an internal `SIGSEGV` (in QEMU, not
+the guest) in about 1 of 12 runs of `rustic-fuzz`'s harness tests when tests ran
+in parallel; reruns passed and native runs never fail. The emulated CI job sets
+`RUST_TEST_THREADS=1` to lower the odds. Serial runs take about the same time
+because the slow tests are sleep-bound timeouts. **Pay:** drop the variable
+once a newer QEMU on the runner image passes repeated parallel runs, or move
+the target to native hardware. **Trigger:** any emulated-job flake, or a runner
+image QEMU upgrade.
 
 ## Reviewing new work
 

@@ -70,6 +70,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
 | TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Paid |
 | TD-22 | Watch | CI | Emulated tests run serially to dodge a rare QEMU crash | Open |
+| TD-23 | Deliberate | Style | Light children of a shadow host inherit from the host, not a slot | Open, pay with slot assignment |
+| TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Open, pay with the custom element registry |
+| TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -358,6 +361,39 @@ because the slow tests are sleep-bound timeouts. **Pay:** drop the variable
 once a newer QEMU on the runner image passes repeated parallel runs, or move
 the target to native hardware. **Trigger:** any emulated-job flake, or a runner
 image QEMU upgrade.
+
+### TD-23 — Light children of a shadow host inherit from the host
+
+CSS-07b styles shadow trees, but `rustic-dom` does not assign slots, so there
+is no flat tree. `style_tree` styles a host's light children as ordinary
+children of the host: they inherit from it and match document-tree rules. In a
+browser, a slotted child inherits from its `<slot>`, and an unslotted one is not
+rendered. `::slotted()` is rejected rather than matching nothing silently.
+**Pay:** with slot assignment (`dom.shadow` step 2), inherit along the flat
+tree and add `::slotted()` with the slot's tree as its context. **Trigger:**
+slot assignment, or layout consuming styles of shadow hosts' children.
+
+### TD-24 — Custom element names approximate `PCENChar`
+
+`Document::attach_shadow` accepts valid custom element names as hosts. The
+check requires a leading ASCII lowercase letter, a hyphen, no ASCII uppercase
+or whitespace and no ASCII punctuation other than `-`, `.` and `_`, and rejects
+the reserved names; it accepts every non-ASCII character, while HTML's
+`PCENChar` excludes a few ranges (such as U+037E and U+2000–U+200B). **Pay:**
+implement the exact production when the custom element registry needs it.
+**Trigger:** `dom.shadow` step 4, or a public `attachShadow` binding.
+
+### TD-25 — Layers in non-matching `@media` still join the layer order
+
+CSS Cascade 5 orders layers by their first declaration *that applies*: a layer
+first declared inside an `@media` block whose query is false takes no place
+until the query matches. Rustic builds each sheet's layer list at parse time,
+before media results exist, so such a layer takes its place regardless; its
+rules still apply only when the query matches. Layer order is only wrong for
+pages that declare the same layer in competing conditional blocks. **Pay:**
+record each layer declaration with its media conditions and rebuild the layer
+order when `Cascade::set_environment` changes a result. **Trigger:** a WPT
+layer-in-media case, or a site report.
 
 ## Reviewing new work
 

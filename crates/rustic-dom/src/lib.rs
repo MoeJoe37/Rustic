@@ -36,7 +36,9 @@ pub use document::{Adopted, Document, DocumentLimits, InvariantViolation, ReadyS
 pub use dump::DumpError;
 pub use error::DomError;
 pub use name::{HTML_NAMESPACE, MATHML_NAMESPACE, QualifiedName, SVG_NAMESPACE};
-pub use node::{Attribute, DocumentType, Element, Node, NodeKind, ProcessingInstruction};
+pub use node::{
+    Attribute, DocumentType, Element, Node, NodeKind, ProcessingInstruction, ShadowRootMode,
+};
 pub use rustic_base::{DocumentId, NodeId};
 pub use string::DomString;
 pub use traversal::Walk;

@@ -47,7 +47,8 @@ impl Write for LimitedString {
 impl Document {
     /// Produce a deterministic preorder diagnostic dump, never HTML serialization.
     ///
-    /// Template contents follow their template's attributes, one level deeper.
+    /// Template contents (`#template-contents`) and shadow roots
+    /// (`#shadow-root`) follow their element's attributes, one level deeper.
     /// The output excludes IDs, allocation history, and detached nodes outside the
     /// selected subtree. Names and values are quoted; lone UTF-16 surrogates are
     /// escaped rather than replaced. The limit counts final UTF-8 output bytes,
@@ -67,19 +68,19 @@ impl Document {
                 continue;
             };
             let node = self.node(id).map_err(DumpError::Node)?;
-            write_node(
-                &mut writer,
-                node.kind(),
-                node.template_host().is_some(),
-                base + depth,
-            )
-            .map_err(|_| DumpError::OutputLimit)?;
+            let fragment = if node.template_host().is_some() {
+                FragmentLabel::TemplateContents
+            } else if node.shadow_host().is_some() {
+                FragmentLabel::ShadowRoot
+            } else {
+                FragmentLabel::Plain
+            };
+            write_node(&mut writer, node.kind(), fragment, base + depth)
+                .map_err(|_| DumpError::OutputLimit)?;
             if let NodeKind::Element(element) = node.kind() {
-                if let Some(contents) = element.template_contents() {
-                    walks.push((
-                        self.walk(contents).map_err(DumpError::Node)?,
-                        base + depth + 1,
-                    ));
+                // A shadow root prints before the host's children.
+                for owned in element.owned_roots() {
+                    walks.push((self.walk(owned).map_err(DumpError::Node)?, base + depth + 1));
                 }
             }
         }
@@ -139,17 +140,28 @@ fn name(writer: &mut impl Write, name: &QualifiedName) -> fmt::Result {
     quoted(writer, name.local().encode_utf16())
 }
 
+/// Which kind of fragment a `DocumentFragment` node is.
+#[derive(Clone, Copy)]
+enum FragmentLabel {
+    Plain,
+    TemplateContents,
+    ShadowRoot,
+}
+
 fn write_node(
     writer: &mut impl Write,
     kind: &NodeKind,
-    template_contents: bool,
+    fragment: FragmentLabel,
     depth: usize,
 ) -> fmt::Result {
     indent(writer, depth)?;
     match kind {
         NodeKind::Document => writer.write_str("#document\n"),
-        NodeKind::DocumentFragment if template_contents => writer.write_str("#template-contents\n"),
-        NodeKind::DocumentFragment => writer.write_str("#document-fragment\n"),
+        NodeKind::DocumentFragment => writer.write_str(match fragment {
+            FragmentLabel::Plain => "#document-fragment\n",
+            FragmentLabel::TemplateContents => "#template-contents\n",
+            FragmentLabel::ShadowRoot => "#shadow-root\n",
+        }),
         NodeKind::ProcessingInstruction(value) => {
             writer.write_str("processing-instruction target=")?;
             quoted(writer, value.target().as_units().iter().copied())?;

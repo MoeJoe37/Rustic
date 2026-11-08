@@ -1,12 +1,12 @@
 //! [`ElementView`] for `rustic-dom` documents.
 
 use rustic_css::{CssParser, SelectorList};
-use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind};
+use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
 
 use crate::matching::{MatchCache, matches_complex_cached};
 use crate::{
     AttributeRef, Cascade, ComputeContext, ComputedStyle, ElementView, MatchContext,
-    SpecifiedStyle, StyleDiagnostic, parse_style_attribute,
+    SpecifiedStyle, StyleDiagnostic, StyleInputs, TreeContext, TreeScope, parse_style_attribute,
 };
 
 /// An element of a [`Document`], borrowed for matching.
@@ -79,6 +79,11 @@ impl ElementView for DomElement<'_> {
 
     fn next_sibling_element(&self) -> Option<Self> {
         self.element_at(self.node.next_sibling(), Node::next_sibling)
+    }
+
+    fn parent_shadow_host(&self) -> Option<Self> {
+        let parent = self.document.node(self.node.parent()?).ok()?;
+        Self::new(self.document, parent.shadow_host()?)
     }
 
     fn is_root(&self) -> bool {
@@ -155,20 +160,43 @@ pub struct ElementStyle {
     pub inline_diagnostics: Vec<StyleDiagnostic>,
 }
 
-/// Style every element in the subtree rooted at `root`, in tree order: run
-/// the cascade, then compute values, with each element inheriting its parent
-/// element's computed values (template contents are not styled).
+/// The [`TreeContext`] of the shadow tree rooted at `shadow_root`.
+///
+/// Derived from the node's slot, so it is stable while the shadow root
+/// lives and never equals [`TreeContext::DOCUMENT`].
+pub fn shadow_tree_context(shadow_root: NodeId) -> TreeContext {
+    TreeContext(u64::from(shadow_root.slot()) + 1)
+}
+
+/// One tree being walked by [`style_tree`].
+struct TreeWalk<'a> {
+    walk: Walk<'a>,
+    /// Depth added to the walk's depths; a shadow tree's walk starts at
+    /// its host's depth, and its root fragment is skipped.
+    base: usize,
+    shadow: bool,
+    scope: TreeScope<DomElement<'a>>,
+}
+
+/// Style every element in the subtree rooted at `root`, in shadow-including
+/// tree order: run the cascade, then compute values, with each element
+/// inheriting its parent element's computed values. A shadow tree is styled
+/// right after its host, before the host's children, and its top-level
+/// elements inherit from the host; its author sheets are those pushed with
+/// [`shadow_tree_context`] (see [`crate::document_cascade`]). Template
+/// contents are not styled. Slots are not assigned yet, so the host's light
+/// children inherit from the host (TD-23).
 ///
 /// `style` attributes on elements are parsed with `parser`; if one exceeds
 /// the parser's limits it is ignored (reported as an empty declaration list).
 /// When `root` is not the document's root element, the subtree is styled as
-/// if `root` had no parent.
-pub fn style_tree(
-    document: &Document,
+/// if `root` had no parent and were in the document tree.
+pub fn style_tree<'a>(
+    document: &'a Document,
     root: NodeId,
     cascade: &Cascade,
     parser: &CssParser,
-    cx: &MatchContext<DomElement<'_>>,
+    cx: &MatchContext<DomElement<'a>>,
     compute: &ComputeContext,
 ) -> Result<Vec<ElementStyle>, DomError> {
     let mut out: Vec<ElementStyle> = Vec::new();
@@ -178,7 +206,23 @@ pub fn style_tree(
     // The tree and the cascade stay borrowed and unchanged for the whole
     // restyle, so match results can be shared.
     let cache = MatchCache::default();
-    for (id, depth) in document.walk(root)? {
+    // An explicit stack of tree walks, bounded by live nodes, so nested
+    // shadow trees never recurse.
+    let mut walks = vec![TreeWalk {
+        walk: document.walk(root)?,
+        base: 0,
+        shadow: false,
+        scope: TreeScope::document(),
+    }];
+    while let Some(tree) = walks.last_mut() {
+        let Some((id, depth)) = tree.walk.next() else {
+            walks.pop();
+            continue;
+        };
+        if tree.shadow && depth == 0 {
+            continue; // The shadow root itself, standing in for its host.
+        }
+        let (scope, depth) = (tree.scope, tree.base + depth);
         while path.last().is_some_and(|&(d, _)| d >= depth) {
             path.pop();
         }
@@ -193,12 +237,19 @@ pub fn style_tree(
             Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
             None => Default::default(),
         };
-        // Only a direct parent element passes its style on.
+        let shadow_root = element.element.shadow_root();
+        let inputs = StyleInputs {
+            style_attribute: &inline,
+            scope,
+            shadow_root: shadow_root.map(shadow_tree_context),
+            ..StyleInputs::document()
+        };
+        // Only a direct parent element (or host) passes its style on.
         let parent = path
             .last()
             .filter(|&&(d, _)| d + 1 == depth)
             .map(|&(_, i)| &out[i].computed);
-        let specified = cascade.specified_style_cached(element, cx, &inline, parent, &cache);
+        let specified = cascade.specified_style_cached(element, cx, &inputs, parent, &cache);
         let root_computed = root_style.map(|i| &out[i].computed);
         let computed = ComputedStyle::compute(
             &specified,
@@ -217,6 +268,18 @@ pub fn style_tree(
             computed,
             inline_diagnostics,
         });
+        if let Some(shadow_root) = shadow_root {
+            walks.push(TreeWalk {
+                walk: document.walk(shadow_root)?,
+                base: depth,
+                shadow: true,
+                scope: TreeScope {
+                    context: shadow_tree_context(shadow_root),
+                    host: Some(element),
+                    depth: scope.depth.saturating_add(1),
+                },
+            });
+        }
     }
     Ok(out)
 }

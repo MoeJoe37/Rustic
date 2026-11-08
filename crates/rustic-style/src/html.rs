@@ -11,7 +11,7 @@ use rustic_dom::{
 
 use crate::{
     Cascade, ComputedStyle, DomElement, ElementStyle, ElementView, Origin, StyleDiagnostic,
-    StyleSheet,
+    StyleSheet, TreeContext, shadow_tree_context,
 };
 
 /// The supported subset of the HTML user-agent stylesheet (HTML §15.3).
@@ -77,8 +77,7 @@ pub fn html_user_agent_sheet(parser: &CssParser) -> StyleSheet {
         .map(|(sheet, _)| sheet)
         .unwrap_or(StyleSheet {
             origin: Origin::UserAgent,
-            rules: Vec::new(),
-            media: Vec::new(),
+            ..StyleSheet::default()
         })
 }
 
@@ -129,10 +128,12 @@ fn child_text(document: &Document, id: NodeId) -> String {
 }
 
 /// A cascade for an HTML document: the user-agent stylesheet, then the sheet
-/// of every HTML `<style>` element in tree order (template contents are not
-/// searched), each reported in the returned list. A `media` attribute
-/// restricts its sheet with [`StyleSheet::restrict_to`]. The cascade uses the
-/// default environment; change it with [`Cascade::set_environment`].
+/// of every HTML `<style>` element in shadow-including tree order (template
+/// contents are not searched), each reported in the returned list. A
+/// `<style>` inside a shadow tree styles that tree only: its sheet belongs to
+/// the tree's [`crate::shadow_tree_context`]. A `media` attribute restricts
+/// its sheet with [`StyleSheet::restrict_to`]. The cascade uses the default
+/// environment; change it with [`Cascade::set_environment`].
 ///
 /// External stylesheets (`<link rel=stylesheet>`) need fetching and are not
 /// loaded.
@@ -143,10 +144,25 @@ pub fn document_cascade(
     let mut cascade = Cascade::new();
     cascade.push(html_user_agent_sheet(parser));
     let mut reports = Vec::new();
-    for (id, _) in document.walk(document.root())? {
+    // An explicit stack of (walk, tree) pairs for nested shadow trees.
+    let mut walks = vec![(document.walk(document.root())?, TreeContext::DOCUMENT)];
+    while let Some((walk, context)) = walks.last_mut() {
+        let context = *context;
+        let Some((id, _)) = walk.next() else {
+            walks.pop();
+            continue;
+        };
         let Some(element) = DomElement::new(document, id) else {
             continue;
         };
+        if let Ok(NodeKind::Element(data)) = document.node(id).map(|n| n.kind()) {
+            if let Some(shadow_root) = data.shadow_root() {
+                walks.push((
+                    document.walk(shadow_root)?,
+                    shadow_tree_context(shadow_root),
+                ));
+            }
+        }
         if element.local_name() != "style" || element.namespace() != Some(HTML_NAMESPACE) {
             continue;
         }
@@ -169,7 +185,7 @@ pub fn document_cascade(
                     if let Some(media) = media {
                         sheet.restrict_to(media);
                     }
-                    cascade.push(sheet);
+                    cascade.push_in(sheet, context);
                     (StyleElementStatus::Applied, diagnostics)
                 }
                 Err(_) => (StyleElementStatus::ResourceLimit, Vec::new()),
@@ -244,7 +260,10 @@ pub fn dump_computed_styles(
         let Some(element) = DomElement::new(document, style.node) else {
             continue;
         };
-        let parent = element.parent_element().and_then(|p| seen.get(&p.id()));
+        let parent = element
+            .parent_element()
+            .or_else(|| element.parent_shadow_host())
+            .and_then(|p| seen.get(&p.id()));
         let depth = parent.map_or(0, |&(d, _)| d + 1);
         let inherited_from = parent.map_or(&initial, |&(_, i)| &styles[i].computed);
         seen.insert(style.node, (depth, index));

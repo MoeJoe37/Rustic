@@ -1,23 +1,27 @@
 //! The cascade (CSS Cascade Level 5 §6) and inheritance (§7).
 //!
 //! For each element and longhand, the winning declaration is chosen by, in
-//! order: origin and importance; whether it comes from the element's `style`
-//! attribute; selector specificity; and order of appearance. CSS-wide
-//! keywords are then resolved: `initial`, `inherit`, `unset`, and `revert` /
-//! `revert-layer` (which roll back to the previous origin, since cascade
-//! layers are not implemented yet). Properties with no declaration inherit or
-//! take their initial value.
+//! order: origin and importance (with the animation and transition origins);
+//! encapsulation context (shadow trees); whether it comes from the element's
+//! `style` attribute; cascade layer; selector specificity; and order of
+//! appearance. CSS-wide keywords are then resolved: `initial`, `inherit`,
+//! `unset`, `revert` (roll back to the previous origin) and `revert-layer`
+//! (roll back to the previous layer). Properties with no declaration
+//! inherit or take their initial value.
 //!
 //! The result is the *specified* value of every supported longhand; inherited
 //! values come from the parent's [`ComputedStyle`], and
 //! [`ComputedStyle::compute`] turns the result into computed values.
+
+use std::collections::HashMap;
 
 use rustic_css::{
     CssWideKeyword, DeclaredValue, MediaEnvironment, PropertyDeclaration, PropertyId,
     PropertyValue, Specificity,
 };
 
-use crate::matching::{MatchCache, matches_complex_cached};
+use crate::layer::{LayerOrder, UNLAYERED};
+use crate::matching::{MatchCache, matches_in_tree};
 use crate::{ComputedStyle, ElementView, MatchContext, Origin, StyleSheet};
 
 /// The specified value of every supported longhand for one element.
@@ -66,44 +70,200 @@ impl SpecifiedStyle {
     }
 }
 
+/// Identifies one node tree for the cascade: the document tree or one
+/// shadow tree. The caller assigns the numbers; the document tree is
+/// [`TreeContext::DOCUMENT`].
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TreeContext(pub u64);
+
+impl TreeContext {
+    /// The document tree.
+    pub const DOCUMENT: Self = Self(0);
+}
+
+/// The tree an element is in.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TreeScope<E> {
+    /// The tree's context.
+    pub context: TreeContext,
+    /// The shadow host whose shadow tree this is; `None` for the document.
+    pub host: Option<E>,
+    /// Nesting depth in shadow-including tree order: 0 for the document
+    /// tree, one more than the host's tree for a shadow tree.
+    pub depth: u32,
+}
+
+impl<E> TreeScope<E> {
+    /// The document tree.
+    pub fn document() -> Self {
+        Self {
+            context: TreeContext::DOCUMENT,
+            host: None,
+            depth: 0,
+        }
+    }
+}
+
+/// Everything besides stylesheets that the cascade needs for one element.
+#[derive(Clone, Copy, Debug)]
+pub struct StyleInputs<'a, E> {
+    /// The element's `style` attribute declarations (author origin).
+    pub style_attribute: &'a [PropertyDeclaration],
+    /// Values from running CSS animations (the animation origin), later
+    /// ones winning. Rustic has no animation engine yet, so the engine
+    /// passes none; the cascade already places them correctly.
+    pub animations: &'a [PropertyDeclaration],
+    /// Values from running CSS transitions (the transition origin).
+    pub transitions: &'a [PropertyDeclaration],
+    /// The tree the element is in.
+    pub scope: TreeScope<E>,
+    /// For a shadow host, the context of its shadow tree, whose author
+    /// sheets style the host through `:host` selectors.
+    pub shadow_root: Option<TreeContext>,
+}
+
+impl<E> StyleInputs<'_, E> {
+    /// An element of the document tree with no attached declarations.
+    pub fn document() -> Self {
+        Self {
+            style_attribute: &[],
+            animations: &[],
+            transitions: &[],
+            scope: TreeScope::document(),
+            shadow_root: None,
+        }
+    }
+}
+
 /// Cascade priority: higher sorts first.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct Priority {
-    /// Origin and importance (§6.2): normal UA < normal user < normal author
-    /// < important author < important user < important UA.
+    /// Origin and importance (§6.1): normal UA < normal user < normal author
+    /// < animations < important author < important user < important UA <
+    /// transitions.
     tier: u8,
+    /// Encapsulation context: outer wins for normal declarations, inner for
+    /// important ones.
+    context: u32,
     /// Declarations from the `style` attribute beat rule declarations.
     inline: bool,
+    /// Cascade layer: later wins for normal declarations, earlier for
+    /// important ones; unlayered declarations are the final layer.
+    layer: u32,
     specificity: Specificity,
     /// Order of appearance across all sheets, then within the block.
     order: (usize, usize, usize),
 }
+
+const ANIMATION_TIER: u8 = 3;
+const TRANSITION_TIER: u8 = 7;
 
 fn tier(origin: Origin, important: bool) -> u8 {
     match (origin, important) {
         (Origin::UserAgent, false) => 0,
         (Origin::User, false) => 1,
         (Origin::Author, false) => 2,
-        (Origin::Author, true) => 3,
-        (Origin::User, true) => 4,
-        (Origin::UserAgent, true) => 5,
+        (Origin::Author, true) => 4,
+        (Origin::User, true) => 5,
+        (Origin::UserAgent, true) => 6,
     }
+}
+
+fn context_key(depth: u32, important: bool) -> u32 {
+    if important { depth } else { u32::MAX - depth }
+}
+
+fn layer_key(rank: u32, important: bool) -> u32 {
+    if important { UNLAYERED - rank } else { rank }
+}
+
+/// Origins as `revert` sees them: the animation and transition origins
+/// count as the author origin.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum RevertLevel {
+    UserAgent,
+    User,
+    Author,
 }
 
 struct Candidate<'a> {
     priority: Priority,
-    origin: Origin,
+    level: RevertLevel,
+    /// Context depth and layer rank, to find the normal level of a layer.
+    depth: u32,
+    rank: u32,
     declaration: &'a PropertyDeclaration,
 }
 
-/// An ordered set of stylesheets from any origins, evaluated against one
-/// media environment.
-#[derive(Clone, Debug, Default, PartialEq)]
+impl Candidate<'_> {
+    /// Where `revert-layer` here rolls back to: every candidate at or above
+    /// the returned priority is skipped, except for important style
+    /// attribute declarations, which skip only style attribute and
+    /// animation declarations (`None`).
+    fn revert_layer_floor(&self) -> Option<Priority> {
+        let p = self.priority;
+        let min = |tier| Priority {
+            tier,
+            context: 0,
+            inline: false,
+            layer: 0,
+            specificity: Specificity::default(),
+            order: (0, 0, 0),
+        };
+        if p.tier == ANIMATION_TIER || p.tier == TRANSITION_TIER {
+            // These origins form their own layer.
+            return Some(min(p.tier));
+        }
+        if p.inline && self.declaration.important {
+            return None;
+        }
+        let origin = match self.level {
+            RevertLevel::UserAgent => Origin::UserAgent,
+            RevertLevel::User => Origin::User,
+            RevertLevel::Author => Origin::Author,
+        };
+        // As if nothing between the layer's important and normal levels
+        // existed, including the normal level itself.
+        Some(Priority {
+            context: context_key(self.depth, false),
+            inline: p.inline,
+            layer: layer_key(self.rank, false),
+            ..min(tier(origin, false))
+        })
+    }
+}
+
+/// Where a cascade's stylesheet belongs: its tree, and the layer tree
+/// nodes of its declared layers.
+#[derive(Clone, Debug, PartialEq)]
+struct Placement {
+    context: TreeContext,
+    layer_nodes: Vec<usize>,
+}
+
+/// An ordered set of stylesheets from any origins and trees, evaluated
+/// against one media environment.
+///
+/// User-agent and user sheets style every tree; author sheets style the
+/// tree they belong to (and its shadow host, through `:host`).
+#[derive(Clone, Debug, Default)]
 pub struct Cascade {
     sheets: Vec<StyleSheet>,
+    placements: Vec<Placement>,
     environment: MediaEnvironment,
     /// Per sheet, whether each of its media query lists matches.
     media_results: Vec<Vec<bool>>,
+    /// Layer trees and their ranks, per origin and tree (derived from the
+    /// sheets and placements).
+    layers: HashMap<(Origin, TreeContext), (LayerOrder, Vec<u32>)>,
+}
+
+impl PartialEq for Cascade {
+    fn eq(&self, other: &Self) -> bool {
+        self.sheets == other.sheets
+            && self.placements == other.placements
+            && self.environment == other.environment
+    }
 }
 
 fn evaluate(sheet: &StyleSheet, environment: &MediaEnvironment) -> Vec<bool> {
@@ -124,10 +284,30 @@ impl Cascade {
         }
     }
 
-    /// Append a stylesheet; later sheets come later in order of appearance.
+    /// Append a document-tree stylesheet; later sheets come later in order
+    /// of appearance.
     pub fn push(&mut self, sheet: StyleSheet) {
+        self.push_in(sheet, TreeContext::DOCUMENT);
+    }
+
+    /// Append a stylesheet belonging to the tree `context` (for user-agent
+    /// and user sheets, which style every tree, `context` only scopes their
+    /// layer order).
+    pub fn push_in(&mut self, sheet: StyleSheet, context: TreeContext) {
+        let index = self.sheets.len();
+        let (order, ranks) = self.layers.entry((sheet.origin, context)).or_default();
+        let layer_nodes = sheet
+            .layers
+            .iter()
+            .map(|name| order.declare(index, name))
+            .collect();
+        *ranks = order.ranks();
         self.media_results.push(evaluate(&sheet, &self.environment));
         self.sheets.push(sheet);
+        self.placements.push(Placement {
+            context,
+            layer_nodes,
+        });
     }
 
     /// The stylesheets in order.
@@ -155,7 +335,7 @@ impl Cascade {
         changed
     }
 
-    /// Compute `element`'s specified style.
+    /// Compute the specified style of a document-tree `element`.
     ///
     /// `inline` holds the element's `style` attribute declarations (author
     /// origin); `parent` is the parent element's computed style, or `None`
@@ -168,21 +348,67 @@ impl Cascade {
         inline: &[PropertyDeclaration],
         parent: Option<&ComputedStyle>,
     ) -> SpecifiedStyle {
-        self.specified_style_cached(element, cx, inline, parent, &MatchCache::default())
+        let inputs = StyleInputs {
+            style_attribute: inline,
+            ..StyleInputs::document()
+        };
+        self.specified_style_with(element, cx, &inputs, parent)
     }
 
-    /// [`Self::specified_style`] sharing `cache` across one restyle.
-    pub(crate) fn specified_style_cached<E: ElementView>(
+    /// [`Self::specified_style`] for an element in any tree, with animation
+    /// and transition values.
+    pub fn specified_style_with<E: ElementView>(
         &self,
         element: E,
         cx: &MatchContext<E>,
-        inline: &[PropertyDeclaration],
+        inputs: &StyleInputs<'_, E>,
         parent: Option<&ComputedStyle>,
-        cache: &MatchCache<E>,
     ) -> SpecifiedStyle {
-        let mut candidates: Vec<Candidate<'_>> = Vec::new();
-        for (sheet_index, (sheet, media)) in self.sheets.iter().zip(&self.media_results).enumerate()
-        {
+        self.specified_style_cached(element, cx, inputs, parent, &MatchCache::default())
+    }
+
+    /// The rank of layer `rule_layer` of a sheet placed at `placement`,
+    /// given its layer group's `ranks`.
+    fn rank(ranks: &[u32], placement: &Placement, rule_layer: Option<usize>) -> u32 {
+        rule_layer
+            .and_then(|l| placement.layer_nodes.get(l))
+            .and_then(|&node| ranks.get(node))
+            .copied()
+            .unwrap_or(UNLAYERED)
+    }
+
+    fn candidates<'a, E: ElementView>(
+        &'a self,
+        element: E,
+        cx: &MatchContext<E>,
+        inputs: &StyleInputs<'a, E>,
+        cache: &MatchCache<E>,
+    ) -> Vec<Candidate<'a>> {
+        let mut candidates: Vec<Candidate<'a>> = Vec::new();
+        let sheets = self
+            .sheets
+            .iter()
+            .zip(&self.placements)
+            .zip(&self.media_results);
+        for (sheet_index, ((sheet, placement), media)) in sheets.enumerate() {
+            let author = sheet.origin == Origin::Author;
+            // (host of the tree the rules match in, context depth)
+            let tree = if !author || placement.context == inputs.scope.context {
+                (inputs.scope.host, inputs.scope.depth)
+            } else if inputs.shadow_root == Some(placement.context) {
+                (Some(element), inputs.scope.depth.saturating_add(1))
+            } else {
+                continue;
+            };
+            let ranks = self
+                .layers
+                .get(&(sheet.origin, placement.context))
+                .map_or(&[][..], |(_, ranks)| ranks);
+            let level = match sheet.origin {
+                Origin::UserAgent => RevertLevel::UserAgent,
+                Origin::User => RevertLevel::User,
+                Origin::Author => RevertLevel::Author,
+            };
             for (rule_index, rule) in sheet.rules.iter().enumerate() {
                 if !StyleSheet::rule_applies(rule, media) {
                     continue;
@@ -193,41 +419,86 @@ impl Cascade {
                     .iter()
                     .filter(|s| {
                         s.pseudo_element().is_none()
-                            && matches_complex_cached(s, element, cx, cache)
+                            && matches_in_tree(s, element, cx, cache, tree.0)
                     })
                     .map(|s| s.specificity())
                     .max();
                 let Some(specificity) = specificity else {
                     continue;
                 };
+                let rank = Self::rank(ranks, placement, rule.layer);
                 for (declaration_index, declaration) in rule.declarations.iter().enumerate() {
+                    let important = declaration.important;
                     candidates.push(Candidate {
                         priority: Priority {
-                            tier: tier(sheet.origin, declaration.important),
+                            tier: tier(sheet.origin, important),
+                            context: context_key(tree.1, important),
                             inline: false,
+                            layer: layer_key(rank, important),
                             specificity,
                             order: (sheet_index, rule_index, declaration_index),
                         },
-                        origin: sheet.origin,
+                        level,
+                        depth: tree.1,
+                        rank,
                         declaration,
                     });
                 }
             }
         }
-        for (declaration_index, declaration) in inline.iter().enumerate() {
+        let depth = inputs.scope.depth;
+        for (declaration_index, declaration) in inputs.style_attribute.iter().enumerate() {
+            let important = declaration.important;
             candidates.push(Candidate {
                 priority: Priority {
-                    tier: tier(Origin::Author, declaration.important),
+                    tier: tier(Origin::Author, important),
+                    context: context_key(depth, important),
                     inline: true,
+                    layer: layer_key(UNLAYERED, important),
                     specificity: Specificity::default(),
                     order: (usize::MAX, 0, declaration_index),
                 },
-                origin: Origin::Author,
+                level: RevertLevel::Author,
+                depth,
+                rank: UNLAYERED,
                 declaration,
             });
         }
+        for (tier, list) in [
+            (ANIMATION_TIER, inputs.animations),
+            (TRANSITION_TIER, inputs.transitions),
+        ] {
+            for (index, declaration) in list.iter().enumerate() {
+                candidates.push(Candidate {
+                    priority: Priority {
+                        tier,
+                        context: 0,
+                        inline: false,
+                        layer: 0,
+                        specificity: Specificity::default(),
+                        order: (0, 0, index),
+                    },
+                    level: RevertLevel::Author,
+                    depth,
+                    rank: UNLAYERED,
+                    declaration,
+                });
+            }
+        }
         candidates.sort_by_key(|c| std::cmp::Reverse(c.priority));
+        candidates
+    }
 
+    /// [`Self::specified_style_with`] sharing `cache` across one restyle.
+    pub(crate) fn specified_style_cached<E: ElementView>(
+        &self,
+        element: E,
+        cx: &MatchContext<E>,
+        inputs: &StyleInputs<'_, E>,
+        parent: Option<&ComputedStyle>,
+        cache: &MatchCache<E>,
+    ) -> SpecifiedStyle {
+        let candidates = self.candidates(element, cx, inputs, cache);
         let initial;
         let parent = match parent {
             Some(parent) => parent,
@@ -247,13 +518,23 @@ impl Cascade {
                         property.initial_value()
                     }
                 };
-                // Origins excluded by `revert`; anything at or above is skipped.
-                let mut ceiling: Option<Origin> = None;
+                // `revert`: origins at or above this level are skipped.
+                let mut ceiling: Option<RevertLevel> = None;
+                // `revert-layer`: candidates at or above this are skipped.
+                let mut floor: Option<Priority> = None;
+                // `revert-layer` in an important style attribute: style
+                // attribute and animation declarations are skipped.
+                let mut skip_attached = false;
                 for candidate in candidates
                     .iter()
                     .filter(|c| c.declaration.property == property)
                 {
-                    if ceiling.is_some_and(|c| candidate.origin >= c) {
+                    if ceiling.is_some_and(|c| candidate.level >= c)
+                        || floor.is_some_and(|f| candidate.priority >= f)
+                        || (skip_attached
+                            && (candidate.priority.inline
+                                || candidate.priority.tier == ANIMATION_TIER))
+                    {
                         continue;
                     }
                     match &candidate.declaration.value {
@@ -263,13 +544,17 @@ impl Cascade {
                         }
                         DeclaredValue::CssWide(CssWideKeyword::Inherit) => return inherit(),
                         DeclaredValue::CssWide(CssWideKeyword::Unset) => return unset(),
-                        DeclaredValue::CssWide(
-                            CssWideKeyword::Revert | CssWideKeyword::RevertLayer,
-                        ) => {
-                            if candidate.origin == Origin::UserAgent {
+                        DeclaredValue::CssWide(CssWideKeyword::Revert) => {
+                            if candidate.level == RevertLevel::UserAgent {
                                 return unset();
                             }
-                            ceiling = Some(candidate.origin);
+                            ceiling = Some(candidate.level);
+                        }
+                        DeclaredValue::CssWide(CssWideKeyword::RevertLayer) => {
+                            match candidate.revert_layer_floor() {
+                                Some(f) => floor = Some(f),
+                                None => skip_attached = true,
+                            }
                         }
                     }
                 }

@@ -371,9 +371,9 @@ impl HostHeap {
         }
         let live_nodes = document.node_count();
 
-        // Template contents are parentless roots kept alive by, and keeping
-        // alive, their template element (`Node::template_host`).
-        let host_of = |fragment: NodeId| document.live(fragment).template_host();
+        // Template contents and shadow roots are parentless roots kept alive
+        // by, and keeping alive, their owning element.
+        let host_of = |fragment: NodeId| document.live(fragment).owner_host();
 
         let mut node_marks = Vec::new();
         node_marks
@@ -437,9 +437,7 @@ impl HostHeap {
                     for (id, _) in document.walk(tree)? {
                         node_marks[id.slot() as usize] = true;
                         if let NodeKind::Element(element) = document.live(id).kind() {
-                            if let Some(contents) = element.template_contents() {
-                                work.push(Traced::Node(contents));
-                            }
+                            work.extend(element.owned_roots().map(Traced::Node));
                         }
                         let start = self
                             .node_edges

@@ -15,7 +15,7 @@ use rustic_html::{
     ParseError, Token,
 };
 use rustic_style::{
-    Cascade, ComputeContext, MatchContext, Origin, StyleSheet, dump_computed_styles,
+    Cascade, ComputeContext, LayerSegment, MatchContext, Origin, StyleSheet, dump_computed_styles,
     query_selector_all, style_tree,
 };
 use rustic_url::{Url, UrlParser};
@@ -977,6 +977,11 @@ impl Target for CssCascadeTarget {
             b"block",
             b"@namespace x url(y);",
             b"@media x {",
+            b"@layer a, b;",
+            b"@layer a {",
+            b"@layer {",
+            b"@layer b.c {",
+            b"revert-layer !important",
             b"currentcolor",
             b"bolder",
             b"larger",
@@ -1000,33 +1005,45 @@ impl Target for CssCascadeTarget {
         let reference = cascade_styles(&single);
         check_computed(&single)?;
 
-        let middle = sheet.rules.len() / 2;
-        let mut split = Cascade::new();
-        split.push(StyleSheet {
-            origin: Origin::Author,
-            rules: sheet.rules[..middle].to_vec(),
-            media: sheet.media.clone(),
-        });
-        split.push(StyleSheet {
-            origin: Origin::Author,
-            rules: sheet.rules[middle..].to_vec(),
-            media: sheet.media.clone(),
-        });
-        if cascade_styles(&split) != reference {
-            return Err("splitting the sheet changed the cascade".into());
+        // Anonymous layers belong to their sheet, so only sheets without
+        // them split or repeat cleanly. Both halves declare every layer, keeping the
+        // layer order and the rules' layer indexes.
+        let anonymous = sheet
+            .layers
+            .iter()
+            .flat_map(|l| l.segments())
+            .any(|s| matches!(s, LayerSegment::Anonymous(_)));
+        if !anonymous {
+            let middle = sheet.rules.len() / 2;
+            let mut split = Cascade::new();
+            split.push(StyleSheet {
+                origin: Origin::Author,
+                rules: sheet.rules[..middle].to_vec(),
+                media: sheet.media.clone(),
+                layers: sheet.layers.clone(),
+            });
+            split.push(StyleSheet {
+                origin: Origin::Author,
+                rules: sheet.rules[middle..].to_vec(),
+                media: sheet.media.clone(),
+                layers: sheet.layers.clone(),
+            });
+            if cascade_styles(&split) != reference {
+                return Err("splitting the sheet changed the cascade".into());
+            }
         }
 
+        // A repeated anonymous layer is a new layer, so the copy may reorder.
         let mut doubled = single.clone();
         doubled.push(sheet.clone());
-        if cascade_styles(&doubled) != reference {
+        if !anonymous && cascade_styles(&doubled) != reference {
             return Err("repeating the sheet changed the cascade".into());
         }
 
         let mut user_below = Cascade::new();
         user_below.push(StyleSheet {
             origin: Origin::User,
-            rules: Vec::new(),
-            media: Vec::new(),
+            ..StyleSheet::default()
         });
         user_below.push(sheet);
         if cascade_styles(&user_below) != reference {

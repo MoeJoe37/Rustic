@@ -27,6 +27,13 @@ pub trait ElementView: Copy + Eq + std::hash::Hash {
     /// The closest following sibling that is an element.
     fn next_sibling_element(&self) -> Option<Self>;
 
+    /// The shadow host, if the parent is a shadow root. Selectors from a
+    /// shadow tree's stylesheets reach the host through it; ordinary
+    /// matching never crosses a shadow boundary.
+    fn parent_shadow_host(&self) -> Option<Self> {
+        None
+    }
+
     /// Whether the parent is a document (the `:root` test).
     fn is_root(&self) -> bool;
 

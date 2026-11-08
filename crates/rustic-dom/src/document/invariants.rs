@@ -164,9 +164,41 @@ impl Document {
             }
         }
 
+        // Shadow roots likewise: owned by exactly one HTML element, parentless,
+        // naming it as their host, and never also template contents.
+        let mut shadows = vec![false; self.arena.slot_count()];
+        for id in self.arena.live_ids() {
+            if let NodeKind::Element(element) = self.live(id).kind() {
+                let Some(shadow_root) = element.shadow_root() else {
+                    continue;
+                };
+                if element.name().namespace() != Some(crate::HTML_NAMESPACE) {
+                    return fail(id, "only an HTML element hosts a shadow root");
+                }
+                let Ok(fragment) = self.node(shadow_root) else {
+                    return fail(id, "shadow root is stale");
+                };
+                if !matches!(fragment.kind(), NodeKind::DocumentFragment)
+                    || fragment.parent().is_some()
+                    || fragment.shadow_host() != Some(id)
+                    || fragment.template_host().is_some()
+                {
+                    return fail(shadow_root, "a shadow root must be a parentless fragment");
+                }
+                let mark = &mut shadows[shadow_root.slot() as usize];
+                if *mark {
+                    return fail(shadow_root, "shadow root has two hosts");
+                }
+                *mark = true;
+            }
+        }
+
         for id in self.arena.live_ids() {
             if self.live(id).template_host().is_some() && !owned[id.slot() as usize] {
                 return fail(id, "template host does not own these contents");
+            }
+            if self.live(id).shadow_host().is_some() && !shadows[id.slot() as usize] {
+                return fail(id, "shadow host does not own this shadow root");
             }
         }
 

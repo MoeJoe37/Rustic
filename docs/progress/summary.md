@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 14.96%** = 11.96% verified complete + 3.00% partial credit. 29/172 capabilities complete, 5 in progress.
+**Overall completion: 15.76%** = 13.11% verified complete + 2.65% partial credit. 30/172 capabilities complete, 5 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `f3542c271e6e63b17ac5122862010d3d749f9d40375c48ff1d848da4130af96a`.
+Catalog: `engine-v3`. Source fingerprint: `066eb1f50c6906bbd5034ed604e1777e1488141e86ef0f61482e5ef1cbf39ab3`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,14 +11,14 @@ Catalog: `engine-v3`. Source fingerprint: `f3542c271e6e63b17ac5122862010d3d749f9
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 1/8 | 41.02% | 7.69% | 9.00% |
+| M2 CSS & computed style | 2/8 | 47.43% | 20.51% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 4.46% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 10.83% |
-| M9 Compatibility expansion | 0/46 | 0.00% | 0.00% | 25.38% |
+| M9 Compatibility expansion | 0/46 | 0.86% | 0.00% | 25.38% |
 | M10 Embedding & release | 0/9 | 0.00% | 0.00% | 3.53% |
 
 ## Subsystems
@@ -27,9 +27,9 @@ Catalog: `engine-v3`. Source fingerprint: `f3542c271e6e63b17ac5122862010d3d749f9
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 6/8 | 0 | 62.50% | 62.50% | 2% | 1.25 |
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
-| DOM | 6/10 | 0 | 52.94% | 52.94% | 6% | 3.17 |
+| DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 1/8 | 5 | 41.02% | 7.69% | 9% | 3.69 |
+| CSS & style | 2/8 | 4 | 47.43% | 20.51% | 9% | 4.26 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -87,7 +87,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **planned** `dom.events` — DOM event propagation and default actions · size 5 · M5 · 0.88% of engine
 - **planned** `dom.observers` — Mutation records and observers · size 3 · M5 · 0.52% of engine
 - **planned** `dom.ranges` — Ranges, live collections and traversal APIs · size 3 · M9 · 0.52% of engine
-- **planned** `dom.shadow` — Shadow DOM and custom element lifecycle · size 5 · M9 · 0.88% of engine
+- **in progress 25.00%** `dom.shadow` — Shadow DOM and custom element lifecycle · size 5 · M9 · 0.88% of engine
+  - [x] Shadow roots: attachment, ownership, destruction, dumps, adoption and tracing ([source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/shadow.rs))
+  - [ ] Slot assignment, the flat tree and slotchange
+  - [ ] Declarative shadow DOM in the HTML parser
+  - [ ] Custom element registry, upgrades and lifecycle callbacks
 - **complete** `dom.tracing` — Tracing integration and DOM conformance gate · size 5 · M1 · 0.88% of engine ([source](../../crates/rustic-dom/src/document/tracing.rs), [test](../../crates/rustic-dom/tests/tracing.rs), [test](../../crates/rustic-dom/tests/tracing.rs), [source](../../crates/rustic-dom/src/document/invariants.rs), [test](../../crates/rustic-dom/tests/conformance.rs))
 
 ### HTML
@@ -116,11 +120,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Lengths, percentages and the CSS-03 longhands and shorthands with initial values and inheritance ([source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/properties.rs))
   - [ ] Math functions: calc(), min(), max(), clamp()
   - [ ] Property catalog for layout, text, backgrounds, positioning and the font shorthand
-- **in progress 50.00%** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine
-  - [x] Origins, importance, style attributes, specificity and order of appearance ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs))
-  - [x] CSS-wide keywords (initial, inherit, unset, revert, revert-layer) and inheritance ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs))
-  - [ ] Cascade layers (@layer) and layered revert-layer
-  - [ ] Encapsulation contexts (shadow trees), animation and transition origins
+- **complete** `css.cascade` — Complete cascade/origins/layers and inheritance · size 5 · M2 · 1.15% of engine ([source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/layer.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/layers.rs), [test](../../crates/rustic-style/tests/layers.rs), [source](../../crates/rustic-style/src/cascade.rs), [source](../../crates/rustic-style/src/matching.rs), [test](../../crates/rustic-style/tests/shadow.rs), [test](../../crates/rustic-style/tests/layers.rs))
 - **in progress 25.00%** `css.values` — Computed values, variables and cycle handling · size 5 · M2 · 1.15% of engine
   - [x] Computed values for the CSS-03 longhands: absolute lengths, font sizes, weights, currentcolor, border widths, root blockification, computed inheritance ([source](../../crates/rustic-style/src/computed.rs), [test](../../crates/rustic-style/tests/computed.rs))
   - [ ] Computed values that need font metrics or math functions (ex/ch/cap from fonts, calc())

@@ -51,7 +51,11 @@ impl<E> MatchContext<E> {
 /// in `Element.matches()`.
 pub fn matches<E: ElementView>(list: &SelectorList, element: E, cx: &MatchContext<E>) -> bool {
     let cache = MatchCache::default();
-    let m = Matcher { cx, cache: &cache };
+    let m = Matcher {
+        cx,
+        cache: &cache,
+        host: None,
+    };
     list.selectors()
         .iter()
         .any(|s| s.pseudo_element().is_none() && complex(s, element, &m))
@@ -75,7 +79,23 @@ pub(crate) fn matches_complex_cached<E: ElementView>(
     cx: &MatchContext<E>,
     cache: &MatchCache<E>,
 ) -> bool {
-    complex(selector, element, &Matcher { cx, cache })
+    matches_in_tree(selector, element, cx, cache, None)
+}
+
+/// [`matches_complex_cached`] for a selector from a stylesheet of the shadow
+/// tree hosted by `host` (`None` for the document tree).
+///
+/// Inside a shadow tree the host is *featureless*: it matches only `:host`
+/// and `:host()` (possibly within `:is()` or `:where()`), combinators reach
+/// it from the shadow tree's top-level elements, and nothing beyond it.
+pub(crate) fn matches_in_tree<E: ElementView>(
+    selector: &ComplexSelector,
+    element: E,
+    cx: &MatchContext<E>,
+    cache: &MatchCache<E>,
+    host: Option<E>,
+) -> bool {
+    complex(selector, element, &Matcher { cx, cache, host })
 }
 
 /// Which sibling count an `:nth-*` position uses, plus the address of its
@@ -106,10 +126,12 @@ impl<E> Default for MatchCache<E> {
     }
 }
 
-/// One match: the context plus the cache it shares.
+/// One match: the context plus the cache it shares, and the shadow host
+/// when matching a shadow tree's selector.
 struct Matcher<'c, E> {
     cx: &'c MatchContext<E>,
     cache: &'c MatchCache<E>,
+    host: Option<E>,
 }
 
 impl<E: ElementView> Matcher<'_, E> {
@@ -171,7 +193,11 @@ fn complex<E: ElementView>(selector: &ComplexSelector, element: E, m: &Matcher<'
             }
         }
         let next = match comb {
-            Combinator::Child | Combinator::Descendant => cursor.parent_element(),
+            // Nothing lies beyond the host of the tree being matched.
+            _ if m.host == Some(cursor) => None,
+            Combinator::Child | Combinator::Descendant => cursor
+                .parent_element()
+                .or_else(|| m.host.and_then(|_| cursor.parent_shadow_host())),
             Combinator::NextSibling | Combinator::SubsequentSibling => {
                 cursor.previous_sibling_element()
             }
@@ -239,6 +265,15 @@ fn attribute_value<'a, E: ElementView>(e: &'a E, local: &str) -> Option<&'a [u16
 }
 
 fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, m: &Matcher<'_, E>) -> bool {
+    if m.host == Some(e) {
+        // The featureless host.
+        return match simple {
+            SimpleSelector::PseudoClass(
+                class @ (PseudoClass::Host(_) | PseudoClass::Is(_) | PseudoClass::Where(_)),
+            ) => pseudo_class_matches(class, e, m),
+            _ => false,
+        };
+    }
     match simple {
         SimpleSelector::Type { namespace, local } => {
             namespace_matches(namespace, e.namespace())
@@ -455,5 +490,17 @@ fn pseudo_class_matches<E: ElementView>(class: &PseudoClass, e: E, m: &Matcher<'
         PseudoClass::AnyLink { .. } => is_link(&e),
         PseudoClass::Visited => false,
         PseudoClass::State(state) => e.in_state(*state),
+        PseudoClass::Host(argument) => {
+            m.host == Some(e)
+                && argument.as_deref().is_none_or(|list| {
+                    // The argument sees the host with its features.
+                    let plain = Matcher {
+                        cx: m.cx,
+                        cache: m.cache,
+                        host: None,
+                    };
+                    plain.list(list, e)
+                })
+        }
     }
 }

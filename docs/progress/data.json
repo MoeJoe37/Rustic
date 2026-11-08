@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "f3542c271e6e63b17ac5122862010d3d749f9d40375c48ff1d848da4130af96a",
-  "percent": "14.96",
-  "verified_percent": "11.96",
-  "partial_percent": "3.00",
-  "completed": 29,
+  "source_fingerprint": "066eb1f50c6906bbd5034ed604e1777e1488141e86ef0f61482e5ef1cbf39ab3",
+  "percent": "15.76",
+  "verified_percent": "13.11",
+  "partial_percent": "2.65",
+  "completed": 30,
   "in_progress": 5,
   "total": 172,
   "fully_complete": false,
@@ -25,11 +25,11 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 1,
+      "completed": 2,
       "total": 8,
-      "percent": "41.02",
-      "verified_percent": "7.69",
-      "partial_percent": "33.33"
+      "percent": "47.43",
+      "verified_percent": "20.51",
+      "partial_percent": "26.92"
     },
     {
       "id": "M3",
@@ -97,9 +97,9 @@
       "share": "25.38",
       "completed": 0,
       "total": 46,
-      "percent": "0.00",
+      "percent": "0.86",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "0.86"
     },
     {
       "id": "M10",
@@ -665,9 +665,42 @@
           "label": "Shadow DOM and custom element lifecycle",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Shadow roots: attachment, ownership, destruction, dumps, adoption and tracing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document.rs",
+                  "marker": "pub fn attach_shadow"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-dom/tests/shadow.rs",
+                  "marker": "fn a_shadow_root_is_a_separate_owned_tree"
+                }
+              ]
+            },
+            {
+              "label": "Slot assignment, the flat tree and slotchange",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Declarative shadow DOM in the HTML parser",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Custom element registry, upgrades and lifecycle callbacks",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.88"
         },
         {
@@ -709,12 +742,12 @@
       ],
       "points": 34,
       "completed": 6,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "3.17",
-      "percent": "52.94",
+      "contribution": "3.39",
+      "percent": "56.61",
       "verified_percent": "52.94",
-      "partial_percent": "0.00"
+      "partial_percent": "3.67"
     },
     {
       "id": "html",
@@ -1195,53 +1228,70 @@
           "label": "Complete cascade/origins/layers and inheritance",
           "size": 5,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Origins, importance, style attributes, specificity and order of appearance",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/cascade.rs",
-                  "marker": "pub fn specified_style"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/cascade.rs",
-                  "marker": "fn origins_and_importance_follow_the_cascade_order"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/cascade.rs",
+              "marker": "pub fn specified_style"
             },
             {
-              "label": "CSS-wide keywords (initial, inherit, unset, revert, revert-layer) and inheritance",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/cascade.rs",
-                  "marker": "CssWideKeyword::Revert | CssWideKeyword::RevertLayer"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/cascade.rs",
-                  "marker": "fn revert_rolls_back_to_the_previous_origin"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn origins_and_importance_follow_the_cascade_order"
             },
             {
-              "label": "Cascade layers (@layer) and layered revert-layer",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-style/src/cascade.rs",
+              "marker": "DeclaredValue::CssWide(CssWideKeyword::RevertLayer)"
             },
             {
-              "label": "Encapsulation contexts (shadow trees), animation and transition origins",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn revert_rolls_back_to_the_previous_origin"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/layer.rs",
+              "marker": "pub(crate) fn ranks"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/sheet.rs",
+              "marker": "fn layer_rule"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/layers.rs",
+              "marker": "fn important_declarations_reverse_the_layer_order"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/layers.rs",
+              "marker": "fn revert_layer_rolls_back_to_the_previous_layer"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/cascade.rs",
+              "marker": "fn context_key"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/matching.rs",
+              "marker": "pub(crate) fn matches_in_tree"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/shadow.rs",
+              "marker": "fn host_rules_lose_to_outer_normal_rules_and_win_when_important"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/layers.rs",
+              "marker": "fn animations_and_transitions_have_their_own_origins"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "1.15"
         },
         {
@@ -1363,13 +1413,13 @@
         }
       ],
       "points": 39,
-      "completed": 1,
-      "in_progress": 5,
+      "completed": 2,
+      "in_progress": 4,
       "total": 8,
-      "contribution": "3.69",
-      "percent": "41.02",
-      "verified_percent": "7.69",
-      "partial_percent": "33.33"
+      "contribution": "4.26",
+      "percent": "47.43",
+      "verified_percent": "20.51",
+      "partial_percent": "26.92"
     },
     {
       "id": "text",

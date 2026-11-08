@@ -105,8 +105,23 @@ HTML template cloning steps; adoption follows
 (TD-16). Reviewed 2026-11-08 against the living standards. Clone and adoption
 work iteratively and roll back on any node, data, depth or allocation failure,
 leaving both documents, their IDs and accounting unchanged. Live ranges,
-mutation records, custom element adopting steps and shadow roots are not
-implemented.
+mutation records and custom element adopting steps are not implemented.
+
+### Shadow roots
+
+`Document::attach_shadow` gives an HTML element a shadow root (open or closed)
+as `attachShadow` does: the host must be a valid custom element name or one of
+the HTML elements the DOM Standard lists (`WrongNodeKind` otherwise), and an
+element has at most one (`InvalidHierarchy`). A shadow root is a parentless
+`DocumentFragment` with `Node::shadow_host`, owned like template contents: it is
+not a child, `walk` skips it, it cannot be inserted, detached, destroyed or
+adopted on its own, the host-including ancestor check hops from it to its host,
+it is destroyed and adopted with its host, clones drop it (no shadow root is
+clonable yet), dumps print it as `#shadow-root` before the host's children, the
+tracing collector keeps host and shadow tree alive together, and
+`check_invariants` verifies the ownership links. Slot assignment, declarative
+shadow roots and the custom element registry are not implemented. The custom
+element name check approximates HTML's `PCENChar` ranges (TD-24).
 
 ## Tracing prototype (DOC-09)
 

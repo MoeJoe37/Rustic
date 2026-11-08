@@ -137,7 +137,39 @@ impl Document {
             name,
             attributes: Vec::new(),
             template_contents: None,
+            shadow_root: None,
         }))
+    }
+
+    /// Attach an empty shadow root to `host`, as `attachShadow` does.
+    ///
+    /// The host must be an HTML element that may host a shadow root: a valid
+    /// custom element name or one of `article`, `aside`, `blockquote`,
+    /// `body`, `div`, `footer`, `h1`–`h6`, `header`, `main`, `nav`, `p`,
+    /// `section` and `span` (`WrongNodeKind` otherwise). An element has at
+    /// most one shadow root (`InvalidHierarchy`). Like template contents, the
+    /// shadow root is a separate tree root: not a child, skipped by
+    /// [`Self::walk`] of the host, never inserted, detached or destroyed on
+    /// its own, and destroyed with its host. Declarative shadow roots and slot
+    /// assignment are not implemented.
+    pub fn attach_shadow(
+        &mut self,
+        host: NodeId,
+        mode: crate::ShadowRootMode,
+    ) -> Result<NodeId, DomError> {
+        let element = self.element(host)?;
+        if element.name.namespace() != Some(crate::HTML_NAMESPACE)
+            || !can_host_shadow(element.name.local())
+        {
+            return Err(DomError::WrongNodeKind);
+        }
+        if element.shadow_root.is_some() {
+            return Err(DomError::InvalidHierarchy);
+        }
+        let root = self.arena.insert(NodeKind::DocumentFragment)?;
+        self.live_mut(root).shadow_host = Some(host);
+        self.element_mut(host).shadow_root = Some((root, mode));
+        Ok(root)
     }
 
     /// Create and associate the empty contents fragment of an HTML `template`.
@@ -267,9 +299,12 @@ impl Document {
         // A child with no children and no template contents can only be its own
         // ancestor, so hopping is skipped; this keeps the parser's insertion of a
         // fresh template into nested contents linear instead of quadratic.
+        if child_node.shadow_host().is_some() {
+            return Err(DomError::InvalidHierarchy);
+        }
         let child_is_leaf = child_node.first_child().is_none()
             && !matches!(child_node.kind(), NodeKind::Element(element)
-                if element.template_contents().is_some());
+                if element.owned_roots().next().is_some());
         let mut depth = 0usize;
         let mut in_parent_tree = true;
         let mut ancestor = Some(parent);
@@ -286,7 +321,7 @@ impl Document {
                 None if child_is_leaf => None,
                 None => {
                     in_parent_tree = false;
-                    node.template_host()
+                    node.owner_host()
                 }
             };
         }
@@ -378,7 +413,7 @@ impl Document {
         if node == self.root {
             return Err(DomError::ProtectedRoot);
         }
-        if self.node(node)?.template_host().is_some() {
+        if self.node(node)?.owner_host().is_some() {
             return Err(DomError::InvalidHierarchy);
         }
         self.unlink(node);
@@ -394,7 +429,7 @@ impl Document {
         if root == self.root {
             return Err(DomError::ProtectedRoot);
         }
-        if self.node(root)?.template_host().is_some() {
+        if self.node(root)?.owner_host().is_some() {
             return Err(DomError::InvalidHierarchy);
         }
         self.destroy_unchecked(root);
@@ -406,13 +441,17 @@ impl Document {
         self.unlink(root);
         let mut current = root;
         loop {
-            // Splice template contents in as a final child so the same
-            // allocation-free walk destroys arbitrarily nested templates.
-            let contents = match &mut self.live_mut(current).kind {
-                NodeKind::Element(element) => element.template_contents.take(),
-                _ => None,
+            // Splice template contents and shadow roots in as final children
+            // so the same allocation-free walk destroys arbitrarily nested
+            // owned trees.
+            let owned = match &mut self.live_mut(current).kind {
+                NodeKind::Element(element) => [
+                    element.template_contents.take(),
+                    element.shadow_root.take().map(|(id, _)| id),
+                ],
+                _ => [None, None],
             };
-            if let Some(fragment) = contents {
+            for fragment in owned.into_iter().flatten() {
                 self.link_last_child(current, fragment);
             }
             if let Some(child) = self.live(current).first_child() {
@@ -604,4 +643,54 @@ impl Document {
 fn contains_units(units: &[u16], needle: &str) -> bool {
     let needle: Vec<u16> = needle.encode_utf16().collect();
     units.windows(needle.len()).any(|window| window == needle)
+}
+
+/// Whether an HTML element named `local` may host a shadow root (DOM
+/// `attachShadow` step 2 and HTML's valid custom element name).
+fn can_host_shadow(local: &str) -> bool {
+    const HOSTS: &[&str] = &[
+        "article",
+        "aside",
+        "blockquote",
+        "body",
+        "div",
+        "footer",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "main",
+        "nav",
+        "p",
+        "section",
+        "span",
+    ];
+    const RESERVED: &[&str] = &[
+        "annotation-xml",
+        "color-profile",
+        "font-face",
+        "font-face-src",
+        "font-face-uri",
+        "font-face-format",
+        "font-face-name",
+        "missing-glyph",
+    ];
+    if HOSTS.contains(&local) {
+        return true;
+    }
+    // A valid custom element name: a lowercase ASCII letter first, a hyphen
+    // somewhere, no ASCII uppercase, and not a reserved name. The PCEN
+    // character set is otherwise approximated by "not ASCII uppercase or
+    // whitespace, and not a few ASCII punctuation characters".
+    local.starts_with(|c: char| c.is_ascii_lowercase())
+        && local.contains('-')
+        && !local.chars().any(|c| {
+            c.is_ascii_uppercase()
+                || c.is_ascii_whitespace()
+                || (c.is_ascii() && !c.is_ascii_alphanumeric() && !matches!(c, '-' | '.' | '_'))
+        })
+        && !RESERVED.contains(&local)
 }

@@ -92,6 +92,8 @@ pub enum SelectorErrorKind {
     NestingLimit,
     /// The nesting selector `&` or column combinator `||` (not implemented).
     Unsupported,
+    /// A `:host()` argument that is not one compound selector.
+    InvalidHostArgument,
 }
 
 /// A selector parse error and the source range it was found at.
@@ -361,6 +363,10 @@ pub enum PseudoClass {
     Visited,
     /// A user-interaction state.
     State(ElementState),
+    /// `:host` and `:host(<compound-selector>)` (CSS Scoping §3.2.1): the
+    /// shadow host, seen from inside its shadow tree. The argument, when
+    /// present, is a list of exactly one single-compound selector.
+    Host(Option<Box<SelectorList>>),
 }
 
 /// A supported pseudo-element.
@@ -927,6 +933,7 @@ impl Parser<'_> {
                 "focus-visible" => PseudoClass::State(ElementState::FocusVisible),
                 "focus-within" => PseudoClass::State(ElementState::FocusWithin),
                 "target" => PseudoClass::State(ElementState::Target),
+                "host" => PseudoClass::Host(None),
                 _ => return unsupported(),
             },
             ComponentValue::Function { name, arguments } => {
@@ -956,6 +963,27 @@ impl Parser<'_> {
                             .map_err(span_err)?;
                         let s = list.max_specificity();
                         return Ok((PseudoClass::Not(list), s));
+                    }
+                    "host" => {
+                        let invalid = SelectorError {
+                            kind: SelectorErrorKind::InvalidHostArgument,
+                            span: value.span,
+                        };
+                        let list = self.list(arguments, depth + 1, false, false).map_err(|e| {
+                            if e.kind == SelectorErrorKind::NestingLimit {
+                                e
+                            } else {
+                                invalid
+                            }
+                        })?;
+                        let [only] = list.selectors() else {
+                            return Err(invalid);
+                        };
+                        if only.compounds().len() != 1 {
+                            return Err(invalid);
+                        }
+                        let s = Specificity::CLASS.add(list.max_specificity());
+                        return Ok((PseudoClass::Host(Some(Box::new(list))), s));
                     }
                     "nth-child" => self.nth(NthKind::Child, arguments, value.span, depth)?,
                     "nth-last-child" => {
@@ -1122,6 +1150,8 @@ impl fmt::Display for PseudoClass {
             Self::AnyLink { link: true } => f.write_str("link"),
             Self::Visited => f.write_str("visited"),
             Self::State(state) => f.write_str(state.name()),
+            Self::Host(None) => f.write_str("host"),
+            Self::Host(Some(list)) => write!(f, "host({list})"),
         }
     }
 }

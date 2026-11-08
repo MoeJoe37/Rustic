@@ -34,6 +34,16 @@ pub struct Element {
     pub(crate) name: QualifiedName,
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) template_contents: Option<NodeId>,
+    pub(crate) shadow_root: Option<(NodeId, ShadowRootMode)>,
+}
+
+/// Whether script outside a shadow tree may reach it (`attachShadow`'s mode).
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ShadowRootMode {
+    /// Reachable through the host's `shadowRoot`.
+    Open,
+    /// Hidden from the host's `shadowRoot`.
+    Closed,
 }
 
 impl Element {
@@ -50,6 +60,22 @@ impl Element {
     /// Separate template contents fragment, which is never one of the children.
     pub fn template_contents(&self) -> Option<NodeId> {
         self.template_contents
+    }
+
+    /// The element's shadow root, which is never one of the children.
+    pub fn shadow_root(&self) -> Option<NodeId> {
+        self.shadow_root.map(|(id, _)| id)
+    }
+
+    /// The mode the shadow root was attached with.
+    pub fn shadow_root_mode(&self) -> Option<ShadowRootMode> {
+        self.shadow_root.map(|(_, mode)| mode)
+    }
+
+    /// The separate trees this element owns: template contents and its
+    /// shadow root.
+    pub(crate) fn owned_roots(&self) -> impl Iterator<Item = NodeId> + use<> {
+        self.template_contents.into_iter().chain(self.shadow_root())
     }
 }
 
@@ -89,7 +115,8 @@ impl ProcessingInstruction {
 
 /// Every DOM tree node kind. Attributes are element records, not tree nodes.
 ///
-/// Shadow roots are not implemented; they arrive with shadow DOM (M5).
+/// A shadow root is a [`NodeKind::DocumentFragment`] with a
+/// [`Node::shadow_host`].
 #[derive(Debug)]
 pub enum NodeKind {
     /// The document's protected root.
@@ -155,6 +182,7 @@ pub struct Node {
     pub(crate) next_sibling: Option<NodeId>,
     pub(crate) data_bytes: usize,
     pub(crate) template_host: Option<NodeId>,
+    pub(crate) shadow_host: Option<NodeId>,
 }
 
 impl Node {
@@ -168,6 +196,7 @@ impl Node {
             next_sibling: None,
             data_bytes,
             template_host: None,
+            shadow_host: None,
         }
     }
 
@@ -194,6 +223,15 @@ impl Node {
     /// The owning `template` element when this node is its contents fragment.
     pub fn template_host(&self) -> Option<NodeId> {
         self.template_host
+    }
+    /// The host element when this node is its shadow root.
+    pub fn shadow_host(&self) -> Option<NodeId> {
+        self.shadow_host
+    }
+    /// The element owning this separate tree root: a template for its
+    /// contents, or a host for its shadow root.
+    pub(crate) fn owner_host(&self) -> Option<NodeId> {
+        self.template_host.or(self.shadow_host)
     }
     /// Next sibling, if attached and not last.
     pub fn next_sibling(&self) -> Option<NodeId> {

@@ -91,11 +91,12 @@ matching.
 | Logical | `:is()` and `:where()` (forgiving lists), `:not()`; nesting is limited to 32 levels |
 | Links and states | `:any-link`, `:link` (every link, since history is never exposed), `:visited` (never matches); `:hover`, `:active`, `:focus`, `:focus-visible`, `:focus-within` and `:target` come from the element view and are off until an interaction model exists |
 | Pseudo-elements | `::before`, `::after`, `::first-line`, `::first-letter` (also with one colon) and `::marker`, last in a top-level selector only |
-| Rejected for now | `:has()`, form-state and language pseudo-classes, other pseudo-elements, pseudo-classes after a pseudo-element, the nesting selector `&` and the column combinator `\|\|` (CSS-07) |
+| Shadow trees | `:host` and `:host(<compound>)`, which match only the host, from its shadow tree's sheets (see [Shadow trees](#shadow-trees)) |
+| Rejected for now | `:has()`, `:host-context()`, form-state and language pseudo-classes, other pseudo-elements (including `::slotted()` and `::part()`), pseudo-classes after a pseudo-element, the nesting selector `&` and the column combinator `\|\|` (CSS-07) |
 
 Specificity follows Selectors Level 4 §17: `:is()`, `:not()` and
-`:nth-child(of S)` take their most specific argument, and `:where()` adds
-nothing. `Display` serializes selectors as CSSOM does (identifiers and strings
+`:nth-child(of S)` take their most specific argument, `:where()` adds
+nothing, and `:host(S)` is a pseudo-class plus its argument. `Display` serializes selectors as CSSOM does (identifiers and strings
 escaped, `An+B` normalized, an implicit `*` dropped), and serializing again is a
 fixed point.
 
@@ -208,33 +209,81 @@ author): style rules keep their parsed selector lists and typed longhand
 declarations in order. Invalid selectors drop their rule, invalid or unknown
 declarations drop themselves, and each drop is a `StyleDiagnostic` with a span.
 `@namespace` rules before the first style rule build the namespace map.
-`@media` rules, nested to any depth, are flattened in place: each style rule
-records the media query lists it sits in (see [Media queries](#media-queries)).
-Other at-rules (`@import`, `@layer`, `@supports`, ...) and nested style rules
-are reported as unsupported for now, and a declaration directly inside a
-top-level `@media` block is reported as misplaced. `parse_style_attribute`
-reads a `style` attribute.
+`@media` and `@layer` rules, nested in each other to the parser's
+block-nesting limit and read with an explicit stack, are flattened in place:
+each style rule records the media query lists it sits in (see
+[Media queries](#media-queries)) and its cascade layer (below). Other at-rules
+(`@import`, `@supports`, ...) and nested style rules are reported as
+unsupported for now, and a declaration directly inside a top-level `@media` or
+`@layer` block is reported as misplaced. `parse_style_attribute` reads a
+`style` attribute.
 
-`Cascade::specified_style` picks each longhand's winner by, in order:
+`Cascade::specified_style` (or `specified_style_with` for elements in shadow
+trees and animated values) picks each longhand's winner by, in order (CSS
+Cascade Level 5 §6.1, reviewed 2026-11-08 against the editor's draft):
 
-1. Origin and importance: important user agent, important user, important
-   author, normal author, normal user, normal user agent.
-2. Declarations from the element's `style` attribute over rule declarations.
-3. Specificity of the most specific matching selector in the rule's list.
-4. Order of appearance across sheets, rules and declarations.
+1. Origin and importance: transitions, important user agent, important user,
+   important author, animations, normal author, normal user, normal user agent.
+2. Encapsulation context: between the element's own tree and the shadow tree
+   it hosts, the outer context wins for normal declarations and the inner one
+   for important declarations.
+3. Declarations from the element's `style` attribute over rule declarations.
+4. Cascade layer: the later layer wins for normal declarations, the earlier
+   for important ones; unlayered declarations form the final layer.
+5. Specificity of the most specific matching selector in the rule's list.
+6. Order of appearance across sheets, rules and declarations.
 
 `initial`, `inherit` and `unset` resolve as specified. `revert` rolls back to
 the previous origin (author to user to user agent; in the user-agent origin it
-acts like `unset`), and `revert-layer` does the same because cascade layers are
-not implemented yet. Undeclared properties inherit or take their initial value.
-`style_tree` styles a whole document subtree in tree order, inheriting from
-each parent element.
+acts like `unset`), counting the animation and transition origins as author.
+`revert-layer` rolls back as if nothing existed between the layer's important
+and normal levels, inclusive; a `style` attribute is its own layer after the
+unlayered one, an important one skips only style-attribute and animation
+declarations, and the animation origin is its own layer. Undeclared properties
+inherit or take their initial value.
 
 The result is the *specified* value. Inheritance and `inherit` take the parent
 element's *computed* value (see [Computed style](#computed-style)), so
-`font-size: 2em` is inherited as pixels, not re-applied. Cascade layers,
-shadow-tree encapsulation and the animation/transition origins are later
-steps.
+`font-size: 2em` is inherited as pixels, not re-applied.
+
+### Cascade layers
+
+`@layer a, b.c;` declares layers; `@layer name { ... }` and anonymous
+`@layer { ... }` blocks hold rules and nest to the parser's block-nesting limit
+(read with an explicit stack). A `<layer-name>` is dot-separated identifiers
+with no whitespace; CSS-wide keywords are reserved, and a block naming more
+than one layer is invalid (`InvalidLayerRule`). A declaration directly in a
+layer block is `MisplacedDeclaration`. Layer statements may precede
+`@namespace`; layer blocks may not. Each sheet lists its layers fully qualified
+in order of first declaration (`StyleSheet::layers`), and each rule names its
+layer by index. The cascade merges those lists per origin and tree, in sheet
+order, into a layer tree: sublayers sort before their parent's own rules,
+siblings in declaration order. Anonymous layers are unique to their sheet.
+A layer declared inside an `@media` block counts in the layer order even when
+the query does not match (TD-25). `@import ... layer()` waits for `@import`.
+
+### Animation and transition origins
+
+`StyleInputs` carries animation and transition values for an element, and the
+cascade sorts them into their origins. Rustic has no animation engine yet, so
+the engine passes none; the tiers, `revert` and `revert-layer` behave as above
+once it does.
+
+### Shadow trees
+
+Every sheet in a `Cascade` belongs to a `TreeContext`: `push` adds a
+document-tree sheet and `push_in` one for a shadow tree (`shadow_tree_context`
+derives a shadow root's context from its node). User-agent and user sheets style
+every tree; an author sheet styles the elements of its own tree and, through
+`:host` and `:host(<compound>)`, the tree's host. Inside a shadow tree the host
+is featureless: it matches only `:host` forms (also within `:is()` and
+`:where()`), combinators reach it from the tree's top-level elements, and
+nothing beyond it. `document_cascade` puts each `<style>` inside a shadow tree
+in that tree's context, and `style_tree` styles in shadow-including tree order:
+a shadow tree right after its host, its top-level elements inheriting from the
+host. Slots are not assigned, so the host's light children inherit from the
+host rather than from a slot (TD-23); `::slotted()`, `::part()` and
+`:host-context()` are rejected. Each tree has its own layer order.
 
 ### Cascade evidence
 
@@ -243,10 +292,23 @@ steps.
   them), dropped inline declarations, inheritance over several generations,
   every CSS-wide keyword including `revert` across origins, and stylesheet
   diagnostics with spans.
+* `rustic-style/tests/layers.rs`: layer order by first declaration across
+  sheets, unlayered and style-attribute precedence, the important reversal,
+  sublayers and dotted names, distinct anonymous layers, per-origin order,
+  every `revert-layer` case above, twelve malformed `@layer` forms, 250 nested
+  layer blocks, and the animation and transition origins with `revert` and
+  `revert-layer`.
+* `rustic-style/tests/shadow.rs`: per-tree sheets, `:host` against outer
+  normal and important rules, the featureless host (`*`, `:not()`, `div p` and
+  document-tree `:host` never reach it), per-tree layer order, nested shadow
+  trees, `:host()` parsing, specificity and serialization, and inheritance from
+  the host.
 * The `css-cascade` fuzz target styles a fixed document with an arbitrary
   author sheet and checks that splitting the sheet in two, repeating it, or
   adding an empty user sheet never changes any element's specified style
-  (400,000 executions before landing, no failures).
+  (400,000 executions before landing, no failures). Sheets with anonymous
+  layers skip the split and repeat checks, since those layers belong to their
+  sheet; `@layer` fragments are in the dictionary.
 
 ## Computed style
 

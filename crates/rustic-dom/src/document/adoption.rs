@@ -9,13 +9,14 @@
 use rustic_base::NodeId;
 
 use super::Document;
-use crate::{DomError, Element, NodeKind};
+use crate::{DomError, Element, NodeKind, ShadowRootMode};
 
 /// The result of [`Document::adopt_node`]: the new root plus an ID map.
 ///
 /// Node IDs embed their document, so adoption gives every node a new ID in the
 /// target document. `ids` maps each old ID to its new ID in preorder (template
-/// contents follow their template's subtree), with the root first. A future
+/// contents and shadow trees follow the whole tree they hang off), with the
+/// root first. A future
 /// binding layer uses this map to retarget wrappers; the old IDs are invalid.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Adopted {
@@ -40,6 +41,8 @@ enum Link {
     ChildOf(usize),
     /// Template contents of an earlier planned template element.
     ContentsOf(usize),
+    /// Shadow root of an earlier planned host element.
+    ShadowOf(usize, ShadowRootMode),
 }
 
 impl Document {
@@ -48,32 +51,34 @@ impl Document {
     /// The copy has the same kinds, names, attributes in order and character
     /// data, and new IDs. Following the HTML cloning steps, a `template` copy gets
     /// its own contents fragment, which a deep clone fills with a copy of the
-    /// original contents. Cloning template contents yields a free-standing
-    /// fragment. The document root cannot be cloned here; use
+    /// original contents. Cloning template contents or a shadow root yields a
+    /// free-standing fragment, and shadow roots are not cloned with their
+    /// hosts (none is clonable). The document root cannot be cloned here; use
     /// [`Self::clone_document`]. Limit or allocation failure creates nothing.
     pub fn clone_node(&mut self, node: NodeId, deep: bool) -> Result<NodeId, DomError> {
         if node == self.root {
             return Err(DomError::WrongNodeKind);
         }
-        let plan = snapshot(self, node, deep)?;
+        let plan = snapshot(self, node, deep, false)?;
         Ok(self.materialize(plan)?[0])
     }
 
     /// Move a subtree from `source` into this document, as `adoptNode` does.
     ///
     /// The subtree is detached from its source parent, copied here with new IDs
-    /// (including nested template contents), and then destroyed in `source`, so
-    /// every old ID becomes invalid. The source root and template contents (which
-    /// belong to their template) cannot be adopted. Any failure, including this
+    /// (including nested template contents and shadow roots), and then
+    /// destroyed in `source`, so every old ID becomes invalid. The source root,
+    /// template contents and shadow roots (which belong to their element)
+    /// cannot be adopted. Any failure, including this
     /// document's node, data or depth limits, leaves both documents unchanged.
     pub fn adopt_node(&mut self, source: &mut Document, node: NodeId) -> Result<Adopted, DomError> {
         if node == source.root {
             return Err(DomError::ProtectedRoot);
         }
-        if source.node(node)?.template_host().is_some() {
+        if source.node(node)?.owner_host().is_some() {
             return Err(DomError::InvalidHierarchy);
         }
-        let plan = snapshot(source, node, true)?;
+        let plan = snapshot(source, node, true, true)?;
         let mut ids = Vec::new();
         ids.try_reserve_exact(plan.len())
             .map_err(|_| DomError::AllocationFailed)?;
@@ -96,7 +101,7 @@ impl Document {
     pub fn clone_document(&self) -> Result<Document, DomError> {
         let mut copy = Document::new(self.limits)?;
         for child in self.children(self.root)? {
-            let plan = snapshot(self, child, true)?;
+            let plan = snapshot(self, child, true, false)?;
             let root = copy.materialize(plan)?[0];
             copy.link_before(copy.root, root, None);
         }
@@ -127,6 +132,11 @@ impl Document {
                     self.live_mut(id).template_host = Some(template);
                     self.element_mut(template).template_contents = Some(id);
                 }
+                Link::ShadowOf(host, mode) => {
+                    let host = created[host];
+                    self.live_mut(id).shadow_host = Some(host);
+                    self.element_mut(host).shadow_root = Some((id, mode));
+                }
             }
             created.push(id);
         }
@@ -141,7 +151,7 @@ impl Document {
     }
 
     /// Greatest edge depth within the tree rooted at `root` or any template
-    /// contents nested in it (each contents fragment is its own tree root).
+    /// contents or shadow root nested in it (each is its own tree root).
     fn subtree_height(&self, root: NodeId) -> Result<usize, DomError> {
         let mut height = 0;
         let mut roots = vec![root];
@@ -149,7 +159,7 @@ impl Document {
             for (id, depth) in self.walk(next)? {
                 height = height.max(depth);
                 if let NodeKind::Element(element) = self.live(id).kind() {
-                    roots.extend(element.template_contents());
+                    roots.extend(element.owned_roots());
                 }
             }
         }
@@ -157,8 +167,14 @@ impl Document {
     }
 }
 
-/// Plan a copy of `root`, its descendants when `deep`, and template contents.
-fn snapshot(document: &Document, root: NodeId, deep: bool) -> Result<Vec<Planned>, DomError> {
+/// Plan a copy of `root`, its descendants when `deep`, template contents, and
+/// with `shadow` (adoption, which moves rather than clones) shadow roots.
+fn snapshot(
+    document: &Document,
+    root: NodeId,
+    deep: bool,
+    shadow: bool,
+) -> Result<Vec<Planned>, DomError> {
     document.node(root)?;
     let mut plan: Vec<Planned> = Vec::new();
     // Pending tree roots: (source root, link of that root).
@@ -186,6 +202,9 @@ fn snapshot(document: &Document, root: NodeId, deep: bool) -> Result<Vec<Planned
             });
             parents.push(index);
             if let NodeKind::Element(element) = node.kind() {
+                if let Some((shadow_root, mode)) = element.shadow_root.filter(|_| shadow) {
+                    pending.push((shadow_root, Link::ShadowOf(index, mode)));
+                }
                 if let Some(contents) = element.template_contents() {
                     if deep {
                         pending.push((contents, Link::ContentsOf(index)));
@@ -214,6 +233,7 @@ fn copy_kind(kind: &NodeKind) -> NodeKind {
             name: element.name.clone(),
             attributes: element.attributes.clone(),
             template_contents: None,
+            shadow_root: None,
         }),
         NodeKind::Text(value) => NodeKind::Text(value.clone()),
         NodeKind::Comment(value) => NodeKind::Comment(value.clone()),

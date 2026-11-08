@@ -121,7 +121,7 @@ bindings remain pending. No additional whole-engine capability gate is completed
 
 ## DOC-04c — Full node kinds, cloning, adoption and lifecycle
 
-`rustic-dom` now has every DOM tree node kind except shadow roots: free-standing
+`rustic-dom` now has every DOM tree node kind (shadow roots came with CSS-07b): free-standing
 `DocumentFragment`s, `ProcessingInstruction` (XML `Name` target, data without
 `?>`) and `CdataSection` (data without `]]>`) join documents, doctypes, elements,
 text and comments. Processing-instruction and CDATA data use the checked
@@ -568,8 +568,26 @@ CSS-wide keywords including `revert` across origins, and inheritance.
 inheritance passes specified values for now. The same change paid TD-21:
 nested `:is()`/`:where()`/`:not()` matching is memoized per element and no longer
 exponential. A seventh fuzz target, `css-cascade`, checks cascade invariants.
-Cascade layers, shadow encapsulation and animation origins remain, so
-`css.cascade` has two of four steps. See [CSS.md](CSS.md#cascade).
+Cascade layers, shadow encapsulation and animation origins remained for
+CSS-07b. See [CSS.md](CSS.md#cascade).
+
+## CSS-07b — Cascade layers, shadow-tree contexts and animation origins
+
+`@layer` statements, named and anonymous blocks and nested layers parse into
+per-sheet layer lists; the cascade merges them per origin and tree into a layer
+tree and applies the layer criterion with the important reversal, and
+`revert-layer` now rolls back by layer (style attributes and the animation
+origin act as their own layers). The animation and transition origins have
+their tiers, fed through `StyleInputs` once an animation engine exists.
+`rustic-dom` gained shadow roots (`attach_shadow`, owned like template contents
+through destruction, adoption, dumps, tracing and invariants), and the cascade
+gained encapsulation contexts: sheets belong to a tree, `:host`/`:host()`
+style the featureless host from inside, outer normal and inner important
+declarations win, `<style>` elements in shadow trees style their tree, and
+`style_tree` walks shadow-including order with shadow trees inheriting from the
+host. `css.cascade` is complete and `dom.shadow` has one of four steps. Slot
+assignment is pending, so light children of a host inherit from the host
+(TD-23). See [CSS.md](CSS.md#cascade) and [DOM.md](DOM.md#shadow-roots).
 
 ## CSS-05 — Computed values, stylesheet attachment and style dump
 
@@ -657,7 +675,8 @@ must keep all tiers green.
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and eight fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
-| CSS-04: cascade and inheritance | Complete for unlayered styles: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins remain |
+| CSS-04: cascade and inheritance | Complete: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins added by CSS-07b |
+| CSS-07b: cascade layers, shadow contexts, animation origins | Complete: `@layer` and layered `revert-layer`, DOM shadow roots, per-tree sheets with `:host`, context precedence, animation/transition tiers; slots, `::slotted()`/`::part()` and `@import layer()` pending |
 | CSS-05: computed values, attachment and style dump | Complete for the declared longhands: computed values, HTML UA sheet subset, `<style>` attachment, `dump-style` and a cached full-restyle path; font metrics, `var()` and media queries remain |
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |

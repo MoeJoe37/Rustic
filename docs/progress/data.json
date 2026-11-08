@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "31c70b25f6987c282dd0b492bfb2b233348008e47f5e10da6d5f874615d2160d",
-  "percent": "18.91",
-  "verified_percent": "16.81",
+  "source_fingerprint": "d7c1bf26e0c4f1b911e74bdecf0722d075c0d5e664b6acecb7c013201384636b",
+  "percent": "20.06",
+  "verified_percent": "17.96",
   "partial_percent": "2.10",
-  "completed": 33,
+  "completed": 34,
   "in_progress": 3,
   "total": 172,
   "fully_complete": false,
@@ -25,10 +25,10 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 5,
+      "completed": 6,
       "total": 8,
-      "percent": "82.47",
-      "verified_percent": "61.53",
+      "percent": "95.29",
+      "verified_percent": "74.35",
       "partial_percent": "20.94"
     },
     {
@@ -1566,19 +1566,45 @@
           "label": "Declared CSS conformance and regression gate",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "tools/import_wpt_css_tests.py",
+              "marker": "REVISION = \"cb97c571c3b1947e08b8615eeb4028a2794b23a4\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/wpt_conformance.rs",
+              "marker": "fn wpt_css_parsing_cases_match_the_declared_expectations"
+            },
+            {
+              "kind": "test",
+              "path": "tools/tests/test_import_wpt_css_tests.py",
+              "marker": "def test_non_literal_calls_are_skipped_not_guessed"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/corpus.rs",
+              "marker": "fn pinned_css_parsing_corpus_matches_after_documented_adaptations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-fuzz/tests/harness.rs",
+              "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "1.15"
         }
       ],
       "points": 39,
-      "completed": 5,
+      "completed": 6,
       "in_progress": 2,
       "total": 8,
-      "contribution": "7.42",
-      "percent": "82.47",
-      "verified_percent": "61.53",
+      "contribution": "8.57",
+      "percent": "95.29",
+      "verified_percent": "74.35",
       "partial_percent": "20.94"
     },
     {

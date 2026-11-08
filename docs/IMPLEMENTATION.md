@@ -619,6 +619,16 @@ host. `css.cascade` is complete and `dom.shadow` has one of four steps. Slot
 assignment is pending, so light children of a host inherit from the host
 (TD-23). See [CSS.md](CSS.md#cascade) and [DOM.md](DOM.md#shadow-roots).
 
+## CSS-08 — Declared CSS conformance gate
+
+`tools/import_wpt_css_tests.py` extracts the literal `test_valid_value`,
+`test_invalid_value`, `test_valid_selector` and `test_invalid_selector` calls
+from a pinned WPT checkout (2,916 cases; 219 non-literal calls counted, not
+guessed) and `tests/wpt_conformance.rs` runs the in-scope ones: 1,073 of
+1,455 pass, and every other in-scope case is listed with a reason in a ratchet
+expectation list. Four serialization bugs the gate found were fixed first.
+`css.conformance` is complete. See [CSS.md](CSS.md#conformance-gate).
+
 ## CSS-05 — Computed values, stylesheet attachment and style dump
 
 `ComputedStyle::compute` resolves the CSS-03 longhands to computed values:
@@ -759,12 +769,13 @@ must keep all tiers green.
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style` |
 | CSS-07a: remaining required selectors | Complete: `:has()` (linear for single-compound arguments, TD-30), HTML form states, `:lang()`, `:dir()` (Bidi_Class via TD-29), `&` with nested style rules expanded by `StyleSheet::parse`, more pseudo-elements and user-action states after them; `css.selectors` is complete. Constraint-validation states and form owners set by the parser (TD-31) remain |
+| CSS-08: declared CSS conformance gate | Complete: pinned WPT parsing cases for selectors and supported properties, 1,073/1,455 in scope pass, the rest listed with reasons in a ratchet; shorthand serialization, named-color keywords and `calc()` wrappers in specified values remain |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
 failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
 complete (media queries, invalidation, custom properties and container
-queries). Next: the CSS conformance gate; math functions, the property catalog,
-external stylesheets and cascade layers run alongside. All project crates remain safe
+queries), and CSS-08 closed the declared conformance gate. Math functions and
+invalidation steps remain in progress. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

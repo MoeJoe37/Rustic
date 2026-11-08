@@ -125,6 +125,7 @@ Do not label a happy-path tag splitter an HTML implementation.
 | CSS-05 | **Done** ([CSS.md](CSS.md#computed-style)): computed values, stylesheet attachment, style dump, full-restyle reference implementation | CSS-04, DOC-07 |
 | CSS-06 | **Done** ([CSS.md](CSS.md#media-queries)): media queries, mutation/viewport invalidation, custom properties with `var()` and cycle handling, and container queries (sizes supplied by the caller until layout) | CSS-05 |
 | CSS-07 | Expand selectors and cascade layers with isolated WPT selections and negative grammar tests. **CSS-07a done** ([CSS.md](CSS.md#selectors)): `:has()`, form states, `:lang()`/`:dir()`, nesting `&` and nested rules, pseudo-element states; cascade layers remain | CSS-05 |
+| CSS-08 | **Done** ([CSS.md](CSS.md#conformance-gate)): declared conformance gate over pinned WPT parsing cases for selectors and supported properties, with a reviewed ratchet expectation list | CSS-07a |
 
 **Demo:** a local page with conflicting stylesheet/inline/inherited declarations
 produces an inspectable computed-style tree. Unknown properties and unsupported

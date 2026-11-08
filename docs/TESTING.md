@@ -63,6 +63,12 @@ enforce per-test time/memory limits. Separate unsupported features from unexpect
 semantic failures. Never run every file as a plain non-strict script and call the
 result Test262 conformance.
 
+The CSS conformance gate is the one WPT selection that runs today without a
+browser host: `tools/import_wpt_css_tests.py` reads literal parsing-helper calls
+statically from a pinned checkout, and `rustic-css/tests/wpt_conformance.rs`
+compares them against a reasoned ratchet list (see
+[CSS.md](CSS.md#conformance-gate)).
+
 WPT integration needs the appropriate test servers, certificates, hostnames,
 automation/runner adapter, screenshot mechanism, testharness result collection,
 and timeout handling. Introduce suites only when their execution requirements are

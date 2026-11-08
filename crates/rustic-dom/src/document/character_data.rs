@@ -31,21 +31,26 @@ impl EditPlan {
 }
 
 impl Document {
-    /// Replace an entire text/comment value, returning the previous owned value.
+    /// Replace an entire character-data value, returning the previous owned value.
     ///
-    /// Identity, kind and payload budget are validated before replacement.
+    /// Character data is the value of a text, comment or CDATA section node, or
+    /// the data (never the target) of a processing instruction. Identity, kind
+    /// and payload budget are validated before replacement.
     pub fn set_character_data(
         &mut self,
         id: NodeId,
         value: impl Into<DomString>,
     ) -> Result<DomString, DomError> {
-        self.character_data(id)?;
+        let fixed = self.fixed_bytes(id)?;
         let value = value.into();
-        self.arena.resize_data(id, value.data_bytes())?;
+        let bytes = fixed
+            .checked_add(value.data_bytes())
+            .ok_or(DomError::DataLimit)?;
+        self.arena.resize_data(id, bytes)?;
         Ok(std::mem::replace(self.character_data_mut(id), value))
     }
 
-    /// Replace a range of UTF-16 code units in a text/comment node.
+    /// Replace a range of UTF-16 code units in a character-data node.
     ///
     /// An offset past the end fails. A count past the end is clamped, including
     /// `usize::MAX`. Surrogate halves may be edited individually. Validation and
@@ -87,16 +92,28 @@ impl Document {
 
     fn character_data(&self, id: NodeId) -> Result<&DomString, DomError> {
         match self.node(id)?.kind() {
-            NodeKind::Text(value) | NodeKind::Comment(value) => Ok(value),
+            NodeKind::Text(value) | NodeKind::Comment(value) | NodeKind::CdataSection(value) => {
+                Ok(value)
+            }
+            NodeKind::ProcessingInstruction(instruction) => Ok(&instruction.data),
             _ => Err(DomError::WrongNodeKind),
         }
     }
 
     fn character_data_mut(&mut self, id: NodeId) -> &mut DomString {
         match &mut self.live_mut(id).kind {
-            NodeKind::Text(value) | NodeKind::Comment(value) => value,
+            NodeKind::Text(value) | NodeKind::Comment(value) | NodeKind::CdataSection(value) => {
+                value
+            }
+            NodeKind::ProcessingInstruction(instruction) => &mut instruction.data,
             _ => unreachable!("validated character-data kind"),
         }
+    }
+
+    /// Accounted bytes that a character-data edit keeps (a target name).
+    fn fixed_bytes(&self, id: NodeId) -> Result<usize, DomError> {
+        let value = self.character_data(id)?.data_bytes();
+        Ok(self.live(id).data_bytes - value)
     }
 
     fn prepare_character_edit(
@@ -105,11 +122,15 @@ impl Document {
         len: usize,
         plan: &EditPlan,
     ) -> Result<(), DomError> {
-        self.arena.check_data_resize(id, plan.bytes)?;
+        let bytes = self
+            .fixed_bytes(id)?
+            .checked_add(plan.bytes)
+            .ok_or(DomError::DataLimit)?;
+        self.arena.check_data_resize(id, bytes)?;
         self.character_data_mut(id)
             .reserve_units(plan.new_len.saturating_sub(len))?;
         // No callbacks/interleaving occur between preflight and this commit.
-        self.arena.resize_data(id, plan.bytes)
+        self.arena.resize_data(id, bytes)
     }
 }
 

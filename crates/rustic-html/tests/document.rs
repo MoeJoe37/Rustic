@@ -29,7 +29,10 @@ fn shape(result: &ParsedDocument) -> String {
                 "doctype {:?}",
                 String::from_utf16(value.name.as_units()).unwrap()
             ),
-            NodeKind::Document | NodeKind::DocumentFragment => unreachable!(),
+            NodeKind::Document
+            | NodeKind::DocumentFragment
+            | NodeKind::ProcessingInstruction(_)
+            | NodeKind::CdataSection(_) => unreachable!("not produced by the HTML parser"),
         };
         lines.push(format!("{depth}:{label}"));
     }

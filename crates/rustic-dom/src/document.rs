@@ -2,10 +2,14 @@ use rustic_base::{DocumentId, NodeId};
 
 use crate::storage::Arena;
 use crate::{
-    Attribute, DocumentType, DomError, DomString, Element, Node, NodeKind, QualifiedName, Walk,
+    Attribute, DocumentType, DomError, DomString, Element, Node, NodeKind, ProcessingInstruction,
+    QualifiedName, Walk,
 };
 
+mod adoption;
 mod character_data;
+
+pub use adoption::Adopted;
 
 /// Per-document limits, covering connected and detached nodes alike.
 ///
@@ -31,27 +35,75 @@ impl Default for DocumentLimits {
     }
 }
 
-/// Sole owner of an arena and its tree links; it is deliberately not cloneable.
+/// Document readiness from the HTML Standard's document lifecycle.
 ///
-/// Checked moves operate within one document. Cross-document adoption, fragments,
-/// mutation observers, bindings and garbage collection are not implemented yet.
+/// Readiness only moves forward: `Loading` → `Interactive` → `Complete`.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ReadyState {
+    /// A parser is still producing the document.
+    Loading,
+    /// Parsing finished; deferred work has not yet completed.
+    Interactive,
+    /// The document has fully loaded.
+    Complete,
+}
+
+/// Sole owner of an arena and its tree links; it is deliberately not `Clone`.
+///
+/// Checked moves operate within one document; [`Self::clone_node`] copies within
+/// a document and [`Self::adopt_node`] moves a subtree between documents. Mutation
+/// observers, bindings and garbage collection are not implemented yet.
 #[derive(Debug)]
 pub struct Document {
     arena: Arena,
     root: NodeId,
     limits: DocumentLimits,
+    ready_state: ReadyState,
 }
 
 impl Document {
-    /// Create a document and charge its root against the node limit.
+    /// Create a script-style document, which is `Complete` from the start.
+    ///
+    /// The root is charged against the node limit.
     pub fn new(limits: DocumentLimits) -> Result<Self, DomError> {
+        Self::with_ready_state(limits, ReadyState::Complete)
+    }
+
+    /// Create a document for a parser to fill, starting in `Loading`.
+    pub fn new_for_parsing(limits: DocumentLimits) -> Result<Self, DomError> {
+        Self::with_ready_state(limits, ReadyState::Loading)
+    }
+
+    fn with_ready_state(limits: DocumentLimits, ready_state: ReadyState) -> Result<Self, DomError> {
         let mut arena = Arena::new(limits.max_nodes, limits.max_data_bytes)?;
         let root = arena.insert(NodeKind::Document)?;
         Ok(Self {
             arena,
             root,
             limits,
+            ready_state,
         })
+    }
+
+    /// Current readiness.
+    pub fn ready_state(&self) -> ReadyState {
+        self.ready_state
+    }
+
+    /// Move readiness forward. Staying put or going back fails with `InvalidState`.
+    ///
+    /// Skipping `Interactive` is allowed, as when a parser is aborted.
+    pub fn advance_ready_state(&mut self, next: ReadyState) -> Result<(), DomError> {
+        if next <= self.ready_state {
+            return Err(DomError::InvalidState);
+        }
+        self.ready_state = next;
+        Ok(())
+    }
+
+    /// The limits this document was created with.
+    pub fn limits(&self) -> DocumentLimits {
+        self.limits
     }
 
     /// Process-local identity, also embedded in all node handles.
@@ -100,8 +152,52 @@ impl Document {
             return Err(DomError::InvalidHierarchy);
         }
         let fragment = self.arena.insert(NodeKind::DocumentFragment)?;
+        self.live_mut(fragment).template_host = Some(template);
         self.element_mut(template).template_contents = Some(fragment);
         Ok(fragment)
+    }
+
+    /// Create an empty, free-standing document fragment.
+    ///
+    /// Unlike template contents it has no host: it can be destroyed or adopted
+    /// on its own. Inserting it moves its children and leaves it empty.
+    pub fn create_document_fragment(&mut self) -> Result<NodeId, DomError> {
+        self.arena.insert(NodeKind::DocumentFragment)
+    }
+
+    /// Create an unattached processing instruction.
+    ///
+    /// The target must be an XML `Name` (`InvalidName`) and the data must not
+    /// contain `?>` (`InvalidCharacterData`), as for `createProcessingInstruction`.
+    pub fn create_processing_instruction(
+        &mut self,
+        target: &str,
+        data: impl Into<DomString>,
+    ) -> Result<NodeId, DomError> {
+        if !crate::name::is_xml_name(target) {
+            return Err(DomError::InvalidName);
+        }
+        let data = data.into();
+        if contains_units(data.as_units(), "?>") {
+            return Err(DomError::InvalidCharacterData);
+        }
+        self.arena
+            .insert(NodeKind::ProcessingInstruction(ProcessingInstruction {
+                target: target.into(),
+                data,
+            }))
+    }
+
+    /// Create an unattached CDATA section; `]]>` fails with `InvalidCharacterData`.
+    pub fn create_cdata_section(
+        &mut self,
+        value: impl Into<DomString>,
+    ) -> Result<NodeId, DomError> {
+        let value = value.into();
+        if contains_units(value.as_units(), "]]>") {
+            return Err(DomError::InvalidCharacterData);
+        }
+        self.arena.insert(NodeKind::CdataSection(value))
     }
 
     /// Create unattached text, preserving UTF-16 code units.
@@ -143,8 +239,11 @@ impl Document {
 
     /// Move a node before a direct child, or append when `before` is absent.
     ///
-    /// All hierarchy, cycle, reference, and depth checks happen before unlinking.
-    /// This low-level operation has no browser callbacks or mutation observers.
+    /// When `child` is a document fragment (including template contents), its
+    /// children move instead, in order, and the fragment stays behind empty.
+    /// All hierarchy, cycle, reference, and depth checks happen before unlinking,
+    /// so a rejected fragment insertion moves none of its children. This
+    /// low-level operation has no browser callbacks or mutation observers.
     pub fn insert_before(
         &mut self,
         parent: NodeId,
@@ -156,53 +255,92 @@ impl Document {
         if child == self.root {
             return Err(DomError::ProtectedRoot);
         }
-        if matches!(child_node.kind(), NodeKind::DocumentFragment) {
-            return Err(DomError::InvalidHierarchy);
-        }
         if !matches!(
             parent_node.kind(),
             NodeKind::Document | NodeKind::Element(_) | NodeKind::DocumentFragment
         ) {
             return Err(DomError::InvalidHierarchy);
         }
-        if let Some(reference) = before {
-            if self.node(reference)?.parent() != Some(parent) {
-                return Err(DomError::InvalidReference);
-            }
-        }
-        if matches!(child_node.kind(), NodeKind::DocumentType(_)) && parent != self.root {
-            return Err(DomError::InvalidHierarchy);
-        }
+        // DOM "ensure pre-insert validity" order: host-including ancestors
+        // (hopping from template contents to their template) before the reference.
         let mut depth = 0usize;
+        let mut in_parent_tree = true;
         let mut ancestor = Some(parent);
         while let Some(id) = ancestor {
             if id == child {
                 return Err(DomError::Cycle);
             }
-            ancestor = self.node(id)?.parent();
-            if ancestor.is_some() {
-                depth += 1;
+            let node = self.node(id)?;
+            ancestor = match node.parent() {
+                Some(next) => {
+                    depth += usize::from(in_parent_tree);
+                    Some(next)
+                }
+                None => {
+                    in_parent_tree = false;
+                    node.template_host()
+                }
+            };
+        }
+        if let Some(reference) = before {
+            if self.node(reference)?.parent() != Some(parent) {
+                return Err(DomError::InvalidReference);
             }
         }
+        let fragment = matches!(child_node.kind(), NodeKind::DocumentFragment);
+        let mut moved = Vec::new();
+        if fragment {
+            let count = self.children(child)?.count();
+            moved
+                .try_reserve_exact(count)
+                .map_err(|_| DomError::AllocationFailed)?;
+            moved.extend(self.children(child)?);
+        } else {
+            moved
+                .try_reserve_exact(1)
+                .map_err(|_| DomError::AllocationFailed)?;
+            moved.push(child);
+        }
+        for &id in &moved {
+            if matches!(self.live(id).kind(), NodeKind::DocumentType(_)) && parent != self.root {
+                return Err(DomError::InvalidHierarchy);
+            }
+        }
+        // A fragment's children land one level shallower than in the fragment.
         let height = self.walk(child)?.map(|(_, depth)| depth).max().unwrap_or(0);
-        depth
-            .checked_add(1)
-            .and_then(|depth| depth.checked_add(height))
-            .filter(|depth| *depth <= self.limits.max_depth)
-            .ok_or(DomError::DepthLimit)?;
+        let height = if fragment {
+            height.saturating_sub(1)
+        } else {
+            height
+        };
+        if !moved.is_empty() {
+            depth
+                .checked_add(1)
+                .and_then(|depth| depth.checked_add(height))
+                .filter(|depth| *depth <= self.limits.max_depth)
+                .ok_or(DomError::DepthLimit)?;
+        }
         let before = if before == Some(child) {
             child_node.next_sibling()
         } else {
             before
         };
         if parent == self.root {
-            self.validate_document_order(child, before)?;
+            self.validate_document_order(&moved, before)?;
         }
-        if child_node.parent() == Some(parent) && child_node.next_sibling() == before {
+        if !fragment && child_node.parent() == Some(parent) && child_node.next_sibling() == before {
             return Ok(());
         }
 
-        self.unlink(child);
+        for id in moved {
+            self.unlink(id);
+            self.link_before(parent, id, before);
+        }
+        Ok(())
+    }
+
+    /// Unchecked link of a detached node before `before` (or last).
+    fn link_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
         let previous = before
             .map(|id| self.live(id).previous_sibling())
             .unwrap_or_else(|| self.live(parent).last_child());
@@ -220,7 +358,6 @@ impl Document {
         node.parent = Some(parent);
         node.previous_sibling = previous;
         node.next_sibling = before;
-        Ok(())
     }
 
     /// Disconnect a subtree while preserving all node IDs and accounted payload.
@@ -228,7 +365,7 @@ impl Document {
         if node == self.root {
             return Err(DomError::ProtectedRoot);
         }
-        if matches!(self.node(node)?.kind(), NodeKind::DocumentFragment) {
+        if self.node(node)?.template_host().is_some() {
             return Err(DomError::InvalidHierarchy);
         }
         self.unlink(node);
@@ -244,9 +381,15 @@ impl Document {
         if root == self.root {
             return Err(DomError::ProtectedRoot);
         }
-        if matches!(self.node(root)?.kind(), NodeKind::DocumentFragment) {
+        if self.node(root)?.template_host().is_some() {
             return Err(DomError::InvalidHierarchy);
         }
+        self.destroy_unchecked(root);
+        Ok(())
+    }
+
+    /// Destroy any non-root subtree, including template contents, iteratively.
+    fn destroy_unchecked(&mut self, root: NodeId) {
         self.unlink(root);
         let mut current = root;
         loop {
@@ -271,7 +414,6 @@ impl Document {
             }
             current = parent.expect("non-root destruction node has parent");
         }
-        Ok(())
     }
 
     /// Set an attribute by expanded name; replacement keeps its insertion order.
@@ -396,16 +538,17 @@ impl Document {
         node.next_sibling = None;
     }
 
+    /// Check the document's children after inserting `inserted` before `before`.
     fn validate_document_order(
         &self,
-        child: NodeId,
+        inserted: &[NodeId],
         before: Option<NodeId>,
     ) -> Result<(), DomError> {
         let mut element_seen = false;
         let mut doctype_seen = false;
         let mut check = |id| {
             match self.live(id).kind() {
-                NodeKind::Comment(_) => {}
+                NodeKind::Comment(_) | NodeKind::ProcessingInstruction(_) => {}
                 NodeKind::Element(_) if !element_seen => {
                     element_seen = true;
                 }
@@ -417,17 +560,22 @@ impl Document {
             Ok(())
         };
         for existing in self.children(self.root)? {
-            if existing == child {
+            if inserted.contains(&existing) {
                 continue;
             }
             if Some(existing) == before {
-                check(child)?;
+                inserted.iter().try_for_each(|id| check(*id))?;
             }
             check(existing)?;
         }
         if before.is_none() {
-            check(child)?;
+            inserted.iter().try_for_each(|id| check(*id))?;
         }
         Ok(())
     }
+}
+
+fn contains_units(units: &[u16], needle: &str) -> bool {
+    let needle: Vec<u16> = needle.encode_utf16().collect();
+    units.windows(needle.len()).any(|window| window == needle)
 }

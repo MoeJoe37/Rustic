@@ -63,6 +63,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / base | HTML diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
+| TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -220,6 +221,19 @@ map tokenizer positions back to original-byte spans, then convert at the
 parser boundary into `Diagnostic`s with `Private` fields for any content.
 **Trigger:** original-byte offset mapping, or the first consumer (DevTools
 console, CLI diagnostic output) that needs both kinds together.
+
+### TD-16 — Adoption reissues node IDs instead of keeping node identity
+
+`Document::adopt_node` copies a subtree into the target arena and destroys it in
+the source, because a `NodeId` embeds its document and slot generation (ADR
+0002, [ADR 0011](adr/0011-fragments-cloning-adoption.md)). The DOM's adopt keeps
+the same node object. Today no script object holds an ID, and `Adopted::ids`
+returns the complete old-to-new map, so nothing is lost or silently stale: old
+IDs fail as `InvalidNode`. **Why deliberate:** moving slots between arenas would
+break per-document budgets and generation checks. **Pay:** when JS wrappers
+exist, the binding layer must retarget every wrapper through the map in the same
+operation (or wrappers must hold a stable cross-document identity). **Trigger:**
+the first script-visible node wrapper (DOC-09 prototype or WEB-02).
 
 ## Reviewing new work
 

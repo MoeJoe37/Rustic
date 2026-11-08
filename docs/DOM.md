@@ -32,7 +32,7 @@ These range semantics follow the storage portion of the DOM Standard's
 [replace-data algorithm](https://dom.spec.whatwg.org/#concept-cd-replace), reviewed
 2026-11-08 against the living standard last updated 2026-11-04. This is not a full
 `CharacterData` implementation: Web IDL conversion/exception mapping, live-range
-adjustment, mutation records/observers, processing-instruction nodes, text
+adjustment, mutation records/observers, text
 splitting and normalization remain pending. No browser conformance suite has
 been run for this storage subset.
 
@@ -69,17 +69,48 @@ boundary before these primitives are exposed as web APIs.
 ## Template contents
 
 An HTML `template` element can own one `DocumentFragment` created by
-`Document::create_template_contents`. The fragment is a separate root, not a
-child: it accepts ordinary children but cannot be inserted, detached or destroyed
-by itself, and `walk` does not enter it. Destroying the template destroys its
-contents, including arbitrarily nested templates, without recursion. `dump_tree`
-prints contents as `#template-contents` after the template's attributes. Public
-fragment APIs, cloning and inert template owner documents are not implemented;
-see [ADR 0010](adr/0010-template-contents.md).
+`Document::create_template_contents`; `Node::template_host` names its template.
+The fragment is a separate root, not a child: it accepts ordinary children but
+cannot be detached or destroyed by itself, and `walk` does not enter it.
+Inserting it moves its children out, like any fragment. Destroying the template
+destroys its contents, including arbitrarily nested templates, without
+recursion. `dump_tree` prints contents as `#template-contents` after the
+template's attributes. Inert template owner documents are not implemented; see
+[ADR 0010](adr/0010-template-contents.md) and [ADR 0011](adr/0011-fragments-cloning-adoption.md).
+
+## Node kinds, fragments, cloning and adoption
+
+| Operation | Contract |
+| --- | --- |
+| `create_document_fragment()` | Free-standing fragment root (`#document-fragment` in dumps); can be destroyed or adopted |
+| `insert_before`/`append_child` with a fragment | Moves the fragment's children in order; all checks precede any move; the fragment stays, empty |
+| `create_processing_instruction(target, data)` | Target must be an XML `Name` (`InvalidName`), data must not contain `?>` (`InvalidCharacterData`); allowed beside the document element |
+| `create_cdata_section(data)` | Data must not contain `]]>`; text-like, so not a document child |
+| `clone_node(node, deep)` | Detached copy with new IDs, names, ordered attributes and data; templates get their own contents (filled when deep); the root is rejected |
+| `adopt_node(&mut source, node)` | Copies into this document, destroys in `source`, returns `Adopted { root, ids }` (old → new IDs) |
+| `clone_document()` | New `Complete` document with the same limits and a deep copy of the tree |
+| `ready_state()` / `advance_ready_state(next)` | `Loading` → `Interactive` → `Complete`, forward only (`InvalidState`) |
+
+Pre-insert validation follows the DOM Standard's
+[ensure pre-insert validity](https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity)
+step order: parent kind, host-including ancestor (a template cannot enter its
+own contents), reference child, then child kinds and document-child rules.
+Processing-instruction and CDATA data are character data: the range and append
+operations above apply, and the creation-only restrictions do not. Cloning
+follows [clone a node](https://dom.spec.whatwg.org/#concept-node-clone) and the
+HTML template cloning steps; adoption follows
+[adopt](https://dom.spec.whatwg.org/#concept-node-adopt) except that IDs change
+(TD-16). Reviewed 2026-11-08 against the living standards. Clone and adoption
+work iteratively and roll back on any node, data, depth or allocation failure,
+leaving both documents, their IDs and accounting unchanged. Live ranges,
+mutation records, custom element adopting steps and shadow roots are not
+implemented.
 
 ## Regression evidence
 
-Run `cargo test --locked -p rustic-dom`. The character-data suite covers:
+Run `cargo test --locked -p rustic-dom`. `tests/node_kinds.rs` and
+`tests/adoption.rs` cover the fragment, node-kind, clone, adoption and lifecycle
+contracts above. The character-data suite covers:
 
 - Range growth/shrink/deletion, end insertion, count clamping, pair splitting,
   lone surrogates and snapshot isolation for text/comments.

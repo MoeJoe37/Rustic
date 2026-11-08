@@ -31,6 +31,10 @@ pub enum DomError {
     IdentityExhausted,
     /// Storage reservation failed.
     AllocationFailed,
+    /// Creation data contains a forbidden sequence (`?>` or `]]>`).
+    InvalidCharacterData,
+    /// The document lifecycle cannot move to the requested state.
+    InvalidState,
 }
 
 impl fmt::Display for DomError {
@@ -50,6 +54,8 @@ impl fmt::Display for DomError {
             Self::InvalidName => "invalid internal parsed name",
             Self::IdentityExhausted => "document or node identity space exhausted",
             Self::AllocationFailed => "document storage reservation failed",
+            Self::InvalidCharacterData => "node data contains a forbidden sequence",
+            Self::InvalidState => "document lifecycle transition is not allowed",
         })
     }
 }

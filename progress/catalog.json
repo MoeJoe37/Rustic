@@ -395,16 +395,63 @@
           "label": "Fragments, processing instructions and full node kinds",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/node.rs",
+              "marker": "ProcessingInstruction(ProcessingInstruction)"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub fn create_document_fragment"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/node_kinds.rs",
+              "marker": "fn inserting_a_fragment_moves_its_children_in_order_and_empties_it"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/node_kinds.rs",
+              "marker": "fn processing_instructions_validate_creation_and_edit_as_character_data"
+            }
+          ]
         },
         {
           "id": "dom.adoption",
           "label": "Adoption, cloning and document lifecycle",
           "size": 3,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/adoption.rs",
+              "marker": "pub fn adopt_node"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub enum ReadyState"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn adoption_failures_leave_both_documents_unchanged"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn deep_clone_copies_payloads_and_template_contents_with_new_ids"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn ready_state_only_moves_forward"
+            }
+          ]
         },
         {
           "id": "dom.events",

@@ -1,7 +1,8 @@
 # ADR 0010: Template contents as parser-owned fragment roots
 
 - Date: 2026-11-08
-- Status: Accepted internal contract; public DocumentFragment APIs pending
+- Status: Accepted internal contract; extended by [ADR 0011](0011-fragments-cloning-adoption.md)
+  (inserting contents now moves their children, as the DOM does)
 
 ## Context
 

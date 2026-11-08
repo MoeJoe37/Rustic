@@ -224,7 +224,10 @@ fn serialize(document: &Document, parent: NodeId) -> String {
                     .unwrap();
                 }
             }
-            NodeKind::Document | NodeKind::DocumentFragment => unreachable!(),
+            NodeKind::Document
+            | NodeKind::DocumentFragment
+            | NodeKind::ProcessingInstruction(_)
+            | NodeKind::CdataSection(_) => unreachable!("not produced by the HTML parser"),
         }
     }
     output

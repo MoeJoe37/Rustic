@@ -264,6 +264,12 @@ impl Document {
         }
         // DOM "ensure pre-insert validity" order: host-including ancestors
         // (hopping from template contents to their template) before the reference.
+        // A child with no children and no template contents can only be its own
+        // ancestor, so hopping is skipped; this keeps the parser's insertion of a
+        // fresh template into nested contents linear instead of quadratic.
+        let child_is_leaf = child_node.first_child().is_none()
+            && !matches!(child_node.kind(), NodeKind::Element(element)
+                if element.template_contents().is_some());
         let mut depth = 0usize;
         let mut in_parent_tree = true;
         let mut ancestor = Some(parent);
@@ -277,6 +283,7 @@ impl Document {
                     depth += usize::from(in_parent_tree);
                     Some(next)
                 }
+                None if child_is_leaf => None,
                 None => {
                     in_parent_tree = false;
                     node.template_host()

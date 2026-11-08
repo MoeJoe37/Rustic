@@ -93,7 +93,7 @@ serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
 `rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing for the HTML tokenizer, document and fragment parsers, the CSS parser, typed values, selectors, cascade and computed style, and the URL parser, with seed replay,
+fuzzing for the HTML tokenizer, document and fragment parsers, the CSS parser, typed values, selectors, cascade and computed style, media queries, and the URL parser, with seed replay,
 minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
 campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
 cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a

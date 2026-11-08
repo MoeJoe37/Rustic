@@ -6,6 +6,7 @@ use crate::rules::{self, Cursor};
 use crate::tokenizer::{self, Diagnostics, SpannedToken};
 use crate::values;
 use crate::{BlockItem, CssError, Declaration, Diagnostic, DiagnosticKind, Rule, Value};
+use crate::{MediaQueryList, parse_media_query_list};
 use crate::{NamespaceMap, SelectorError, SelectorList, parse_selector_list};
 
 /// Independent budgets for one parse.
@@ -208,6 +209,13 @@ impl CssParser {
         let mut d = self.diagnostics();
         let values = self.values(source, &mut d)?;
         Ok(Self::finish(parse_selector_list(&values, namespaces), d))
+    }
+
+    /// Parse a media query list, such as a `media` attribute's value.
+    pub fn media_query_list(&self, source: &str) -> Result<Parsed<MediaQueryList>, CssError> {
+        let mut d = self.diagnostics();
+        let values = self.values(source, &mut d)?;
+        Ok(Self::finish(parse_media_query_list(&values), d))
     }
 
     /// Parse a list of component values (§5.3.10).

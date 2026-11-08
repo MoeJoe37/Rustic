@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "d8a1688037b6d781e0077db3aa870a126277dc5c031b99c6e15ac85a5415b56d",
-  "percent": "14.79",
+  "source_fingerprint": "f3542c271e6e63b17ac5122862010d3d749f9d40375c48ff1d848da4130af96a",
+  "percent": "14.96",
   "verified_percent": "11.96",
-  "partial_percent": "2.83",
+  "partial_percent": "3.00",
   "completed": 29,
   "in_progress": 5,
   "total": 172,
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 1,
       "total": 8,
-      "percent": "39.10",
+      "percent": "41.02",
       "verified_percent": "7.69",
-      "partial_percent": "31.41"
+      "partial_percent": "33.33"
     },
     {
       "id": "M3",
@@ -1317,9 +1317,20 @@
               "evidence": []
             },
             {
-              "label": "Media queries (@media and media attributes) with viewport invalidation",
-              "status": "planned",
-              "evidence": []
+              "label": "Media queries (@media rules and media attributes) re-evaluated when the environment changes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/media.rs",
+                  "marker": "pub fn parse_media_query_list"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn media_rules_apply_only_when_their_queries_match"
+                }
+              ]
             },
             {
               "label": "Container queries",
@@ -1327,7 +1338,7 @@
               "evidence": []
             }
           ],
-          "credit": "25.00",
+          "credit": "50.00",
           "engine_share": "0.69"
         },
         {
@@ -1355,10 +1366,10 @@
       "completed": 1,
       "in_progress": 5,
       "total": 8,
-      "contribution": "3.51",
-      "percent": "39.10",
+      "contribution": "3.69",
+      "percent": "41.02",
       "verified_percent": "7.69",
-      "partial_percent": "31.41"
+      "partial_percent": "33.33"
     },
     {
       "id": "text",

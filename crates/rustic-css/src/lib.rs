@@ -22,6 +22,7 @@ mod anb;
 mod color;
 mod error;
 mod length;
+mod media;
 mod parser;
 mod properties;
 mod rules;
@@ -35,6 +36,11 @@ pub use anb::parse_an_plus_b;
 pub use color::{Color, LabSpace, PredefinedSpace};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
 pub use length::{Length, LengthPercentage, LengthUnit};
+pub use media::{
+    ColorScheme, MAX_MEDIA_NESTING, MediaComparison, MediaCondition, MediaEnvironment,
+    MediaFeature, MediaFeatureName, MediaFeatureValue, MediaPrefix, MediaQualifier, MediaQuery,
+    MediaQueryList, MediaType, PointerAccuracy, ResolutionUnit, parse_media_query_list,
+};
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
     BorderStyle, BorderWidth, BoxSizing, CssWideKeyword, DeclaredValue, Display, FamilyName,

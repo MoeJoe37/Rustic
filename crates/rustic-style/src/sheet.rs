@@ -3,9 +3,9 @@
 
 use rustic_base::SourceSpan;
 use rustic_css::{
-    BlockItem, CssError, CssParser, NamespaceMap, PropertyDeclaration, PropertyError, Rule,
-    SelectorErrorKind, SelectorList, Token, parse_block_contents, parse_declaration,
-    parse_selector_list,
+    AtRule, BlockItem, CssError, CssParser, MediaQueryList, NamespaceMap, PropertyDeclaration,
+    PropertyError, QualifiedRule, Rule, SelectorErrorKind, SelectorList, Token,
+    parse_block_contents, parse_declaration, parse_media_query_list, parse_selector_list,
 };
 
 /// Where a stylesheet comes from (CSS Cascade Level 5 §6.2).
@@ -26,6 +26,9 @@ pub struct StyleRule {
     pub selectors: SelectorList,
     /// Typed longhand declarations, in source order (shorthands expanded).
     pub declarations: Vec<PropertyDeclaration>,
+    /// Indices into [`StyleSheet::media`] of the media query lists the rule
+    /// is nested in (outermost first); the rule applies only when all match.
+    pub media: Vec<usize>,
 }
 
 /// A stylesheet ready for the cascade.
@@ -33,8 +36,13 @@ pub struct StyleRule {
 pub struct StyleSheet {
     /// The sheet's origin.
     pub origin: Origin,
-    /// Style rules in source order.
+    /// Style rules in source order, with the rules of conditional groups
+    /// such as `@media` flattened in place.
     pub rules: Vec<StyleRule>,
+    /// The media query lists that [`StyleRule::media`] refers to: one per
+    /// `@media` rule, plus any added for the whole sheet (such as a `<style>`
+    /// element's `media` attribute).
+    pub media: Vec<MediaQueryList>,
 }
 
 /// Why part of a stylesheet was dropped.
@@ -48,10 +56,15 @@ pub enum StyleDiagnosticKind {
     InvalidValue,
     /// A nested style rule (CSS Nesting) is not implemented yet.
     UnsupportedNestedRule,
-    /// An at-rule that is not implemented yet, such as `@media` or `@import`.
+    /// An at-rule that is not implemented yet, such as `@import`.
     UnsupportedAtRule,
     /// A malformed or misplaced `@namespace` rule.
     InvalidNamespaceRule,
+    /// An `@media` rule without a block.
+    InvalidMediaRule,
+    /// A declaration directly inside a conditional group rule at the top
+    /// level, such as `@media print { color: red }`.
+    MisplacedDeclaration,
 }
 
 /// A dropped construct and its byte range in the stylesheet source.
@@ -110,13 +123,100 @@ fn namespace_rule(prelude: &[rustic_css::Value]) -> Option<(Option<String>, Stri
     }
 }
 
+/// Builds a sheet's flat rule list.
+struct Builder<'d> {
+    namespaces: NamespaceMap,
+    namespaces_allowed: bool,
+    rules: Vec<StyleRule>,
+    media: Vec<MediaQueryList>,
+    diagnostics: &'d mut Vec<StyleDiagnostic>,
+}
+
+impl Builder<'_> {
+    fn report(&mut self, kind: StyleDiagnosticKind, span: SourceSpan) {
+        self.diagnostics.push(StyleDiagnostic { kind, span });
+    }
+
+    /// Handle one rule; `conditions` are the enclosing media list indices.
+    fn rule(&mut self, rule: Rule, conditions: &[usize]) {
+        match rule {
+            Rule::Qualified(q) => self.style_rule(q, conditions),
+            Rule::At(at) if at.name.eq_ignore_ascii_case("namespace") => {
+                self.namespace(at, conditions.is_empty());
+            }
+            Rule::At(at) if at.name.eq_ignore_ascii_case("media") => {
+                self.namespaces_allowed = false;
+                self.media_rule(at, conditions);
+            }
+            Rule::At(at) => {
+                if !at.name.eq_ignore_ascii_case("charset")
+                    && !at.name.eq_ignore_ascii_case("import")
+                {
+                    self.namespaces_allowed = false;
+                }
+                self.report(StyleDiagnosticKind::UnsupportedAtRule, at.span);
+            }
+        }
+    }
+
+    fn namespace(&mut self, at: AtRule, top_level: bool) {
+        match namespace_rule(&at.prelude)
+            .filter(|_| top_level && self.namespaces_allowed && at.block.is_none())
+        {
+            Some((Some(prefix), url)) => {
+                self.namespaces = std::mem::take(&mut self.namespaces).with_prefix(prefix, url);
+            }
+            Some((None, url)) => {
+                self.namespaces = std::mem::take(&mut self.namespaces).with_default(url);
+            }
+            None => self.report(StyleDiagnosticKind::InvalidNamespaceRule, at.span),
+        }
+    }
+
+    fn media_rule(&mut self, at: AtRule, conditions: &[usize]) {
+        let Some(block) = at.block else {
+            self.report(StyleDiagnosticKind::InvalidMediaRule, at.span);
+            return;
+        };
+        let index = self.media.len();
+        self.media.push(parse_media_query_list(&at.prelude));
+        let mut nested = conditions.to_vec();
+        nested.push(index);
+        for item in parse_block_contents(&block, 0).value {
+            match item {
+                BlockItem::Rule(rule) => self.rule(rule, &nested),
+                BlockItem::Declaration(declaration) => {
+                    self.report(StyleDiagnosticKind::MisplacedDeclaration, declaration.span);
+                }
+            }
+        }
+    }
+
+    fn style_rule(&mut self, q: QualifiedRule, conditions: &[usize]) {
+        self.namespaces_allowed = false;
+        match parse_selector_list(&q.prelude, &self.namespaces) {
+            Ok(selectors) => {
+                let declarations = declarations(&q.block, self.diagnostics);
+                self.rules.push(StyleRule {
+                    selectors,
+                    declarations,
+                    media: conditions.to_vec(),
+                });
+            }
+            Err(error) => self.report(StyleDiagnosticKind::InvalidSelector(error.kind), q.span),
+        }
+    }
+}
+
 impl StyleSheet {
     /// Parse a stylesheet and prepare it for the cascade.
     ///
     /// Invalid style rules and declarations are dropped with diagnostics, as
     /// CSS requires; only resource limits ([`CssError`]) fail the whole sheet.
     /// `@namespace` rules before the first style rule build the namespace
-    /// map; other at-rules and nested rules are reported as unsupported.
+    /// map, and `@media` rules (nested to any depth) contribute their style
+    /// rules with the media conditions attached; other at-rules and nested
+    /// style rules are reported as unsupported.
     pub fn parse(
         parser: &CssParser,
         source: &str,
@@ -124,52 +224,43 @@ impl StyleSheet {
     ) -> Result<(Self, Vec<StyleDiagnostic>), CssError> {
         let sheet = parser.stylesheet(source)?.value;
         let mut diagnostics = Vec::new();
-        let mut namespaces = NamespaceMap::new();
-        let mut rules = Vec::new();
-        let mut namespaces_allowed = true;
+        let mut builder = Builder {
+            namespaces: NamespaceMap::new(),
+            namespaces_allowed: true,
+            rules: Vec::new(),
+            media: Vec::new(),
+            diagnostics: &mut diagnostics,
+        };
         for rule in sheet.rules {
-            match rule {
-                Rule::At(at) if at.name.eq_ignore_ascii_case("namespace") => {
-                    match namespace_rule(&at.prelude)
-                        .filter(|_| namespaces_allowed && at.block.is_none())
-                    {
-                        Some((Some(prefix), url)) => {
-                            namespaces = namespaces.with_prefix(prefix, url)
-                        }
-                        Some((None, url)) => namespaces = namespaces.with_default(url),
-                        None => diagnostics.push(StyleDiagnostic {
-                            kind: StyleDiagnosticKind::InvalidNamespaceRule,
-                            span: at.span,
-                        }),
-                    }
-                }
-                Rule::At(at) => {
-                    if !at.name.eq_ignore_ascii_case("charset")
-                        && !at.name.eq_ignore_ascii_case("import")
-                    {
-                        namespaces_allowed = false;
-                    }
-                    diagnostics.push(StyleDiagnostic {
-                        kind: StyleDiagnosticKind::UnsupportedAtRule,
-                        span: at.span,
-                    });
-                }
-                Rule::Qualified(q) => {
-                    namespaces_allowed = false;
-                    match parse_selector_list(&q.prelude, &namespaces) {
-                        Ok(selectors) => rules.push(StyleRule {
-                            selectors,
-                            declarations: declarations(&q.block, &mut diagnostics),
-                        }),
-                        Err(error) => diagnostics.push(StyleDiagnostic {
-                            kind: StyleDiagnosticKind::InvalidSelector(error.kind),
-                            span: q.span,
-                        }),
-                    }
-                }
-            }
+            builder.rule(rule, &[]);
         }
-        Ok((Self { origin, rules }, diagnostics))
+        let (rules, media) = (builder.rules, builder.media);
+        Ok((
+            Self {
+                origin,
+                rules,
+                media,
+            },
+            diagnostics,
+        ))
+    }
+
+    /// Make every rule also depend on `media` (for example a `<style>`
+    /// element's `media` attribute).
+    pub fn restrict_to(&mut self, media: MediaQueryList) {
+        let index = self.media.len();
+        self.media.push(media);
+        for rule in &mut self.rules {
+            rule.media.insert(0, index);
+        }
+    }
+
+    /// Whether `rule`'s media conditions all hold, given each of this
+    /// sheet's media lists' results.
+    pub(crate) fn rule_applies(rule: &StyleRule, media_results: &[bool]) -> bool {
+        rule.media
+            .iter()
+            .all(|&i| media_results.get(i).copied().unwrap_or(false))
     }
 }
 

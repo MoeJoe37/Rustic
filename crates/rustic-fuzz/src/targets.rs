@@ -7,8 +7,8 @@
 
 use rustic_base::CancellationToken;
 use rustic_css::{
-    BlockItem, CssParser, Declaration, NamespaceMap, Parsed, Rule, SelectorList,
-    parse_block_contents, parse_declaration,
+    BlockItem, ColorScheme, CssParser, Declaration, MediaEnvironment, MediaType, NamespaceMap,
+    Parsed, PointerAccuracy, Rule, SelectorList, parse_block_contents, parse_declaration,
 };
 use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
@@ -43,6 +43,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(CssTarget),
         Box::new(CssSelectorTarget),
         Box::new(CssCascadeTarget),
+        Box::new(CssMediaTarget),
         Box::new(UrlTarget),
     ]
 }
@@ -797,6 +798,108 @@ fn cascade_styles(cascade: &Cascade) -> Vec<String> {
     .unwrap_or_default()
 }
 
+/// Media query lists: parsing is total, serialization reaches a fixed point
+/// after one round, and the reparsed list matches exactly the same
+/// environments (a desktop, a phone, print and a zero-sized viewport).
+pub struct CssMediaTarget;
+
+fn media_environments() -> Vec<MediaEnvironment> {
+    let desktop = MediaEnvironment::default();
+    let mut phone = MediaEnvironment::screen(390.0, 844.0);
+    phone.resolution = 3.0;
+    phone.pointer = PointerAccuracy::Coarse;
+    phone.any_pointer = PointerAccuracy::Coarse;
+    phone.hover = false;
+    phone.any_hover = false;
+    phone.color_scheme = ColorScheme::Dark;
+    phone.reduced_motion = true;
+    let mut print = MediaEnvironment::screen(816.0, 1056.0);
+    print.media_type = MediaType::Print;
+    print.color = 0;
+    print.monochrome = 1;
+    let empty = MediaEnvironment::screen(0.0, 0.0);
+    vec![desktop, phone, print, empty]
+}
+
+impl Target for CssMediaTarget {
+    fn name(&self) -> &'static str {
+        "css-media"
+    }
+
+    fn max_len(&self) -> usize {
+        1024
+    }
+
+    fn dictionary(&self) -> &'static [&'static [u8]] {
+        &[
+            b"(",
+            b")",
+            b",",
+            b":",
+            b" and ",
+            b" or ",
+            b"not ",
+            b"only ",
+            b"screen",
+            b"print",
+            b"all",
+            b"width",
+            b"min-width",
+            b"max-height",
+            b"aspect-ratio",
+            b"resolution",
+            b"hover",
+            b"orientation",
+            b"prefers-color-scheme",
+            b"grid",
+            b"color",
+            b"<",
+            b"<=",
+            b">=",
+            b"=",
+            b"600px",
+            b"40em",
+            b"16/9",
+            b"2dppx",
+            b"0",
+            b"dark",
+            b"foo(",
+            b"\\",
+            b"/*",
+            b"*/",
+            b"\"",
+        ]
+    }
+
+    fn check(&self, input: &[u8]) -> Result<(), String> {
+        let text = String::from_utf8_lossy(input);
+        let parser = CssParser::default();
+        let Ok(parsed) = parser.media_query_list(&text) else {
+            return Ok(()); // A resource limit is a legitimate outcome.
+        };
+        let list = parsed.value;
+        let first = list.to_string();
+        let Ok(reparsed) = parser.media_query_list(&first) else {
+            return Err(format!("serialization {first:?} exceeded parser limits"));
+        };
+        let reparsed = reparsed.value;
+        let second = reparsed.to_string();
+        if second != first {
+            return Err(format!(
+                "serialization not a fixed point: {first:?} -> {second:?}"
+            ));
+        }
+        for environment in media_environments() {
+            if list.matches(&environment) != reparsed.matches(&environment) {
+                return Err(format!(
+                    "{first:?} matches {environment:?} differently after reparsing"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Computed values stay finite and the computed-style dump always succeeds.
 fn check_computed(cascade: &Cascade) -> Result<(), String> {
     let mut document = HtmlDocumentParser::default();
@@ -902,10 +1005,12 @@ impl Target for CssCascadeTarget {
         split.push(StyleSheet {
             origin: Origin::Author,
             rules: sheet.rules[..middle].to_vec(),
+            media: sheet.media.clone(),
         });
         split.push(StyleSheet {
             origin: Origin::Author,
             rules: sheet.rules[middle..].to_vec(),
+            media: sheet.media.clone(),
         });
         if cascade_styles(&split) != reference {
             return Err("splitting the sheet changed the cascade".into());
@@ -921,6 +1026,7 @@ impl Target for CssCascadeTarget {
         user_below.push(StyleSheet {
             origin: Origin::User,
             rules: Vec::new(),
+            media: Vec::new(),
         });
         user_below.push(sheet);
         if cascade_styles(&user_below) != reference {

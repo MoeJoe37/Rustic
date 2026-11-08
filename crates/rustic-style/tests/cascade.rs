@@ -2,6 +2,7 @@
 //! CSS-wide keywords and inheritance (CSS-04).
 
 use rustic_css::CssParser;
+use rustic_css::{MediaEnvironment, MediaType};
 use rustic_dom::{Document, NodeId, NodeKind};
 use rustic_html::{HtmlDocumentParser, ParsedDocument};
 use rustic_style::{
@@ -261,7 +262,7 @@ fn stylesheet_diagnostics_drop_only_the_broken_parts() {
     let source = "@namespace svg url(http://www.w3.org/2000/svg);\n\
                   p:has(a) { color: red }\n\
                   svg|rect, p { color: blue; colour: red; width: -1px }\n\
-                  @media print { p { color: green } }\n\
+                  @supports (color: red) { p { color: green } }\n\
                   div { & p { color: red } height: 1px }\n\
                   @namespace late url(x);";
     let (sheet, diagnostics) = StyleSheet::parse(&parser, source, Origin::Author).unwrap();
@@ -280,8 +281,88 @@ fn stylesheet_diagnostics_drop_only_the_broken_parts() {
         ]
     );
     assert_eq!(sheet.rules.len(), 2);
+    assert!(sheet.media.is_empty());
     assert_eq!(sheet.rules[0].selectors.to_string(), "svg|rect, p");
     assert_eq!(sheet.rules[0].declarations.len(), 1);
     assert_eq!(sheet.rules[1].declarations.len(), 1);
     assert_eq!(&source[diagnostics[1].span.range()], "colour: red");
+}
+
+#[test]
+fn media_rules_apply_only_when_their_queries_match() {
+    let source = "p { width: 1px } \
+                  @media (min-width: 1000px) { p { width: 2px } \
+                      @media (hover) { #p { height: 5px } } } \
+                  @media print { p { width: 3px; color: red } } \
+                  @media (max-width: 999px) { p { color: blue } } \
+                  p.late { width: 4px }";
+    let parser = CssParser::default();
+    let (sheet, diagnostics) = StyleSheet::parse(&parser, source, Origin::Author).unwrap();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    assert_eq!(sheet.media.len(), 4);
+    let media: Vec<_> = sheet.rules.iter().map(|r| r.media.clone()).collect();
+    assert_eq!(
+        media,
+        [vec![], vec![0], vec![0, 1], vec![2], vec![3], vec![]]
+    );
+
+    let page = document("<p id=p>");
+    let doc = page.document();
+    let dump = |cascade: &Cascade| {
+        let styles = style_tree(
+            doc,
+            doc.root(),
+            cascade,
+            &parser,
+            &MatchContext::html(),
+            &ComputeContext::default(),
+        )
+        .unwrap();
+        styles
+            .iter()
+            .find(|s| id_of(doc, s.node).as_deref() == Some("p"))
+            .unwrap()
+            .specified
+            .dump_non_initial()
+    };
+    let mut cascade = Cascade::new();
+    cascade.push(sheet);
+    // The default environment is a 1280x720 screen with a hovering pointer.
+    assert_eq!(dump(&cascade), "width: 2px\nheight: 5px\n");
+
+    let mut narrow = MediaEnvironment::screen(600.0, 800.0);
+    assert!(cascade.set_environment(narrow.clone()));
+    assert_eq!(dump(&cascade), "color: rgb(0, 0, 255)\nwidth: 1px\n");
+    // Nothing that a query tests changed: no restyle needed.
+    narrow.reduced_motion = true;
+    assert!(!cascade.set_environment(narrow));
+
+    let mut print = MediaEnvironment::screen(800.0, 1000.0);
+    print.media_type = MediaType::Print;
+    assert!(cascade.set_environment(print));
+    assert_eq!(dump(&cascade), "color: rgb(0, 0, 255)\nwidth: 3px\n");
+}
+
+#[test]
+fn media_rule_errors_are_reported() {
+    let parser = CssParser::default();
+    let source = "@media screen;\n\
+                  @media screen { color: red; p { width: 1px } }\n\
+                  @media screen { @namespace x url(y); }\n\
+                  @namespace late url(z);\n\
+                  @media (bogus) , screen { p { height: 1px } }";
+    let (sheet, diagnostics) = StyleSheet::parse(&parser, source, Origin::Author).unwrap();
+    let kinds: Vec<_> = diagnostics.iter().map(|d| d.kind).collect();
+    assert_eq!(
+        kinds,
+        [
+            StyleDiagnosticKind::InvalidMediaRule,
+            StyleDiagnosticKind::MisplacedDeclaration,
+            StyleDiagnosticKind::InvalidNamespaceRule,
+            StyleDiagnosticKind::InvalidNamespaceRule,
+        ]
+    );
+    assert_eq!(&source[diagnostics[1].span.range()], "color: red");
+    assert_eq!(sheet.rules.len(), 2);
+    assert_eq!(sheet.media[2].to_string(), "(bogus), screen");
 }

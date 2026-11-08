@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 14.79%** = 11.96% verified complete + 2.83% partial credit. 29/172 capabilities complete, 5 in progress.
+**Overall completion: 14.96%** = 11.96% verified complete + 3.00% partial credit. 29/172 capabilities complete, 5 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `d8a1688037b6d781e0077db3aa870a126277dc5c031b99c6e15ac85a5415b56d`.
+Catalog: `engine-v3`. Source fingerprint: `f3542c271e6e63b17ac5122862010d3d749f9d40375c48ff1d848da4130af96a`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `d8a1688037b6d781e0077db3aa870a126277d
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 1/8 | 39.10% | 7.69% | 9.00% |
+| M2 CSS & computed style | 1/8 | 41.02% | 7.69% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `d8a1688037b6d781e0077db3aa870a126277d
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 0 | 52.94% | 52.94% | 6% | 3.17 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 1/8 | 5 | 39.10% | 7.69% | 9% | 3.51 |
+| CSS & style | 1/8 | 5 | 41.02% | 7.69% | 9% | 3.69 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -126,10 +126,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Computed values that need font metrics or math functions (ex/ch/cap from fonts, calc())
   - [ ] Custom properties and var() substitution
   - [ ] Dependency cycle handling for custom properties and font-relative units
-- **in progress 25.00%** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine
+- **in progress 50.00%** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.69% of engine
   - [x] HTML user-agent stylesheet and document style element attachment ([source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-style/tests/computed.rs))
   - [ ] External stylesheets: link rel=stylesheet and @import over controlled fetching
-  - [ ] Media queries (@media and media attributes) with viewport invalidation
+  - [x] Media queries (@media rules and media attributes) re-evaluated when the environment changes ([source](../../crates/rustic-css/src/media.rs), [test](../../crates/rustic-style/tests/cascade.rs))
   - [ ] Container queries
 - **planned** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 1.15% of engine
 - **planned** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 1.15% of engine

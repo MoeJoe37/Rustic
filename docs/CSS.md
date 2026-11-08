@@ -11,7 +11,9 @@ values for colors, lengths, the box model, `display` and font basics (see
 [Property values](#property-values)), CSS-04 the cascade (see
 [Cascade](#cascade)), and CSS-05 computed values, the HTML user-agent
 stylesheet, `<style>` attachment and a style dump (see
-[Computed style](#computed-style)).
+[Computed style](#computed-style)). CSS-06 is under way: media queries are
+done (see [Media queries](#media-queries)); invalidation and custom properties
+follow.
 
 ## Implemented behavior
 
@@ -205,9 +207,13 @@ later tasks.
 author): style rules keep their parsed selector lists and typed longhand
 declarations in order. Invalid selectors drop their rule, invalid or unknown
 declarations drop themselves, and each drop is a `StyleDiagnostic` with a span.
-`@namespace` rules before the first style rule build the namespace map; other
-at-rules (`@media`, `@import`, `@layer`, ...) and nested rules are reported as
-unsupported for now. `parse_style_attribute` reads a `style` attribute.
+`@namespace` rules before the first style rule build the namespace map.
+`@media` rules, nested to any depth, are flattened in place: each style rule
+records the media query lists it sits in (see [Media queries](#media-queries)).
+Other at-rules (`@import`, `@layer`, `@supports`, ...) and nested style rules
+are reported as unsupported for now, and a declaration directly inside a
+top-level `@media` block is reported as misplaced. `parse_style_attribute`
+reads a `style` attribute.
 
 `Cascade::specified_style` picks each longhand's winner by, in order:
 
@@ -273,9 +279,9 @@ Logical margins and padding are written as their left-to-right physical sides
 until writing modes exist. `document_cascade` builds a cascade from that sheet
 and every HTML `<style>` element in tree order (not inside templates or
 foreign content). A `type` other than empty or `text/css` is skipped; a
-`media` attribute other than empty, `all` or `screen` is skipped until media
-queries arrive (CSS-06); each element is reported with its status and
-diagnostics. `<link rel=stylesheet>` needs fetching and is not loaded.
+`media` attribute restricts the sheet with `StyleSheet::restrict_to`, so it
+applies only while its query list matches; each element is reported with its
+status and diagnostics. `<link rel=stylesheet>` needs fetching and is not loaded.
 
 ### Style dump
 
@@ -288,6 +294,47 @@ omitted on sides with no border. Output is bounded by a byte limit.
 `dump-dom`, lists each `<style>` element's status and dropped constructs, then
 prints the dump. The fixture `crates/rustic-cli/tests/fixtures/styled.html` and
 its snapshot `styled.dump` cover it.
+
+## Media queries
+
+`rustic-css` parses [Media Queries Level 4](https://drafts.csswg.org/mediaqueries-4/)
+(Editor's Draft, reviewed 2026-11-08) and the Level 5 features that need no
+new value types (`parse_media_query_list`, `CssParser::media_query_list`):
+
+| Area | Behavior |
+| --- | --- |
+| Queries | Comma-separated lists; `not`/`only` with a media type and an optional `and` condition, or a bare condition; `all`, `screen` and `print` match, other types (`tv`, ...) parse and never match; an empty list matches everything |
+| Conditions | `not`, `and`, `or` (not mixed without parentheses; no `or` directly after a media type), parentheses nested up to `MAX_MEDIA_NESTING` (32) |
+| Feature forms | `(name)`, `(name: value)`, `min-`/`max-` prefixes on range features, and range syntax `(name < v)`, `(v <= name)`, `(v1 < name <= v2)` with matching directions |
+| Features | `width`, `height`, `device-width`, `device-height`, `aspect-ratio`, `device-aspect-ratio`, `orientation`, `resolution` (`dpi`, `dpcm`, `dppx`, `x`), `color`, `color-index`, `monochrome`, `grid`, `scan`, `update`, `overflow-block`, `overflow-inline`, `color-gamut`, `dynamic-range`, `video-dynamic-range`, `pointer`, `any-pointer`, `hover`, `any-hover`, `prefers-color-scheme`, `prefers-reduced-motion`, `prefers-reduced-transparency`, `prefers-reduced-data`, `prefers-contrast`, `forced-colors`, `inverted-colors`, `scripting`, `display-mode` |
+| Errors | A malformed query becomes `not all` without affecting the rest of the list; an unknown feature, a value of the wrong type, or any other parenthesized or functional expression is `<general-enclosed>` and evaluates to unknown |
+| Evaluation | Three-valued (Kleene) logic; unknown is false at the top level and stays unknown under `not`; relative lengths use the initial 16px font and the viewport |
+| Serialization | CSSOM form: lowercase names, `(name: value)`, ratios as `a / b`, range tests as written, general-enclosed reserialized from its tokens |
+
+`MediaEnvironment` describes the surface: media type, viewport and device
+size, resolution, color depth, pointer and hover capabilities and the user
+preferences. The default is a 1280×720 light-scheme desktop screen with a
+mouse and no scripting (JavaScript does not run yet). A `Cascade` holds one
+environment and caches each sheet's media list results; `set_environment`
+re-evaluates them and returns whether any result changed, which is the signal
+to restyle after a viewport resize or preference change. Container queries
+are planned after CSS-06's invalidation work.
+
+### Media query evidence
+
+* `rustic-css/tests/media.rs`: 41 serialization cases (canonical forms,
+  general-enclosed, invalid queries and a fixed-point check for each), bounded
+  deep nesting, and 47 queries evaluated on a desktop, a phone and a print
+  environment.
+* `rustic-style/tests/cascade.rs`: nested `@media` rules flattened with their
+  conditions, rules switching as the environment changes (and
+  `set_environment` reporting no change when no query is affected), and
+  `@media` diagnostics.
+* The `css-media` fuzz target checks that serialization is a fixed point after
+  one round and that the reparsed list matches the same four environments. It
+  found two fixed-point bugs before landing (parentheses nested past the limit,
+  and whitespace split by a comment), both fixed and kept as regression inputs;
+  then 900,000 further executions found nothing.
 
 ### Computed style evidence
 

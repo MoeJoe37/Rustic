@@ -1127,9 +1127,20 @@
               "evidence": []
             },
             {
-              "label": "Media queries (@media and media attributes) with viewport invalidation",
-              "status": "planned",
-              "evidence": []
+              "label": "Media queries (@media rules and media attributes) re-evaluated when the environment changes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/media.rs",
+                  "marker": "pub fn parse_media_query_list"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn media_rules_apply_only_when_their_queries_match"
+                }
+              ]
             },
             {
               "label": "Container queries",

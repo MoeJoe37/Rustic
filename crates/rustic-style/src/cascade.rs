@@ -13,7 +13,8 @@
 //! [`ComputedStyle::compute`] turns the result into computed values.
 
 use rustic_css::{
-    CssWideKeyword, DeclaredValue, PropertyDeclaration, PropertyId, PropertyValue, Specificity,
+    CssWideKeyword, DeclaredValue, MediaEnvironment, PropertyDeclaration, PropertyId,
+    PropertyValue, Specificity,
 };
 
 use crate::matching::{MatchCache, matches_complex_cached};
@@ -95,26 +96,63 @@ struct Candidate<'a> {
     declaration: &'a PropertyDeclaration,
 }
 
-/// An ordered set of stylesheets from any origins.
+/// An ordered set of stylesheets from any origins, evaluated against one
+/// media environment.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Cascade {
     sheets: Vec<StyleSheet>,
+    environment: MediaEnvironment,
+    /// Per sheet, whether each of its media query lists matches.
+    media_results: Vec<Vec<bool>>,
+}
+
+fn evaluate(sheet: &StyleSheet, environment: &MediaEnvironment) -> Vec<bool> {
+    sheet.media.iter().map(|m| m.matches(environment)).collect()
 }
 
 impl Cascade {
-    /// An empty cascade.
+    /// An empty cascade for the default environment (a 1280×720 screen).
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// An empty cascade for `environment`.
+    pub fn with_environment(environment: MediaEnvironment) -> Self {
+        Self {
+            environment,
+            ..Self::default()
+        }
+    }
+
     /// Append a stylesheet; later sheets come later in order of appearance.
     pub fn push(&mut self, sheet: StyleSheet) {
+        self.media_results.push(evaluate(&sheet, &self.environment));
         self.sheets.push(sheet);
     }
 
     /// The stylesheets in order.
     pub fn sheets(&self) -> &[StyleSheet] {
         &self.sheets
+    }
+
+    /// The media environment rules are evaluated against.
+    pub fn environment(&self) -> &MediaEnvironment {
+        &self.environment
+    }
+
+    /// Switch to `environment` (for example after a viewport resize) and
+    /// re-evaluate every media query. Returns whether any media query list
+    /// changed its result, which is when styles may need recomputing.
+    pub fn set_environment(&mut self, environment: MediaEnvironment) -> bool {
+        let results: Vec<Vec<bool>> = self
+            .sheets
+            .iter()
+            .map(|sheet| evaluate(sheet, &environment))
+            .collect();
+        let changed = results != self.media_results;
+        self.environment = environment;
+        self.media_results = results;
+        changed
     }
 
     /// Compute `element`'s specified style.
@@ -143,8 +181,12 @@ impl Cascade {
         cache: &MatchCache<E>,
     ) -> SpecifiedStyle {
         let mut candidates: Vec<Candidate<'_>> = Vec::new();
-        for (sheet_index, sheet) in self.sheets.iter().enumerate() {
+        for (sheet_index, (sheet, media)) in self.sheets.iter().zip(&self.media_results).enumerate()
+        {
             for (rule_index, rule) in sheet.rules.iter().enumerate() {
+                if !StyleSheet::rule_applies(rule, media) {
+                    continue;
+                }
                 let specificity = rule
                     .selectors
                     .selectors()

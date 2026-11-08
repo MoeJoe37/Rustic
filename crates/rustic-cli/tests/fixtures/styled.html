@@ -8,6 +8,8 @@
   ul li:nth-child(odd of .x) { font-weight: lighter }
   p:has(b) { color: red }
   @media print { p { color: green } }
+  @media (max-width: 600px) { .card { width: auto } }
+  @media screen and (min-width: 1000px) { @media (hover) { .card > h2 { font-weight: 900 } } }
 </style>
 <style media=print>p { color: green }</style>
 <div class=card id=main>

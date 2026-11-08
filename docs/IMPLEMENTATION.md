@@ -443,6 +443,7 @@ default budgets plus a differential invariant:
 | `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01); typed longhands serialize to a fixed point (CSS-03) | Checked-in sheet plus the css-parsing-tests inputs |
 | `css-selector` | Every valid selector list serializes to a fixed point with equal specificities and selects the same elements of a fixed document in HTML, quirks and XML modes (added with CSS-02) | Checked-in selectors plus the pinned `An+B` inputs |
 | `css-cascade` | Styling a fixed document with an arbitrary author sheet is total and unchanged by splitting the sheet, repeating it or adding an empty user sheet (added with CSS-04); computed values stay finite and the style dump always succeeds (CSS-05) | The `css` seeds |
+| `css-media` | Media query list serialization is a fixed point after one round and the reparsed list matches the same desktop, phone, print and zero-size environments (added with CSS-06) | `corpus/css-media` |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -589,6 +590,19 @@ from the previous counted sibling, so long lists match in linear time. The
 `css.queries` each have one of four steps; variables, media queries and
 external sheets remain. See [CSS.md](CSS.md#computed-style).
 
+## CSS-06 (in progress) — Media queries
+
+`rustic-css` parses, serializes and evaluates Media Queries 4 lists (with the
+Level 5 preference and capability features), including range syntax,
+`<general-enclosed>` as unknown and three-valued logic. `@media` rules in
+`rustic-style` sheets, nested to any depth, flatten into rules that carry their
+media conditions; `<style media>` restricts a whole sheet. A `Cascade` holds a
+`MediaEnvironment`, caches query results and reports from `set_environment`
+whether any changed. An eighth fuzz target, `css-media`, found and pinned two
+serialization bugs. Invalidation on DOM mutation, custom properties and
+container queries are the remaining CSS-06 work. See
+[CSS.md](CSS.md#media-queries).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -640,7 +654,7 @@ must keep all tiers green.
 | DOC-06d: `selectedcontent` mirroring | Done: last four known tree failures fixed; 1,776/1,776 runnable records |
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
-| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and seven fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
+| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and eight fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 | CSS-04: cascade and inheritance | Complete for unlayered styles: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins remain |
@@ -651,6 +665,7 @@ must keep all tiers green.
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
-failures. M2 has CSS-01 through CSS-05 done. Next: CSS-06 invalidation, then
-media queries and custom properties. All project crates remain safe
+failures. M2 has CSS-01 through CSS-05 done and CSS-06 under way (media
+queries landed). Next: style invalidation, custom properties and `var()`, then
+container queries. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

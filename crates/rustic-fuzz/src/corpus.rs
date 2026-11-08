@@ -40,6 +40,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         "url" => seeds.extend(wpt_url_strings(root)?),
         "css" => seeds.extend(css_corpus_inputs(root)?),
         "css-selector" => seeds.extend(selector_inputs(root)?),
+        "css-media" => seeds.extend(media_inputs(root)?),
         _ => {}
     }
     Ok(seeds)
@@ -99,6 +100,17 @@ fn selector_inputs(root: &Path) -> io::Result<Vec<Vec<u8>>> {
         if let Some((value, _)) = line.strip_prefix('"').and_then(json_string_body) {
             seeds.push(format!(":nth-child({value})").into_bytes());
         }
+    }
+    Ok(seeds)
+}
+
+/// One media query list per line of `corpus/css-media/*.mq`.
+fn media_inputs(root: &Path) -> io::Result<Vec<Vec<u8>>> {
+    let fuzz = root.join("crates/rustic-fuzz/corpus/css-media");
+    let mut seeds = Vec::new();
+    for (_, bytes) in read_dir_inputs(&fuzz)? {
+        let source = String::from_utf8_lossy(&bytes);
+        seeds.extend(source.lines().map(|line| line.as_bytes().to_vec()));
     }
     Ok(seeds)
 }

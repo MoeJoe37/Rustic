@@ -216,7 +216,6 @@ pub fn dump_style(parsed: &ParsedDocument, max_bytes: usize) -> Result<String, L
         let status = match sheet.status {
             StyleElementStatus::Applied => "applied",
             StyleElementStatus::NotCss => "skipped: not CSS",
-            StyleElementStatus::UnsupportedMedia => "skipped: media queries not supported",
             StyleElementStatus::ResourceLimit => "skipped: CSS parser limit",
         };
         out.push_str(&format!("@style {}: {status}\n", index + 1));

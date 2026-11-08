@@ -78,6 +78,7 @@ pub fn html_user_agent_sheet(parser: &CssParser) -> StyleSheet {
         .unwrap_or(StyleSheet {
             origin: Origin::UserAgent,
             rules: Vec::new(),
+            media: Vec::new(),
         })
 }
 
@@ -88,9 +89,6 @@ pub enum StyleElementStatus {
     Applied,
     /// Its `type` attribute is not empty or `text/css`, so it is not CSS.
     NotCss,
-    /// Its `media` attribute needs media queries, which are not implemented
-    /// yet; only an empty list, `all` and `screen` are applied.
-    UnsupportedMedia,
     /// Its contents exceeded the CSS parser's limits.
     ResourceLimit,
 }
@@ -117,15 +115,6 @@ fn trim_ascii_whitespace(s: &str) -> &str {
     s.trim_matches(|c: char| matches!(c, '\t' | '\n' | '\x0c' | '\r' | ' '))
 }
 
-fn media_applies(media: &str) -> bool {
-    let media = trim_ascii_whitespace(media);
-    media.is_empty()
-        || media.split(',').any(|query| {
-            let query = trim_ascii_whitespace(query);
-            query.eq_ignore_ascii_case("all") || query.eq_ignore_ascii_case("screen")
-        })
-}
-
 /// The child text content of `id` (its direct text children, concatenated).
 fn child_text(document: &Document, id: NodeId) -> String {
     let mut units = Vec::new();
@@ -141,7 +130,9 @@ fn child_text(document: &Document, id: NodeId) -> String {
 
 /// A cascade for an HTML document: the user-agent stylesheet, then the sheet
 /// of every HTML `<style>` element in tree order (template contents are not
-/// searched), each reported in the returned list.
+/// searched), each reported in the returned list. A `media` attribute
+/// restricts its sheet with [`StyleSheet::restrict_to`]. The cascade uses the
+/// default environment; change it with [`Cascade::set_environment`].
 ///
 /// External stylesheets (`<link rel=stylesheet>`) need fetching and are not
 /// loaded.
@@ -165,11 +156,19 @@ pub fn document_cascade(
         });
         let (status, diagnostics) = if !css_type {
             (StyleElementStatus::NotCss, Vec::new())
-        } else if !attribute(element, "media").is_none_or(|m| media_applies(&m)) {
-            (StyleElementStatus::UnsupportedMedia, Vec::new())
         } else {
-            match StyleSheet::parse(parser, &child_text(document, id), Origin::Author) {
-                Ok((sheet, diagnostics)) => {
+            let media = match attribute(element, "media") {
+                Some(media) => parser.media_query_list(&media).map(|m| Some(m.value)),
+                None => Ok(None),
+            };
+            match media.and_then(|media| {
+                StyleSheet::parse(parser, &child_text(document, id), Origin::Author)
+                    .map(|parsed| (media, parsed))
+            }) {
+                Ok((media, (mut sheet, diagnostics))) => {
+                    if let Some(media) = media {
+                        sheet.restrict_to(media);
+                    }
                     cascade.push(sheet);
                     (StyleElementStatus::Applied, diagnostics)
                 }

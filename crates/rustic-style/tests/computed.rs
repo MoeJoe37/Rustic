@@ -225,14 +225,15 @@ fn style_elements_are_attached_in_tree_order() {
         [
             StyleElementStatus::Applied,
             StyleElementStatus::NotCss,
-            StyleElementStatus::UnsupportedMedia,
+            StyleElementStatus::Applied,
             StyleElementStatus::Applied,
             StyleElementStatus::Applied,
         ]
     );
     assert_eq!(reports[0].diagnostics.len(), 1);
-    // The user-agent sheet plus three author sheets.
-    assert_eq!(cascade.sheets().len(), 4);
+    // The user-agent sheet plus four author sheets; the print one is
+    // attached but its media query does not match a screen.
+    assert_eq!(cascade.sheets().len(), 5);
     let styles = style_tree(
         doc,
         doc.root(),

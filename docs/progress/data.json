@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_version": "engine-v2",
-  "source_fingerprint": "51e9867fde31d67b892f69c357019cfc1b597d764a1973de92a2351affd2d7f3",
-  "percent": "8.44",
-  "completed": 19,
+  "source_fingerprint": "d7c16874dd4d77ba05679fb219bc1f7922eed054d61e54e2272a4c23779eb6c1",
+  "percent": "9.04",
+  "completed": 20,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -547,8 +547,19 @@
         {
           "id": "html.loader",
           "label": "Bounded local loader and dump-dom command",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "pub fn load_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn dump_dom_matches_the_checked_snapshot_for_every_chunk_size"
+            }
+          ]
         },
         {
           "id": "html.conformance",
@@ -557,9 +568,9 @@
           "evidence": []
         }
       ],
-      "completed": 7,
+      "completed": 8,
       "total": 10,
-      "percent": "70.00"
+      "percent": "80.00"
     },
     {
       "id": "css",

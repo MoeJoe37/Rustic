@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 8.44%** · 19/172 capabilities complete.
+**Overall completion: 9.04%** · 20/172 capabilities complete.
 
-Catalog: `engine-v2`. Source fingerprint: `51e9867fde31d67b892f69c357019cfc1b597d764a1973de92a2351affd2d7f3`.
+Catalog: `engine-v2`. Source fingerprint: `d7c16874dd4d77ba05679fb219bc1f7922eed054d61e54e2272a4c23779eb6c1`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights measure planned engine scope; they are not compatibility results or time estimates.
 
@@ -11,7 +11,7 @@ Catalog: `engine-v2`. Source fingerprint: `51e9867fde31d67b892f69c357019cfc1b597
 | Foundation | 5/8 | 62.50% | 2% |
 | URLs & encoding | 3/12 | 25.00% | 3% |
 | DOM | 3/10 | 30.00% | 6% |
-| HTML | 7/10 | 70.00% | 6% |
+| HTML | 8/10 | 80.00% | 6% |
 | CSS & style | 0/8 | 0.00% | 9% |
 | Text & fonts | 0/6 | 0.00% | 4% |
 | Layout | 0/10 | 0.00% | 9% |
@@ -81,7 +81,7 @@ Catalog: `engine-v2`. Source fingerprint: `51e9867fde31d67b892f69c357019cfc1b597
 - **complete** `html.tree` — Core insertion modes and malformed-tree recovery ([source](../../crates/rustic-html/src/parser/tree.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
 - **complete** `html.tables` — Table, formatting, template and foreign content rules ([source](../../crates/rustic-html/src/parser/tree/formatting.rs), [source](../../crates/rustic-html/src/parser/tree/table.rs), [source](../../crates/rustic-html/src/parser/tree/foreign.rs), [test](../../crates/rustic-html/tests/tree_rules.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
 - **planned** `html.scripts` — Parser/script reentry and encoding restart
-- **planned** `html.loader` — Bounded local loader and dump-dom command
+- **complete** `html.loader` — Bounded local loader and dump-dom command ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **planned** `html.conformance` — Parser corpora, chunk invariance and fuzz gate
 
 ### CSS & style

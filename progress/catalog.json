@@ -533,8 +533,19 @@
         {
           "id": "html.loader",
           "label": "Bounded local loader and dump-dom command",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "pub fn load_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn dump_dom_matches_the_checked_snapshot_for_every_chunk_size"
+            }
+          ]
         },
         {
           "id": "html.conformance",

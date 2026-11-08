@@ -111,3 +111,17 @@ python3 tools/import_html_tree_tests.py --check
 
 Use `--vendor <html5lib-tests checkout>` only for a deliberate corpus update at a
 reviewed revision. A user-facing bounded `dump-dom` loader/CLI is DOC-07 work.
+
+## Local `dump-dom` command
+
+DOC-07 exposes this parser through a bounded command-line loader:
+
+```sh
+cargo run --locked -p rustic-cli -- dump-dom crates/rustic-cli/tests/fixtures/malformed.html
+```
+
+The command accepts one local path (never a URL), reads it in chunks within a
+file byte limit that also bounds the tokenizer, uses the default parser limits
+and caps dump output. Its output is the same diagnostic dump as above, so its
+coverage is exactly this document's. See
+[IMPLEMENTATION.md](IMPLEMENTATION.md) for options, exit codes and tests.

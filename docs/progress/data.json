@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "fa7b45bd260c66495e4b8832865d13cdc2a5c11f6da60ddbc6a7b5b65608255b",
-  "percent": "8.65",
-  "verified_percent": "8.65",
+  "source_fingerprint": "ec7703abc4db92b4650d9f70a187619e1ff328ab66849d47e4499627025718d8",
+  "percent": "8.90",
+  "verified_percent": "8.90",
   "partial_percent": "0.00",
-  "completed": 21,
+  "completed": 22,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -15,10 +15,10 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 21,
+      "completed": 22,
       "total": 28,
-      "percent": "76.80",
-      "verified_percent": "76.80",
+      "percent": "79.02",
+      "verified_percent": "79.02",
       "partial_percent": "0.00"
     },
     {
@@ -238,9 +238,30 @@
           "label": "Structured source/revision diagnostics and redaction",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/diagnostic.rs",
+              "marker": "pub struct DiagnosticLog"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/revision.rs",
+              "marker": "pub struct SourceLocation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/diagnostic.rs",
+              "marker": "fn rendering_is_redacted_by_default_and_single_line"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/revision.rs",
+              "marker": "fn stale_or_foreign_locations_are_rejected"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.25"
         },
         {
@@ -255,12 +276,12 @@
         }
       ],
       "points": 16,
-      "completed": 5,
+      "completed": 6,
       "in_progress": 0,
       "total": 8,
-      "contribution": "1.00",
-      "percent": "50.00",
-      "verified_percent": "50.00",
+      "contribution": "1.25",
+      "percent": "62.50",
+      "verified_percent": "62.50",
       "partial_percent": "0.00"
     },
     {

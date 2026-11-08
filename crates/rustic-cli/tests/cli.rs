@@ -184,3 +184,27 @@ fn dump_dom_parser_limits_are_configurable() {
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
 }
+
+#[test]
+fn dump_dom_escapes_hostile_paths_and_options_in_errors() {
+    let output = rustic(&["dump-dom", "--x\u{1b}[2J\nfake"]);
+    assert_eq!(output.status.code(), Some(2));
+    let message = stderr(&output);
+    assert!(
+        message.contains("unknown option \"--x\\u{1b}[2J\\nfake\""),
+        "{message}"
+    );
+    assert!(!message.contains('\u{1b}'));
+
+    let directory = env!("CARGO_TARGET_TMPDIR");
+    let missing = Path::new(directory).join("missing\u{202e}lmth.\nerror");
+    let output = rustic(&["dump-dom", missing.to_str().expect("UTF-8 path")]);
+    assert_eq!(output.status.code(), Some(1));
+    let message = stderr(&output);
+    assert!(
+        message.contains("missing\\u{202e}lmth.\\nerror\""),
+        "{message}"
+    );
+    assert!(!message.contains('\u{202e}'));
+    assert_eq!(message.lines().count(), 1, "{message}");
+}

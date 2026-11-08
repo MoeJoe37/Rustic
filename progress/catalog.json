@@ -158,8 +158,29 @@
           "label": "Structured source/revision diagnostics and redaction",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/diagnostic.rs",
+              "marker": "pub struct DiagnosticLog"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/revision.rs",
+              "marker": "pub struct SourceLocation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/diagnostic.rs",
+              "marker": "fn rendering_is_redacted_by_default_and_single_line"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/src/revision.rs",
+              "marker": "fn stale_or_foreign_locations_are_rejected"
+            }
+          ]
         },
         {
           "id": "base.lifecycle",

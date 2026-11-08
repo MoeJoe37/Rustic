@@ -5,7 +5,7 @@ use std::ops::Range;
 ///
 /// This does not encode UTF-16 offsets or identify a source revision. The caller
 /// must retain the matching buffer; slicing checks its actual bounds/boundaries.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SourceSpan {
     start: usize,
     end: usize,

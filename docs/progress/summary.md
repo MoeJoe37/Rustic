@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 8.65%** = 8.65% verified complete + 0.00% partial credit. 21/172 capabilities complete, 0 in progress.
+**Overall completion: 8.90%** = 8.90% verified complete + 0.00% partial credit. 22/172 capabilities complete, 0 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `fa7b45bd260c66495e4b8832865d13cdc2a5c11f6da60ddbc6a7b5b65608255b`.
+Catalog: `engine-v3`. Source fingerprint: `ec7703abc4db92b4650d9f70a187619e1ff328ab66849d47e4499627025718d8`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -10,7 +10,7 @@ Catalog: `engine-v3`. Source fingerprint: `fa7b45bd260c66495e4b8832865d13cdc2a5c
 
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
-| M1 Document core | 21/28 | 76.80% | 76.80% | 11.27% |
+| M1 Document core | 22/28 | 79.02% | 79.02% | 11.27% |
 | M2 CSS & computed style | 0/8 | 0.00% | 0.00% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
@@ -25,7 +25,7 @@ Catalog: `engine-v3`. Source fingerprint: `fa7b45bd260c66495e4b8832865d13cdc2a5c
 
 | Subsystem | Completed | In progress | Progress | Verified | Engine weight | Engine points |
 | --- | --- | --- | --- | --- | --- | --- |
-| Foundation | 5/8 | 0 | 50.00% | 50.00% | 2% | 1.00 |
+| Foundation | 6/8 | 0 | 62.50% | 62.50% | 2% | 1.25 |
 | URLs & encoding | 3/12 | 0 | 23.33% | 23.33% | 3% | 0.70 |
 | DOM | 3/10 | 0 | 23.52% | 23.52% | 6% | 1.41 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
@@ -59,7 +59,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `base.spans` — Checked source byte spans · size 1 · M1 · 0.12% of engine ([source](../../crates/rustic-base/src/source.rs), [test](../../crates/rustic-base/src/source.rs))
 - **complete** `base.clocks` — Injectable monotonic clocks · size 1 · M1 · 0.12% of engine ([source](../../crates/rustic-base/src/clock.rs), [test](../../crates/rustic-base/src/clock.rs))
 - **planned** `base.geometry` — Typed CSS/device geometry and checked surface allocation · size 3 · M3 · 0.37% of engine
-- **planned** `base.diagnostics` — Structured source/revision diagnostics and redaction · size 2 · M1 · 0.25% of engine
+- **complete** `base.diagnostics` — Structured source/revision diagnostics and redaction · size 2 · M1 · 0.25% of engine ([source](../../crates/rustic-base/src/diagnostic.rs), [source](../../crates/rustic-base/src/revision.rs), [test](../../crates/rustic-base/src/diagnostic.rs), [test](../../crates/rustic-base/src/revision.rs))
 - **planned** `base.lifecycle` — Coordinated lifecycle, shutdown and resource ownership · size 3 · M5 · 0.37% of engine
 
 ### URLs & encoding

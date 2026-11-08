@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use std::io::{self, Write};
 use std::process::ExitCode;
 
-use rustic_base::CancellationToken;
+use rustic_base::{CancellationToken, EscapedText};
 use rustic_engine::Viewport;
 
 mod loader;
@@ -94,7 +94,12 @@ fn dump_dom(args: &[OsString]) -> ExitCode {
             ExitCode::from(2)
         }
         Err(error) => {
-            eprintln!("rustic dump-dom: {}: {error}", path.display());
+            // The path is user input: escape it so control characters in a file
+            // name cannot forge terminal output or extra log lines.
+            eprintln!(
+                "rustic dump-dom: {}: {error}",
+                EscapedText(&path.to_string_lossy())
+            );
             ExitCode::from(1)
         }
     }
@@ -122,7 +127,7 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
                     Some(diagnostics.insert(limits.parser.max_tree_diagnostics))
                 }
                 Some(option) if option.starts_with('-') && option != "-" => {
-                    return Err(format!("unknown option {option}"));
+                    return Err(format!("unknown option {}", EscapedText(option)));
                 }
                 _ => None,
             };

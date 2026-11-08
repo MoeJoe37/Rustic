@@ -1,6 +1,6 @@
 [package]
 name = "rustic-base"
-description = "Checked identity, resource, cancellation, source, and time primitives for Rustic"
+description = "Checked identity, resource, cancellation, source, time and diagnostic primitives for Rustic"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

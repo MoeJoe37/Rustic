@@ -26,7 +26,40 @@ Budget units belong to the consumer: node count, input bytes or another explicit
 resource. This primitive is not a total memory limit and does not automatically
 free resources. Cancellation is checked cooperatively; it does not preempt blocked
 code. Source spans refer to the caller's matching buffer; they are byte offsets,
-not JS UTF-16 indices or persistent source-revision handles.
+not JS UTF-16 indices. `SourceLocation` (DOC-01c below) ties a span to a source
+revision.
+
+## DOC-01c — Structured diagnostics and redaction
+
+`rustic-base` now provides the shared diagnostic contract (`base.diagnostics`):
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| `SourceId` / `SourceRevision` | Never-reused source identity plus a non-wrapping revision counter; every text change takes a new revision | Uniqueness, ordering and `u64::MAX` exhaustion |
+| `SourceLocation` | A `SourceSpan` tied to the revision it was measured in; resolving against another source or revision fails instead of slicing different text | Stale, foreign, out-of-bounds and split-UTF-8 cases |
+| `Diagnostic` | Severity, validated stable code (`html.eof-in-tag` style), fixed `&'static str` summary, optional location and ordered named fields | Name validation, field order, `Debug` redaction |
+| `DiagnosticValue` / `RedactionPolicy` | Every field value is `Public` or `Private`; rendering redacts private values to `<redacted>` (no length) unless a caller explicitly chooses `Reveal` | Default policy, both policies, `Debug` never printing private text |
+| `EscapedText` | Quoted single-line output that escapes quotes, backslashes, C0/C1 controls, DEL, line/paragraph separators, bidi controls and zero-width characters | Log-forging, ANSI and Trojan-Source style inputs; non-Latin text kept |
+| `DiagnosticLog` | Ordered log with entry-count and byte budgets (code, summary, keys and raw values); a rejected push changes nothing | Exact entry/byte boundaries, zero capacity, atomic rejection |
+| `render` | Deterministic one-line format within a caller byte cap; exceeding it returns no partial output | Exact-cap and cap−1 cases for single entries and whole logs |
+
+Because summaries and names are fixed engine strings, content-derived data can
+only enter a diagnostic through a field with declared sensitivity. Privacy is
+the default: the policy must be changed deliberately to reveal anything.
+
+`rustic dump-dom` uses `EscapedText` for the user-supplied path and unknown
+options in its error messages, so a file name containing a newline, ANSI escape
+or bidi override prints as one inert line (CLI test
+`dump_dom_escapes_hostile_paths_and_options_in_errors`).
+
+Known limits, recorded as deliberate follow-up work: the HTML tokenizer and tree
+builder keep their own compact `Copy` diagnostics, whose positions are
+normalized code-point offsets and token indexes rather than original-byte spans.
+Converting them needs original-byte offset mapping, which is separate HTML work;
+until then they are not routed through `DiagnosticLog`. Line/column display,
+UTF-16 positions, structured (JSON) export and a process-wide logging sink are
+not implemented. Redaction classifies values at the point they are recorded; it
+does not detect secrets inside text that a caller wrongly marks `Public`.
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 
@@ -387,6 +420,7 @@ link/package checks, runtime tests and device support remain planned.
 | --- | --- |
 | DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |
 | DOC-01b: explicit budgets and cooperative cancellation | Complete primitives; integrated into URL parsing and initial HTML tokenization |
+| DOC-01c: structured diagnostics and redaction | Complete base contract; used for CLI error escaping; HTML diagnostics migrate after original-byte offset mapping |
 | DOC-03: minimal document arena and node kinds | Complete internal subset described above |
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |

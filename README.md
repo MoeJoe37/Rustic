@@ -25,7 +25,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 8.65%** (8.65% verified complete + 0.00% partial credit) — 21/172 capabilities complete and 0 in progress across 21 subsystems. Current milestone: **M1 Document core**, 76.80% done.
+**Overall engine completion: 8.90%** (8.90% verified complete + 0.00% partial credit) — 22/172 capabilities complete and 0 in progress across 21 subsystems. Current milestone: **M1 Document core**, 79.02% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -86,8 +86,8 @@ RCDATA/raw text/script/plaintext contexts. The `document` example parses a local
 fixture into a DOM tree with implied elements and paragraph recovery. Unsupported
 tree constructs return explicit errors; broad tree-building rules remain pending.
 
-The current crates are `rustic-base` (identity, budgets, cancellation, source spans
-and clocks), `rustic-dom` (bounded node storage, checked tree mutation and
+The current crates are `rustic-base` (identity, budgets, cancellation, source spans,
+clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tree mutation and
 [UTF-16 text edits](docs/DOM.md)),
 `rustic-url` (URL records, parsing and origins),
 `rustic-html` (streaming tokens and full WHATWG document tree construction),

@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "066eb1f50c6906bbd5034ed604e1777e1488141e86ef0f61482e5ef1cbf39ab3",
-  "percent": "15.76",
+  "source_fingerprint": "2eec6beee5c8d476670666f206dad25bb6d15ce8559faa45e77afe7f28e22d9b",
+  "percent": "16.39",
   "verified_percent": "13.11",
-  "partial_percent": "2.65",
+  "partial_percent": "3.28",
   "completed": 30,
   "in_progress": 5,
   "total": 172,
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 2,
       "total": 8,
-      "percent": "47.43",
+      "percent": "54.48",
       "verified_percent": "20.51",
-      "partial_percent": "26.92"
+      "partial_percent": "33.97"
     },
     {
       "id": "M3",
@@ -1210,9 +1210,20 @@
               ]
             },
             {
-              "label": "Math functions: calc(), min(), max(), clamp()",
-              "status": "planned",
-              "evidence": []
+              "label": "Math functions: calc(), min(), max(), clamp() (CSS-03b)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/calc.rs",
+                  "marker": "pub fn parse_length_percentage"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/calc.rs",
+                  "marker": "fn length_percentage_calculations_simplify_and_serialize"
+                }
+              ]
             },
             {
               "label": "Property catalog for layout, text, backgrounds, positioning and the font shorthand",
@@ -1220,7 +1231,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "1.84"
         },
         {
@@ -1319,7 +1330,23 @@
               ]
             },
             {
-              "label": "Computed values that need font metrics or math functions (ex/ch/cap from fonts, calc())",
+              "label": "Computed values of math functions: pixel simplification and range clamping (CSS-03b)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/calc.rs",
+                  "marker": "pub fn compute("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn math_functions_compute_with_pixel_lengths"
+                }
+              ]
+            },
+            {
+              "label": "Computed values that need font metrics (ex/ch/cap/ic from loaded fonts)",
               "status": "planned",
               "evidence": []
             },
@@ -1334,7 +1361,7 @@
               "evidence": []
             }
           ],
-          "credit": "25.00",
+          "credit": "40.00",
           "engine_share": "1.15"
         },
         {
@@ -1416,10 +1443,10 @@
       "completed": 2,
       "in_progress": 4,
       "total": 8,
-      "contribution": "4.26",
-      "percent": "47.43",
+      "contribution": "4.90",
+      "percent": "54.48",
       "verified_percent": "20.51",
-      "partial_percent": "26.92"
+      "partial_percent": "33.97"
     },
     {
       "id": "text",

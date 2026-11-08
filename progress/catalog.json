@@ -1026,9 +1026,20 @@
               ]
             },
             {
-              "label": "Math functions: calc(), min(), max(), clamp()",
-              "status": "planned",
-              "evidence": []
+              "label": "Math functions: calc(), min(), max(), clamp() (CSS-03b)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/calc.rs",
+                  "marker": "pub fn parse_length_percentage"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/calc.rs",
+                  "marker": "fn length_percentage_calculations_simplify_and_serialize"
+                }
+              ]
             },
             {
               "label": "Property catalog for layout, text, backgrounds, positioning and the font shorthand",
@@ -1131,7 +1142,23 @@
               ]
             },
             {
-              "label": "Computed values that need font metrics or math functions (ex/ch/cap from fonts, calc())",
+              "label": "Computed values of math functions: pixel simplification and range clamping (CSS-03b)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/calc.rs",
+                  "marker": "pub fn compute("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn math_functions_compute_with_pixel_lengths"
+                }
+              ]
+            },
+            {
+              "label": "Computed values that need font metrics (ex/ch/cap/ic from loaded fonts)",
               "status": "planned",
               "evidence": []
             },

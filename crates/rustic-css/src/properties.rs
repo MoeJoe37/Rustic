@@ -12,14 +12,19 @@
 //! `line-height`. Shorthands: `margin`, `padding`, `border-width`,
 //! `border-style`, `border-color`, `border-top`/`-right`/`-bottom`/`-left`
 //! and `border`. Every property also accepts the CSS-wide keywords.
-//! Math functions (`calc()` and friends), `var()` substitution and the `font`
-//! shorthand are later tasks; their values are rejected for now.
+//! Math functions (`calc()`, `min()`, `max()`, `clamp()`) are accepted in
+//! every length, length-percentage and number slot (see [`crate::Calc`]).
+//! `var()` substitution and the `font` shorthand are later tasks; their values
+//! are rejected for now.
 
 use std::fmt;
 
+use crate::calc::{censor, is_math_function};
 use crate::color::write_number;
 use crate::serialize::serialize_string;
-use crate::{Color, Declaration, Length, LengthPercentage, LengthUnit, Token, Value};
+use crate::{
+    Calc, Color, ComponentValue, Declaration, Length, LengthPercentage, LengthUnit, Token, Value,
+};
 
 /// The CSS-wide keywords (CSS Cascade Level 5 §7.3).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -188,7 +193,7 @@ keywords! {
 }
 
 /// `auto | <length-percentage>`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LengthPercentageOrAuto {
     /// `auto`.
     Auto,
@@ -197,7 +202,7 @@ pub enum LengthPercentageOrAuto {
 }
 
 /// `none | <length-percentage>`, for `max-width` and `max-height`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MaxSize {
     /// `none`.
     None,
@@ -206,7 +211,7 @@ pub enum MaxSize {
 }
 
 /// `thin | medium | thick | <length>`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BorderWidth {
     /// `thin` (1px).
     Thin,
@@ -216,10 +221,12 @@ pub enum BorderWidth {
     Thick,
     /// A nonnegative length.
     Length(Length),
+    /// A math function resolving to a length; negative results clamp to 0.
+    Calc(Box<Calc>),
 }
 
 /// `font-size`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FontSize {
     /// An absolute- or relative-size keyword.
     Keyword(FontSizeKeyword),
@@ -252,7 +259,7 @@ pub enum FamilyName {
 }
 
 /// `line-height`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineHeight {
     /// `normal`.
     Normal,
@@ -440,7 +447,7 @@ pub enum PropertyError {
     /// The property is not supported (or does not exist).
     UnknownProperty,
     /// The value does not match the property's grammar (or uses syntax that
-    /// is not implemented yet, such as `calc()`).
+    /// is not implemented yet, such as `var()`).
     InvalidValue,
 }
 
@@ -608,7 +615,17 @@ fn length(value: &Value) -> Option<Length> {
     }
 }
 
+fn math_function(value: &Value) -> bool {
+    matches!(&value.value, ComponentValue::Function { name, .. } if is_math_function(name))
+}
+
+/// A `<length-percentage>`, including math functions. A math function stays
+/// a [`LengthPercentage::Calc`] even when it simplifies to one value, so it
+/// serializes as written and its range is checked only once it resolves.
 fn length_percentage(value: &Value) -> Option<LengthPercentage> {
+    if math_function(value) {
+        return Calc::parse_length_percentage(value).map(|c| LengthPercentage::Calc(Box::new(c)));
+    }
     match value.token()? {
         Token::Percentage(n) => Some(LengthPercentage::Percentage(n.value)),
         _ => length(value).map(LengthPercentage::Length),
@@ -635,6 +652,9 @@ fn border_width(value: &Value) -> Option<BorderWidth> {
             "thick" => Some(BorderWidth::Thick),
             _ => None,
         };
+    }
+    if math_function(value) {
+        return Calc::parse_length(value).map(|c| BorderWidth::Calc(Box::new(c)));
     }
     length(value)
         .filter(|l| l.value >= 0.0)
@@ -708,6 +728,15 @@ fn number(value: &Value) -> Option<f64> {
     }
 }
 
+/// A `<number>` in `min..=max`. A literal outside the range is invalid; a
+/// math function's result is clamped to it instead (CSS Values 4 §10.9).
+fn number_in(value: &Value, min: f64, max: f64) -> Option<f64> {
+    if math_function(value) {
+        return Calc::parse_number(value).map(|n| censor(n).clamp(min, max));
+    }
+    number(value).filter(|n| (min..=max).contains(n))
+}
+
 /// Parse a longhand value from its non-whitespace component values.
 fn longhand(property: PropertyId, parts: &[&Value]) -> Option<PropertyValue> {
     use PropertyId as P;
@@ -761,16 +790,15 @@ fn longhand(property: PropertyId, parts: &[&Value]) -> Option<PropertyValue> {
                 "lighter" => FontWeight::Lighter,
                 _ => return None,
             },
-            None => FontWeight::Number(number(value).filter(|w| (1.0..=1000.0).contains(w))?),
+            None => FontWeight::Number(number_in(value, 1.0, 1000.0)?),
         }),
         P::FontStyle => PropertyValue::FontStyle(FontStyle::from_name(ident(value)?)?),
         P::LineHeight => PropertyValue::LineHeight(if keyword(value, "normal") {
             LineHeight::Normal
-        } else if let Some(n) = number(value) {
-            if n < 0.0 {
-                return None;
-            }
+        } else if let Some(n) = number_in(value, 0.0, f64::MAX) {
             LineHeight::Number(n)
+        } else if number(value).is_some() {
+            return None;
         } else {
             LineHeight::LengthPercentage(nonnegative(value)?)
         }),
@@ -867,6 +895,7 @@ impl fmt::Display for PropertyValue {
             Self::BorderWidth(BorderWidth::Medium) => f.write_str("medium"),
             Self::BorderWidth(BorderWidth::Thick) => f.write_str("thick"),
             Self::BorderWidth(BorderWidth::Length(l)) => write!(f, "{l}"),
+            Self::BorderWidth(BorderWidth::Calc(c)) => write!(f, "{c}"),
             Self::BorderStyle(s) => write!(f, "{s}"),
             Self::BoxSizing(b) => write!(f, "{b}"),
             Self::FontSize(FontSize::Keyword(k)) => write!(f, "{k}"),

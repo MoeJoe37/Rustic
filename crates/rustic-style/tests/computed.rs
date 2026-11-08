@@ -119,6 +119,39 @@ fn lengths_become_pixels_and_percentages_stay() {
 }
 
 #[test]
+fn math_functions_compute_with_pixel_lengths() {
+    let html = "<div id=p><div id=a></div></div>";
+    let sheet = "#p { font-size: 20px } \
+                 #a { font-size: calc(50% + 2px); width: calc(50% + 2em); \
+                 height: calc(2em + 3px); min-width: calc(10px - 20px); \
+                 margin-left: calc(10px - 20px); max-width: min(10px, 5em); \
+                 padding-left: calc(-50%); line-height: calc(150% + 1px); \
+                 border-top: calc(1em + 0.5px) solid; margin-top: calc(1lh); \
+                 margin-bottom: clamp(1px, 50vw, 20px); margin-right: calc(1px * infinity) }";
+    let c = |property| computed(html, sheet, "a", property);
+    assert_eq!(c("font-size"), "12px");
+    assert_eq!(c("width"), "calc(50% + 24px)");
+    assert_eq!(c("height"), "27px");
+    // Negative results clamp to the property's range; margins may be negative.
+    assert_eq!(c("min-width"), "0px");
+    assert_eq!(c("margin-left"), "-10px");
+    assert_eq!(c("max-width"), "10px");
+    assert_eq!(c("padding-left"), "0%");
+    assert_eq!(c("line-height"), "19px");
+    assert_eq!(c("border-top-width"), "12.5px");
+    assert_eq!(c("margin-top"), "19px");
+    assert_eq!(c("margin-bottom"), "20px");
+    assert_eq!(
+        c("margin-right"),
+        rustic_css::Length::px(f64::MAX).to_string()
+    );
+    // `font-weight` and `line-height` numbers are evaluated when parsed.
+    let sheet = "#a { font-weight: calc(250 * 2); line-height: calc(3 / 2) }";
+    assert_eq!(computed(html, sheet, "a", "font-weight"), "500");
+    assert_eq!(computed(html, sheet, "a", "line-height"), "1.5");
+}
+
+#[test]
 fn line_height_percentages_compute_and_numbers_inherit() {
     let html = "<div id=a><p id=b></p></div><div id=c><p id=d></p></div>";
     let sheet = "#a { font-size: 10px; line-height: 150% } #b { font-size: 20px } \

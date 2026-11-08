@@ -14,11 +14,13 @@
 //! Selector syntax and specificity (Selectors Level 4, the CSS-02 subset)
 //! and the `An+B` microsyntax are parsed from component values here, as are
 //! typed values for the CSS-03 property set (colors, lengths, box model,
-//! display and font basics). Selector matching and the cascade live elsewhere.
+//! display and font basics) and the math functions `calc()`, `min()`, `max()`
+//! and `clamp()` ([`Calc`]). Selector matching and the cascade live elsewhere.
 
 #![warn(missing_docs)]
 
 mod anb;
+mod calc;
 mod color;
 mod error;
 mod length;
@@ -33,6 +35,7 @@ mod tokenizer;
 mod values;
 
 pub use anb::parse_an_plus_b;
+pub use calc::{Calc, CalcKind, CalcNode, MAX_CALC_DEPTH, MAX_CALC_NODES};
 pub use color::{Color, LabSpace, PredefinedSpace};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
 pub use length::{Length, LengthPercentage, LengthUnit};

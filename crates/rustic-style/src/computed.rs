@@ -146,13 +146,35 @@ impl Basis {
         Length::px(self.px(length))
     }
 
-    fn lp(&self, value: LengthPercentage) -> LengthPercentage {
-        match value {
-            LengthPercentage::Length(l) => LengthPercentage::Length(self.length(l)),
-            percentage => percentage,
+    /// A computed `<length-percentage>`: lengths become pixels, percentages
+    /// stay, and a math function is simplified with pixel lengths. When
+    /// `nonnegative`, a result that is a single negative value clamps to
+    /// zero; a mix of pixels and percentages is clamped once it resolves.
+    fn lp(&self, value: &LengthPercentage, nonnegative: bool) -> LengthPercentage {
+        let computed = match value {
+            LengthPercentage::Length(l) => LengthPercentage::Length(self.length(*l)),
+            LengthPercentage::Percentage(p) => LengthPercentage::Percentage(*p),
+            LengthPercentage::Calc(calc) => calc.compute(|l| self.px(l)),
+        };
+        match computed {
+            LengthPercentage::Length(l) if nonnegative && l.value < 0.0 => {
+                LengthPercentage::Length(Length::px(0.0))
+            }
+            LengthPercentage::Percentage(p) if nonnegative && p < 0.0 => {
+                LengthPercentage::Percentage(0.0)
+            }
+            other => other,
         }
     }
 }
+
+/// Longhands whose lengths may be negative; every other length clamps at 0.
+const NEGATIVE_LENGTHS: &[PropertyId] = &[
+    PropertyId::MarginTop,
+    PropertyId::MarginRight,
+    PropertyId::MarginBottom,
+    PropertyId::MarginLeft,
+];
 
 fn line_px(line_height: &PropertyValue, font_px: f64) -> f64 {
     match line_height {
@@ -288,6 +310,10 @@ fn compute_values(
         PropertyValue::FontSize(FontSize::LengthPercentage(LengthPercentage::Length(l))) => {
             parent_basis.px(*l)
         }
+        PropertyValue::FontSize(FontSize::LengthPercentage(LengthPercentage::Calc(calc))) => calc
+            .resolve(|l| parent_basis.px(l), Some(parent_font_px))
+            .unwrap_or(parent_font_px)
+            .max(0.0),
         _ => parent_font_px,
     };
     // On the root, `rem` and `rlh` in other properties use its own values.
@@ -318,6 +344,24 @@ fn compute_values(
             };
             PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Length(l)))
         }
+        PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Calc(calc))) => {
+            let px = calc
+                .resolve(
+                    |l| {
+                        if matches!(l.unit, LengthUnit::Lh) {
+                            l.value * parent_basis.line_px
+                        } else {
+                            basis.px(l)
+                        }
+                    },
+                    Some(font_px),
+                )
+                .unwrap_or(font_px * 1.2)
+                .max(0.0);
+            PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Length(
+                Length::px(px),
+            )))
+        }
         other => other.clone(),
     };
     basis.line_px = line_px(&line_height, font_px);
@@ -345,6 +389,9 @@ fn compute_values(
             PropertyValue::BorderWidth(BorderWidth::Thin) => 1.0,
             PropertyValue::BorderWidth(BorderWidth::Thick) => 5.0,
             PropertyValue::BorderWidth(BorderWidth::Length(l)) => basis.px(*l),
+            PropertyValue::BorderWidth(BorderWidth::Calc(calc)) => {
+                calc.resolve(|l| basis.px(l), None).unwrap_or(0.0).max(0.0)
+            }
             _ => 3.0,
         };
         PropertyValue::BorderWidth(BorderWidth::Length(Length::px(px)))
@@ -379,20 +426,25 @@ fn compute_values(
                     other => other.clone(),
                 },
                 P::LineHeight => line_height.clone(),
-                _ => match value {
-                    PropertyValue::LengthPercentageOrAuto(
-                        LengthPercentageOrAuto::LengthPercentage(lp),
-                    ) => PropertyValue::LengthPercentageOrAuto(
-                        LengthPercentageOrAuto::LengthPercentage(basis.lp(*lp)),
-                    ),
-                    PropertyValue::LengthPercentage(lp) => {
-                        PropertyValue::LengthPercentage(basis.lp(*lp))
+                _ => {
+                    let nonnegative = !NEGATIVE_LENGTHS.contains(&property);
+                    match value {
+                        PropertyValue::LengthPercentageOrAuto(
+                            LengthPercentageOrAuto::LengthPercentage(lp),
+                        ) => PropertyValue::LengthPercentageOrAuto(
+                            LengthPercentageOrAuto::LengthPercentage(basis.lp(lp, nonnegative)),
+                        ),
+                        PropertyValue::LengthPercentage(lp) => {
+                            PropertyValue::LengthPercentage(basis.lp(lp, nonnegative))
+                        }
+                        PropertyValue::MaxSize(MaxSize::LengthPercentage(lp)) => {
+                            PropertyValue::MaxSize(MaxSize::LengthPercentage(
+                                basis.lp(lp, nonnegative),
+                            ))
+                        }
+                        other => other.clone(),
                     }
-                    PropertyValue::MaxSize(MaxSize::LengthPercentage(lp)) => {
-                        PropertyValue::MaxSize(MaxSize::LengthPercentage(basis.lp(*lp)))
-                    }
-                    other => other.clone(),
-                },
+                }
             }
         })
         .collect();

@@ -186,9 +186,42 @@ Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 units including the small/large/dynamic variants, plus unitless zero. Every
 longhand reports `initial_value()` and `inherited()`. `color`'s initial value is
 `CanvasText` and `font-family`'s depends on the user agent; Rustic uses opaque
-black and `serif` until system colors and font settings exist. `calc()` and the
-other math functions, `var()`, the `font` shorthand and custom properties are
-later tasks.
+black and `serif` until system colors and font settings exist. `var()` and
+custom properties are later tasks (CSS-06).
+
+### Math functions
+
+`calc()`, `min()`, `max()` and `clamp()` (CSS-03b, [CSS Values and Units
+Level 4 §10](https://drafts.csswg.org/css-values-4/#math), Editor's Draft
+reviewed 2026-11-08) are accepted wherever a supported longhand takes a
+`<length>`, `<length-percentage>` or `<number>`. `Calc` parses a function into
+a calculation tree with `+ - * /`, parentheses, nested math functions and the
+constants `e`, `pi`, `infinity`, `-infinity` and `NaN`; type-checks it against
+its context (a length plus a percentage is allowed only where percentages are
+lengths, a number never mixes with a dimension); and simplifies it per §10.10:
+absolute lengths become `px`, like units in a sum combine, numbers multiply
+into the other factor, and `min()`/`max()`/`clamp()` arguments with the same
+unit reduce. Specified values serialize per §10.12 (`calc(1in + 2em - 10% + 4px * 2)`
+becomes `calc(-10% + 2em + 104px)`), with children sorted as numbers,
+percentages, then dimensions by unit.
+
+| Behavior | Rule |
+| --- | --- |
+| Whitespace | `+` and `-` need whitespace on both sides (`calc(1px+2px)` is invalid) |
+| Products | One side of `*` and the right side of `/` must be a `<number>`; typed division such as `10px / 2px` is rejected for now |
+| Range | Not checked when parsing: `width: calc(-10px)` is valid and clamps to `0px` when computed; margins keep negative results |
+| Numbers | `font-weight` and `line-height` numbers are evaluated when parsed and clamped to the property's range, so `font-weight: calc(2000)` is `1000` (the specified value serializes as the number, not `calc(1000)`) |
+| Degenerate values | Dimensions are censored when produced: NaN becomes 0 and infinities the largest finite value; numbers may be infinite inside a tree and are censored when used or computed |
+| Limits | At most 32 nested functions/parentheses (`MAX_CALC_DEPTH`) and 1,024 nodes (`MAX_CALC_NODES`); deeper or larger expressions make the declaration invalid |
+| Not yet | `round()`, `mod()`, `rem()`, trigonometric, exponential and sign functions, `none` in `clamp()`, math functions inside colors, angles and times |
+
+At computed-value time every length in a tree becomes pixels and the tree is
+simplified again: a single value becomes a plain length or percentage
+(`calc(2em + 3px)` with a 10px font is `23px`), while a mix of pixels and
+percentages stays a calculation (`calc(50% + 20px)`) for layout to resolve.
+`font-size` and `line-height` percentages resolve against the parent's font
+size and the element's own font size, so their calculations always compute to
+pixels.
 
 ### Property value evidence
 
@@ -201,6 +234,12 @@ later tasks.
   value serializes and reparses to itself.
 * The `css` fuzz target now also checks that every typed longhand it parses
   serializes to a fixed point.
+* `tests/calc.rs` (CSS-03b): 28 simplification/serialization cases, 30
+  invalid expressions, number evaluation and censoring, resolution against
+  lengths and percentages, the exact depth and node limits, and a
+  serialization fixed-point check for values that round. The `css` fuzz
+  target's dictionary and seeds include math functions, so its fixed-point
+  check covers them.
 
 ## Cascade
 
@@ -325,6 +364,7 @@ Cascade 5 §4.4, with each property's "computed value" line):
 | Colors | `currentcolor` becomes the element's `color` (for `color` itself, the parent's) |
 | Border widths | Pixels (`thin` 1, `medium` 3, `thick` 5), and 0 when that side's style is `none` or `hidden` |
 | `display` | Blockified on the root element |
+| Math functions | Lengths become pixels and the tree is simplified again; one value becomes a plain length or percentage clamped to the property's range, a pixel/percentage mix stays a calculation (CSS-03b) |
 
 Fonts are not loaded yet, so `ex` and `ch` use the specification's 0.5em
 fallback, `cap` 0.7em and `ic` 1em, and `normal` line height counts as 1.2 for

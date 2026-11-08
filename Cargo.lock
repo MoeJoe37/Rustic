@@ -10,7 +10,10 @@ version = "0.1.0"
 name = "rustic-cli"
 version = "0.1.0"
 dependencies = [
+ "rustic-base",
+ "rustic-dom",
  "rustic-engine",
+ "rustic-html",
 ]
 
 [[package]]

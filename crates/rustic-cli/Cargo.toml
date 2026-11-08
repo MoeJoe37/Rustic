@@ -13,7 +13,10 @@ name = "rustic"
 path = "src/main.rs"
 
 [dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-dom = { path = "../rustic-dom" }
 rustic-engine = { path = "../rustic-engine" }
+rustic-html = { path = "../rustic-html" }
 
 [lints]
 workspace = true

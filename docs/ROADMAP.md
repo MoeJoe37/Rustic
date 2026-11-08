@@ -119,6 +119,8 @@ Do not label a happy-path tag splitter an HTML implementation.
 | CSS-01 | **Done** ([CSS.md](CSS.md)): CSS syntax tokenizer/parser, escapes, comments, blocks, bad-token recovery, source locations | DOC-01 |
 | CSS-02 | **Done** ([CSS.md](CSS.md#selectors)): type/universal/ID/class/attribute selectors, combinators, specificity, initial pseudo-classes, DOM matching | CSS-01, DOM views |
 | CSS-03 | **Done** ([CSS.md](CSS.md#property-values)): typed property parsers: display, box model, color, font basics, lengths/percentages | CSS-01 |
+| CSS-03b | **Done** ([CSS.md](CSS.md#math-functions)): `calc()`, `min()`, `max()`, `clamp()` for lengths, length-percentages and numbers, with computed values | CSS-03 |
+| CSS-03c | **Done** ([CSS.md](CSS.md#property-values)): positioning, overflow, visibility, opacity, text and decoration longhands, `font` and `background` shorthands, with computed values | CSS-03b |
 | CSS-04 | **Done** ([CSS.md](CSS.md#cascade)): UA/user/author origins, importance, inline styles, source order, inheritance and CSS-wide values | CSS-02, CSS-03 |
 | CSS-05 | **Done** ([CSS.md](CSS.md#computed-style)): computed values, stylesheet attachment, style dump, full-restyle reference implementation | CSS-04, DOC-07 |
 | CSS-06 | **In progress** ([CSS.md](CSS.md#media-queries)): media queries done; mutation/viewport invalidation, custom properties/variables and cycle handling, then container queries | CSS-05 |

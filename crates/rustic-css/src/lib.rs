@@ -14,11 +14,14 @@
 //! Selector syntax and specificity (Selectors Level 4, the CSS-02 subset)
 //! and the `An+B` microsyntax are parsed from component values here, as are
 //! typed values for the CSS-03 property set (colors, lengths, box model,
-//! display and font basics). Selector matching and the cascade live elsewhere.
+//! display and font basics) and the math functions `calc()`, `min()`, `max()`
+//! and `clamp()` ([`Calc`]). Selector matching and the cascade live elsewhere.
 
 #![warn(missing_docs)]
 
 mod anb;
+mod background;
+mod calc;
 mod color;
 mod error;
 mod length;
@@ -33,6 +36,11 @@ mod tokenizer;
 mod values;
 
 pub use anb::parse_an_plus_b;
+pub use background::{
+    Attachment, BackgroundRepeat, BackgroundSize, Image, PositionComponent, PositionSide,
+    PositionValue, RepeatStyle, VisualBox,
+};
+pub use calc::{Calc, CalcKind, CalcNode, MAX_CALC_DEPTH, MAX_CALC_NODES};
 pub use color::{Color, LabSpace, PredefinedSpace};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
 pub use length::{Length, LengthPercentage, LengthUnit};
@@ -43,10 +51,12 @@ pub use media::{
 };
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
-    BorderStyle, BorderWidth, BoxSizing, CssWideKeyword, DeclaredValue, Display, FamilyName,
-    FontSize, FontSizeKeyword, FontStyle, FontWeight, GenericFamily, LengthPercentageOrAuto,
-    LineHeight, MaxSize, PropertyDeclaration, PropertyError, PropertyId, PropertyValue,
-    parse_declaration,
+    BorderStyle, BorderWidth, BoxSizing, Clear, CssWideKeyword, DeclaredValue, Direction, Display,
+    FamilyName, Float, FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle,
+    FontVariantCaps, FontWeight, GenericFamily, LengthPercentageOrAuto, LineHeight, MaxSize,
+    Overflow, Position, PropertyDeclaration, PropertyError, PropertyId, PropertyValue, Spacing,
+    TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign,
+    VerticalAlignKeyword, Visibility, WhiteSpace, ZIndex, parse_declaration,
 };
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{

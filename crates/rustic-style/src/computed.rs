@@ -15,9 +15,10 @@
 //! taken as `1.2`.
 
 use rustic_css::{
-    BorderStyle, BorderWidth, Color, Display, FontSize, FontSizeKeyword, FontWeight, Length,
-    LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, PropertyId,
-    PropertyValue,
+    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, Float, FontSize,
+    FontSizeKeyword, FontStretch, FontWeight, Length, LengthPercentage, LengthPercentageOrAuto,
+    LengthUnit, LineHeight, MaxSize, Overflow, Position, PositionComponent, PositionValue,
+    PropertyId, PropertyValue, Spacing, TextAlign, VerticalAlign,
 };
 
 use crate::SpecifiedStyle;
@@ -146,11 +147,64 @@ impl Basis {
         Length::px(self.px(length))
     }
 
-    fn lp(&self, value: LengthPercentage) -> LengthPercentage {
-        match value {
-            LengthPercentage::Length(l) => LengthPercentage::Length(self.length(l)),
-            percentage => percentage,
+    /// A computed `<length-percentage>`: lengths become pixels, percentages
+    /// stay, and a math function is simplified with pixel lengths. When
+    /// `nonnegative`, a result that is a single negative value clamps to
+    /// zero; a mix of pixels and percentages is clamped once it resolves.
+    fn lp(&self, value: &LengthPercentage, nonnegative: bool) -> LengthPercentage {
+        let computed = match value {
+            LengthPercentage::Length(l) => LengthPercentage::Length(self.length(*l)),
+            LengthPercentage::Percentage(p) => LengthPercentage::Percentage(*p),
+            LengthPercentage::Calc(calc) => calc.compute(|l| self.px(l)),
+        };
+        match computed {
+            LengthPercentage::Length(l) if nonnegative && l.value < 0.0 => {
+                LengthPercentage::Length(Length::px(0.0))
+            }
+            LengthPercentage::Percentage(p) if nonnegative && p < 0.0 => {
+                LengthPercentage::Percentage(0.0)
+            }
+            other => other,
         }
+    }
+}
+
+/// Longhands whose lengths may be negative; every other length clamps at 0.
+const NEGATIVE_LENGTHS: &[PropertyId] = &[
+    PropertyId::MarginTop,
+    PropertyId::MarginRight,
+    PropertyId::MarginBottom,
+    PropertyId::MarginLeft,
+    PropertyId::Top,
+    PropertyId::Right,
+    PropertyId::Bottom,
+    PropertyId::Left,
+    PropertyId::TextIndent,
+];
+
+/// `overflow-x`/`-y` (CSS Overflow 3 §3.1): if one axis is `visible` or
+/// `clip` and the other is not, `visible` computes to `auto` and `clip` to
+/// `hidden`.
+fn overflow_pair(x: Overflow, y: Overflow) -> (Overflow, Overflow) {
+    let passive = |o: Overflow| matches!(o, Overflow::Visible | Overflow::Clip);
+    let fix = |o: Overflow| match o {
+        Overflow::Visible => Overflow::Auto,
+        Overflow::Clip => Overflow::Hidden,
+        other => other,
+    };
+    if passive(x) != passive(y) {
+        (fix(x), fix(y))
+    } else {
+        (x, y)
+    }
+}
+
+/// `start`/`end` against a direction, for `match-parent`.
+fn absolute_align(align: TextAlign, direction: Direction) -> TextAlign {
+    match (align, direction) {
+        (TextAlign::Start, Direction::Ltr) | (TextAlign::End, Direction::Rtl) => TextAlign::Left,
+        (TextAlign::Start, Direction::Rtl) | (TextAlign::End, Direction::Ltr) => TextAlign::Right,
+        (other, _) => other,
     }
 }
 
@@ -288,6 +342,10 @@ fn compute_values(
         PropertyValue::FontSize(FontSize::LengthPercentage(LengthPercentage::Length(l))) => {
             parent_basis.px(*l)
         }
+        PropertyValue::FontSize(FontSize::LengthPercentage(LengthPercentage::Calc(calc))) => calc
+            .resolve(|l| parent_basis.px(l), Some(parent_font_px))
+            .unwrap_or(parent_font_px)
+            .max(0.0),
         _ => parent_font_px,
     };
     // On the root, `rem` and `rlh` in other properties use its own values.
@@ -318,6 +376,24 @@ fn compute_values(
             };
             PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Length(l)))
         }
+        PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Calc(calc))) => {
+            let px = calc
+                .resolve(
+                    |l| {
+                        if matches!(l.unit, LengthUnit::Lh) {
+                            l.value * parent_basis.line_px
+                        } else {
+                            basis.px(l)
+                        }
+                    },
+                    Some(font_px),
+                )
+                .unwrap_or(font_px * 1.2)
+                .max(0.0);
+            PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Length(
+                Length::px(px),
+            )))
+        }
         other => other.clone(),
     };
     basis.line_px = line_px(&line_height, font_px);
@@ -345,9 +421,26 @@ fn compute_values(
             PropertyValue::BorderWidth(BorderWidth::Thin) => 1.0,
             PropertyValue::BorderWidth(BorderWidth::Thick) => 5.0,
             PropertyValue::BorderWidth(BorderWidth::Length(l)) => basis.px(*l),
+            PropertyValue::BorderWidth(BorderWidth::Calc(calc)) => {
+                calc.resolve(|l| basis.px(l), None).unwrap_or(0.0).max(0.0)
+            }
             _ => 3.0,
         };
         PropertyValue::BorderWidth(BorderWidth::Length(Length::px(px)))
+    };
+
+    // Absolutely positioned and floated boxes are blockified (CSS Display 3
+    // §2.7), and absolute positioning makes `float` compute to `none` (CSS 2
+    // §9.7).
+    let positioned = matches!(
+        specified.get(P::Position),
+        PropertyValue::Position(Position::Absolute | Position::Fixed)
+    );
+    let floated =
+        !positioned && !matches!(specified.get(P::Float), PropertyValue::Float(Float::None));
+    let overflow = match (specified.get(P::OverflowX), specified.get(P::OverflowY)) {
+        (PropertyValue::Overflow(x), PropertyValue::Overflow(y)) => Some(overflow_pair(*x, *y)),
+        _ => None,
     };
 
     let values = PropertyId::ALL
@@ -356,7 +449,96 @@ fn compute_values(
             let value = specified.get(property);
             match property {
                 P::Display => match value {
-                    PropertyValue::Display(d) if is_root => PropertyValue::Display(blockify(*d)),
+                    PropertyValue::Display(d) if is_root || positioned || floated => {
+                        PropertyValue::Display(blockify(*d))
+                    }
+                    other => other.clone(),
+                },
+                P::Float if positioned => PropertyValue::Float(Float::None),
+                P::OverflowX | P::OverflowY => match overflow {
+                    Some((x, y)) => {
+                        PropertyValue::Overflow(if property == P::OverflowX { x } else { y })
+                    }
+                    None => value.clone(),
+                },
+                P::Opacity => match value {
+                    PropertyValue::Opacity(n) => PropertyValue::Opacity(n.clamp(0.0, 1.0)),
+                    other => other.clone(),
+                },
+                P::TextAlign => match value {
+                    PropertyValue::TextAlign(TextAlign::MatchParent) => {
+                        let (align, direction) = match parent {
+                            Some(p) => (p.get(P::TextAlign), p.get(P::Direction)),
+                            None => (
+                                &PropertyValue::TextAlign(TextAlign::Start),
+                                &PropertyValue::Direction(Direction::Ltr),
+                            ),
+                        };
+                        match (align, direction) {
+                            (PropertyValue::TextAlign(a), PropertyValue::Direction(d)) => {
+                                PropertyValue::TextAlign(absolute_align(*a, *d))
+                            }
+                            _ => PropertyValue::TextAlign(TextAlign::Start),
+                        }
+                    }
+                    other => other.clone(),
+                },
+                P::TextDecorationColor => resolve_color(value),
+                P::FontStretch => match value {
+                    PropertyValue::FontStretch(FontStretch::Keyword(k)) => {
+                        PropertyValue::FontStretch(FontStretch::Percentage(k.percentage()))
+                    }
+                    other => other.clone(),
+                },
+                P::VerticalAlign => match value {
+                    // Percentages refer to the element's line height.
+                    PropertyValue::VerticalAlign(VerticalAlign::LengthPercentage(lp)) => {
+                        let px = match lp {
+                            LengthPercentage::Percentage(p) => basis.line_px * p / 100.0,
+                            LengthPercentage::Length(l) => basis.px(*l),
+                            LengthPercentage::Calc(calc) => calc
+                                .resolve(|l| basis.px(l), Some(basis.line_px))
+                                .unwrap_or(0.0),
+                        };
+                        PropertyValue::VerticalAlign(VerticalAlign::LengthPercentage(
+                            LengthPercentage::Length(Length::px(px)),
+                        ))
+                    }
+                    other => other.clone(),
+                },
+                P::LetterSpacing | P::WordSpacing => match value {
+                    PropertyValue::Spacing(Spacing::LengthPercentage(lp)) => {
+                        PropertyValue::Spacing(Spacing::LengthPercentage(basis.lp(lp, false)))
+                    }
+                    other => other.clone(),
+                },
+                P::BackgroundPosition => match value {
+                    PropertyValue::BackgroundPosition(positions) => {
+                        PropertyValue::BackgroundPosition(
+                            positions
+                                .iter()
+                                .map(|p| PositionValue {
+                                    x: PositionComponent::Offset(basis.lp(&p.x.to_offset(), false)),
+                                    y: PositionComponent::Offset(basis.lp(&p.y.to_offset(), false)),
+                                })
+                                .collect(),
+                        )
+                    }
+                    other => other.clone(),
+                },
+                P::BackgroundSize => match value {
+                    PropertyValue::BackgroundSize(sizes) => PropertyValue::BackgroundSize(
+                        sizes
+                            .iter()
+                            .map(|size| match size {
+                                BackgroundSize::Explicit(w, h) => BackgroundSize::Explicit(
+                                    w.as_ref().map(|lp| basis.lp(lp, true)),
+                                    h.as_ref().map(|lp| basis.lp(lp, true)),
+                                ),
+                                other => other.clone(),
+                            })
+                            .collect(),
+                    ),
                     other => other.clone(),
                 },
                 P::Color => PropertyValue::Color(color),
@@ -379,20 +561,25 @@ fn compute_values(
                     other => other.clone(),
                 },
                 P::LineHeight => line_height.clone(),
-                _ => match value {
-                    PropertyValue::LengthPercentageOrAuto(
-                        LengthPercentageOrAuto::LengthPercentage(lp),
-                    ) => PropertyValue::LengthPercentageOrAuto(
-                        LengthPercentageOrAuto::LengthPercentage(basis.lp(*lp)),
-                    ),
-                    PropertyValue::LengthPercentage(lp) => {
-                        PropertyValue::LengthPercentage(basis.lp(*lp))
+                _ => {
+                    let nonnegative = !NEGATIVE_LENGTHS.contains(&property);
+                    match value {
+                        PropertyValue::LengthPercentageOrAuto(
+                            LengthPercentageOrAuto::LengthPercentage(lp),
+                        ) => PropertyValue::LengthPercentageOrAuto(
+                            LengthPercentageOrAuto::LengthPercentage(basis.lp(lp, nonnegative)),
+                        ),
+                        PropertyValue::LengthPercentage(lp) => {
+                            PropertyValue::LengthPercentage(basis.lp(lp, nonnegative))
+                        }
+                        PropertyValue::MaxSize(MaxSize::LengthPercentage(lp)) => {
+                            PropertyValue::MaxSize(MaxSize::LengthPercentage(
+                                basis.lp(lp, nonnegative),
+                            ))
+                        }
+                        other => other.clone(),
                     }
-                    PropertyValue::MaxSize(MaxSize::LengthPercentage(lp)) => {
-                        PropertyValue::MaxSize(MaxSize::LengthPercentage(basis.lp(*lp)))
-                    }
-                    other => other.clone(),
-                },
+                }
             }
         })
         .collect();

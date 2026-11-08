@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+use crate::Calc;
 use crate::color::write_number;
 
 macro_rules! units {
@@ -114,12 +115,16 @@ impl fmt::Display for Length {
 }
 
 /// A `<length-percentage>`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LengthPercentage {
     /// A length.
     Length(Length),
     /// A percentage, such as `50` for `50%`.
     Percentage(f64),
+    /// A math function that did not simplify to a single length or
+    /// percentage, such as `calc(50% - 2em)`. Its range is not checked when
+    /// parsing: a negative result is clamped by whoever resolves it.
+    Calc(Box<Calc>),
 }
 
 impl LengthPercentage {
@@ -129,10 +134,11 @@ impl LengthPercentage {
         unit: LengthUnit::Px,
     });
 
-    pub(crate) fn is_negative(self) -> bool {
+    pub(crate) fn is_negative(&self) -> bool {
         match self {
             Self::Length(l) => l.value < 0.0,
-            Self::Percentage(p) => p < 0.0,
+            Self::Percentage(p) => *p < 0.0,
+            Self::Calc(_) => false,
         }
     }
 }
@@ -145,6 +151,7 @@ impl fmt::Display for LengthPercentage {
                 write_number(f, *p)?;
                 f.write_str("%")
             }
+            Self::Calc(calc) => write!(f, "{calc}"),
         }
     }
 }

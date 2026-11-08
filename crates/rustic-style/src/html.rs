@@ -32,7 +32,7 @@ header, hr, legend, listing, main, p, plaintext, pre, search, xmp { display: blo
 blockquote, figure, listing, p, plaintext, pre, xmp { margin-top: 1em; margin-bottom: 1em }
 blockquote, figure { margin-left: 40px; margin-right: 40px }
 address { font-style: italic }
-listing, plaintext, pre, xmp { font-family: monospace }
+listing, plaintext, pre, xmp { font-family: monospace; white-space: pre }
 dialog:not([open]) { display: none }
 
 article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section { display: block }
@@ -50,7 +50,7 @@ dir, dl, menu, ol, ul { margin-top: 1em; margin-bottom: 1em }
 dd { margin-left: 40px }
 dir, menu, ol, ul { padding-left: 40px }
 
-table { display: table; box-sizing: border-box }
+table { display: table; box-sizing: border-box; text-indent: initial }
 caption { display: table-caption }
 colgroup { display: table-column-group }
 col { display: table-column }
@@ -59,6 +59,8 @@ tbody { display: table-row-group }
 tfoot { display: table-footer-group }
 tr { display: table-row }
 td, th { display: table-cell; padding: 1px }
+thead, tbody, tfoot, table > tr { vertical-align: middle }
+tr, td, th { vertical-align: inherit }
 th { font-weight: bold }
 
 b, strong { font-weight: bolder }
@@ -66,6 +68,15 @@ i, cite, dfn, em, var { font-style: italic }
 code, kbd, samp, tt { font-family: monospace }
 big { font-size: larger }
 small, sub, sup { font-size: smaller }
+sub { vertical-align: sub }
+sup { vertical-align: super }
+nobr { white-space: nowrap }
+:link { color: #0000ee; text-decoration: underline }
+u, ins { text-decoration: underline }
+s, strike, del { text-decoration: line-through }
+
+[dir=ltr i] { direction: ltr }
+[dir=rtl i] { direction: rtl }
 
 hr { color: gray; border-style: inset; border-width: 1px; margin: 0.5em auto }
 fieldset { display: block; margin-left: 2px; margin-right: 2px; border: 2px groove gray }
@@ -236,7 +247,8 @@ fn is_zero_width(value: &PropertyValue) -> bool {
 /// value (the root's is compared with the initial value), and any other
 /// property where it differs from its initial value. A border color is listed
 /// only when that side's border width is not zero, since it has no effect
-/// otherwise.
+/// otherwise, and `text-decoration-color` only when a decoration line is
+/// set.
 ///
 /// Returns `None` once the dump would exceed `max_bytes`.
 pub fn dump_computed_styles(
@@ -280,7 +292,11 @@ pub fn dump_computed_styles(
             };
             let invisible = BORDERS.iter().any(|&(color, width)| {
                 property == color && is_zero_width(style.computed.get(width))
-            });
+            }) || (property == P::TextDecorationColor
+                && matches!(
+                    style.computed.get(P::TextDecorationLine),
+                    PropertyValue::TextDecorationLine(line) if line.is_none()
+                ));
             if value != default && !invisible {
                 out.push_str(&indent);
                 out.push_str("  ");

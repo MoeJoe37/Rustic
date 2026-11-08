@@ -79,6 +79,30 @@ const VALID: &[(&str, &str)] = &[
     ("line-height: 0", "line-height: 0"),
     ("line-height: 20px", "line-height: 20px"),
     ("color: inherit", "color: inherit"),
+    ("width: calc(100% - 20px)", "width: calc(100% - 20px)"),
+    ("width: CALC(1in)", "width: calc(96px)"),
+    ("width: calc(-10px)", "width: calc(-10px)"),
+    ("padding-left: min(1em, 5%)", "padding-left: min(1em, 5%)"),
+    (
+        "margin: calc(1px) auto",
+        "margin-top: calc(1px); margin-right: auto; margin-bottom: calc(1px); margin-left: auto",
+    ),
+    (
+        "font-size: clamp(12px, 2vw, 20px)",
+        "font-size: clamp(12px, 2vw, 20px)",
+    ),
+    ("font-weight: calc(2000)", "font-weight: 1000"),
+    ("font-weight: calc(100 * 3.5)", "font-weight: 350"),
+    ("line-height: calc(1 + 0.5)", "line-height: 1.5"),
+    ("line-height: calc(-1)", "line-height: 0"),
+    (
+        "line-height: calc(1em + 2px)",
+        "line-height: calc(1em + 2px)",
+    ),
+    (
+        "border-top-width: calc(1px + 0.5em)",
+        "border-top-width: calc(0.5em + 1px)",
+    ),
     (
         "margin: REVERT-LAYER",
         "margin-top: revert-layer; margin-right: revert-layer; margin-bottom: revert-layer; margin-left: revert-layer",
@@ -101,15 +125,19 @@ fn valid_declarations_parse_to_typed_longhands() {
 fn invalid_declarations_are_rejected() {
     use PropertyError::*;
     let cases = [
-        ("float: left", UnknownProperty),
-        ("font: 12px serif", UnknownProperty),
+        ("transform: none", UnknownProperty),
+        ("cursor: pointer", UnknownProperty),
         ("--x: 1", UnknownProperty),
         ("display: block inline", InvalidValue),
         ("display: inline-block flow", InvalidValue),
         ("width: -1px", InvalidValue),
         ("width: 10", InvalidValue),
         ("width: 10furlongs", InvalidValue),
-        ("width: calc(1px + 2%)", InvalidValue),
+        ("width: calc(1px + 2)", InvalidValue),
+        ("width: calc(1deg)", InvalidValue),
+        ("border-top-width: calc(10%)", InvalidValue),
+        ("font-weight: calc(1px)", InvalidValue),
+        ("line-height: calc(1 + 1px)", InvalidValue),
         ("padding: -1px", InvalidValue),
         ("margin: 1px 2px 3px 4px 5px", InvalidValue),
         ("margin: 1px, 2px", InvalidValue),
@@ -157,7 +185,17 @@ fn every_longhand_has_an_initial_value_that_reparses() {
             "font-weight",
             "font-style",
             "font-family",
-            "line-height"
+            "line-height",
+            "font-variant-caps",
+            "font-stretch",
+            "visibility",
+            "direction",
+            "text-align",
+            "text-indent",
+            "text-transform",
+            "letter-spacing",
+            "word-spacing",
+            "white-space",
         ]
     );
 }

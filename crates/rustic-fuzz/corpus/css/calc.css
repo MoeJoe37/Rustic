@@ -1,0 +1,1 @@
+a{width:calc(50% - 2em + 1in);margin:min(1px,5%) clamp(1px,2vw,3px);line-height:calc(1 + .5);font-weight:calc(2000);border-top-width:calc(1px*infinity);font-size:max(1em,calc((1px + 2px)/4))}

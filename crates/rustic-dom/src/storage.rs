@@ -154,6 +154,23 @@ impl Arena {
         }
         // A generation at u64::MAX is retired permanently, never wrapped/reused.
     }
+
+    /// Number of slots ever allocated, including vacant and retired ones.
+    ///
+    /// Collectors size per-slot mark tables with this; it is not a node count.
+    pub(crate) fn slot_count(&self) -> usize {
+        self.slots.len()
+    }
+
+    /// Every live node identity in slot order, which is deterministic.
+    pub(crate) fn live_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.slots.iter().enumerate().filter_map(|(index, slot)| {
+            slot.node.as_ref().map(|_| {
+                let index = u32::try_from(index).expect("slot index was checked at insertion");
+                NodeId::from_parts(self.id, index, slot.generation)
+            })
+        })
+    }
 }
 
 #[cfg(test)]

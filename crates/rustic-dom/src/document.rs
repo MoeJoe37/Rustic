@@ -8,6 +8,10 @@ use crate::{
 
 mod adoption;
 mod character_data;
+mod invariants;
+pub(crate) mod tracing;
+
+pub use invariants::InvariantViolation;
 
 pub use adoption::Adopted;
 
@@ -252,9 +256,6 @@ impl Document {
     ) -> Result<(), DomError> {
         let parent_node = self.node(parent)?;
         let child_node = self.node(child)?;
-        if child == self.root {
-            return Err(DomError::ProtectedRoot);
-        }
         if !matches!(
             parent_node.kind(),
             NodeKind::Document | NodeKind::Element(_) | NodeKind::DocumentFragment
@@ -286,6 +287,11 @@ impl Document {
             if self.node(reference)?.parent() != Some(parent) {
                 return Err(DomError::InvalidReference);
             }
+        }
+        // Step 4: a document node is never insertable. A connected parent
+        // already failed the ancestor check above with `Cycle`.
+        if child == self.root {
+            return Err(DomError::ProtectedRoot);
         }
         let fragment = matches!(child_node.kind(), NodeKind::DocumentFragment);
         let mut moved = Vec::new();
@@ -544,6 +550,19 @@ impl Document {
         inserted: &[NodeId],
         before: Option<NodeId>,
     ) -> Result<(), DomError> {
+        // The DOM counts the node itself ("parent has an element/doctype
+        // child"), so re-inserting the document element or doctype is rejected
+        // rather than treated as a reorder.
+        if inserted.iter().any(|id| {
+            let node = self.live(*id);
+            node.parent() == Some(self.root)
+                && matches!(
+                    node.kind(),
+                    NodeKind::Element(_) | NodeKind::DocumentType(_)
+                )
+        }) {
+            return Err(DomError::InvalidHierarchy);
+        }
         let mut element_seen = false;
         let mut doctype_seen = false;
         let mut check = |id| {

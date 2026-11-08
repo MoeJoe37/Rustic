@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "1e55c6f2001cdaf9f0ada00c8c2c10a7a0d3fd44580252250bb9ed1d069a51f3",
-  "percent": "11.08",
-  "verified_percent": "11.08",
+  "source_fingerprint": "6e887c1139d3083db297d21e87bb4527666dab183e513529d9208f92cc28a5ed",
+  "percent": "11.96",
+  "verified_percent": "11.96",
   "partial_percent": "0.00",
-  "completed": 28,
+  "completed": 29,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -15,10 +15,10 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 27,
+      "completed": 28,
       "total": 28,
-      "percent": "92.17",
-      "verified_percent": "92.17",
+      "percent": "100.00",
+      "verified_percent": "100.00",
       "partial_percent": "0.00"
     },
     {
@@ -675,19 +675,45 @@
           "label": "Tracing integration and DOM conformance gate",
           "size": 5,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/tracing.rs",
+              "marker": "pub fn collect"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn unreachable_node_object_cycles_disappear_and_rooted_ones_survive"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn seeded_graphs_match_an_independent_reachability_model"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/invariants.rs",
+              "marker": "pub fn check_invariants"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/conformance.rs",
+              "marker": "fn every_pre_insert_combination_matches_the_dom_standard"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.88"
         }
       ],
       "points": 34,
-      "completed": 5,
+      "completed": 6,
       "in_progress": 0,
       "total": 10,
-      "contribution": "2.29",
-      "percent": "38.23",
-      "verified_percent": "38.23",
+      "contribution": "3.17",
+      "percent": "52.94",
+      "verified_percent": "52.94",
       "partial_percent": "0.00"
     },
     {

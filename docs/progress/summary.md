@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 11.08%** = 11.08% verified complete + 0.00% partial credit. 28/172 capabilities complete, 0 in progress.
+**Overall completion: 11.96%** = 11.96% verified complete + 0.00% partial credit. 29/172 capabilities complete, 0 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `1e55c6f2001cdaf9f0ada00c8c2c10a7a0d3fd44580252250bb9ed1d069a51f3`.
+Catalog: `engine-v3`. Source fingerprint: `6e887c1139d3083db297d21e87bb4527666dab183e513529d9208f92cc28a5ed`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -10,7 +10,7 @@ Catalog: `engine-v3`. Source fingerprint: `1e55c6f2001cdaf9f0ada00c8c2c10a7a0d3f
 
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
-| M1 Document core | 27/28 | 92.17% | 92.17% | 11.27% |
+| M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 1/8 | 7.69% | 7.69% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
@@ -27,7 +27,7 @@ Catalog: `engine-v3`. Source fingerprint: `1e55c6f2001cdaf9f0ada00c8c2c10a7a0d3f
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 6/8 | 0 | 62.50% | 62.50% | 2% | 1.25 |
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
-| DOM | 5/10 | 0 | 38.23% | 38.23% | 6% | 2.29 |
+| DOM | 6/10 | 0 | 52.94% | 52.94% | 6% | 3.17 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 1/8 | 0 | 7.69% | 7.69% | 9% | 0.69 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -88,7 +88,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **planned** `dom.observers` — Mutation records and observers · size 3 · M5 · 0.52% of engine
 - **planned** `dom.ranges` — Ranges, live collections and traversal APIs · size 3 · M9 · 0.52% of engine
 - **planned** `dom.shadow` — Shadow DOM and custom element lifecycle · size 5 · M9 · 0.88% of engine
-- **planned** `dom.tracing` — Tracing integration and DOM conformance gate · size 5 · M1 · 0.88% of engine
+- **complete** `dom.tracing` — Tracing integration and DOM conformance gate · size 5 · M1 · 0.88% of engine ([source](../../crates/rustic-dom/src/document/tracing.rs), [test](../../crates/rustic-dom/tests/tracing.rs), [test](../../crates/rustic-dom/tests/tracing.rs), [source](../../crates/rustic-dom/src/document/invariants.rs), [test](../../crates/rustic-dom/tests/conformance.rs))
 
 ### HTML
 

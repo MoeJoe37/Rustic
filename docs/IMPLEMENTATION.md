@@ -443,6 +443,42 @@ decoding. Before landing, 1.2 million mutated executions over five seeds found
 no failures, so `regressions/` is empty. That is evidence of robustness at the
 tested depth, not proof of absence of defects.
 
+## DOC-09 — DOM/host tracing prototype and DOM conformance gate
+
+`HostHeap` (`crates/rustic-dom/src/document/tracing.rs`) is a stop-the-world,
+nonmoving mark/sweep model of the future JS heap, bound to one document, so the
+DOM side of the tracing contract is tested before a runtime exists
+([ADR 0012](adr/0012-dom-tracing-prototype.md), [DOM.md](DOM.md)). Objects have
+generation-checked `HostObjectId`s; node → object, object → node and
+object → object edges and counted node/object roots are registered explicitly
+and bounded by `HostHeapLimits`. Holding any node keeps its whole tree; a
+template and its contents keep each other; the document's tree is always live.
+`collect` reserves all temporary storage first, marks iteratively, destroys
+unreachable parentless trees through `destroy_subtree` (their IDs go stale),
+frees unreachable objects, and prunes entries naming nodes destroyed or adopted
+away by the engine.
+
+The gate half adds `Document::check_invariants`, a linear structural checker,
+and `tests/conformance.rs`, which runs all 25,230 (parent, node, reference
+child) combinations over a fixture with every node kind, connected and detached
+trees, template contents and four free fragments against an oracle transcribed
+from the DOM Standard's pre-insert steps (reviewed 2026-11-08). It checks the
+exception class and step precedence, resulting child order, unchanged trees after
+a rejection and invariants after every call. It found and this change fixes two
+gaps in `insert_before`: the document node was rejected before the ancestor and
+reference steps, and re-inserting the existing document element or doctype into
+the document was accepted as a reorder instead of `HierarchyRequestError`. The
+`html-document` and `html-fragment` fuzz targets now also check invariants on
+every completed tree; 600,000 mutated executions found no violations.
+
+Ten tracing tests cover rooted detached trees, wrapper/listener cycles, connected
+nodes keeping objects, template liveness both ways, engine destruction and
+adoption pruning, foreign/stale/node-to-node rejections, exact limits, a
+100,000-object ring through a 256-deep chain, and 200 seeded graphs compared with
+an independent fixpoint model. A unit test corrupts links, kinds, accounting,
+parent cycles and document order to show the checker detects each. Not covered:
+a real JS heap, multi-document heaps, incremental collection, replace/remove
+algorithms (no such APIs yet) and web-platform-tests, which need bindings.
 ## CSS-01 — CSS syntax tokenizer and parser
 
 `rustic-css` implements CSS Syntax Level 3 tokenization, component values and
@@ -505,7 +541,7 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
-| DOC-09: traced node/JS ownership prototype | Owned by a separate thread |
+| DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document

@@ -64,6 +64,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
+| TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -249,7 +250,22 @@ IDs fail as `InvalidNode`. **Why deliberate:** moving slots between arenas would
 break per-document budgets and generation checks. **Pay:** when JS wrappers
 exist, the binding layer must retarget every wrapper through the map in the same
 operation (or wrappers must hold a stable cross-document identity). **Trigger:**
-the first script-visible node wrapper (DOC-09 prototype or WEB-02).
+the first script-visible node wrapper (WEB-02). The DOC-09 prototype heap prunes adopted IDs rather than retargeting them (TD-17).
+
+### TD-17 — Prototype host heap lives in the DOM crate, one document only
+
+`HostHeap` (ADR 0012) stands in for the JS heap so DOC-09 could test roots,
+detached-tree retention and node/object cycles before a runtime exists. ADR 0002
+says the runtime owns its heap without depending on the DOM crate, so this type
+is not the final home. It is bound to one document: edges to another document's
+nodes are rejected, and adoption prunes the source heap's entries (TD-16) rather
+than retargeting them. Its edge registry is a flat vector sorted per collection,
+and collection is stop-the-world. **Why deliberate:** it is the smallest thing
+that tests the contract, it fails loudly instead of leaking, and the DOM side
+(per-tree marking, sweep through `destroy_subtree`) is what carries forward.
+**Pay:** JS-03 owns objects and roots; the DOM keeps tree-closure marking and
+exposes it to a shared marking phase across documents; adoption retargets edges
+through `Adopted::ids`. **Trigger:** JS-03, or a second document sharing a heap.
 
 ## Reviewing new work
 

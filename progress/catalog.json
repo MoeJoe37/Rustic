@@ -533,8 +533,34 @@
           "label": "Tracing integration and DOM conformance gate",
           "size": 5,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/tracing.rs",
+              "marker": "pub fn collect"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn unreachable_node_object_cycles_disappear_and_rooted_ones_survive"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/tracing.rs",
+              "marker": "fn seeded_graphs_match_an_independent_reachability_model"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/invariants.rs",
+              "marker": "pub fn check_invariants"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/conformance.rs",
+              "marker": "fn every_pre_insert_combination_matches_the_dom_standard"
+            }
+          ]
         }
       ]
     },

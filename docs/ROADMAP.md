@@ -353,7 +353,7 @@ thread), then CSS-02 onward in the M2 table.
 | 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (1,580/1,584 records) |
 | 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected | Done |
 | 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Done (fuzz smoke + all fragment records) |
-| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Not started |
+| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Done (prototype; ADR 0012) |
 
 For every issue include task ID, dependencies, specification section/revision,
 in/out scope, input/output contract, acceptance fixtures, budget behavior, and

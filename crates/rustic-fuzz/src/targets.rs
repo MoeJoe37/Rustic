@@ -213,6 +213,9 @@ fn build(chunks: &[&[u8]]) -> Result<DocumentRun, String> {
     };
     let document = parsed.document();
     document
+        .check_invariants()
+        .map_err(|error| format!("completed document breaks a DOM invariant: {error}"))?;
+    document
         .dump_tree(document.root(), MAX_DUMP_BYTES)
         .map(DocumentRun::Parsed)
         .map_err(|error| format!("completed document could not be dumped: {error}"))
@@ -320,6 +323,10 @@ fn build_fragment(context: &FragmentContext, chunks: &[&[u8]]) -> Result<Documen
         Ok(parsed) => parsed,
         Err(error) => return Ok(DocumentRun::Rejected(error)),
     };
+    parsed
+        .document()
+        .check_invariants()
+        .map_err(|error| format!("completed fragment breaks a DOM invariant: {error}"))?;
     parsed
         .document()
         .dump_tree(parsed.root(), MAX_DUMP_BYTES)

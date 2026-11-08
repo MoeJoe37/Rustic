@@ -848,3 +848,48 @@ these cycles.
   custom-property mutation values.
   The `css` target's typed-declaration round trip now includes custom and
   `var()` declarations.
+
+## Conformance gate
+
+`css.conformance` is a declared gate, not a whole-WPT claim. The
+[web-platform-tests](https://github.com/web-platform-tests/wpt) parsing pages
+call `test_valid_value`, `test_invalid_value`, `test_valid_selector` and
+`test_invalid_selector` with string literals. `tools/import_wpt_css_tests.py`
+reads those calls statically, never running script, from a pinned checkout
+(`cb97c571c3b1947e08b8615eeb4028a2794b23a4`, BSD-3-Clause, license vendored)
+for the selector, pseudo-element and property directories of M2's scope. It
+writes `crates/rustic-css/tests/fixtures/wpt-css/cases.json` and a manifest with
+per-file digests. A call whose arguments are not plain literals is counted as
+skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
+
+`tests/wpt_conformance.rs` runs every case through `rustic-css`:
+
+* A selector case must parse (or be rejected) and serialize as WPT expects.
+* A value case is in scope when the property is supported. A longhand must be
+  accepted (or rejected) and serialize as expected; a shorthand checks
+  acceptance only, because serializing a shorthand from its longhands is not
+  implemented.
+* `.tentative` files test proposals and are never in scope.
+
+Of 2,916 cases, 1,455 are in scope and **1,073 pass** (invalid-selector
+102/104, invalid-value 470/471, valid-selector 108/199, valid-value 393/681).
+Every other in-scope case is listed in `expected_failures.json` with a reason,
+and the list is a ratchet: an unlisted failure fails the gate, and so does a
+listed case that now passes, or a listed case that no longer exists. The
+largest groups of known failures are features outside M2's declared scope:
+
+| Reason | Cases |
+| --- | --- |
+| Multi-keyword `display` with `flow`, `list-item`, `run-in` or `ruby` | 65 |
+| `alpha()`, `contrast-color()`, `light-dark()` and system colors | 87 |
+| `::scroll-button()`, `::part()`, `::slotted()`, `:state()`, `:heading` | 89 |
+| Intrinsic sizing keywords and `fit-content()` | 34 |
+| Math functions serialize folded (`2`, not `calc(2)`), and percentages in numeric math functions | 28 |
+| Named colors serialize as `rgb()`; family names are always quoted | 12 |
+| Other unimplemented values (`oblique <angle>`, `text-indent` keywords, `cross-fade()`, ...) | 59 |
+
+Before the gate, four serialization bugs it found were fixed: `[|a]` and
+`*|*` without a default namespace now drop the redundant prefix, a lone `*`
+before a pseudo-element is omitted, and `background-size` writes `<w> auto`.
+Keyword-like words (`cursive serif`) in an unquoted family name are now
+rejected.

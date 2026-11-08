@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 18.91%** = 16.81% verified complete + 2.10% partial credit. 33/172 capabilities complete, 3 in progress.
+**Overall completion: 20.06%** = 17.96% verified complete + 2.10% partial credit. 34/172 capabilities complete, 3 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `31c70b25f6987c282dd0b492bfb2b233348008e47f5e10da6d5f874615d2160d`.
+Catalog: `engine-v3`. Source fingerprint: `d7c1bf26e0c4f1b911e74bdecf0722d075c0d5e664b6acecb7c013201384636b`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -11,7 +11,7 @@ Catalog: `engine-v3`. Source fingerprint: `31c70b25f6987c282dd0b492bfb2b23334800
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
-| M2 CSS & computed style | 5/8 | 82.47% | 61.53% | 9.00% |
+| M2 CSS & computed style | 6/8 | 95.29% | 74.35% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
@@ -29,7 +29,7 @@ Catalog: `engine-v3`. Source fingerprint: `31c70b25f6987c282dd0b492bfb2b23334800
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 3% | 1.30 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
-| CSS & style | 5/8 | 2 | 82.47% | 61.53% | 9% | 7.42 |
+| CSS & style | 6/8 | 2 | 95.29% | 74.35% | 9% | 8.57 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -127,7 +127,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Targeted invalidation for :has() and element states instead of full restyles (TD-32)
   - [x] Invalidation for custom property dependencies (var() users restyle when an inherited custom property changes) ([source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
   - [x] Invalidation for container query dependencies (container sizes and container styles restyle descendants) ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/containers.rs))
-- **planned** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 1.15% of engine
+- **complete** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 1.15% of engine ([source](../../tools/import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/wpt_conformance.rs), [test](../../tools/tests/test_import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/corpus.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
 
 ### Text & fonts
 

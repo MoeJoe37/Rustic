@@ -162,7 +162,7 @@ const VALID: &[(&str, &str)] = &[
         "background-position: right 5% bottom 10px, center center",
     ),
     ("background-size: cover", "background-size: cover"),
-    ("background-size: 50% auto", "background-size: 50%"),
+    ("background-size: 50% auto", "background-size: 50% auto"),
     (
         "background-size: auto 10px, contain",
         "background-size: auto 10px, contain",

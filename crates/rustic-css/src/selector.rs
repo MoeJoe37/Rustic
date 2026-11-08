@@ -1072,6 +1072,11 @@ impl<'a> Parser<'a> {
                 return err(SelectorErrorKind::UnexpectedToken, values, i + 2);
             };
             let namespace = match prefix {
+                // Without a default namespace `*|` means what no prefix
+                // means, and CSSOM serializes it without one.
+                None if self.namespaces.default_namespace().is_none() => {
+                    NamespaceSelector::Implicit(None)
+                }
                 None => NamespaceSelector::Any,
                 Some(prefix) => match self.namespaces.resolve(&prefix) {
                     Some(url) => NamespaceSelector::Prefix {
@@ -1579,7 +1584,10 @@ impl fmt::Display for SimpleSelector {
             }
             Self::Attribute(attribute) => {
                 f.write_char('[')?;
-                write_namespace(f, &attribute.namespace)?;
+                // `|` is the attribute default (no namespace): CSSOM omits it.
+                if attribute.namespace != NamespaceSelector::None {
+                    write_namespace(f, &attribute.namespace)?;
+                }
                 serialize_identifier(f, &attribute.local)?;
                 if let Some(value) = &attribute.value {
                     f.write_str(value.operator.as_str())?;
@@ -1689,7 +1697,18 @@ impl ComplexSelector {
                     Combinator::SubsequentSibling => " ~ ",
                 })?;
             }
-            write!(f, "{compound}")?;
+            // A lone unprefixed `*` before a pseudo-element adds nothing.
+            let bare_universal = self.compounds.len() == 1
+                && self.pseudo_element.is_some()
+                && matches!(
+                    compound.simple.as_slice(),
+                    [SimpleSelector::Universal {
+                        namespace: NamespaceSelector::Implicit(_)
+                    }]
+                );
+            if !bare_universal {
+                write!(f, "{compound}")?;
+            }
         }
         if let Some(pe) = self.pseudo_element {
             write!(f, "::{}", pe.name())?;

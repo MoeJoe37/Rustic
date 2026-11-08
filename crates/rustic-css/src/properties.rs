@@ -1241,6 +1241,15 @@ fn font_family(parts: &[&Value]) -> Option<Vec<FamilyName>> {
             },
             several => {
                 let words: Vec<&str> = several.iter().map(|v| ident(v)).collect::<Option<_>>()?;
+                // Each word is a <custom-ident>, and a keyword-like word
+                // (a generic family, a CSS-wide keyword) must be quoted.
+                if words.iter().any(|word| {
+                    GenericFamily::from_name(word).is_some()
+                        || CssWideKeyword::from_name(word).is_some()
+                        || word.eq_ignore_ascii_case("default")
+                }) {
+                    return None;
+                }
                 FamilyName::Named(words.join(" "))
             }
         };

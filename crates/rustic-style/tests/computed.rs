@@ -382,7 +382,7 @@ fn catalog_properties_compute() {
         c("a", "background-position"),
         "calc(100% - 10px) 80%, 50% 50%"
     );
-    assert_eq!(c("a", "background-size"), "20px, 50% 10px");
+    assert_eq!(c("a", "background-size"), "20px auto, 50% 10px");
     assert_eq!(c("b", "display"), "block");
     assert_eq!(c("b", "float"), "none");
     assert_eq!(c("b", "overflow-x"), "hidden");

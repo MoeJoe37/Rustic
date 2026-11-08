@@ -1372,8 +1372,34 @@
           "label": "Declared CSS conformance and regression gate",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "tools/import_wpt_css_tests.py",
+              "marker": "REVISION = \"cb97c571c3b1947e08b8615eeb4028a2794b23a4\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/wpt_conformance.rs",
+              "marker": "fn wpt_css_parsing_cases_match_the_declared_expectations"
+            },
+            {
+              "kind": "test",
+              "path": "tools/tests/test_import_wpt_css_tests.py",
+              "marker": "def test_non_literal_calls_are_skipped_not_guessed"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/corpus.rs",
+              "marker": "fn pinned_css_parsing_corpus_matches_after_documented_adaptations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-fuzz/tests/harness.rs",
+              "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+            }
+          ]
         }
       ]
     },

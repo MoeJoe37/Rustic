@@ -244,8 +244,9 @@ impl fmt::Display for BackgroundSize {
             Self::Contain => f.write_str("contain"),
             Self::Explicit(w, h) => {
                 side(f, w)?;
-                // A single value means `<w> auto`.
-                if h.is_some() {
+                // A single value means `<w> auto`; CSSOM writes both sides
+                // unless both are `auto` (as browsers serialize it).
+                if w.is_some() || h.is_some() {
                     f.write_str(" ")?;
                     side(f, h)?;
                 }

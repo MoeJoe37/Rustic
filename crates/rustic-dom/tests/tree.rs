@@ -419,16 +419,15 @@ fn template_contents_are_a_separate_owned_root_destroyed_with_their_template() {
     ));
     assert_eq!(doc.node(contents).unwrap().parent(), None);
 
-    // Contents accept ordinary children but are never children themselves.
+    // Contents accept ordinary children; inserting them moves those children.
     let inner = html(&mut doc, "template");
     doc.append_child(contents, inner).unwrap();
     let nested = doc.create_template_contents(inner).unwrap();
     let text = doc.create_text("x").unwrap();
     doc.append_child(nested, text).unwrap();
-    assert_eq!(
-        doc.append_child(div, contents),
-        Err(DomError::InvalidHierarchy)
-    );
+    // Host-including ancestors: a template cannot enter its own contents.
+    assert_eq!(doc.append_child(nested, template), Err(DomError::Cycle));
+    assert_eq!(doc.append_child(nested, div), Err(DomError::Cycle));
     assert_eq!(doc.detach(contents), Err(DomError::InvalidHierarchy));
     assert_eq!(
         doc.destroy_subtree(contents),

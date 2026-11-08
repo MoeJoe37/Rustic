@@ -67,8 +67,13 @@ impl Document {
                 continue;
             };
             let node = self.node(id).map_err(DumpError::Node)?;
-            write_node(&mut writer, node.kind(), base + depth)
-                .map_err(|_| DumpError::OutputLimit)?;
+            write_node(
+                &mut writer,
+                node.kind(),
+                node.template_host().is_some(),
+                base + depth,
+            )
+            .map_err(|_| DumpError::OutputLimit)?;
             if let NodeKind::Element(element) = node.kind() {
                 if let Some(contents) = element.template_contents() {
                     walks.push((
@@ -124,11 +129,29 @@ fn name(writer: &mut impl Write, name: &QualifiedName) -> fmt::Result {
     quoted(writer, name.local().encode_utf16())
 }
 
-fn write_node(writer: &mut impl Write, kind: &NodeKind, depth: usize) -> fmt::Result {
+fn write_node(
+    writer: &mut impl Write,
+    kind: &NodeKind,
+    template_contents: bool,
+    depth: usize,
+) -> fmt::Result {
     indent(writer, depth)?;
     match kind {
         NodeKind::Document => writer.write_str("#document\n"),
-        NodeKind::DocumentFragment => writer.write_str("#template-contents\n"),
+        NodeKind::DocumentFragment if template_contents => writer.write_str("#template-contents\n"),
+        NodeKind::DocumentFragment => writer.write_str("#document-fragment\n"),
+        NodeKind::ProcessingInstruction(value) => {
+            writer.write_str("processing-instruction target=")?;
+            quoted(writer, value.target().as_units().iter().copied())?;
+            writer.write_str(" data=")?;
+            quoted(writer, value.data().as_units().iter().copied())?;
+            writer.write_char('\n')
+        }
+        NodeKind::CdataSection(value) => {
+            writer.write_str("cdata ")?;
+            quoted(writer, value.as_units().iter().copied())?;
+            writer.write_char('\n')
+        }
         NodeKind::Element(element) => {
             writer.write_str("element ")?;
             name(writer, element.name())?;

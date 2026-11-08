@@ -246,10 +246,6 @@ fn absent_and_empty_suffixes_remain_distinct() {
 #[test]
 fn explicit_unsupported_features_and_invalid_hosts_fail_without_fallback() {
     assert_eq!(
-        Url::parse("file:///secret", None),
-        Err(ParseError::UnsupportedFile)
-    );
-    assert_eq!(
         Url::parse("blob:https://host/id", None),
         Err(ParseError::UnsupportedBlob)
     );
@@ -351,4 +347,84 @@ fn debug_and_errors_omit_credentials_and_private_payload() {
             .to_string()
             .contains("secret")
     );
+}
+
+#[test]
+fn file_urls_follow_drive_letter_host_and_localhost_rules() {
+    for (input, expected) in [
+        ("file:///C|/a/b", "file:///C:/a/b"),
+        ("FILE://LOCALHOST/tmp/x", "file:///tmp/x"),
+        ("file://server/share/doc", "file://server/share/doc"),
+        ("file://C|/x", "file:///C:/x"),
+        (r"file:\\server\share", "file://server/share"),
+        ("file:///C:/../..", "file:///C:/"),
+        ("file:///C:/a/%2e%2E/b", "file:///C:/b"),
+        ("file:/x", "file:///x"),
+        ("file:x", "file:///x"),
+        ("file:", "file:///"),
+        ("file:////x", "file:////x"),
+        ("file:///a/C|/b", "file:///a/C|/b"),
+        ("file://example.net/C:/", "file://example.net/C:/"),
+        ("file://1.2.3.4/", "file://1.2.3.4/"),
+        ("file://[::1]/a?b#c", "file://[::1]/a?b#c"),
+    ] {
+        let url = parse(input);
+        assert_eq!(url.serialize(), expected, "{input}");
+        assert_eq!(url.scheme(), "file");
+        assert!(url.origin().is_opaque(), "{input}");
+        assert_eq!(Url::parse(&url.serialize(), None).as_ref(), Ok(&url));
+    }
+    assert_eq!(
+        parse("file:///x").host().map(|host| host.serialize()),
+        Some(String::new())
+    );
+    for host in ["exa mple", "a^b", "%zz%"] {
+        assert!(
+            Url::parse(&format!("file://{host}/"), None).is_err(),
+            "{host}"
+        );
+    }
+    assert_eq!(
+        Url::parse("file://h:80/", None),
+        Err(ParseError::InvalidHost)
+    );
+}
+
+#[test]
+fn file_references_resolve_against_file_bases_only() {
+    let base = parse("file:///C:/dir/page.html?q#f");
+    for (input, expected) in [
+        ("", "file:///C:/dir/page.html?q"),
+        ("#x", "file:///C:/dir/page.html?q#x"),
+        ("?y", "file:///C:/dir/page.html?y"),
+        ("other", "file:///C:/dir/other"),
+        ("../../../up", "file:///C:/up"),
+        ("/abs", "file:///C:/abs"),
+        ("D|/x", "file:///D:/x"),
+        ("/D:/x", "file:///D:/x"),
+        ("//host/x", "file://host/x"),
+        ("file:rel", "file:///C:/dir/rel"),
+        (r"\\\\x", "file:////x"),
+    ] {
+        assert_eq!(
+            Url::parse(input, Some(&base)).unwrap().serialize(),
+            expected,
+            "{input:?}"
+        );
+    }
+    let unc = parse("file://server/share/a");
+    assert_eq!(
+        Url::parse("b", Some(&unc)).unwrap().serialize(),
+        "file://server/share/b"
+    );
+    assert_eq!(
+        Url::parse("/b", Some(&unc)).unwrap().serialize(),
+        "file://server/b"
+    );
+    let http = parse("https://host/a");
+    assert_eq!(
+        Url::parse("file:x", Some(&http)).unwrap().serialize(),
+        "file:///x"
+    );
+    assert_eq!(base.serialize(), "file:///C:/dir/page.html?q#f");
 }

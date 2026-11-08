@@ -123,3 +123,31 @@ fn pinned_upstream_url_subset_has_no_unexpected_failures() {
         cases::NEGATIVE
     );
 }
+
+#[test]
+fn diagnostic_parsing_matches_plain_parsing_for_every_case() {
+    // Upstream records no expected validation errors, and canonical hrefs are not
+    // always valid URL strings (credentials, stray `%`), so only the result and
+    // offset invariants are checked here; tests/diagnostics.rs pins the kinds.
+    let parser = rustic_url::UrlParser::default();
+    for case in cases::CASES {
+        let base = case.base.map(|base| Url::parse(base, None).unwrap());
+        let report = parser.parse_with_diagnostics(case.input, base.as_ref());
+        assert_eq!(
+            report.result(),
+            run(case).as_ref().map_err(|error| *error),
+            "upstream array index {}",
+            case.index
+        );
+        for diagnostic in report.diagnostics() {
+            assert!(case.input.is_char_boundary(diagnostic.offset()));
+        }
+        if case.expected.is_none() {
+            assert!(
+                !report.diagnostics().is_empty() || report.result().is_ok(),
+                "upstream array index {}: failure without a diagnostic",
+                case.index
+            );
+        }
+    }
+}

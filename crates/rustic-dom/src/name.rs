@@ -71,3 +71,49 @@ impl QualifiedName {
             .ok_or(DomError::DataLimit)
     }
 }
+
+/// Whether `value` matches the XML 1.0 (Fifth Edition) `Name` production.
+pub(crate) fn is_xml_name(value: &str) -> bool {
+    let mut chars = value.chars();
+    chars.next().is_some_and(is_name_start) && chars.all(is_name_char)
+}
+
+fn is_name_start(c: char) -> bool {
+    matches!(c,
+        ':' | 'A'..='Z' | '_' | 'a'..='z'
+        | '\u{C0}'..='\u{D6}' | '\u{D8}'..='\u{F6}' | '\u{F8}'..='\u{2FF}'
+        | '\u{370}'..='\u{37D}' | '\u{37F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}'
+        | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
+        | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
+}
+
+fn is_name_char(c: char) -> bool {
+    is_name_start(c)
+        || matches!(c,
+            '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_xml_name;
+
+    #[test]
+    fn xml_name_production_boundaries() {
+        for name in [
+            "a",
+            "xml-stylesheet",
+            "_x.1",
+            ":",
+            "é",
+            "a\u{B7}",
+            "\u{10000}",
+        ] {
+            assert!(is_xml_name(name), "{name:?}");
+        }
+        for name in [
+            "", "1a", "-a", ".a", "a b", "a?", "\u{B7}", "\u{D7}", "\u{FFFE}",
+        ] {
+            assert!(!is_xml_name(name), "{name:?}");
+        }
+    }
+}

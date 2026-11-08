@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "d5f1f5f32b4b43929e6092cd97f1571a7440f31300d20e6d184f42af4a34e9f1",
-  "percent": "8.90",
-  "verified_percent": "8.90",
+  "source_fingerprint": "003bb9ad2f469bc0a045a738c1fb1ae005598477819fca75621119a550743c5f",
+  "percent": "10.09",
+  "verified_percent": "10.09",
   "partial_percent": "0.00",
-  "completed": 22,
+  "completed": 26,
   "in_progress": 0,
   "total": 172,
   "fully_complete": false,
@@ -15,10 +15,10 @@
       "id": "M1",
       "label": "Document core",
       "share": "11.27",
-      "completed": 22,
+      "completed": 26,
       "total": 28,
-      "percent": "79.02",
-      "verified_percent": "79.02",
+      "percent": "89.51",
+      "verified_percent": "89.51",
       "partial_percent": "0.00"
     },
     {
@@ -367,9 +367,20 @@
           "label": "File URL and platform rules",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/parser.rs",
+              "marker": "fn file_host"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/url.rs",
+              "marker": "file_urls_follow_drive_letter_host_and_localhost_rules"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.20"
         },
         {
@@ -417,9 +428,20 @@
           "label": "Validation-error diagnostics and source locations",
           "size": 1,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/diagnostics.rs",
+              "marker": "pub enum ValidationError"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/diagnostics.rs",
+              "marker": "failures_name_the_standard_error_and_location"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.10"
         },
         {
@@ -444,12 +466,12 @@
         }
       ],
       "points": 30,
-      "completed": 3,
+      "completed": 5,
       "in_progress": 0,
       "total": 12,
-      "contribution": "0.70",
-      "percent": "23.33",
-      "verified_percent": "23.33",
+      "contribution": "1.00",
+      "percent": "33.33",
+      "verified_percent": "33.33",
       "partial_percent": "0.00"
     },
     {
@@ -525,9 +547,30 @@
           "label": "Fragments, processing instructions and full node kinds",
           "size": 2,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/node.rs",
+              "marker": "ProcessingInstruction(ProcessingInstruction)"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub fn create_document_fragment"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/node_kinds.rs",
+              "marker": "fn inserting_a_fragment_moves_its_children_in_order_and_empties_it"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/node_kinds.rs",
+              "marker": "fn processing_instructions_validate_creation_and_edit_as_character_data"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.35"
         },
         {
@@ -535,9 +578,35 @@
           "label": "Adoption, cloning and document lifecycle",
           "size": 3,
           "milestone": "M1",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/adoption.rs",
+              "marker": "pub fn adopt_node"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub enum ReadyState"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn adoption_failures_leave_both_documents_unchanged"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn deep_clone_copies_payloads_and_template_contents_with_new_ids"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn ready_state_only_moves_forward"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.52"
         },
         {
@@ -592,12 +661,12 @@
         }
       ],
       "points": 34,
-      "completed": 3,
+      "completed": 5,
       "in_progress": 0,
       "total": 10,
-      "contribution": "1.41",
-      "percent": "23.52",
-      "verified_percent": "23.52",
+      "contribution": "2.29",
+      "percent": "38.23",
+      "verified_percent": "38.23",
       "partial_percent": "0.00"
     },
     {

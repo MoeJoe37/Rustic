@@ -29,11 +29,11 @@ mod storage;
 mod string;
 mod traversal;
 
-pub use document::{Document, DocumentLimits};
+pub use document::{Adopted, Document, DocumentLimits, ReadyState};
 pub use dump::DumpError;
 pub use error::DomError;
 pub use name::{HTML_NAMESPACE, MATHML_NAMESPACE, QualifiedName, SVG_NAMESPACE};
-pub use node::{Attribute, DocumentType, Element, Node, NodeKind};
+pub use node::{Attribute, DocumentType, Element, Node, NodeKind, ProcessingInstruction};
 pub use rustic_base::{DocumentId, NodeId};
 pub use string::DomString;
 pub use traversal::Walk;

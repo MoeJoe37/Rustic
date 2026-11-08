@@ -1,4 +1,4 @@
-use crate::ParseError;
+use crate::{ParseError, ValidationError};
 
 pub(crate) fn ends_in_number(input: &str) -> bool {
     let without_trailing_dot = input.strip_suffix('.').unwrap_or(input);
@@ -15,35 +15,54 @@ pub(crate) fn ends_in_number(input: &str) -> bool {
 }
 
 pub(crate) fn parse(input: &str) -> Result<u32, ParseError> {
-    let input = input.strip_suffix('.').unwrap_or(input);
+    analyze(input, &mut |_| {}).map_err(|_| ParseError::InvalidIpv4)
+}
+
+/// The IPv4 parser; `report` receives non-failure validation errors in order.
+pub(crate) fn analyze(
+    input: &str,
+    report: &mut dyn FnMut(ValidationError),
+) -> Result<u32, ValidationError> {
+    let input = match input.strip_suffix('.') {
+        Some(stripped) => {
+            report(ValidationError::Ipv4EmptyPart);
+            stripped
+        }
+        None => input,
+    };
+    if input.split('.').count() > 4 {
+        return Err(ValidationError::Ipv4TooManyParts);
+    }
     let mut numbers = [0u64; 4];
     let mut count = 0;
     for part in input.split('.') {
-        if count == 4 {
-            return Err(ParseError::InvalidIpv4);
+        let (value, non_decimal) = number(part).ok_or(ValidationError::Ipv4NonNumericPart)?;
+        if non_decimal {
+            report(ValidationError::Ipv4NonDecimalPart);
         }
-        numbers[count] = number(part)?;
+        numbers[count] = value;
         count += 1;
     }
-    if count == 0 {
-        return Err(ParseError::InvalidIpv4);
+    let numbers = &numbers[..count];
+    if numbers.iter().any(|number| *number > 255) {
+        report(ValidationError::Ipv4OutOfRangePart);
     }
-    let last = numbers[count - 1];
-    if numbers[..count - 1].iter().any(|number| *number > 255)
-        || last >= 256u64.pow((5 - count) as u32)
-    {
-        return Err(ParseError::InvalidIpv4);
+    let (last, leading) = numbers.split_last().expect("split yields one part");
+    if leading.iter().any(|number| *number > 255) || *last >= 256u64.pow((5 - count) as u32) {
+        return Err(ValidationError::Ipv4OutOfRangePart);
     }
-    let mut address = last;
-    for (index, number) in numbers[..count - 1].iter().enumerate() {
+    let mut address = *last;
+    for (index, number) in leading.iter().enumerate() {
         address += number << (24 - index * 8);
     }
-    u32::try_from(address).map_err(|_| ParseError::InvalidIpv4)
+    u32::try_from(address).map_err(|_| ValidationError::Ipv4OutOfRangePart)
 }
 
-fn number(input: &str) -> Result<u64, ParseError> {
+/// Parse one part, returning its value (saturated, since any value that large
+/// is out of range) and whether it used a non-decimal radix.
+fn number(input: &str) -> Option<(u64, bool)> {
     if input.is_empty() {
-        return Err(ParseError::InvalidIpv4);
+        return None;
     }
     let (digits, radix) = if let Some(hex) = input
         .strip_prefix("0x")
@@ -61,15 +80,12 @@ fn number(input: &str) -> Result<u64, ParseError> {
             b'0'..=b'9' => u64::from(byte - b'0'),
             b'a'..=b'f' => u64::from(byte - b'a' + 10),
             b'A'..=b'F' => u64::from(byte - b'A' + 10),
-            _ => return Err(ParseError::InvalidIpv4),
+            _ => return None,
         };
         if digit >= radix {
-            return Err(ParseError::InvalidIpv4);
+            return None;
         }
-        value = value
-            .checked_mul(radix)
-            .and_then(|value| value.checked_add(digit))
-            .ok_or(ParseError::InvalidIpv4)?;
+        value = value.saturating_mul(radix).saturating_add(digit);
     }
-    Ok(value)
+    Some((value, radix != 10))
 }

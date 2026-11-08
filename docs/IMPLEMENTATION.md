@@ -85,10 +85,9 @@ The internal model follows the supported node hierarchy and tree concepts from
 the [DOM Standard](https://dom.spec.whatwg.org/#concept-node-tree) and
 [mutation algorithms](https://dom.spec.whatwg.org/#concept-node-ensure-pre-insertion-validity),
 reviewed 2026-11-07 against the living document last updated 2026-11-04. This is
-not a conformance claim: public DOM APIs, general fragments (only parser-owned
-template contents exist), processing instructions,
-shadow trees, cross-document adoption, cloning, mutation records/observers and
-script bindings remain unimplemented. Internal parsed names do not perform the
+not a conformance claim: public DOM APIs, shadow trees, mutation
+records/observers and script bindings remain unimplemented. General fragments,
+processing instructions, CDATA sections, cloning and adoption are DOC-04c below. Internal parsed names do not perform the
 validation or case normalization required by future public `createElement*` APIs.
 
 Detachment retains node identity and data. Explicit destruction is a separate
@@ -119,6 +118,35 @@ contract, specification reference, capacity accounting and remaining web APIs.
 These primitives support the initial tree builder described below; they are not
 a full `CharacterData` implementation. Live ranges, mutation records/observers and
 bindings remain pending. No additional whole-engine capability gate is completed.
+
+## DOC-04c — Full node kinds, cloning, adoption and lifecycle
+
+`rustic-dom` now has every DOM tree node kind except shadow roots: free-standing
+`DocumentFragment`s, `ProcessingInstruction` (XML `Name` target, data without
+`?>`) and `CdataSection` (data without `]]>`) join documents, doctypes, elements,
+text and comments. Processing-instruction and CDATA data use the checked
+character-data edits; a processing instruction's target stays fixed and charged.
+Inserting any fragment, including template contents, moves its children in
+order after validating all of them. Pre-insert checks follow the DOM step
+order, and the ancestor check walks host-including ancestors, so a template can
+no longer be inserted into its own contents.
+
+`clone_node(node, deep)`, `adopt_node(source, node)` and `clone_document()` share
+an iterative snapshot-then-materialize engine. Templates get their own contents
+(filled when deep). Adoption copies the subtree into the target with new IDs,
+destroys it in the source and returns an old-to-new ID map (TD-16). Any node,
+data, depth or allocation failure rolls back what was created, so both documents
+stay unchanged. `ReadyState` adds the document lifecycle: parser documents start
+`Loading` and only move forward; script-style documents start `Complete`.
+[ADR 0011](adr/0011-fragments-cloning-adoption.md) records the design and
+[DOM.md](DOM.md) the contracts. The HTML parser does not yet set readiness, and
+live ranges, mutation records and the inert template owner document are pending.
+
+Sixteen tests in `tests/node_kinds.rs` and `tests/adoption.rs` cover fragment
+moves, atomic rejection, step order, host-including cycles, kind validation and
+accounting, deep/shallow clones, limit failures in both documents, ID maps,
+stale source IDs, document cloning and readiness. `dom.nodekinds` and
+`dom.adoption` are complete.
 
 ## DOC-04a — Deterministic inspection
 
@@ -152,6 +180,8 @@ explicit unsupported errors. Limits and cooperative cancellation are integrated;
 the supplied base is immutable even on failure. Debug/error output omits userinfo
 and private URL payloads.
 
+DOC-02b adds `file:` URLs and validation-error diagnostics; see the section below.
+
 Tuple origins compare canonical scheme/host/port. Opaque origins have unique
 process-local identity; `null` is never compared as authority. Each URL-origin
 derivation for a non-tuple URL is fresh, while cloning an assigned `Origin`
@@ -165,6 +195,25 @@ upstream records: 443 positive, 242 negative, 214 excluded. The exact revision,
 source/generated digests, indices, license, selection rules and untested fields
 are recorded; this is not whole-WPT or complete URL conformance. See [URL.md](URL.md)
 for contracts, evidence and the runnable `resolve` example.
+
+## DOC-02b — File URLs and URL validation diagnostics
+
+`rustic-url` now parses `file:` URLs with the standard's file, file slash and file
+host states: empty/`localhost` hosts, UNC-style hosts, Windows drive letters
+(including `C|` and drive letters in the host position) and resolution against
+file bases. The rules are platform-independent; parsing does not touch the file
+system, and file URLs get a fresh opaque origin. `ParseError::UnsupportedFile` is
+gone. Native path conversion and access policy remain loader/platform work.
+
+`UrlParser::parse_with_diagnostics` returns the unchanged parse result plus up to
+64 standard-named validation errors with byte offsets into the original input,
+covering the URL parser, host code points and all IPv4/IPv6 errors. IDNA-specific
+errors arrive with the IDNA adapter.
+
+Evidence: the pinned WPT subset grows from 685 to 815 cases (all 130 file cases
+pass, 84 excluded), every expected failure there yields a diagnostic, two new
+file tests and eight diagnostics tests in `rustic-url`, and the URL fuzz target
+now also uses file bases and checks diagnostic offsets and result equality.
 
 ## DOC-05a — Incremental HTML input, tag and declaration states
 
@@ -425,7 +474,9 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-03: minimal document arena and node kinds | Complete internal subset described above |
 | DOC-04a: mutation and deterministic tree inspection | Complete initial same-document subset |
 | DOC-04b: character-data mutation primitives | Complete checked text/comment storage edits; live ranges, observers and bindings pending |
-| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA/file/blob and broader DOC-02 remain pending |
+| DOC-04c: node kinds, cloning, adoption and lifecycle | Complete: general fragments, PI/CDATA, clone, cross-document adoption with ID maps, `ReadyState`; mutation records pending |
+| DOC-02a: URL records and tuple/opaque origins | Complete initial declared subset; IDNA and blob remain pending |
+| DOC-02b: file URLs and validation diagnostics | Complete: platform-independent file rules, 815-case WPT subset, standard-named diagnostics with offsets |
 | DOC-05a: incremental tokenizer data/tag/comment states | Complete initial scope, with doctype and HTML-context declaration recovery |
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Done for document parsing; fragment parsing and scripting pending |
@@ -435,8 +486,8 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and four fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Not started |
 
-M1 remains in progress. Cross-document adoption, node cloning and mutation records
-are still needed for the broader DOC-04 task. With DOC-06c and DOC-08 done,
+M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
+adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete. The next queue work is DOC-06d (`selectedcontent`
 mirroring, the last four known tree failures), then DOC-09 and CSS-01. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

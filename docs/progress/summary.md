@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 8.90%** = 8.90% verified complete + 0.00% partial credit. 22/172 capabilities complete, 0 in progress.
+**Overall completion: 10.09%** = 10.09% verified complete + 0.00% partial credit. 26/172 capabilities complete, 0 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `d5f1f5f32b4b43929e6092cd97f1571a7440f31300d20e6d184f42af4a34e9f1`.
+Catalog: `engine-v3`. Source fingerprint: `003bb9ad2f469bc0a045a738c1fb1ae005598477819fca75621119a550743c5f`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -10,7 +10,7 @@ Catalog: `engine-v3`. Source fingerprint: `d5f1f5f32b4b43929e6092cd97f1571a7440f
 
 | Milestone | Capabilities complete | Progress | Verified | Share of engine |
 | --- | --- | --- | --- | --- |
-| M1 Document core | 22/28 | 79.02% | 79.02% | 11.27% |
+| M1 Document core | 26/28 | 89.51% | 89.51% | 11.27% |
 | M2 CSS & computed style | 0/8 | 0.00% | 0.00% | 9.00% |
 | M3 Static renderer | 0/17 | 0.00% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
@@ -26,8 +26,8 @@ Catalog: `engine-v3`. Source fingerprint: `d5f1f5f32b4b43929e6092cd97f1571a7440f
 | Subsystem | Completed | In progress | Progress | Verified | Engine weight | Engine points |
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 6/8 | 0 | 62.50% | 62.50% | 2% | 1.25 |
-| URLs & encoding | 3/12 | 0 | 23.33% | 23.33% | 3% | 0.70 |
-| DOM | 3/10 | 0 | 23.52% | 23.52% | 6% | 1.41 |
+| URLs & encoding | 5/12 | 0 | 33.33% | 33.33% | 3% | 1.00 |
+| DOM | 5/10 | 0 | 38.23% | 38.23% | 6% | 2.29 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 0/8 | 0 | 0.00% | 0.00% | 9% | 0.00 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -68,12 +68,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `url.addresses` — IPv4/IPv6 host parsing and canonicalization · size 2 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/ipv6.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **complete** `url.origins` — Tuple and process-local opaque origin identity · size 2 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/origin.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **planned** `url.idna` — Unicode IDNA and data adapter · size 3 · M1 · 0.30% of engine
-- **planned** `url.file` — File URL and platform rules · size 2 · M1 · 0.20% of engine
+- **complete** `url.file` — File URL and platform rules · size 2 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/parser.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **planned** `url.blob` — Blob registry and origin rules · size 2 · M9 · 0.20% of engine
 - **planned** `url.setters` — URL setters and URLSearchParams · size 2 · M9 · 0.20% of engine
 - **planned** `url.encoding` — Required legacy decoders and charset selection · size 5 · M6 · 0.50% of engine
 - **planned** `url.restart` — Encoding sniff/restart integration · size 2 · M6 · 0.20% of engine
-- **planned** `url.diagnostics` — Validation-error diagnostics and source locations · size 1 · M1 · 0.10% of engine
+- **complete** `url.diagnostics` — Validation-error diagnostics and source locations · size 1 · M1 · 0.10% of engine ([source](../../crates/rustic-url/src/diagnostics.rs), [test](../../crates/rustic-url/tests/diagnostics.rs))
 - **planned** `url.policy` — Navigation origin inheritance and policy integration · size 3 · M6 · 0.30% of engine
 - **planned** `url.conformance` — Complete declared URL/encoding conformance gate · size 3 · M9 · 0.30% of engine
 
@@ -82,8 +82,8 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `dom.storage` — Bounded document-owned node storage · size 3 · M1 · 0.52% of engine ([source](../../crates/rustic-dom/src/storage.rs), [test](../../crates/rustic-dom/src/storage.rs))
 - **complete** `dom.mutation` — Checked same-document mutation and traversal · size 3 · M1 · 0.52% of engine ([source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/tree.rs))
 - **complete** `dom.values` — Namespace/attribute identity and UTF-16 values · size 2 · M1 · 0.35% of engine ([source](../../crates/rustic-dom/src/string.rs), [test](../../crates/rustic-dom/tests/tree.rs))
-- **planned** `dom.nodekinds` — Fragments, processing instructions and full node kinds · size 2 · M1 · 0.35% of engine
-- **planned** `dom.adoption` — Adoption, cloning and document lifecycle · size 3 · M1 · 0.52% of engine
+- **complete** `dom.nodekinds` — Fragments, processing instructions and full node kinds · size 2 · M1 · 0.35% of engine ([source](../../crates/rustic-dom/src/node.rs), [source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/node_kinds.rs), [test](../../crates/rustic-dom/tests/node_kinds.rs))
+- **complete** `dom.adoption` — Adoption, cloning and document lifecycle · size 3 · M1 · 0.52% of engine ([source](../../crates/rustic-dom/src/document/adoption.rs), [source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/adoption.rs), [test](../../crates/rustic-dom/tests/adoption.rs), [test](../../crates/rustic-dom/tests/adoption.rs))
 - **planned** `dom.events` — DOM event propagation and default actions · size 5 · M5 · 0.88% of engine
 - **planned** `dom.observers` — Mutation records and observers · size 3 · M5 · 0.52% of engine
 - **planned** `dom.ranges` — Ranges, live collections and traversal APIs · size 3 · M9 · 0.52% of engine

@@ -35,12 +35,13 @@ cargo +stable test --locked --workspace --all-targets
 
 The first `Cargo.lock` is a dependency-free workspace lockfile. Keep it committed
 and use `--locked` so implicit resolution changes fail visibly. Do not publish the
-scaffold or claim rendering support. The initial CLI deliberately accepts only
-`info`, `--help`, and `--version`.
+scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
+`--version` and the local-only `dump-dom` command described in
+[HTML_TREE.md](HTML_TREE.md#local-dump-dom-command).
 
 The DOM `tree` example constructs nodes through the storage API, then emits an
 inspection dump. It is a runnable check of document ownership and traversal, not
-an HTML parser or the future `dump-dom` command. The dump is capped at 64 KiB,
+an HTML parser or the `dump-dom` command. The dump is capped at 64 KiB,
 contains no allocation IDs, preserves attribute insertion order, and quotes
 names/UTF-16 values including lone surrogates. Its diagnostic format is not HTML
 serialization or a stable external protocol. See [AGENTS.md](../AGENTS.md) for

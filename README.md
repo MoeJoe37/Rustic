@@ -72,8 +72,10 @@ cargo run --locked -p rustic-html --example document
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
 supported Rust version is **1.85.0**, tested separately in CI; the workspace uses
-the 2024 edition. `rustic info`, `--help`, and `--version` are the only commands.
-Other arguments, including URLs, return an error instead of implying navigation.
+the 2024 edition. The commands are `rustic info`, `--help`, `--version` and
+`rustic dump-dom <file>`, which loads one local HTML file within byte, token,
+node and output budgets and prints a deterministic DOM dump. URLs and other
+arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints
 a deterministic inspection dump. It does not parse HTML or load a page.

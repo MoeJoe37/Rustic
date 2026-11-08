@@ -106,8 +106,8 @@ cargo run --locked -p rustic-dom --example tree
 ```
 
 The example creates a doctype, HTML/body nodes, an attribute, mixed Arabic/Latin
-text and an SVG-namespaced node. There is no parser involved, and no `dump-dom`
-HTML command is advertised yet.
+text and an SVG-namespaced node. There is no parser involved; the separate
+parser-backed `dump-dom` command arrived with DOC-07.
 
 ## DOC-02a — URL records, parsing and origins
 
@@ -237,6 +237,35 @@ Python regressions and ordinary repository checks validate importer provenance.
 tables, formatting, templates, foreign content, script reentry and the full
 corpus/fuzz gate remain unfinished. No new completion credit is awarded yet.
 
+## DOC-07 — Bounded local loader and `dump-dom`
+
+`rustic dump-dom [--max-input-bytes N] [--max-output-bytes N] [--chunk-bytes N] [--] <file>`
+loads exactly one local file granted on the command line and prints the
+deterministic `Document::dump_tree` output. The loader lives in
+`rustic-cli/src/loader.rs` and only calls the public `HtmlDocumentParser`
+feed/finish API; it adds no tree-construction rules of its own.
+
+Arguments with a URL scheme of two or more characters (`https:`, `file:`,
+`data:`, `about:` and similar) are rejected before any filesystem access;
+single-letter prefixes stay paths for Windows drives. Directories, devices and
+FIFOs are rejected from metadata before opening and again through the handle.
+The file is read in fixed chunks (default 64 KiB) and never buffered whole. Its
+byte limit (default 8 MiB) is checked from metadata and enforced while reading,
+and also becomes the tokenizer's raw input budget. Parser token/node/depth/
+payload/diagnostic limits keep their defaults, and dump output is capped at
+64 MiB. Cancellation is checked between reads. Any failure prints nothing on
+stdout: usage/URL errors exit 2, load/parse/budget failures exit 1. Unsupported
+constructs from the DOC-06 subset fail explicitly rather than dumping a partial
+tree. No network, script, subresource, encoding sniffing or base-URL resolution occurs.
+
+Nine loader unit tests cover URL/path classification, exact file and dump byte
+limits, chunk-size invariance at every size up to the input length, parser
+budgets, unsupported markup, directories, `/dev/zero`, missing files, zero limits
+and cancellation. Seven CLI tests compare a malformed fixture against a checked
+snapshot for 19 chunk sizes and check URL rejection, usage errors, exact budgets
+and clean failures. `html.loader` is complete for this scope; tree coverage
+still grows with DOC-06.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -273,7 +302,7 @@ link/package checks, runtime tests and device support remain planned.
 | DOC-05b: references and alternate text modes | Reference/text modes complete; broader encoding cases remain pending |
 | DOC-06a: initial/head/body tree construction | Partial: shell/head rules and a declared small body set; broader body algorithms pending |
 | DOC-06b: tables/formatting/template/foreign tree rules | Not started |
-| DOC-07: bounded HTML loader/CLI | Not started |
+| DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
 | DOC-08: parser corpus/fuzzing | Partial: tokenizer corpora and 45 pinned tree records with chunk splits; broader tree corpus and fuzz targets pending |
 | DOC-09: traced node/JS ownership prototype | Not started |
 

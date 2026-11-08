@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 IGNORED = {".git", "target", "artifacts", "__pycache__", "checkouts"}
 LINK = re.compile(r"!?\[[^\]\n]*\]\(([^)\n]+)\)")
 ERRORS: list[str] = []
+DEPENDENCY_KEYS = ("dependencies", "dev-dependencies", "build-dependencies")
+DEBT_MARKER = re.compile(r"\b(TODO|FIXME|HACK|XXX)\b")
+DEBT_ID = re.compile(r"\bTD-\d+\b")
 
 
 def error(path: Path, detail: str) -> None:
@@ -92,6 +95,63 @@ def check_entities() -> None:
         error(manifest_path, f"invalid entity table/provenance: {exc}")
 
 
+def check_workflows(channel: str) -> None:
+    """Every workflow uses the pinned toolchain and SHA-pinned actions (TD-07)."""
+    for workflow in sorted((ROOT / ".github/workflows").glob("*.y*ml")):
+        source = workflow.read_text(encoding="utf-8")
+        pins = re.findall(r'^\s*RUST_VERSION: "([^"]+)"$', source, re.MULTILINE)
+        if workflow.name == "ci.yml" and not pins:
+            error(workflow, "RUST_VERSION must match rust-toolchain.toml")
+        for pin in pins:
+            if pin != channel:
+                error(workflow, f"RUST_VERSION {pin} must match rust-toolchain.toml ({channel})")
+        for action in re.findall(r"uses:\s*(\S+)", source):
+            if not re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action):
+                error(workflow, f"action is not pinned to a full commit SHA: {action}")
+
+
+def check_dependencies(members: list[str]) -> None:
+    """External crates need the docs/DEPENDENCIES.md review and an ADR first."""
+    def tables(manifest: dict) -> list[dict]:
+        found = [manifest.get(key, {}) for key in DEPENDENCY_KEYS]
+        for target in manifest.get("target", {}).values():
+            found.extend(target.get(key, {}) for key in DEPENDENCY_KEYS)
+        return found
+
+    for member in members:
+        path = ROOT / member / "Cargo.toml"
+        for table in tables(tomllib.loads(path.read_text(encoding="utf-8"))):
+            for name, spec in table.items():
+                if not (isinstance(spec, dict) and ("path" in spec or spec.get("workspace"))):
+                    error(path, f"external dependency {name!r} needs a reviewed entry in "
+                          "docs/DEPENDENCIES.md, an ADR and an update to this check")
+    workspace_deps = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"].get("dependencies", {})
+    for name, spec in workspace_deps.items():
+        if not (isinstance(spec, dict) and "path" in spec):
+            error(ROOT / "Cargo.toml", f"external workspace dependency {name!r} is not reviewed")
+    for package in tomllib.loads((ROOT / "Cargo.lock").read_text())["package"]:
+        if "source" in package:
+            error(ROOT / "Cargo.lock", f"lockfile contains external package {package['name']!r}")
+
+
+def check_debt_markers(files: list[Path]) -> None:
+    """Debt markers must cite a TD-NN entry that exists in docs/TECH_DEBT.md."""
+    ledger = ROOT / "docs/TECH_DEBT.md"
+    known = set(re.findall(r"^### (TD-\d+)\b", ledger.read_text(encoding="utf-8"), re.MULTILINE))
+    for path in files:
+        relative = path.relative_to(ROOT)
+        if (path.suffix not in {".rs", ".py", ".yml", ".yaml", ".toml", ".sh"}
+                or "fixtures" in relative.parts
+                or path.name in {"check_repository.py", "test_check_repository.py"}):
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if DEBT_MARKER.search(line) and not DEBT_ID.search(line):
+                error(path, f"line {number}: debt marker must cite a TD-NN entry from docs/TECH_DEBT.md")
+            for debt_id in DEBT_ID.findall(line):
+                if debt_id not in known:
+                    error(path, f"line {number}: {debt_id} is not recorded in docs/TECH_DEBT.md")
+
+
 def main() -> int:
     files = [
         path
@@ -141,6 +201,7 @@ def main() -> int:
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
             error(url_manifest, f"invalid WPT fixture metadata: {exc}")
 
+    check_debt_markers(files)
     check_html_fixture("html5lib")
     check_html_fixture("references")
     check_html_fixture("text")
@@ -158,15 +219,11 @@ def main() -> int:
                 error(ROOT / "Cargo.toml", f"workspace member missing: {member}")
         workflow = ROOT / ".github/workflows/ci.yml"
         workflow_source = workflow.read_text()
-        rust_pin = re.search(r'^  RUST_VERSION: "([^"]+)"$', workflow_source, re.MULTILINE)
-        if rust_pin is None or rust_pin.group(1) != toolchain["channel"]:
-            error(workflow, "RUST_VERSION must match rust-toolchain.toml")
         msrv = workspace["package"]["rust-version"]
         if f'"{msrv}.0"' not in workflow_source:
             error(workflow, "compatibility matrix must include workspace MSRV")
-        for action in re.findall(r"uses:\s*(\S+)", workflow_source):
-            if not re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action):
-                error(workflow, f"action is not pinned to a full commit SHA: {action}")
+        check_workflows(toolchain["channel"])
+        check_dependencies(workspace["members"])
     except (OSError, KeyError, tomllib.TOMLDecodeError) as exc:
         ERRORS.append(f"repository configuration: {exc}")
 

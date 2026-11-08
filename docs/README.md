@@ -15,7 +15,9 @@ boundary. Status changes require test evidence rather than a checkbox alone.
 6. [Development](DEVELOPMENT.md) and [dependencies](DEPENDENCIES.md): how to work here.
 7. [Decision records](adr/README.md): why key choices were made.
 
-See [implementation progress](IMPLEMENTATION.md) for completed tasks and their contracts.
+See [implementation progress](IMPLEMENTATION.md) for completed tasks and their contracts,
+and the [technical debt ledger](TECH_DEBT.md) for known shortcuts and the rules that
+keep them from becoming bad debt.
 The accepted [product requirements](PRODUCT.md) and [extension/uBO design](EXTENSIONS.md)
 define mandatory full-engine scope beyond the first document milestones.
 The [README graph](PROGRESS.md) measures whole-engine delivery using a weighted

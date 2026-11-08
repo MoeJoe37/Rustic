@@ -14,7 +14,13 @@ publish = false
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
-all = "warn"
+all = { level = "warn", priority = -1 }
+# Debt guardrails (docs/TECH_DEBT.md): no placeholder panics, leftover debug
+# output or unexplained lint suppressions in committed code.
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
 
 [profile.release]
 lto = "thin"

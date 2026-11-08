@@ -253,7 +253,7 @@ impl HtmlTokenizer {
             .last_start_tag
             .as_ref()
             .and_then(|name| name.as_bytes().get(self.text_probe.len()));
-        if expected.copied() == Some(value.to_ascii_lowercase() as u8) {
+        if expected.copied() == ascii_lowercase_byte(value) {
             self.text_probe.push(value);
             true
         } else {
@@ -300,8 +300,7 @@ impl HtmlTokenizer {
 
     fn script_word_char(&mut self, value: char) {
         if self.text_probe_matches
-            && b"script".get(self.text_probe.len()).copied()
-                == Some(value.to_ascii_lowercase() as u8)
+            && b"script".get(self.text_probe.len()).copied() == ascii_lowercase_byte(value)
         {
             self.text_probe.push(value.to_ascii_lowercase());
         } else {
@@ -332,5 +331,32 @@ impl HtmlTokenizer {
         }
         self.text_probe.clear();
         Ok(())
+    }
+}
+
+/// The ASCII-lowercased byte for an ASCII scalar, or `None` otherwise.
+///
+/// A plain `as u8` cast would truncate non-ASCII scalars (U+0174 to `t`), so
+/// end-tag matching must not depend on callers filtering to ASCII first.
+fn ascii_lowercase_byte(value: char) -> Option<u8> {
+    u8::try_from(value)
+        .ok()
+        .filter(u8::is_ascii)
+        .map(|byte| byte.to_ascii_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ascii_lowercase_byte;
+
+    #[test]
+    fn ascii_lowercase_byte_never_truncates_scalars() {
+        assert_eq!(ascii_lowercase_byte('T'), Some(b't'));
+        assert_eq!(ascii_lowercase_byte('t'), Some(b't'));
+        assert_eq!(ascii_lowercase_byte('\u{7f}'), Some(0x7f));
+        // Each of these would equal an ASCII letter after an `as u8` cast.
+        for value in ['\u{174}', '\u{e9}', '\u{1F474}', '\u{80}'] {
+            assert_eq!(ascii_lowercase_byte(value), None, "{value:?}");
+        }
     }
 }

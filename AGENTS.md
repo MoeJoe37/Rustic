@@ -30,6 +30,17 @@ an extension application layer, not permission to replace the original engine.
 - Maintain safe Rust and the declared minimum compiler. Do not add blanket lint suppressions to hide defects or compiler incompatibility.
 - Add dependencies only for a concrete need after the documented boundary/license/security review. Do not embed an existing browser engine or JavaScript VM.
 
+## Technical debt
+
+Read `docs/TECH_DEBT.md` before taking a shortcut. Deliberate debt is fine when it
+is recorded there in the same change, with a reason and a payoff trigger; any
+`TODO`/`FIXME`/`HACK`/`XXX` must cite its `TD-NN` entry (CI checks this). Never
+take bad debt: silent truncation of content, narrowing casts on content-derived
+values without a local bound, invariants that only hold because a distant caller
+filters input, fatal limits on parse errors, unreviewed dependencies, or
+duplicated settings without a consistency check. Mark paid entries **Paid**
+rather than deleting them.
+
 ## Evidence and documentation
 
 - Add focused regression and negative tests for actual behavior. For stateful structures, test invariants and compare against an independent model where useful.

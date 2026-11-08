@@ -66,7 +66,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
 | TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
-| TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Open |
+| TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -283,7 +283,7 @@ inputs. Reported by the milestone M1 work. Paid by indenting at most 64 levels;
 deeper lines start with an `@<depth> ` marker, so output is linear in node count.
 The test now runs in well under a second and checks the threshold.
 
-### TD-19 — Runners without rustup download its installer unpinned
+### TD-19 — Runners without rustup download its installer unpinned (Paid)
 
 The native test job installs rustup with `curl | sh` from `sh.rustup.rs` (or
 `rustup-init.exe` on Windows) when a runner image lacks it, such as
@@ -292,6 +292,11 @@ unlike the SHA-pinned actions (rule 5). Acceptable while only
 images without rustup use it. **Pay:** check the installer's published SHA-256
 before running it. **Trigger:** when another job starts using the step, or
 the hosted images ship rustup.
+
+**Paid:** the step now downloads rustup-init 1.29.3 from the versioned
+`rustup/archive` path and refuses to run it unless its SHA-256 matches the
+hash pinned in the workflow for that OS/CPU (published hashes, checked when
+pinned). Unknown runner platforms fail instead of falling back to `curl | sh`.
 
 ## Reviewing new work
 

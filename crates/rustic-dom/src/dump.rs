@@ -87,7 +87,17 @@ impl Document {
     }
 }
 
+/// Deepest level written as plain two-space indentation.
+///
+/// Deeper lines (only reachable through nested template contents) start with
+/// `@<depth> ` instead, so output stays linear in node count rather than
+/// quadratic in content-controlled nesting (docs/TECH_DEBT.md TD-18).
+const MAX_INDENT_DEPTH: usize = 64;
+
 fn indent(writer: &mut impl Write, depth: usize) -> fmt::Result {
+    if depth > MAX_INDENT_DEPTH {
+        return write!(writer, "@{depth} ");
+    }
     for _ in 0..depth {
         writer.write_str("  ")?;
     }

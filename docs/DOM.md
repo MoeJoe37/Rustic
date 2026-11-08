@@ -75,7 +75,9 @@ cannot be detached or destroyed by itself, and `walk` does not enter it.
 Inserting it moves its children out, like any fragment. Destroying the template
 destroys its contents, including arbitrarily nested templates, without
 recursion. `dump_tree` prints contents as `#template-contents` after the
-template's attributes. Inert template owner documents are not implemented; see
+template's attributes. Indentation stops at 64 levels; deeper lines (reachable
+only through nested template contents) start with `@<depth> ` so dump size stays
+linear in node count. Inert template owner documents are not implemented; see
 [ADR 0010](adr/0010-template-contents.md) and [ADR 0011](adr/0011-fragments-cloning-adoption.md).
 
 ## Node kinds, fragments, cloning and adoption

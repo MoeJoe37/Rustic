@@ -65,6 +65,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
 | TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
+| TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -266,6 +267,17 @@ that tests the contract, it fails loudly instead of leaking, and the DOM side
 **Pay:** JS-03 owns objects and roots; the DOM keeps tree-closure marking and
 exposes it to a shared marking phase across documents; adoption retargets edges
 through `Adopted::ids`. **Trigger:** JS-03, or a second document sharing a heap.
+
+### TD-18 — Tree dumps grew quadratically with nested template contents (Paid)
+
+`Document::dump_tree` indented every nested template-contents level by two more
+spaces. Template nesting is content-controlled and not bounded by `max_depth`,
+so output was quadratic in nesting: the 20,000-level regression test built a
+1.6 GB string and took about 43 s in debug CI (already true at `b9595a5`). The
+caller's byte cap bounded memory, but `dump-dom` hit it on small adversarial
+inputs. Reported by the milestone M1 work. Paid by indenting at most 64 levels;
+deeper lines start with an `@<depth> ` marker, so output is linear in node count.
+The test now runs in well under a second and checks the threshold.
 
 ## Reviewing new work
 

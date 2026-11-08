@@ -8,7 +8,7 @@ when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-07
 and DOC-08 are complete for their declared scope, including fragment parsing;
-M2 has CSS-01 through CSS-04 done; M3–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
+M2 has CSS-01 through CSS-05 done; M3–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
@@ -120,7 +120,7 @@ Do not label a happy-path tag splitter an HTML implementation.
 | CSS-02 | **Done** ([CSS.md](CSS.md#selectors)): type/universal/ID/class/attribute selectors, combinators, specificity, initial pseudo-classes, DOM matching | CSS-01, DOM views |
 | CSS-03 | **Done** ([CSS.md](CSS.md#property-values)): typed property parsers: display, box model, color, font basics, lengths/percentages | CSS-01 |
 | CSS-04 | **Done** ([CSS.md](CSS.md#cascade)): UA/user/author origins, importance, inline styles, source order, inheritance and CSS-wide values | CSS-02, CSS-03 |
-| CSS-05 | Computed values, stylesheet attachment, style dump, full-restyle reference implementation | CSS-04, DOC-07 |
+| CSS-05 | **Done** ([CSS.md](CSS.md#computed-style)): computed values, stylesheet attachment, style dump, full-restyle reference implementation | CSS-04, DOC-07 |
 | CSS-06 | Mutation/viewport invalidation; then media queries, custom properties/variables and cycle handling | CSS-05 |
 | CSS-07 | Expand selectors and cascade layers with isolated WPT selections and negative grammar tests | CSS-05 |
 
@@ -340,8 +340,9 @@ order. Status reflects [implementation progress](IMPLEMENTATION.md) as of
 fragment records) is also done. CSS-01 (CSS syntax) is done as the first M2 task. DOC-06d
 (`selectedcontent` mirroring) is done too, so every runnable html5lib tree record
 passes. Item 12 is owned by a separate thread. CSS-02 (selectors, specificity and
-matching), CSS-03 (typed property values) and CSS-04 (cascade) are done; this
-queue continues with CSS-05 onward in the M2 table.
+matching), CSS-03 (typed property values), CSS-04 (cascade) and CSS-05
+(computed style) are done; this queue continues with CSS-06 onward in the M2
+table.
 
 | Order | Task / suggested issue title | Concrete completion test | Status |
 | --- | --- | --- | --- |

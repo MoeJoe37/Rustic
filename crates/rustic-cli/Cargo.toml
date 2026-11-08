@@ -14,9 +14,11 @@ path = "src/main.rs"
 
 [dependencies]
 rustic-base = { path = "../rustic-base" }
+rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-engine = { path = "../rustic-engine" }
 rustic-html = { path = "../rustic-html" }
+rustic-style = { path = "../rustic-style" }
 
 [lints]
 workspace = true

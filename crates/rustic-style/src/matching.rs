@@ -50,7 +50,8 @@ impl<E> MatchContext<E> {
 /// Selectors that target a pseudo-element never match an element itself, as
 /// in `Element.matches()`.
 pub fn matches<E: ElementView>(list: &SelectorList, element: E, cx: &MatchContext<E>) -> bool {
-    let m = Matcher::new(cx);
+    let cache = MatchCache::default();
+    let m = Matcher { cx, cache: &cache };
     list.selectors()
         .iter()
         .any(|s| s.pseudo_element().is_none() && complex(s, element, &m))
@@ -63,38 +64,64 @@ pub fn matches_complex<E: ElementView>(
     element: E,
     cx: &MatchContext<E>,
 ) -> bool {
-    complex(selector, element, &Matcher::new(cx))
+    matches_complex_cached(selector, element, cx, &MatchCache::default())
 }
 
-/// One top-level match: the context plus a memo of nested selector-list
-/// results (`:is()`, `:where()`, `:not()`, `:nth-*(of S)`) per element.
+/// [`matches_complex`] sharing `cache` with other matches against the same,
+/// unchanged tree and the same, still-borrowed selectors (one restyle).
+pub(crate) fn matches_complex_cached<E: ElementView>(
+    selector: &ComplexSelector,
+    element: E,
+    cx: &MatchContext<E>,
+    cache: &MatchCache<E>,
+) -> bool {
+    complex(selector, element, &Matcher { cx, cache })
+}
+
+/// Which sibling count an `:nth-*` position uses, plus the address of its
+/// `of S` list (0 for none).
+type NthKey = (u8, usize);
+
+/// Results reused across matches while the tree and the selectors stay
+/// unchanged: nested selector-list results (`:is()`, `:where()`, `:not()`,
+/// `:nth-*(of S)`) per element, and `:nth-*` sibling positions.
 ///
-/// Without the memo, an outer descendant combinator re-evaluates a nested
-/// list from scratch for every ancestor it tries, which is exponential in the
-/// nesting depth (TD-21). With it, each (list, element) pair is evaluated at
-/// most once per top-level match.
-struct Matcher<'c, E> {
-    cx: &'c MatchContext<E>,
-    memo: RefCell<HashMap<(usize, E), bool>>,
+/// Without the list memo, an outer descendant combinator re-evaluates a
+/// nested list from scratch for every ancestor it tries, which is exponential
+/// in the nesting depth (TD-21). Without the position memo, matching every
+/// child of an *n*-child parent against `:nth-child()` costs O(*n*²) (TD-20).
+/// Keys use selector-list addresses, so a cache must not outlive the
+/// selectors it was filled from: callers keep it for one match or restyle.
+pub(crate) struct MatchCache<E> {
+    lists: RefCell<HashMap<(usize, E), bool>>,
+    positions: RefCell<HashMap<(NthKey, E), u64>>,
 }
 
-impl<'c, E: ElementView> Matcher<'c, E> {
-    fn new(cx: &'c MatchContext<E>) -> Self {
+impl<E> Default for MatchCache<E> {
+    fn default() -> Self {
         Self {
-            cx,
-            memo: RefCell::new(HashMap::new()),
+            lists: RefCell::new(HashMap::new()),
+            positions: RefCell::new(HashMap::new()),
         }
     }
+}
 
+/// One match: the context plus the cache it shares.
+struct Matcher<'c, E> {
+    cx: &'c MatchContext<E>,
+    cache: &'c MatchCache<E>,
+}
+
+impl<E: ElementView> Matcher<'_, E> {
     /// Whether any selector of a nested `list` (pseudo-elements excluded by
     /// the parser) matches `e`, memoized by the list's address.
     fn list(&self, list: &SelectorList, e: E) -> bool {
         let key = (std::ptr::from_ref(list) as usize, e);
-        if let Some(&known) = self.memo.borrow().get(&key) {
+        if let Some(&known) = self.cache.lists.borrow().get(&key) {
             return known;
         }
         let result = list.selectors().iter().any(|s| complex(s, e, self));
-        self.memo.borrow_mut().insert(key, result);
+        self.cache.lists.borrow_mut().insert(key, result);
         result
     }
 }
@@ -363,13 +390,40 @@ fn nth_matches<E: ElementView>(nth: &Nth, e: E, m: &Matcher<'_, E>) -> bool {
             s.previous_sibling_element()
         }
     };
-    let mut position: u64 = 1;
+    let key: NthKey = (
+        match nth.kind {
+            NthKind::Child => 0,
+            NthKind::LastChild => 1,
+            NthKind::OfType => 2,
+            NthKind::LastOfType => 3,
+        },
+        nth.of
+            .as_deref()
+            .map_or(0, |of| std::ptr::from_ref(of) as usize),
+    );
+    // A counted sibling's position is one less than the next counted
+    // sibling's, so walk towards the start only until a known position, then
+    // record every counted sibling passed on the way.
+    let mut passed = vec![e];
+    let mut base: u64 = 0;
     let mut sibling = step(&e);
     while let Some(s) = sibling {
+        // `counts` may match nested selectors that use this cache too, so no
+        // borrow is held across it.
         if counts(&s) {
-            position += 1;
+            if let Some(&known) = m.cache.positions.borrow().get(&(key, s)) {
+                base = known;
+                break;
+            }
+            passed.push(s);
         }
         sibling = step(&s);
+    }
+    let mut positions = m.cache.positions.borrow_mut();
+    let mut position = base;
+    for s in passed.iter().rev() {
+        position = position.saturating_add(1);
+        positions.insert((key, *s), position);
     }
     nth.matches_position(position)
 }

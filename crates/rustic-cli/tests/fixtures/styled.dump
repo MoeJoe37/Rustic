@@ -1,0 +1,70 @@
+@style 1: applied
+  dropped InvalidSelector(UnsupportedPseudoClass) at bytes 239..262
+  dropped UnsupportedAtRule at bytes 265..300
+@style 2: skipped: media queries not supported
+html
+  display: block
+  color: rgb(51, 51, 51)
+  font-size: 20px
+  head
+    display: none
+    title
+      display: none
+    style
+      display: none
+    style
+      display: none
+  body
+    display: block
+    margin-top: 8px
+    margin-right: 8px
+    margin-bottom: 8px
+    margin-left: 8px
+    div#main.card
+      display: block
+      padding-top: 10px
+      padding-right: 20px
+      padding-bottom: 10px
+      padding-left: 20px
+      border-top-width: 2px
+      border-right-width: 2px
+      border-bottom-width: 2px
+      border-left-width: 2px
+      border-top-style: solid
+      border-right-style: solid
+      border-bottom-style: solid
+      border-left-style: solid
+      border-top-color: rgb(51, 51, 51)
+      border-right-color: rgb(51, 51, 51)
+      border-bottom-color: rgb(51, 51, 51)
+      border-left-color: rgb(51, 51, 51)
+      width: 50%
+      h2
+        display: block
+        color: rgb(0, 0, 128)
+        font-size: 30px
+        font-weight: 700
+      p
+        display: block
+        margin-top: 20px
+        margin-bottom: 20px
+        margin-left: 40px
+        line-height: 30px
+        b
+          font-weight: 700
+        em
+          font-style: italic
+      ul
+        display: block
+        margin-top: 20px
+        margin-bottom: 20px
+        padding-left: 40px
+        li.x
+          display: list-item
+          font-weight: 100
+        li
+          display: list-item
+        li.x
+          display: list-item
+    svg svg
+      svg rect

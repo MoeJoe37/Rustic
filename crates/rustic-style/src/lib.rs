@@ -38,14 +38,21 @@
 #![warn(missing_docs)]
 
 mod cascade;
+mod computed;
 mod dom;
+mod html;
 mod matching;
 mod sheet;
 mod text;
 mod view;
 
 pub use cascade::{Cascade, SpecifiedStyle};
+pub use computed::{ComputeContext, ComputedStyle};
 pub use dom::{DomElement, ElementStyle, query_selector_all, style_tree};
+pub use html::{
+    HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,
+    dump_computed_styles, html_user_agent_sheet,
+};
 pub use matching::{MatchContext, matches, matches_complex};
 pub use sheet::{
     Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet, parse_style_attribute,

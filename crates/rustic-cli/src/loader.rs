@@ -14,8 +14,13 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use rustic_base::CancellationToken;
+use rustic_css::CssParser;
 use rustic_dom::DumpError;
-use rustic_html::{HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
+use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
+use rustic_style::{
+    ComputeContext, MatchContext, StyleElementStatus, document_cascade, dump_computed_styles,
+    style_tree,
+};
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -194,6 +199,53 @@ pub fn dump_dom(parsed: &ParsedDocument, max_bytes: usize) -> Result<String, Loa
     document
         .dump_tree(document.root(), max_bytes)
         .map_err(LoadError::Dump)
+}
+
+/// Deterministic computed-style dump of the whole document: a line per
+/// `<style>` element with its status and dropped constructs, then every
+/// element with its non-initial computed values (see
+/// [`rustic_style::dump_computed_styles`]). Uses the HTML user-agent sheet and
+/// a 1280×720 viewport; external stylesheets are never loaded.
+pub fn dump_style(parsed: &ParsedDocument, max_bytes: usize) -> Result<String, LoadError> {
+    let document = parsed.document();
+    let node_error = |error| LoadError::Dump(DumpError::Node(error));
+    let parser = CssParser::default();
+    let (cascade, sheets) = document_cascade(document, &parser).map_err(node_error)?;
+    let mut out = String::new();
+    for (index, sheet) in sheets.iter().enumerate() {
+        let status = match sheet.status {
+            StyleElementStatus::Applied => "applied",
+            StyleElementStatus::NotCss => "skipped: not CSS",
+            StyleElementStatus::UnsupportedMedia => "skipped: media queries not supported",
+            StyleElementStatus::ResourceLimit => "skipped: CSS parser limit",
+        };
+        out.push_str(&format!("@style {}: {status}\n", index + 1));
+        for diagnostic in &sheet.diagnostics {
+            let range = diagnostic.span.range();
+            out.push_str(&format!(
+                "  dropped {:?} at bytes {}..{}\n",
+                diagnostic.kind, range.start, range.end
+            ));
+        }
+    }
+    let mut cx = MatchContext::html();
+    cx.quirks = parsed.mode() == DocumentMode::Quirks;
+    let styles = style_tree(
+        document,
+        document.root(),
+        &cascade,
+        &parser,
+        &cx,
+        &ComputeContext::default(),
+    )
+    .map_err(node_error)?;
+    let remaining = max_bytes
+        .checked_sub(out.len())
+        .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
+    let elements = dump_computed_styles(document, &styles, remaining)
+        .ok_or(LoadError::Dump(DumpError::OutputLimit))?;
+    out.push_str(&elements);
+    Ok(out)
 }
 
 #[cfg(test)]

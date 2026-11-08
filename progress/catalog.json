@@ -1061,16 +1061,82 @@
           "label": "Computed values, variables and cycle handling",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Computed values for the CSS-03 longhands: absolute lengths, font sizes, weights, currentcolor, border widths, root blockification, computed inheritance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/computed.rs",
+                  "marker": "pub fn compute("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn font_sizes_resolve_against_the_parent_and_root"
+                }
+              ]
+            },
+            {
+              "label": "Computed values that need font metrics or math functions (ex/ch/cap from fonts, calc())",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Custom properties and var() substitution",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Dependency cycle handling for custom properties and font-relative units",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.queries",
           "label": "Media/container queries and style attachment",
           "size": 3,
           "milestone": "M2",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "HTML user-agent stylesheet and document style element attachment",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/html.rs",
+                  "marker": "pub fn document_cascade("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn style_elements_are_attached_in_tree_order"
+                }
+              ]
+            },
+            {
+              "label": "External stylesheets: link rel=stylesheet and @import over controlled fetching",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Media queries (@media and media attributes) with viewport invalidation",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Container queries",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.invalidation",

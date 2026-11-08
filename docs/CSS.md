@@ -8,8 +8,10 @@ no dependencies beyond `rustic-base`. Since CSS-02 it also parses
 and the `An+B` microsyntax, and the new `rustic-style` crate matches selectors
 against a read-only DOM view (see [Selectors](#selectors)). CSS-03 added typed
 values for colors, lengths, the box model, `display` and font basics (see
-[Property values](#property-values)), and CSS-04 the cascade (see
-[Cascade](#cascade)). Computed values are CSS-05.
+[Property values](#property-values)), CSS-04 the cascade (see
+[Cascade](#cascade)), and CSS-05 computed values, the HTML user-agent
+stylesheet, `<style>` attachment and a style dump (see
+[Computed style](#computed-style)).
 
 ## Implemented behavior
 
@@ -112,8 +114,11 @@ never backtracks exponentially and a selector with tens of thousands of
 compounds never recurses. Recursion happens only into pseudo-class arguments,
 which the parser bounds, and each top-level match memoizes nested list results
 per element, so nested `:is(… *)` levels cost polynomial rather than
-exponential time (TD-21, paid with CSS-04). `:nth-*` pseudo-classes count
-siblings on each test without caching (TD-20).
+exponential time (TD-21, paid with CSS-04). `:nth-*` positions are memoized
+too, and a counted sibling's position is derived from the previous counted
+sibling's, so matching every child of a long list is linear rather than
+quadratic (TD-20, paid with CSS-05). A restyle (`style_tree`) and
+`query_selector_all` share one cache for the whole walk.
 
 ### Selector evidence
 
@@ -219,11 +224,11 @@ not implemented yet. Undeclared properties inherit or take their initial value.
 `style_tree` styles a whole document subtree in tree order, inheriting from
 each parent element.
 
-The result is the *specified* value. Until computed values arrive (CSS-05),
-inheritance passes the parent's specified value unchanged, so a relative value
-such as `font-size: 2em` is inherited as written rather than resolved. Cascade
-layers, shadow-tree encapsulation and the animation/transition origins are
-later steps.
+The result is the *specified* value. Inheritance and `inherit` take the parent
+element's *computed* value (see [Computed style](#computed-style)), so
+`font-size: 2em` is inherited as pixels, not re-applied. Cascade layers,
+shadow-tree encapsulation and the animation/transition origins are later
+steps.
 
 ### Cascade evidence
 
@@ -236,3 +241,67 @@ later steps.
   author sheet and checks that splitting the sheet in two, repeating it, or
   adding an empty user sheet never changes any element's specified style
   (400,000 executions before landing, no failures).
+
+## Computed style
+
+`ComputedStyle::compute` turns a specified style into computed values (CSS
+Cascade 5 §4.4, with each property's "computed value" line):
+
+| Property | Computed value |
+| --- | --- |
+| `font-size` | Pixels: keywords from `xx-small` 9px to `xxx-large` 48px with `medium` 16px; `larger`/`smaller` ×1.2 / ÷1.2 of the parent; percentages and `em` of the parent's size; `rem` of the root's (the root's own `rem` uses 16px) |
+| Other lengths | Pixels: absolute units, font-relative units against the element's font size, `lh`/`rlh` against the computed line height, viewport units against `ComputeContext` (default 1280×720) |
+| Percentages of the containing block | Kept as percentages for layout (widths, heights, margins, padding) |
+| `line-height` | Percentages and lengths become pixels; numbers and `normal` stay, so children rescale them |
+| `font-weight` | A number; `bolder`/`lighter` use the CSS Fonts 4 relative-weight table on the parent's weight |
+| Colors | `currentcolor` becomes the element's `color` (for `color` itself, the parent's) |
+| Border widths | Pixels (`thin` 1, `medium` 3, `thick` 5), and 0 when that side's style is `none` or `hidden` |
+| `display` | Blockified on the root element |
+
+Fonts are not loaded yet, so `ex` and `ch` use the specification's 0.5em
+fallback, `cap` 0.7em and `ic` 1em, and `normal` line height counts as 1.2 for
+`lh`. `style_tree` returns both the specified and computed style of each
+element and inherits computed values.
+
+### User-agent stylesheet and `<style>` elements
+
+`HTML_USER_AGENT_STYLESHEET` is the supported subset of the HTML Rendering
+section's sheet: hidden elements, block and list-item display, table display
+types, body margin, paragraph, heading, list and blockquote spacing, heading
+sizes and weights, and phrase elements (`b`, `strong`, `em`, `code`, ...).
+Logical margins and padding are written as their left-to-right physical sides
+until writing modes exist. `document_cascade` builds a cascade from that sheet
+and every HTML `<style>` element in tree order (not inside templates or
+foreign content). A `type` other than empty or `text/css` is skipped; a
+`media` attribute other than empty, `all` or `screen` is skipped until media
+queries arrive (CSS-06); each element is reported with its status and
+diagnostics. `<link rel=stylesheet>` needs fetching and is not loaded.
+
+### Style dump
+
+`dump_computed_styles` prints one line per element (tag, `#id`, `.class`es)
+and, indented below it, each computed value the element does not simply get by
+default: an inherited property that differs from the parent's computed value,
+or another property that differs from its initial value. Border colors are
+omitted on sides with no border. Output is bounded by a byte limit.
+`rustic dump-style <file>` loads a local HTML file with the same limits as
+`dump-dom`, lists each `<style>` element's status and dropped constructs, then
+prints the dump. The fixture `crates/rustic-cli/tests/fixtures/styled.html` and
+its snapshot `styled.dump` cover it.
+
+### Computed style evidence
+
+* `rustic-style/tests/computed.rs`: font-size keywords, percentages, `em`,
+  `rem` and root `rem`; absolute, font-relative, `lh` and viewport units;
+  line-height percentages versus numbers under inheritance; relative font
+  weights; `currentcolor` and border widths with `none` styles; root
+  blockification; a clean parse of the user-agent sheet; `<style>` attachment
+  (type, media, templates, foreign content, diagnostics); and an exact dump.
+* `rustic-style/tests/matching.rs`: cached `:nth-*` positions agree with fresh
+  matching for nine selectors including nested `of S` lists, and four `:nth-*`
+  selectors over a 20,000-element list stay linear.
+* `rustic-cli/tests/cli.rs`: the `dump-style` snapshot at several chunk sizes,
+  exact output budgets and URL rejection.
+* The `css-cascade` fuzz target also checks that computed font sizes stay
+  finite and non-negative, no computed value serializes as NaN or infinity, and
+  the dump always succeeds (300,000 executions before landing, no failures).

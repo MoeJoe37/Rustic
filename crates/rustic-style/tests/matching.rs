@@ -282,3 +282,70 @@ fn nested_logical_pseudo_classes_stay_polynomial() {
         started.elapsed()
     );
 }
+
+/// Elements matching `source` under `root`, by `matches` on each element
+/// with a fresh cache every time (the uncached reference).
+fn reference_matches(page: &ParsedDocument, source: &str) -> Vec<NodeId> {
+    let doc = page.document();
+    let list = selectors(source, &NamespaceMap::new());
+    let cx = MatchContext::html();
+    doc.walk(doc.root())
+        .unwrap()
+        .filter_map(|(id, _)| DomElement::new(doc, id))
+        .filter(|e| matches(&list, *e, &cx))
+        .map(|e| e.id())
+        .collect()
+}
+
+#[test]
+fn shared_nth_positions_agree_with_fresh_matching() {
+    // TD-20: positions are cached across a whole walk; they must equal what a
+    // fresh match computes, whatever order elements are tested in.
+    let mut html = String::from("<ul>");
+    for i in 0..60 {
+        let class = ["a", "b", "a b", ""][i % 4];
+        let tag = if i % 3 == 0 { "li" } else { "p" };
+        html.push_str(&format!("<{tag} class='{class}'></{tag}>"));
+    }
+    html.push_str("</ul>");
+    let page = document(&html);
+    let doc = page.document();
+    for source in [
+        ":nth-child(3n+1)",
+        ":nth-last-child(2n)",
+        "li:nth-of-type(odd)",
+        "p:nth-last-of-type(-n+4)",
+        ".a:nth-child(even of .b)",
+        ":nth-last-child(1 of .a)",
+        ":nth-child(2n of :nth-child(odd of .a))",
+        ".b:nth-child(odd), :nth-child(odd of .b)",
+        ":not(:nth-child(5n)):nth-last-of-type(3n+2)",
+    ] {
+        let list = selectors(source, &NamespaceMap::new());
+        let found = query_selector_all(doc, doc.root(), &list, &MatchContext::html()).unwrap();
+        assert_eq!(found, reference_matches(&page, source), "{source}");
+    }
+}
+
+#[test]
+fn nth_matching_over_long_sibling_lists_stays_linear() {
+    // TD-20: counting siblings on every test made this O(n²).
+    let page = document(&format!("<ul>{}</ul>", "<li class=x><li>".repeat(10_000)));
+    let doc = page.document();
+    let started = std::time::Instant::now();
+    for (source, expected) in [
+        ("li:nth-child(2n+1)", 10_000),
+        ("li:nth-last-of-type(-n+3)", 3),
+        ("li:nth-child(odd of .x)", 5_000),
+        ("li:nth-last-child(1 of .x)", 1),
+    ] {
+        let list = selectors(source, &NamespaceMap::new());
+        let found = query_selector_all(doc, doc.root(), &list, &MatchContext::html()).unwrap();
+        assert_eq!(found.len(), expected, "{source}");
+    }
+    assert!(
+        started.elapsed().as_secs() < 5,
+        "nth matching took {:?}",
+        started.elapsed()
+    );
+}

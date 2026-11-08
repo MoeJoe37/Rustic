@@ -201,3 +201,40 @@ fn dump_dom_escapes_hostile_paths_and_options_in_errors() {
     assert!(!message.contains('\u{202e}'));
     assert_eq!(message.lines().count(), 1, "{message}");
 }
+
+#[test]
+fn dump_style_matches_the_checked_snapshot_and_budgets() {
+    let input = fixture("styled.html");
+    let input = input.to_str().expect("UTF-8 fixture path");
+    let expected = fs::read(fixture("styled.dump")).expect("read snapshot");
+    for chunk in ["1", "7", "65536"] {
+        let output = rustic(&["dump-style", "--chunk-bytes", chunk, "--", input]);
+        assert!(
+            output.status.success(),
+            "chunk {chunk}: {}",
+            stderr(&output)
+        );
+        assert_eq!(output.stdout, expected, "chunk {chunk}");
+        assert!(output.stderr.is_empty());
+    }
+    let exact = expected.len().to_string();
+    assert!(
+        rustic(&["dump-style", "--max-output-bytes", &exact, input])
+            .status
+            .success()
+    );
+    for under in [expected.len() - 1, 10] {
+        let output = rustic(&[
+            "dump-style",
+            "--max-output-bytes",
+            &under.to_string(),
+            input,
+        ]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(stderr(&output).contains("output byte limit"));
+        assert!(output.stdout.is_empty());
+    }
+    let output = rustic(&["dump-style", "https://example.com/"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stderr(&output).starts_with("rustic dump-style:"));
+}

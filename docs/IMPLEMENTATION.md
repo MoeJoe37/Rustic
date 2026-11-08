@@ -442,7 +442,7 @@ default budgets plus a differential invariant:
 | `html-fragment` | The same feed-plan equality for fragment parsing, with one of 28 HTML/SVG/MathML contexts chosen from the input's fingerprint (added with DOC-06c) | Same as above |
 | `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01); typed longhands serialize to a fixed point (CSS-03) | Checked-in sheet plus the css-parsing-tests inputs |
 | `css-selector` | Every valid selector list serializes to a fixed point with equal specificities and selects the same elements of a fixed document in HTML, quirks and XML modes (added with CSS-02) | Checked-in selectors plus the pinned `An+B` inputs |
-| `css-cascade` | Styling a fixed document with an arbitrary author sheet is total and unchanged by splitting the sheet, repeating it or adding an empty user sheet (added with CSS-04) | The `css` seeds |
+| `css-cascade` | Styling a fixed document with an arbitrary author sheet is total and unchanged by splitting the sheet, repeating it or adding an empty user sheet (added with CSS-04); computed values stay finite and the style dump always succeeds (CSS-05) | The `css` seeds |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -570,6 +570,25 @@ exponential. A seventh fuzz target, `css-cascade`, checks cascade invariants.
 Cascade layers, shadow encapsulation and animation origins remain, so
 `css.cascade` has two of four steps. See [CSS.md](CSS.md#cascade).
 
+## CSS-05 — Computed values, stylesheet attachment and style dump
+
+`ComputedStyle::compute` resolves the CSS-03 longhands to computed values:
+lengths in pixels (font-relative, `lh` and viewport units included), font-size
+keywords, percentages and `em`/`rem`, relative font weights, `currentcolor`,
+border widths (zero under `none`/`hidden`) and root blockification, while
+containing-block percentages stay for layout. `style_tree` is now the
+full-restyle reference path: it cascades and computes every element and
+inherits computed values. `document_cascade` attaches the HTML user-agent
+stylesheet subset and the document's `<style>` elements (type and media
+checked, statuses and diagnostics reported), `dump_computed_styles` prints a
+deterministic dump, and `rustic dump-style <file>` exposes it with the
+`dump-dom` loader budgets and a checked fixture snapshot. The restyle shares one
+match cache, which also paid TD-20: `:nth-*` positions are memoized and derived
+from the previous counted sibling, so long lists match in linear time. The
+`css-cascade` fuzz target gained computed-value invariants. `css.values` and
+`css.queries` each have one of four steps; variables, media queries and
+external sheets remain. See [CSS.md](CSS.md#computed-style).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -624,13 +643,14 @@ must keep all tiers green.
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and seven fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
-| CSS-04: cascade and inheritance | Complete for unlayered styles: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance of specified values; layers, shadow contexts and animation origins remain |
+| CSS-04: cascade and inheritance | Complete for unlayered styles: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins remain |
+| CSS-05: computed values, attachment and style dump | Complete for the declared longhands: computed values, HTML UA sheet subset, `<style>` attachment, `dump-style` and a cached full-restyle path; font metrics, `var()` and media queries remain |
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style`; `:has()`, form-state pseudo-classes and nesting await CSS-07 |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
-failures. M2 has CSS-01 through CSS-04 done. Next: CSS-05 computed values,
-stylesheet attachment and a style dump, then CSS-06 invalidation. All project crates remain safe
+failures. M2 has CSS-01 through CSS-05 done. Next: CSS-06 invalidation, then
+media queries and custom properties. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

@@ -67,7 +67,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
-| TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Open, pay with CSS-05 restyle |
+| TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
 | TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -300,7 +300,7 @@ the hosted images ship rustup.
 hash pinned in the workflow for that OS/CPU (published hashes, checked when
 pinned). Unknown runner platforms fail instead of falling back to `curl | sh`.
 
-### TD-20 — `:nth-*` matching recounts siblings on every test
+### TD-20 — `:nth-*` matching recounts siblings on every test (Paid)
 
 `rustic-style` (CSS-02) computes an element's position for `:nth-child()`,
 `:nth-of-type()` and their `last` forms by walking its siblings on every test,
@@ -310,6 +310,16 @@ is fine for the reference matcher and tests but not for full restyles of large
 lists. **Pay:** cache sibling indices per parent for the duration of a restyle
 (as browsers do) and reuse them across selectors. **Trigger:** CSS-05 full
 restyle, or a measured slowdown on a page with large sibling lists.
+
+**Paid** (CSS-05): a match cache now lives for one `style_tree` restyle or
+`query_selector_all` walk and memoizes `:nth-*` positions per (kind, `of`
+list, element). A position is the previous counted sibling's plus one, so a
+lookup walks back only to the nearest known sibling and records every counted
+sibling it passes; each parent's list costs O(*n*) per selector. The cache is
+keyed by selector-list addresses, so it is dropped at the end of the walk.
+`nth_matching_over_long_sibling_lists_stays_linear` covers a 20,000-element
+list and `shared_nth_positions_agree_with_fresh_matching` checks the cached
+results against fresh matches.
 
 ### TD-21 — Nested pseudo-class matching is exponential in nesting (Paid)
 

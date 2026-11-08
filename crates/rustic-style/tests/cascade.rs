@@ -4,7 +4,9 @@
 use rustic_css::CssParser;
 use rustic_dom::{Document, NodeId, NodeKind};
 use rustic_html::{HtmlDocumentParser, ParsedDocument};
-use rustic_style::{Cascade, MatchContext, Origin, StyleDiagnosticKind, StyleSheet, style_tree};
+use rustic_style::{
+    Cascade, ComputeContext, MatchContext, Origin, StyleDiagnosticKind, StyleSheet, style_tree,
+};
 
 fn document(html: &str) -> ParsedDocument {
     let mut parser = HtmlDocumentParser::default();
@@ -44,10 +46,11 @@ fn styles(html: &str, sheets: &[(Origin, &str)]) -> Vec<(String, String)> {
         &cascade(sheets),
         &CssParser::default(),
         &MatchContext::html(),
+        &ComputeContext::default(),
     )
     .unwrap()
     .into_iter()
-    .filter_map(|s| Some((id_of(doc, s.node)?, s.style.dump_non_initial())))
+    .filter_map(|s| Some((id_of(doc, s.node)?, s.specified.dump_non_initial())))
     .collect()
 }
 
@@ -168,13 +171,14 @@ fn style_attributes_beat_rules_of_the_same_importance() {
         &Cascade::new(),
         &CssParser::default(),
         &MatchContext::html(),
+        &ComputeContext::default(),
     )
     .unwrap();
     let p = styled
         .iter()
         .find(|s| !s.inline_diagnostics.is_empty())
         .unwrap();
-    assert_eq!(p.style.dump_non_initial(), "width: 4px\n");
+    assert_eq!(p.specified.dump_non_initial(), "width: 4px\n");
     let kinds: Vec<_> = p.inline_diagnostics.iter().map(|d| d.kind).collect();
     assert_eq!(
         kinds,

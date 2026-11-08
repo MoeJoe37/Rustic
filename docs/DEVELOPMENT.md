@@ -36,8 +36,9 @@ cargo +stable test --locked --workspace --all-targets
 The first `Cargo.lock` is a dependency-free workspace lockfile. Keep it committed
 and use `--locked` so implicit resolution changes fail visibly. Do not publish the
 scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
-`--version` and the local-only `dump-dom` command described in
-[HTML_TREE.md](HTML_TREE.md#local-dump-dom-command).
+`--version`, the local-only `dump-dom` command described in
+[HTML_TREE.md](HTML_TREE.md#local-dump-dom-command), and `dump-style`, which
+prints computed styles for the same input ([CSS.md](CSS.md#style-dump)).
 
 The DOM `tree` example constructs nodes through the storage API, then emits an
 inspection dump. It is a runnable check of document ownership and traversal, not

@@ -8,16 +8,16 @@
 //! layers are not implemented yet). Properties with no declaration inherit or
 //! take their initial value.
 //!
-//! The result is the *specified* value of every supported longhand.
-//! Computed values (resolving `em`, percentages of font size, `currentcolor`,
-//! keyword font sizes and so on) are CSS-05; until then `inherit` and
-//! inherited properties pass the parent's specified value unchanged.
+//! The result is the *specified* value of every supported longhand; inherited
+//! values come from the parent's [`ComputedStyle`], and
+//! [`ComputedStyle::compute`] turns the result into computed values.
 
 use rustic_css::{
     CssWideKeyword, DeclaredValue, PropertyDeclaration, PropertyId, PropertyValue, Specificity,
 };
 
-use crate::{ElementView, MatchContext, Origin, StyleSheet, matches_complex};
+use crate::matching::{MatchCache, matches_complex_cached};
+use crate::{ComputedStyle, ElementView, MatchContext, Origin, StyleSheet};
 
 /// The specified value of every supported longhand for one element.
 #[derive(Clone, Debug, PartialEq)]
@@ -47,10 +47,14 @@ impl SpecifiedStyle {
 
     /// `property: value` lines for every longhand that differs from its
     /// initial value, in [`PropertyId::ALL`] order.
+    ///
+    /// A value equal to the *computed* initial value (such as the `16px`
+    /// font size a root passes down by inheritance) also counts as initial.
     pub fn dump_non_initial(&self) -> String {
+        let computed = ComputedStyle::initial();
         let mut out = String::new();
         for (&property, value) in PropertyId::ALL.iter().zip(&self.values) {
-            if *value != property.initial_value() {
+            if *value != property.initial_value() && value != computed.get(property) {
                 out.push_str(property.name());
                 out.push_str(": ");
                 out.push_str(&value.to_string());
@@ -116,14 +120,27 @@ impl Cascade {
     /// Compute `element`'s specified style.
     ///
     /// `inline` holds the element's `style` attribute declarations (author
-    /// origin); `parent` is the parent element's specified style, or `None`
-    /// for a root, which inherits initial values.
+    /// origin); `parent` is the parent element's computed style, or `None`
+    /// for a root, which inherits computed initial values. Inherited values
+    /// and `inherit` take the parent's computed value, as CSS requires.
     pub fn specified_style<E: ElementView>(
         &self,
         element: E,
         cx: &MatchContext<E>,
         inline: &[PropertyDeclaration],
-        parent: Option<&SpecifiedStyle>,
+        parent: Option<&ComputedStyle>,
+    ) -> SpecifiedStyle {
+        self.specified_style_cached(element, cx, inline, parent, &MatchCache::default())
+    }
+
+    /// [`Self::specified_style`] sharing `cache` across one restyle.
+    pub(crate) fn specified_style_cached<E: ElementView>(
+        &self,
+        element: E,
+        cx: &MatchContext<E>,
+        inline: &[PropertyDeclaration],
+        parent: Option<&ComputedStyle>,
+        cache: &MatchCache<E>,
     ) -> SpecifiedStyle {
         let mut candidates: Vec<Candidate<'_>> = Vec::new();
         for (sheet_index, sheet) in self.sheets.iter().enumerate() {
@@ -132,7 +149,10 @@ impl Cascade {
                     .selectors
                     .selectors()
                     .iter()
-                    .filter(|s| s.pseudo_element().is_none() && matches_complex(s, element, cx))
+                    .filter(|s| {
+                        s.pseudo_element().is_none()
+                            && matches_complex_cached(s, element, cx, cache)
+                    })
                     .map(|s| s.specificity())
                     .max();
                 let Some(specificity) = specificity else {
@@ -166,8 +186,14 @@ impl Cascade {
         }
         candidates.sort_by_key(|c| std::cmp::Reverse(c.priority));
 
-        let initial = SpecifiedStyle::initial();
-        let parent = parent.unwrap_or(&initial);
+        let initial;
+        let parent = match parent {
+            Some(parent) => parent,
+            None => {
+                initial = ComputedStyle::initial();
+                &initial
+            }
+        };
         let values = PropertyId::ALL
             .iter()
             .map(|&property| {

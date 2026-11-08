@@ -19,7 +19,7 @@ Device shells, rendering, input, and runtime validation are still planned. See
 architecture, implementation plan, shared engine primitives, and continuous
 integration. Bounded DOM/URL foundations, HTML tokenization,
 [document and fragment tree construction](docs/HTML_TREE.md), parser fuzzing and
-[CSS syntax, selector matching, typed property values and the cascade](docs/CSS.md) are implemented.
+[CSS syntax, selector matching, typed property values, the cascade and computed style](docs/CSS.md) are implemented.
 It does not yet execute JavaScript, fetch web pages, or render content.
 A complete modern browser engine is a sustained, multi-year
 engineering effort; milestones below describe targets, not existing support.
@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 14.33%** (11.96% verified complete + 2.37% partial credit) — 29/172 capabilities complete and 3 in progress across 21 subsystems. Current milestone: **M2 CSS & computed style**, 33.97% done.
+**Overall engine completion: 14.79%** (11.96% verified complete + 2.83% partial credit) — 29/172 capabilities complete and 5 in progress across 21 subsystems. Current milestone: **M2 CSS & computed style**, 39.10% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -75,13 +75,16 @@ cargo run --locked -p rustic-url --example resolve
 cargo run --locked -p rustic-html --example tokenize
 cargo run --locked -p rustic-html --example text_modes
 cargo run --locked -p rustic-html --example document
+cargo run --locked -p rustic-cli -- dump-style crates/rustic-cli/tests/fixtures/styled.html
 ```
 
 The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
 supported Rust version is **1.85.0**, tested separately in CI; the workspace uses
 the 2024 edition. The commands are `rustic info`, `--help`, `--version` and
 `rustic dump-dom <file>`, which loads one local HTML file within byte, token,
-node and output budgets and prints a deterministic DOM dump. URLs and other
+node and output budgets and prints a deterministic DOM dump, and
+`rustic dump-style <file>`, which prints each element's computed style for the
+same file. URLs and other
 arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints
@@ -99,7 +102,7 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 `rustic-url` (URL records, parsing and origins),
 `rustic-html` (streaming tokens and full WHATWG document tree construction),
 `rustic-css` (CSS syntax, selectors, specificity and typed property values),
-`rustic-style` (selector matching and the cascade over a read-only DOM view),
+`rustic-style` (selector matching, the cascade and computed style over a read-only DOM view),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

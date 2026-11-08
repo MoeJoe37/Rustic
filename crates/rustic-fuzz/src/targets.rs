@@ -14,7 +14,10 @@ use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
     ParseError, Token,
 };
-use rustic_style::{Cascade, MatchContext, Origin, StyleSheet, query_selector_all, style_tree};
+use rustic_style::{
+    Cascade, ComputeContext, MatchContext, Origin, StyleSheet, dump_computed_styles,
+    query_selector_all, style_tree,
+};
 use rustic_url::{Url, UrlParser};
 
 use crate::fingerprint;
@@ -783,14 +786,51 @@ fn cascade_styles(cascade: &Cascade) -> Vec<String> {
         cascade,
         &CssParser::default(),
         &MatchContext::html(),
+        &ComputeContext::default(),
     )
     .map(|styles| {
         styles
             .into_iter()
-            .map(|s| s.style.dump_non_initial())
+            .map(|s| s.computed.dump_non_initial())
             .collect()
     })
     .unwrap_or_default()
+}
+
+/// Computed values stay finite and the computed-style dump always succeeds.
+fn check_computed(cascade: &Cascade) -> Result<(), String> {
+    let mut document = HtmlDocumentParser::default();
+    if document.feed(CASCADE_DOCUMENT).is_err() {
+        return Ok(());
+    }
+    let Ok(document) = document.finish() else {
+        return Ok(());
+    };
+    let document = document.document();
+    let Ok(styles) = style_tree(
+        document,
+        document.root(),
+        cascade,
+        &CssParser::default(),
+        &MatchContext::html(),
+        &ComputeContext::default(),
+    ) else {
+        return Ok(());
+    };
+    for style in &styles {
+        let size = style.computed.font_size_px();
+        if !size.is_finite() || size < 0.0 {
+            return Err(format!("computed font size {size}"));
+        }
+        let dump = style.computed.dump_non_initial();
+        if dump.contains("NaN") || dump.contains("inf") {
+            return Err(format!("non-finite computed value in {dump:?}"));
+        }
+    }
+    if dump_computed_styles(document, &styles, usize::MAX).is_none() {
+        return Err("unbounded computed-style dump failed".into());
+    }
+    Ok(())
 }
 
 impl Target for CssCascadeTarget {
@@ -834,6 +874,13 @@ impl Target for CssCascadeTarget {
             b"block",
             b"@namespace x url(y);",
             b"@media x {",
+            b"currentcolor",
+            b"bolder",
+            b"larger",
+            b"1rem",
+            b"3vw",
+            b"1.5",
+            b"line-height:",
             b"/*",
             b"*/",
         ]
@@ -848,6 +895,7 @@ impl Target for CssCascadeTarget {
         let mut single = Cascade::new();
         single.push(sheet.clone());
         let reference = cascade_styles(&single);
+        check_computed(&single)?;
 
         let middle = sheet.rules.len() / 2;
         let mut split = Cascade::new();

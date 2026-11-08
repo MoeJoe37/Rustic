@@ -3,9 +3,10 @@
 use rustic_css::{CssParser, SelectorList};
 use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind};
 
+use crate::matching::{MatchCache, matches_complex_cached};
 use crate::{
-    AttributeRef, Cascade, ElementView, MatchContext, SpecifiedStyle, StyleDiagnostic, matches,
-    parse_style_attribute,
+    AttributeRef, Cascade, ComputeContext, ComputedStyle, ElementView, MatchContext,
+    SpecifiedStyle, StyleDiagnostic, parse_style_attribute,
 };
 
 /// An element of a [`Document`], borrowed for matching.
@@ -118,8 +119,8 @@ impl ElementView for DomElement<'_> {
 /// Every element in the subtree rooted at `root` (including `root`) that
 /// matches `list`, in tree order. Template contents are not searched.
 ///
-/// Cost is proportional to elements × selector work; `:nth-*` pseudo-classes
-/// count siblings on each test (no caching yet).
+/// Match results (nested lists and `:nth-*` positions) are shared across the
+/// walk, so cost is proportional to elements × selector work.
 pub fn query_selector_all(
     document: &Document,
     root: NodeId,
@@ -127,9 +128,13 @@ pub fn query_selector_all(
     cx: &MatchContext<DomElement<'_>>,
 ) -> Result<Vec<NodeId>, DomError> {
     let mut found = Vec::new();
+    let cache = MatchCache::default();
     for (id, _) in document.walk(root)? {
         if let Some(element) = DomElement::new(document, id) {
-            if matches(list, element, cx) {
+            let matched = list.selectors().iter().any(|s| {
+                s.pseudo_element().is_none() && matches_complex_cached(s, element, cx, &cache)
+            });
+            if matched {
                 found.push(id);
             }
         }
@@ -137,33 +142,42 @@ pub fn query_selector_all(
     Ok(found)
 }
 
-/// One element's specified style from [`style_tree`].
+/// One element's style from [`style_tree`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElementStyle {
     /// The element.
     pub node: NodeId,
-    /// Its specified style.
-    pub style: SpecifiedStyle,
+    /// Its specified style (the cascade's output).
+    pub specified: SpecifiedStyle,
+    /// Its computed style.
+    pub computed: ComputedStyle,
     /// Diagnostics from its `style` attribute.
     pub inline_diagnostics: Vec<StyleDiagnostic>,
 }
 
-/// Compute the specified style of every element in the subtree rooted at
-/// `root`, in tree order, with each element inheriting from its parent
-/// element (template contents are not styled).
+/// Style every element in the subtree rooted at `root`, in tree order: run
+/// the cascade, then compute values, with each element inheriting its parent
+/// element's computed values (template contents are not styled).
 ///
 /// `style` attributes on elements are parsed with `parser`; if one exceeds
 /// the parser's limits it is ignored (reported as an empty declaration list).
+/// When `root` is not the document's root element, the subtree is styled as
+/// if `root` had no parent.
 pub fn style_tree(
     document: &Document,
     root: NodeId,
     cascade: &Cascade,
     parser: &CssParser,
     cx: &MatchContext<DomElement<'_>>,
+    compute: &ComputeContext,
 ) -> Result<Vec<ElementStyle>, DomError> {
     let mut out: Vec<ElementStyle> = Vec::new();
-    // Indices into `out` of the styled ancestors on the current path.
-    let mut path: Vec<(usize, usize)> = Vec::new(); // (depth, index)
+    // (depth, index into `out`) of the styled ancestors on the current path.
+    let mut path: Vec<(usize, usize)> = Vec::new();
+    let mut root_style: Option<usize> = None;
+    // The tree and the cascade stay borrowed and unchanged for the whole
+    // restyle, so match results can be shared.
+    let cache = MatchCache::default();
     for (id, depth) in document.walk(root)? {
         while path.last().is_some_and(|&(d, _)| d >= depth) {
             path.pop();
@@ -183,12 +197,24 @@ pub fn style_tree(
         let parent = path
             .last()
             .filter(|&&(d, _)| d + 1 == depth)
-            .map(|&(_, i)| &out[i].style);
-        let style = cascade.specified_style(element, cx, &inline, parent);
+            .map(|&(_, i)| &out[i].computed);
+        let specified = cascade.specified_style_cached(element, cx, &inline, parent, &cache);
+        let root_computed = root_style.map(|i| &out[i].computed);
+        let computed = ComputedStyle::compute(
+            &specified,
+            parent,
+            root_computed,
+            element.is_root() || root_style.is_none(),
+            compute,
+        );
+        if root_style.is_none() {
+            root_style = Some(out.len());
+        }
         path.push((depth, out.len()));
         out.push(ElementStyle {
             node: id,
-            style,
+            specified,
+            computed,
             inline_diagnostics,
         });
     }

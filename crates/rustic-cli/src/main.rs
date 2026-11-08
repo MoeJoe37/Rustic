@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use rustic_base::{CancellationToken, EscapedText};
 use rustic_engine::Viewport;
+use rustic_html::ParsedDocument;
 
 mod loader;
 
@@ -15,12 +16,16 @@ const USAGE: &str = "Rustic browser engine development scaffold
 Usage:
   rustic info
   rustic dump-dom [OPTIONS] [--] <file>
+  rustic dump-style [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
-prints a deterministic DOM tree dump. URLs are rejected.
+prints a deterministic DOM tree dump. dump-style loads the file the same way,
+applies the HTML user-agent stylesheet and the document's <style> elements
+(external stylesheets are never fetched) and prints each element's computed
+style for a 1280x720 viewport. URLs are rejected.
 
-dump-dom options (positive integers; exceeding any limit except
+Options for both commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
   --max-input-bytes N    file and tokenizer input bytes (default 8388608)
   --max-output-bytes N   dump output bytes (default 67108864)
@@ -49,12 +54,15 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: partial local document parsing via dump-dom; CSS, JavaScript, networking, and rendering: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; layout, JavaScript, networking, and rendering: not implemented"
         );
         return ExitCode::SUCCESS;
     }
     if args[0] == "dump-dom" {
-        return dump_dom(&args[1..]);
+        return dump_command("dump-dom", &args[1..], loader::dump_dom);
+    }
+    if args[0] == "dump-style" {
+        return dump_command("dump-style", &args[1..], loader::dump_style);
     }
     eprintln!(
         "Unsupported command. Rendering and navigation are not implemented; see docs/ROADMAP.md."
@@ -62,23 +70,27 @@ fn main() -> ExitCode {
     ExitCode::from(2)
 }
 
-fn dump_dom(args: &[OsString]) -> ExitCode {
+fn dump_command(
+    command: &str,
+    args: &[OsString],
+    dump: fn(&ParsedDocument, usize) -> Result<String, LoadError>,
+) -> ExitCode {
     let (limits, path) = match parse_dump_args(args) {
         Ok(parsed) => parsed,
         Err(message) => {
-            eprintln!("rustic dump-dom: {message}\n\n{USAGE}");
+            eprintln!("rustic {command}: {message}\n\n{USAGE}");
             return ExitCode::from(2);
         }
     };
     let path = match loader::local_path(&path) {
         Ok(path) => path,
         Err(error) => {
-            eprintln!("rustic dump-dom: {error}");
+            eprintln!("rustic {command}: {error}");
             return ExitCode::from(2);
         }
     };
     let result = loader::load_document(&path, limits, CancellationToken::default())
-        .and_then(|parsed| loader::dump_dom(&parsed, limits.max_dump_bytes));
+        .and_then(|parsed| dump(&parsed, limits.max_dump_bytes));
     match result {
         Ok(dump) => {
             let mut stdout = io::stdout().lock();
@@ -92,14 +104,14 @@ fn dump_dom(args: &[OsString]) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error @ LoadError::InvalidLimits) => {
-            eprintln!("rustic dump-dom: {error}");
+            eprintln!("rustic {command}: {error}");
             ExitCode::from(2)
         }
         Err(error) => {
             // The path is user input: escape it so control characters in a file
             // name cannot forge terminal output or extra log lines.
             eprintln!(
-                "rustic dump-dom: {}: {error}",
+                "rustic {command}: {}: {error}",
                 EscapedText(&path.to_string_lossy())
             );
             ExitCode::from(1)

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "68a9b827408b89fd89734da71dabf93ee0077831688bc3d67cf02cba26e66d9d",
-  "percent": "14.33",
+  "source_fingerprint": "6cebb674866553f7aac9f6f15c6e3de67fcee2b9db6709d07cca0e2bf598317a",
+  "percent": "14.79",
   "verified_percent": "11.96",
-  "partial_percent": "2.37",
+  "partial_percent": "2.83",
   "completed": 29,
-  "in_progress": 3,
+  "in_progress": 5,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -27,9 +27,9 @@
       "share": "9.00",
       "completed": 1,
       "total": 8,
-      "percent": "33.97",
+      "percent": "39.10",
       "verified_percent": "7.69",
-      "partial_percent": "26.28"
+      "partial_percent": "31.41"
     },
     {
       "id": "M3",
@@ -1249,9 +1249,42 @@
           "label": "Computed values, variables and cycle handling",
           "size": 5,
           "milestone": "M2",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Computed values for the CSS-03 longhands: absolute lengths, font sizes, weights, currentcolor, border widths, root blockification, computed inheritance",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/computed.rs",
+                  "marker": "pub fn compute("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn font_sizes_resolve_against_the_parent_and_root"
+                }
+              ]
+            },
+            {
+              "label": "Computed values that need font metrics or math functions (ex/ch/cap from fonts, calc())",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Custom properties and var() substitution",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Dependency cycle handling for custom properties and font-relative units",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "1.15"
         },
         {
@@ -1259,9 +1292,42 @@
           "label": "Media/container queries and style attachment",
           "size": 3,
           "milestone": "M2",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "HTML user-agent stylesheet and document style element attachment",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/html.rs",
+                  "marker": "pub fn document_cascade("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn style_elements_are_attached_in_tree_order"
+                }
+              ]
+            },
+            {
+              "label": "External stylesheets: link rel=stylesheet and @import over controlled fetching",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Media queries (@media and media attributes) with viewport invalidation",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Container queries",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.69"
         },
         {
@@ -1287,12 +1353,12 @@
       ],
       "points": 39,
       "completed": 1,
-      "in_progress": 3,
+      "in_progress": 5,
       "total": 8,
-      "contribution": "3.05",
-      "percent": "33.97",
+      "contribution": "3.51",
+      "percent": "39.10",
       "verified_percent": "7.69",
-      "partial_percent": "26.28"
+      "partial_percent": "31.41"
     },
     {
       "id": "text",

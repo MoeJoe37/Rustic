@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang=en>
+<title>Styled fixture</title>
+<style>
+  :root { font-size: 20px; color: #333 }
+  .card { border: 2px solid currentcolor; padding: 0.5em 1rem; width: 50% }
+  .card > h2 { margin: 0; font-size: 150%; color: rgb(0 0 128) }
+  ul li:nth-child(odd of .x) { font-weight: lighter }
+  p:has(b) { color: red }
+  @media print { p { color: green } }
+</style>
+<style media=print>p { color: green }</style>
+<div class=card id=main>
+  <h2>Title</h2>
+  <p style="line-height: 150%; margin-left: 2em">Some <b>bold</b> and <em>emphasis</em>.</p>
+  <ul><li class=x>one<li>two<li class=x>three</ul>
+</div>
+<svg><rect width=10 /></svg>

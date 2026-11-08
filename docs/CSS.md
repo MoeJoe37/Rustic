@@ -597,7 +597,7 @@ new value types (`parse_media_query_list`, `CssParser::media_query_list`):
 | Area | Behavior |
 | --- | --- |
 | Queries | Comma-separated lists; `not`/`only` with a media type and an optional `and` condition, or a bare condition; `all`, `screen` and `print` match, other types (`tv`, ...) parse and never match; an empty list matches everything |
-| Conditions | `not`, `and`, `or` (not mixed without parentheses; no `or` directly after a media type), parentheses nested up to `MAX_MEDIA_NESTING` (32) |
+| Conditions | `not`, `and`, `or` (not mixed without parentheses; no `or` directly after a media type), parentheses nested up to `MAX_MEDIA_NESTING` (32); a query nested deeper is invalid as a whole |
 | Feature forms | `(name)`, `(name: value)`, `min-`/`max-` prefixes on range features, and range syntax `(name < v)`, `(v <= name)`, `(v1 < name <= v2)` with matching directions |
 | Features | `width`, `height`, `device-width`, `device-height`, `aspect-ratio`, `device-aspect-ratio`, `orientation`, `resolution` (`dpi`, `dpcm`, `dppx`, `x`), `color`, `color-index`, `monochrome`, `grid`, `scan`, `update`, `overflow-block`, `overflow-inline`, `color-gamut`, `dynamic-range`, `video-dynamic-range`, `pointer`, `any-pointer`, `hover`, `any-hover`, `prefers-color-scheme`, `prefers-reduced-motion`, `prefers-reduced-transparency`, `prefers-reduced-data`, `prefers-contrast`, `forced-colors`, `inverted-colors`, `scripting`, `display-mode` |
 | Errors | A malformed query becomes `not all` without affecting the rest of the list; an unknown feature, a value of the wrong type, or any other parenthesized or functional expression is `<general-enclosed>` and evaluates to unknown |
@@ -611,7 +611,7 @@ mouse and no scripting (JavaScript does not run yet). A `Cascade` holds one
 environment and caches each sheet's media list results; `set_environment`
 re-evaluates them and returns whether any result changed, which is the signal
 to restyle after a viewport resize or preference change. Container queries
-are planned after CSS-06's invalidation work.
+share the condition grammar; see [Container queries](#container-queries).
 
 ### Media query evidence
 
@@ -628,6 +628,65 @@ are planned after CSS-06's invalidation work.
   found two fixed-point bugs before landing (parentheses nested past the limit,
   and whitespace split by a comment), both fixed and kept as regression inputs;
   then 900,000 further executions found nothing.
+
+## Container queries
+
+`@container` rules follow [CSS Conditional Rules Level 5 §6](https://drafts.csswg.org/css-conditional-5/#container-queries)
+(Editor's Draft, reviewed 2026-11-08). `parse_container_query_list` reads a
+prelude as a comma-separated list of conditions. Each condition is an optional
+container name and an optional query, and at least one of the two must be
+present. A query uses the media condition grammar (`not`, `and`, `or`,
+parentheses, range syntax) with the container feature set. A media feature
+such as `(color)` is `<general-enclosed>` in a container query, and
+`inline-size` is `<general-enclosed>` in a media query. An invalid prelude
+drops the rule with `InvalidContainerRule`. The rule also nests inside style
+rules, `@media` and `@layer`, and they nest inside it.
+
+| Area | Behavior |
+| --- | --- |
+| Size features | `width`, `height`, `inline-size`, `block-size`, `aspect-ratio`, `orientation`; `inline-size` is `width` and `block-size` is `height`, since writing modes are not supported yet |
+| Style queries | `style(--name: value)`, `style(--name)` (true when the property has a value), and `not`/`and`/`or` of parenthesized style queries. Values are compared by serialization after substituting `var()` against the container. Standard properties in `style()` are unknown (browsers do not support them either) |
+| Properties | `container-type: normal \| size \| inline-size`, `container-name: none \| <custom-ident>+` (case-sensitive; not `and`, `or`, `not`, `default` or CSS-wide keywords) and the `container` shorthand `<name> [/ <type>]?` |
+| Container selection | The nearest ancestor (never the element itself) whose `container-name` lists the condition's name, if it has one, and whose `container-type` has every axis the query tests (`inline-size` gives the inline axis, `size` both). Every element is a style container. A condition with no eligible container is false |
+| Lengths | `em`/`ex`/`ch`/`cap`/`lh` use the container's font size, the `r*` units the root's, and viewport units the cascade's media environment |
+| Evaluation | Three-valued, as for media queries; the rule applies when any condition is true |
+
+Sizes come from layout, which arrives with M3. Until then the caller supplies
+content-box sizes per element: `style_tree_with_sizes` takes a map, and
+`StyledDocument::set_container_size` records or forgets one, restyling that
+element's subtree when it changes. A size feature tested on an element with
+no supplied size is unknown, so plain `style_tree` applies no size-based
+container rule. Container query length units (`cqw`, `cqi`, ...), `scroll-state()`
+queries, and the anonymous containment that size containers would impose on
+layout remain open.
+
+With `@container` rules in the cascade, an element whose computed style
+changes during a restyle recomputes its whole subtree. A descendant may query
+it even when the elements in between keep equal styles, for example when they
+override the custom property it tests.
+
+### Container query evidence
+
+* `rustic-css/tests/container.rs`: prelude parsing and serialization
+  (names, lists, `style()`, general-enclosed, invalid preludes); container
+  features kept out of media queries; 24 evaluations including unknown
+  sizes; the axes each query needs; and the container properties.
+* `rustic-style/tests/containers.rs`: nearest-eligible container selection by
+  type and name; `em` against the container; an element never being its own
+  container; style queries against the parent or a named ancestor;
+  `@container` nested in a style rule; diagnostics; and, through
+  `StyledDocument`, size changes and container style changes (also past an
+  ancestor that overrides the property) matching a full restyle.
+* The `css-media` fuzz target also checks every input as an `@container`
+  prelude: serialization is a fixed point and the reparsed list has the same
+  names, axes and results. It found three fixed-point bugs before landing,
+  all about parentheses near the nesting limit. They are fixed by keeping
+  parentheses around general-enclosed style queries, by counting `style()`
+  nesting from zero, and by treating a query nested past `MAX_MEDIA_NESTING`
+  as invalid, which also fixed a latent media query case. All four inputs
+  are kept as regressions, and 800,000 further executions found nothing. The `css-invalidation` target gained container size
+  mutations and container property values, and the `css` seeds gained
+  `corpus/css/container.css`.
 
 ## Invalidation
 
@@ -647,6 +706,7 @@ cascade's selectors decides the scope:
 | Text | The parent, when a selector uses `:empty` |
 | Anything, with `:has()` or HTML element states (`:checked`, `:default`, `:disabled`, `:lang()`, `:dir()`, ...) in the cascade, that those can read | Everything (TD-32) |
 | Stylesheets or the media environment (`cascade_changed`) | Everything |
+| A container size (`set_container_size`) | The element's subtree |
 
 During the walk an element whose computed style changed restyles its children
 (inheritance, and `inherit` on non-inherited properties), which stops where
@@ -707,15 +767,19 @@ failures are a missing reference without a fallback, a grammar mismatch and an
 exceeded limit. Substituted tokens keep their own units, so `2em` set on an
 ancestor resolves against the font size of the element that uses it.
 
-Two limits bound the work. Each element gets a budget of `MAX_SUBSTITUTED_VALUES`
-(65,536) component values across all of its substitutions, which stops
-exponential doubling chains. A substituted value may nest at most
+Two limits bound the work. Each computation gets a budget of `MAX_SUBSTITUTED_VALUES`
+(65,536) component values, which stops exponential doubling chains. One
+computation covers an element's custom property map or one `var()` longhand.
+Within a restyle the results are shared (TD-33, paid): elements with the same
+parent custom properties and the same winning custom declarations share one
+map, and a longhand is substituted once per declaration, longhand and map. A
+result depends only on these inputs, so sharing never changes a style. A substituted value may nest at most
 `MAX_SUBSTITUTION_DEPTH` (128) functions and blocks. Substitution never merges
 tokens: `var(--a)var(--a)` serializes with an empty comment between the copies.
 
 Computed custom properties live on `ComputedStyle::custom_properties()`. Both
 style dumps list them after the longhands in name order. `dump-style` lists them
-where they differ from the parent. Not yet supported: `@property` registration
+where they differ from the parent, cutting values at 256 bytes. Not yet supported: `@property` registration
 (typed, non-inherited or animatable custom properties), `env()`, `attr()`, and
 CSS-wide keywords produced by substitution, which are currently invalid
 instead of applying.
@@ -731,7 +795,8 @@ instead of applying.
   shorthands and `calc()`; case-sensitive names; fallbacks and
   invalid-at-computed-value-time (`unset`); CSS-wide keywords; cycles, self
   references and references to cycle members; style attributes; late
-  resolution of relative units; exponential expansion; and dumps.
+  resolution of relative units; exponential expansion; dumps; and a
+  2,000-paragraph doubling chain that must share one computed map (TD-33).
 * `rustic-style/tests/invalidation.rs`: changing an ancestor's custom
   property restyles the elements that use it, matching a full restyle.
 * `rustic-style/src/variables.rs` unit tests: component order and a

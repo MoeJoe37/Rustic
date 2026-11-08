@@ -209,3 +209,43 @@ fn dumps_list_custom_properties_where_they_change() {
     );
     assert!(!dump.contains("div#inner\n        --x"), "{dump}");
 }
+
+#[test]
+fn chained_variables_are_computed_once_and_shared() {
+    // TD-33: a doubling chain on many siblings is computed once per
+    // distinct input and shared, instead of once per element.
+    let mut css = String::from("p { --v0: aaaaaaaaaa;");
+    for i in 1..40 {
+        css.push_str(&format!(" --v{i}: var(--v{0}) var(--v{0});", i - 1));
+    }
+    css.push_str(" width: var(--v39) }");
+    let html = format!(
+        "<!doctype html><div>{}</div><section><p id=far></p></section>",
+        "<p></p>".repeat(2000)
+    );
+    let started = std::time::Instant::now();
+    let page = Styled::new(&html, &css);
+    let elapsed = started.elapsed();
+    let doc = page.page.document();
+    let paragraphs: Vec<&ElementStyle> = page
+        .styles
+        .iter()
+        .filter(|s| match doc.node(s.node).unwrap().kind() {
+            NodeKind::Element(e) => e.name().local() == "p",
+            _ => false,
+        })
+        .collect();
+    assert_eq!(paragraphs.len(), 2001);
+    let first = paragraphs[0].computed.custom_properties();
+    assert!(first.get("--v12").is_some());
+    assert!(first.get("--v39").is_none(), "past the budget");
+    for p in &paragraphs[1..2000] {
+        assert!(p.computed.custom_properties().shares_storage_with(first));
+    }
+    // Same values under another parent (not shared storage, equal content).
+    assert_eq!(paragraphs[2000].computed.custom_properties(), first);
+    assert_eq!(page.get("far", PropertyId::Width), "auto");
+    // Generous: about 0.1 s in release builds; per-element expansion took
+    // seconds even in release.
+    assert!(elapsed.as_secs() < 30, "{elapsed:?}");
+}

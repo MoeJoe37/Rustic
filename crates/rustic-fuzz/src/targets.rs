@@ -7,16 +7,17 @@
 
 use rustic_base::CancellationToken;
 use rustic_css::{
-    BlockItem, ColorScheme, CssParser, Declaration, MediaEnvironment, MediaType, NamespaceMap,
-    Parsed, PointerAccuracy, Rule, SelectorList, parse_block_contents, parse_declaration,
+    BlockItem, ColorScheme, ContainerFacts, CssParser, CustomValue, Declaration, MediaEnvironment,
+    MediaType, NamespaceMap, Parsed, PointerAccuracy, Rule, SelectorList, parse_block_contents,
+    parse_container_query_list, parse_declaration,
 };
 use rustic_html::{
     Diagnostic, FragmentContext, HtmlDocumentParser, HtmlError, HtmlFragmentParser, HtmlTokenizer,
     ParseError, Token,
 };
 use rustic_style::{
-    Cascade, ComputeContext, LayerSegment, MatchContext, Mutation, Origin, StyleSheet,
-    StyledDocument, dump_computed_styles, query_selector_all, style_tree,
+    Cascade, ComputeContext, ContainerSize, LayerSegment, MatchContext, Mutation, Origin,
+    StyleSheet, StyledDocument, dump_computed_styles, query_selector_all, style_tree,
 };
 use rustic_url::{Url, UrlParser};
 
@@ -905,6 +906,10 @@ impl Target for CssMediaTarget {
             b"0",
             b"dark",
             b"foo(",
+            b"style(",
+            b"--x",
+            b"inline-size",
+            b"block-size",
             b"\\",
             b"/*",
             b"*/",
@@ -937,8 +942,65 @@ impl Target for CssMediaTarget {
                 ));
             }
         }
-        Ok(())
+        check_container_prelude(&parser, &text)
     }
+}
+
+/// The same input as an `@container` prelude: serialization is a fixed
+/// point and the reparsed list evaluates the same against sample sizes.
+fn check_container_prelude(parser: &CssParser, text: &str) -> Result<(), String> {
+    let Ok(values) = parser.component_values(text) else {
+        return Ok(());
+    };
+    let Some(list) = parse_container_query_list(&values.value) else {
+        return Ok(());
+    };
+    let first = list.to_string();
+    let reparsed = parser
+        .component_values(&first)
+        .ok()
+        .and_then(|v| parse_container_query_list(&v.value));
+    let Some(reparsed) = reparsed else {
+        return Err(format!("container prelude {first:?} did not reparse"));
+    };
+    let second = reparsed.to_string();
+    if second != first {
+        return Err(format!(
+            "container serialization not a fixed point: {first:?} -> {second:?}"
+        ));
+    }
+    let style = |name: &str, value: Option<&CustomValue>| match value {
+        None => Some(name.len() % 2 == 0),
+        Some(v) => Some(v.to_string().len() % 2 == 0),
+    };
+    for (width, height) in [
+        (Some(0.0), Some(0.0)),
+        (Some(400.0), Some(300.0)),
+        (Some(50.0), None),
+        (None, None),
+    ] {
+        let facts = ContainerFacts {
+            width,
+            height,
+            font_size_px: 16.0,
+            root_font_size_px: 16.0,
+            viewport_width: 1280.0,
+            viewport_height: 720.0,
+        };
+        for (a, b) in list.conditions.iter().zip(&reparsed.conditions) {
+            let eval = |c: &rustic_css::ContainerCondition| {
+                c.query
+                    .as_ref()
+                    .map(|q| q.evaluate_container(&facts, &style))
+            };
+            if a.name != b.name || eval(a) != eval(b) || a.axes() != b.axes() {
+                return Err(format!(
+                    "container prelude {first:?} changed meaning after reparsing"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Incremental restyling: a fixed document styled with an arbitrary author
@@ -992,6 +1054,8 @@ const MUTATION_VALUES: &[&str] = &[
     "--v: 3px",
     "--v: var(--w); --w: var(--v)",
     "width: var(--v, 2px); --w: calc(var(--v) * 2)",
+    "container-type: size",
+    "container: c / inline-size; --t: 1",
 ];
 const MUTATION_TAGS: &[&str] = &["div", "p", "li", "span", "input", "b", "ul", "html"];
 
@@ -1032,6 +1096,7 @@ fn invalidation_texts(document: &rustic_dom::Document) -> Vec<rustic_dom::NodeId
 fn apply_mutation(
     document: &mut rustic_dom::Document,
     script: &mut impl Iterator<Item = u8>,
+    sizes: &mut Vec<(rustic_dom::NodeId, Option<ContainerSize>)>,
 ) -> Option<Vec<Mutation>> {
     use rustic_dom::QualifiedName;
     let op = script.next()?;
@@ -1039,12 +1104,22 @@ fn apply_mutation(
         script.next().map(|b| usize::from(b) % len.max(1))
     };
     let elements = invalidation_elements(document);
-    let mutation = match op % 6 {
+    let mutation = match op % 7 {
+        6 => {
+            let element = *elements.get(pick(script, elements.len())?)?;
+            let b = script.next()?;
+            let size = (b % 5 != 0).then(|| ContainerSize {
+                width: f64::from(b) * 8.0,
+                height: f64::from(b >> 4) * 50.0,
+            });
+            sizes.push((element, size));
+            None
+        }
         0 | 1 => {
             let element = *elements.get(pick(script, elements.len())?)?;
             let local = MUTATION_ATTRIBUTES[pick(script, MUTATION_ATTRIBUTES.len())?];
             let name = QualifiedName::from_parsed(None, None, local).ok()?;
-            let done = if op % 6 == 0 {
+            let done = if op % 7 == 0 {
                 let value = MUTATION_VALUES[pick(script, MUTATION_VALUES.len())?];
                 document.set_attribute(element, name, value).is_ok()
             } else {
@@ -1136,6 +1211,9 @@ impl Target for CssInvalidationTarget {
             b"color: red",
             b"font-size: 2em",
             b"width: inherit",
+            b"@container (width > 100px) {",
+            b"@container c style(--t: 1) {",
+            b"container-type: size",
             b"\x00\x00\x00\x00",
             b"\x02\x03\x04",
         ]
@@ -1179,8 +1257,16 @@ impl Target for CssInvalidationTarget {
             styled
                 .restyle(document, &cascade, &parser, &cx, &compute)
                 .map_err(|e| format!("restyle failed: {e}"))?;
-            let full = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)
-                .map_err(|e| format!("full restyle failed: {e}"))?;
+            let full = rustic_style::style_tree_with_sizes(
+                document,
+                document.root(),
+                &cascade,
+                &parser,
+                &cx,
+                &compute,
+                styled.container_sizes(),
+            )
+            .map_err(|e| format!("full restyle failed: {e}"))?;
             if full.len() != styled.styles().len() {
                 return Err(format!(
                     "step {step}: {} incremental styles, {} full",
@@ -1200,10 +1286,14 @@ impl Target for CssInvalidationTarget {
             }
             Ok(())
         };
-        while let Some(mutations) = apply_mutation(&mut document, &mut script) {
+        let mut sizes = Vec::new();
+        while let Some(mutations) = apply_mutation(&mut document, &mut script, &mut sizes) {
             step += 1;
             for mutation in mutations {
                 styled.note(&document, mutation);
+            }
+            for (element, size) in sizes.drain(..) {
+                styled.set_container_size(element, size);
             }
             if step % 3 == 0 {
                 check(&mut styled, &document, step)?;
@@ -1346,12 +1436,14 @@ impl Target for CssCascadeTarget {
                 origin: Origin::Author,
                 rules: sheet.rules[..middle].to_vec(),
                 media: sheet.media.clone(),
+                containers: sheet.containers.clone(),
                 layers: sheet.layers.clone(),
             });
             split.push(StyleSheet {
                 origin: Origin::Author,
                 rules: sheet.rules[middle..].to_vec(),
                 media: sheet.media.clone(),
+                containers: sheet.containers.clone(),
                 layers: sheet.layers.clone(),
             });
             if cascade_styles(&split) != reference {

@@ -7,10 +7,10 @@ use std::sync::Arc;
 
 use rustic_base::SourceSpan;
 use rustic_css::{
-    AtRule, BlockItem, ComponentValue, CssError, CssParser, Declaration, MediaQueryList,
-    NamespaceMap, PropertyDeclaration, PropertyError, Rule, SelectorErrorKind, SelectorList, Token,
-    Value, parse_block_contents, parse_declaration, parse_media_query_list,
-    parse_nested_selector_list, parse_selector_list,
+    AtRule, BlockItem, ComponentValue, ContainerQueryList, CssError, CssParser, Declaration,
+    MediaQueryList, NamespaceMap, PropertyDeclaration, PropertyError, Rule, SelectorErrorKind,
+    SelectorList, Token, Value, parse_block_contents, parse_container_query_list,
+    parse_declaration, parse_media_query_list, parse_nested_selector_list, parse_selector_list,
 };
 
 use crate::{LayerName, LayerSegment};
@@ -39,8 +39,10 @@ pub struct StyleRule {
     pub selectors: SelectorList,
     /// Typed longhand declarations, in source order (shorthands expanded).
     pub declarations: Vec<PropertyDeclaration>,
-    /// Indices into [`StyleSheet::media`] of the media query lists the rule
+    /// Indices into [`StyleSheet::media`] of the conditional rules the rule
     /// is nested in (outermost first); the rule applies only when all match.
+    /// An index listed in [`StyleSheet::containers`] is an `@container`
+    /// condition (its media list is empty, so it always matches as media).
     pub media: Vec<usize>,
     /// The rule's cascade layer, as an index into its sheet's
     /// [`StyleSheet::layers`]; `None` for an unlayered rule. An index past
@@ -60,6 +62,9 @@ pub struct StyleSheet {
     /// `@media` rule, plus any added for the whole sheet (such as a `<style>`
     /// element's `media` attribute).
     pub media: Vec<MediaQueryList>,
+    /// `@container` conditions, as (index into [`StyleSheet::media`], query
+    /// list) pairs in increasing index order.
+    pub containers: Vec<(usize, ContainerQueryList)>,
     /// Every cascade layer the sheet declares, fully qualified, in order of
     /// first declaration (`@layer` statements and blocks alike). Layer
     /// order follows this list; style rules refer to it by index.
@@ -84,6 +89,8 @@ pub enum StyleDiagnosticKind {
     InvalidNamespaceRule,
     /// An `@media` rule without a block.
     InvalidMediaRule,
+    /// An `@container` rule without a block or with an invalid prelude.
+    InvalidContainerRule,
     /// A malformed `@layer` rule, such as one naming a layer `initial`, or a
     /// block rule naming more than one layer.
     InvalidLayerRule,
@@ -369,14 +376,42 @@ impl Builder {
         index
     }
 
-    /// `@media`: the frame for its block, with its query list added.
-    fn media_rule(&mut self, at: AtRule, layer: Option<usize>, media: &[usize]) -> Option<Frame> {
-        let Some(block) = at.block else {
-            self.diagnose(StyleDiagnosticKind::InvalidMediaRule, at.span);
+    /// The condition of an `@media` or `@container` rule with a block, as a
+    /// new index into the sheet's media lists, and the block; `None` (with a
+    /// diagnostic) for a rule without a block or an invalid container query.
+    fn condition(&mut self, at: AtRule) -> Option<(usize, Vec<Value>)> {
+        let container = at.name.eq_ignore_ascii_case("container");
+        let kind = if container {
+            StyleDiagnosticKind::InvalidContainerRule
+        } else {
+            StyleDiagnosticKind::InvalidMediaRule
+        };
+        let query = if container {
+            parse_container_query_list(&at.prelude).map(Some)
+        } else {
+            Some(None)
+        };
+        let (Some(block), Some(query)) = (at.block, query) else {
+            self.diagnose(kind, at.span);
             return None;
         };
         let index = self.sheet.media.len();
-        self.sheet.media.push(parse_media_query_list(&at.prelude));
+        match query {
+            Some(query) => {
+                self.sheet.media.push(MediaQueryList {
+                    queries: Vec::new(),
+                });
+                self.sheet.containers.push((index, query));
+            }
+            None => self.sheet.media.push(parse_media_query_list(&at.prelude)),
+        }
+        Some((index, block))
+    }
+
+    /// `@media` or `@container`: the frame for its block, with its
+    /// condition added.
+    fn media_rule(&mut self, at: AtRule, layer: Option<usize>, media: &[usize]) -> Option<Frame> {
+        let (index, block) = self.condition(at)?;
         let mut nested = media.to_vec();
         nested.push(index);
         Some(Frame {
@@ -426,14 +461,14 @@ impl Builder {
                         }
                     }
                 }
-                BlockItem::Rule(Rule::At(at)) if at.name.eq_ignore_ascii_case("media") => {
-                    let Some(block) = at.block else {
-                        self.diagnose(StyleDiagnosticKind::InvalidMediaRule, at.span);
+                BlockItem::Rule(Rule::At(at))
+                    if at.name.eq_ignore_ascii_case("media")
+                        || at.name.eq_ignore_ascii_case("container") =>
+                {
+                    let Some((index, block)) = self.condition(at) else {
                         continue;
                     };
                     frame.flush(&mut self.sheet.rules, layer);
-                    let index = self.sheet.media.len();
-                    self.sheet.media.push(parse_media_query_list(&at.prelude));
                     let mut media = frame.media.clone();
                     media.push(index);
                     let mut child = NestingFrame::new(Arc::clone(&frame.selectors), media, &block);
@@ -597,7 +632,10 @@ impl StyleSheet {
                         stack.push(frame);
                     }
                 }
-                Rule::At(at) if at.name.eq_ignore_ascii_case("media") => {
+                Rule::At(at)
+                    if at.name.eq_ignore_ascii_case("media")
+                        || at.name.eq_ignore_ascii_case("container") =>
+                {
                     builder.namespaces_allowed = false;
                     if let Some(frame) = builder.media_rule(at, layer, &media) {
                         stack.push(frame);
@@ -633,6 +671,14 @@ impl StyleSheet {
         for rule in &mut self.rules {
             rule.media.insert(0, index);
         }
+    }
+
+    /// The `@container` query list at media index `index`, if it is one.
+    pub fn container_at(&self, index: usize) -> Option<&ContainerQueryList> {
+        self.containers
+            .binary_search_by_key(&index, |(i, _)| *i)
+            .ok()
+            .map(|i| &self.containers[i].1)
     }
 
     /// Whether `rule`'s media conditions all hold, given each of this

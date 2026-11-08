@@ -35,8 +35,9 @@ pub fn is_custom_property_name(name: &str) -> bool {
 
 /// The value of a custom property: component values, kept as written.
 ///
-/// Values are compared by their component values, including source spans.
-#[derive(Clone, Debug, PartialEq)]
+/// Values are compared by their component values, including source spans
+/// (shared storage compares equal without a walk).
+#[derive(Clone, Debug)]
 pub struct CustomValue {
     values: Arc<[Value]>,
     /// Component values, counting nested ones.
@@ -137,6 +138,13 @@ pub(crate) fn has_references(values: &[Value]) -> bool {
 /// closing bracket.
 pub(crate) fn valid_for_substitution(values: &[Value]) -> bool {
     shape(values).valid
+}
+
+impl PartialEq for CustomValue {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.values, &other.values)
+            || (self.size == other.size && self.values == other.values)
+    }
 }
 
 impl CustomValue {

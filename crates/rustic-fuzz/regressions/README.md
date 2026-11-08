@@ -9,4 +9,8 @@ message describing the violated contract.
 | Reproducer | Contract | Fix |
 | --- | --- | --- |
 | `css-media/violation-076bafb4550d968d.bin` | Media query serialization must be a fixed point; parentheses nested past `MAX_MEDIA_NESTING` around general-enclosed collapsed on reparse | CSS-06: parentheses around general-enclosed stay general-enclosed |
+| `css-media/violation-0639aa11e8f78f12.bin` | `@container` prelude serialization must be a fixed point; a `style()` query's parentheses around general-enclosed collapsed on reparse | CSS-06: parentheses around general-enclosed style queries stay general-enclosed |
+| `css-media/violation-87bace5f31c6386a.bin` | `@container` prelude serialization must be a fixed point; a `style()` query's nesting limit counted the media parentheses around it, which serialization can drop | CSS-06: `style()` counts its own nesting from zero |
+| `css-media/violation-c97cedf85e7049bb.bin` | `@container` prelude serialization must be a fixed point; a nesting limit hit inside `style()` kept the inner parentheses as general-enclosed while the outer ones collapsed | CSS-06: a `style()` nested past the limit is general-enclosed as a whole |
+| `css-media/violation-cfd9fe1a97a41aa2.bin` | Media query serialization must be a fixed point; a nesting limit hit under `not` kept inner parentheses as general-enclosed while the outer ones collapsed | CSS-06: a query nested past `MAX_MEDIA_NESTING` is invalid as a whole |
 | `css-media/violation-d6d25ca1ecbf13e5.bin` | Media query serialization must be a fixed point; whitespace split by a comment inside general-enclosed doubled and then merged on reparse | CSS-06: consecutive whitespace values serialize as one space |

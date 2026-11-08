@@ -25,6 +25,7 @@ mod anb;
 mod background;
 mod calc;
 mod color;
+mod container;
 mod custom;
 mod error;
 mod length;
@@ -45,6 +46,10 @@ pub use background::{
 };
 pub use calc::{Calc, CalcKind, CalcNode, MAX_CALC_DEPTH, MAX_CALC_NODES};
 pub use color::{Color, LabSpace, PredefinedSpace};
+pub use container::{
+    ContainerAxes, ContainerCondition, ContainerFacts, ContainerQueryList, StyleQuery,
+    parse_container_query_list,
+};
 pub use custom::{
     CustomValue, MAX_SUBSTITUTED_VALUES, MAX_SUBSTITUTION_DEPTH, UnparsedValue,
     is_custom_property_name,
@@ -58,13 +63,13 @@ pub use media::{
 };
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
-    BorderStyle, BorderWidth, BoxSizing, Clear, CssWideKeyword, DeclaredValue, Direction, Display,
-    FamilyName, Float, FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle,
-    FontVariantCaps, FontWeight, GenericFamily, LengthPercentageOrAuto, LineHeight, MaxSize,
-    Overflow, Position, PropertyDeclaration, PropertyError, PropertyId, PropertyName,
-    PropertyValue, Spacing, TextAlign, TextCase, TextDecorationLine, TextDecorationStyle,
-    TextTransform, VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, ZIndex,
-    parse_declaration,
+    BorderStyle, BorderWidth, BoxSizing, Clear, ContainerType, CssWideKeyword, DeclaredValue,
+    Direction, Display, FamilyName, Float, FontSize, FontSizeKeyword, FontStretch,
+    FontStretchKeyword, FontStyle, FontVariantCaps, FontWeight, GenericFamily,
+    LengthPercentageOrAuto, LineHeight, MaxSize, Overflow, Position, PropertyDeclaration,
+    PropertyError, PropertyId, PropertyName, PropertyValue, Spacing, TextAlign, TextCase,
+    TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign, VerticalAlignKeyword,
+    Visibility, WhiteSpace, ZIndex, parse_declaration,
 };
 pub use rules::{AtRule, BlockItem, Declaration, QualifiedRule, Rule};
 pub use selector::{

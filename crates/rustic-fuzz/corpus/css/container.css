@@ -1,0 +1,7 @@
+div{container:card/inline-size;--t:dark}#a{container-type:size;container-name:main side}
+@container (width>300px){p{color:red}}@container card (min-width:10em) and (height){p{width:1px}}
+@container main style(--t:dark),side not (orientation:portrait){span{height:2px}}
+p{color:blue;@container (inline-size<=1px){color:green;b{color:red}}}
+@container style((--t:dark) or (not (--x))){li{margin:var(--m,1px)}}
+@container none (width>1px){p{color:red}}@container (width>1px);@container x foo(bar){i{color:red}}
+@media (width>1px){@container (aspect-ratio>1/2){b{width:3px}}}@layer l{@container c{a{color:red}}}

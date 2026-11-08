@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "37b8a203e6369b6f4e94d20194e4d31114098609da9eaaf2babf502df8c756d7",
-  "percent": "18.31",
-  "verified_percent": "16.11",
-  "partial_percent": "2.20",
-  "completed": 32,
-  "in_progress": 4,
+  "source_fingerprint": "450ac364ece1ad7f2d5efc6efd6bbd89a49a5eeea9a332d12a58515421d7f1f6",
+  "percent": "18.72",
+  "verified_percent": "16.81",
+  "partial_percent": "1.91",
+  "completed": 33,
+  "in_progress": 3,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -25,11 +25,11 @@
       "id": "M2",
       "label": "CSS & computed style",
       "share": "9.00",
-      "completed": 4,
+      "completed": 5,
       "total": 8,
-      "percent": "75.85",
-      "verified_percent": "53.84",
-      "partial_percent": "22.01"
+      "percent": "80.34",
+      "verified_percent": "61.53",
+      "partial_percent": "18.81"
     },
     {
       "id": "M3",
@@ -1398,74 +1398,75 @@
           "label": "Media/container queries and style attachment",
           "size": 3,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "HTML user-agent stylesheet and document style element attachment",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html.rs",
-                  "marker": "pub fn document_cascade("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn style_elements_are_attached_in_tree_order"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "pub fn document_cascade("
             },
             {
-              "label": "External stylesheets: link rel=stylesheet and @import over controlled fetching",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html.rs",
-                  "marker": "pub fn document_cascade_with("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/loading.rs",
-                  "marker": "pub trait StylesheetFetcher"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/external.rs",
-                  "marker": "fn imports_precede_their_sheet_and_resolve_against_it"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn dump_style_loads_linked_and_imported_sheets_beside_the_document"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn style_elements_are_attached_in_tree_order"
             },
             {
-              "label": "Media queries (@media rules and media attributes) re-evaluated when the environment changes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/media.rs",
-                  "marker": "pub fn parse_media_query_list"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/cascade.rs",
-                  "marker": "fn media_rules_apply_only_when_their_queries_match"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "pub fn document_cascade_with("
             },
             {
-              "label": "Container queries",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-style/src/loading.rs",
+              "marker": "pub trait StylesheetFetcher"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/external.rs",
+              "marker": "fn imports_precede_their_sheet_and_resolve_against_it"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn dump_style_loads_linked_and_imported_sheets_beside_the_document"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/media.rs",
+              "marker": "pub fn parse_media_query_list"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn media_rules_apply_only_when_their_queries_match"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/container.rs",
+              "marker": "pub fn parse_container_query_list"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/containers.rs",
+              "marker": "pub(crate) fn container_list_matches"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/containers.rs",
+              "marker": "fn size_queries_use_the_nearest_eligible_container"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/sheet.rs",
+              "marker": "pub fn container_at"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/containers.rs",
+              "marker": "fn container_rules_nest_and_report_errors"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.69"
         },
         {
@@ -1530,12 +1531,23 @@
               ]
             },
             {
-              "label": "Invalidation for container query dependencies",
-              "status": "planned",
-              "evidence": []
+              "label": "Invalidation for container query dependencies (container sizes and container styles restyle descendants)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/invalidation.rs",
+                  "marker": "pub fn set_container_size"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/containers.rs",
+                  "marker": "fn sizes_and_container_styles_invalidate_descendants"
+                }
+              ]
             }
           ],
-          "credit": "60.00",
+          "credit": "80.00",
           "engine_share": "1.15"
         },
         {
@@ -1550,13 +1562,13 @@
         }
       ],
       "points": 39,
-      "completed": 4,
-      "in_progress": 3,
+      "completed": 5,
+      "in_progress": 2,
       "total": 8,
-      "contribution": "6.82",
-      "percent": "75.85",
-      "verified_percent": "53.84",
-      "partial_percent": "22.01"
+      "contribution": "7.23",
+      "percent": "80.34",
+      "verified_percent": "61.53",
+      "partial_percent": "18.81"
     },
     {
       "id": "text",

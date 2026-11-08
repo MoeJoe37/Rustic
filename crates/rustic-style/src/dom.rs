@@ -7,8 +7,9 @@ use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
 
 use crate::matching::{MatchCache, matches_complex_cached};
 use crate::{
-    AttributeRef, Cascade, ChildRef, ComputeContext, ComputedStyle, ElementView, MatchContext,
-    SpecifiedStyle, StyleDiagnostic, StyleInputs, TreeContext, TreeScope, parse_style_attribute,
+    AttributeRef, Cascade, ChildRef, ComputeContext, ComputedStyle, ContainerInfo, ContainerSize,
+    ElementView, MatchContext, SpecifiedStyle, StyleDiagnostic, StyleInputs, TreeContext,
+    TreeScope, parse_style_attribute,
 };
 
 /// An element of a [`Document`], borrowed for matching.
@@ -221,7 +222,31 @@ pub fn style_tree<'a>(
     cx: &MatchContext<DomElement<'a>>,
     compute: &ComputeContext,
 ) -> Result<Vec<ElementStyle>, DomError> {
-    style_walk(document, root, cascade, parser, cx, compute, None).map(|walk| walk.styles)
+    style_walk(
+        document,
+        root,
+        cascade,
+        parser,
+        cx,
+        (compute, &HashMap::new()),
+        None,
+    )
+    .map(|walk| walk.styles)
+}
+
+/// [`style_tree`] with the content-box sizes of query containers, as
+/// layout would report them, for `@container` size features. Elements
+/// without a size answer size features with unknown.
+pub fn style_tree_with_sizes<'a>(
+    document: &'a Document,
+    root: NodeId,
+    cascade: &Cascade,
+    parser: &CssParser,
+    cx: &MatchContext<DomElement<'a>>,
+    compute: &ComputeContext,
+    sizes: &HashMap<NodeId, ContainerSize>,
+) -> Result<Vec<ElementStyle>, DomError> {
+    style_walk(document, root, cascade, parser, cx, (compute, sizes), None).map(|walk| walk.styles)
 }
 
 /// Styles kept from an earlier walk and what has to be recomputed; see
@@ -274,16 +299,19 @@ struct PathEntry {
 
 /// The walk behind [`style_tree`]; with `reuse`, an element keeps its
 /// earlier style unless it is dirty, has a new style parent, or its parent
-/// (or the root) got a different computed style.
+/// (or the root) got a different computed style. With `@container` rules in
+/// the cascade, a changed computed style restyles the whole subtree, since
+/// any descendant may query it.
 pub(crate) fn style_walk<'a>(
     document: &'a Document,
     root: NodeId,
     cascade: &Cascade,
     parser: &CssParser,
     cx: &MatchContext<DomElement<'a>>,
-    compute: &ComputeContext,
+    (compute, sizes): (&ComputeContext, &HashMap<NodeId, ContainerSize>),
     mut reuse: Option<Reuse<'_>>,
 ) -> Result<Walked, DomError> {
+    let container_queries = cascade.has_container_queries();
     let mut out: Vec<ElementStyle> = Vec::new();
     let mut parents: Vec<Option<NodeId>> = Vec::new();
     let mut recomputed = 0usize;
@@ -364,10 +392,25 @@ pub(crate) fn style_walk<'a>(
                     Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
                     None => Default::default(),
                 };
+                let containers: Vec<ContainerInfo<'_, DomElement<'a>>> = if container_queries {
+                    path.iter()
+                        .filter_map(|e| {
+                            let ancestor = &out[e.index];
+                            Some(ContainerInfo {
+                                element: DomElement::new(document, ancestor.node)?,
+                                style: &ancestor.computed,
+                                size: sizes.get(&ancestor.node).copied(),
+                            })
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
                 let inputs = StyleInputs {
                     style_attribute: &inline,
                     scope,
                     shadow_root: shadow_root.map(shadow_tree_context),
+                    containers: &containers,
                     ..StyleInputs::document()
                 };
                 let parent = parent_entry.map(|e| &out[e.index].computed);
@@ -400,7 +443,7 @@ pub(crate) fn style_walk<'a>(
         path.push(PathEntry {
             depth,
             index: out.len(),
-            subtree,
+            subtree: subtree || (container_queries && changed),
             changed,
         });
         out.push(style);

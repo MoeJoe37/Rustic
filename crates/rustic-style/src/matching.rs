@@ -8,6 +8,7 @@ use rustic_css::{
 use rustic_dom::HTML_NAMESPACE;
 use rustic_url::idna::StrongDirection;
 
+use crate::variables::SubstitutionCache;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -136,6 +137,8 @@ pub(crate) struct MatchCache<E> {
     subtrees: RefCell<HashMap<(usize, E), bool>>,
     pub(crate) directions: RefCell<HashMap<E, StrongDirection>>,
     pub(crate) tree: RefCell<Option<Rc<TreeFacts<E>>>>,
+    /// Shared custom property and `var()` results (TD-33).
+    pub(crate) substitution: RefCell<SubstitutionCache>,
 }
 
 impl<E> Default for MatchCache<E> {
@@ -146,6 +149,7 @@ impl<E> Default for MatchCache<E> {
             subtrees: RefCell::new(HashMap::new()),
             directions: RefCell::new(HashMap::new()),
             tree: RefCell::new(None),
+            substitution: RefCell::new(SubstitutionCache::default()),
         }
     }
 }

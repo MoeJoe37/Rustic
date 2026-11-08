@@ -80,7 +80,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Open |
-| TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Open, fix before real-page styling |
+| TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -493,7 +493,7 @@ changes only under `dir=auto` ancestors). **Trigger:** script-driven DOM
 mutation (JS-series) or a measured restyle cost on a page using these
 selectors.
 
-### TD-33 — `var()` substitution budget is per element
+### TD-33 — `var()` substitution budget is per element (Paid)
 
 `MAX_SUBSTITUTED_VALUES` (65,536 component values, `rustic-css/src/custom.rs`)
 stops exponential `var()` expansion for **one element**, and each element that
@@ -512,6 +512,21 @@ properties caches do), and/or charge substitutions to a document-wide budget
 per restyle, failing the substitution (invalid at computed-value time) when it
 runs out. Add the chain above as a timing regression case. **Trigger:** before
 styling real pages or network content.
+
+**Paid:** each restyle shares a `SubstitutionCache`
+(`rustic-style/src/variables.rs`). Elements with the same parent custom
+properties and the same winning custom declarations share one computed map,
+and a `var()` longhand is substituted once per declaration, longhand and
+custom-property map. Every cached computation gets a fresh budget, so a
+result depends only on its key and caching never changes a style
+(incremental and full restyles still agree). `CustomValue` equality
+short-circuits on shared storage. Style dumps cut custom values at 256 bytes.
+The 2,000-paragraph chain now styles in about 0.06 s and dumps in 0.13 s
+(6.4 MB) in a release build, against 10.7 s and the 64 MiB cap before. The
+chain is a regression test (`chained_variables_are_computed_once_and_shared`)
+that checks the paragraphs share storage. Elements with different parents but
+equal values still compute separately (no interning by content); that costs
+time per distinct parent, not per element.
 
 ## Reviewing new work
 

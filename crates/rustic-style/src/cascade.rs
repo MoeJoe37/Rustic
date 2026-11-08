@@ -16,13 +16,14 @@
 use std::collections::HashMap;
 
 use rustic_css::{
-    CssWideKeyword, DeclaredValue, MAX_SUBSTITUTED_VALUES, MediaEnvironment, PropertyDeclaration,
-    PropertyId, PropertyValue, Specificity,
+    CssWideKeyword, DeclaredValue, MediaEnvironment, PropertyDeclaration, PropertyId,
+    PropertyValue, Specificity,
 };
 
+use crate::containers::{ContainerInfo, container_list_matches};
 use crate::layer::{LayerOrder, UNLAYERED};
 use crate::matching::{MatchCache, matches_in_tree};
-use crate::variables::{CustomOutcome, CustomProperties, compute_custom_properties};
+use crate::variables::{CustomOutcome, CustomProperties};
 use crate::{ComputedStyle, ElementView, MatchContext, Origin, StyleSheet};
 
 /// The specified value of every supported longhand for one element.
@@ -134,6 +135,9 @@ pub struct StyleInputs<'a, E> {
     /// For a shadow host, the context of its shadow tree, whose author
     /// sheets style the host through `:host` selectors.
     pub shadow_root: Option<TreeContext>,
+    /// The element's ancestors with their computed styles, root first, for
+    /// `@container` rules. Without them no container condition holds.
+    pub containers: &'a [ContainerInfo<'a, E>],
 }
 
 impl<E> StyleInputs<'_, E> {
@@ -145,6 +149,7 @@ impl<E> StyleInputs<'_, E> {
             transitions: &[],
             scope: TreeScope::document(),
             shadow_root: None,
+            containers: &[],
         }
     }
 }
@@ -329,6 +334,11 @@ impl Cascade {
         &self.sheets
     }
 
+    /// Whether any sheet has `@container` rules.
+    pub fn has_container_queries(&self) -> bool {
+        self.sheets.iter().any(|s| !s.containers.is_empty())
+    }
+
     /// The media environment rules are evaluated against.
     pub fn environment(&self) -> &MediaEnvironment {
         &self.environment
@@ -425,6 +435,15 @@ impl Cascade {
             };
             for (rule_index, rule) in sheet.rules.iter().enumerate() {
                 if !StyleSheet::rule_applies(rule, media) {
+                    continue;
+                }
+                if !sheet.containers.is_empty()
+                    && !rule.media.iter().all(|&i| {
+                        sheet.container_at(i).is_none_or(|list| {
+                            container_list_matches(list, inputs.containers, &self.environment)
+                        })
+                    })
+                {
                     continue;
                 }
                 let specificity = rule
@@ -547,9 +566,10 @@ impl Cascade {
                 (name, outcome)
             })
             .collect();
-        let mut budget = MAX_SUBSTITUTED_VALUES;
-        let custom = compute_custom_properties(&parent.custom, outcomes, &mut budget);
-        let lookup = |name: &str| custom.get(name);
+        let custom = cache
+            .substitution
+            .borrow_mut()
+            .custom_properties(&parent.custom, outcomes);
         let values = PropertyId::ALL
             .iter()
             .map(|&property| {
@@ -568,8 +588,10 @@ impl Cascade {
                 );
                 match resolved {
                     Resolved::Declared(DeclaredValue::Value(value)) => value.clone(),
-                    Resolved::Declared(DeclaredValue::Unparsed(unparsed)) => unparsed
-                        .resolve(property, &lookup, &mut budget)
+                    Resolved::Declared(DeclaredValue::Unparsed(unparsed)) => cache
+                        .substitution
+                        .borrow_mut()
+                        .longhand(unparsed, property, &custom)
                         .unwrap_or_else(unset),
                     Resolved::Initial => property.initial_value(),
                     Resolved::Inherit => inherit(),

@@ -443,8 +443,8 @@ default budgets plus a differential invariant:
 | `css` | Token spans are ordered, nonempty, on character boundaries and cover all non-comment input; stylesheet and nested block parsing are total and deterministic (added with CSS-01); typed longhands serialize to a fixed point (CSS-03) | Checked-in sheet plus the css-parsing-tests inputs |
 | `css-selector` | Every valid selector list serializes to a fixed point with equal specificities and selects the same elements of a fixed document in HTML, quirks and XML modes (added with CSS-02) | Checked-in selectors plus the pinned `An+B` inputs |
 | `css-cascade` | Styling a fixed document with an arbitrary author sheet is total and unchanged by splitting the sheet, repeating it or adding an empty user sheet (added with CSS-04); computed values stay finite and the style dump always succeeds (CSS-05) | The `css` seeds |
-| `css-invalidation` | A fixed document styled with an arbitrary sheet and mutated by a script of up to 96 attribute, insertion, removal, move and text changes restyles incrementally to exactly a full restyle (added with CSS-06) | The `css` seeds |
-| `css-media` | Media query list serialization is a fixed point after one round and the reparsed list matches the same desktop, phone, print and zero-size environments (added with CSS-06) | `corpus/css-media` |
+| `css-invalidation` | A fixed document styled with an arbitrary sheet and mutated by a script of up to 96 attribute, insertion, removal, move, text and container size changes restyles incrementally to exactly a full restyle (added with CSS-06) | The `css` seeds |
+| `css-media` | Media query list serialization is a fixed point after one round and the reparsed list matches the same desktop, phone, print and zero-size environments; the same input as an `@container` prelude also serializes to a fixed point with unchanged names, axes and results (added with CSS-06) | `corpus/css-media` |
 | `url` | Parsing with no base and five pinned bases is total; every success reserializes to a fixed point and an equal record | Inputs and bases of the pinned WPT URL cases |
 
 Feed plans come from the input's FNV-1a fingerprint, so a saved file replays the
@@ -638,7 +638,7 @@ from the previous counted sibling, so long lists match in linear time. The
 `css.queries` each have one of four steps; variables, media queries and
 external sheets remain. See [CSS.md](CSS.md#computed-style).
 
-## CSS-06 (in progress) — Media queries, invalidation and custom properties
+## CSS-06 — Media queries, invalidation, custom properties and container queries
 
 `rustic-css` parses, serializes and evaluates Media Queries 4 lists (with the
 Level 5 preference and capability features), including range syntax,
@@ -665,9 +665,19 @@ dependency order, with every cycle member guaranteed-invalid. Each `var()`
 longhand is then substituted and parsed, and a failure acts as `unset`. Each
 element has a substitution budget and a nesting limit. Serialization no
 longer escapes an `e`-leading unit unless it could read back as an exponent
-(`2em` stays `2em`). Container queries are the remaining CSS-06 work. See
-[CSS.md](CSS.md#media-queries), [CSS.md](CSS.md#invalidation) and
-[CSS.md](CSS.md#custom-properties).
+(`2em` stays `2em`).
+
+Container queries complete CSS-06. `@container` preludes parse with the media
+condition grammar and the container feature set, plus `style()` queries. The
+`container-type`, `container-name` and `container` properties are typed.
+Rules flatten like `@media`, as an always-matching media entry plus a
+container query list. The cascade picks the nearest eligible ancestor
+container for each condition. Style queries read that container's custom
+properties. Size features read sizes that the caller supplies until layout
+exists (`style_tree_with_sizes`, `StyledDocument::set_container_size`). With
+container rules present, a changed computed style restyles the whole subtree.
+See [CSS.md](CSS.md#media-queries), [CSS.md](CSS.md#invalidation),
+[CSS.md](CSS.md#custom-properties) and [CSS.md](CSS.md#container-queries).
 
 ## External stylesheets — `<link rel=stylesheet>` and `@import`
 
@@ -741,6 +751,7 @@ must keep all tiers green.
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 | CSS-04: cascade and inheritance | Complete: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins added by CSS-07b |
 | CSS-07b: cascade layers, shadow contexts, animation origins | Complete: `@layer` and layered `revert-layer`, DOM shadow roots, per-tree sheets with `:host`, context precedence, animation/transition tiers; slots, `::slotted()`/`::part()` and `@import layer()` pending |
+| CSS-06: media queries, invalidation, custom properties, container queries | Complete: Media Queries 4/5, incremental restyle checked against full restyles, `var()` with cycles and bounded expansion, `@container` with size and style queries; `@property`, container units and layout-provided sizes remain |
 | CSS-05: computed values, attachment and style dump | Complete for the declared longhands: computed values, HTML UA sheet subset, `<style>` attachment, `dump-style` and a cached full-restyle path; font metrics, `var()` and media queries remain |
 | CSS-03c: property catalog | Complete for the declared set: positioning, overflow, visibility, opacity, text, decoration, font shorthand and backgrounds with computed values; gradients and system fonts remain |
 | CSS-03b: math functions | Complete for lengths, length-percentages and numbers: parsing, type checking, simplification, serialization, computed values; typed division and the newer math functions remain |
@@ -753,7 +764,7 @@ M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
 failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
-under way (media queries, invalidation and custom properties landed). Next:
-container queries; math functions, the property catalog,
+complete (media queries, invalidation, custom properties and container
+queries). Next: the CSS conformance gate; math functions, the property catalog,
 external stylesheets and cascade layers run alongside. All project crates remain safe
 Rust, unpublished, and free of third-party Rust dependencies.

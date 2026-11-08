@@ -1208,71 +1208,72 @@
           "label": "Media/container queries and style attachment",
           "size": 3,
           "milestone": "M2",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "HTML user-agent stylesheet and document style element attachment",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html.rs",
-                  "marker": "pub fn document_cascade("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn style_elements_are_attached_in_tree_order"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "pub fn document_cascade("
             },
             {
-              "label": "External stylesheets: link rel=stylesheet and @import over controlled fetching",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html.rs",
-                  "marker": "pub fn document_cascade_with("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/loading.rs",
-                  "marker": "pub trait StylesheetFetcher"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/external.rs",
-                  "marker": "fn imports_precede_their_sheet_and_resolve_against_it"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn dump_style_loads_linked_and_imported_sheets_beside_the_document"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn style_elements_are_attached_in_tree_order"
             },
             {
-              "label": "Media queries (@media rules and media attributes) re-evaluated when the environment changes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/media.rs",
-                  "marker": "pub fn parse_media_query_list"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/cascade.rs",
-                  "marker": "fn media_rules_apply_only_when_their_queries_match"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "pub fn document_cascade_with("
             },
             {
-              "label": "Container queries",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-style/src/loading.rs",
+              "marker": "pub trait StylesheetFetcher"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/external.rs",
+              "marker": "fn imports_precede_their_sheet_and_resolve_against_it"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn dump_style_loads_linked_and_imported_sheets_beside_the_document"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/media.rs",
+              "marker": "pub fn parse_media_query_list"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn media_rules_apply_only_when_their_queries_match"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/container.rs",
+              "marker": "pub fn parse_container_query_list"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/containers.rs",
+              "marker": "pub(crate) fn container_list_matches"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/containers.rs",
+              "marker": "fn size_queries_use_the_nearest_eligible_container"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/sheet.rs",
+              "marker": "pub fn container_at"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/containers.rs",
+              "marker": "fn container_rules_nest_and_report_errors"
             }
           ]
         },
@@ -1338,9 +1339,20 @@
               ]
             },
             {
-              "label": "Invalidation for container query dependencies",
-              "status": "planned",
-              "evidence": []
+              "label": "Invalidation for container query dependencies (container sizes and container styles restyle descendants)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/invalidation.rs",
+                  "marker": "pub fn set_container_size"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/containers.rs",
+                  "marker": "fn sizes_and_container_styles_invalidate_descendants"
+                }
+              ]
             }
           ]
         },

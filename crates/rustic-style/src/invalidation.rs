@@ -1,11 +1,11 @@
 //! Incremental restyling: which elements a DOM mutation can affect, and a
 //! restyle that recomputes only those (CSS-06).
 //!
-//! [`StyledDocument`] keeps the styles of a full [`style_tree`] walk. The
+//! [`StyledDocument`] keeps the styles of a full [`crate::style_tree`] walk. The
 //! caller reports each mutation after making it ([`StyledDocument::note`]),
 //! and [`StyledDocument::restyle`] then recomputes the elements the
 //! mutations may have affected, reusing every other element's style. The
-//! result always equals a fresh [`style_tree`] walk; the tests and the
+//! result always equals a fresh [`crate::style_tree`] walk; the tests and the
 //! `css-invalidation` fuzz target check exactly that.
 //!
 //! What a mutation affects comes from an [`InvalidationMap`] built from the
@@ -37,7 +37,10 @@ use rustic_css::{
 use rustic_dom::{Document, DomError, NodeId, NodeKind};
 
 use crate::dom::{Dirty, Reuse, style_walk};
-use crate::{Cascade, ComputeContext, DomElement, ElementStyle, MatchContext, style_tree};
+use crate::{
+    Cascade, ComputeContext, ContainerSize, DomElement, ElementStyle, MatchContext,
+    style_tree_with_sizes,
+};
 
 /// Attributes that HTML element states (form states, `:lang()`, `:dir()`)
 /// read, anywhere in the tree.
@@ -220,10 +223,11 @@ pub struct StyledDocument {
     index: HashMap<NodeId, usize>,
     map: InvalidationMap,
     dirty: Dirty,
+    sizes: HashMap<NodeId, ContainerSize>,
 }
 
 impl StyledDocument {
-    /// Style the whole document (as [`style_tree`] from its root).
+    /// Style the whole document (as [`crate::style_tree`] from its root).
     pub fn new<'a>(
         document: &'a Document,
         cascade: &Cascade,
@@ -237,7 +241,7 @@ impl StyledDocument {
             cascade,
             parser,
             cx,
-            compute,
+            (compute, &HashMap::new()),
             None,
         )?;
         let mut styled = Self {
@@ -246,6 +250,7 @@ impl StyledDocument {
             index: HashMap::new(),
             map: InvalidationMap::new(cascade),
             dirty: Dirty::default(),
+            sizes: HashMap::new(),
         };
         styled.store(walked.styles, walked.parents);
         Ok(styled)
@@ -261,7 +266,7 @@ impl StyledDocument {
         self.parents = parents;
     }
 
-    /// Every element's style, in the order [`style_tree`] returns them.
+    /// Every element's style, in the order [`crate::style_tree`] returns them.
     pub fn styles(&self) -> &[ElementStyle] {
         &self.styles
     }
@@ -406,7 +411,7 @@ impl StyledDocument {
             cascade,
             parser,
             cx,
-            compute,
+            (compute, &self.sizes),
             Some(reuse),
         )?;
         let stats = RestyleStats {
@@ -417,7 +422,7 @@ impl StyledDocument {
         Ok(stats)
     }
 
-    /// Whether these styles equal a fresh [`style_tree`] walk (for tests and
+    /// Whether these styles equal a fresh [`crate::style_tree`] walk (for tests and
     /// fuzzing).
     pub fn matches_full_restyle<'a>(
         &self,
@@ -427,7 +432,33 @@ impl StyledDocument {
         cx: &MatchContext<DomElement<'a>>,
         compute: &ComputeContext,
     ) -> Result<bool, DomError> {
-        let full = style_tree(document, document.root(), cascade, parser, cx, compute)?;
+        let full = style_tree_with_sizes(
+            document,
+            document.root(),
+            cascade,
+            parser,
+            cx,
+            compute,
+            &self.sizes,
+        )?;
         Ok(full == self.styles)
+    }
+
+    /// Record `element`'s content-box size from layout (or forget it with
+    /// `None`) for `@container` size features. A change restyles the
+    /// element's subtree on the next [`Self::restyle`].
+    pub fn set_container_size(&mut self, element: NodeId, size: Option<ContainerSize>) {
+        let old = match size {
+            Some(size) => self.sizes.insert(element, size),
+            None => self.sizes.remove(&element),
+        };
+        if old != size {
+            self.dirty.subtrees.insert(element);
+        }
+    }
+
+    /// The container sizes recorded with [`Self::set_container_size`].
+    pub fn container_sizes(&self) -> &HashMap<NodeId, ContainerSize> {
+        &self.sizes
     }
 }

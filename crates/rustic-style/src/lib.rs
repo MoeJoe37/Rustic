@@ -40,6 +40,7 @@
 
 mod cascade;
 mod computed;
+mod containers;
 mod dom;
 mod html;
 mod html_state;
@@ -54,7 +55,11 @@ mod view;
 
 pub use cascade::{Cascade, SpecifiedStyle, StyleInputs, TreeContext, TreeScope};
 pub use computed::{ComputeContext, ComputedStyle};
-pub use dom::{DomElement, ElementStyle, query_selector_all, shadow_tree_context, style_tree};
+pub use containers::{ContainerInfo, ContainerSize};
+pub use dom::{
+    DomElement, ElementStyle, query_selector_all, shadow_tree_context, style_tree,
+    style_tree_with_sizes,
+};
 pub use html::{
     HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,
     document_cascade_with, dump_computed_styles, html_user_agent_sheet,

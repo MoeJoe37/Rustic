@@ -11,7 +11,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::sync::Arc;
 
-use rustic_css::CustomValue;
+use rustic_css::{CustomValue, MAX_SUBSTITUTED_VALUES, PropertyId, PropertyValue, UnparsedValue};
+
+/// Longest custom property value a style dump prints in full.
+const MAX_DUMPED_VALUE_BYTES: usize = 256;
 
 /// The computed custom properties of an element: name to value, with
 /// guaranteed-invalid properties absent. Cloning is cheap.
@@ -36,22 +39,59 @@ impl CustomProperties {
         self.map.is_empty()
     }
 
+    /// Whether both share one storage (as elements whose custom properties
+    /// were computed from the same parent values and declarations do).
+    pub fn shares_storage_with(&self, other: &CustomProperties) -> bool {
+        Arc::ptr_eq(&self.map, &other.map)
+    }
+
+    /// An identity for cache keys, valid while `self` is alive.
+    pub(crate) fn identity(&self) -> usize {
+        Arc::as_ptr(&self.map) as usize
+    }
+
     /// Custom properties in name order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &CustomValue)> {
         self.map.iter().map(|(k, v)| (&**k, v))
     }
 
     /// `name: value` lines in name order, for the properties whose value
-    /// differs from `other`'s.
+    /// differs from `other`'s. Values longer than
+    /// [`MAX_DUMPED_VALUE_BYTES`] are cut and end in `...`.
     pub(crate) fn dump_differences(&self, other: &CustomProperties, indent: &str) -> String {
         let mut out = String::new();
         for (name, value) in self.iter() {
             if other.get(name) != Some(value) {
                 out.push_str(indent);
-                let _ = fmt::write(&mut out, format_args!("{}: {value}\n", Name(name)));
+                let mut text = Bounded(String::new());
+                if fmt::write(&mut text, format_args!("{value}")).is_err() {
+                    text.0.push_str("...");
+                }
+                let text = text.0;
+                let _ = fmt::write(&mut out, format_args!("{}: {text}\n", Name(name)));
             }
         }
         out
+    }
+}
+
+/// A string that refuses to grow past [`MAX_DUMPED_VALUE_BYTES`], so long
+/// values stop serializing early.
+struct Bounded(String);
+
+impl fmt::Write for Bounded {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let room = MAX_DUMPED_VALUE_BYTES.saturating_sub(self.0.len());
+        if s.len() <= room {
+            self.0.push_str(s);
+            return Ok(());
+        }
+        let mut cut = room;
+        while !s.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        self.0.push_str(&s[..cut]);
+        Err(fmt::Error)
     }
 }
 
@@ -72,6 +112,81 @@ pub(crate) enum CustomOutcome<'a> {
     Initial,
     /// `inherit`, `unset` or no declaration: the parent's value.
     Inherit,
+}
+
+/// Parent identity and (name, declared value address or 0) pairs.
+type CustomKey = (usize, Vec<(String, usize)>);
+
+/// Results shared across the elements of one restyle (TD-33): elements
+/// with the same parent custom properties and the same winning custom
+/// declarations share one computed map, and a `var()` longhand is
+/// substituted once per (declaration, longhand, custom properties).
+/// Every result is a function of its key alone (each computation gets a
+/// fresh substitution budget), so caching never changes a style.
+#[derive(Default)]
+pub(crate) struct SubstitutionCache {
+    /// (parent identity, (name, declared value address or 0 for
+    /// `initial`)...) to (parent, kept alive so its identity stays unique;
+    /// result).
+    custom: HashMap<CustomKey, (CustomProperties, CustomProperties)>,
+    /// (declaration address, longhand, custom properties identity) to
+    /// (those custom properties, kept alive; result).
+    longhands: HashMap<(usize, PropertyId, usize), (CustomProperties, Option<PropertyValue>)>,
+}
+
+impl SubstitutionCache {
+    /// [`compute_custom_properties`], shared between equal inputs. The
+    /// declared values must outlive the cache (they live in the cascade).
+    pub(crate) fn custom_properties<'a>(
+        &mut self,
+        parent: &CustomProperties,
+        outcomes: Vec<(&'a str, CustomOutcome<'a>)>,
+    ) -> CustomProperties {
+        let key_parts: Vec<(String, usize)> = outcomes
+            .iter()
+            .filter_map(|(name, outcome)| match outcome {
+                CustomOutcome::Value(value) => {
+                    Some(((*name).to_owned(), *value as *const CustomValue as usize))
+                }
+                CustomOutcome::Initial => Some(((*name).to_owned(), 0)),
+                CustomOutcome::Inherit => None,
+            })
+            .collect();
+        if key_parts.is_empty() {
+            return parent.clone();
+        }
+        let key = (parent.identity(), key_parts);
+        if let Some((_, result)) = self.custom.get(&key) {
+            return result.clone();
+        }
+        let mut budget = MAX_SUBSTITUTED_VALUES;
+        let result = compute_custom_properties(parent, outcomes, &mut budget);
+        self.custom.insert(key, (parent.clone(), result.clone()));
+        result
+    }
+
+    /// Substitute and parse `unparsed` as `property` against `custom`,
+    /// shared between equal inputs. `unparsed` must outlive the cache.
+    pub(crate) fn longhand(
+        &mut self,
+        unparsed: &UnparsedValue,
+        property: PropertyId,
+        custom: &CustomProperties,
+    ) -> Option<PropertyValue> {
+        let key = (
+            unparsed as *const UnparsedValue as usize,
+            property,
+            custom.identity(),
+        );
+        if let Some((_, result)) = self.longhands.get(&key) {
+            return result.clone();
+        }
+        let mut budget = MAX_SUBSTITUTED_VALUES;
+        let lookup = |name: &str| custom.get(name);
+        let result = unparsed.resolve(property, &lookup, &mut budget);
+        self.longhands.insert(key, (custom.clone(), result.clone()));
+        result
+    }
 }
 
 /// Compute an element's custom properties from its parent's and the

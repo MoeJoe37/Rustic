@@ -57,7 +57,7 @@ pub enum CssWideKeyword {
 }
 
 impl CssWideKeyword {
-    fn from_name(name: &str) -> Option<Self> {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
         Some(match name.to_ascii_lowercase().as_str() {
             "initial" => Self::Initial,
             "inherit" => Self::Inherit,
@@ -217,6 +217,15 @@ keywords! {
         Absolute => "absolute",
         Fixed => "fixed",
         Sticky => "sticky",
+    }
+}
+
+keywords! {
+    /// `container-type` values.
+    ContainerType {
+        Normal => "normal",
+        Size => "size",
+        InlineSize => "inline-size",
     }
 }
 
@@ -599,6 +608,10 @@ pub enum PropertyValue {
     BackgroundAttachment(Vec<Attachment>),
     /// `background-origin`, `background-clip`, one entry per layer.
     BackgroundBox(Vec<VisualBox>),
+    /// `container-type`.
+    ContainerType(ContainerType),
+    /// `container-name`: case-sensitive names; empty for `none`.
+    ContainerName(Vec<String>),
 }
 
 macro_rules! property_ids {
@@ -706,6 +719,8 @@ property_ids! {
     BackgroundAttachment => "background-attachment", false;
     BackgroundOrigin => "background-origin", false;
     BackgroundClip => "background-clip", false;
+    ContainerType => "container-type", false;
+    ContainerName => "container-name", false;
 }
 
 impl PropertyId {
@@ -791,6 +806,8 @@ impl PropertyId {
             }
             P::BackgroundOrigin => PropertyValue::BackgroundBox(vec![VisualBox::PaddingBox]),
             P::BackgroundClip => PropertyValue::BackgroundBox(vec![VisualBox::BorderBox]),
+            P::ContainerType => PropertyValue::ContainerType(ContainerType::Normal),
+            P::ContainerName => PropertyValue::ContainerName(Vec::new()),
         }
     }
 }
@@ -1030,6 +1047,7 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     const BORDER_LEFT: &[P] = &[P::BorderLeftWidth, P::BorderLeftStyle, P::BorderLeftColor];
     const INSET: &[P] = &[P::Top, P::Right, P::Bottom, P::Left];
     const OVERFLOW: &[P] = &[P::OverflowX, P::OverflowY];
+    const CONTAINER: &[P] = &[P::ContainerName, P::ContainerType];
     const TEXT_DECORATION: &[P] = &[
         P::TextDecorationLine,
         P::TextDecorationStyle,
@@ -1067,6 +1085,7 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "border-left" => BORDER_LEFT,
         "inset" => INSET,
         "overflow" => OVERFLOW,
+        "container" => CONTAINER,
         "text-decoration" => TEXT_DECORATION,
         "font" => FONT,
         "background" => BACKGROUND,
@@ -1076,6 +1095,30 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
             &PropertyId::ALL[index..=index]
         }
     })
+}
+
+/// `none | <custom-ident>+`, excluding `and`, `or`, `not` and `default`
+/// (CSS Conditional 5 `<container-name>`).
+fn container_name(parts: &[&Value]) -> Option<Vec<String>> {
+    if let [only] = parts {
+        if keyword(only, "none") {
+            return Some(Vec::new());
+        }
+    }
+    if parts.is_empty() {
+        return None;
+    }
+    parts
+        .iter()
+        .map(|v| {
+            let name = ident(v)?;
+            let reserved = ["none", "and", "or", "not", "default"]
+                .iter()
+                .any(|r| name.eq_ignore_ascii_case(r))
+                || CssWideKeyword::from_name(name).is_some();
+            (!reserved).then(|| name.to_owned())
+        })
+        .collect()
 }
 
 pub(crate) fn ident(value: &Value) -> Option<&str> {
@@ -1489,6 +1532,7 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
             return background::list(parts, |p| VisualBox::from_name(ident(single(p)?)?))
                 .map(PropertyValue::BackgroundBox);
         }
+        P::ContainerName => return container_name(parts).map(PropertyValue::ContainerName),
         _ => {}
     }
     let [value] = parts else {
@@ -1506,7 +1550,9 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::BackgroundRepeat
         | P::BackgroundAttachment
         | P::BackgroundOrigin
-        | P::BackgroundClip => unreachable!("handled above"),
+        | P::BackgroundClip
+        | P::ContainerName => unreachable!("handled above"),
+        P::ContainerType => PropertyValue::ContainerType(ContainerType::from_name(name()?)?),
         P::FontVariantCaps => PropertyValue::FontVariantCaps(FontVariantCaps::from_name(name()?)?),
         P::FontStretch => PropertyValue::FontStretch(font_stretch(value)?),
         P::Position => PropertyValue::Position(Position::from_name(name()?)?),
@@ -1631,6 +1677,24 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             Some(vec![PropertyValue::Overflow(x), PropertyValue::Overflow(y)])
         }
         "text-decoration" => text_decoration(parts),
+        "container" => {
+            let (names, kind) = match parts
+                .iter()
+                .position(|v| v.token() == Some(&Token::Delim('/')))
+            {
+                Some(slash) => {
+                    let [kind] = &parts[slash + 1..] else {
+                        return None;
+                    };
+                    (&parts[..slash], ContainerType::from_name(ident(kind)?)?)
+                }
+                None => (parts, ContainerType::Normal),
+            };
+            Some(vec![
+                PropertyValue::ContainerName(container_name(names)?),
+                PropertyValue::ContainerType(kind),
+            ])
+        }
         "font" => font(parts),
         "background" => background::shorthand(parts),
         "border" | "border-top" | "border-right" | "border-bottom" | "border-left" => {
@@ -1722,6 +1786,19 @@ impl fmt::Display for PropertyValue {
             Self::ZIndex(ZIndex::Auto) => f.write_str("auto"),
             Self::ZIndex(ZIndex::Integer(n)) => write!(f, "{n}"),
             Self::Float(v) => write!(f, "{v}"),
+            Self::ContainerType(v) => write!(f, "{v}"),
+            Self::ContainerName(names) => {
+                if names.is_empty() {
+                    return f.write_str("none");
+                }
+                for (i, name) in names.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ")?;
+                    }
+                    serialize_identifier(f, name)?;
+                }
+                Ok(())
+            }
             Self::Clear(v) => write!(f, "{v}"),
             Self::Overflow(v) => write!(f, "{v}"),
             Self::Visibility(v) => write!(f, "{v}"),

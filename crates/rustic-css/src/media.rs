@@ -11,6 +11,7 @@
 use std::fmt::{self, Write};
 
 use crate::color::write_number;
+use crate::container::{StyleQuery, parse_style_function};
 use crate::serialize::write_values;
 use crate::{BlockKind, ComponentValue, Length, LengthUnit, Token, Value, serialize_identifier};
 
@@ -75,6 +76,8 @@ pub enum MediaCondition {
     Or(Vec<MediaCondition>),
     /// A media feature test.
     Feature(MediaFeature),
+    /// `style(...)`, in container queries only.
+    Style(StyleQuery),
     /// `<general-enclosed>`: a function or parenthesized block that is not a
     /// valid feature or condition. Always evaluates to unknown.
     Unknown(Value),
@@ -147,6 +150,19 @@ pub enum MediaFeatureName {
     Scripting,
     /// `display-mode`.
     DisplayMode,
+    /// `inline-size`, in container queries only.
+    InlineSize,
+    /// `block-size`, in container queries only.
+    BlockSize,
+}
+
+/// Which features a condition may test.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FeatureSet {
+    /// `@media` and `media` attributes.
+    Media,
+    /// `@container`: size features and `style()`.
+    Container,
 }
 
 /// What values a feature takes.
@@ -223,15 +239,38 @@ features! {
     InvertedColors => "inverted-colors", Keywords(&["none", "inverted"]);
     Scripting => "scripting", Keywords(&["none", "initial-only", "enabled"]);
     DisplayMode => "display-mode", Keywords(&["fullscreen", "standalone", "minimal-ui", "browser", "picture-in-picture"]);
+    InlineSize => "inline-size", FeatureType::Length;
+    BlockSize => "block-size", FeatureType::Length;
 }
 
 impl MediaFeatureName {
-    /// The feature named `name` (ASCII case-insensitive).
+    /// The feature named `name` (ASCII case-insensitive), whether a media or
+    /// a container feature.
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL
             .iter()
             .copied()
             .find(|f| f.name().eq_ignore_ascii_case(name))
+    }
+
+    /// Whether container queries can test the feature.
+    pub fn is_container_feature(self) -> bool {
+        matches!(
+            self,
+            Self::Width
+                | Self::Height
+                | Self::InlineSize
+                | Self::BlockSize
+                | Self::AspectRatio
+                | Self::Orientation
+        )
+    }
+
+    fn in_set(self, set: FeatureSet) -> bool {
+        match set {
+            FeatureSet::Media => !matches!(self, Self::InlineSize | Self::BlockSize),
+            FeatureSet::Container => self.is_container_feature(),
+        }
     }
 }
 
@@ -304,7 +343,7 @@ pub enum MediaComparison {
 }
 
 impl MediaComparison {
-    fn flipped(self) -> Self {
+    pub(crate) fn flipped(self) -> Self {
         match self {
             Self::Lt => Self::Gt,
             Self::Le => Self::Ge,
@@ -324,7 +363,7 @@ impl MediaComparison {
         }
     }
 
-    fn holds(self, ordering: std::cmp::Ordering) -> bool {
+    pub(crate) fn holds(self, ordering: std::cmp::Ordering) -> bool {
         use std::cmp::Ordering::{Equal, Greater, Less};
         match self {
             Self::Lt => ordering == Less,
@@ -372,18 +411,18 @@ pub enum MediaFeature {
 // ---------------------------------------------------------------------------
 // Parsing
 
-fn ident(value: &Value) -> Option<&str> {
+pub(crate) fn ident(value: &Value) -> Option<&str> {
     match value.token()? {
         Token::Ident(name) => Some(name),
         _ => None,
     }
 }
 
-fn is_keyword(value: &Value, keyword: &str) -> bool {
+pub(crate) fn is_keyword(value: &Value, keyword: &str) -> bool {
     ident(value).is_some_and(|i| i.eq_ignore_ascii_case(keyword))
 }
 
-fn paren_block(value: &Value) -> Option<&[Value]> {
+pub(crate) fn paren_block(value: &Value) -> Option<&[Value]> {
     match &value.value {
         ComponentValue::Block {
             kind: BlockKind::Paren,
@@ -393,11 +432,11 @@ fn paren_block(value: &Value) -> Option<&[Value]> {
     }
 }
 
-fn non_whitespace(values: &[Value]) -> Vec<&Value> {
+pub(crate) fn non_whitespace(values: &[Value]) -> Vec<&Value> {
     values.iter().filter(|v| !v.is_whitespace()).collect()
 }
 
-fn contains_bad_token(values: &[Value]) -> bool {
+pub(crate) fn contains_bad_token(values: &[Value]) -> bool {
     values.iter().any(|v| match &v.value {
         ComponentValue::Token(Token::BadString | Token::BadUrl) => true,
         ComponentValue::Token(_) => false,
@@ -433,7 +472,30 @@ fn media_type(name: &str) -> Option<MediaType> {
     })
 }
 
+/// The deepest function and block nesting in `items` (1 for a block with
+/// only tokens inside), computed without recursion.
+pub(crate) fn nesting_depth(items: &[&Value]) -> usize {
+    let mut deepest = 0;
+    let mut stack: Vec<(&Value, usize)> = items.iter().map(|v| (*v, 0)).collect();
+    while let Some((value, depth)) = stack.pop() {
+        let inner = match &value.value {
+            ComponentValue::Function { arguments, .. } => arguments,
+            ComponentValue::Block { contents, .. } => contents,
+            ComponentValue::Token(_) => continue,
+        };
+        deepest = deepest.max(depth + 1);
+        stack.extend(inner.iter().map(|v| (v, depth + 1)));
+    }
+    deepest
+}
+
+/// A query nested deeper than [`MAX_MEDIA_NESTING`] is invalid as a whole,
+/// so that where a nesting limit cuts it off never depends on parentheses
+/// that serialization drops.
 fn parse_query(items: &[&Value]) -> Option<MediaQuery> {
+    if nesting_depth(items) > MAX_MEDIA_NESTING {
+        return None;
+    }
     // A bare condition (including `not (...)`).
     let bare = items.first().is_some_and(|v| {
         ident(v).is_none()
@@ -441,7 +503,7 @@ fn parse_query(items: &[&Value]) -> Option<MediaQuery> {
     });
     if bare {
         let mut pos = 0;
-        let condition = parse_condition(items, &mut pos, true, 0)?;
+        let condition = parse_condition(items, &mut pos, true, 0, FeatureSet::Media)?;
         return (pos == items.len()).then_some(MediaQuery::Query {
             qualifier: None,
             media_type: None,
@@ -466,7 +528,7 @@ fn parse_query(items: &[&Value]) -> Option<MediaQuery> {
             return None;
         }
         pos += 1;
-        let condition = parse_condition(items, &mut pos, false, 0)?;
+        let condition = parse_condition(items, &mut pos, false, 0, FeatureSet::Media)?;
         if pos != items.len() {
             return None;
         }
@@ -479,17 +541,18 @@ fn parse_query(items: &[&Value]) -> Option<MediaQuery> {
     })
 }
 
-fn parse_condition(
+pub(crate) fn parse_condition(
     items: &[&Value],
     pos: &mut usize,
     allow_or: bool,
     depth: usize,
+    set: FeatureSet,
 ) -> Option<MediaCondition> {
     if items.get(*pos).is_some_and(|v| is_keyword(v, "not")) {
         *pos += 1;
-        return parse_in_parens(items, pos, depth).map(|c| MediaCondition::Not(Box::new(c)));
+        return parse_in_parens(items, pos, depth, set).map(|c| MediaCondition::Not(Box::new(c)));
     }
-    let first = parse_in_parens(items, pos, depth)?;
+    let first = parse_in_parens(items, pos, depth, set)?;
     let joiner = match items.get(*pos) {
         Some(v) if is_keyword(v, "and") => "and",
         Some(v) if allow_or && is_keyword(v, "or") => "or",
@@ -498,7 +561,7 @@ fn parse_condition(
     let mut operands = vec![first];
     while items.get(*pos).is_some_and(|v| is_keyword(v, joiner)) {
         *pos += 1;
-        operands.push(parse_in_parens(items, pos, depth)?);
+        operands.push(parse_in_parens(items, pos, depth, set)?);
     }
     Some(if joiner == "and" {
         MediaCondition::And(operands)
@@ -507,7 +570,12 @@ fn parse_condition(
     })
 }
 
-fn parse_in_parens(items: &[&Value], pos: &mut usize, depth: usize) -> Option<MediaCondition> {
+fn parse_in_parens(
+    items: &[&Value],
+    pos: &mut usize,
+    depth: usize,
+    set: FeatureSet,
+) -> Option<MediaCondition> {
     let value = *items.get(*pos)?;
     let result = if let Some(contents) = paren_block(value) {
         let inner = non_whitespace(contents);
@@ -515,7 +583,7 @@ fn parse_in_parens(items: &[&Value], pos: &mut usize, depth: usize) -> Option<Me
         // Past the nesting limit a nested condition is left unparsed and
         // treated as `<general-enclosed>`, which keeps recursion bounded.
         let nested = if depth < MAX_MEDIA_NESTING {
-            parse_condition(&inner, &mut inner_pos, true, depth + 1)
+            parse_condition(&inner, &mut inner_pos, true, depth + 1, set)
         } else {
             None
         };
@@ -526,17 +594,23 @@ fn parse_in_parens(items: &[&Value], pos: &mut usize, depth: usize) -> Option<Me
                 MediaCondition::Unknown(value.clone())
             }
             Some(condition) if inner_pos == inner.len() => condition,
-            _ => match parse_feature(&inner) {
+            _ => match parse_feature(&inner, set) {
                 Some(feature) => MediaCondition::Feature(feature),
                 None if contains_bad_token(contents) => return None,
                 None => MediaCondition::Unknown(value.clone()),
             },
         }
-    } else if let ComponentValue::Function { arguments, .. } = &value.value {
+    } else if let ComponentValue::Function { name, arguments } = &value.value {
         if contains_bad_token(arguments) {
             return None;
         }
-        MediaCondition::Unknown(value.clone())
+        let style = (set == FeatureSet::Container && name.eq_ignore_ascii_case("style"))
+            .then(|| parse_style_function(arguments))
+            .flatten();
+        match style {
+            Some(query) => MediaCondition::Style(query),
+            None => MediaCondition::Unknown(value.clone()),
+        }
     } else {
         return None;
     };
@@ -632,11 +706,12 @@ fn whole_value(kind: FeatureType, items: &[&Value]) -> Option<MediaFeatureValue>
     (used == items.len()).then_some(value)
 }
 
-fn parse_feature(items: &[&Value]) -> Option<MediaFeature> {
+fn parse_feature(items: &[&Value], set: FeatureSet) -> Option<MediaFeature> {
+    let named = |raw: &str| MediaFeatureName::from_name(raw).filter(|n| n.in_set(set));
     // `(name)` and `(name: value)`.
     if let Some(raw) = items.first().and_then(|v| ident(v)) {
         if items.len() == 1 {
-            return MediaFeatureName::from_name(raw).map(MediaFeature::Boolean);
+            return named(raw).map(MediaFeature::Boolean);
         }
         if matches!(items[1].token(), Some(Token::Colon)) {
             let lower = raw.to_ascii_lowercase();
@@ -647,7 +722,7 @@ fn parse_feature(items: &[&Value]) -> Option<MediaFeature> {
             } else {
                 (None, lower.as_str())
             };
-            let name = MediaFeatureName::from_name(base)?;
+            let name = named(base)?;
             if prefix.is_some() && !name.kind().is_range() {
                 return None;
             }
@@ -659,7 +734,7 @@ fn parse_feature(items: &[&Value]) -> Option<MediaFeature> {
             });
         }
         // `(name <op> value)`.
-        let name = MediaFeatureName::from_name(raw)?;
+        let name = named(raw)?;
         if !name.kind().is_range() {
             return None;
         }
@@ -673,7 +748,7 @@ fn parse_feature(items: &[&Value]) -> Option<MediaFeature> {
     // `(value <op> name)` and `(value <op> name <op> value)`: try each
     // feature position.
     let name_at = items.iter().position(|v| ident(v).is_some())?;
-    let name = MediaFeatureName::from_name(ident(items[name_at])?)?;
+    let name = named(ident(items[name_at])?)?;
     let kind = name.kind();
     if !kind.is_range() {
         return None;
@@ -894,8 +969,10 @@ impl MediaEnvironment {
         use MediaFeatureName as F;
         let ratio = |w: f64, h: f64, a: f64, b: f64| (w * b).partial_cmp(&(h * a));
         match (name, value) {
-            (F::Width, MediaFeatureValue::Length(l)) => self.width.partial_cmp(&self.length_px(*l)),
-            (F::Height, MediaFeatureValue::Length(l)) => {
+            (F::Width | F::InlineSize, MediaFeatureValue::Length(l)) => {
+                self.width.partial_cmp(&self.length_px(*l))
+            }
+            (F::Height | F::BlockSize, MediaFeatureValue::Length(l)) => {
                 self.height.partial_cmp(&self.length_px(*l))
             }
             (F::DeviceWidth, MediaFeatureValue::Length(l)) => {
@@ -928,8 +1005,8 @@ impl MediaEnvironment {
     fn boolean(&self, name: MediaFeatureName) -> bool {
         use MediaFeatureName as F;
         match name {
-            F::Width => self.width > 0.0,
-            F::Height => self.height > 0.0,
+            F::Width | F::InlineSize => self.width > 0.0,
+            F::Height | F::BlockSize => self.height > 0.0,
             F::DeviceWidth => self.device_width > 0.0,
             F::DeviceHeight => self.device_height > 0.0,
             F::AspectRatio => self.width > 0.0 && self.height > 0.0,
@@ -1001,7 +1078,7 @@ impl MediaEnvironment {
                 result
             }
             MediaCondition::Feature(feature) => self.feature(feature),
-            MediaCondition::Unknown(_) => None,
+            MediaCondition::Style(_) | MediaCondition::Unknown(_) => None,
         }
     }
 
@@ -1097,7 +1174,9 @@ impl fmt::Display for MediaQuery {
 
 fn write_operand(f: &mut fmt::Formatter<'_>, operand: &MediaCondition) -> fmt::Result {
     match operand {
-        MediaCondition::Feature(_) | MediaCondition::Unknown(_) => write!(f, "{operand}"),
+        MediaCondition::Feature(_) | MediaCondition::Style(_) | MediaCondition::Unknown(_) => {
+            write!(f, "{operand}")
+        }
         _ => write!(f, "({operand})"),
     }
 }
@@ -1124,6 +1203,7 @@ impl fmt::Display for MediaCondition {
                 Ok(())
             }
             Self::Feature(feature) => write!(f, "{feature}"),
+            Self::Style(query) => write!(f, "style({query})"),
             Self::Unknown(value) => {
                 let mut out = String::new();
                 write_values(&mut out, std::slice::from_ref(value))?;

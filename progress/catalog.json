@@ -2237,7 +2237,34 @@
             },
             {
               "id": "glyphs",
-              "label": "Glyph and image rasterization",
+              "label": "Glyph rasterization",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn flatten"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "pub fn build_with_fonts"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn quadratic_contours_flatten_within_tolerance"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
+                }
+              ]
+            },
+            {
+              "id": "images",
+              "label": "Image rasterization",
               "status": "planned",
               "evidence": []
             },

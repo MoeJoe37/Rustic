@@ -4,14 +4,18 @@
 
 use crate::color::{Srgba, srgba};
 use rustic_base::CancellationToken;
+use rustic_css::Overflow;
 use rustic_css::{
     BorderStyle, Image, PropertyId as P, PropertyValue as V, Visibility, VisualBox, ZIndex,
 };
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
-    BlockFragment, BlockLayout, BoxTree, Clip, CssPoint, CssPx, CssRect, CssSize, PositionScheme,
+    AxisRange, BlockFragment, BlockLayout, BoxTree, Clip, CssPoint, CssPx, CssRect, CssSize,
+    InlineFragment, PositionScheme, TextFragment,
 };
 use rustic_style::ComputedStyle;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::{error::Error, fmt, fmt::Write as _};
 
 /// Display list budgets, independent of layout limits.
@@ -19,11 +23,47 @@ use std::{error::Error, fmt, fmt::Write as _};
 pub struct PaintLimits {
     /// Maximum display commands (fills plus group begin/end markers).
     pub max_items: usize,
+    /// Maximum outline points across all glyph paths.
+    pub max_path_points: usize,
 }
 
 impl Default for PaintLimits {
     fn default() -> Self {
-        Self { max_items: 400_000 }
+        Self {
+            max_items: 400_000,
+            max_path_points: 8_000_000,
+        }
+    }
+}
+
+/// One outline point of a [`Path`], in CSS pixels (y grows downward).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PathPoint {
+    /// Horizontal position.
+    pub x: f64,
+    /// Vertical position.
+    pub y: f64,
+    /// Whether the point lies on the curve; off-curve points are quadratic
+    /// control points, and two in a row imply an on-curve midpoint
+    /// (TrueType conventions).
+    pub on_curve: bool,
+}
+
+/// Closed quadratic contours filled with the nonzero rule, such as the
+/// glyphs of one text fragment.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Path {
+    contours: Vec<Vec<PathPoint>>,
+}
+
+impl Path {
+    /// The contours, each implicitly closed.
+    pub fn contours(&self) -> &[Vec<PathPoint>] {
+        &self.contours
+    }
+
+    fn points(&self) -> usize {
+        self.contours.iter().map(Vec::len).sum()
     }
 }
 
@@ -34,6 +74,8 @@ pub enum ItemRole {
     Background,
     /// A box's border (one side, or all four sides when they match).
     Border,
+    /// The glyphs of one text fragment, in the text's `color`.
+    Text,
 }
 
 /// A filled area in CSS pixels. Edges are not snapped to device pixels.
@@ -50,6 +92,8 @@ pub enum Shape {
     },
     /// A convex quadrilateral, used for one mitred border side.
     Quad([CssPoint; 4]),
+    /// Index into [`DisplayList::paths`].
+    Path(usize),
 }
 
 /// One paint operation: fill `shape` with `color` using source-over.
@@ -96,6 +140,9 @@ pub enum UnsupportedPaint {
     BorderStyle,
 }
 
+/// The fonts a text layout was computed with, needed to paint its glyphs.
+pub type Fonts<'a> = Option<&'a rustic_text::FontDatabase>;
+
 /// An atomic failure to build a display list.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PaintError {
@@ -108,8 +155,12 @@ pub enum PaintError {
     },
     /// The layout does not belong to the box snapshot, or a style is invalid.
     InvalidInput,
-    /// More display commands than [`PaintLimits::max_items`].
+    /// More display commands than [`PaintLimits::max_items`], or more path
+    /// points than [`PaintLimits::max_path_points`].
     ItemLimit,
+    /// The layout has text but no fonts were given, or a glyph outline is
+    /// unreadable.
+    Font,
     /// Cooperative cancellation.
     Cancelled,
     /// Dump byte budget exceeded.
@@ -124,6 +175,7 @@ impl fmt::Display for PaintError {
             }
             Self::InvalidInput => f.write_str("paint input is inconsistent with its layout"),
             Self::ItemLimit => f.write_str("display item limit exceeded"),
+            Self::Font => f.write_str("glyph outlines are unavailable"),
             Self::Cancelled => f.write_str("paint cancelled"),
             Self::OutputLimit => f.write_str("display list dump output limit exceeded"),
         }
@@ -138,6 +190,8 @@ pub struct DisplayList {
     viewport: CssSize,
     canvas: Srgba,
     commands: Vec<DisplayCommand>,
+    /// Glyph paths referenced by [`Shape::Path`].
+    paths: Vec<Path>,
     /// Hit-testable border boxes in paint order.
     hits: Vec<HitRegion>,
     /// The root fragment, the target when no box is hit.
@@ -214,10 +268,73 @@ fn point(x: f64, y: f64) -> Result<CssPoint, PaintError> {
     })
 }
 
+/// The boxes and clip of one block or inline fragment.
+#[derive(Clone, Copy)]
+struct Geometry {
+    node: NodeId,
+    border: CssRect,
+    padding: CssRect,
+    content: CssRect,
+    clip: Clip,
+}
+
+impl Geometry {
+    fn block(f: &BlockFragment) -> Self {
+        Self {
+            node: f.node(),
+            border: f.border(),
+            padding: f.padding(),
+            content: f.content(),
+            clip: f.clip(),
+        }
+    }
+
+    fn inline(f: &InlineFragment, clip: Clip) -> Self {
+        Self {
+            node: f.node(),
+            border: f.border(),
+            padding: f.padding(),
+            content: f.content(),
+            clip,
+        }
+    }
+}
+
+/// The clip a block applies to its own in-flow content: its ancestors' clip
+/// narrowed to its padding box on axes whose overflow is not visible.
+fn content_clip(f: &BlockFragment) -> Clip {
+    let own = |overflow: Overflow, start: CssPx, size: CssPx| {
+        (overflow != Overflow::Visible).then(|| AxisRange {
+            start,
+            end: CssPx::new(start.get() + size.get()).unwrap_or(start),
+        })
+    };
+    let p = f.padding();
+    let (ox, oy) = f.overflow();
+    let narrow = |a: Option<AxisRange>, b: Option<AxisRange>| match (a, b) {
+        (Some(a), Some(b)) => Some(AxisRange {
+            start: if a.start > b.start { a.start } else { b.start },
+            end: if a.end < b.end { a.end } else { b.end },
+        }),
+        (a, None) => a,
+        (None, b) => b,
+    };
+    let clip = f.clip();
+    Clip {
+        x: narrow(clip.x, own(ox, p.origin().x, p.size().width())),
+        y: narrow(clip.y, own(oy, p.origin().y, p.size().height())),
+    }
+}
+
 struct Builder<'a> {
     commands: Vec<DisplayCommand>,
     limits: PaintLimits,
     cancellation: &'a CancellationToken,
+    fonts: Fonts<'a>,
+    paths: Vec<Path>,
+    path_points: usize,
+    /// Outlines by (face, glyph), each read once.
+    outlines: HashMap<(usize, u16), rustic_text::Outline>,
 }
 
 impl Builder<'_> {
@@ -241,7 +358,7 @@ impl Builder<'_> {
 
     fn background(
         &mut self,
-        fragment: &BlockFragment,
+        fragment: Geometry,
         source: usize,
         style: &ComputedStyle,
     ) -> Result<(), PaintError> {
@@ -250,23 +367,23 @@ impl Builder<'_> {
             _ => return Err(PaintError::InvalidInput),
         };
         let area = match clip {
-            VisualBox::BorderBox => fragment.border(),
-            VisualBox::PaddingBox => fragment.padding(),
-            VisualBox::ContentBox => fragment.content(),
+            VisualBox::BorderBox => fragment.border,
+            VisualBox::PaddingBox => fragment.padding,
+            VisualBox::ContentBox => fragment.content,
         };
         self.push(DisplayItem {
             source_box: source,
-            node: fragment.node(),
+            node: fragment.node,
             role: ItemRole::Background,
             shape: Shape::Rect(area),
             color: color(style, P::BackgroundColor)?,
-            clip: fragment.clip(),
+            clip: fragment.clip,
         })
     }
 
     fn border(
         &mut self,
-        fragment: &BlockFragment,
+        fragment: Geometry,
         source: usize,
         style: &ComputedStyle,
     ) -> Result<(), PaintError> {
@@ -276,8 +393,8 @@ impl Builder<'_> {
             (P::BorderBottomStyle, P::BorderBottomColor),
             (P::BorderLeftStyle, P::BorderLeftColor),
         ];
-        let (x0, y0, x1, y1) = edges(fragment.border());
-        let (ix0, iy0, ix1, iy1) = edges(fragment.padding());
+        let (x0, y0, x1, y1) = edges(fragment.border);
+        let (ix0, iy0, ix1, iy1) = edges(fragment.padding);
         let widths = [iy0 - y0, x1 - ix1, y1 - iy1, ix0 - x0];
         let mut colors = [Srgba::WHITE; 4];
         for (i, &(style_property, color_property)) in sides.iter().enumerate() {
@@ -289,7 +406,7 @@ impl Builder<'_> {
                 )
             {
                 return Err(PaintError::Unsupported {
-                    node: fragment.node(),
+                    node: fragment.node,
                     reason: UnsupportedPaint::BorderStyle,
                 });
             }
@@ -299,11 +416,11 @@ impl Builder<'_> {
         }
         let item = |role, shape, color| DisplayItem {
             source_box: source,
-            node: fragment.node(),
+            node: fragment.node,
             role,
             shape,
             color,
-            clip: fragment.clip(),
+            clip: fragment.clip,
         };
         // Matching sides are one ring, so no antialiased seam appears at
         // the corner diagonals where separately composited quads would meet.
@@ -311,8 +428,8 @@ impl Builder<'_> {
             return self.push(item(
                 ItemRole::Border,
                 Shape::Ring {
-                    outer: fragment.border(),
-                    inner: fragment.padding(),
+                    outer: fragment.border,
+                    inner: fragment.padding,
                 },
                 colors[0],
             ));
@@ -333,6 +450,78 @@ impl Builder<'_> {
             }
             self.push(item(ItemRole::Border, Shape::Quad(points), colors[i]))?;
         }
+        Ok(())
+    }
+
+    /// One path item with every glyph of `text`, scaled from font units and
+    /// placed on its baseline (font y grows upward, CSS y downward).
+    fn text(
+        &mut self,
+        text: &TextFragment,
+        style: &ComputedStyle,
+        clip: Clip,
+    ) -> Result<(), PaintError> {
+        let fill = color(style, P::Color)?;
+        if fill.is_transparent() || text.glyphs().is_empty() {
+            return Ok(());
+        }
+        let face = self
+            .fonts
+            .and_then(|fonts| fonts.faces().get(text.face()))
+            .ok_or(PaintError::Font)?;
+        let scale = text.font_size() / f64::from(face.units_per_em());
+        let baseline = text.baseline().get();
+        let mut path = Path::default();
+        for glyph in text.glyphs() {
+            self.cancellation
+                .check()
+                .map_err(|_| PaintError::Cancelled)?;
+            let key = (text.face(), glyph.glyph.0);
+            let outline = match self.outlines.entry(key) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => {
+                    entry.insert(face.outline(glyph.glyph).map_err(|_| PaintError::Font)?)
+                }
+            };
+            for contour in outline.contours() {
+                self.path_points = self
+                    .path_points
+                    .checked_add(contour.len())
+                    .filter(|&n| n <= self.limits.max_path_points)
+                    .ok_or(PaintError::ItemLimit)?;
+                path.contours.push(
+                    contour
+                        .iter()
+                        .map(|p| PathPoint {
+                            x: glyph.x + p.x * scale,
+                            y: baseline - p.y * scale,
+                            on_curve: p.on_curve,
+                        })
+                        .collect(),
+                );
+            }
+        }
+        if path.contours.is_empty() {
+            return Ok(());
+        }
+        if !path
+            .contours
+            .iter()
+            .flatten()
+            .all(|p| p.x.is_finite() && p.y.is_finite())
+        {
+            return Err(PaintError::InvalidInput);
+        }
+        let index = self.paths.len();
+        self.push(DisplayItem {
+            source_box: text.source_box(),
+            node: text.node(),
+            role: ItemRole::Text,
+            shape: Shape::Path(index),
+            color: fill,
+            clip,
+        })?;
+        self.paths.push(path);
         Ok(())
     }
 }
@@ -367,6 +556,9 @@ struct Layers {
 enum Task {
     Layer(usize, bool),
     Own(usize, bool),
+    /// The inline content (inline box backgrounds and borders, then text,
+    /// line by line) of these in-flow blocks, in tree order.
+    Inline(Vec<usize>, bool),
     End,
 }
 
@@ -386,7 +578,8 @@ impl DisplayList {
     /// with `opacity < 1` is a group; `opacity: 0` paints nothing. Backgrounds
     /// are clipped to the bottom layer's `background-clip` box and borders
     /// must be solid. `visibility:hidden` boxes paint nothing of their own.
-    /// Unsupported features fail atomically.
+    /// Unsupported features fail atomically. A layout with text needs
+    /// [`DisplayList::build_with_fonts`].
     pub fn build(
         document: &Document,
         tree: &BoxTree,
@@ -395,10 +588,33 @@ impl DisplayList {
         limits: PaintLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, PaintError> {
+        Self::build_with_fonts(document, tree, layout, viewport, None, limits, cancellation)
+    }
+
+    /// Like [`DisplayList::build`], also painting the layout's inline
+    /// content with `fonts`, the database the layout was computed with.
+    /// Each in-flow block's inline content paints after the floats of its
+    /// layer (CSS 2.2 Appendix E step 7): line by line, inline box
+    /// backgrounds and solid borders, then one [`ItemRole::Text`] path per
+    /// text fragment in the text's `color`, clipped by the block's own
+    /// overflow as well as its ancestors'. Text decorations are not painted.
+    pub fn build_with_fonts(
+        document: &Document,
+        tree: &BoxTree,
+        layout: &BlockLayout,
+        viewport: CssSize,
+        fonts: Fonts<'_>,
+        limits: PaintLimits,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, PaintError> {
         let mut builder = Builder {
             commands: Vec::new(),
             limits,
             cancellation,
+            fonts,
+            paths: Vec::new(),
+            path_points: 0,
+            outlines: HashMap::new(),
         };
         let fragments = layout.fragments();
         let style_of = |fragment: &BlockFragment| -> Result<&ComputedStyle, PaintError> {
@@ -531,6 +747,42 @@ impl DisplayList {
             });
         }
 
+        // Inline content by block fragment: per line, inline boxes then text.
+        let lines = layout.lines();
+        let mut inline_lines: Vec<Vec<usize>> = vec![Vec::new(); n];
+        for (index, line) in lines.iter().enumerate() {
+            inline_lines
+                .get_mut(line.block())
+                .ok_or(PaintError::InvalidInput)?
+                .push(index);
+        }
+        let mut line_inlines: Vec<Vec<usize>> = vec![Vec::new(); lines.len()];
+        for (index, inline) in layout.inlines().iter().enumerate() {
+            line_inlines
+                .get_mut(inline.line())
+                .ok_or(PaintError::InvalidInput)?
+                .push(index);
+        }
+        let mut line_texts: Vec<Vec<usize>> = vec![Vec::new(); lines.len()];
+        for (index, text) in layout.texts().iter().enumerate() {
+            line_texts
+                .get_mut(text.line())
+                .ok_or(PaintError::InvalidInput)?
+                .push(index);
+        }
+        if !layout.texts().is_empty() && fonts.is_none() {
+            return Err(PaintError::Font);
+        }
+        let box_style = |source: usize| -> Result<&ComputedStyle, PaintError> {
+            tree.boxes()
+                .get(source)
+                .and_then(|b| b.style())
+                .ok_or(PaintError::InvalidInput)
+        };
+        let visible = |style: &ComputedStyle| {
+            matches!(style.get(P::Visibility), V::Visibility(Visibility::Visible))
+        };
+
         // Expand layers with an explicit stack: no content-controlled recursion.
         let mut stack: Vec<Task> = tops.iter().rev().map(|&i| Task::Layer(i, false)).collect();
         let mut hits = Vec::new();
@@ -538,6 +790,43 @@ impl DisplayList {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             match task {
                 Task::End => builder.command(DisplayCommand::EndGroup)?,
+                Task::Inline(blocks, muted) => {
+                    for b in blocks {
+                        let clip = content_clip(&fragments[b]);
+                        for &line in &inline_lines[b] {
+                            for &k in &line_inlines[line] {
+                                let inline = &layout.inlines()[k];
+                                let style = box_style(inline.source_box())?;
+                                if !visible(style) {
+                                    continue;
+                                }
+                                let geometry = Geometry::inline(inline, clip);
+                                hits.push(HitRegion {
+                                    hit: Hit {
+                                        source_box: inline.source_box(),
+                                        node: inline.node(),
+                                    },
+                                    border: inline.border(),
+                                    clip,
+                                });
+                                if !muted {
+                                    builder.background(geometry, inline.source_box(), style)?;
+                                    builder.border(geometry, inline.source_box(), style)?;
+                                }
+                            }
+                            if muted {
+                                continue;
+                            }
+                            for &t in &line_texts[line] {
+                                let text = &layout.texts()[t];
+                                let style = box_style(text.source_box())?;
+                                if visible(style) {
+                                    builder.text(text, style, clip)?;
+                                }
+                            }
+                        }
+                    }
+                }
                 Task::Own(i, muted) => {
                     let fragment = &fragments[i];
                     let style = style_of(fragment)?;
@@ -554,9 +843,13 @@ impl DisplayList {
                             continue;
                         }
                         if canvas_source != Some(i) {
-                            builder.background(fragment, fragment.source_box(), style)?;
+                            builder.background(
+                                Geometry::block(fragment),
+                                fragment.source_box(),
+                                style,
+                            )?;
                         }
-                        builder.border(fragment, fragment.source_box(), style)?;
+                        builder.border(Geometry::block(fragment), fragment.source_box(), style)?;
                     }
                 }
                 Task::Layer(i, muted) => {
@@ -575,6 +868,11 @@ impl DisplayList {
                     // Pushed in reverse so they pop in paint order.
                     stack.extend(l.positive.iter().rev().map(|&c| Task::Layer(c, muted)));
                     stack.extend(l.zero.iter().rev().map(|&c| Task::Layer(c, muted)));
+                    // The layer root's inline content, then its blocks'.
+                    let mut inline = Vec::with_capacity(l.blocks.len() + 1);
+                    inline.push(i);
+                    inline.extend(&l.blocks);
+                    stack.push(Task::Inline(inline, muted));
                     stack.extend(l.floats.iter().rev().map(|&c| Task::Layer(c, muted)));
                     stack.extend(l.blocks.iter().rev().map(|&c| Task::Own(c, muted)));
                     stack.extend(l.negative.iter().rev().map(|&c| Task::Layer(c, muted)));
@@ -593,6 +891,7 @@ impl DisplayList {
             viewport,
             canvas,
             commands: builder.commands,
+            paths: builder.paths,
             hits,
             root,
         })
@@ -633,6 +932,11 @@ impl DisplayList {
             .find(|region| region.contains(x, y))
             .map(|region| region.hit)
             .or(self.root)
+    }
+
+    /// Glyph paths, indexed by [`Shape::Path`].
+    pub fn paths(&self) -> &[Path] {
+        &self.paths
     }
 
     /// Copies of the fills alone, in paint order (group markers skipped).
@@ -693,6 +997,7 @@ impl DisplayList {
             let role = match item.role {
                 ItemRole::Background => "background",
                 ItemRole::Border => "border",
+                ItemRole::Text => "text",
             };
             let shape = match item.shape {
                 Shape::Rect(rect) => format!("rect=({})", r(rect)),
@@ -708,6 +1013,14 @@ impl DisplayList {
                     }
                     s.push(')');
                     s
+                }
+                Shape::Path(index) => {
+                    let path = &self.paths[index];
+                    format!(
+                        "path={index} contours={} points={}",
+                        path.contours.len(),
+                        path.points()
+                    )
                 }
             };
             // Unclipped items keep the REN-04a line format.

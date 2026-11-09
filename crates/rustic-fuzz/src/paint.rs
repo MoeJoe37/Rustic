@@ -55,6 +55,16 @@ impl Target for PaintTarget {
             b"overflow:clip",
             b"opacity:0.5",
             b"opacity:0",
+            b"x0H w",
+            b"<span>",
+            b"</span>",
+            b"<br>",
+            b"font:9px/7px 'Rustic Test'",
+            b"font-style:italic",
+            b"color:lime",
+            b"letter-spacing:1.5px",
+            b"text-align:justify",
+            b"white-space:pre",
             b"{",
             b"}",
         ]
@@ -95,15 +105,22 @@ impl Target for PaintTarget {
             return Ok(());
         };
         let viewport = CssSize::new(37.0, 23.0).map_err(|e| e.to_string())?;
-        let Ok(layout) = BlockLayout::compute(&tree, viewport, LayoutLimits::default(), &cancel)
-        else {
+        let fonts = fonts();
+        let Ok(layout) = BlockLayout::compute_with_fonts(
+            &tree,
+            viewport,
+            LayoutLimits::default(),
+            fonts,
+            &cancel,
+        ) else {
             return Ok(());
         };
-        let Ok(list) = DisplayList::build(
+        let Ok(list) = DisplayList::build_with_fonts(
             document,
             &tree,
             &layout,
             viewport,
+            Some(fonts),
             PaintLimits::default(),
             &cancel,
         ) else {
@@ -116,8 +133,16 @@ impl Target for PaintTarget {
         for command in list.commands() {
             match command {
                 DisplayCommand::Fill(item) => {
-                    if !layout.fragments().iter().any(|f| f.node() == item.node) {
+                    let known = layout.fragments().iter().any(|f| f.node() == item.node)
+                        || layout.inlines().iter().any(|f| f.node() == item.node)
+                        || layout.texts().iter().any(|f| f.node() == item.node);
+                    if !known {
                         return Err("display item for a box without a fragment".into());
+                    }
+                    if let rustic_paint::Shape::Path(index) = item.shape {
+                        if index >= list.paths().len() {
+                            return Err("text item names a missing path".into());
+                        }
                     }
                     if item.role == ItemRole::Background && !backgrounds.insert(item.node) {
                         return Err("a box painted its background twice".into());
@@ -154,6 +179,10 @@ impl Target for PaintTarget {
                     .fragments()
                     .iter()
                     .any(|f| f.node() == hit.node && f.source_box() == hit.source_box)
+                    || layout
+                        .inlines()
+                        .iter()
+                        .any(|f| f.node() == hit.node && f.source_box() == hit.source_box)
             };
             match list.hit_test(point) {
                 Some(hit) if x >= 37.0 => return Err(format!("hit {hit:?} outside the viewport")),
@@ -186,4 +215,10 @@ impl Target for PaintTarget {
         }
         Ok(())
     }
+}
+
+/// The bundled test fonts, parsed once per process.
+fn fonts() -> &'static rustic_text::FontDatabase {
+    static FONTS: std::sync::OnceLock<rustic_text::FontDatabase> = std::sync::OnceLock::new();
+    FONTS.get_or_init(rustic_text::bundled::test_database)
 }

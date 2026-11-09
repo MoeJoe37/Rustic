@@ -14,6 +14,7 @@ rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-layout = { path = "../rustic-layout" }
 rustic-style = { path = "../rustic-style" }
+rustic-text = { path = "../rustic-text" }
 
 [lints]
 workspace = true

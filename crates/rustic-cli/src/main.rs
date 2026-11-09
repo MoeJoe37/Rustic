@@ -42,15 +42,16 @@ anonymous/line boxes, layout positions or painting yet).
 dump-formatting prints normalized static flow boxes with anonymous blocks and
 split inline continuations, preserving unshaped text. Other formatting types,
 positioning/floats and special/replaced elements fail explicitly.
-dump-layout prints used content/padding/border rectangles for static non-replaced
-blocks with collapsed vertical margins and visible overflow. Inline/text layout and
-other unsupported formatting fail explicitly.
+dump-layout prints used content/padding/border rectangles for blocks with
+collapsed vertical margins, plus line boxes, text fragments and inline boxes
+laid out with the bundled test fonts. Unsupported formatting fails explicitly.
 dump-paint prints the display list for that layout: the canvas color (with
-root/body background propagation), block background colors and solid borders
-in stacking-context paint order, with overflow clips and opacity groups.
+root/body background propagation), block and inline background colors, solid
+borders and text glyph paths in stacking-context paint order, with overflow
+clips and opacity groups. Layout and paint use the bundled test fonts only.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). --scale sets device pixels per CSS pixel (default 1,
-at most 64). Text, images and non-solid borders fail explicitly; the
+at most 64). Images and non-solid borders fail explicitly; the
 PNG counts against --max-output-bytes.
 reftest renders a test page and every <link rel=match|mismatch href> reference
 the same way and compares the pixels, allowing the differences that
@@ -102,7 +103,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block background/border painting via dump-paint and render, reftests via reftest, hit testing via hit-test; text layout, JavaScript and networking: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; text layout, JavaScript and networking: not implemented"
         );
         return ExitCode::SUCCESS;
     }

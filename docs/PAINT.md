@@ -131,6 +131,34 @@ streams for stored, fixed and dynamic blocks; a decompression-bomb test; a
 round trip of `rustic render` output through the decoder; and the `codec-png`
 fuzz target seeded with PngSuite.
 
+## Text
+
+`DisplayList::build_with_fonts` paints the inline content the layout
+produced with `BlockLayout::compute_with_fonts`, given the same
+`FontDatabase`. Each in-flow block's inline content paints in its layer after
+the floats (CSS 2.2 Appendix E step 7), line by line: inline box backgrounds
+and solid borders (only the sides the layout gave a width, so split inline
+boxes draw their start and end edges once), then one `ItemRole::Text` item per
+text fragment. That item's `Shape::Path` indexes `DisplayList::paths`: the
+fragment's glyph outlines from the face's `glyf` table, scaled by
+`font-size / unitsPerEm` and placed at each glyph's pen position on the
+fragment's baseline, filled in the text's `color`. Inline content is clipped
+by its block's own overflow as well as its ancestors'. Outlines are read once
+per face and glyph; `PaintLimits::max_path_points` bounds the total points, and
+a layout with text but no fonts is `PaintError::Font`. The rasterizer
+flattens each quadratic arc into at most 128 segments within 0.05 device
+pixels and fills with the same exact-area coverage, whose clamped
+accumulation approximates the nonzero rule. Glyphs are not hinted or snapped
+to pixels, so text renders identically on every platform. `visibility:
+hidden` text is not painted, and `opacity: 0` contexts paint none. Inline
+boxes take hits; text nodes do not (their inline box or block does).
+
+The command line lays out and paints with the bundled original test fonts
+(`rustic_text::bundled`), with every generic family and the fallback mapped to
+them; no system fonts are read. Their `x` is a plain rectangle (500 units
+advance, 50 to 450 wide, 500 high, at 1000 units per em), which the text
+reftests use as an Ahem-style reference. See TD-52.
+
 ## Hit testing
 
 `DisplayList::hit_test` returns the topmost box whose border box contains a
@@ -168,10 +196,10 @@ tolerance and a mismatch.
 
 ## Not yet implemented
 
-Text and glyphs, painting decoded images (`<img>`, `background-image`),
+Text decorations, emphasis marks and shadows; painting decoded images (`<img>`, `background-image`),
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
 `border-radius`, outlines, box shadows, blend modes and filters, rounded or
 `clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52 and docs/ROADMAP.md (REN-04 to
 REN-07).

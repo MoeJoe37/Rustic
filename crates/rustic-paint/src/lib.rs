@@ -15,6 +15,6 @@ mod display;
 
 pub use color::{Srgba, srgba};
 pub use display::{
-    DisplayCommand, DisplayItem, DisplayList, Hit, ItemRole, PaintError, PaintLimits, Shape,
-    UnsupportedPaint,
+    DisplayCommand, DisplayItem, DisplayList, Fonts, Hit, ItemRole, PaintError, PaintLimits, Path,
+    PathPoint, Shape, UnsupportedPaint,
 };

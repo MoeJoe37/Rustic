@@ -19,6 +19,7 @@ dependencies = [
  "rustic-paint",
  "rustic-raster",
  "rustic-style",
+ "rustic-text",
  "rustic-url",
 ]
 
@@ -93,6 +94,7 @@ dependencies = [
  "rustic-dom",
  "rustic-layout",
  "rustic-style",
+ "rustic-text",
 ]
 
 [[package]]
@@ -107,6 +109,7 @@ dependencies = [
  "rustic-layout",
  "rustic-paint",
  "rustic-style",
+ "rustic-text",
 ]
 
 [[package]]

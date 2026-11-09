@@ -915,6 +915,17 @@ paint order, and `DisplayList::hit_test` finds the topmost one at a point;
 `rustic hit-test` prints it. `paint.hit` credits its hit-testing step; resize
 and zoom relayout remain. See [PAINT.md](PAINT.md#hit-testing).
 
+## REN-04c — Text painting
+
+The display list paints inline content after floats in each layer: inline
+box backgrounds and borders, then one glyph path per text fragment, built
+from `glyf` outlines and clipped by the block's own overflow. The rasterizer
+flattens quadratic contours at device scale. `rustic` layout and paint
+commands load the bundled test fonts, so `dump-layout`, `dump-paint`, `render`,
+`reftest` and `hit-test` now accept text. Three text reftests run at scales 1
+and 2. `paint.raster` credits glyph rasterization; gaps are TD-52. See
+[PAINT.md](PAINT.md#text).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

@@ -369,7 +369,7 @@ fn dump_layout_matches_used_geometry_at_every_fixture_chunk_and_enforces_exact_o
 }
 
 #[test]
-fn dump_layout_loads_local_css_and_rejects_unsupported_text_without_partial_stdout() {
+fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_partial_stdout() {
     let base = std::env::temp_dir().join(format!("rustic-cli-block-layout-{}", std::process::id()));
     fs::create_dir_all(&base).unwrap();
     fs::write(base.join("block.css"), "main {height:15px;width:100px}").unwrap();
@@ -382,14 +382,21 @@ fn dump_layout_loads_local_css_and_rejects_unsupported_text_without_partial_stdo
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains("content=(0,0,100,15)"));
+    fs::write(&path, "<style>* {margin:0}</style><main>shaped text</main>").unwrap();
+    // Text lays out with the bundled test fonts.
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\nline 0 block=") && stdout.contains("\ntext 0 line=0 "));
+    // Atomic inlines are not supported yet: no partial output.
     fs::write(
         &path,
-        "<style>* {margin:0}</style><main>unshaped text</main>",
+        "<style>* {margin:0}</style><main>a <span style=display:inline-block>b</span></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert_eq!(output.status.code(), Some(1));
-    assert!(stderr(&output).contains("TextLayout"));
+    assert!(stderr(&output).contains("FormattingContext"));
     assert!(output.stdout.is_empty());
     fs::remove_dir_all(base).unwrap();
 }
@@ -568,9 +575,19 @@ fn render_writes_a_deterministic_png_at_the_requested_scale() {
     assert_eq!(output.status.code(), Some(1));
     assert!(!limited.exists());
 
-    // Text is not painted yet, so the load fails without creating a file.
+    // Text paints; unsupported paint fails without creating a file.
     let text = base.join("text.html");
     fs::write(&text, "<p>hello</p>").unwrap();
+    let painted = base.join("text.png");
+    let output = rustic(&[
+        "render",
+        "--output",
+        painted.to_str().unwrap(),
+        text.to_str().unwrap(),
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(painted.exists());
+    fs::write(&text, "<p style='border: 1px dashed'>hello</p>").unwrap();
     let missing = base.join("missing.png");
     let output = rustic(&[
         "render",

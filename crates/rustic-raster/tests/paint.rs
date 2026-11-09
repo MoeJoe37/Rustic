@@ -59,6 +59,19 @@ impl Page {
             cancel,
         )
     }
+    /// The `id` of an element, `#text` for text, else the local name.
+    fn id_name(&self, node: NodeId) -> String {
+        match self.doc.node(node).unwrap().kind() {
+            NodeKind::Element(e) => e
+                .attributes()
+                .iter()
+                .find(|a| a.name().local() == "id")
+                .map(|a| String::from_utf16_lossy(a.value().as_units()))
+                .unwrap_or_else(|| e.name().local().to_string()),
+            NodeKind::Text(_) => "#text".into(),
+            _ => "?".into(),
+        }
+    }
     fn id(&self, name: &str) -> NodeId {
         let doc = &self.doc;
         doc.walk(doc.root())
@@ -339,12 +352,24 @@ fn item_raster_and_cancellation_budgets_are_exact() {
     let list = p.list().unwrap();
     assert_eq!(list.items().len(), 2);
     assert_eq!(
-        p.list_with(PaintLimits { max_items: 1 }, &CancellationToken::default()),
+        p.list_with(
+            PaintLimits {
+                max_items: 1,
+                ..PaintLimits::default()
+            },
+            &CancellationToken::default()
+        ),
         Err(PaintError::ItemLimit)
     );
     assert!(
-        p.list_with(PaintLimits { max_items: 2 }, &CancellationToken::default())
-            .is_ok()
+        p.list_with(
+            PaintLimits {
+                max_items: 2,
+                ..PaintLimits::default()
+            },
+            &CancellationToken::default()
+        )
+        .is_ok()
     );
     let cancel = CancellationToken::default();
     cancel.cancel();
@@ -714,4 +739,93 @@ fn hit_testing_follows_paint_order_clips_and_visibility() {
     // Outside the viewport nothing is hit.
     assert_eq!(at(60.0, 5.0), None);
     assert_eq!(at(-1.0, 5.0), None);
+}
+
+#[test]
+fn inline_content_paints_after_floats_and_before_positioned_boxes() {
+    let fonts = rustic_text::bundled::test_database();
+    let (doc, styles) = common::page(
+        "<div id=block><div id=float></div><span id=span>x</span><div id=pos></div></div>",
+        &format!(
+            "{RESET} #block {{ font: 10px/10px 'Rustic Test'; color: blue; background: gray;
+               overflow: hidden; height: 6px }}
+             #float {{ float: left; width: 4px; height: 4px; background: red }}
+             #span {{ background: lime }}
+             #pos {{ position: absolute; top: 0; width: 2px; height: 2px; background: black }}"
+        ),
+    );
+    let tree = BoxTree::build(
+        &doc,
+        doc.root(),
+        &styles,
+        LayoutLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let viewport = CssSize::new(20.0, 20.0).unwrap();
+    let layout = BlockLayout::compute_with_fonts(
+        &tree,
+        viewport,
+        LayoutLimits::default(),
+        &fonts,
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let build = |fonts| {
+        DisplayList::build_with_fonts(
+            &doc,
+            &tree,
+            &layout,
+            viewport,
+            fonts,
+            PaintLimits::default(),
+            &CancellationToken::default(),
+        )
+    };
+    // Text cannot be painted without the fonts it was laid out with.
+    assert_eq!(build(None), Err(PaintError::Font));
+    let list = build(Some(&fonts)).unwrap();
+    let page = Page {
+        doc,
+        tree,
+        layout,
+        viewport,
+    };
+    let roles: Vec<_> = list
+        .items()
+        .iter()
+        .map(|item| (page.id_name(item.node), item.role))
+        .collect();
+    assert_eq!(
+        roles,
+        [
+            ("block".to_string(), ItemRole::Background),
+            ("float".to_string(), ItemRole::Background),
+            ("span".to_string(), ItemRole::Background),
+            ("#text".to_string(), ItemRole::Text),
+            ("pos".to_string(), ItemRole::Background),
+        ]
+    );
+    // The text item is one path, clipped by its block's own overflow.
+    let text = list.items()[3];
+    let Shape::Path(index) = text.shape else {
+        panic!("text is a path: {text:?}");
+    };
+    assert_eq!(list.paths()[index].contours().len(), 1);
+    assert_eq!(text.clip.y.map(|r| r.end.get()), Some(6.0));
+    assert!(
+        list.dump(usize::MAX)
+            .unwrap()
+            .contains(" text path=0 contours=1 points=4 ")
+    );
+    // The span takes hits; the glyph's pixels are blue and clipped at y = 6.
+    let surface = rasterize(
+        &list,
+        DeviceScale::new(1.0).unwrap(),
+        RasterLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    assert_eq!(surface.pixel(5, 4), Some(rgb(0, 0, 255)));
+    assert_eq!(surface.pixel(5, 7), Some(rgb(255, 255, 255)));
 }

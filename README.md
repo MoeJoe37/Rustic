@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 27.83%** (21.25% verified complete + 6.58% partial credit) — 37/172 capabilities complete and 16 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 60.04% done.
+**Overall engine completion: 27.94%** (21.25% verified complete + 6.69% partial credit) — 37/172 capabilities complete and 16 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 60.95% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -93,8 +93,9 @@ continuations before shaping. `rustic dump-layout <file>` adds [used block recta
 for a static block subset with adjoining-margin collapse. `rustic dump-paint <file>` prints
 its [display list](docs/PAINT.md) and `rustic render --output out.png <file>` rasterizes
 block backgrounds and solid borders to a PNG on the CPU; `rustic reftest <test>`
-compares a page's render with its `rel=match` references. General block/inline flow, text
-shaping and image decoding remain pending. URLs and other
+compares a page's render with its `rel=match` references. Text lays out and
+paints with bundled test fonts. OpenType shaping, image painting and system
+fonts remain pending. URLs and other
 arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints

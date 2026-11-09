@@ -434,6 +434,14 @@ pub fn dump_layout(
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
+/// The fonts every layout and paint command uses: the bundled test faces,
+/// with every generic family and the fallback mapped to them. No system
+/// fonts are read.
+fn fonts() -> &'static rustic_text::FontDatabase {
+    static FONTS: std::sync::OnceLock<rustic_text::FontDatabase> = std::sync::OnceLock::new();
+    FONTS.get_or_init(rustic_text::bundled::test_database)
+}
+
 fn block_layout(
     parsed: &ParsedDocument,
     path: &Path,
@@ -450,10 +458,11 @@ fn block_layout(
     let compute = ComputeContext::default();
     let viewport = rustic_layout::CssSize::new(compute.viewport_width, compute.viewport_height)
         .map_err(|error| LoadError::Flow(error.into()))?;
-    let layout = rustic_layout::BlockLayout::compute(
+    let layout = rustic_layout::BlockLayout::compute_with_fonts(
         &tree,
         viewport,
         layout_limits(limits),
+        fonts(),
         &CancellationToken::default(),
     )
     .map_err(LoadError::Flow)?;
@@ -466,11 +475,12 @@ fn display_list(
     limits: LoaderLimits,
 ) -> Result<rustic_paint::DisplayList, LoadError> {
     let (tree, layout, viewport) = block_layout(parsed, path, limits)?;
-    rustic_paint::DisplayList::build(
+    rustic_paint::DisplayList::build_with_fonts(
         parsed.document(),
         &tree,
         &layout,
         viewport,
+        Some(fonts()),
         rustic_paint::PaintLimits::default(),
         &CancellationToken::default(),
     )

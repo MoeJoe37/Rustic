@@ -8,7 +8,7 @@
 use rustic_base::CancellationToken;
 use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
-use rustic_paint::{DisplayCommand, DisplayItem, DisplayList, Shape, Srgba};
+use rustic_paint::{DisplayCommand, DisplayItem, DisplayList, Path, PathPoint, Shape, Srgba};
 use std::{error::Error, fmt};
 
 /// Surface and work budgets for one rasterization.
@@ -263,8 +263,88 @@ fn rect_points(r: CssRect, scale: f64, reverse: bool) -> Vec<Point> {
     points
 }
 
-fn contours(shape: &Shape, scale: f64) -> Vec<Vec<Point>> {
+/// Largest distance a flattened quadratic may stray from the curve, in
+/// device pixels.
+const FLATNESS: f64 = 0.05;
+/// Most line segments one quadratic becomes.
+const MAX_SEGMENTS: u32 = 128;
+
+/// Append the flattening of the quadratic `p0`–`c`–`p1` (excluding `p0`).
+fn quadratic(out: &mut Vec<Point>, p0: Point, c: Point, p1: Point) {
+    // The curve deviates from its chord by at most |p0 - 2c + p1| / 4, and
+    // splitting into n parts divides that by n².
+    let dx = p0.0 - 2.0 * c.0 + p1.0;
+    let dy = p0.1 - 2.0 * c.1 + p1.1;
+    let deviation = (dx * dx + dy * dy).sqrt() / 4.0;
+    let n = (deviation / FLATNESS).sqrt().ceil();
+    let n = if n.is_finite() && n >= 1.0 {
+        (n as u32).min(MAX_SEGMENTS)
+    } else {
+        1
+    };
+    for k in 1..=n {
+        let t = f64::from(k) / f64::from(n);
+        let u = 1.0 - t;
+        out.push((
+            u * u * p0.0 + 2.0 * u * t * c.0 + t * t * p1.0,
+            u * u * p0.1 + 2.0 * u * t * c.1 + t * t * p1.1,
+        ));
+    }
+}
+
+/// Flatten one TrueType-style contour (quadratic, implied on-curve
+/// midpoints between consecutive control points) into a polygon.
+fn flatten(contour: &[PathPoint], scale: f64) -> Vec<Point> {
+    let points: Vec<(Point, bool)> = contour
+        .iter()
+        .map(|p| ((p.x * scale, p.y * scale), p.on_curve))
+        .collect();
+    let n = points.len();
+    let mid = |a: Point, b: Point| ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
+    // Start on an on-curve point, or the midpoint of the first two controls.
+    let (start, first) = match points.iter().position(|p| p.1) {
+        Some(i) => (points[i].0, i + 1),
+        None => (mid(points[0].0, points[n - 1].0), 0),
+    };
+    let mut out = vec![start];
+    let mut current = start;
+    let mut control: Option<Point> = None;
+    for k in 0..n {
+        let (p, on_curve) = points[(first + k) % n];
+        match (on_curve, control) {
+            (true, None) => {
+                out.push(p);
+                current = p;
+            }
+            (true, Some(c)) => {
+                quadratic(&mut out, current, c, p);
+                current = p;
+                control = None;
+            }
+            (false, None) => control = Some(p),
+            (false, Some(c)) => {
+                let m = mid(c, p);
+                quadratic(&mut out, current, c, m);
+                current = m;
+                control = Some(p);
+            }
+        }
+    }
+    if let Some(c) = control {
+        quadratic(&mut out, current, c, start);
+    }
+    out
+}
+
+fn contours(shape: &Shape, paths: &[Path], scale: f64) -> Vec<Vec<Point>> {
     match *shape {
+        Shape::Path(index) => paths.get(index).map_or_else(Vec::new, |path| {
+            path.contours()
+                .iter()
+                .filter(|c| !c.is_empty())
+                .map(|c| flatten(c, scale))
+                .collect()
+        }),
         Shape::Rect(r) => vec![rect_points(r, scale, false)],
         Shape::Ring { outer, inner } => {
             vec![
@@ -320,6 +400,7 @@ fn fill(
     pixels: &mut [u8],
     (width, height): (u32, u32),
     item: &DisplayItem,
+    paths: &[Path],
     scale: f64,
     work: &mut Work<'_>,
 ) -> Result<(), RasterError> {
@@ -328,7 +409,12 @@ fn fill(
         return Ok(());
     };
     let color = item.color;
-    let clipped: Vec<Vec<Point>> = contours(&item.shape, scale)
+    let shape = contours(&item.shape, paths, scale);
+    if matches!(item.shape, Shape::Path(_)) {
+        // Flattened glyph points; box shapes are a few points each.
+        work.charge(shape.iter().map(|c| c.len() as u64).sum())?;
+    }
+    let clipped: Vec<Vec<Point>> = shape
         .iter()
         .map(|c| clip(c, limit))
         .filter(|c| c.len() >= 3)
@@ -462,7 +548,7 @@ pub fn rasterize(
                     Some((pixels, _)) => pixels,
                     None => &mut surface.pixels,
                 };
-                fill(target, size, item, factor, &mut work)?;
+                fill(target, size, item, list.paths(), factor, &mut work)?;
             }
             DisplayCommand::BeginGroup { opacity, .. } => {
                 // The surface, every open group and the new one.
@@ -495,6 +581,68 @@ pub fn rasterize(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn polygon_area(points: &[Point]) -> f64 {
+        let n = points.len();
+        (0..n)
+            .map(|i| {
+                let (a, b) = (points[i], points[(i + 1) % n]);
+                a.0 * b.1 - b.0 * a.1
+            })
+            .sum::<f64>()
+            / 2.0
+    }
+
+    #[test]
+    fn quadratic_contours_flatten_within_tolerance() {
+        let p = |x: f64, y: f64, on_curve| PathPoint { x, y, on_curve };
+        // Four quadratic arcs with corner controls, as in the test fonts'
+        // `0`: the exact area is 5/6 of the bounding rectangle.
+        let oval = [
+            p(20.0, 0.0, true),
+            p(0.0, 0.0, false),
+            p(0.0, 30.0, true),
+            p(0.0, 60.0, false),
+            p(20.0, 60.0, true),
+            p(40.0, 60.0, false),
+            p(40.0, 30.0, true),
+            p(40.0, 0.0, false),
+        ];
+        for scale in [1.0, 4.0, 64.0] {
+            let polygon = flatten(&oval, scale);
+            let exact = 5.0 / 6.0 * 40.0 * 60.0 * scale * scale;
+            let area = polygon_area(&polygon).abs();
+            // Chords lie inside the convex arcs, so the error is negative;
+            // within the flatness it is under a band along the perimeter
+            // (200 units), and the segment cap keeps huge glyphs within 0.05%.
+            let band = FLATNESS * 200.0 * scale;
+            assert!(
+                area <= exact && exact - area <= band.max(exact * 5e-4),
+                "{scale}: {area}"
+            );
+            assert!(polygon.len() <= 4 * MAX_SEGMENTS as usize + 1);
+        }
+        // Only control points: the start is the implied midpoint, and every
+        // arc still closes on itself.
+        let controls = [
+            p(0.0, 0.0, false),
+            p(10.0, 0.0, false),
+            p(10.0, 10.0, false),
+            p(0.0, 10.0, false),
+        ];
+        let polygon = flatten(&controls, 1.0);
+        assert_eq!(polygon[0], (0.0, 5.0));
+        assert_eq!(*polygon.last().unwrap(), (0.0, 5.0));
+        // A lone on-curve point and a straight contour stay as they are.
+        assert_eq!(flatten(&[p(1.0, 2.0, true)], 2.0), [(2.0, 4.0), (2.0, 4.0)]);
+        let square = [
+            p(0.0, 0.0, true),
+            p(0.0, 1.0, true),
+            p(1.0, 1.0, true),
+            p(1.0, 0.0, true),
+        ];
+        assert_eq!(polygon_area(&flatten(&square, 3.0)).abs(), 9.0);
+    }
 
     fn coverage(contour: &[Point], w: usize, h: usize) -> Vec<f64> {
         let stride = w + 2;

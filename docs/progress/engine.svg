@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1202" viewBox="0 0 1000 1202" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 27.83%</title>
-<desc id="desc">Weighted engine completion is 27.83%: 21.25% from capabilities verified complete and 6.58% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
+<title id="title">Rustic engine completion: 27.94%</title>
+<desc id="desc">Weighted engine completion is 27.94%: 21.25% from capabilities verified complete and 6.69% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
 <rect width="1000" height="1202" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
 <text x="24.00" y="60" fill="#8b949e" font-size="12">37/172 capabilities complete · 16 in progress · 21 subsystems · engine-v3</text>
-<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">27.83%</text>
+<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">27.94%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
-<rect x="24.00" y="76" width="264.94" height="14" rx="4" fill="#388bfd"/>
+<rect x="24.00" y="76" width="265.99" height="14" rx="4" fill="#388bfd"/>
 <rect x="24.00" y="76" width="202.30" height="14" rx="4" fill="#2ea043"/>
 <rect x="24" y="104" width="10" height="10" rx="2" fill="#2ea043"/>
 <text x="40.00" y="113" fill="#c9d1d9" font-size="12">21.25% verified complete</text>
 <rect x="224" y="104" width="10" height="10" rx="2" fill="#388bfd"/>
-<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+6.58% partial credit (verified steps)</text>
+<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+6.69% partial credit (verified steps)</text>
 <rect x="524" y="104" width="10" height="10" rx="2" fill="#30363d"/>
-<text x="540.00" y="113" fill="#c9d1d9" font-size="12">72.17% remaining</text>
+<text x="540.00" y="113" fill="#c9d1d9" font-size="12">72.06% remaining</text>
 <text x="24.00" y="142" fill="#f0f6fc" font-size="14" font-weight="600">Scope map</text>
 <text x="976.00" y="142" fill="#8b949e" font-size="11" text-anchor="end">block width = share of engine · fill = subsystem progress</text>
 <g><title>Foundation: 62.50% of 2% engine weight (1.25 engine points)</title>
@@ -62,9 +62,9 @@
 <rect x="351.94" y="184" width="1" height="4" fill="#30363d"/>
 <text x="352.44" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Layout</text>
 </g>
-<g><title>Paint &amp; raster: 37.03% of 6% engine weight (2.22 engine points)</title>
+<g><title>Paint &amp; raster: 38.88% of 6% engine weight (2.33 engine points)</title>
 <rect x="396.28" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
-<rect x="396.28" y="150" width="20.41" height="32" rx="3" fill="#388bfd"/>
+<rect x="396.28" y="150" width="21.43" height="32" rx="3" fill="#388bfd"/>
 <rect x="423.34" y="184" width="1" height="16" fill="#30363d"/>
 <text x="423.84" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Paint</text>
 </g>
@@ -152,13 +152,13 @@
 <text x="434.00" y="308" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
 <text x="488.00" y="308" fill="#8b949e" font-size="11" text-anchor="end">9.00%</text>
 </g>
-<g><title>M3 Static renderer: 60.04% (1/17 capabilities, 12.22% of engine)</title>
+<g><title>M3 Static renderer: 60.95% (1/17 capabilities, 12.22% of engine)</title>
 <text x="24.00" y="338" fill="#8b949e" font-size="12" font-weight="600">M3</text>
 <text x="60.00" y="338" fill="#c9d1d9" font-size="12">Static renderer</text>
 <rect x="224.00" y="329" width="150.00" height="10" rx="3" fill="#21262d"/>
-<rect x="224.00" y="329" width="90.06" height="10" rx="3" fill="#388bfd"/>
+<rect x="224.00" y="329" width="91.42" height="10" rx="3" fill="#388bfd"/>
 <rect x="224.00" y="329" width="11.98" height="10" rx="3" fill="#2ea043"/>
-<text x="434.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">60.04%</text>
+<text x="434.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">60.95%</text>
 <text x="488.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">12.22%</text>
 </g>
 <g><title>M4 ECMAScript runtime: 0.00% (0/13 capabilities, 10.68% of engine)</title>
@@ -492,13 +492,13 @@
 </g>
 <text x="976.00" y="677" fill="#c9d1d9" font-size="12" text-anchor="end">3.63</text>
 </g>
-<g><title>Paint &amp; raster: 0/7 capabilities complete, 37.03% done, 2.22 of 6 engine points</title>
+<g><title>Paint &amp; raster: 0/7 capabilities complete, 38.88% done, 2.33 of 6 engine points</title>
 <rect x="24" y="688" width="952" height="30" fill="#161b22"/>
 <text x="32.00" y="707" fill="#f0f6fc" font-size="12">Paint &amp; raster</text>
 <text x="236.00" y="707" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
 <rect x="252.00" y="698" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="698" width="74.06" height="10" rx="3" fill="#388bfd"/>
-<text x="504.00" y="707" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">37.03%</text>
+<rect x="252.00" y="698" width="77.76" height="10" rx="3" fill="#388bfd"/>
+<text x="504.00" y="707" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">38.88%</text>
 <g><title>Immutable display lists and paint order: in progress, size 3, M3, 66.66% verified</title>
 <rect x="520.00" y="696" width="40.22" height="14" rx="2" fill="#30363d"/>
 <rect x="520.00" y="696" width="26.81" height="14" rx="2" fill="#388bfd"/>
@@ -509,9 +509,9 @@
 <rect x="562.22" y="696" width="20.11" height="14" rx="2" fill="#388bfd"/>
 <rect x="562.72" y="696.5" width="39.22" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Deterministic CPU reference rasterizer: in progress, size 5, M3, 40.00% verified</title>
+<g><title>Deterministic CPU reference rasterizer: in progress, size 5, M3, 50.00% verified</title>
 <rect x="604.44" y="696" width="68.37" height="14" rx="2" fill="#30363d"/>
-<rect x="604.44" y="696" width="27.35" height="14" rx="2" fill="#388bfd"/>
+<rect x="604.44" y="696" width="34.19" height="14" rx="2" fill="#388bfd"/>
 <rect x="604.94" y="696.5" width="67.37" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <g><title>Bounded images, color/alpha and resource lifecycle: in progress, size 3, M3, 50.00% verified</title>
@@ -532,7 +532,7 @@
 <rect x="857.78" y="696" width="26.81" height="14" rx="2" fill="#388bfd"/>
 <rect x="858.28" y="696.5" width="39.22" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<text x="976.00" y="707" fill="#c9d1d9" font-size="12" text-anchor="end">2.22</text>
+<text x="976.00" y="707" fill="#c9d1d9" font-size="12" text-anchor="end">2.33</text>
 </g>
 <g><title>JavaScript &amp; GC: 0/15 capabilities complete, 0.00% done, 0.00 of 12 engine points</title>
 <text x="32.00" y="737" fill="#f0f6fc" font-size="12">JavaScript &amp; GC</text>
@@ -944,6 +944,6 @@
 <rect x="640" y="1126" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1137" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1164" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1184" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 08da5a54bd6e</text>
+<text x="24.00" y="1184" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 324d0181bf76</text>
 </g>
 </svg>

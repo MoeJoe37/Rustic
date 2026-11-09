@@ -1,5 +1,6 @@
 //! Public line, text and inline-box fragments (REN-03b).
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use rustic_dom::NodeId;
@@ -56,6 +57,7 @@ pub struct TextFragment {
     face: usize,
     font_size: f64,
     glyphs: Vec<PositionedGlyph>,
+    parent: Option<usize>,
 }
 
 impl TextFragment {
@@ -99,6 +101,12 @@ impl TextFragment {
     pub fn glyphs(&self) -> &[PositionedGlyph] {
         &self.glyphs
     }
+    /// The enclosing inline box fragment on the same line (an index into
+    /// [`crate::BlockLayout::inlines`]); `None` when the text sits directly
+    /// in the line's root inline box.
+    pub const fn parent(&self) -> Option<usize> {
+        self.parent
+    }
 }
 
 /// One `display:inline` box's fragment on one line.
@@ -112,6 +120,7 @@ pub struct InlineFragment {
     content: CssRect,
     starts: bool,
     ends: bool,
+    parent: Option<usize>,
 }
 
 impl InlineFragment {
@@ -148,7 +157,14 @@ impl InlineFragment {
     pub const fn ends(self) -> bool {
         self.ends
     }
+    /// The enclosing inline box fragment on the same line, if any.
+    pub const fn parent(self) -> Option<usize> {
+        self.parent
+    }
 }
+
+/// Global inline-fragment index of (line in the converted set, inline box).
+pub(crate) type InlineIndex = HashMap<(usize, usize), usize>;
 
 fn rect(x: f64, y: f64, w: f64, h: f64) -> Result<CssRect, FlowError> {
     Ok(CssRect::new(
@@ -172,8 +188,14 @@ pub(crate) fn convert(
     texts: &mut Vec<TextFragment>,
     inlines: &mut Vec<InlineFragment>,
     work: &mut Work<'_>,
-) -> Result<(), FlowError> {
+) -> Result<InlineIndex, FlowError> {
     let base = lines.len();
+    // Inline fragments first, so text can name its enclosing box; a box's
+    // parent precedes it on each line (boxes are in preorder).
+    let mut index = InlineIndex::new();
+    for f in &set.inlines {
+        index.insert((f.line, f.ibox), inlines.len() + index.len());
+    }
     let (ox, oy) = origin;
     for l in &set.lines {
         work.charge(1)?;
@@ -181,6 +203,23 @@ pub(crate) fn convert(
             block,
             rect: rect(l.x + ox, l.y + oy, l.width, l.height)?,
             baseline: CssPx::new(l.baseline + oy)?,
+        });
+    }
+    for f in set.inlines {
+        work.charge(1)?;
+        let b = &ifc.boxes[f.ibox];
+        let r = |(x, y, w, h): (f64, f64, f64, f64)| rect(x + ox, y + oy, w, h);
+        let parent = b.parent.and_then(|p| index.get(&(f.line, p)).copied());
+        inlines.push(InlineFragment {
+            line: base + f.line,
+            node: b.node,
+            source_box: b.source,
+            border: r(f.border)?,
+            padding: r(f.padding)?,
+            content: r(f.content)?,
+            starts: f.starts,
+            ends: f.ends,
+            parent,
         });
     }
     for t in set.texts {
@@ -206,22 +245,8 @@ pub(crate) fn convert(
             face: t.face,
             font_size: t.size,
             glyphs,
+            parent: item.parent.and_then(|p| index.get(&(t.line, p)).copied()),
         });
     }
-    for f in set.inlines {
-        work.charge(1)?;
-        let b = &ifc.boxes[f.ibox];
-        let r = |(x, y, w, h): (f64, f64, f64, f64)| rect(x + ox, y + oy, w, h);
-        inlines.push(InlineFragment {
-            line: base + f.line,
-            node: b.node,
-            source_box: b.source,
-            border: r(f.border)?,
-            padding: r(f.padding)?,
-            content: r(f.content)?,
-            starts: f.starts,
-            ends: f.ends,
-        });
-    }
-    Ok(())
+    Ok(index)
 }

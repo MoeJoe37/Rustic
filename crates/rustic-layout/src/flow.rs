@@ -98,6 +98,8 @@ pub struct BlockFragment {
     scrollable: Option<CssRect>,
     line: Option<usize>,
     sticky: Option<StickyConstraint>,
+    /// For an atomic inline, its enclosing inline fragment on the line.
+    pub(crate) inline_parent: Option<usize>,
 }
 
 impl BlockFragment {
@@ -184,6 +186,10 @@ pub struct BlockLayout {
     lines: Vec<LineFragment>,
     texts: Vec<TextFragment>,
     inlines: Vec<InlineFragment>,
+    /// Preorder position (flow node) of each fragment and of the block
+    /// (possibly anonymous) that produced each line, for the fragment tree.
+    pub(crate) fragment_order: Vec<usize>,
+    pub(crate) line_order: Vec<usize>,
 }
 
 /// A metered work counter that also polls cancellation.
@@ -2469,6 +2475,7 @@ impl Engine<'_, '_> {
             }
         };
         let mut lines_out = Vec::new();
+        let mut line_order = Vec::new();
         let mut texts_out = Vec::new();
         let mut inlines_out = Vec::new();
         for i in 0..n {
@@ -2481,12 +2488,8 @@ impl Engine<'_, '_> {
             let origin = fragments[i].content().origin();
             let block = public[owner(i)].ok_or(FlowError::InvalidSnapshot)?;
             let base = lines_out.len();
-            for placed in &set.atomics {
-                let node = self.ifcs[k].atomics[placed.atomic].node;
-                let f = fragments.get_mut(node).ok_or(FlowError::InvalidSnapshot)?;
-                f.line = Some(base + placed.line);
-            }
-            text::convert(
+            let atomics = set.atomics.clone();
+            let index = text::convert(
                 &self.ifcs[k],
                 set,
                 (origin.x.get(), origin.y.get()),
@@ -2496,12 +2499,25 @@ impl Engine<'_, '_> {
                 &mut inlines_out,
                 &mut self.work,
             )?;
+            line_order.resize(lines_out.len(), i);
+            for placed in &atomics {
+                let item = &self.ifcs[k].atomics[placed.atomic];
+                let f = fragments
+                    .get_mut(item.node)
+                    .ok_or(FlowError::InvalidSnapshot)?;
+                f.line = Some(base + placed.line);
+                f.inline_parent = item
+                    .parent
+                    .and_then(|p| index.get(&(placed.line, p)).copied());
+            }
         }
         let mut kept = Vec::with_capacity(count);
+        let mut fragment_order = Vec::with_capacity(count);
         for (i, mut f) in fragments.into_iter().enumerate() {
             if self.nodes[i].anonymous {
                 continue;
             }
+            fragment_order.push(i);
             f.parent = f.parent.and_then(|p| public[owner(p)]);
             f.containing_block = f.containing_block.and_then(|c| public[owner(c)]);
             if let Some(c) = f.sticky.as_mut() {
@@ -2516,6 +2532,8 @@ impl Engine<'_, '_> {
             lines: lines_out,
             texts: texts_out,
             inlines: inlines_out,
+            fragment_order,
+            line_order,
         })
     }
 }
@@ -2586,6 +2604,7 @@ fn fragment(node: &Node<'_>, border_origin: (f64, f64)) -> Result<BlockFragment,
         scrollable: None,
         line: None,
         sticky: None,
+        inline_parent: None,
     })
 }
 

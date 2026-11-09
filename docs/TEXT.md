@@ -1,8 +1,9 @@
-# Text segmentation and bidi (REN-03b, part 1)
+# Text segmentation, bidi and shaping (REN-03b)
 
-`rustic-text` now carries the Unicode algorithms that line layout needs, all
-from scratch in safe Rust with no dependencies. Line boxes, shaping and text
-fragments build on them in later REN-03b work; see [LAYOUT.md](LAYOUT.md).
+`rustic-text` carries the Unicode algorithms and the simple shaper that line
+layout needs, all from scratch in safe Rust with no dependencies. Line boxes
+and text fragments are built on them in `rustic-layout`; see
+[LAYOUT.md](LAYOUT.md#inline-formatting-and-text-fragments-ren-03b).
 
 ## Unicode data
 
@@ -48,6 +49,32 @@ equivalents of U+2329/U+232A), N1–N2, I1–I2, and per line L1
 glyph. X9-removed characters keep the preceding character's level so they
 never split a run. Rule L3 (combining marks) is not applied (TD-47).
 
+## Shaping
+
+`shape::shape(database, chain, text, options)` turns decoded text into
+`ShapedCluster`s, one per UAX #29 extended grapheme cluster:
+
+- **Font fallback per cluster.** `FontDatabase::fallback_chain(families,
+  query)` resolves each `font-family` entry (generic families through the
+  database's generic map) to its best face for the weight/style/stretch query,
+  then appends the fallback family; its first entry is the CSS *first
+  available font*. A cluster takes the first face that maps all its visible
+  characters, else the first that maps its first character, else the chain's
+  first face with `.notdef`. A cluster is never split across faces.
+- **Glyphs and advances.** Each visible character maps through `cmap` to one
+  glyph with its `hmtx` advance scaled to the used font size. Default
+  ignorables (ZWJ/ZWNJ, variation selectors, bidi controls, ZWSP, soft hyphen
+  and similar, `shape::is_invisible`) produce no glyph.
+- **Mirroring.** In right-to-left runs a character with a `Bidi_Mirroring_Glyph`
+  uses that glyph when the face has it (UAX #9 L4).
+- **Spacing.** `letter-spacing` is added once after every visible cluster and
+  `word-spacing` to every word-separator character (CSS Text 3 §8).
+
+There is no OpenType layout: GSUB/GPOS/`kern` are not applied, so ligatures,
+kerning, contextual forms, mark positioning and complex scripts such as Arabic
+joining or Indic reordering are not shaped (TD-50). `shape` is pure and
+width-independent, so layout shapes each run once.
+
 ## Evidence
 
 - All 19,338 `LineBreakTest.txt` and 766 `GraphemeBreakTest.txt` cases are
@@ -60,6 +87,11 @@ never split a run. Rule L3 (combining marks) is not applied (TD-47).
   (run on 2026-11-09: 490,846 class lines and 91,707 character cases).
 - Unit tests cover mandatory breaks, empty input, paragraph splitting, L1
   trailing whitespace, 300-deep embeddings and long bracketed input.
+- `tests/shape.rs` uses the bundled test faces (which map only `x` and the
+  space): fallback-chain resolution, clusters kept on one face, `.notdef`,
+  per-face scaling, invisible characters, missing fonts and spacing. The test
+  faces have no bracket glyphs, so mirrored-glyph substitution itself is not
+  yet exercised by a font that has them.
 
 Specification basis, reviewed 2026-11-09: UAX #14 revision for Unicode 17.0.0,
 UAX #29 revision for 17.0.0 and UAX #9 revision for 17.0.0. These are the

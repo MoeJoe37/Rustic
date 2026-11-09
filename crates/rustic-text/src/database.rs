@@ -74,7 +74,18 @@ impl FontDatabase {
         self.fallback = Some(family.to_owned());
     }
 
-    fn family_faces(&self, family: &str) -> Vec<&Face> {
+    pub(crate) fn generic_family(&self, generic: &str) -> Option<&str> {
+        self.generics
+            .iter()
+            .find(|(g, _)| g.eq_ignore_ascii_case(generic))
+            .map(|(_, family)| family.as_str())
+    }
+
+    pub(crate) fn fallback_family(&self) -> Option<&str> {
+        self.fallback.as_deref()
+    }
+
+    pub(crate) fn family_faces(&self, family: &str) -> Vec<&Face> {
         self.faces
             .iter()
             .filter(|face| {

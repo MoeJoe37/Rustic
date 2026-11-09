@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "2a6558f23421553b23cc8248c5ef575d1197d81cd4daa704a24acdd510e7f2bc",
-  "percent": "25.22",
-  "verified_percent": "20.27",
-  "partial_percent": "4.95",
-  "completed": 36,
-  "in_progress": 13,
+  "source_fingerprint": "3cbf782948539987be13ab6c9189d3bbfe658b28af8a1d4f7ed2bc6e8dec7b60",
+  "percent": "26.55",
+  "verified_percent": "21.25",
+  "partial_percent": "5.30",
+  "completed": 37,
+  "in_progress": 14,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -35,11 +35,11 @@
       "id": "M3",
       "label": "Static renderer",
       "share": "12.22",
-      "completed": 0,
+      "completed": 1,
       "total": 17,
-      "percent": "38.66",
-      "verified_percent": "0.00",
-      "partial_percent": "38.66"
+      "percent": "49.59",
+      "verified_percent": "7.99",
+      "partial_percent": "41.60"
     },
     {
       "id": "M4",
@@ -1655,9 +1655,50 @@
           "label": "Shaping, fallback and glyph clusters",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "clusters",
+              "label": "Grapheme clusters, per-cluster font fallback, advances, mirroring and spacing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/shape.rs",
+                  "marker": "pub fn shape("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/shape.rs",
+                  "marker": "pub fn fallback_chain<"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/shape.rs",
+                  "marker": "fn clusters_take_one_face_and_unmapped_text_uses_notdef"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/shape.rs",
+                  "marker": "fn letter_and_word_spacing_follow_css_text"
+                }
+              ]
+            },
+            {
+              "id": "opentype",
+              "label": "OpenType GSUB/GPOS: ligatures, kerning and mark positioning",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "complex",
+              "label": "Complex scripts (Arabic joining, Indic reordering)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.90"
         },
         {
@@ -1693,11 +1734,28 @@
             {
               "id": "layout",
               "label": "Mixed-direction line fragments in layout",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/lines.rs",
+                  "marker": "fn visual_order("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn right_to_left_and_mixed_direction_lines_reorder"
+                }
+              ]
+            },
+            {
+              "id": "unicode-bidi",
+              "label": "unicode-bidi embeddings and isolates on inline boxes",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "66.66",
           "engine_share": "0.54"
         },
         {
@@ -1745,11 +1803,33 @@
             {
               "id": "lines",
               "label": "CSS white-space and soft wrapping applied in line layout",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "fn break_opportunities("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn white_space_collapses_across_elements_and_preserves_where_asked"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn words_wrap_at_spaces_and_trailing_spaces_are_removed"
+                }
+              ]
+            },
+            {
+              "id": "tailoring",
+              "label": "CSS line-break, word-break, overflow-wrap and hyphens tailoring",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "66.66",
+          "credit": "75.00",
           "engine_share": "0.54"
         },
         {
@@ -1775,12 +1855,12 @@
       ],
       "points": 22,
       "completed": 0,
-      "in_progress": 3,
+      "in_progress": 4,
       "total": 6,
-      "contribution": "1.04",
-      "percent": "26.13",
+      "contribution": "1.48",
+      "percent": "37.12",
       "verified_percent": "0.00",
-      "partial_percent": "26.13"
+      "partial_percent": "37.12"
     },
     {
       "id": "layout",
@@ -1854,83 +1934,65 @@
           "label": "Block flow, margins and anonymous boxes",
           "size": 5,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "widths",
-              "label": "Normal-flow non-replaced horizontal width equation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/sizing.rs",
-                  "marker": "pub fn measure_block_width"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/reference.rs",
-                  "marker": "fn width_equation_holds_across_auto_negative_and_overconstrained_cases"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/sizing.rs",
+              "marker": "pub fn measure_block_width"
             },
             {
-              "id": "flow",
-              "label": "Vertical block flow and used geometry",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow.rs",
-                  "marker": "pub fn compute"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/flow.rs",
-                  "marker": "fn nested_block_flow_has_exact_content_padding_border_and_sibling_geometry"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/flow.rs",
-                  "marker": "fn sequential_blocks_match_an_independent_prefix_sum_model"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/reference.rs",
+              "marker": "fn width_equation_holds_across_auto_negative_and_overconstrained_cases"
             },
             {
-              "id": "margins",
-              "label": "Adjoining and parent-child margin collapse",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow.rs",
-                  "marker": "fn exit_block"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/margins.rs",
-                  "marker": "fn parent_child_margins_escape_until_a_padding_border_or_flow_root_boundary"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/margins.rs",
-                  "marker": "fn flat_sibling_layout_matches_an_independent_margin_adjacency_graph"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/margins.rs",
-                  "marker": "fn empty_descendants_with_minimum_height_do_not_escape_both_parent_edges"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow.rs",
+              "marker": "pub fn compute"
             },
             {
-              "id": "anonymous",
-              "label": "Mixed block/inline flow through anonymous boxes",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/flow.rs",
+              "marker": "fn nested_block_flow_has_exact_content_padding_border_and_sibling_geometry"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/flow.rs",
+              "marker": "fn sequential_blocks_match_an_independent_prefix_sum_model"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow.rs",
+              "marker": "fn exit_block"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/margins.rs",
+              "marker": "fn parent_child_margins_escape_until_a_padding_border_or_flow_root_boundary"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/margins.rs",
+              "marker": "fn flat_sibling_layout_matches_an_independent_margin_adjacency_graph"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/margins.rs",
+              "marker": "fn empty_descendants_with_minimum_height_do_not_escape_both_parent_edges"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow.rs",
+              "marker": "fn build_text_nodes<"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn mixed_content_gets_anonymous_blocks_without_fragments"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.97"
         },
         {
@@ -1938,9 +2000,71 @@
           "label": "Inline formatting, line boxes and baselines",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "lines",
+              "label": "Line boxes: greedy breaking, white-space, alignment, line-height and vertical-align baselines",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/lines.rs",
+                  "marker": "pub(crate) fn layout("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "pub(crate) fn build<"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn line_height_and_vertical_align_build_baselines"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn greedy_breaking_matches_an_independent_model"
+                }
+              ]
+            },
+            {
+              "id": "fragments",
+              "label": "Text and inline fragments, anonymous blocks, float avoidance and text intrinsic sizes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow.rs",
+                  "marker": "pub fn compute_with_fonts("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/text.rs",
+                  "marker": "pub struct TextFragment"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn lines_shorten_beside_floats_and_move_below_when_nothing_fits"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/inline.rs",
+                  "marker": "fn shrink_to_fit_uses_text_min_and_max_content"
+                }
+              ]
+            },
+            {
+              "id": "atomic",
+              "label": "Atomic inlines, replaced elements and blocks inside inline boxes",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "66.66",
           "engine_share": "0.97"
         },
         {
@@ -2194,13 +2318,13 @@
         }
       ],
       "points": 46,
-      "completed": 0,
+      "completed": 1,
       "in_progress": 5,
       "total": 10,
-      "contribution": "2.73",
-      "percent": "30.43",
-      "verified_percent": "0.00",
-      "partial_percent": "30.43"
+      "contribution": "3.63",
+      "percent": "40.39",
+      "verified_percent": "10.86",
+      "partial_percent": "29.53"
     },
     {
       "id": "paint",

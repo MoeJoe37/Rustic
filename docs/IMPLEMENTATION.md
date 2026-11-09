@@ -865,6 +865,19 @@ also pass from an `#[ignore]`d test. Tailoring and L3 are TD-47. Shaping,
 line boxes and text fragments are the next REN-03b units. See
 [TEXT.md](TEXT.md).
 
+## REN-03b (part 2) — Shaping, line boxes and text fragments
+
+`rustic-text::shape` adds per-cluster font fallback, glyph advances, bidi
+mirroring and letter/word spacing. `rustic-layout` gains inline formatting
+contexts (`inline.rs`), line boxes (`lines.rs`) and public `LineFragment`,
+`TextFragment` and `InlineFragment` results (`text.rs`) through the new
+`BlockLayout::compute_with_fonts`. This covers white-space processing,
+`<br>`/`<wbr>`, anonymous blocks, float avoidance by line, bidi reordering,
+text-align/indent/justify, line-height and vertical-align, and text-based
+shrink-to-fit. OpenType shaping, atomic inlines and the other gaps are TD-50.
+See [LAYOUT.md](LAYOUT.md#inline-formatting-and-text-fragments-ren-03b) and
+[TEXT.md](TEXT.md#shaping).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

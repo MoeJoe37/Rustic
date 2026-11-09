@@ -184,14 +184,15 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 
 1. Finish REN-01b: normalize principal/anonymous boxes and mixed inline/block
    content, then expand the initial block geometry reference.
-2. Finish REN-02: text min-/max-content once REN-03 line layout exists, and
-   sticky positioning once scroll offsets exist. Margin collapse, floats,
-   clearance, positioning, overflow clipping, intrinsic sizing keywords and
-   block-level replaced sizing (REN-02c) are implemented. Flexbox (REN-08)
-   is implemented for block-level items; text and `inline-flex` wait for
-   line layout.
-3. REN-03/04: shaping/bidi/line layout, fragments and paint order
-   (the REN-03a font adapter below is done).
+2. Finish REN-02: sticky positioning once scroll offsets exist. Margin
+   collapse, floats, clearance, positioning, overflow clipping, intrinsic
+   sizing keywords, block-level replaced sizing (REN-02c) and text min-/max-
+   content (REN-03b) are implemented. Flexbox (REN-08) is implemented for
+   block-level items; text directly in flex containers and `inline-flex`
+   remain refused.
+3. REN-03/04: line layout and text fragments exist
+   (`BlockLayout::compute_with_fonts`, below); OpenType shaping, atomic
+   inlines, glyph paint and paint order remain.
    The first block display list exists ([PAINT.md](PAINT.md)).
 4. REN-05/06/07: the CPU raster reference and PNG `render` exist for blocks;
    bounded decode, glyph raster and reftests remain.
@@ -477,8 +478,9 @@ nested layout. `fit-content` clamps the available width between the two; a
 keyword, since it has no subtree to measure.
 
 Floats and absolutely positioned boxes use the same contributions for
-shrink-to-fit. Text content has no intrinsic size until REN-03, so a text
-subtree is still refused with `UnsupportedFlow::TextLayout`.
+shrink-to-fit. With `compute_with_fonts`, a block container's inline
+formatting context adds its text min- and max-content widths (REN-03b,
+below). `compute` still refuses text with `UnsupportedFlow::TextLayout`.
 
 ### Replaced elements
 
@@ -558,3 +560,131 @@ Alignment 3 [§4–§8](https://www.w3.org/TR/css-align-3/), CSS Sizing 3
 [§3–§5](https://www.w3.org/TR/css-sizing-3/#sizing-values) and CSS 2.2
 [§10.3.2/§10.4/§10.6.2](https://www.w3.org/TR/CSS22/visudet.html#inline-replaced-width).
 These are focused fixtures and models, not a layout-WPT result.
+
+## Inline formatting and text fragments (REN-03b)
+
+`BlockLayout::compute_with_fonts(tree, viewport, limits, &fonts, cancel)` lays
+out text. `BlockLayout::compute` keeps refusing text with
+`UnsupportedFlow::TextLayout`, so callers without a font database (the CLI
+dumps, paint and fuzzers for now) behave as before.
+
+### Building an inline formatting context
+
+A block container whose children include text, `display:inline` boxes, `<br>`
+or `<wbr>` gets one inline formatting context (`inline.rs`). It is built once,
+independent of the available width, and reused by intrinsic sizing, float
+retries and line breaking:
+
+- **Mixed content.** Inline runs beside block-level siblings are wrapped in
+  anonymous block boxes (CSS 2.2 §9.2.1.1). Runs of collapsible whitespace
+  alone are dropped. Anonymous blocks have no `BlockFragment`; their lines
+  report the nearest real ancestor.
+- **White space** (CSS Text 3 §4.1.1). Phase I collapses spaces and tabs, and
+  removes them around segment breaks, across element boundaries, for
+  `normal`/`nowrap`/`pre-line`. Segment breaks become spaces except under
+  `pre`/`pre-wrap`/`break-spaces`/`pre-line`, where they are forced breaks.
+  `<br>` is a forced break. `<wbr>` is a zero-width break opportunity.
+  Tabs advance to the next multiple of 8 spaces (`tab-size` is not parsed).
+- **Text transform.** `uppercase`, `lowercase` and `full-width` change the
+  shaped characters but not the source ranges, so `ß` → `SS` is two glyphs
+  over one UTF-16 unit.
+- **Bidi.** Every IFC is one UAX #9 paragraph with the container's
+  `direction` as its base level. Inline boxes do not yet open embeddings or
+  isolates for `unicode-bidi`.
+- **Breaks.** UAX #14 opportunities over the whole IFC, with the
+  `white-space` of the nearest common ancestor of the two sides deciding
+  whether wrapping is allowed. `break-spaces` breaks after each space.
+- **Shaping.** Runs split at bidi level, style and box boundaries are shaped
+  with each style's `font-family` fallback chain ([TEXT.md](TEXT.md#shaping)).
+  Inline box margins, borders and padding become zero-height edge pieces.
+
+### Line boxes
+
+`lines.rs` breaks greedily: each line takes as many pieces as fit, breaking at
+the last opportunity, and an unbreakable piece wider than the line overflows
+it. For each line:
+
+- **Floats.** The line's width comes from the BFC's float band at its top.
+  If the first piece cannot fit, the line moves down to the next float bottom.
+  If the line turns out taller than the band it was measured in, it is
+  re-measured (up to four times).
+- **Trailing spaces.** Collapsible spaces at line ends are removed and
+  `pre-wrap` spaces hang. Leading collapsible spaces after a soft break are
+  dropped.
+- **Alignment.** `text-indent` (percentages of the container width) applies
+  to the first line. `text-align` `start`/`end`/`left`/`right`/`center`
+  resolve against `direction`. `justify` distributes free space over the
+  justifiable spaces of every line but the last and lines ending in forced
+  breaks.
+- **Bidi order.** Levels come from UAX #9 L1 for the line's range. Pieces are
+  reordered with L2, and consecutive glyphs of one text box, face and level
+  merge into one `TextFragment`.
+- **Height.** Each inline box contributes its font's ascent and descent plus
+  half-leading from its `line-height` (`normal` uses the face's ascent +
+  descent + line gap). The root's strut always counts (CSS 2.2 §10.8).
+  `vertical-align` supports `baseline`, `sub`, `super`, lengths,
+  percentages of `line-height`, `middle`, `text-top`, `text-bottom`, `top` and
+  `bottom`; `top`/`bottom` subtrees are aligned after the rest of the line is
+  sized.
+- **Relative boxes.** `position:relative` on inline boxes shifts their
+  fragments and those of their descendants.
+
+### Fragments and sizing
+
+`BlockLayout::lines()` gives `LineFragment{block, rect, baseline}`. `texts()`
+gives `TextFragment`s: their line, node, UTF-16 source range, rect, baseline,
+bidi level, face index, font size and glyphs with absolute pen positions.
+Forced breaks and invisible break hints produce no text fragment.
+`inlines()` gives one `InlineFragment` per inline box per line, with border,
+padding and content rectangles and whether the box starts or ends on that
+line. Edges are drawn only where the box starts or ends, in visual order. The
+layout dump adds `line`, `text` and `inline` rows.
+
+The IFC also seeds shrink-to-fit: min-content breaks at every opportunity,
+and max-content only at forced breaks. Floats and absolutely positioned boxes
+therefore size to their text.
+
+### Limits and evidence
+
+Collection, shaping, breaking, placement and conversion are charged to the
+same `MAX_FLOW_WORK` budget and poll cancellation. Text over
+`LayoutLimits::max_text_units` returns `FlowError::TextLimit`. Unsupported
+inline content fails the whole layout atomically:
+
+- atomic inline-level boxes (`inline-block` and other inline-level displays);
+- replaced elements;
+- blocks, floats or absolutely positioned boxes inside inline boxes;
+- sticky inline boxes.
+
+Remaining approximations are listed under TD-50.
+
+`tests/inline.rs` has 18 scenarios with exact geometry over the bundled test
+fonts:
+
+- wrapping and trailing-space removal, overflow and `nowrap`;
+- white-space collapsing across elements and the preserving modes, `<br>` and
+  `<wbr>`;
+- every `text-align` value, `text-indent` and justify;
+- inline box edges across lines;
+- line-height and each `vertical-align` group;
+- RTL and mixed-direction reordering;
+- float bands and moving below floats;
+- anonymous blocks and shrink-to-fit;
+- spacing and transforms;
+- relative inline boxes;
+- atomic failures, cancellation and the text limit;
+- the dump rows;
+- sizing keywords, flex items with text, and refusals for text directly in
+  flex containers.
+
+An independent greedy model checks line breaks for generated word sequences
+against the implementation.
+
+Specification basis, reviewed 2026-11-09: CSS 2.2
+[§9.2.1.1, §9.4.2](https://www.w3.org/TR/CSS22/visuren.html#inline-formatting)
+and [§10.8](https://www.w3.org/TR/CSS22/visudet.html#line-height),
+CSS Text 3 [§4–§8](https://www.w3.org/TR/css-text-3/#white-space-processing)
+and CSS Writing Modes 4
+[§2](https://www.w3.org/TR/css-writing-modes-4/#text-direction).
+These are focused fixtures and models, not a layout-WPT or browser comparison
+result.

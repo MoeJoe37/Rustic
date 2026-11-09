@@ -63,6 +63,10 @@ pub(crate) enum HtmlTag {
     DocumentElement,
     /// An HTML `body` element.
     Body,
+    /// An HTML `br` element (a forced line break inside inline content).
+    Br,
+    /// An HTML `wbr` element (a line break opportunity).
+    Wbr,
     /// Anything else, including text.
     Other,
 }
@@ -233,6 +237,10 @@ impl BoxTree {
                         HtmlTag::DocumentElement
                     } else if local.eq_ignore_ascii_case("body") {
                         HtmlTag::Body
+                    } else if local.eq_ignore_ascii_case("br") {
+                        HtmlTag::Br
+                    } else if local.eq_ignore_ascii_case("wbr") {
+                        HtmlTag::Wbr
                     } else {
                         HtmlTag::Other
                     }

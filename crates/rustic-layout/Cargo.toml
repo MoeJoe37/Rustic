@@ -13,6 +13,7 @@ rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-style = { path = "../rustic-style" }
+rustic-text = { path = "../rustic-text" }
 
 [dev-dependencies]
 rustic-html = { path = "../rustic-html" }

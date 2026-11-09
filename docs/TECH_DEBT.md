@@ -96,6 +96,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-47 | Deliberate | Text | Untailored UAX #14/#29 segmentation and bidi without L3 | Open, REN-03b |
 | TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
+| TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, refused atomic inlines, approximations | Open, REN-03b |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -809,3 +810,30 @@ pieces (line baselines, layout reftests) belong to REN-03 and REN-07.
 §9.9.1 intrinsic sizes, and compare against the css-flexbox and
 css-sizing WPT directories. **Trigger:** REN-03 line boxes, layout-WPT
 import, or a fuzz finding that hits the work budget through nested flex.
+
+### TD-50 — First inline layout slice
+
+REN-03b's shaper and line layout cover the common Latin/RTL cases and refuse
+or approximate the rest:
+
+- **No OpenType layout.** One glyph per character from `cmap`/`hmtx`, so no
+  ligatures, kerning, mark positioning, Arabic joining or Indic reordering.
+- **Refused content.** Atomic inlines (`inline-block`, replaced elements),
+  blocks inside inline boxes, and floats or absolutely positioned boxes nested
+  in inline boxes return `UnsupportedFlow` errors.
+- **Floats among inline content.** A float that is a direct child of an inline
+  run ends the anonymous block before it, so it is placed below the previous
+  line instead of on it.
+- **Approximations.** `capitalize` is applied as `uppercase`. `full-size-kana`
+  is ignored. Percentage margins and padding on inline boxes resolve against
+  0. `unicode-bidi` on inline boxes is ignored, and each IFC is one bidi
+  paragraph. East Asian segment-break removal is not done. `tab-size` is fixed
+  at 8. Float-band re-measurement of one line stops after four attempts.
+- **Overflow and paint.** Text does not extend scrollable overflow, and no
+  glyphs are painted yet.
+
+**Reason:** this slice gives paint and intrinsic sizing real text geometry
+with exact tests, while each missing piece is its own unit. **Pay:** GSUB/GPOS
+shaping on `rustic-text`, atomic inlines and block-in-inline splitting with
+the formatting-context work, `unicode-bidi` embeddings, then glyph raster.
+**Trigger:** any real-page text rendering, or the first WPT text reftests.

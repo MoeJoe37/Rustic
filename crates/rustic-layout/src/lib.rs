@@ -15,12 +15,15 @@ mod flow;
 mod formatting;
 mod geometry;
 mod height;
+mod inline;
 mod intrinsic;
+mod lines;
 mod margins;
 mod overflow;
 mod position;
 mod replaced;
 mod sizing;
+mod text;
 mod tree;
 
 pub use flow::{
@@ -35,4 +38,5 @@ pub use geometry::{
 pub use overflow::{AxisRange, Clip};
 pub use replaced::NaturalSize;
 pub use sizing::{BlockMeasure, Edges, MeasureError, measure_block_width};
+pub use text::{InlineFragment, LineFragment, PositionedGlyph, TextFragment};
 pub use tree::{BoxKind, BoxSnapshot, BoxTree, LayoutError, LayoutLimits};

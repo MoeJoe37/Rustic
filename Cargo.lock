@@ -73,6 +73,7 @@ dependencies = [
  "rustic-dom",
  "rustic-html",
  "rustic-style",
+ "rustic-text",
 ]
 
 [[package]]

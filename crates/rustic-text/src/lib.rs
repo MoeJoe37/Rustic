@@ -28,6 +28,7 @@ mod glyf;
 mod metrics;
 mod reader;
 pub mod segment;
+pub mod shape;
 pub mod unicode;
 
 pub use database::{FaceQuery, FamilyRef, FontDatabase, best_face};

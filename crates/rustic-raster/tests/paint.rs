@@ -588,7 +588,9 @@ fn opacity_groups_composite_their_whole_context_once() {
         Some(&DisplayCommand::BeginGroup {
             source_box: list.items()[0].source_box,
             node: p.id("a"),
-            opacity: 0.5
+            opacity: 0.5,
+            blend: rustic_css::BlendMode::Normal,
+            filter: None,
         })
     );
     assert_eq!(list.commands().last(), Some(&DisplayCommand::EndGroup));
@@ -1346,4 +1348,87 @@ fn box_shadows_paint_around_backgrounds_blur_and_take_no_hits() {
     // Deterministic at another scale, too.
     let p2 = render(&p, 1.5);
     assert_eq!(p2, render(&p, 1.5));
+}
+
+#[test]
+fn blend_modes_and_filters_composite_groups_in_order() {
+    // Each blend mode over rgb(51 102 204): the blended color of a solid
+    // source over a solid backdrop is B(cb, cs) exactly.
+    for (mode, expected) in [
+        ("normal", rgb(153, 102, 101)),
+        ("screen", rgb(173, 163, 224)),
+        ("difference", rgb(102, 0, 103)),
+        ("darken", rgb(51, 102, 101)),
+        ("exclusion", rgb(143, 122, 143)),
+        ("luminosity", rgb(70, 121, 223)),
+        ("plus-lighter", rgb(204, 204, 255)),
+    ] {
+        let p = page(
+            "<div id=b><div id=s></div></div>",
+            &format!(
+                "{RESET} #b {{ height: 10px; background: rgb(51 102 204) }}
+                 #s {{ height: 10px; background: rgb(153 102 101); mix-blend-mode: {mode} }}"
+            ),
+            20.0,
+            20.0,
+        );
+        assert_eq!(render(&p, 1.0).pixel(5, 5), Some(expected), "{mode}");
+    }
+    // A blur filter spreads the box symmetrically within its group, and a
+    // filtered context's commands nest: blend group, clip, filter group.
+    let p = page(
+        "<div id=f></div>",
+        &format!(
+            "{RESET} body {{ padding: 20px }}
+             #f {{ width: 20px; height: 20px; background: black; filter: blur(3px);
+                   mix-blend-mode: multiply; clip-path: inset(-10px) }}"
+        ),
+        60.0,
+        60.0,
+    );
+    let list = p.list().unwrap();
+    let steps: Vec<&str> = list
+        .commands()
+        .iter()
+        .map(|c| match c {
+            DisplayCommand::BeginGroup { filter: None, .. } => "group",
+            DisplayCommand::BeginGroup {
+                filter: Some(_), ..
+            } => "filter",
+            DisplayCommand::EndGroup => "end",
+            DisplayCommand::BeginClip { .. } => "clip",
+            DisplayCommand::EndClip => "end-clip",
+            DisplayCommand::Fill(_) => "fill",
+            _ => "other",
+        })
+        .collect();
+    // The root isolates its blending child.
+    assert_eq!(
+        steps,
+        [
+            "group", "group", "clip", "filter", "fill", "end", "end-clip", "end", "end"
+        ]
+    );
+    let surface = render(&p, 1.0);
+    let ink = |x: u32, y: u32| 255 - surface.pixel(x, y).unwrap().r;
+    assert!(ink(30, 30) > 200);
+    assert!(ink(18, 30) > 0 && ink(18, 30) < 128);
+    assert_eq!(ink(18, 30), ink(41, 30));
+    assert_eq!(ink(30, 18), ink(30, 41));
+    // The clip path cuts the blur 10px outside the box.
+    assert_eq!(ink(9, 30), 0);
+    assert!(list.dump(1 << 20).unwrap().contains("filter=(blur:3)"));
+    let p = page(
+        "<div id=u></div>",
+        &format!("{RESET} #u {{ filter: url(#f) }}"),
+        20.0,
+        20.0,
+    );
+    assert_eq!(
+        p.list(),
+        Err(PaintError::Unsupported {
+            node: p.id("u"),
+            reason: UnsupportedPaint::FilterUrl,
+        })
+    );
 }

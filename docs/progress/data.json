@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "b7a67b1abfaf8280c310adff8798811968a4036be5cb7990107a8609912f615c",
-  "percent": "28.68",
+  "source_fingerprint": "6f8aa64d1c745ab5ea658c13e1e5b327c0b2cc28243c313a87f62e3db6bc96ed",
+  "percent": "28.87",
   "verified_percent": "22.58",
-  "partial_percent": "6.10",
+  "partial_percent": "6.29",
   "completed": 39,
   "in_progress": 14,
   "total": 172,
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 3,
       "total": 17,
-      "percent": "67.00",
+      "percent": "68.52",
       "verified_percent": "18.90",
-      "partial_percent": "48.10"
+      "partial_percent": "49.62"
     },
     {
       "id": "M4",
@@ -2577,8 +2577,24 @@
             {
               "id": "blend",
               "label": "Blend modes, filters and shadows",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn composite_blend("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn blend_modes_and_filters_composite_groups_in_order"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn box_shadows_paint_around_backgrounds_blur_and_take_no_hits"
+                }
+              ]
             },
             {
               "id": "performance",
@@ -2587,7 +2603,7 @@
               "evidence": []
             }
           ],
-          "credit": "66.66",
+          "credit": "83.33",
           "engine_share": "1.11"
         },
         {
@@ -2785,10 +2801,10 @@
       "completed": 2,
       "in_progress": 4,
       "total": 7,
-      "contribution": "3.07",
-      "percent": "51.23",
+      "contribution": "3.25",
+      "percent": "54.32",
       "verified_percent": "22.22",
-      "partial_percent": "29.01"
+      "partial_percent": "32.10"
     },
     {
       "id": "js",

@@ -1,0 +1,9 @@
+<!doctype html><link rel=match href=mix-blend-multiply-ref.html><style>
+* { margin: 0; }
+#b { position: absolute; left: 10px; top: 10px; width: 40px; height: 30px; background: blue; }
+#r { position: absolute; left: 30px; top: 20px; width: 40px; height: 30px; background: red; mix-blend-mode: multiply; }
+#iso { position: absolute; left: 10px; top: 60px; width: 40px; height: 30px; background: blue; }
+#inner { isolation: isolate; width: 20px; height: 20px; }
+#r2 { width: 20px; height: 20px; background: red; mix-blend-mode: multiply; }
+</style>
+<div id=b></div><div id=r></div><div id=iso><div id=inner><div id=r2></div></div></div>

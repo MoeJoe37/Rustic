@@ -81,6 +81,12 @@ impl Target for PaintTarget {
             b"clip-path:inset(2px round 50%) content-box",
             b"transform:rotate(30deg) scale(1.5)",
             b"box-shadow:3px 4px 5px red",
+            b"mix-blend-mode:multiply",
+            b"mix-blend-mode:luminosity",
+            b"isolation:isolate",
+            b"filter:blur(2px) hue-rotate(90deg)",
+            b"filter:drop-shadow(2px 3px 1px blue) invert(1)",
+            b"filter:grayscale(1) sepia(0.5) saturate(3) contrast(2)",
             b"box-shadow:inset -2px 1px 6px 2px rgb(0 0 0 / 50%), 0 0 0 4px blue",
             b"box-shadow:1px 1px 40px -3px",
             b"transform:translate(3px,-50%) skew(10deg)",
@@ -232,8 +238,8 @@ impl Target for PaintTarget {
                     }
                 }
                 DisplayCommand::BeginGroup { opacity, .. } => {
-                    if !(*opacity > 0.0 && *opacity < 1.0) {
-                        return Err("group opacity outside (0, 1)".into());
+                    if !(*opacity > 0.0 && *opacity <= 1.0) {
+                        return Err("group opacity outside (0, 1]".into());
                     }
                     layers.push(false);
                 }

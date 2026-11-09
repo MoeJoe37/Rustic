@@ -19,8 +19,11 @@ mod rounded;
 
 pub use color::{Srgba, srgba};
 pub use display::{
-    BoxShadow, ClipNode, DisplayCommand, DisplayItem, DisplayList, Fonts, Hit, Image, ItemRole,
-    PaintError, PaintLimits, Path, PathPoint, Resources, Shape, TransformNode, UnsupportedPaint,
+    BoxShadow, ClipNode, DisplayCommand, DisplayItem, DisplayList, FilterOp, Fonts, Hit, Image,
+    ItemRole, PaintError, PaintLimits, Path, PathPoint, Resources, Shape, TransformNode,
+    UnsupportedPaint,
 };
 pub use matrix::Homography;
 pub use rounded::{Corner, RoundedRect};
+/// Blend modes of [`DisplayCommand::BeginGroup`], from `rustic-css`.
+pub use rustic_css::BlendMode;

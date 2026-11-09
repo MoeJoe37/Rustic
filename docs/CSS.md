@@ -910,9 +910,9 @@ skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
   implemented.
 * `.tentative` files test proposals and are never in scope.
 
-Of 2,916 cases, 1,489 are in scope and **1,149 pass** (invalid-selector
-102/104, invalid-value 481/482, valid-selector 108/199, valid-value 458/704).
-The other 1,427 are out of scope: properties `rustic-css` does not support yet,
+Of 2,916 cases, 1,567 are in scope and **1,199 pass** (invalid-selector
+102/104, invalid-value 521/522, valid-selector 108/199, valid-value 468/742).
+The other 1,349 are out of scope: properties `rustic-css` does not support yet,
 and tentative files. Both counts are pinned in the gate, so supporting or
 dropping a property changes them deliberately. Every other in-scope case is
 listed in `expected_failures.json` with a reason,
@@ -926,7 +926,7 @@ largest groups of known failures are features outside M2's declared scope:
 | `alpha()`, `contrast-color()`, `light-dark()` and system colors | 87 |
 | `::scroll-button()`, `::part()`, `::slotted()`, `:state()`, `:heading` | 89 |
 | Math functions serialize folded (`2`, not `calc(2)`), and percentages in numeric math functions | 28 |
-| Named colors serialize as `rgb()`; family names are always quoted | 12 |
+| Named colors serialize as `rgb()`; family names are always quoted | 40 |
 | Other unimplemented values (`oblique <angle>`, `text-indent` keywords, `cross-fade()`, ...) | 59 |
 
 Before the gate, four serialization bugs it found were fixed: `[|a]` and

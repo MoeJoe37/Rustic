@@ -333,14 +333,41 @@ and hit nothing. Hit testing maps the point into each region's local plane
 through the inverse homographies and checks every enclosing transform's
 clips and clip path in its own coordinates. See TD-57.
 
+## Shadows, blending and filters
+
+`box-shadow` parses (one to many shadows, `inset`, two to four lengths and
+an optional color in either order) and computes lengths to pixels, blur
+radii clamped at zero, and `currentcolor` to the box's color. Outer shadows
+paint before the box's background and inset ones after it, before the
+border, the first shadow on top. Each is a [`ItemRole::Shadow`] item whose
+[`Shape::Shadow`] indexes a [`BoxShadow`]: the border box moved and spread
+(radii grown by the spread, scaled by `1 + (r/s − 1)³` below it, so square
+corners stay square), or the padding box moved and shrunk for an inset
+shadow, whose shadow is everything outside that shape. The rasterizer
+blurs the shape's coverage by a Gaussian of half the blur radius (exactly
+below two device pixels, by three box blurs above, as `feGaussianBlur`
+allows), in plain arithmetic, then keeps it outside the border box or
+inside the padding box. Shadows take no hits.
+
+`mix-blend-mode` (all sixteen modes plus `plus-lighter`), `isolation` and
+`filter` make a stacking context. A context that blends, has `opacity < 1`
+or has blending children (which blend only with their stacking context)
+paints into a group; [`DisplayCommand::BeginGroup`] carries the blend mode,
+and the group composites with `co = cs·αs·(1 − αb) + cb·αb·(1 − αs) +
+αs·αb·B(cb, cs)`. A filter opens an inner group inside any clip path, since
+filters apply before clipping: `blur()` blurs every premultiplied channel,
+color functions are 4×5 matrices on straight-alpha sRGB (clamped after
+each), and `drop-shadow()` paints the blurred, offset alpha under the
+group. `url()` filters fail with a typed error. See TD-58.
+
 ## Not yet implemented
 
 Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
-box shadows, blend modes and filters, `clip-path` URLs and the
+`text-shadow`, `background-blend-mode`, `backdrop-filter`, `filter` URLs, `clip-path` URLs and the
 `evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58 and docs/ROADMAP.md (REN-04 to
 REN-07).

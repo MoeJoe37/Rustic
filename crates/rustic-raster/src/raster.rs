@@ -9,8 +9,8 @@ use rustic_base::CancellationToken;
 use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
 use rustic_paint::{
-    ClipNode, DisplayCommand, DisplayItem, DisplayList, Homography, Image, Path, PathPoint,
-    RoundedRect, Shape, Srgba,
+    BlendMode, ClipNode, DisplayCommand, DisplayItem, DisplayList, FilterOp, Homography, Image,
+    Path, PathPoint, RoundedRect, Shape, Srgba,
 };
 use std::{error::Error, fmt};
 
@@ -1301,11 +1301,263 @@ fn composite(dst: &mut [u8], group: &[u8], opacity: f64) {
     }
 }
 
+/// The blended color `B(cb, cs)` of one pixel's straight-alpha channels in
+/// 0–1 (Compositing and Blending 1 §5), for every mode but `normal` and
+/// `plus-lighter`.
+fn blend_rgb(mode: BlendMode, cb: [f64; 3], cs: [f64; 3]) -> [f64; 3] {
+    let separable =
+        |f: &dyn Fn(f64, f64) -> f64| [f(cb[0], cs[0]), f(cb[1], cs[1]), f(cb[2], cs[2])];
+    let multiply = |b: f64, s: f64| b * s;
+    let screen = |b: f64, s: f64| b + s - b * s;
+    let hard_light = |b: f64, s: f64| {
+        if s <= 0.5 {
+            multiply(b, 2.0 * s)
+        } else {
+            screen(b, 2.0 * s - 1.0)
+        }
+    };
+    let lum = |c: [f64; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    let clip_color = |c: [f64; 3]| {
+        let l = lum(c);
+        let n = c[0].min(c[1]).min(c[2]);
+        let x = c[0].max(c[1]).max(c[2]);
+        let mut c = c;
+        if n < 0.0 && l - n != 0.0 {
+            c = c.map(|v| l + (v - l) * l / (l - n));
+        }
+        if x > 1.0 && x - l != 0.0 {
+            c = c.map(|v| l + (v - l) * (1.0 - l) / (x - l));
+        }
+        c
+    };
+    let set_lum = |c: [f64; 3], l: f64| {
+        let d = l - lum(c);
+        clip_color(c.map(|v| v + d))
+    };
+    let sat = |c: [f64; 3]| c[0].max(c[1]).max(c[2]) - c[0].min(c[1]).min(c[2]);
+    let set_sat = |c: [f64; 3], s: f64| {
+        let (n, x) = (c[0].min(c[1]).min(c[2]), c[0].max(c[1]).max(c[2]));
+        if x > n {
+            c.map(|v| (v - n) * s / (x - n))
+        } else {
+            [0.0; 3]
+        }
+    };
+    match mode {
+        BlendMode::Normal | BlendMode::PlusLighter => cs,
+        BlendMode::Multiply => separable(&multiply),
+        BlendMode::Screen => separable(&screen),
+        BlendMode::Overlay => separable(&|b, s| hard_light(s, b)),
+        BlendMode::Darken => separable(&f64::min),
+        BlendMode::Lighten => separable(&f64::max),
+        BlendMode::ColorDodge => separable(&|b, s| {
+            if b == 0.0 {
+                0.0
+            } else if s >= 1.0 {
+                1.0
+            } else {
+                (b / (1.0 - s)).min(1.0)
+            }
+        }),
+        BlendMode::ColorBurn => separable(&|b, s| {
+            if b >= 1.0 {
+                1.0
+            } else if s <= 0.0 {
+                0.0
+            } else {
+                1.0 - ((1.0 - b) / s).min(1.0)
+            }
+        }),
+        BlendMode::HardLight => separable(&hard_light),
+        BlendMode::SoftLight => separable(&|b, s| {
+            if s <= 0.5 {
+                b - (1.0 - 2.0 * s) * b * (1.0 - b)
+            } else {
+                let d = if b <= 0.25 {
+                    ((16.0 * b - 12.0) * b + 4.0) * b
+                } else {
+                    b.sqrt()
+                };
+                b + (2.0 * s - 1.0) * (d - b)
+            }
+        }),
+        BlendMode::Difference => separable(&|b, s| (b - s).abs()),
+        BlendMode::Exclusion => separable(&|b, s| b + s - 2.0 * b * s),
+        BlendMode::Hue => set_lum(set_sat(cs, sat(cb)), lum(cb)),
+        BlendMode::Saturation => set_lum(set_sat(cb, sat(cs)), lum(cb)),
+        BlendMode::Color => set_lum(cs, lum(cb)),
+        BlendMode::Luminosity => set_lum(cb, lum(cs)),
+    }
+}
+
+/// Composite a premultiplied group onto `dst` at `opacity` with a blend
+/// mode: `co = cs·αs·(1 − αb) + cb·αb·(1 − αs) + αs·αb·B(cb, cs)`, or for
+/// `plus-lighter` the clamped sum (Compositing and Blending 1 §9.1).
+fn composite_blend(dst: &mut [u8], group: &[u8], opacity: f64, mode: BlendMode) {
+    if mode == BlendMode::Normal {
+        composite(dst, group, opacity);
+        return;
+    }
+    for (d, g) in dst.chunks_exact_mut(4).zip(group.chunks_exact(4)) {
+        if g[3] == 0 {
+            continue;
+        }
+        let a_s = f64::from(g[3]) / 255.0 * opacity;
+        let a_b = f64::from(d[3]) / 255.0;
+        if mode == BlendMode::PlusLighter {
+            for c in 0..4 {
+                let v = f64::from(g[c]) * opacity + f64::from(d[c]);
+                d[c] = v.round().clamp(0.0, 255.0) as u8;
+            }
+            continue;
+        }
+        let straight = |p: &[u8], c: usize| {
+            if p[3] == 0 {
+                0.0
+            } else {
+                f64::from(p[c]) / f64::from(p[3])
+            }
+        };
+        let cs = [straight(g, 0), straight(g, 1), straight(g, 2)].map(|v| v.min(1.0));
+        let cb = [straight(d, 0), straight(d, 1), straight(d, 2)].map(|v| v.min(1.0));
+        let mixed = blend_rgb(mode, cb, cs);
+        let a_o = a_s + a_b * (1.0 - a_s);
+        for c in 0..3 {
+            let v = cs[c] * a_s * (1.0 - a_b) + cb[c] * a_b * (1.0 - a_s) + a_s * a_b * mixed[c];
+            d[c] = (v * 255.0).round().clamp(0.0, 255.0) as u8;
+        }
+        d[3] = (a_o * 255.0).round().clamp(0.0, 255.0) as u8;
+    }
+}
+
+/// Apply filter operations in order to a premultiplied `w`×`h` layer,
+/// `scale` device pixels per CSS pixel.
+fn apply_filter(
+    pixels: &mut [u8],
+    (w, h): (usize, usize),
+    ops: &[FilterOp],
+    scale: f64,
+    work: &mut Work<'_>,
+) -> Result<(), RasterError> {
+    for op in ops {
+        work.charge((w * h) as u64)?;
+        match *op {
+            FilterOp::Blur(sigma) => {
+                let mut channels: Vec<Vec<f64>> = (0..4)
+                    .map(|c| {
+                        pixels
+                            .iter()
+                            .skip(c)
+                            .step_by(4)
+                            .map(|&v| f64::from(v))
+                            .collect()
+                    })
+                    .collect();
+                for channel in &mut channels {
+                    blur(channel, (w, h), sigma * scale, work)?;
+                }
+                for (i, p) in pixels.chunks_exact_mut(4).enumerate() {
+                    for c in 0..4 {
+                        p[c] = channels[c][i].round().clamp(0.0, 255.0) as u8;
+                    }
+                }
+                // Blurring premultiplied channels separately can leave a
+                // color above its alpha by rounding.
+                for p in pixels.chunks_exact_mut(4) {
+                    for c in 0..3 {
+                        p[c] = p[c].min(p[3]);
+                    }
+                }
+            }
+            FilterOp::Color(m) => {
+                for p in pixels.chunks_exact_mut(4) {
+                    let a = f64::from(p[3]) / 255.0;
+                    let straight = |v: u8| {
+                        if a > 0.0 {
+                            f64::from(v) / 255.0 / a
+                        } else {
+                            0.0
+                        }
+                    };
+                    let input = [straight(p[0]), straight(p[1]), straight(p[2]), a];
+                    let mut out = [0.0_f64; 4];
+                    for (r, o) in out.iter_mut().enumerate() {
+                        let row = &m[r * 5..r * 5 + 5];
+                        *o = (row[0] * input[0]
+                            + row[1] * input[1]
+                            + row[2] * input[2]
+                            + row[3] * input[3]
+                            + row[4])
+                            .clamp(0.0, 1.0);
+                    }
+                    for c in 0..3 {
+                        p[c] = (out[c] * out[3] * 255.0).round().clamp(0.0, 255.0) as u8;
+                    }
+                    p[3] = (out[3] * 255.0).round().clamp(0.0, 255.0) as u8;
+                }
+            }
+            FilterOp::DropShadow {
+                dx,
+                dy,
+                sigma,
+                color,
+            } => {
+                let mut alpha: Vec<f64> = pixels
+                    .chunks_exact(4)
+                    .map(|p| f64::from(p[3]) / 255.0)
+                    .collect();
+                blur(&mut alpha, (w, h), sigma * scale, work)?;
+                let (dx, dy) = (dx * scale, dy * scale);
+                // Shift by bilinear sampling at (x − dx, y − dy).
+                let at = |x: isize, y: isize| {
+                    if x < 0 || y < 0 || x >= w as isize || y >= h as isize {
+                        0.0
+                    } else {
+                        alpha[y as usize * w + x as usize]
+                    }
+                };
+                let (fx, fy) = (dx.floor(), dy.floor());
+                let (tx, ty) = (dx - fx, dy - fy);
+                let ca = f64::from(color.a) / 255.0;
+                let tint = [color.r, color.g, color.b].map(|v| f64::from(v) * ca);
+                for y in 0..h {
+                    for x in 0..w {
+                        let (sx, sy) = (x as isize - fx as isize, y as isize - fy as isize);
+                        let shadow = at(sx, sy) * (1.0 - tx) * (1.0 - ty)
+                            + at(sx - 1, sy) * tx * (1.0 - ty)
+                            + at(sx, sy - 1) * (1.0 - tx) * ty
+                            + at(sx - 1, sy - 1) * tx * ty;
+                        if shadow <= 0.0 {
+                            continue;
+                        }
+                        let p = &mut pixels[(y * w + x) * 4..(y * w + x) * 4 + 4];
+                        // The layer over its shadow.
+                        let keep = 1.0 - f64::from(p[3]) / 255.0;
+                        for c in 0..3 {
+                            let v = f64::from(p[c]) + tint[c] * shadow * keep;
+                            p[c] = v.round().clamp(0.0, 255.0) as u8;
+                        }
+                        let v = f64::from(p[3]) + 255.0 * ca * shadow * keep;
+                        p[3] = v.round().clamp(0.0, 255.0) as u8;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// An open layer: an opacity group, a `clip-path` layer with the map its
 /// shape is drawn with, or a transform with the clips around it.
 #[derive(Clone, Copy)]
 enum Layer {
-    Opacity(f64),
+    Group {
+        opacity: f64,
+        blend: BlendMode,
+        filter: Option<usize>,
+        /// Device pixels per CSS pixel where the group opened.
+        scale: f64,
+    },
     Clip(Shape, Option<Homography>),
     Transform {
         clip: Clip,
@@ -1409,7 +1661,26 @@ pub fn rasterize(
             | DisplayCommand::BeginClip { .. }
             | DisplayCommand::BeginTransform { .. } => {
                 let layer = match command {
-                    DisplayCommand::BeginGroup { opacity, .. } => Layer::Opacity(*opacity),
+                    DisplayCommand::BeginGroup {
+                        opacity,
+                        blend,
+                        filter,
+                        ..
+                    } => Layer::Group {
+                        opacity: *opacity,
+                        blend: *blend,
+                        filter: *filter,
+                        scale: maps.last().map_or(factor, |m| {
+                            stretch(
+                                m,
+                                &[PathPoint {
+                                    x: 0.0,
+                                    y: 0.0,
+                                    on_curve: true,
+                                }],
+                            )
+                        }),
+                    },
                     DisplayCommand::BeginClip { shape, .. } => {
                         Layer::Clip(*shape, maps.last().copied())
                     }
@@ -1453,10 +1724,27 @@ pub fn rasterize(
             DisplayCommand::EndGroup | DisplayCommand::EndClip | DisplayCommand::EndTransform => {
                 let (group, layer) = groups.pop().ok_or(RasterError::InvalidList)?;
                 let mask = match (command, layer) {
-                    (DisplayCommand::EndGroup, Layer::Opacity(opacity)) => {
-                        let group = group.ok_or(RasterError::InvalidList)?;
+                    (
+                        DisplayCommand::EndGroup,
+                        Layer::Group {
+                            opacity,
+                            blend,
+                            filter,
+                            scale,
+                        },
+                    ) => {
+                        let mut group = group.ok_or(RasterError::InvalidList)?;
                         work.charge(u64::from(size.0) * u64::from(size.1))?;
-                        composite(target(&mut groups, &mut surface.pixels), &group, opacity);
+                        if let Some(f) = filter {
+                            let ops = list.filters().get(f).ok_or(RasterError::InvalidList)?;
+                            apply_filter(&mut group, window_size, ops, scale, &mut work)?;
+                        }
+                        composite_blend(
+                            target(&mut groups, &mut surface.pixels),
+                            &group,
+                            opacity,
+                            blend,
+                        );
                         continue;
                     }
                     (DisplayCommand::EndClip, Layer::Clip(shape, None)) => {

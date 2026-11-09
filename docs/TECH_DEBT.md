@@ -105,6 +105,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-55 | Deliberate | Paint | First `border-radius`: single-axis overflow ignores radii, per-fragment inline curves, unsnapped side joins | Open, REN-04f |
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
 | TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
+| TD-58 | Deliberate | Paint | First shadows, blending and filters: sRGB filters, full-surface groups, no ink overflow, approximate blur under transforms | Open, REN-04i |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -974,3 +975,23 @@ containing blocks for transformed boxes (layout thread, with REN-02
 positioning); bounded layers in the tiled raster. **Trigger:** 3D WPT
 reftests, sites relying on transformed containing blocks, or the tiled
 raster step.
+
+### TD-58 — First shadows, blending and filters
+
+REN-04i paints `box-shadow`, `mix-blend-mode`, `isolation` and the
+`filter` functions. Filter color functions run in sRGB as browsers do,
+not the linearRGB that `color-interpolation-filters` would select, and
+round to 8 bits between functions. Every group, including a filter's and
+one opened only to isolate blending children, is a full-surface buffer,
+and blurs run over the whole surface (bounded by the memory and work
+budgets). Layout's scrollable overflow ignores shadows and filter
+outsets (ink overflow is not modeled). Inside a transform, shadow and
+filter blurs use the map's stretch at one point, so they are isotropic
+approximations under skew or perspective. Inline box shadows are per
+fragment (`box-decoration-break: slice` is not honored). Named shadow
+colors serialize as `rgb()` (28 WPT cases, listed). `text-shadow`,
+`background-blend-mode`, `backdrop-filter` and SVG `url()` filters are not
+implemented. **Pay:** filter regions and groups bounded by ink overflow
+in the tiled raster; linearRGB as an option; ink overflow in layout.
+**Trigger:** the tiled raster step, filter WPT reftests, or SVG filters in
+M4.

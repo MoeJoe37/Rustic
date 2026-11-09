@@ -13,6 +13,7 @@ use rustic_css::{
     Image as CssImage, LengthPercentage, LengthUnit, OutlineStyle, Position, PropertyId as P,
     PropertyValue as V, TextDecorationStyle, Visibility, VisualBox, ZIndex,
 };
+use rustic_css::{BlendMode, FilterFunction, Isolation};
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
     AxisRange, BlockFragment, BlockLayout, BoxTree, Clip, CssPoint, CssPx, CssRect, CssSize,
@@ -218,6 +219,118 @@ pub struct BoxShadow {
     pub inset: bool,
 }
 
+/// One filter operation on a group (Filter Effects 1 §13), in CSS pixels.
+/// Color operations act on straight-alpha sRGB values in 0–1, each result
+/// clamped to that range.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FilterOp {
+    /// A Gaussian blur of every channel with this standard deviation.
+    Blur(f64),
+    /// A 4×5 color matrix, row-major: each output channel of r, g, b, a is
+    /// the dot product of its row with (r, g, b, a, 1).
+    Color([f64; 20]),
+    /// A shadow of the group's alpha under it.
+    DropShadow {
+        /// Horizontal offset.
+        dx: f64,
+        /// Vertical offset.
+        dy: f64,
+        /// Gaussian standard deviation.
+        sigma: f64,
+        /// Shadow color.
+        color: Srgba,
+    },
+}
+
+/// The color matrix of a `filter` color function, amounts clamped as
+/// Filter Effects 1 §13.1 requires.
+fn color_matrix(function: &FilterFunction) -> Option<[f64; 20]> {
+    let linear = |slope: f64, intercept: f64| {
+        let mut m = [0.0; 20];
+        for c in 0..3 {
+            m[c * 5 + c] = slope;
+            m[c * 5 + 4] = intercept;
+        }
+        m[18] = 1.0;
+        m
+    };
+    let rgb = |m: [f64; 9]| {
+        let mut out = [0.0; 20];
+        for r in 0..3 {
+            out[r * 5..r * 5 + 3].copy_from_slice(&m[r * 3..r * 3 + 3]);
+        }
+        out[18] = 1.0;
+        out
+    };
+    Some(match *function {
+        FilterFunction::Brightness(a) => linear(a, 0.0),
+        FilterFunction::Contrast(a) => linear(a, 0.5 - 0.5 * a),
+        FilterFunction::Invert(a) => {
+            let a = a.min(1.0);
+            linear(1.0 - 2.0 * a, a)
+        }
+        FilterFunction::Opacity(a) => {
+            let mut m = linear(1.0, 0.0);
+            m[18] = a.min(1.0);
+            m
+        }
+        FilterFunction::Grayscale(a) => {
+            let s = 1.0 - a.min(1.0);
+            rgb([
+                0.2126 + 0.7874 * s,
+                0.7152 - 0.7152 * s,
+                0.0722 - 0.0722 * s,
+                0.2126 - 0.2126 * s,
+                0.7152 + 0.2848 * s,
+                0.0722 - 0.0722 * s,
+                0.2126 - 0.2126 * s,
+                0.7152 - 0.7152 * s,
+                0.0722 + 0.9278 * s,
+            ])
+        }
+        FilterFunction::Sepia(a) => {
+            let s = 1.0 - a.min(1.0);
+            rgb([
+                0.393 + 0.607 * s,
+                0.769 - 0.769 * s,
+                0.189 - 0.189 * s,
+                0.349 - 0.349 * s,
+                0.686 + 0.314 * s,
+                0.168 - 0.168 * s,
+                0.272 - 0.272 * s,
+                0.534 - 0.534 * s,
+                0.131 + 0.869 * s,
+            ])
+        }
+        FilterFunction::Saturate(s) => rgb([
+            0.213 + 0.787 * s,
+            0.715 - 0.715 * s,
+            0.072 - 0.072 * s,
+            0.213 - 0.213 * s,
+            0.715 + 0.285 * s,
+            0.072 - 0.072 * s,
+            0.213 - 0.213 * s,
+            0.715 - 0.715 * s,
+            0.072 + 0.928 * s,
+        ]),
+        FilterFunction::HueRotate(degrees) => {
+            let (sin, cos) = crate::matrix::sin_cos_degrees(degrees);
+            rgb([
+                0.213 + cos * 0.787 - sin * 0.213,
+                0.715 - cos * 0.715 - sin * 0.715,
+                0.072 - cos * 0.072 + sin * 0.928,
+                0.213 - cos * 0.213 + sin * 0.143,
+                0.715 + cos * 0.285 + sin * 0.140,
+                0.072 - cos * 0.072 - sin * 0.283,
+                0.213 - cos * 0.213 - sin * 0.787,
+                0.715 - cos * 0.715 + sin * 0.715,
+                0.072 + cos * 0.928 + sin * 0.072,
+            ])
+        }
+        _ => return None,
+    })
+}
+
 /// One rounded clip: the padding edge curve of a box with `border-radius`
 /// that clips its overflow, or a replaced element's rounded content box.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -250,16 +363,23 @@ pub struct TransformNode {
 pub enum DisplayCommand {
     /// Fill one shape source-over into the current group.
     Fill(DisplayItem),
-    /// Start a transparent group for a stacking context with `opacity < 1`.
+    /// Start a transparent group for a stacking context with `opacity < 1`,
+    /// a blend mode, a filter or blending children to isolate.
     BeginGroup {
         /// Principal-box index of the stacking context root.
         source_box: usize,
         /// Source DOM node.
         node: NodeId,
-        /// Group opacity, greater than 0 and less than 1.
+        /// Group opacity, greater than 0 and at most 1.
         opacity: f64,
+        /// How the group blends with what is under it.
+        blend: BlendMode,
+        /// Filter operations applied to the group first, as an index into
+        /// [`DisplayList::filters`].
+        filter: Option<usize>,
     },
-    /// Composite the innermost open group into its parent with its opacity.
+    /// Composite the innermost open group into its parent: filtered, then
+    /// blended with its opacity.
     EndGroup,
     /// Start a layer for a stacking context with a `clip-path`.
     BeginClip {
@@ -305,6 +425,8 @@ pub enum UnsupportedPaint {
     ClipPathUrl,
     /// A `clip-path: polygon()` with the `evenodd` fill rule.
     ClipPathFillRule,
+    /// A `filter` that references an SVG `<filter>` by URL.
+    FilterUrl,
 }
 
 /// The fonts a text layout was computed with, needed to paint its glyphs.
@@ -368,6 +490,8 @@ pub struct DisplayList {
     rounded: Vec<RoundedRect>,
     /// Box shadows referenced by [`Shape::Shadow`].
     shadows: Vec<BoxShadow>,
+    /// Filter chains referenced by [`DisplayCommand::BeginGroup`].
+    filters: Vec<Vec<FilterOp>>,
     /// `clip-path` areas for hit testing.
     clip_paths: Vec<ClipPathNode>,
     /// Transformed stacking contexts referenced by
@@ -633,9 +757,48 @@ struct Builder<'a> {
     clips: Vec<ClipNode>,
     rounded: Vec<RoundedRect>,
     shadows: Vec<BoxShadow>,
+    filters: Vec<Vec<FilterOp>>,
 }
 
 impl Builder<'_> {
+    /// Store a box's `filter` as operations, or `None` for `none`.
+    fn filter(&mut self, node: NodeId, style: &ComputedStyle) -> Result<Option<usize>, PaintError> {
+        let V::Filter(functions) = style.get(P::Filter) else {
+            return Err(PaintError::InvalidInput);
+        };
+        if functions.is_empty() {
+            return Ok(None);
+        }
+        let px = |lp: Option<&LengthPercentage>| match lp {
+            None => Ok(0.0),
+            Some(lp) => crate::clip::length(lp, 0.0).ok_or(PaintError::InvalidInput),
+        };
+        let mut ops = Vec::with_capacity(functions.len());
+        for function in functions {
+            ops.push(match function {
+                FilterFunction::Url(_) => {
+                    return Err(PaintError::Unsupported {
+                        node,
+                        reason: UnsupportedPaint::FilterUrl,
+                    });
+                }
+                FilterFunction::Blur(r) => FilterOp::Blur(px(Some(r))?.max(0.0)),
+                FilterFunction::DropShadow(s) => FilterOp::DropShadow {
+                    dx: px(Some(&s.x))?,
+                    dy: px(Some(&s.y))?,
+                    sigma: px(s.blur.as_ref())?.max(0.0) / 2.0,
+                    color: match s.color {
+                        Some(c) => srgba(&c).ok_or(PaintError::InvalidInput)?,
+                        None => color(style, P::Color)?,
+                    },
+                },
+                other => FilterOp::Color(color_matrix(other).ok_or(PaintError::InvalidInput)?),
+            });
+        }
+        self.filters.push(ops);
+        Ok(Some(self.filters.len() - 1))
+    }
+
     /// Paint a box's outer shadows (before its background) or inset ones
     /// (after it), the first shadow on top.
     fn shadows(
@@ -1431,6 +1594,7 @@ impl DisplayList {
             clips: Vec::new(),
             rounded: Vec::new(),
             shadows: Vec::new(),
+            filters: Vec::new(),
         };
         let mut image_index: HashMap<NodeId, usize> = HashMap::new();
         let fragments = layout.fragments();
@@ -1554,6 +1718,9 @@ impl DisplayList {
                 || !matches!(style.get(P::ClipPath), V::ClipPath(ClipPath::None))
                 || transformed
                 || matches!(style.get(P::Perspective), V::Perspective(Some(_)))
+                || !matches!(style.get(P::Filter), V::Filter(f) if f.is_empty())
+                || !matches!(style.get(P::MixBlendMode), V::BlendMode(BlendMode::Normal))
+                || matches!(style.get(P::Isolation), V::Isolation(Isolation::Isolate))
             {
                 // z-index applies only to positioned boxes here.
                 Role::Context(if positioned { z.unwrap_or(0) } else { 0 })
@@ -1589,6 +1756,19 @@ impl DisplayList {
                 Role::Context(_) | Role::Positioned => layers[context[p]].zero.push(i),
                 Role::Float => layers[layer[p]].floats.push(i),
                 Role::Block => layers[layer[p]].blocks.push(i),
+            }
+        }
+        // Contexts that must isolate blending children, and those that
+        // ask to.
+        let mut isolates = vec![false; n];
+        for (i, fragment) in fragments.iter().enumerate() {
+            let style = style_of(fragment)?;
+            if matches!(style.get(P::Isolation), V::Isolation(Isolation::Isolate)) {
+                isolates[i] = true;
+            }
+            let blends = !matches!(style.get(P::MixBlendMode), V::BlendMode(BlendMode::Normal));
+            if let (true, Some(p)) = (blends, fragment.parent()) {
+                isolates[context[p]] = true;
             }
         }
         for l in &mut layers {
@@ -1909,16 +2089,27 @@ impl DisplayList {
                         stack.push(Task::EndTransform(transform, !muted));
                         transform = Some(index);
                     }
-                    let group = !muted && opacity[i] < 1.0;
+                    let style = style_of(&fragments[i])?;
+                    let blend = match style.get(P::MixBlendMode) {
+                        V::BlendMode(b) => *b,
+                        _ => return Err(PaintError::InvalidInput),
+                    };
+                    // A group isolates blending children, so they blend
+                    // only with their stacking context (Compositing 1 §3.2).
+                    let group =
+                        !muted && (opacity[i] < 1.0 || blend != BlendMode::Normal || isolates[i]);
                     if group {
                         builder.command(DisplayCommand::BeginGroup {
                             source_box: fragments[i].source_box(),
                             node: fragments[i].node(),
                             opacity: opacity[i],
+                            blend,
+                            filter: None,
                         })?;
                         stack.push(Task::End);
                     }
-                    let style = style_of(&fragments[i])?;
+                    // Filters apply before clipping (Filter Effects 1 §4).
+                    let filter = builder.filter(fragments[i].node(), style)?;
                     if let V::ClipPath(path) = style.get(P::ClipPath) {
                         if let Some((shape, area)) =
                             builder.clip_path(&fragments[i], style, path)?
@@ -1938,6 +2129,16 @@ impl DisplayList {
                             });
                             clip_path = Some(clip_paths.len() - 1);
                         }
+                    }
+                    if let (Some(filter), false) = (filter, muted) {
+                        builder.command(DisplayCommand::BeginGroup {
+                            source_box: fragments[i].source_box(),
+                            node: fragments[i].node(),
+                            opacity: 1.0,
+                            blend: BlendMode::Normal,
+                            filter: Some(filter),
+                        })?;
+                        stack.push(Task::End);
                     }
                     if context[i] == i {
                         stack.push(Task::Outlines(i, muted));
@@ -1974,6 +2175,7 @@ impl DisplayList {
             clips: builder.clips,
             rounded: builder.rounded,
             shadows: builder.shadows,
+            filters: builder.filters,
             clip_paths,
             transforms,
             spaces,
@@ -2076,6 +2278,11 @@ impl DisplayList {
     /// [`Shape::RoundedRing`].
     pub fn rounded(&self) -> &[RoundedRect] {
         &self.rounded
+    }
+
+    /// Filter chains, indexed by [`DisplayCommand::BeginGroup`].
+    pub fn filters(&self) -> &[Vec<FilterOp>] {
+        &self.filters
     }
 
     /// Box shadows, indexed by [`Shape::Shadow`].
@@ -2205,9 +2412,37 @@ impl DisplayList {
                     source_box,
                     node,
                     opacity,
+                    blend,
+                    filter,
                 } => {
+                    let blend = if *blend == BlendMode::Normal {
+                        String::new()
+                    } else {
+                        format!(" blend={blend}")
+                    };
+                    let filter = filter.map_or_else(String::new, |f| {
+                        let mut text = String::from(" filter=(");
+                        for (n, op) in self.filters[f].iter().enumerate() {
+                            if n > 0 {
+                                text.push(' ');
+                            }
+                            // Writing to a String cannot fail.
+                            let _ = match op {
+                                FilterOp::Blur(s) => write!(text, "blur:{s}"),
+                                FilterOp::Color(m) => write!(text, "color:{m:?}"),
+                                FilterOp::DropShadow {
+                                    dx,
+                                    dy,
+                                    sigma,
+                                    color,
+                                } => write!(text, "shadow:{dx},{dy},{sigma},{}", hex(*color)),
+                            };
+                        }
+                        text.push(')');
+                        text
+                    });
                     line = format!(
-                        "group box={source_box} node={}:{} opacity={opacity}\n",
+                        "group box={source_box} node={}:{} opacity={opacity}{blend}{filter}\n",
                         node.slot(),
                         node.generation()
                     );

@@ -996,6 +996,22 @@ coverage, outer clips, perspective, hits and degenerate cases cover it.
 `paint.stacking` credits its transforms step. Gaps are TD-57. See
 [PAINT.md](PAINT.md#transforms).
 
+## REN-04i — Shadows, blending and filters
+
+`box-shadow`, `mix-blend-mode`, `isolation` and `filter` parse, compute
+and paint. Shadows are items over a side table, blurred deterministically
+(exact Gaussian below two pixels, three box blurs above); blend modes and
+filters ride on groups, with filters inside clip paths and blending
+isolated by stacking contexts. Five exact reftests (offset and spread
+shadows, inset shadows, `multiply` with and without isolation, color
+filters with a drop shadow) and one fuzzy one (rounded spread, whose
+corners differ only by coverage conflation), paint tests for shadow order
+and blur, blend formulas and filter nesting, and unit tests for the blur
+cover it. `box-shadow` brought 78 WPT parsing cases into scope; 50 pass and
+28 fail only because named colors serialize as `rgb()`. `paint.raster`
+credits its blend step. Gaps are TD-58. See
+[PAINT.md](PAINT.md#shadows-blending-and-filters).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

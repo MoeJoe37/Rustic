@@ -624,7 +624,7 @@ assignment is pending, so light children of a host inherit from the host
 `tools/import_wpt_css_tests.py` extracts the literal `test_valid_value`,
 `test_invalid_value`, `test_valid_selector` and `test_invalid_selector` calls
 from a pinned WPT checkout (2,916 cases; 219 non-literal calls counted, not
-guessed) and `tests/wpt_conformance.rs` runs the in-scope ones: 1,073 of
+guessed) and `tests/wpt_conformance.rs` runs the in-scope ones: 1,115 of
 1,455 pass, and every other in-scope case is listed with a reason in a ratchet
 expectation list. Four serialization bugs the gate found were fixed first.
 `css.conformance` is complete. See [CSS.md](CSS.md#conformance-gate).
@@ -929,7 +929,7 @@ must keep all tiers green.
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style` |
 | CSS-07a: remaining required selectors | Complete: `:has()` (linear for single-compound arguments, TD-30), HTML form states, `:lang()`, `:dir()` (Bidi_Class via TD-29), `&` with nested style rules expanded by `StyleSheet::parse`, more pseudo-elements and user-action states after them; `css.selectors` is complete. Constraint-validation states and form owners set by the parser (TD-31) remain |
-| CSS-08: declared CSS conformance gate | Complete: pinned WPT parsing cases for selectors and supported properties, 1,073/1,455 in scope pass, the rest listed with reasons in a ratchet; shorthand serialization, named-color keywords and `calc()` wrappers in specified values remain |
+| CSS-08: declared CSS conformance gate | Complete: pinned WPT parsing cases for selectors and supported properties, 1,115/1,455 in scope pass, the rest listed with reasons in a ratchet; shorthand serialization, named-color keywords and `calc()` wrappers in specified values remain |
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document

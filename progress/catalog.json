@@ -1718,8 +1718,60 @@
           "label": "Intrinsic and replaced-element sizing",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "keywords",
+              "label": "min-content, max-content and fit-content widths with shrink-to-fit contributions",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/intrinsic.rs",
+                  "marker": "pub(crate) fn outer_contribution"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/sizing.rs",
+                  "marker": "fn width_keywords_use_min_and_max_content"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/sizing.rs",
+                  "marker": "fn keyword_widths_propagate_through_intrinsic_contributions"
+                }
+              ]
+            },
+            {
+              "id": "replaced",
+              "label": "Block-level replaced sizing with natural sizes, ratios and the 300x150 default",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/replaced.rs",
+                  "marker": "pub(crate) fn used_size"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/sizing.rs",
+                  "marker": "fn replaced_sizes_follow_the_aspect_ratio_and_min_max_table"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/sizing.rs",
+                  "marker": "fn embedders_supply_decoded_image_sizes"
+                }
+              ]
+            },
+            {
+              "id": "text",
+              "label": "Text min-/max-content and inline-level replaced elements",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "layout.position",
@@ -1803,8 +1855,66 @@
           "label": "Flexbox",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "properties",
+              "label": "Flex and box alignment properties with blockified items",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/flex.rs",
+                  "marker": "pub(crate) fn alignment"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/flex.rs",
+                  "marker": "fn flex_and_sizing_declarations_parse_to_typed_longhands"
+                }
+              ]
+            },
+            {
+              "id": "algorithm",
+              "label": "Flex layout algorithm for block-level items (lines, flexing, alignment, reversal)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/flex.rs",
+                  "marker": "fn resolve_line"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/flex.rs",
+                  "marker": "fn generated_rows_fill_the_line_within_their_bounds"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/flex.rs",
+                  "marker": "fn wrapping_builds_lines_and_wrap_reverse_stacks_them_upwards"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/flex.rs",
+                  "marker": "fn deep_nested_flex_containers_are_laid_out_without_recursion"
+                }
+              ]
+            },
+            {
+              "id": "inline",
+              "label": "Text items, inline-flex and line baselines",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "wpt",
+              "label": "css-flexbox layout WPT comparison",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "layout.grid",

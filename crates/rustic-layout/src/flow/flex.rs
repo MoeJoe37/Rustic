@@ -370,7 +370,7 @@ impl Engine<'_, '_> {
             match child.scheme {
                 Scheme::Absolute | Scheme::Fixed => {
                     // Static position: the content box's start corner
-                    // (an approximation of CSS Flexbox 1 §4.1, TD-48).
+                    // (an approximation of CSS Flexbox 1 §4.1, TD-49).
                     let x = match direction {
                         Direction::Ltr => 0.0,
                         Direction::Rtl => width,
@@ -688,7 +688,7 @@ impl Engine<'_, '_> {
                 .get();
             self.flexes[k].items[idx].cross = stretched;
             // Lay out again only if something can differ: a new height, or a
-            // definite one children may resolve percentages against (TD-48).
+            // definite one children may resolve percentages against (TD-49).
             if item.laid == Some(stretched)
                 || (item.laid.is_none() && stretched == item.cross && definite.is_none())
             {

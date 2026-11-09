@@ -565,7 +565,7 @@ fn compute_values(
     // Children of a flex or grid container are blockified too (CSS Display
     // 3 §2.7, CSS Flexbox 1 §4); `display:contents` generates no box. The
     // parent is the DOM parent's style, so a child promoted through a
-    // `display:contents` parent is not blockified (TD-47).
+    // `display:contents` parent is not blockified (TD-48).
     let container_child = parent.is_some_and(|p| {
         matches!(
             p.get(P::Display),

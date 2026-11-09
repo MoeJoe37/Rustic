@@ -285,6 +285,22 @@ two boxes (one box sets both origin and clip) in any order, with a color only
 in the last layer, and sets all eight background longhands with one entry per
 layer. These are the CSS-03c catalog.
 
+REN-02c and REN-08 add sizing keywords and flexbox values: `width`,
+`height`, `min-width` and `min-height` take `auto | <length-percentage> |
+min-content | max-content | fit-content | fit-content(<length-percentage>)`,
+and `max-width`/`max-height` take the same keywords after `none`. The flex
+longhands are `flex-direction`, `flex-wrap`, `flex-grow`, `flex-shrink`
+(non-negative numbers), `flex-basis` (`content | <'width'>`), `order`
+(integer), `justify-content`, `align-content`, `align-items`, `align-self`
+(CSS Box Alignment 3 keywords with `safe`/`unsafe` and `[first | last]?
+baseline`, checked per property) and `row-gap`/`column-gap` (`normal |
+<length-percentage [0,∞]>`). The `flex` shorthand follows CSS Flexbox 1 §7.1
+(`none`, `auto`, an omitted basis of `0`, and a unitless zero read as a
+factor unless two factors precede it),
+`flex-flow` takes direction and wrap in any order, and `gap` sets both gaps.
+Children of flex and grid containers are blockified at computed-value time.
+`tests/flex.rs` covers valid, round-trip and invalid values.
+
 Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 `rex`, `ch`, `rch`, `cap`, `rcap`, `ic`, `ric`, `lh`, `rlh`) and the viewport
 units including the small/large/dynamic variants, plus unitless zero. Every
@@ -894,8 +910,8 @@ skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
   implemented.
 * `.tentative` files test proposals and are never in scope.
 
-Of 2,916 cases, 1,455 are in scope and **1,073 pass** (invalid-selector
-102/104, invalid-value 470/471, valid-selector 108/199, valid-value 393/681).
+Of 2,916 cases, 1,455 are in scope and **1,115 pass** (invalid-selector
+102/104, invalid-value 470/471, valid-selector 108/199, valid-value 435/681).
 The other 1,461 are out of scope: properties `rustic-css` does not support yet,
 and tentative files. Both counts are pinned in the gate, so supporting or
 dropping a property changes them deliberately. Every other in-scope case is
@@ -909,7 +925,6 @@ largest groups of known failures are features outside M2's declared scope:
 | Multi-keyword `display` with `flow`, `list-item`, `run-in` or `ruby` | 65 |
 | `alpha()`, `contrast-color()`, `light-dark()` and system colors | 87 |
 | `::scroll-button()`, `::part()`, `::slotted()`, `:state()`, `:heading` | 89 |
-| Intrinsic sizing keywords and `fit-content()` | 34 |
 | Math functions serialize folded (`2`, not `calc(2)`), and percentages in numeric math functions | 28 |
 | Named colors serialize as `rgb()`; family names are always quoted | 12 |
 | Other unimplemented values (`oblique <angle>`, `text-indent` keywords, `cross-fade()`, ...) | 59 |

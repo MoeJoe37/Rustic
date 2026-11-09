@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 24.34%** = 20.27% verified complete + 4.07% partial credit. 36/172 capabilities complete, 11 in progress.
+**Overall completion: 25.22%** = 20.27% verified complete + 4.95% partial credit. 36/172 capabilities complete, 13 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `1c2b204210f03fc6bc3b374bd6c9b5b5fd62344a284a9bc00245c9ee02a795c5`.
+Catalog: `engine-v3`. Source fingerprint: `0f995b1ce5c939559febf4e8b2d184c4c00a63ebe8e1b9e10804372e1591fd96`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `1c2b204210f03fc6bc3b374bd6c9b5b5fd623
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 0/17 | 31.46% | 0.00% | 12.22% |
+| M3 Static renderer | 0/17 | 38.66% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -31,7 +31,7 @@ Catalog: `engine-v3`. Source fingerprint: `1c2b204210f03fc6bc3b374bd6c9b5b5fd623
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 3 | 26.13% | 0.00% | 4% | 1.04 |
-| Layout | 0/10 | 3 | 20.65% | 0.00% | 9% | 1.85 |
+| Layout | 0/10 | 5 | 30.43% | 0.00% | 9% | 2.73 |
 | Paint & raster | 0/7 | 4 | 15.74% | 0.00% | 6% | 0.94 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -148,13 +148,20 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Adjoining and parent-child margin collapse ([source](../../crates/rustic-layout/src/flow.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs))
   - [ ] Mixed block/inline flow through anonymous boxes
 - **planned** `layout.inline` — Inline formatting, line boxes and baselines · size 5 · M3 · 0.97% of engine
-- **planned** `layout.sizing` — Intrinsic and replaced-element sizing · size 3 · M3 · 0.58% of engine
+- **in progress 66.66%** `layout.sizing` — Intrinsic and replaced-element sizing · size 3 · M3 · 0.58% of engine
+  - [x] min-content, max-content and fit-content widths with shrink-to-fit contributions ([source](../../crates/rustic-layout/src/intrinsic.rs), [test](../../crates/rustic-layout/tests/sizing.rs), [test](../../crates/rustic-layout/tests/sizing.rs))
+  - [x] Block-level replaced sizing with natural sizes, ratios and the 300x150 default ([source](../../crates/rustic-layout/src/replaced.rs), [test](../../crates/rustic-layout/tests/sizing.rs), [test](../../crates/rustic-layout/tests/sizing.rs))
+  - [ ] Text min-/max-content and inline-level replaced elements
 - **in progress 75.00%** `layout.position` — Floats, positioning and overflow · size 5 · M3 · 0.97% of engine
   - [x] Relative offsets and absolute/fixed containing-block equations ([source](../../crates/rustic-layout/src/position.rs), [test](../../crates/rustic-layout/tests/position.rs), [test](../../crates/rustic-layout/tests/position.rs))
   - [x] Float placement, clearance and float-avoiding formatting roots ([source](../../crates/rustic-layout/src/exclusions.rs), [test](../../crates/rustic-layout/tests/position.rs), [test](../../crates/rustic-layout/tests/position.rs))
   - [x] Overflow clipping, scroll-container geometry and viewport propagation ([source](../../crates/rustic-layout/src/overflow.rs), [test](../../crates/rustic-layout/tests/position.rs))
   - [ ] Sticky positioning against scroll offsets
-- **planned** `layout.flex` — Flexbox · size 5 · M3 · 0.97% of engine
+- **in progress 50.00%** `layout.flex` — Flexbox · size 5 · M3 · 0.97% of engine
+  - [x] Flex and box alignment properties with blockified items ([source](../../crates/rustic-css/src/flex.rs), [test](../../crates/rustic-css/tests/flex.rs))
+  - [x] Flex layout algorithm for block-level items (lines, flexing, alignment, reversal) ([source](../../crates/rustic-layout/src/flow/flex.rs), [test](../../crates/rustic-layout/tests/flex.rs), [test](../../crates/rustic-layout/tests/flex.rs), [test](../../crates/rustic-layout/tests/flex.rs))
+  - [ ] Text items, inline-flex and line baselines
+  - [ ] css-flexbox layout WPT comparison
 - **planned** `layout.grid` — Grid · size 5 · M9 · 0.97% of engine
 - **planned** `layout.tables` — Tables · size 5 · M9 · 0.97% of engine
 - **planned** `layout.fragmentation` — Fragmentation, printing and advanced formatting · size 5 · M9 · 0.97% of engine

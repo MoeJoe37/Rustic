@@ -184,9 +184,12 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 
 1. Finish REN-01b: normalize principal/anonymous boxes and mixed inline/block
    content, then expand the initial block geometry reference.
-2. Finish REN-02: intrinsic sizing for text and replaced elements, and sticky
-   positioning once scroll offsets exist. Margin collapse, floats, clearance,
-   relative/absolute/fixed positioning and overflow clipping are implemented.
+2. Finish REN-02: text min-/max-content once REN-03 line layout exists, and
+   sticky positioning once scroll offsets exist. Margin collapse, floats,
+   clearance, positioning, overflow clipping, intrinsic sizing keywords and
+   block-level replaced sizing (REN-02c) are implemented. Flexbox (REN-08)
+   is implemented for block-level items; text and `inline-flex` wait for
+   line layout.
 3. REN-03/04: shaping/bidi/line layout, fragments and paint order
    (the REN-03a font adapter below is done).
    The first block display list exists ([PAINT.md](PAINT.md)).
@@ -458,3 +461,100 @@ and CSS Logical 1 [float/clear](https://www.w3.org/TR/css-logical-1/#float-clear
 These are focused fixtures and models, not a layout-WPT or browser comparison
 result.
 
+## Intrinsic and replaced sizing (REN-02c)
+
+### Sizing keywords
+
+`width`, `min-width` and `max-width` accept `min-content`, `max-content`,
+`fit-content` and `fit-content(<length-percentage>)` (CSS Sizing 3 §3 and
+Sizing 4's bare `fit-content`). The block-axis properties parse the same
+keywords and behave as their initial values in a block container (Sizing 3
+§3.1). Each node's min- and max-content content-box widths are computed
+bottom-up before the walk (`intrinsic.rs`), so a keyword never triggers a
+nested layout. `fit-content` clamps the available width between the two; a
+`box-sizing:border-box` keyword still names the content box.
+`measure_block_width` returns `MeasureError::IntrinsicSizeRequired` for a
+keyword, since it has no subtree to measure.
+
+Floats and absolutely positioned boxes use the same contributions for
+shrink-to-fit. Text content has no intrinsic size until REN-03, so a text
+subtree is still refused with `UnsupportedFlow::TextLayout`.
+
+### Replaced elements
+
+`img`, `canvas`, `video`, `iframe`, `embed` and `object` are atomic boxes;
+their children produce no fragments. `replaced.rs` implements CSS 2.2
+§10.3.2/§10.6.2 with the §10.4 min/max table for `width:auto;height:auto`,
+and the 300×150 default object size (CSS Images 3 §5.2). `canvas` reads its
+`width`/`height` attributes with HTML's non-negative integer rules. `img` is
+0×0 until the embedder passes decoded sizes to `BoxTree::set_natural_sizes`,
+which rejects non-replaced nodes atomically (`LayoutError::NotReplaced`).
+Nothing is decoded or fetched in layout. Inline-level replaced elements wait
+for line layout and stay `UnsupportedFlow::SpecialElement`.
+
+### Evidence
+
+`tests/sizing.rs` has eleven scenarios: every width keyword with min/max
+interplay, fit-content in a narrow containing block, contributions through
+floats and absolute boxes, block-axis keywords, the public measure error,
+flex-item blockification, the natural-size table, auto-margin centring,
+floats and positioning of replaced boxes, and embedder sizes. Unit tests
+cover the §10.4 table and canvas attribute parsing. The 34 WPT
+parse/serialize cases for the keywords now pass (see [CSS.md](CSS.md)).
+Approximations are tracked in TD-49.
+
+## Flexbox (REN-08)
+
+### Properties
+
+`rustic-css` parses `flex-direction`, `flex-wrap`, `flex-grow`,
+`flex-shrink`, `flex-basis`, `order`, `justify-content`, `align-content`,
+`align-items`, `align-self`, `row-gap` and `column-gap`, plus the `flex`,
+`flex-flow` and `gap` shorthands. Alignment values keep their `safe`/`unsafe`
+overflow position. `rustic-style` blockifies the children of flex
+containers (TD-48 covers `display:contents` parents).
+
+### Algorithm
+
+A `display:flex` container is its own formatting context, driven as a state
+machine on the container's frame in the same explicit walk (`flow/flex.rs`).
+Each phase asks for items to be laid out as formatting roots at a given width
+and optional definite height and receives their content heights back; nested
+containers are more frames, never recursion. It implements CSS Flexbox 1 §9:
+- flex base and hypothetical sizes, including `flex-basis:content` and
+  automatic minimum sizes (§4.5);
+- line breaking with gaps, and §9.7 flexible length resolution with freezing
+  of min/max violations;
+- line cross sizes, first/last baseline alignment, `align-content`
+  (with `safe` fallback) and stretched lines;
+- `align-self`/`align-items` with stretch, which relays out an item at its
+  stretched height so children see a definite height;
+- auto margins before `justify-content`, and every distribution keyword;
+- `row-reverse`, `column-reverse`, `wrap-reverse`, `order` and RTL;
+- column containers that flex within a definite height and size to content
+  otherwise;
+- static positions for absolutely positioned children, and shrink-to-fit
+  containers whose intrinsic sizes come from their items.
+
+An item is laid out again only when its size changed or became definite.
+Every step charges `MAX_FLOW_WORK`, so worst-case nested relayout fails with
+`FlowError::WorkLimit` rather than running long (TD-49). Text inside a flex
+container and `inline-flex` stay refused with `TextLayout` and
+`FormattingContext` until line layout exists.
+
+### Evidence
+
+`tests/flex.rs` has thirteen scenarios with exact geometry: growth and
+stretch, justify/align keywords, column flexing, wrap and wrap-reverse,
+reversal with RTL and `order`, auto margins, automatic minimum sizes,
+baselines, stretched children and replaced items, shrink-to-fit containers
+with positioned children, the explicit refusals, 120 nested containers, and
+60 generated rows checked for bounds, exact fill and equal growth. The fuzz
+corpus has a flex page (`paint-flex.html`) and flex dictionary tokens.
+
+Specification basis, reviewed 2026-11-09: CSS Flexible Box Layout 1
+[§4–§9](https://www.w3.org/TR/css-flexbox-1/#layout-algorithm), CSS Box
+Alignment 3 [§4–§8](https://www.w3.org/TR/css-align-3/), CSS Sizing 3
+[§3–§5](https://www.w3.org/TR/css-sizing-3/#sizing-values) and CSS 2.2
+[§10.3.2/§10.4/§10.6.2](https://www.w3.org/TR/CSS22/visudet.html#inline-replaced-width).
+These are focused fixtures and models, not a layout-WPT result.

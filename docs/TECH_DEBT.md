@@ -94,6 +94,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
 | TD-47 | Deliberate | Text | Untailored UAX #14/#29 segmentation and bidi without L3 | Open, REN-03b |
+| TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
+| TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -772,3 +774,38 @@ are fully conformance-tested and are what line layout needs first. **Pay:**
 add the CSS tailorings with the properties in `rustic-css`, then dictionary
 breaking behind a reviewed data source. **Trigger:** supporting
 `word-break`/`overflow-wrap`, or Southeast Asian text.
+
+### TD-48 — Blockification stops at `display:contents`
+
+`rustic-style` blockifies the children of flex and grid containers (CSS
+Display 3 §2.7) by looking at the parent's computed `display`. A child of a
+`display:contents` element whose own parent is a flex container is therefore
+not blockified, although its box becomes a flex item. **Reason:** blockifying
+through `contents` needs the box-tree parent, which the per-element cascade
+does not see. **Pay:** pass the nearest box-generating ancestor's display into
+`compute`, or blockify in `BoxTree::build`. **Trigger:** a page or WPT case
+that puts inline content under a `contents` wrapper inside a flex container.
+
+### TD-49 — Flex and replaced sizing approximations
+
+REN-02c and REN-08 make these choices before text and layout WPT exist:
+- Flex and replaced item baselines are synthesized from the border-box bottom
+  edge, since there are no line boxes to supply a first or last baseline.
+- An absolutely positioned child of a flex container takes the content box's
+  start corner as its static position instead of the full §4.1 alignment.
+- A flex container's intrinsic sizes are the sum (row) or maximum (column) of
+  its items' outer contributions; §9.9.1's flex-factor scaling is not applied.
+- An item is laid out again after stretching or main-size resolution only when
+  its size changed or became definite. Nested flex containers can still cost
+  one relayout per level; `MAX_FLOW_WORK` bounds the total.
+- A replaced box with only an aspect ratio and `width:auto` fills the
+  containing block width (CSS Sizing's stretch fit; CSS 2.2 leaves it open).
+- `img` without an embedder-supplied size is 0×0; `video`, `iframe`, `embed`
+  and `object` use the 300×150 default.
+
+**Reason:** each choice is documented and deterministic, and the missing
+pieces (line baselines, layout reftests) belong to REN-03 and REN-07.
+**Pay:** take baselines from line layout, implement §4.1 static positions and
+§9.9.1 intrinsic sizes, and compare against the css-flexbox and
+css-sizing WPT directories. **Trigger:** REN-03 line boxes, layout-WPT
+import, or a fuzz finding that hits the work budget through nested flex.

@@ -143,6 +143,7 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | --- | --- | --- |
 | REN-01 | Typed CSS/device geometry, box tree, anonymous boxes, block flow, margins/padding/borders | CSS-05 |
 | REN-02 | Intrinsic sizing, replaced elements, overflow, positioning, floats and margin collapse | REN-01 |
+| REN-02c | **Done** ([LAYOUT.md](LAYOUT.md#intrinsic-and-replaced-sizing-ren-02c)): intrinsic sizing keywords, shrink-to-fit contributions and block-level replaced sizing with embedder natural sizes; text intrinsic sizes wait for REN-03 (TD-49) | REN-02b |
 | REN-03 | Font adapter, bundled test fonts, shaping, bidi, line breaking, inline layout and baselines; computed `ex`/`ch`/`cap`/`ic` from loaded font metrics (moved from M2 css.values) | CSS font values, REN-01 |
 | REN-03a | **Done** ([LAYOUT.md](LAYOUT.md#font-adapter-ren-03a)): `rustic-text` TrueType parser, bundled original test fonts, CSS face matching and computed `ex`/`ch`/`cap`/`ic`; CFF/WOFF, discovery and shaping remain (TD-42) | CSS font values |
 | REN-04 | Fragments, stacking contexts, paint order, clips, glyph/image display-list commands | REN-02, REN-03 |
@@ -150,6 +151,7 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | REN-06 | `render` headless command, PNG output, layout/display-list dumps, resize and hit testing | REN-05 |
 | REN-07 | Reftest harness, checked image fixtures, deterministic clocks/fonts, allocation counters | REN-06 |
 | REN-08 | Implement flexbox as its own tested formatting context; start grid/table plans from failures | REN-07 |
+| REN-08a | **Done** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): flexbox formatting context for block-level items, taken ahead of REN-07; text items and `inline-flex` wait for line layout, layout-WPT comparison for REN-07 (TD-49) | REN-02c |
 | MOB-03/04 | Android/iOS local-fixture CPU surfaces through narrow native bridges | REN-05; mobile core checks |
 
 **Current slice:** REN-01a implements checked CSS/device geometry, bounded

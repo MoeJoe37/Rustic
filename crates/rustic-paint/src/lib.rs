@@ -11,6 +11,7 @@
 
 #![warn(missing_docs)]
 
+mod clip;
 mod color;
 mod display;
 mod rounded;

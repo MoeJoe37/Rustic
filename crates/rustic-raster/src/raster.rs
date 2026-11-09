@@ -218,7 +218,9 @@ fn accumulate_edge(acc: &mut [f64], stride: usize, h: usize, p0: Point, p1: Poin
         if dy <= 0.0 {
             continue;
         }
-        let x_next = x + dxdy * dy;
+        // Stepping can stray an ulp outside the clipped range; a negative
+        // x would floor to column -1 and shift the edge a whole pixel.
+        let x_next = (x + dxdy * dy).max(0.0);
         let d = dy * dir;
         let (xa, xb) = if x < x_next { (x, x_next) } else { (x_next, x) };
         let line = &mut acc[row * stride..(row + 1) * stride];
@@ -716,6 +718,28 @@ fn composite(dst: &mut [u8], group: &[u8], opacity: f64) {
     }
 }
 
+/// An open layer: an opacity group or a `clip-path` layer.
+#[derive(Clone, Copy)]
+enum Layer {
+    Opacity(f64),
+    Clip(Shape),
+}
+
+/// Composite a premultiplied layer onto `dst` source-over, each pixel
+/// weighted by `mask` (one coverage value per pixel).
+fn composite_masked(dst: &mut [u8], layer: &[u8], mask: &[f64]) {
+    for ((d, g), &m) in dst.chunks_exact_mut(4).zip(layer.chunks_exact(4)).zip(mask) {
+        if g[3] == 0 || m <= 0.0 {
+            continue;
+        }
+        let keep = 1.0 - f64::from(g[3]) * m / 255.0;
+        for c in 0..4 {
+            let v = f64::from(g[c]) * m + f64::from(d[c]) * keep;
+            d[c] = v.round().clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
 /// Rasterize `list` at `scale` device pixels per CSS pixel.
 ///
 /// The surface is the viewport size times `scale`, rounded up, cleared to the
@@ -757,8 +781,8 @@ pub fn rasterize(
         .get();
     let size = (surface.width, surface.height);
     let bytes = surface.pixels.len();
-    // Open opacity groups, innermost last, with their opacity.
-    let mut groups: Vec<(Vec<u8>, f64)> = Vec::new();
+    // Open layers, innermost last: an opacity group or a clip-path layer.
+    let mut groups: Vec<(Vec<u8>, Layer)> = Vec::new();
     for command in list.commands() {
         match command {
             DisplayCommand::Fill(item) => {
@@ -772,8 +796,8 @@ pub fn rasterize(
                     fill(target, size, item, list, factor, &mut work)?;
                 }
             }
-            DisplayCommand::BeginGroup { opacity, .. } => {
-                // The surface, every open group and the new one.
+            DisplayCommand::BeginGroup { .. } | DisplayCommand::BeginClip { .. } => {
+                // The surface, every open layer and the new one.
                 if bytes
                     .checked_mul(groups.len() + 2)
                     .is_none_or(|n| n > limits.max_bytes)
@@ -781,16 +805,38 @@ pub fn rasterize(
                     return Err(RasterError::MemoryLimit);
                 }
                 work.charge(u64::from(size.0) * u64::from(size.1))?;
-                groups.push((vec![0; bytes], *opacity));
+                let layer = match command {
+                    DisplayCommand::BeginGroup { opacity, .. } => Layer::Opacity(*opacity),
+                    DisplayCommand::BeginClip { shape, .. } => Layer::Clip(*shape),
+                    _ => return Err(RasterError::InvalidList),
+                };
+                groups.push((vec![0; bytes], layer));
             }
-            DisplayCommand::EndGroup => {
-                let (group, opacity) = groups.pop().ok_or(RasterError::InvalidList)?;
+            DisplayCommand::EndGroup | DisplayCommand::EndClip => {
+                let (group, layer) = groups.pop().ok_or(RasterError::InvalidList)?;
                 work.charge(u64::from(size.0) * u64::from(size.1))?;
+                let mask = match (command, layer) {
+                    (DisplayCommand::EndGroup, Layer::Opacity(opacity)) => {
+                        let target = match groups.last_mut() {
+                            Some((pixels, _)) => pixels,
+                            None => &mut surface.pixels,
+                        };
+                        composite(target, &group, opacity);
+                        continue;
+                    }
+                    (DisplayCommand::EndClip, Layer::Clip(shape)) => {
+                        let contours = contours(&shape, list.paths(), list.rounded(), factor);
+                        work.charge(contours.iter().map(|c| c.len() as u64).sum())?;
+                        let window = (size.0 as usize, size.1 as usize);
+                        coverage(&contours, (0.0, 0.0), window, &mut work)?
+                    }
+                    _ => return Err(RasterError::InvalidList),
+                };
                 let target = match groups.last_mut() {
                     Some((pixels, _)) => pixels,
                     None => &mut surface.pixels,
                 };
-                composite(target, &group, opacity);
+                composite_masked(target, &group, &mask);
             }
         }
     }
@@ -917,6 +963,38 @@ mod tests {
         // Winding direction does not matter.
         let r = coverage(&[(0.0, 4.0), (4.0, 0.0), (0.0, 0.0)], 4, 4);
         assert_eq!(c, r);
+    }
+
+    #[test]
+    fn coverage_does_not_depend_on_the_window_origin() {
+        // A steep edge ending exactly on the window's left edge: stepping
+        // along it once produced x = -1e-16 and shifted it a column.
+        let contour = vec![
+            (25.0, 35.0),
+            (25.190_301_168_721_78, 33.048_729_582_188_98),
+            (40.0, 30.0),
+            (40.0, 40.0),
+        ];
+        let cancel = CancellationToken::default();
+        let mut work = Work {
+            used: 0,
+            limit: u64::MAX,
+            cancellation: &cancel,
+        };
+        let wide = super::coverage(
+            std::slice::from_ref(&contour),
+            (0.0, 0.0),
+            (50, 50),
+            &mut work,
+        )
+        .unwrap();
+        let tight = super::coverage(&[contour], (25.0, 30.0), (15, 10), &mut work).unwrap();
+        for row in 0..10 {
+            for col in 0..15 {
+                let (a, b) = (wide[(row + 30) * 50 + col + 25], tight[row * 15 + col]);
+                assert!(close(a, b), "({col},{row}): {a} vs {b}");
+            }
+        }
     }
 
     #[test]

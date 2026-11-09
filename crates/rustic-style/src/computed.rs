@@ -760,6 +760,12 @@ fn compute_values(
                         PropertyValue::Gap(Gap::LengthPercentage(lp)) => {
                             PropertyValue::Gap(Gap::LengthPercentage(basis.lp(lp, nonnegative)))
                         }
+                        PropertyValue::ClipPath(rustic_css::ClipPath::Shape(shape, b)) => {
+                            PropertyValue::ClipPath(rustic_css::ClipPath::Shape(
+                                shape.map_lengths(&|lp| basis.lp(lp, false)),
+                                *b,
+                            ))
+                        }
                         PropertyValue::BorderRadius(r) => {
                             PropertyValue::BorderRadius(rustic_css::CornerRadius {
                                 horizontal: basis.lp(&r.horizontal, true),

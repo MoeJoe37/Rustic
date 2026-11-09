@@ -115,6 +115,27 @@ const VALID: &[(&str, &str)] = &[
         "border-radius: 4px / 10% 5px",
         "border-top-left-radius: 4px 10%; border-top-right-radius: 4px 5px; border-bottom-right-radius: 4px 10%; border-bottom-left-radius: 4px 5px",
     ),
+    // Clip paths.
+    ("clip-path: none", "clip-path: none"),
+    ("clip-path: url(#c)", "clip-path: url(\"#c\")"),
+    ("clip-path: padding-box", "clip-path: padding-box"),
+    ("clip-path: circle()", "clip-path: circle(closest-side)"),
+    (
+        "clip-path: circle(50% at left 10px top)",
+        "clip-path: circle(50% at left 10px top)",
+    ),
+    (
+        "clip-path: content-box ellipse(farthest-side 2px)",
+        "clip-path: ellipse(farthest-side 2px) content-box",
+    ),
+    (
+        "clip-path: inset(1px 2px round 3px)",
+        "clip-path: inset(1px 2px 1px 2px round 3px 3px 3px 3px / 3px 3px 3px 3px)",
+    ),
+    (
+        "clip-path: polygon(nonzero, 0 0, 100% 0, 50% 1em)",
+        "clip-path: polygon(0px 0px, 100% 0px, 50% 1em)",
+    ),
     // Fonts.
     (
         "font-variant-caps: all-small-caps",
@@ -303,6 +324,16 @@ fn invalid_catalog_declarations_are_rejected() {
         "border-radius: 1px / ",
         "border-radius: 1px 2px 3px 4px 5px",
         "border-radius: auto",
+        "clip-path: circle(1px 2px)",
+        "clip-path: circle(-1px)",
+        "clip-path: ellipse(1px)",
+        "clip-path: inset()",
+        "clip-path: inset(1px 2px 3px 4px 5px)",
+        "clip-path: polygon()",
+        "clip-path: polygon(0 0 0)",
+        "clip-path: border-box padding-box",
+        "clip-path: circle() circle()",
+        "clip-path: none border-box",
         "font-variant-caps: small",
         "font-stretch: -10%",
         "font-stretch: 100",

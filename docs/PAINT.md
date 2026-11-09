@@ -228,8 +228,8 @@ are not followed yet.
 The checked suite lives in `crates/rustic-cli/tests/reftests` and runs at
 scales 1 and 2 in `cargo test`; it covers borders against nested backgrounds,
 z-index against tree order, overflow clipping, opacity groups with a fuzzy
-tolerance, solid and double outlines, rounded borders and clips, and
-mismatches.
+tolerance, solid and double outlines, rounded borders and clips,
+`clip-path` circles, polygons and insets, and mismatches.
 
 ## Outlines
 
@@ -274,14 +274,34 @@ Shapes and clips are stored once in [`DisplayList::rounded`] and
 [`DisplayList::clips`] and are listed in dumps as `rounded=` shapes and
 `rclip` lines. See TD-55.
 
+## Clip paths
+
+`clip-path` parses `none`, `url()`, a reference box alone and the `inset()`,
+`circle()`, `ellipse()` and `polygon()` basic shapes with an optional
+reference box, and computes their lengths and positions. A box with a clip
+path other than `none` is a stacking context (CSS Masking 1 §5). Its
+context paints into a layer opened by `DisplayCommand::BeginClip` and closed
+by `DisplayCommand::EndClip`, which composites the layer weighted by the
+shape's exact-area coverage, so the box and every descendant painted in its
+context are clipped, including positioned ones that escape its overflow.
+Circles and ellipses are fully rounded [`RoundedRect`]s, insets are rounded
+rectangles with their `round` radii, and polygons are paths with the
+nonzero rule. Reference boxes resolve against the box: `margin-box`,
+`border-box` (the default), `padding-box` and `content-box`; `fill-box` is
+the content box and `stroke-box` and `view-box` the border box, as for boxes
+without SVG layout. A reference box alone clips to that box's
+`border-radius` curve. Hit testing excludes points outside every enclosing
+clip path. `url()` references and `polygon(evenodd, …)` fail with typed
+errors. See TD-56.
+
 ## Not yet implemented
 
 Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
-box shadows, blend modes and filters, rounded or
-`clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
+box shadows, blend modes and filters, `clip-path` URLs and the
+`evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56 and docs/ROADMAP.md (REN-04 to
 REN-07).

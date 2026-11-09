@@ -1016,6 +1016,8 @@ fn outlines_paint_last_in_their_stacking_context_and_collapse_inward() {
             DisplayCommand::Fill(item) => format!("{}:{:?}", p.id_name(item.node), item.role),
             DisplayCommand::BeginGroup { .. } => "group".into(),
             DisplayCommand::EndGroup => "end".into(),
+            DisplayCommand::BeginClip { .. } => "clip".into(),
+            DisplayCommand::EndClip => "end-clip".into(),
         });
     }
     assert_eq!(
@@ -1106,4 +1108,70 @@ fn rounded_clips_follow_containing_blocks_and_shape_hits() {
     let dump = list.dump(1 << 20).unwrap();
     assert!(dump.contains("rclip 0 rounded=(0,0,40,40) radii=(20/20 20/20 20/20 20/20)"));
     assert!(dump.contains(" rclip=0\n"), "{dump}");
+}
+
+#[test]
+fn clip_paths_form_contexts_clip_descendants_and_hits() {
+    let p = page(
+        "<div id=clip><div id=inner></div><div id=abs></div></div><div id=after></div>",
+        &format!(
+            "{RESET} #clip {{ width: 40px; height: 40px; clip-path: circle(20px at 20px 20px) }}
+             #inner {{ height: 40px; background: red }}
+             #abs {{ position: absolute; left: 30px; top: 30px; width: 40px; height: 40px;
+                     background: blue }}
+             #after {{ height: 10px; margin-top: -45px; position: relative; z-index: -1;
+                       background: lime }}"
+        ),
+        100.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    // The clip-path box is a stacking context (z-index 0 in tree order), so
+    // the negative z-index sibling paints first; its absolutely positioned
+    // descendant is inside the clip layer even though it overflows the box.
+    let mut steps = Vec::new();
+    for command in list.commands() {
+        steps.push(match command {
+            DisplayCommand::Fill(item) => p.id_name(item.node),
+            DisplayCommand::BeginClip { shape, .. } => {
+                assert!(matches!(shape, Shape::Rounded(_)));
+                "clip".into()
+            }
+            DisplayCommand::EndClip => "end-clip".into(),
+            DisplayCommand::BeginGroup { .. } => "group".into(),
+            DisplayCommand::EndGroup => "end".into(),
+        });
+    }
+    assert_eq!(steps, ["after", "clip", "inner", "abs", "end-clip"]);
+    // Hits follow the circle for the box and every descendant.
+    assert_eq!(hit(&p, &list, 20.0, 20.0).as_deref(), Some("inner"));
+    assert_eq!(hit(&p, &list, 32.0, 32.0).as_deref(), Some("abs"));
+    // Outside the circle, neither the box nor its descendants take hits.
+    assert_eq!(hit(&p, &list, 36.0, 36.0).as_deref(), Some("html"));
+    assert_eq!(hit(&p, &list, 60.0, 60.0).as_deref(), Some("html"));
+    let dump = list.dump(1 << 20).unwrap();
+    assert!(dump.contains("clip-path box="), "{dump}");
+    assert!(dump.contains("end-clip-path\n"));
+    // References to SVG and the evenodd rule fail atomically.
+    for (css, reason) in [
+        ("url(#a)", UnsupportedPaint::ClipPathUrl),
+        (
+            "polygon(evenodd, 0 0, 1px 0, 0 1px)",
+            UnsupportedPaint::ClipPathFillRule,
+        ),
+    ] {
+        let p = page(
+            "<div id=d></div>",
+            &format!("#d {{ clip-path: {css} }}"),
+            20.0,
+            20.0,
+        );
+        assert_eq!(
+            p.list(),
+            Err(PaintError::Unsupported {
+                node: p.id("d"),
+                reason,
+            })
+        );
+    }
 }

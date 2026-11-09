@@ -966,6 +966,20 @@ scaling cover it. Adding the properties brought 34 more WPT parsing cases
 into scope, all passing. Gaps are TD-55. See
 [PAINT.md](PAINT.md#rounded-corners).
 
+## REN-04g — Clip paths
+
+`clip-path` parses and computes basic shapes and reference boxes, makes a
+stacking context, and paints that context into a layer composited through
+the shape's coverage; hit testing follows the shape for the box and its
+descendants. Three exact reftests (circle against `border-radius: 50%`, a
+rectangle polygon clipping an overflowing positioned child, and a rounded
+inset in the padding box) and a paint test cover it. Writing them exposed a
+rasterizer bug that predates this work: when an edge ended exactly on the
+left of an item's pixel window, stepping could give x = -1e-16 and move the
+edge's coverage one column over. Clamping fixes it, and a unit test covers
+it. `paint.stacking` credits its rounded and clip-path step. Gaps are
+TD-56. See [PAINT.md](PAINT.md#clip-paths).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

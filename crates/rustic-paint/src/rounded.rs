@@ -192,7 +192,7 @@ impl RoundedRect {
 }
 
 /// Resolve one computed `<length-percentage>` radius against `basis`.
-fn resolve(value: &LengthPercentage, basis: f64) -> Option<f64> {
+pub(crate) fn resolve(value: &LengthPercentage, basis: f64) -> Option<f64> {
     let px = match value {
         LengthPercentage::Length(l) if l.unit == LengthUnit::Px => l.value,
         LengthPercentage::Length(_) => return None,

@@ -76,6 +76,9 @@ impl Target for PaintTarget {
             b"border-radius:50%",
             b"border-radius:9px 3px/40% 2px",
             b"overflow:hidden;border-radius:12px",
+            b"clip-path:circle(40% at 20% 30%)",
+            b"clip-path:polygon(0 0,100% 0,0 100%)",
+            b"clip-path:inset(2px round 50%) content-box",
             b"{",
             b"}",
         ]
@@ -170,7 +173,8 @@ impl Target for PaintTarget {
         // Every box paints at most one background, each command refers to a
         // laid-out box, and groups are balanced.
         let mut backgrounds = std::collections::HashSet::new();
-        let mut depth = 0usize;
+        // Open layers: `true` for a clip-path layer, `false` for a group.
+        let mut layers: Vec<bool> = Vec::new();
         for command in list.commands() {
             match command {
                 DisplayCommand::Fill(item) => {
@@ -190,6 +194,19 @@ impl Target for PaintTarget {
                             return Err("image item names a missing image".into());
                         }
                     }
+                    let missing = match item.shape {
+                        rustic_paint::Shape::Rounded(r) => r >= list.rounded().len(),
+                        rustic_paint::Shape::RoundedRing { outer, inner } => {
+                            outer.max(inner) >= list.rounded().len()
+                        }
+                        _ => false,
+                    };
+                    if missing {
+                        return Err("item names a missing rounded shape".into());
+                    }
+                    if item.rounded_clip.is_some_and(|c| c >= list.clips().len()) {
+                        return Err("item names a missing rounded clip".into());
+                    }
                     if item.role == ItemRole::Background && !backgrounds.insert(item.node) {
                         return Err("a box painted its background twice".into());
                     }
@@ -198,15 +215,34 @@ impl Target for PaintTarget {
                     if !(*opacity > 0.0 && *opacity < 1.0) {
                         return Err("group opacity outside (0, 1)".into());
                     }
-                    depth += 1;
+                    layers.push(false);
+                }
+                DisplayCommand::BeginClip { shape, .. } => {
+                    let known = match *shape {
+                        rustic_paint::Shape::Rect(_) => true,
+                        rustic_paint::Shape::Rounded(r) => r < list.rounded().len(),
+                        rustic_paint::Shape::Path(p) => p < list.paths().len(),
+                        _ => false,
+                    };
+                    if !known {
+                        return Err("clip-path layer with an invalid shape".into());
+                    }
+                    layers.push(true);
                 }
                 DisplayCommand::EndGroup => {
-                    depth = depth.checked_sub(1).ok_or("unbalanced group end")?;
+                    if layers.pop() != Some(false) {
+                        return Err("unbalanced group end".into());
+                    }
+                }
+                DisplayCommand::EndClip => {
+                    if layers.pop() != Some(true) {
+                        return Err("unbalanced clip-path end".into());
+                    }
                 }
             }
         }
-        if depth != 0 {
-            return Err("unclosed group".into());
+        if !layers.is_empty() {
+            return Err("unclosed layer".into());
         }
         // Every hit inside the viewport names a laid-out box; outside, none.
         for (x, y) in [

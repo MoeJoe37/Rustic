@@ -228,6 +228,12 @@ fn currentcolor_and_border_widths() {
         computed(html, radius, "a", "border-top-right-radius"),
         "10% 28px"
     );
+    // Clip paths compute lengths and positions to offsets.
+    let clip = "#a { clip-path: circle(1em at right 2em bottom) }";
+    assert_eq!(
+        computed(html, clip, "a", "clip-path"),
+        "circle(16px at calc(100% - 32px) 100%)"
+    );
 }
 
 #[test]

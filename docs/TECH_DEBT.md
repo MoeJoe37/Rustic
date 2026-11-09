@@ -103,6 +103,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
 | TD-54 | Deliberate | Paint | First outline painting: solid/double only, `auto` as solid, per-fragment inline outlines | Open, REN-04e |
 | TD-55 | Deliberate | Paint | First `border-radius`: single-axis overflow ignores radii, per-fragment inline curves, unsnapped side joins | Open, REN-04f |
+| TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -933,3 +934,19 @@ scrollers (bounded by the work budget). Corner curves are four quadratics
 raster work (paint.raster performance); `box-decoration-break`; one-axis
 rounded clips. **Trigger:** the tiled raster step, or border-radius WPT
 reftests that need them.
+
+### TD-56 — First clip-path slice
+
+REN-04g clips with `inset()`, `circle()`, `ellipse()`, `polygon()` and
+reference boxes. `url()` references to SVG `<clipPath>` and `polygon()`
+with `evenodd` fail atomically (the coverage accumulator only implements
+the nonzero rule), and `xywh()`, `rect()`, `path()` and `shape()` do not
+parse. Each clip-path context rasterizes into a full-surface layer and a
+full-surface coverage mask, so many small clipped elements cost a whole
+surface each (bounded by the memory and work budgets). Computed `clip-path`
+values serialize every inset side and radius instead of the shortest form.
+`margin-box` ignores `border-radius`. **Pay:** layers bounded by the
+context's ink overflow in the tiled raster; an even-odd accumulator; the
+remaining shape functions with SVG paths in M4 (`paint.formats`).
+**Trigger:** the tiled raster step, SVG integration, or clip-path WPT
+reftests.

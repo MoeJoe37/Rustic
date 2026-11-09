@@ -599,6 +599,8 @@ pub enum PropertyValue {
     OutlineStyle(OutlineStyle),
     /// `border-*-radius`.
     BorderRadius(CornerRadius),
+    /// `clip-path`.
+    ClipPath(crate::ClipPath),
     /// `box-sizing`.
     BoxSizing(BoxSizing),
     /// `font-size`.
@@ -805,6 +807,7 @@ property_ids! {
     BorderTopRightRadius => "border-top-right-radius", false;
     BorderBottomRightRadius => "border-bottom-right-radius", false;
     BorderBottomLeftRadius => "border-bottom-left-radius", false;
+    ClipPath => "clip-path", false;
 }
 
 impl PropertyId {
@@ -885,6 +888,7 @@ impl PropertyId {
             | P::BorderTopRightRadius
             | P::BorderBottomRightRadius
             | P::BorderBottomLeftRadius => PropertyValue::BorderRadius(CornerRadius::ZERO),
+            P::ClipPath => PropertyValue::ClipPath(crate::ClipPath::None),
             P::BackgroundImage => PropertyValue::BackgroundImage(vec![Image::None]),
             P::BackgroundPosition => {
                 PropertyValue::BackgroundPosition(vec![PositionValue::top_left()])
@@ -1753,6 +1757,7 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
                 .map(PropertyValue::BackgroundBox);
         }
         P::ContainerName => return container_name(parts).map(PropertyValue::ContainerName),
+        P::ClipPath => return crate::shape::clip_path(parts).map(PropertyValue::ClipPath),
         P::BorderTopLeftRadius
         | P::BorderTopRightRadius
         | P::BorderBottomRightRadius
@@ -1794,7 +1799,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::BorderTopLeftRadius
         | P::BorderTopRightRadius
         | P::BorderBottomRightRadius
-        | P::BorderBottomLeftRadius => unreachable!("handled above"),
+        | P::BorderBottomLeftRadius
+        | P::ClipPath => unreachable!("handled above"),
         P::FlexDirection => PropertyValue::FlexDirection(FlexDirection::from_name(name()?)?),
         P::FlexWrap => PropertyValue::FlexWrap(FlexWrap::from_name(name()?)?),
         P::FlexGrow | P::FlexShrink => PropertyValue::Number(flex_factor(value)?),
@@ -2177,6 +2183,7 @@ impl fmt::Display for PropertyValue {
             }
             Self::TextDecorationStyle(v) => write!(f, "{v}"),
             Self::OutlineStyle(v) => write!(f, "{v}"),
+            Self::ClipPath(c) => write!(f, "{c}"),
             Self::BorderRadius(r) if r.horizontal == r.vertical => write!(f, "{}", r.horizontal),
             Self::BorderRadius(r) => write!(f, "{} {}", r.horizontal, r.vertical),
             Self::FontVariantCaps(v) => write!(f, "{v}"),

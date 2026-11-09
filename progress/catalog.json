@@ -2198,8 +2198,24 @@
             {
               "id": "radius",
               "label": "Rounded and clip-path clips",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/clip.rs",
+                  "marker": "fn resolve_shape("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn rounded_clips_follow_containing_blocks_and_shape_hits"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn clip_paths_form_contexts_clip_descendants_and_hits"
+                }
+              ]
             },
             {
               "id": "transforms",

@@ -2,14 +2,15 @@
 //! paint order with stacking contexts, z-index, floats and positioned boxes;
 //! overflow clips; opacity groups; CSS Backgrounds 3 §2.11 canvas propagation.
 
+use crate::clip::{Resolved, polygon_contains, resolve_shape};
 use crate::color::{Srgba, srgba};
 use crate::rounded::{RoundedRect, clip_convex, used_corners};
 use rustic_base::CancellationToken;
 use rustic_css::Overflow;
 use rustic_css::{
-    BorderStyle, BorderWidth, Float, Image as CssImage, LengthPercentage, LengthUnit, OutlineStyle,
-    Position, PropertyId as P, PropertyValue as V, TextDecorationStyle, Visibility, VisualBox,
-    ZIndex,
+    BasicShape, BorderStyle, BorderWidth, ClipPath, Float, GeometryBox, Image as CssImage,
+    LengthPercentage, LengthUnit, OutlineStyle, Position, PropertyId as P, PropertyValue as V,
+    TextDecorationStyle, Visibility, VisualBox, ZIndex,
 };
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
@@ -219,6 +220,19 @@ pub enum DisplayCommand {
     },
     /// Composite the innermost open group into its parent with its opacity.
     EndGroup,
+    /// Start a layer for a stacking context with a `clip-path`.
+    BeginClip {
+        /// Principal-box index of the stacking context root.
+        source_box: usize,
+        /// Source DOM node.
+        node: NodeId,
+        /// The area kept: a [`Shape::Rect`], [`Shape::Rounded`] or
+        /// [`Shape::Path`].
+        shape: Shape,
+    },
+    /// Composite the innermost open clip layer into its parent, keeping only
+    /// what its shape covers.
+    EndClip,
 }
 
 /// Why a box needs paint features this reference does not implement.
@@ -232,6 +246,10 @@ pub enum UnsupportedPaint {
     DecorationStyle,
     /// A visible `outline-style` other than `solid`, `double` or `auto`.
     OutlineStyle,
+    /// A `clip-path` that references an SVG `<clipPath>` by URL.
+    ClipPathUrl,
+    /// A `clip-path: polygon()` with the `evenodd` fill rule.
+    ClipPathFillRule,
 }
 
 /// The fonts a text layout was computed with, needed to paint its glyphs.
@@ -293,6 +311,8 @@ pub struct DisplayList {
     /// Rounded rectangles referenced by [`Shape::Rounded`] and
     /// [`Shape::RoundedRing`].
     rounded: Vec<RoundedRect>,
+    /// `clip-path` areas for hit testing.
+    clip_paths: Vec<ClipPathNode>,
     /// Hit-testable border boxes in paint order.
     hits: Vec<HitRegion>,
     /// The root fragment, the target when no box is hit.
@@ -316,6 +336,31 @@ struct HitRegion {
     /// The rounded border box, when any corner is rounded.
     rounded: Option<RoundedRect>,
     rounded_clip: Option<usize>,
+    /// The innermost `clip-path` around the box, an index into
+    /// [`DisplayList::clip_paths`].
+    clip_path: Option<usize>,
+}
+
+/// A `clip-path` area for hit testing, inside its `parent`.
+#[derive(Clone, Debug, PartialEq)]
+struct ClipPathNode {
+    shape: Resolved,
+    parent: Option<usize>,
+}
+
+/// Whether `(x, y)` lies in `node`'s clip path and every enclosing one.
+fn in_clip_paths(nodes: &[ClipPathNode], mut node: Option<usize>, x: f64, y: f64) -> bool {
+    while let Some(n) = node.and_then(|i| nodes.get(i)) {
+        let inside = match &n.shape {
+            Resolved::Rounded(r) => r.contains(x, y),
+            Resolved::Polygon(points) => polygon_contains(points, x, y),
+        };
+        if !inside {
+            return false;
+        }
+        node = n.parent;
+    }
+    true
 }
 
 /// Whether `(x, y)` survives the rounded clip `node` and its ancestors.
@@ -533,6 +578,69 @@ struct Builder<'a> {
 }
 
 impl Builder<'_> {
+    /// The layer shape and hit area of a box's `clip-path`, or `None` for
+    /// `none`. The reference box is the border box unless one is named;
+    /// `fill-box` is the content box and `stroke-box` and `view-box` the
+    /// border box, as for boxes without SVG layout. A reference box alone
+    /// clips to its curve when the box has `border-radius`.
+    fn clip_path(
+        &mut self,
+        fragment: &BlockFragment,
+        style: &ComputedStyle,
+        path: &ClipPath,
+    ) -> Result<Option<(Shape, Resolved)>, PaintError> {
+        let unsupported = |reason| PaintError::Unsupported {
+            node: fragment.node(),
+            reason,
+        };
+        let (shape, reference) = match path {
+            ClipPath::None => return Ok(None),
+            ClipPath::Url(_) => return Err(unsupported(UnsupportedPaint::ClipPathUrl)),
+            ClipPath::Shape(shape, reference) => (Some(shape), *reference),
+            ClipPath::Box(reference) => (None, Some(*reference)),
+        };
+        let border = fragment.border();
+        let area = match reference.unwrap_or(GeometryBox::BorderBox) {
+            GeometryBox::MarginBox => {
+                let (x0, y0, x1, y1) = edges(border);
+                let m = fragment.margin();
+                let (l, t) = (x0 - m.left.get(), y0 - m.top.get());
+                let (r, b) = (x1 + m.right.get(), y1 + m.bottom.get());
+                CssRect::new(
+                    point(l, t)?,
+                    CssSize::new((r - l).max(0.0), (b - t).max(0.0))
+                        .map_err(|_| PaintError::InvalidInput)?,
+                )
+                .map_err(|_| PaintError::InvalidInput)?
+            }
+            GeometryBox::BorderBox | GeometryBox::StrokeBox | GeometryBox::ViewBox => border,
+            GeometryBox::PaddingBox => fragment.padding(),
+            GeometryBox::ContentBox | GeometryBox::FillBox => fragment.content(),
+        };
+        let resolved = match shape {
+            Some(BasicShape::Polygon { evenodd: true, .. }) => {
+                return Err(unsupported(UnsupportedPaint::ClipPathFillRule));
+            }
+            Some(shape) => {
+                let (x0, y0, x1, y1) = edges(area);
+                resolve_shape(shape, (x0, y0, x1 - x0, y1 - y0)).ok_or(PaintError::InvalidInput)?
+            }
+            None => {
+                let curve = rounded_box(style, border)?.map(|r| r.inset(area));
+                Resolved::Rounded(curve.unwrap_or(RoundedRect {
+                    rect: area,
+                    corners: [crate::rounded::Corner::default(); 4],
+                }))
+            }
+        };
+        let shape = match &resolved {
+            Resolved::Rounded(r) if r.is_rect() => Shape::Rect(r.rect),
+            Resolved::Rounded(r) => Shape::Rounded(self.rounded(*r)),
+            Resolved::Polygon(points) => Shape::Path(self.polygon_path(vec![points.clone()])?),
+        };
+        Ok(Some((shape, resolved)))
+    }
+
     /// Store a rounded rectangle for a shape.
     fn rounded(&mut self, shape: RoundedRect) -> usize {
         self.rounded.push(shape);
@@ -1106,6 +1214,9 @@ enum Task {
     /// after all of its other content (CSS 2.2 Appendix E step 10).
     Outlines(usize, bool),
     End,
+    /// Leave a `clip-path` context: restore the enclosing clip path and
+    /// close its layer if one was opened.
+    EndClip(Option<usize>, bool),
 }
 
 /// A box whose outline a stacking context paints.
@@ -1284,6 +1395,7 @@ impl DisplayList {
                 || (positioned && z.is_some())
                 || fragment.scheme() == PositionScheme::Fixed
                 || alpha < 1.0
+                || !matches!(style.get(P::ClipPath), V::ClipPath(ClipPath::None))
             {
                 // z-index applies only to positioned boxes here.
                 Role::Context(if positioned { z.unwrap_or(0) } else { 0 })
@@ -1411,10 +1523,18 @@ impl DisplayList {
         // Expand layers with an explicit stack: no content-controlled recursion.
         let mut stack: Vec<Task> = tops.iter().rev().map(|&i| Task::Layer(i, false)).collect();
         let mut hits = Vec::new();
+        let mut clip_paths: Vec<ClipPathNode> = Vec::new();
+        let mut clip_path: Option<usize> = None;
         while let Some(task) = stack.pop() {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             match task {
                 Task::End => builder.command(DisplayCommand::EndGroup)?,
+                Task::EndClip(previous, opened) => {
+                    clip_path = previous;
+                    if opened {
+                        builder.command(DisplayCommand::EndClip)?;
+                    }
+                }
                 Task::Outlines(_, true) => {}
                 Task::Outlines(c, false) => {
                     for &entry in &std::mem::take(&mut outlined[c]) {
@@ -1500,6 +1620,7 @@ impl DisplayList {
                                     clip,
                                     rounded: shape,
                                     rounded_clip: inner_clip[b],
+                                    clip_path,
                                 });
                                 if !muted {
                                     builder.background(geometry, inline.source_box(), style)?;
@@ -1545,6 +1666,7 @@ impl DisplayList {
                             clip: fragment.clip(),
                             rounded: rounded[i],
                             rounded_clip: outer_clip[i],
+                            clip_path,
                         });
                         if muted {
                             continue;
@@ -1567,6 +1689,26 @@ impl DisplayList {
                             opacity: opacity[i],
                         })?;
                         stack.push(Task::End);
+                    }
+                    let style = style_of(&fragments[i])?;
+                    if let V::ClipPath(path) = style.get(P::ClipPath) {
+                        if let Some((shape, area)) =
+                            builder.clip_path(&fragments[i], style, path)?
+                        {
+                            if !muted {
+                                builder.command(DisplayCommand::BeginClip {
+                                    source_box: fragments[i].source_box(),
+                                    node: fragments[i].node(),
+                                    shape,
+                                })?;
+                            }
+                            stack.push(Task::EndClip(clip_path, !muted));
+                            clip_paths.push(ClipPathNode {
+                                shape: area,
+                                parent: clip_path,
+                            });
+                            clip_path = Some(clip_paths.len() - 1);
+                        }
                     }
                     if context[i] == i {
                         stack.push(Task::Outlines(i, muted));
@@ -1602,6 +1744,7 @@ impl DisplayList {
             images: builder.images,
             clips: builder.clips,
             rounded: builder.rounded,
+            clip_paths,
             hits,
             root,
         })
@@ -1639,7 +1782,10 @@ impl DisplayList {
         self.hits
             .iter()
             .rev()
-            .find(|region| region.contains(x, y, &self.clips))
+            .find(|region| {
+                region.contains(x, y, &self.clips)
+                    && in_clip_paths(&self.clip_paths, region.clip_path, x, y)
+            })
             .map(|region| region.hit)
             .or(self.root)
     }
@@ -1715,6 +1861,45 @@ impl DisplayList {
             line = format!("rclip {n} rounded={}{parent}\n", rounded(&node.shape));
             append(&mut out, &line, max_bytes)?;
         }
+        let shape_text = |shape: Shape| match shape {
+            Shape::Rect(rect) => format!("rect=({})", r(rect)),
+            Shape::Ring { outer, inner } => format!("ring=({}) inner=({})", r(outer), r(inner)),
+            Shape::Quad(points) => {
+                let mut s = String::from("quad=(");
+                for (n, p) in points.iter().enumerate() {
+                    if n > 0 {
+                        s.push(' ');
+                    }
+                    // Writing to a String cannot fail.
+                    let _ = write!(s, "{},{}", p.x.get(), p.y.get());
+                }
+                s.push(')');
+                s
+            }
+            Shape::Image { rect, image } => {
+                let data = &self.images[image];
+                format!(
+                    "image={image} rect=({}) size={}x{}",
+                    r(rect),
+                    data.width,
+                    data.height
+                )
+            }
+            Shape::Rounded(shape) => format!("rounded={}", rounded(&self.rounded[shape])),
+            Shape::RoundedRing { outer, inner } => format!(
+                "rounded-ring={} inner={}",
+                rounded(&self.rounded[outer]),
+                rounded(&self.rounded[inner])
+            ),
+            Shape::Path(index) => {
+                let path = &self.paths[index];
+                format!(
+                    "path={index} contours={} points={}",
+                    path.contours.len(),
+                    path.points()
+                )
+            }
+        };
         let mut index = 0usize;
         for command in &self.commands {
             let item = match command {
@@ -1736,6 +1921,24 @@ impl DisplayList {
                     append(&mut out, "end-group\n", max_bytes)?;
                     continue;
                 }
+                DisplayCommand::BeginClip {
+                    source_box,
+                    node,
+                    shape,
+                } => {
+                    line = format!(
+                        "clip-path box={source_box} node={}:{} {}\n",
+                        node.slot(),
+                        node.generation(),
+                        shape_text(*shape)
+                    );
+                    append(&mut out, &line, max_bytes)?;
+                    continue;
+                }
+                DisplayCommand::EndClip => {
+                    append(&mut out, "end-clip-path\n", max_bytes)?;
+                    continue;
+                }
             };
             let i = index;
             index += 1;
@@ -1747,45 +1950,7 @@ impl DisplayList {
                 ItemRole::Decoration => "decoration",
                 ItemRole::Outline => "outline",
             };
-            let shape = match item.shape {
-                Shape::Rect(rect) => format!("rect=({})", r(rect)),
-                Shape::Ring { outer, inner } => format!("ring=({}) inner=({})", r(outer), r(inner)),
-                Shape::Quad(points) => {
-                    let mut s = String::from("quad=(");
-                    for (n, p) in points.iter().enumerate() {
-                        if n > 0 {
-                            s.push(' ');
-                        }
-                        // Writing to a String cannot fail.
-                        let _ = write!(s, "{},{}", p.x.get(), p.y.get());
-                    }
-                    s.push(')');
-                    s
-                }
-                Shape::Image { rect, image } => {
-                    let data = &self.images[image];
-                    format!(
-                        "image={image} rect=({}) size={}x{}",
-                        r(rect),
-                        data.width,
-                        data.height
-                    )
-                }
-                Shape::Rounded(shape) => format!("rounded={}", rounded(&self.rounded[shape])),
-                Shape::RoundedRing { outer, inner } => format!(
-                    "rounded-ring={} inner={}",
-                    rounded(&self.rounded[outer]),
-                    rounded(&self.rounded[inner])
-                ),
-                Shape::Path(index) => {
-                    let path = &self.paths[index];
-                    format!(
-                        "path={index} contours={} points={}",
-                        path.contours.len(),
-                        path.points()
-                    )
-                }
-            };
+            let shape = shape_text(item.shape);
             // Unclipped items keep the REN-04a line format.
             let clip = if item.clip.is_none() {
                 String::new()

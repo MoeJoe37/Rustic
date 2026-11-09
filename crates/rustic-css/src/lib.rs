@@ -37,6 +37,7 @@ mod registered;
 mod rules;
 mod selector;
 mod serialize;
+mod shape;
 mod token;
 mod tokenizer;
 mod values;
@@ -88,6 +89,7 @@ pub use selector::{
     Specificity, parse_nested_selector_list, parse_selector_list,
 };
 pub use serialize::{serialize_identifier, serialize_string};
+pub use shape::{BasicShape, ClipPath, GeometryBox, ShapeRadius};
 pub use token::{Numeric, Token};
 pub use tokenizer::SpannedToken;
 pub use values::{BlockKind, ComponentValue, Value};

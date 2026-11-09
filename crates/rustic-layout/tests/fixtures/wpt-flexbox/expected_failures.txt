@@ -1,0 +1,57 @@
+# css-flexbox WPT pages that fail, with the reviewed reason (path<TAB>reason).
+# Regenerate the pages with tools/import_wpt_flexbox_tests.py; keep this list exact:
+# the test fails when a listed page passes or an unlisted page fails.
+
+css/css-flexbox/align-content-wmvert-001.html	vertical writing modes are not implemented
+css/css-flexbox/align-content-wrap-001.html	vertical writing modes are not implemented
+css/css-flexbox/align-content-wrap-003.html	vertical writing modes are not implemented
+css/css-flexbox/align-self-baseline-with-flex-wrap.html	vertical writing modes are not implemented
+css/css-flexbox/fieldset-as-container-justify-center.tentative.html	fieldset layout is not implemented
+css/css-flexbox/flex-aspect-ratio-img-column-011.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/flex-aspect-ratio-img-column-017.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/flex-aspect-ratio-img-row-005.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/flex-aspect-ratio-img-row-013.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/flex-base-size-ignores-min-max-width-002.html	not yet diagnosed (TD-72): <canvas> data-expected-width: expected 100, got 75
+css/css-flexbox/flex-base-size-ignores-min-max-width-003.html	form controls layout is not implemented
+css/css-flexbox/flex-basis-009.html	vertical writing modes are not implemented
+css/css-flexbox/flex-basis-014.html	aspect-ratio on non-replaced boxes is not implemented
+css/css-flexbox/flex-basis-intrinsics-001.html	vertical writing modes are not implemented
+css/css-flexbox/flex-factor-less-than-one.html	vertical writing modes are not implemented
+css/css-flexbox/flex-flow-013.html	vertical writing modes are not implemented
+css/css-flexbox/flex-item-compressible-002.html	vertical writing modes are not implemented
+css/css-flexbox/flex-item-contains-strict.html	not yet diagnosed (TD-72): <div> data-expected-width: expected 0, got 48
+css/css-flexbox/flex-item-percentage-height-img-001.html	not yet diagnosed (TD-72): <div> data-expected-width: expected 200, got 410
+css/css-flexbox/flex-minimum-height-flex-items-012.html	not yet diagnosed (TD-72): <div> data-expected-height: expected 10, got 0
+css/css-flexbox/flex-minimum-height-flex-items-025.html	vertical writing modes are not implemented
+css/css-flexbox/flex-minimum-size-003.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/flex-minimum-size-single-axis-scroll-container.html	not yet diagnosed (TD-72): <div> data-expected-width: expected 100, got 0
+css/css-flexbox/flexbox-justify-content-wmvert-002.html	vertical writing modes are not implemented
+css/css-flexbox/flexbox-justify-content-wmvert-003.html	vertical writing modes are not implemented
+css/css-flexbox/flexitem-stretch-image.html	data-expected-display is not a geometry check
+css/css-flexbox/image-as-flexitem-size-001.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-001v.html	vertical writing modes are not implemented
+css/css-flexbox/image-as-flexitem-size-002.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-002v.html	vertical writing modes are not implemented
+css/css-flexbox/image-as-flexitem-size-003.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-003v.html	vertical writing modes are not implemented
+css/css-flexbox/image-as-flexitem-size-004.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-004v.html	vertical writing modes are not implemented
+css/css-flexbox/image-as-flexitem-size-005.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-005v.html	vertical writing modes are not implemented
+css/css-flexbox/image-as-flexitem-size-006.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-006v.html	vertical writing modes are not implemented
+css/css-flexbox/image-as-flexitem-size-007.html	the harness decodes no images, so img has a 0x0 natural size
+css/css-flexbox/image-as-flexitem-size-007v.html	vertical writing modes are not implemented
+css/css-flexbox/inline-flexbox-wrap-vertically-width-calculation.html	vertical writing modes are not implemented
+css/css-flexbox/intrinsic-width-orthogonal-writing-mode.html	vertical writing modes are not implemented
+css/css-flexbox/overflow-auto-002.html	display: list-item is not implemented
+css/css-flexbox/percentage-heights-000.html	vertical writing modes are not implemented
+css/css-flexbox/percentage-heights-001.html	percentage heights of flex items against definite flex sizes (TD-72): <div> data-expected-height: expected 25, got 50
+css/css-flexbox/percentage-heights-003.html	vertical writing modes are not implemented
+css/css-flexbox/percentage-size-quirks-002.html	quirks-mode percentage heights are not implemented
+css/css-flexbox/position-relative-percentage-top-001.html	inline-level elements have no block fragment to measure: <label> has no block fragment
+css/css-flexbox/quirks-auto-block-size-with-percentage-item.html	quirks-mode percentage heights are not implemented
+css/css-flexbox/svg-root-as-flex-item-006.html	svg layout is not implemented
+css/css-flexbox/svg-root-as-flex-item-007.html	svg layout is not implemented
+css/css-flexbox/table-as-item-cross-size.html	tables are not implemented
+css/css-flexbox/table-with-percent-intrinsic-width.html	tables are not implemented

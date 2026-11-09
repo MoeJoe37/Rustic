@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "249ecd82b83c9291fb112adca3a879e56a8b90928840302703f7593196a20dd2",
-  "percent": "27.39",
+  "source_fingerprint": "b486a310735dd70892c863655589147261f0f2c00f127b287082b0bd139b7759",
+  "percent": "27.61",
   "verified_percent": "21.25",
-  "partial_percent": "6.14",
+  "partial_percent": "6.36",
   "completed": 37,
   "in_progress": 15,
   "total": 172,
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 1,
       "total": 17,
-      "percent": "56.40",
+      "percent": "58.22",
       "verified_percent": "7.99",
-      "partial_percent": "48.41"
+      "partial_percent": "50.23"
     },
     {
       "id": "M4",
@@ -2661,8 +2661,29 @@
             {
               "id": "reftests",
               "label": "Reftest harness and checked image fixtures",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/reftest.rs",
+                  "marker": "pub fn manifest"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/compare.rs",
+                  "marker": "pub fn compare"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/reftests.rs",
+                  "marker": "fn every_reftest_passes_at_scales_one_and_two"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn reftest_reports_each_reference_and_fails_when_one_does_not_hold"
+                }
+              ]
             },
             {
               "id": "damage",
@@ -2671,7 +2692,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.66"
         }
       ],
@@ -2679,10 +2700,10 @@
       "completed": 0,
       "in_progress": 5,
       "total": 7,
-      "contribution": "1.77",
-      "percent": "29.62",
+      "contribution": "2.00",
+      "percent": "33.33",
       "verified_percent": "0.00",
-      "partial_percent": "29.62"
+      "partial_percent": "33.33"
     },
     {
       "id": "js",

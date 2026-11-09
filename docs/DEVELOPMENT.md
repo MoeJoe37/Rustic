@@ -46,7 +46,10 @@ box/depth/work limits; it preserves unshaped UTF-16 text. `dump-layout` adds use
 rectangles and margin collapse for an explicitly limited static block subset; it rejects
 unsupported inline/text and other formatting rather than emitting partial output.
 `dump-paint` prints the display list for that layout and `render` writes it as a
-PNG through the CPU rasterizer ([PAINT.md](PAINT.md)).
+PNG through the CPU rasterizer ([PAINT.md](PAINT.md)). `reftest` renders a test
+page and its `rel=match`/`rel=mismatch` references and compares the pixels within
+the test's fuzzy tolerance; `cargo test -p rustic-cli --test reftests` runs the
+checked suite in `crates/rustic-cli/tests/reftests`.
 While hosted Actions is unavailable, the maintainer has authorized sandbox-gated
 merges: run the local gates and compatibility/compile checks, record their
 actual scope, push the checked source to `feature`, and then merge that exact

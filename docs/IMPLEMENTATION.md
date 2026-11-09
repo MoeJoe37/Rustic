@@ -898,6 +898,16 @@ match an independent decoder's references; a `codec-png` fuzz target covers
 mutations. `paint.images` credits its PNG decode step; painting images waits
 for replaced-element sizing. Shortcuts are TD-51. See [PAINT.md](PAINT.md).
 
+## REN-07a — Reftest harness
+
+`rustic reftest` renders a test and each `<link rel=match|mismatch>` reference
+through the same pipeline and compares the surfaces (`rustic_raster::compare`),
+honoring WPT-style `<meta name=fuzzy>` tolerances. References are confined to
+the test's directory like linked stylesheets. A checked suite runs at scales 1
+and 2 under `cargo test`. `paint.conformance` credits its reftest step;
+deterministic clocks, allocation counters, reference chains and an imported WPT
+reftest subset remain for later REN-07 work. See [PAINT.md](PAINT.md#reftests).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

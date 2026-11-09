@@ -164,8 +164,10 @@ continuations and `dump-formatting`. REN-04a/REN-05a add the first display
 list (canvas propagation, block backgrounds and solid borders), a deterministic
 CPU rasterizer, PNG output, `dump-paint` and `rustic render` ([PAINT.md](PAINT.md)).
 REN-04b paints in Appendix E order with stacking contexts, `z-index`, floats,
-positioned boxes, overflow clips and opacity groups.
-Inline used geometry/shaping, clearance with floats, stacking contexts and the
+positioned boxes, overflow clips and opacity groups. REN-05b adds bounded
+inflate and PNG decoding (`rustic-codecs`), and REN-07a the `rustic reftest`
+harness with a checked reftest suite.
+Inline used geometry/shaping, glyph and image painting, hit testing and the
 final general fragment tree remain pending.
 See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.
 

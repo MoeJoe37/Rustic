@@ -488,22 +488,33 @@ pub fn dump_paint(
         .map_err(LoadError::Paint)
 }
 
-/// Rasterize the display list at `scale` and encode it as PNG, within the
-/// output byte limit. Only block backgrounds and solid borders are painted.
+/// Rasterize the display list at `scale`. Only block backgrounds and solid
+/// borders are painted.
+pub fn render_surface(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    scale: rustic_layout::DeviceScale,
+) -> Result<rustic_raster::Surface, LoadError> {
+    let list = display_list(parsed, path, limits)?;
+    rustic_raster::rasterize(
+        &list,
+        scale,
+        rustic_raster::RasterLimits::default(),
+        &CancellationToken::default(),
+    )
+    .map_err(LoadError::Raster)
+}
+
+/// Rasterize like [`render_surface`] and encode the result as PNG, within
+/// the output byte limit.
 pub fn render_png(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
     scale: rustic_layout::DeviceScale,
 ) -> Result<Vec<u8>, LoadError> {
-    let list = display_list(parsed, path, limits)?;
-    let surface = rustic_raster::rasterize(
-        &list,
-        scale,
-        rustic_raster::RasterLimits::default(),
-        &CancellationToken::default(),
-    )
-    .map_err(LoadError::Raster)?;
+    let surface = render_surface(parsed, path, limits, scale)?;
     rustic_raster::encode_png(&surface, limits.max_dump_bytes).map_err(LoadError::Png)
 }
 

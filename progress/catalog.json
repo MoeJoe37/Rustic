@@ -2397,8 +2397,29 @@
             {
               "id": "reftests",
               "label": "Reftest harness and checked image fixtures",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/reftest.rs",
+                  "marker": "pub fn manifest"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/compare.rs",
+                  "marker": "pub fn compare"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/reftests.rs",
+                  "marker": "fn every_reftest_passes_at_scales_one_and_two"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn reftest_reports_each_reference_and_fails_when_one_does_not_hold"
+                }
+              ]
             },
             {
               "id": "damage",

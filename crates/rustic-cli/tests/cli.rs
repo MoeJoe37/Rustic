@@ -602,3 +602,46 @@ fn render_rejects_missing_output_and_invalid_scales() {
     }
     assert!(!Path::new("x.png").exists());
 }
+
+#[test]
+fn reftest_reports_each_reference_and_fails_when_one_does_not_hold() {
+    let input = fixture("reftest/fails.html");
+    let input = input.to_str().unwrap();
+    let output = rustic(&["reftest", input]);
+    assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 5, "{stdout}");
+    assert!(
+        lines[0].starts_with(
+            "FAIL match \"fails-ref.html\": 100 pixels differ, max channel difference 5"
+        )
+    );
+    assert!(lines[1].starts_with("PASS mismatch \"fails-ref.html\""));
+    assert_eq!(
+        lines[2],
+        "FAIL match \"../paint.html\": outside the test's directory"
+    );
+    assert_eq!(lines[3], "FAIL match \"missing.html\": not found");
+    assert!(lines[4].starts_with("FAIL "));
+    // A page without references is an error, not a pass.
+    let output = rustic(&["reftest", fixture("paint.html").to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output).contains("no rel=match or rel=mismatch reference"));
+}
+
+#[test]
+fn reftest_rejects_output_and_invalid_arguments() {
+    let input = fixture("reftest/fails.html");
+    let input = input.to_str().unwrap();
+    for args in [
+        vec!["reftest"],
+        vec!["reftest", "--output", "x.png", input],
+        vec!["reftest", "--scale", "0", input],
+        vec!["reftest", "--bogus", input],
+    ] {
+        let output = rustic(&args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        assert!(output.stdout.is_empty());
+    }
+}

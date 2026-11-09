@@ -9,6 +9,7 @@ use rustic_html::ParsedDocument;
 use std::path::Path;
 
 mod loader;
+mod reftest;
 mod stylesheets;
 
 use loader::{LoadError, LoaderLimits};
@@ -24,6 +25,7 @@ Usage:
   rustic dump-layout [OPTIONS] [--] <file>
   rustic dump-paint [OPTIONS] [--] <file>
   rustic render --output <png> [--scale N] [OPTIONS] [--] <file>
+  rustic reftest [--scale N] [OPTIONS] [--] <test>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
@@ -49,6 +51,12 @@ render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). --scale sets device pixels per CSS pixel (default 1,
 at most 64). Text, images and non-solid borders fail explicitly; the
 PNG counts against --max-output-bytes.
+reftest renders a test page and every <link rel=match|mismatch href> reference
+the same way and compares the pixels, allowing the differences that
+<meta name=fuzzy content=\"maxDifference=A;totalPixels=B\"> states (each a
+number N meaning 0-N, or a range N-M). References load only from the test's
+directory or below it. It prints one line per reference and a final PASS or
+FAIL line, and exits 0 when every reference holds and 1 otherwise.
 
 Options for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
@@ -89,7 +97,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block background/border painting via dump-paint and render; text layout, JavaScript and networking: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block background/border painting via dump-paint and render, reftests via reftest; text layout, JavaScript and networking: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -110,6 +118,9 @@ fn main() -> ExitCode {
     }
     if args[0] == "render" {
         return render_command(&args[1..]);
+    }
+    if args[0] == "reftest" {
+        return reftest_command(&args[1..]);
     }
     if args[0] == "dump-formatting" {
         return dump_command("dump-formatting", &args[1..], loader::dump_formatting);
@@ -154,7 +165,7 @@ fn dump_command(
 fn load<T>(
     command: &str,
     limits: LoaderLimits,
-    path: &OsString,
+    path: &std::ffi::OsStr,
     then: impl FnOnce(&ParsedDocument, &Path) -> Result<T, LoadError>,
 ) -> Result<T, ExitCode> {
     let path = match loader::local_path(path) {
@@ -184,11 +195,16 @@ fn load<T>(
     }
 }
 
-fn render_command(args: &[OsString]) -> ExitCode {
-    let usage = |message: String| {
-        eprintln!("rustic render: {message}\n\n{USAGE}");
-        ExitCode::from(2)
-    };
+/// Arguments of the rendering commands: `--output`, `--scale` and the dump
+/// options and file path.
+struct RenderArgs {
+    output: Option<OsString>,
+    scale: rustic_layout::DeviceScale,
+    limits: LoaderLimits,
+    path: OsString,
+}
+
+fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     let mut output = None;
     let mut scale = 1.0;
     let mut rest = Vec::new();
@@ -201,32 +217,43 @@ fn render_command(args: &[OsString]) -> ExitCode {
             }
             Some("--output") => match iter.next() {
                 Some(value) => output = Some(value.clone()),
-                None => return usage("--output requires a value".into()),
+                None => return Err("--output requires a value".into()),
             },
             Some("--scale") => {
-                match iter
+                scale = iter
                     .next()
                     .and_then(|v| v.to_str())
                     .and_then(|v| v.parse::<f64>().ok())
-                {
-                    Some(value) => scale = value,
-                    None => return usage("--scale requires a number".into()),
-                }
+                    .ok_or("--scale requires a number")?;
             }
             _ => rest.push(arg.clone()),
         }
     }
-    let Some(output) = output else {
-        return usage("missing --output".into());
+    let scale = rustic_layout::DeviceScale::new(scale)
+        .map_err(|_| "--scale must be greater than 0 and at most 64")?;
+    let (limits, path) = parse_dump_args(&rest)?;
+    Ok(RenderArgs {
+        output,
+        scale,
+        limits,
+        path,
+    })
+}
+
+fn render_command(args: &[OsString]) -> ExitCode {
+    let usage = |message: String| {
+        eprintln!("rustic render: {message}\n\n{USAGE}");
+        ExitCode::from(2)
     };
-    let Ok(scale) = rustic_layout::DeviceScale::new(scale) else {
-        return usage("--scale must be greater than 0 and at most 64".into());
-    };
-    let (limits, path) = match parse_dump_args(&rest) {
-        Ok(parsed) => parsed,
+    let args = match parse_render_args(args) {
+        Ok(args) => args,
         Err(message) => return usage(message),
     };
-    let png = match load("render", limits, &path, |parsed, path| {
+    let Some(output) = args.output else {
+        return usage("missing --output".into());
+    };
+    let (limits, scale) = (args.limits, args.scale);
+    let png = match load("render", limits, &args.path, |parsed, path| {
         loader::render_png(parsed, path, limits, scale)
     }) {
         Ok(png) => png,
@@ -240,6 +267,89 @@ fn render_command(args: &[OsString]) -> ExitCode {
         return ExitCode::from(1);
     }
     ExitCode::SUCCESS
+}
+
+fn reftest_command(args: &[OsString]) -> ExitCode {
+    let args = match parse_render_args(args) {
+        Ok(args) if args.output.is_some() => Err("--output is not accepted".into()),
+        other => other,
+    };
+    let args = match args {
+        Ok(args) => args,
+        Err(message) => {
+            eprintln!("rustic reftest: {message}\n\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+    let (limits, scale) = (args.limits, args.scale);
+    let loaded = load("reftest", limits, &args.path, |parsed, path| {
+        let test = std::fs::canonicalize(path).map_err(loader::LoadError::Io)?;
+        let surface = loader::render_surface(parsed, path, limits, scale)?;
+        Ok((surface, reftest::manifest(parsed.document(), &test)))
+    });
+    let (surface, manifest) = match loaded {
+        Ok(loaded) => loaded,
+        Err(code) => return code,
+    };
+    let shown = EscapedText(&Path::new(&args.path).to_string_lossy()).to_string();
+    for content in &manifest.invalid_fuzzy {
+        eprintln!(
+            "rustic reftest: {shown}: invalid fuzzy value {:?}",
+            EscapedText(content).to_string()
+        );
+    }
+    if manifest.references.is_empty() {
+        eprintln!("rustic reftest: {shown}: no rel=match or rel=mismatch reference");
+    }
+    let mut report = String::new();
+    let mut all = manifest.invalid_fuzzy.is_empty() && !manifest.references.is_empty();
+    for reference in &manifest.references {
+        let detail = match &reference.path {
+            Err(reason) => Err((*reason).to_owned()),
+            Ok(path) => load("reftest", limits, path.as_os_str(), |parsed, path| {
+                loader::render_surface(parsed, path, limits, scale)
+            })
+            .map_err(|_| "failed to render".to_owned()),
+        };
+        let (pass, detail) = match detail {
+            Err(reason) => (false, reason),
+            Ok(other) => {
+                let difference = rustic_raster::compare(&surface, &other);
+                let detail = match difference {
+                    None => "sizes differ".to_owned(),
+                    Some(d) => format!(
+                        "{} pixels differ, max channel difference {}, allowed maxDifference={} totalPixels={}",
+                        d.pixels,
+                        d.max_channel,
+                        reference.fuzzy.max_difference,
+                        reference.fuzzy.total_pixels
+                    ),
+                };
+                (reftest::passes(reference, difference), detail)
+            }
+        };
+        all &= pass;
+        report.push_str(&format!(
+            "{} {} {}: {detail}\n",
+            if pass { "PASS" } else { "FAIL" },
+            reference.relation,
+            EscapedText(&reference.href)
+        ));
+    }
+    report.push_str(&format!("{} {shown}\n", if all { "PASS" } else { "FAIL" }));
+    let mut stdout = io::stdout().lock();
+    if stdout
+        .write_all(report.as_bytes())
+        .and_then(|()| stdout.flush())
+        .is_err()
+    {
+        return ExitCode::from(1);
+    }
+    if all {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
 }
 
 fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String> {

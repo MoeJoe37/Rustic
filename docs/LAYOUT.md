@@ -195,7 +195,8 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
    inlines, glyph paint and paint order remain.
    The first block display list exists ([PAINT.md](PAINT.md)).
 4. REN-05/06/07: the CPU raster reference and PNG `render` exist for blocks;
-   bounded decode, glyph raster and reftests remain.
+   bounded PNG decode and the reftest harness exist; glyph raster, image
+   painting and hit testing remain.
 
 No image output or whole REN-01 completion is claimed by this first slice.
 

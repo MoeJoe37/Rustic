@@ -117,6 +117,11 @@ impl Surface {
         Some(unpremultiply([p[0], p[1], p[2], p[3]]))
     }
 
+    #[cfg(test)]
+    pub(crate) fn pixels_mut(&mut self) -> &mut [u8] {
+        &mut self.pixels
+    }
+
     fn fill_opaque(&mut self, color: Srgba) {
         for p in self.pixels.chunks_exact_mut(4) {
             p.copy_from_slice(&[color.r, color.g, color.b, 255]);

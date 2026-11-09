@@ -131,11 +131,34 @@ streams for stored, fixed and dynamic blocks; a decompression-bomb test; a
 round trip of `rustic render` output through the decoder; and the `codec-png`
 fuzz target seeded with PngSuite.
 
+## Reftests
+
+`rustic reftest [--scale N] <test.html>` renders a test page and each
+reference it names with `<link rel=match href>` or `<link rel=mismatch href>`,
+using the same loader, viewport and scale, and compares the surfaces with
+`rustic_raster::compare` (differing pixel count and largest per-channel
+difference of premultiplied RGBA). A `match` reference holds when the images are
+identical or the difference lies within the test's
+`<meta name=fuzzy content>` ranges; a `mismatch` reference holds otherwise.
+The fuzzy value is `maxDifference=A;totalPixels=B` or `A;B`, each a number `N`
+(read as `0-N`) or an inclusive range `N-M`, optionally prefixed by `href:` to
+apply to one reference only. An unparsable fuzzy value or a page without
+references fails the test. References resolve against the document base URL
+and load only from the test's directory or below it (checked lexically and
+again after symbolic links resolve), like linked stylesheets. Reference chains
+are not followed yet.
+
+The checked suite lives in `crates/rustic-cli/tests/reftests` and runs at
+scales 1 and 2 in `cargo test`; it covers borders against nested backgrounds,
+z-index against tree order, overflow clipping, opacity groups with a fuzzy
+tolerance and a mismatch.
+
 ## Not yet implemented
 
 Text and glyphs, painting decoded images (`<img>`, `background-image`),
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
 `border-radius`, outlines, box shadows, blend modes and filters, rounded or
 `clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
-joins, PNG compression and reftests. See TD-41 and docs/ROADMAP.md (REN-04 to
+joins, PNG compression, reference chains in reftests and a broad imported
+reftest suite. See TD-41 and docs/ROADMAP.md (REN-04 to
 REN-07).

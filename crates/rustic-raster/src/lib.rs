@@ -7,8 +7,10 @@
 
 #![warn(missing_docs)]
 
+mod compare;
 mod png;
 mod raster;
 
+pub use compare::{Difference, compare};
 pub use png::{PngError, encode_png};
 pub use raster::{RasterError, RasterLimits, Surface, rasterize};

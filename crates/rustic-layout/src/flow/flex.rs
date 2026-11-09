@@ -36,6 +36,9 @@ enum Phase {
     ColumnBase,
     /// Column: items are being laid out at their used heights.
     ColumnMain,
+    /// Multi-line column: stretched items are laid out at their lines'
+    /// cross sizes.
+    ColumnStretch,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -539,7 +542,8 @@ impl Engine<'_, '_> {
             match self.flexes[k].phase {
                 Phase::RowCross => self.row_cross(k)?,
                 Phase::ColumnBase => self.column_main(k)?,
-                Phase::RowStretch | Phase::ColumnMain => {
+                Phase::ColumnMain if self.flexes[k].wrap => self.column_stretch(k)?,
+                Phase::RowStretch | Phase::ColumnMain | Phase::ColumnStretch => {
                     let natural = self.finish_flex(k)?;
                     if self.flexes.len() != k + 1 {
                         return Err(FlowError::InvalidSnapshot);
@@ -806,9 +810,12 @@ impl Engine<'_, '_> {
             let (specified, minimum, maximum) = r.widths(available)?;
             let stretch =
                 matches!(item.align.keyword, K::Stretch | K::Normal) && !item.cross_auto(false);
+            // In a multi-line container a stretched item takes its line's
+            // cross size, known only after lines are sized (`column_stretch`).
+            let single = !self.flexes[k].wrap;
             let tentative = specified.unwrap_or(if let Some(natural) = n.natural {
                 replaced::used_size(n.style, natural, Some(width), None)?.0
-            } else if stretch {
+            } else if stretch && single {
                 available.max(0.0)
             } else {
                 n.intrinsic.fit(available)
@@ -926,10 +933,60 @@ impl Engine<'_, '_> {
         Ok(())
     }
 
+    /// Multi-line column: size the lines, then lay stretched items out
+    /// again at their line's cross size (CSS Flexbox 1 §9.4 step 11).
+    fn column_stretch(&mut self, k: usize) -> Result<(), FlowError> {
+        self.size_lines(k)?;
+        let width = self.flexes[k].width;
+        let count = self.flexes[k].items.len();
+        let mut queue = Vec::new();
+        for idx in (0..count).rev() {
+            self.work.charge(1)?;
+            let item = self.flexes[k].items[idx];
+            let stretch =
+                matches!(item.align.keyword, K::Stretch | K::Normal) && !item.cross_auto(false);
+            if !stretch || self.nodes[item.node].natural.is_some() {
+                continue;
+            }
+            let run = &self.flexes[k];
+            let line = run.lines.iter().find(|l| (l.start..l.end).contains(&idx));
+            let Some(line) = line else {
+                return Err(FlowError::InvalidSnapshot);
+            };
+            let n = &self.nodes[item.node];
+            let extras = item.horizontal_extras();
+            let r = Resolver::new(n.style, Some(width), extras, n.intrinsic);
+            let available = line.cross - item.horizontal_margins() - extras;
+            let (specified, minimum, maximum) = r.widths(available)?;
+            if specified.is_some() {
+                continue;
+            }
+            let stretched = maximum
+                .map_or(available, |m| available.min(m))
+                .max(minimum)
+                .max(0.0);
+            let entry = &mut self.flexes[k].items[idx];
+            entry.cross = stretched;
+            if stretched == item.width {
+                continue;
+            }
+            queue.push(Request {
+                item: idx,
+                width: stretched,
+                height: Some(item.target),
+            });
+        }
+        let run = &mut self.flexes[k];
+        run.queue = queue;
+        run.phase = Phase::ColumnStretch;
+        Ok(())
+    }
+
     /// Main/cross alignment and final item geometry; returns the
     /// container's natural content height.
     fn finish_flex(&mut self, k: usize) -> Result<f64, FlowError> {
-        if !self.flexes[k].row {
+        // Multi-line columns sized their lines before stretching items.
+        if !self.flexes[k].row && !self.flexes[k].wrap {
             self.size_lines(k)?;
         }
         let container = self.flexes[k].container;

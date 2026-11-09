@@ -2,8 +2,9 @@
 
 use std::{error::Error, fmt};
 
-/// Maximum absolute CSS coordinate accepted by this reference implementation.
-pub const MAX_CSS_PX: f64 = 1_000_000_000.0;
+/// Maximum absolute CSS coordinate accepted by this reference implementation
+/// (the same bound as [`rustic_base::MAX_COORDINATE`]).
+pub const MAX_CSS_PX: f64 = rustic_base::MAX_COORDINATE;
 
 /// A finite CSS pixel coordinate, bounded before geometry arithmetic.
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
@@ -59,6 +60,13 @@ impl DevicePx {
 pub struct DeviceScale(f64);
 
 impl DeviceScale {
+    /// The same factor as a unit-typed base scale from CSS to device pixels.
+    pub fn to_typed(
+        self,
+    ) -> Result<rustic_base::Scale<rustic_base::Css, rustic_base::Device>, GeometryError> {
+        rustic_base::Scale::new(self.0).map_err(|_| GeometryError)
+    }
+
     /// Validate an embedder's scale independently of page dimensions.
     pub fn new(value: f64) -> Result<Self, GeometryError> {
         if !value.is_finite() || value <= 0.0 || value > 64.0 {
@@ -115,6 +123,16 @@ pub struct CssRect {
 }
 
 impl CssRect {
+    /// The same rectangle as unit-typed base geometry. Both share one
+    /// coordinate bound, so this fails only for values built unchecked.
+    pub fn to_typed(self) -> Result<rustic_base::Rect<rustic_base::Css>, GeometryError> {
+        let point = rustic_base::Point2::new(self.origin.x.get(), self.origin.y.get());
+        let size = rustic_base::Size2::new(self.size.width.get(), self.size.height.get());
+        point
+            .and_then(|p| rustic_base::Rect::new(p, size?))
+            .map_err(|_| GeometryError)
+    }
+
     /// Validate far edges before retaining the rectangle.
     pub fn new(origin: CssPoint, size: CssSize) -> Result<Self, GeometryError> {
         origin.x.checked_add(size.width)?;

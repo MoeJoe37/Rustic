@@ -366,3 +366,28 @@ fn deep_boxless_chains_stay_iterative_and_keep_text_style() {
         Err(LayoutError::DepthLimit)
     );
 }
+
+#[test]
+fn layout_geometry_converts_to_unit_typed_base_geometry() {
+    use rustic_layout::{CssPoint, CssPx, CssRect, CssSize, DeviceScale};
+    let rect = CssRect::new(
+        CssPoint {
+            x: CssPx::new(1.5).unwrap(),
+            y: CssPx::new(-2.0).unwrap(),
+        },
+        CssSize::new(10.0, 4.0).unwrap(),
+    )
+    .unwrap();
+    let typed = rect.to_typed().unwrap();
+    assert_eq!(typed.origin().x.get(), 1.5);
+    assert_eq!(typed.max_y(), 2.0);
+    let scale = DeviceScale::new(2.0).unwrap().to_typed().unwrap();
+    let device = scale.rect(typed).unwrap();
+    let limits = rustic_base::SurfaceLimits {
+        max_width: 100,
+        max_height: 100,
+        max_bytes: 40_000,
+    };
+    let surface = rustic_base::SurfaceAllocation::covering(device, 4, limits).unwrap();
+    assert_eq!((surface.width(), surface.height()), (20, 8));
+}

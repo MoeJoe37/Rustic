@@ -4,7 +4,7 @@ use rustic_base::CancellationToken;
 use rustic_css::{Display, PropertyId, PropertyValue};
 use rustic_dom::{Document, DomError, NodeId, NodeKind};
 use rustic_style::{ComputedStyle, ElementStyle};
-use std::{collections::HashMap, error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
 /// Independent work, box and depth limits. These are not total process memory.
 #[derive(Clone, Copy, Debug)]
@@ -44,7 +44,9 @@ pub struct BoxSnapshot {
     node: NodeId,
     parent: Option<usize>,
     kind: BoxKind,
-    style: Option<ComputedStyle>,
+    // Shared, not copied: a text run reuses its DOM parent's style, so many
+    // text boxes cost one style rather than one multi-kilobyte copy each.
+    style: Option<Arc<ComputedStyle>>,
     text: Vec<u16>,
     special_layout: bool,
 }
@@ -63,7 +65,7 @@ impl BoxSnapshot {
     }
     /// Immutable M2 style, or the text run's inherited DOM-parent style.
     pub fn style(&self) -> Option<&ComputedStyle> {
-        self.style.as_ref()
+        self.style.as_deref()
     }
     /// Original UTF-16 text, including lone surrogates; empty for elements.
     pub fn text(&self) -> &[u16] {
@@ -112,7 +114,8 @@ impl BoxTree {
             }
         }
         let mut boxes = Vec::new();
-        let mut parents: Vec<(usize, Option<usize>, Option<&ComputedStyle>)> = Vec::new();
+        let mut parents: Vec<(usize, Option<usize>, Option<Arc<ComputedStyle>>)> = Vec::new();
+        let initial = Arc::new(ComputedStyle::initial());
         let mut hidden = None;
         let mut text_units = 0usize;
         for (visited, (id, depth)) in document.walk(root)?.enumerate() {
@@ -131,7 +134,7 @@ impl BoxTree {
                 parents.pop();
             }
             let parent = parents.last().and_then(|&(_, parent, _)| parent);
-            let inherited = parents.last().and_then(|&(_, _, style)| style);
+            let inherited = parents.last().and_then(|(_, _, style)| style.clone());
             let node = document.node(id)?;
             // A computed `display:block` cannot turn a replaced element, a
             // native control or foreign content into a generic CSS block.
@@ -179,13 +182,17 @@ impl BoxTree {
                         return Err(LayoutError::ShadowTree);
                     }
                     if *display == Display::Contents {
-                        parents.push((depth, parent, Some(style)));
+                        parents.push((depth, parent, Some(Arc::new(style.clone()))));
                         continue;
                     }
                     if boxes.len() >= limits.max_boxes {
                         return Err(LayoutError::BoxLimit);
                     }
-                    (BoxKind::Element(*display), Some(style.clone()), Vec::new())
+                    (
+                        BoxKind::Element(*display),
+                        Arc::new(style.clone()),
+                        Vec::new(),
+                    )
                 }
                 NodeKind::Text(data) | NodeKind::CdataSection(data)
                     if !data.as_units().is_empty() =>
@@ -199,22 +206,28 @@ impl BoxTree {
                         .ok_or(LayoutError::TextLimit)?;
                     (
                         BoxKind::Text,
-                        Some(inherited.cloned().unwrap_or_else(ComputedStyle::initial)),
+                        inherited.clone().unwrap_or_else(|| Arc::clone(&initial)),
                         data.as_units().to_vec(),
                     )
                 }
                 _ => continue,
             };
             let current = boxes.len();
+            // Descendant text inherits an element's own style; a text node has
+            // no children, so its entry only closes the stack level.
+            let shared = match kind {
+                BoxKind::Element(_) => Some(Arc::clone(&style)),
+                BoxKind::Text => inherited,
+            };
             boxes.push(BoxSnapshot {
                 node: id,
                 parent,
                 kind,
-                style,
+                style: Some(style),
                 text,
                 special_layout,
             });
-            parents.push((depth, Some(current), index.get(&id).copied().or(inherited)));
+            parents.push((depth, Some(current), shared));
         }
         Ok(Self { boxes })
     }

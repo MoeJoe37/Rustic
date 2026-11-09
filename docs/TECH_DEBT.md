@@ -82,11 +82,12 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
-| TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
-| TD-38 | Deliberate | Layout | Static block subset; margin-free restriction removed by REN-02a | Partly paid |
-| TD-37 | Deliberate | Layout | Normal flow normalization paid; flattened and pseudo trees pending | Partly paid, REN-01c |
-| TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
+| TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
+| TD-37 | Deliberate | Layout | Normal flow normalization paid; flattened and pseudo trees pending | Partly paid, REN-01c |
+| TD-38 | Deliberate | Layout | Static block subset; margin-free restriction removed by REN-02a | Partly paid |
+| TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
+| TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -601,6 +602,15 @@ snapshot and never claims positions or pixels. **Pay:** implement normalization
 with mixed inline/block fixtures and a flattened-tree input contract.
 **Trigger:** vertical flow/inline layout; shadow rendering before M5.
 
+#### TD-37 update — REN-01c normal flow normalization paid
+
+A separate borrowed formatting forest now wraps mixed inline runs, splits
+inline ancestors around block groups, retains source/continuation identity and
+preserves original UTF-16. Anonymous style and whitespace suppression have
+focused fixtures, an independent grouping model and a mutation-fuzz target.
+Flattened shadow input, pseudo boxes and other formatting contexts remain open;
+the principal snapshot deliberately stays distinct from the formatting tree.
+
 ### TD-38 — Margin-free block-only vertical reference
 
 The first vertical layout pass emits used content/padding/border rectangles for
@@ -626,15 +636,6 @@ Inline/anonymous normalization, text shaping, positioning/floats, overflow
 semantics and special/replaced content remain explicit unsupported cases; those
 portions of TD-38 stay open. The earlier paragraph records the initial subset.
 
-#### TD-37 update — REN-01c normal flow normalization paid
-
-A separate borrowed formatting forest now wraps mixed inline runs, splits
-inline ancestors around block groups, retains source/continuation identity and
-preserves original UTF-16. Anonymous style and whitespace suppression have
-focused fixtures, an independent grouping model and a mutation-fuzz target.
-Flattened shadow input, pseudo boxes and other formatting contexts remain open;
-the principal snapshot deliberately stays distinct from the formatting tree.
-
 ### TD-39 — Normal flow normalization before line layout and special contexts
 
 REN-01c handles static non-floating block/flow-root/inline/inline-block content.
@@ -653,3 +654,14 @@ with REN-03 line/shaping layout and general fragments; add each specialized
 context with its own fixups. Replace sequence bubbling if measured workloads
 exhaust budgets disproportionately. **Trigger:** first normalized-inline used
 geometry or profiling of deep split-inline content.
+
+### TD-40 — Text boxes copied whole computed styles (Paid)
+
+The first principal snapshot cloned the DOM parent's `ComputedStyle` into every
+text box, and normalization derived a fresh anonymous inline style per text run.
+A style holds every longhand (69 values of 72 bytes, plus heap data), so the
+default 100,000-box budget allowed roughly 1 GB of copies from a page whose
+text budget is only 8 MiB. The box limit did not bound memory as intended.
+**Paid** (M3 review, 2026-11-09): snapshot styles are shared `Arc`s, text runs
+reuse their parent's style and normalization derives one anonymous inline style
+per shared parent style. A regression test checks the sharing by identity.

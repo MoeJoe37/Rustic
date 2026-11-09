@@ -4,7 +4,7 @@ use crate::{BoxKind, BoxTree};
 use rustic_base::CancellationToken;
 use rustic_css::{Display, Float, Position, PropertyId as P, PropertyValue as V, WhiteSpace};
 use rustic_style::ComputedStyle;
-use std::{error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
 /// Independent limits for normalization, including temporary generated boxes.
 #[derive(Clone, Copy, Debug)]
@@ -97,7 +97,7 @@ impl FormattingBox {
 pub struct FormattingTree<'a> {
     principal: &'a BoxTree,
     boxes: Vec<FormattingBox>,
-    anonymous_styles: Vec<Option<ComputedStyle>>,
+    anonymous_styles: Vec<Option<Arc<ComputedStyle>>>,
     suppressed: Vec<usize>,
 }
 impl<'a> FormattingTree<'a> {
@@ -130,7 +130,10 @@ impl<'a> FormattingTree<'a> {
         }
         let mut arena = Vec::<Entry>::new();
         let mut sequences: Vec<Vec<usize>> = vec![Vec::new(); source.len()];
-        let mut styles = vec![None; source.len()];
+        let mut styles: Vec<Option<Arc<ComputedStyle>>> = vec![None; source.len()];
+        // Sibling text runs share their parent's snapshot style; derive each
+        // anonymous inline style once per shared parent style, not per run.
+        let mut inline_styles: HashMap<*const ComputedStyle, Arc<ComputedStyle>> = HashMap::new();
         let mut suppressed = Vec::new();
         for i in (0..source.len()).rev() {
             work.charge(1)?;
@@ -165,7 +168,10 @@ impl<'a> FormattingTree<'a> {
             }
             let mut space = false;
             if kind == FormattingKind::Text {
-                styles[i] = Some(style.anonymous_flow(Display::Inline));
+                let shared = inline_styles
+                    .entry(std::ptr::from_ref(style))
+                    .or_insert_with(|| Arc::new(style.anonymous_flow(Display::Inline)));
+                styles[i] = Some(Arc::clone(shared));
                 space = matches!(
                     style.get(P::WhiteSpace),
                     V::WhiteSpace(WhiteSpace::Normal | WhiteSpace::Nowrap)
@@ -181,7 +187,7 @@ impl<'a> FormattingTree<'a> {
                 sequences[i] = split_inline(i, items, &mut arena, &mut suppressed, &mut work)?;
             } else {
                 if has_blocks {
-                    styles[i] = Some(style.anonymous_flow(Display::Block));
+                    styles[i] = Some(Arc::new(style.anonymous_flow(Display::Block)));
                     items = wrap_runs(i, items, &mut arena, &mut suppressed, &mut work)?;
                 }
                 let entry = Entry {
@@ -259,7 +265,7 @@ impl<'a> FormattingTree<'a> {
             b.kind,
             FormattingKind::AnonymousBlock | FormattingKind::Text
         ) {
-            self.anonymous_styles[b.style_source].as_ref()
+            self.anonymous_styles[b.style_source].as_deref()
         } else {
             self.principal.boxes()[b.style_source].style()
         }

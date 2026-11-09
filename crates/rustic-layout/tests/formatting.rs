@@ -392,6 +392,37 @@ fn anonymous_styles_resolve_currentcolor_and_registered_inheritance() {
 }
 
 #[test]
+fn sibling_text_runs_share_one_parent_and_one_anonymous_style() {
+    // Text runs must not each copy a multi-kilobyte style: siblings share
+    // their parent's snapshot style and one derived anonymous inline style.
+    let p = principal("a<span></span>b<b>c</b>d", "");
+    let texts: Vec<usize> = (0..p.boxes().len())
+        .filter(|&i| p.boxes()[i].kind() == BoxKind::Text && p.boxes()[i].parent() == Some(0))
+        .collect();
+    assert_eq!(texts.len(), 3);
+    let parent = p.boxes()[0].style().unwrap();
+    for &i in &texts {
+        assert!(std::ptr::eq(p.boxes()[i].style().unwrap(), parent));
+    }
+    let nested = p
+        .boxes()
+        .iter()
+        .position(|b| b.kind() == BoxKind::Text && b.parent() != Some(0))
+        .unwrap();
+    assert!(!std::ptr::eq(p.boxes()[nested].style().unwrap(), parent));
+    let t = normalize(&p);
+    let anonymous: Vec<_> = (0..t.boxes().len())
+        .filter(|&i| {
+            t.boxes()[i].kind() == K::Text && texts.contains(&t.boxes()[i].source().unwrap())
+        })
+        .map(|i| t.style(i).unwrap())
+        .collect();
+    assert_eq!(anonymous.len(), 3);
+    assert!(anonymous.iter().all(|s| std::ptr::eq(*s, anonymous[0])));
+    assert_eq!(anonymous[0].get(P::Display).to_string(), "inline");
+}
+
+#[test]
 fn unsupported_formatting_fails_without_mutating_the_snapshot() {
     for html in [
         "<img>",

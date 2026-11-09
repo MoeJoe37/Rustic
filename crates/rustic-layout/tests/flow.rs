@@ -210,7 +210,7 @@ fn whitespace_only_runs_vanish_but_preserved_or_non_css_whitespace_needs_inline_
 fn unsupported_contexts_controls_and_sticky_return_typed_errors() {
     for css in [
         "display:inline",
-        "display:flex",
+        "display:inline-flex",
         "display:grid",
         "display:table",
         "display:list-item",

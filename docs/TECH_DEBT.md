@@ -850,6 +850,7 @@ with exact tests, while each missing piece is its own unit. **Pay:** GSUB/GPOS
 shaping on `rustic-text`, atomic inlines and block-in-inline splitting with
 the formatting-context work, `unicode-bidi` embeddings, then glyph raster.
 **Trigger:** any real-page text rendering, or the first WPT text reftests.
+
 ### TD-51 — First PNG decoder shortcuts
 
 `decode_png` treats every image as sRGB: `gAMA`, `cHRM`, `iCCP`, `sRGB` and

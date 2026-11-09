@@ -159,6 +159,33 @@ type Point = (f64, f64);
 /// Device-space clip rectangle as (left, top, right, bottom).
 type Bounds = (f64, f64, f64, f64);
 
+/// The device pixels being rasterized: a rectangle of the full surface,
+/// in its coordinates. Every buffer covers the frame; geometry stays in
+/// surface coordinates, so a pixel's value does not depend on the frame.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Frame {
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+}
+
+impl Frame {
+    fn bounds(self) -> Bounds {
+        (
+            self.x as f64,
+            self.y as f64,
+            (self.x + self.w) as f64,
+            (self.y + self.h) as f64,
+        )
+    }
+
+    /// The byte offset of surface pixel `(x, y)`, which must be inside.
+    fn offset(self, x: usize, y: usize) -> usize {
+        ((y - self.y) * self.w + (x - self.x)) * 4
+    }
+}
+
 /// Sutherland–Hodgman clip of one closed contour to `bounds`.
 fn clip(contour: &[Point], bounds: Bounds) -> Vec<Point> {
     let mut points = contour.to_vec();
@@ -525,8 +552,8 @@ fn local_bounds(clip: Clip) -> Bounds {
     (x0, y0, x1, y1)
 }
 
-/// The device pixel window covering `contours`, within the surface.
-fn window(contours: &[Vec<Point>], (w, h): (f64, f64)) -> Option<(f64, f64, usize, usize)> {
+/// The device pixel window covering `contours`, within `limit`.
+fn window(contours: &[Vec<Point>], limit: Bounds) -> Option<(f64, f64, usize, usize)> {
     let mut b = (
         f64::INFINITY,
         f64::INFINITY,
@@ -536,8 +563,8 @@ fn window(contours: &[Vec<Point>], (w, h): (f64, f64)) -> Option<(f64, f64, usiz
     for p in contours.iter().filter(|c| c.len() >= 3).flatten() {
         b = (b.0.min(p.0), b.1.min(p.1), b.2.max(p.0), b.3.max(p.1));
     }
-    let (x0, y0) = (b.0.max(0.0).floor(), b.1.max(0.0).floor());
-    let (x1, y1) = (b.2.min(w).ceil(), b.3.min(h).ceil());
+    let (x0, y0) = (b.0.max(limit.0).floor(), b.1.max(limit.1).floor());
+    let (x1, y1) = (b.2.min(limit.2).ceil(), b.3.min(limit.3).ceil());
     (x0 < x1 && y0 < y1).then_some((x0, y0, (x1 - x0) as usize, (y1 - y0) as usize))
 }
 
@@ -570,7 +597,7 @@ fn clip_mask_mapped(
 /// Fill an item whose coordinates `map` takes to device pixels.
 fn fill_mapped(
     pixels: &mut [u8],
-    (width, height): (u32, u32),
+    frame: Frame,
     item: &DisplayItem,
     list: &DisplayList,
     map: &Homography,
@@ -584,7 +611,7 @@ fn fill_mapped(
         .map(|c| project(c, map, Some(bounds)))
         .collect();
     work.charge(shape.iter().map(|c| c.len() as u64).sum())?;
-    let Some((bx, by, bw, bh)) = window(&shape, (f64::from(width), f64::from(height))) else {
+    let Some((bx, by, bw, bh)) = window(&shape, frame.bounds()) else {
         return Ok(());
     };
     let cover = coverage(&shape, (bx, by), (bw, bh), work)?;
@@ -592,7 +619,7 @@ fn fill_mapped(
     let mask = clip_mask_mapped(&nodes, map, (bx, by), (bw, bh), work)?;
     blend_color(
         pixels,
-        width as usize,
+        frame,
         (bx, by, bw, bh),
         &cover,
         mask.as_deref(),
@@ -605,7 +632,7 @@ fn fill_mapped(
 /// `cover` and `mask`.
 fn blend_color(
     pixels: &mut [u8],
-    width: usize,
+    frame: Frame,
     (bx, by, bw, bh): (f64, f64, usize, usize),
     cover: &[f64],
     mask: Option<&[f64]>,
@@ -624,7 +651,7 @@ fn blend_color(
         work.cancellation
             .check()
             .map_err(|_| RasterError::Cancelled)?;
-        let start = ((oy + row) * width + ox) * 4;
+        let start = frame.offset(ox, oy + row);
         for col in 0..bw {
             let k = row * bw + col;
             let coverage = cover[k] * mask.map_or(1.0, |m| m[k]);
@@ -648,7 +675,7 @@ fn blend_color(
 /// (within the clips) covers.
 fn draw_image_mapped(
     pixels: &mut [u8],
-    (width, height): (u32, u32),
+    frame: Frame,
     item: &DisplayItem,
     list: &DisplayList,
     map: &Homography,
@@ -671,7 +698,7 @@ fn draw_image_mapped(
         .iter()
         .map(|c| project(c, map, Some(local_bounds(item.clip))))
         .collect();
-    let Some((bx, by, bw, bh)) = window(&shape, (f64::from(width), f64::from(height))) else {
+    let Some((bx, by, bw, bh)) = window(&shape, frame.bounds()) else {
         return Ok(());
     };
     let cover = coverage(&shape, (bx, by), (bw, bh), work)?;
@@ -681,7 +708,6 @@ fn draw_image_mapped(
         f64::from(image.width()) / rw,
         f64::from(image.height()) / rh,
     );
-    let stride = width as usize;
     let (ox, oy) = (bx as usize, by as usize);
     for row in 0..bh {
         work.cancellation
@@ -704,7 +730,7 @@ fn draw_image_mapped(
             let ly = (h[3] * center.0 + h[4] * center.1 + h[5]) / w;
             let src = sample(image, (lx - x0) * sx, (ly - y0) * sy);
             let keep = 1.0 - src[3] / 255.0 * coverage;
-            let i = (py * stride + px) * 4;
+            let i = frame.offset(px, py);
             for (dst, s) in pixels[i..i + 4].iter_mut().zip(src) {
                 let value = s * coverage + f64::from(*dst) * keep;
                 *dst = value.round().clamp(0.0, 255.0) as u8;
@@ -739,32 +765,63 @@ fn exp_neg(x: f64) -> f64 {
     sum
 }
 
+/// The box size of the three-box approximation for `sigma` (Filter
+/// Effects 1 §15.17).
+fn box_size(sigma: f64) -> isize {
+    (sigma * 3.0 * (2.0 * std::f64::consts::PI).sqrt() / 4.0 + 0.5).floor() as isize
+}
+
+/// How far a blur of `sigma` device pixels reaches, including how far the
+/// clamped edges of a finite buffer can disturb it.
+fn blur_reach(sigma: f64) -> usize {
+    if sigma.is_nan() || sigma <= 0.001 {
+        return 0;
+    }
+    let exact = (3.0 * sigma).ceil();
+    let boxes = if sigma >= 2.0 {
+        2.0 * box_size(sigma) as f64
+    } else {
+        0.0
+    };
+    let reach = exact.max(boxes) + 2.0;
+    if reach < 1e9 {
+        reach as usize
+    } else {
+        1_000_000_000
+    }
+}
+
+/// Fixed-point scale for box sums: integer sums are exact, so a value does
+/// not depend on where a buffer starts.
+const BOX_ONE: f64 = 4_294_967_296.0;
+
 /// Replace each value of `line` by the mean of `line[x + lo ..= x + hi]`,
-/// edge values extending past the ends.
-fn box_pass(line: &mut [f64], lo: isize, hi: isize, prefix: &mut Vec<f64>) {
+/// edge values extending past the ends, summing in fixed point.
+fn box_pass(line: &mut [f64], lo: isize, hi: isize, prefix: &mut Vec<i64>) {
     let n = line.len() as isize;
     prefix.clear();
-    prefix.push(0.0);
-    let mut sum = 0.0;
-    for &v in line.iter() {
-        sum += v;
+    prefix.push(0);
+    let mut sum = 0i64;
+    let fixed: Vec<i64> = line.iter().map(|&v| (v * BOX_ONE).round() as i64).collect();
+    for &v in &fixed {
+        sum = sum.saturating_add(v);
         prefix.push(sum);
     }
-    let (first, last) = (line[0], line[line.len() - 1]);
+    let (first, last) = (fixed[0], fixed[fixed.len() - 1]);
     let width = (hi - lo + 1) as f64;
     let out: Vec<f64> = (0..n)
         .map(|x| {
             let (a, b) = (x + lo, x + hi);
             // Clamped parts beyond each end repeat the edge value.
-            let before = (-a).max(0).min(b - a + 1) as f64 * first;
-            let after = (b - (n - 1)).max(0).min(b - a + 1) as f64 * last;
+            let before = (-a).max(0).min(b - a + 1) as i64 * first;
+            let after = (b - (n - 1)).max(0).min(b - a + 1) as i64 * last;
             let (ca, cb) = (a.clamp(0, n), (b + 1).clamp(0, n));
             let inside = if cb > ca {
                 prefix[cb as usize] - prefix[ca as usize]
             } else {
-                0.0
+                0
             };
-            (before + inside + after) / width
+            (before + inside + after) as f64 / BOX_ONE / width
         })
         .collect();
     line.copy_from_slice(&out);
@@ -773,12 +830,12 @@ fn box_pass(line: &mut [f64], lo: isize, hi: isize, prefix: &mut Vec<f64>) {
 /// Blur one line by a Gaussian of standard deviation `sigma` pixels:
 /// exactly below two pixels, else by three box blurs as Filter Effects 1
 /// §15.17 (`feGaussianBlur`) allows.
-fn blur_line(line: &mut [f64], sigma: f64, kernel: &[f64], prefix: &mut Vec<f64>) {
+fn blur_line(line: &mut [f64], sigma: f64, kernel: &[f64], prefix: &mut Vec<i64>) {
     if line.is_empty() {
         return;
     }
     if sigma >= 2.0 {
-        let d = (sigma * 3.0 * (2.0 * std::f64::consts::PI).sqrt() / 4.0 + 0.5).floor() as isize;
+        let d = box_size(sigma);
         if d % 2 == 1 {
             let h = (d - 1) / 2;
             for _ in 0..3 {
@@ -856,7 +913,7 @@ fn blur(
 /// coordinates scale by `scale`.
 fn shadow(
     pixels: &mut [u8],
-    (width, height): (u32, u32),
+    frame: Frame,
     item: &DisplayItem,
     list: &DisplayList,
     map: Option<&Homography>,
@@ -876,11 +933,10 @@ fn shadow(
             None => scale,
             Some(m) => stretch(m, &s.clip.contour()),
         };
-    let reach = (3.0 * sigma).ceil() + 2.0;
-    let (w, h) = (f64::from(width), f64::from(height));
-    let mut limit: Bounds = (0.0, 0.0, w, h);
+    let reach = blur_reach(sigma) as f64;
+    let mut limit = frame.bounds();
     if map.is_none() {
-        let Some(b) = item_bounds(item.clip, w, h, scale) else {
+        let Some(b) = item_bounds(item.clip, limit, scale) else {
             return Ok(());
         };
         limit = b;
@@ -890,7 +946,7 @@ fn shadow(
     work.charge(clip.len() as u64 + shape.as_ref().map_or(0, |c| c.len() as u64))?;
     // The pixels the shadow may reach.
     let reaching = if s.inset {
-        window(std::slice::from_ref(&clip), (w, h))
+        window(std::slice::from_ref(&clip), limit)
     } else {
         shape.as_ref().and_then(|c| {
             let mut b = (
@@ -909,7 +965,7 @@ fn shadow(
                 (grown.2, grown.3),
                 (grown.0, grown.3),
             ];
-            window(&[corners], (w, h))
+            window(&[corners], limit)
         })
     };
     let Some((tx, ty, tw, th)) = reaching else {
@@ -973,7 +1029,7 @@ fn shadow(
     }
     blend_color(
         pixels,
-        width as usize,
+        frame,
         (tx, ty, tw, th),
         &cover,
         mask.as_deref(),
@@ -1004,8 +1060,8 @@ impl Work<'_> {
 
 /// The device-space area an item may touch: the surface intersected with its
 /// overflow clip. `None` when nothing remains.
-fn item_bounds(clip_rect: Clip, w: f64, h: f64, scale: f64) -> Option<Bounds> {
-    let mut b: Bounds = (0.0, 0.0, w, h);
+fn item_bounds(clip_rect: Clip, frame: Bounds, scale: f64) -> Option<Bounds> {
+    let mut b = frame;
     if let Some(r) = clip_rect.x {
         b.0 = b.0.max(r.start.get() * scale);
         b.2 = b.2.min(r.end.get() * scale);
@@ -1148,7 +1204,7 @@ fn sample(image: &Image, u: f64, v: f64) -> [f64; 4] {
 /// them exactly.
 fn draw_image(
     pixels: &mut [u8],
-    (width, height): (u32, u32),
+    frame: Frame,
     item: &DisplayItem,
     list: &DisplayList,
     scale: f64,
@@ -1158,8 +1214,7 @@ fn draw_image(
         return Ok(());
     };
     let image = list.images().get(image).ok_or(RasterError::InvalidList)?;
-    let (w, h) = (f64::from(width), f64::from(height));
-    let Some(mut limit) = item_bounds(item.clip, w, h, scale) else {
+    let Some(mut limit) = item_bounds(item.clip, frame.bounds(), scale) else {
         return Ok(());
     };
     let nodes = chain(list.clips(), item.rounded_clip)?;
@@ -1196,7 +1251,6 @@ fn draw_image(
         f64::from(image.width()) / (x1 - x0),
         f64::from(image.height()) / (y1 - y0),
     );
-    let stride = width as usize;
     let overlap = |p: usize, lo: f64, hi: f64| (hi.min(p as f64 + 1.0) - lo.max(p as f64)).max(0.0);
     for py in py0..py1 {
         work.cancellation
@@ -1214,7 +1268,7 @@ fn draw_image(
             }
             let src = sample(image, (px as f64 + 0.5 - x0) * sx, v);
             let keep = 1.0 - src[3] / 255.0 * coverage;
-            let i = (py * stride + px) * 4;
+            let i = frame.offset(px, py);
             for (dst, s) in pixels[i..i + 4].iter_mut().zip(src) {
                 let value = s * coverage + f64::from(*dst) * keep;
                 *dst = value.round().clamp(0.0, 255.0) as u8;
@@ -1226,14 +1280,13 @@ fn draw_image(
 
 fn fill(
     pixels: &mut [u8],
-    (width, height): (u32, u32),
+    frame: Frame,
     item: &DisplayItem,
     list: &DisplayList,
     scale: f64,
     work: &mut Work<'_>,
 ) -> Result<(), RasterError> {
-    let (w, h) = (f64::from(width), f64::from(height));
-    let Some(mut limit) = item_bounds(item.clip, w, h, scale) else {
+    let Some(mut limit) = item_bounds(item.clip, frame.bounds(), scale) else {
         return Ok(());
     };
     let nodes = chain(list.clips(), item.rounded_clip)?;
@@ -1257,7 +1310,12 @@ fn fill(
         .map(|c| clip(c, limit))
         .filter(|c| c.len() >= 3)
         .collect();
-    let mut bounds = (w, h, 0.0_f64, 0.0_f64);
+    let mut bounds = (
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+    );
     for p in clipped.iter().flatten() {
         bounds = (
             bounds.0.min(p.0),
@@ -1278,7 +1336,7 @@ fn fill(
     let mask = clip_mask(&nodes, (bx, by), (bw, bh), scale, work)?;
     blend_color(
         pixels,
-        width as usize,
+        frame,
         (bx, by, bw, bh),
         &cover,
         mask.as_deref(),
@@ -1593,18 +1651,38 @@ fn composite_masked(dst: &mut [u8], layer: &[u8], mask: &[f64]) {
     }
 }
 
-/// Rasterize `list` at `scale` device pixels per CSS pixel.
-///
-/// The surface is the viewport size times `scale`, rounded up, cleared to the
-/// list's opaque canvas color. Items are composited source-over in order with
-/// exact-area antialiasing; edges are not snapped to device pixels.
-pub fn rasterize(
-    list: &DisplayList,
-    scale: DeviceScale,
-    limits: RasterLimits,
-    cancellation: &CancellationToken,
-) -> Result<Surface, RasterError> {
-    cancellation.check().map_err(|_| RasterError::Cancelled)?;
+/// A rectangle of device pixels.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DeviceRect {
+    /// Left edge.
+    pub x: u32,
+    /// Top edge.
+    pub y: u32,
+    /// Width.
+    pub width: u32,
+    /// Height.
+    pub height: u32,
+}
+
+impl DeviceRect {
+    /// The smallest rectangle containing both.
+    pub fn union(self, other: Self) -> Self {
+        let x = self.x.min(other.x);
+        let y = self.y.min(other.y);
+        let right = (self.x + self.width).max(other.x + other.width);
+        let bottom = (self.y + self.height).max(other.y + other.height);
+        Self {
+            x,
+            y,
+            width: right - x,
+            height: bottom - y,
+        }
+    }
+}
+
+/// The surface size `list` rasterizes to at `scale`: the viewport times
+/// `scale`, rounded up.
+pub fn surface_size(list: &DisplayList, scale: DeviceScale) -> Result<(u32, u32), RasterError> {
     let device = |css: f64| -> Result<u32, RasterError> {
         let v = rustic_layout::CssPx::new(css)
             .map_err(|_| RasterError::SurfaceSize)?
@@ -1618,43 +1696,244 @@ pub fn rasterize(
         }
     };
     let viewport = list.viewport();
-    let width = device(viewport.width().get())?;
-    let height = device(viewport.height().get())?;
-    let mut surface = Surface::new(width, height, limits)?;
+    Ok((
+        device(viewport.width().get())?,
+        device(viewport.height().get())?,
+    ))
+}
+
+/// Device pixels per CSS pixel.
+fn device_factor(scale: DeviceScale) -> Result<f64, RasterError> {
+    Ok(rustic_layout::CssPx::new(1.0)
+        .map_err(|_| RasterError::SurfaceSize)?
+        .to_device(scale)
+        .get())
+}
+
+/// Rasterize `list` at `scale` device pixels per CSS pixel.
+///
+/// The surface is the viewport size times `scale`, rounded up, cleared to the
+/// list's opaque canvas color. Items are composited source-over in order with
+/// exact-area antialiasing; edges are not snapped to device pixels.
+pub fn rasterize(
+    list: &DisplayList,
+    scale: DeviceScale,
+    limits: RasterLimits,
+    cancellation: &CancellationToken,
+) -> Result<Surface, RasterError> {
+    let (width, height) = surface_size(list, scale)?;
+    let all = DeviceRect {
+        x: 0,
+        y: 0,
+        width,
+        height,
+    };
+    rasterize_region(list, scale, all, limits, cancellation)
+}
+
+/// How far, in device pixels, filters can move color across the surface:
+/// the largest sum of blur reaches and drop shadow offsets over nested
+/// filter groups. Rasterizing a region needs this much context around it.
+fn effect_margin(list: &DisplayList, factor: f64) -> Result<usize, RasterError> {
+    let mut maps: Vec<Option<Homography>> = Vec::new();
+    let mut open: Vec<usize> = Vec::new();
+    let mut total = 0usize;
+    let mut most = 0usize;
+    for command in list.commands() {
+        match command {
+            DisplayCommand::BeginTransform { transform, .. } => {
+                let node = list
+                    .transforms()
+                    .get(*transform)
+                    .ok_or(RasterError::InvalidList)?;
+                let outer = maps
+                    .iter()
+                    .rev()
+                    .flatten()
+                    .next()
+                    .copied()
+                    .unwrap_or_else(|| Homography::scale(factor));
+                maps.push(Some(outer.then_after(&node.matrix)));
+            }
+            DisplayCommand::EndTransform => {
+                maps.pop();
+            }
+            DisplayCommand::BeginGroup { filter, .. } => {
+                let scale = group_scale(maps.iter().rev().flatten().next(), factor);
+                let reach = match filter {
+                    None => 0,
+                    Some(f) => list
+                        .filters()
+                        .get(*f)
+                        .ok_or(RasterError::InvalidList)?
+                        .iter()
+                        .map(|op| filter_reach(op, scale))
+                        .fold(0usize, usize::saturating_add),
+                };
+                open.push(reach);
+                total = total.saturating_add(reach);
+                most = most.max(total);
+            }
+            DisplayCommand::EndGroup => {
+                total -= open.pop().ok_or(RasterError::InvalidList)?;
+            }
+            _ => {}
+        }
+    }
+    Ok(most)
+}
+
+/// Device pixels per CSS pixel for a group opened under `map`.
+fn group_scale(map: Option<&Homography>, factor: f64) -> f64 {
+    map.map_or(factor, |m| {
+        stretch(
+            m,
+            &[PathPoint {
+                x: 0.0,
+                y: 0.0,
+                on_curve: true,
+            }],
+        )
+    })
+}
+
+/// How far one filter operation moves color, in device pixels.
+fn filter_reach(op: &FilterOp, scale: f64) -> usize {
+    let px = |v: f64| {
+        let v = (v.abs() * scale).ceil();
+        if v.is_finite() && v < 1e9 {
+            v as usize
+        } else {
+            1_000_000_000
+        }
+    };
+    match *op {
+        FilterOp::Blur(sigma) => blur_reach(sigma * scale),
+        FilterOp::DropShadow { dx, dy, sigma, .. } => blur_reach(sigma * scale)
+            .saturating_add(px(dx))
+            .saturating_add(px(dy)),
+        FilterOp::Color(_) => 0,
+    }
+}
+
+/// The side of the square device-pixel tiles the surface is rasterized in.
+/// Tiles are the unit of work: a tile's pixels depend only on the display
+/// list and the tile, so any set of tiles can be repainted alone and match
+/// the full surface exactly.
+pub const TILE_SIZE: u32 = 256;
+
+/// Rasterize the pixels of `region` of the surface [`rasterize`] would
+/// produce, into a surface of the region's size. The surface is painted in
+/// [`TILE_SIZE`] tiles on a grid from its origin; this paints only the
+/// tiles that meet `region`, each with enough context around it for every
+/// filter (see `effect_margin`), so every pixel equals the full surface's.
+pub fn rasterize_region(
+    list: &DisplayList,
+    scale: DeviceScale,
+    region: DeviceRect,
+    limits: RasterLimits,
+    cancellation: &CancellationToken,
+) -> Result<Surface, RasterError> {
+    cancellation.check().map_err(|_| RasterError::Cancelled)?;
+    let (width, height) = surface_size(list, scale)?;
+    if region.width == 0
+        || region.height == 0
+        || region.x.checked_add(region.width).is_none_or(|r| r > width)
+        || region
+            .y
+            .checked_add(region.height)
+            .is_none_or(|b| b > height)
+    {
+        return Err(RasterError::SurfaceSize);
+    }
+    let factor = device_factor(scale)?;
+    let margin = effect_margin(list, factor)?;
+    let mut out = Surface::new(region.width, region.height, limits)?;
     let mut work = Work {
         used: 0,
         limit: limits.max_work,
         cancellation,
     };
-    work.charge(u64::from(width) * u64::from(height))?;
+    let (rx0, ry0) = (region.x as usize, region.y as usize);
+    let (rx1, ry1) = (rx0 + region.width as usize, ry0 + region.height as usize);
+    let tile = TILE_SIZE as usize;
+    let grow = |start: usize, end: usize, limit: u32| {
+        let lo = start.saturating_sub(margin);
+        let hi = end.saturating_add(margin).min(limit as usize);
+        (lo, hi - lo)
+    };
+    for ty in (ry0 / tile)..ry1.div_ceil(tile) {
+        for tx in (rx0 / tile)..rx1.div_ceil(tile) {
+            let (x0, y0) = (tx * tile, ty * tile);
+            let (x1, y1) = (
+                (x0 + tile).min(width as usize),
+                (y0 + tile).min(height as usize),
+            );
+            let (fx, fw) = grow(x0, x1, width);
+            let (fy, fh) = grow(y0, y1, height);
+            let frame = Frame {
+                x: fx,
+                y: fy,
+                w: fw,
+                h: fh,
+            };
+            let painted = render(list, factor, frame, limits, &mut work)?;
+            // Copy the part of the tile inside the region.
+            let (cx0, cy0) = (x0.max(rx0), y0.max(ry0));
+            let (cx1, cy1) = (x1.min(rx1), y1.min(ry1));
+            let row = (cx1 - cx0) * 4;
+            let into = Frame {
+                x: rx0,
+                y: ry0,
+                w: region.width as usize,
+                h: region.height as usize,
+            };
+            for y in cy0..cy1 {
+                let from = frame.offset(cx0, y);
+                let to = into.offset(cx0, y);
+                out.pixels[to..to + row].copy_from_slice(&painted.pixels[from..from + row]);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Rasterize `frame` of the surface into a surface of the frame's size.
+fn render(
+    list: &DisplayList,
+    factor: f64,
+    frame: Frame,
+    limits: RasterLimits,
+    work: &mut Work<'_>,
+) -> Result<Surface, RasterError> {
+    let to_u32 = |v: usize| u32::try_from(v).map_err(|_| RasterError::SurfaceSize);
+    let mut surface = Surface::new(to_u32(frame.w)?, to_u32(frame.h)?, limits)?;
+    work.charge(frame.w as u64 * frame.h as u64)?;
     surface.fill_opaque(list.canvas());
-    let factor = rustic_layout::CssPx::new(1.0)
-        .map_err(|_| RasterError::SurfaceSize)?
-        .to_device(scale)
-        .get();
     let size = (surface.width, surface.height);
     let bytes = surface.pixels.len();
     // Open layers, innermost last; a transform without clips has no buffer.
     let mut groups: Vec<(Option<Vec<u8>>, Layer)> = Vec::new();
     // Local-to-device maps of the open transforms, innermost last.
     let mut maps: Vec<Homography> = Vec::new();
-    let window_size = (size.0 as usize, size.1 as usize);
+    let window_size = (frame.w, frame.h);
+    let origin = (frame.x as f64, frame.y as f64);
     for command in list.commands() {
         match command {
             DisplayCommand::Fill(item) => {
                 let pixels = target(&mut groups, &mut surface.pixels);
                 if matches!(item.shape, Shape::Shadow(_)) {
-                    shadow(pixels, size, item, list, maps.last(), factor, &mut work)?;
+                    shadow(pixels, frame, item, list, maps.last(), factor, work)?;
                     continue;
                 }
                 let image = matches!(item.shape, Shape::Image { .. });
                 match (maps.last(), image) {
-                    (None, true) => draw_image(pixels, size, item, list, factor, &mut work)?,
-                    (None, false) => fill(pixels, size, item, list, factor, &mut work)?,
+                    (None, true) => draw_image(pixels, frame, item, list, factor, work)?,
+                    (None, false) => fill(pixels, frame, item, list, factor, work)?,
                     (Some(map), true) => {
-                        draw_image_mapped(pixels, size, item, list, map, &mut work)?;
+                        draw_image_mapped(pixels, frame, item, list, map, work)?;
                     }
-                    (Some(map), false) => fill_mapped(pixels, size, item, list, map, &mut work)?,
+                    (Some(map), false) => fill_mapped(pixels, frame, item, list, map, work)?,
                 }
             }
             DisplayCommand::BeginGroup { .. }
@@ -1670,16 +1949,7 @@ pub fn rasterize(
                         opacity: *opacity,
                         blend: *blend,
                         filter: *filter,
-                        scale: maps.last().map_or(factor, |m| {
-                            stretch(
-                                m,
-                                &[PathPoint {
-                                    x: 0.0,
-                                    y: 0.0,
-                                    on_curve: true,
-                                }],
-                            )
-                        }),
+                        scale: group_scale(maps.last(), factor),
                     },
                     DisplayCommand::BeginClip { shape, .. } => {
                         Layer::Clip(*shape, maps.last().copied())
@@ -1737,7 +2007,7 @@ pub fn rasterize(
                         work.charge(u64::from(size.0) * u64::from(size.1))?;
                         if let Some(f) = filter {
                             let ops = list.filters().get(f).ok_or(RasterError::InvalidList)?;
-                            apply_filter(&mut group, window_size, ops, scale, &mut work)?;
+                            apply_filter(&mut group, window_size, ops, scale, work)?;
                         }
                         composite_blend(
                             target(&mut groups, &mut surface.pixels),
@@ -1750,14 +2020,14 @@ pub fn rasterize(
                     (DisplayCommand::EndClip, Layer::Clip(shape, None)) => {
                         let contours = contours(&shape, list.paths(), list.rounded(), factor);
                         work.charge(contours.iter().map(|c| c.len() as u64).sum())?;
-                        coverage(&contours, (0.0, 0.0), window_size, &mut work)?
+                        coverage(&contours, origin, window_size, work)?
                     }
                     (DisplayCommand::EndClip, Layer::Clip(shape, Some(map))) => {
                         let local = local_contours(&shape, list);
                         let contours: Vec<Vec<Point>> =
                             local.iter().map(|c| project(c, &map, None)).collect();
                         work.charge(contours.iter().map(|c| c.len() as u64).sum())?;
-                        coverage(&contours, (0.0, 0.0), window_size, &mut work)?
+                        coverage(&contours, origin, window_size, work)?
                     }
                     (
                         DisplayCommand::EndTransform,
@@ -1783,10 +2053,10 @@ pub fn rasterize(
                         };
                         let rect = [on(x0, y0), on(x1, y0), on(x1, y1), on(x0, y1)];
                         let area = project(&rect, &outer, None);
-                        let mut mask = coverage(&[area], (0.0, 0.0), window_size, &mut work)?;
+                        let mut mask = coverage(&[area], origin, window_size, work)?;
                         let nodes = chain(list.clips(), rounded_clip)?;
                         if let Some(rounded) =
-                            clip_mask_mapped(&nodes, &outer, (0.0, 0.0), window_size, &mut work)?
+                            clip_mask_mapped(&nodes, &outer, origin, window_size, work)?
                         {
                             for (a, b) in mask.iter_mut().zip(rounded) {
                                 *a *= b;
@@ -1992,10 +2262,10 @@ mod tests {
             line[50] = 1.0;
             blur(&mut line, (w, h), sigma, &mut work).unwrap();
             let total: f64 = line.iter().sum();
-            assert!((total - 1.0).abs() < 1e-12, "{sigma}: {total}");
+            assert!((total - 1.0).abs() < 1e-8, "{sigma}: {total}");
             for k in 1..40 {
-                assert!((line[50 - k] - line[50 + k]).abs() < 1e-12, "{sigma} {k}");
-                assert!(line[50 + k] <= line[50 + k - 1] + 1e-15, "{sigma} {k}");
+                assert!((line[50 - k] - line[50 + k]).abs() < 1e-9, "{sigma} {k}");
+                assert!(line[50 + k] <= line[50 + k - 1] + 1e-9, "{sigma} {k}");
             }
             // The spread matches the standard deviation within a few percent.
             let variance: f64 = line
@@ -2009,7 +2279,7 @@ mod tests {
         // A step blurs to one half at the edge.
         let mut step: Vec<f64> = (0..60).map(|i| if i < 30 { 1.0 } else { 0.0 }).collect();
         blur(&mut step, (60, 1), 4.0, &mut work).unwrap();
-        assert!((step[29] + step[30] - 1.0).abs() < 1e-12);
+        assert!((step[29] + step[30] - 1.0).abs() < 1e-8);
         assert!(step[0] > 0.999 && step[59] < 0.001);
     }
 

@@ -72,6 +72,14 @@ color and composites each item source-over.
   TD-46), and total pixel visits summed over item bounds (`max_work`,
   default 2³⁰). Each item uses a scratch buffer sized to its clipped bounds.
 
+- **Tiles.** The surface is painted in `TILE_SIZE` (256) device-pixel tiles
+  on a grid from its origin. Each tile renders into a frame grown by the
+  list's effect margin (the largest nested sum of filter blur reaches and
+  drop shadow offsets), so a tile's pixels depend only on the list and the
+  tile. `rasterize_region(list, scale, region, …)` paints just the tiles
+  that meet `region` and returns exactly the pixels `rasterize` would; blur
+  box sums are fixed point so they do not depend on where a frame starts.
+
 `encode_png(surface, max_bytes)` writes straight-alpha RGBA8 PNG with stored
 (uncompressed) deflate blocks, after checking the exact output size against
 `max_bytes`. CRC-32 and Adler-32 are computed in the crate.

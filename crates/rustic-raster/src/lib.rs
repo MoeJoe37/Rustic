@@ -13,4 +13,6 @@ mod raster;
 
 pub use compare::{Difference, compare};
 pub use png::{PngError, encode_png};
-pub use raster::{RasterError, RasterLimits, Surface, rasterize};
+pub use raster::{
+    DeviceRect, RasterError, RasterLimits, Surface, rasterize, rasterize_region, surface_size,
+};

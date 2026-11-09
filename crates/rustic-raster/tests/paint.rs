@@ -5,7 +5,9 @@ use rustic_layout::{BlockLayout, BoxTree, CssSize, DeviceScale, LayoutLimits};
 use rustic_paint::{
     DisplayCommand, DisplayList, ItemRole, PaintError, PaintLimits, Shape, Srgba, UnsupportedPaint,
 };
-use rustic_raster::{RasterError, RasterLimits, Surface, encode_png, rasterize};
+use rustic_raster::{
+    DeviceRect, RasterError, RasterLimits, Surface, encode_png, rasterize, rasterize_region,
+};
 mod common;
 
 struct Page {
@@ -1430,5 +1432,84 @@ fn blend_modes_and_filters_composite_groups_in_order() {
             node: p.id("u"),
             reason: UnsupportedPaint::FilterUrl,
         })
+    );
+}
+
+#[test]
+fn regions_rasterize_to_exactly_the_pixels_of_the_full_surface() {
+    let p = page(
+        "<div id=a><div id=b></div></div><div id=c></div><div id=d></div><div id=e></div>",
+        &format!(
+            "{RESET} body {{ padding: 7px }}
+             #a {{ width: 50px; height: 30px; border: 3px solid red; border-radius: 9px 4px;
+                   overflow: hidden; background: rgb(0 128 255 / 60%);
+                   box-shadow: 3px 4px 6px 1px green, inset 0 0 5px black }}
+             #b {{ width: 80px; height: 15px; background: lime; transform: rotate(17deg) }}
+             #c {{ width: 40px; height: 20px; margin: 12px; background: orange;
+                   filter: blur(2.5px) drop-shadow(4px -3px 1.5px blue) hue-rotate(40deg);
+                   clip-path: circle(30px) }}
+             #d {{ width: 30px; height: 25px; margin-top: -30px; background: purple;
+                   mix-blend-mode: screen; opacity: 0.7; transform: perspective(60px) rotateY(25deg) }}
+             #e {{ width: 20px; height: 20px; margin-left: 160px; background: teal;
+                   box-shadow: 0 0 20px 4px red }}"
+        ),
+        200.0,
+        131.0,
+    );
+    let list = p.list().unwrap();
+    let cancel = CancellationToken::default();
+    for scale in [1.0, 1.5] {
+        let scale = DeviceScale::new(scale).unwrap();
+        let full = rasterize(&list, scale, RasterLimits::default(), &cancel).unwrap();
+        let (w, h) = (full.width(), full.height());
+        // At 1.5 the surface spans two tile columns and #e's shadow crosses
+        // the seam; the regions straddle tiles at odd sizes.
+        for (tw, th) in [(61, 37), (128, 200)] {
+            let mut y = 0;
+            while y < h {
+                let mut x = 0;
+                while x < w {
+                    let region = DeviceRect {
+                        x,
+                        y,
+                        width: tw.min(w - x),
+                        height: th.min(h - y),
+                    };
+                    let tile =
+                        rasterize_region(&list, scale, region, RasterLimits::default(), &cancel)
+                            .unwrap();
+                    for ty in 0..region.height {
+                        for tx in 0..region.width {
+                            assert_eq!(
+                                tile.pixel(tx, ty),
+                                full.pixel(x + tx, y + ty),
+                                "tile {region:?} pixel ({}, {})",
+                                x + tx,
+                                y + ty
+                            );
+                        }
+                    }
+                    x += tw;
+                }
+                y += th;
+            }
+        }
+    }
+    // A region outside the surface is refused.
+    let outside = DeviceRect {
+        x: 195,
+        y: 0,
+        width: 8,
+        height: 1,
+    };
+    assert_eq!(
+        rasterize_region(
+            &list,
+            DeviceScale::new(1.0).unwrap(),
+            outside,
+            RasterLimits::default(),
+            &cancel
+        ),
+        Err(RasterError::SurfaceSize)
     );
 }

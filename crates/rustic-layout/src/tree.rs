@@ -49,6 +49,18 @@ pub struct BoxSnapshot {
     style: Option<Arc<ComputedStyle>>,
     text: Vec<u16>,
     special_layout: bool,
+    html_tag: HtmlTag,
+}
+
+/// HTML elements whose `overflow` can propagate to the viewport.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum HtmlTag {
+    /// An HTML `html` element that is the document element.
+    DocumentElement,
+    /// An HTML `body` element.
+    Body,
+    /// Anything else, including text.
+    Other,
 }
 impl BoxSnapshot {
     /// Source node identity, validated while the snapshot was constructed.
@@ -74,6 +86,10 @@ impl BoxSnapshot {
 
     pub(crate) fn requires_special_layout(&self) -> bool {
         self.special_layout
+    }
+
+    pub(crate) fn html_tag(&self) -> HtmlTag {
+        self.html_tag
     }
 }
 
@@ -168,6 +184,26 @@ impl BoxTree {
                 }
                 _ => false,
             };
+            let html_tag = match node.kind() {
+                NodeKind::Element(element)
+                    if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
+                {
+                    let local = element.name().local();
+                    let document_parent = node.parent().is_some_and(|p| {
+                        document
+                            .node(p)
+                            .is_ok_and(|p| matches!(p.kind(), NodeKind::Document))
+                    });
+                    if local.eq_ignore_ascii_case("html") && document_parent {
+                        HtmlTag::DocumentElement
+                    } else if local.eq_ignore_ascii_case("body") {
+                        HtmlTag::Body
+                    } else {
+                        HtmlTag::Other
+                    }
+                }
+                _ => HtmlTag::Other,
+            };
             let (kind, style, text) = match node.kind() {
                 NodeKind::Element(element) => {
                     let style = *index.get(&id).ok_or(LayoutError::MissingStyle(id))?;
@@ -226,6 +262,7 @@ impl BoxTree {
                 style: Some(style),
                 text,
                 special_layout,
+                html_tag,
             });
             parents.push((depth, Some(current), shared));
         }

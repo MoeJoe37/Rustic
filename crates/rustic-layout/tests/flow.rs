@@ -207,7 +207,7 @@ fn whitespace_only_runs_vanish_but_preserved_or_non_css_whitespace_needs_inline_
 }
 
 #[test]
-fn unsupported_contexts_controls_and_overflow_return_typed_errors() {
+fn unsupported_contexts_controls_and_sticky_return_typed_errors() {
     for css in [
         "display:inline",
         "display:flex",
@@ -221,17 +221,10 @@ fn unsupported_contexts_controls_and_overflow_return_typed_errors() {
             UnsupportedFlow::FormattingContext,
         );
     }
-    for css in ["position:relative", "position:absolute", "float:left"] {
-        unsupported(
-            "<main></main>",
-            &format!("main {{{css}}}"),
-            UnsupportedFlow::Positioning,
-        );
-    }
     unsupported(
         "<main></main>",
-        "main {overflow:hidden}",
-        UnsupportedFlow::Overflow,
+        "main {position:sticky}",
+        UnsupportedFlow::Positioning,
     );
     for html in [
         "<img>",

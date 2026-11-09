@@ -93,7 +93,11 @@ pub(crate) fn lp(value: &LengthPercentage, basis: f64) -> Result<f64, MeasureErr
     Ok(CssPx::new(n)?.get())
 }
 
-fn auto(style: &ComputedStyle, property: P, basis: f64) -> Result<Option<f64>, MeasureError> {
+pub(crate) fn auto(
+    style: &ComputedStyle,
+    property: P,
+    basis: f64,
+) -> Result<Option<f64>, MeasureError> {
     match style.get(property) {
         V::LengthPercentageOrAuto(LengthPercentageOrAuto::Auto) => Ok(None),
         V::LengthPercentageOrAuto(LengthPercentageOrAuto::LengthPercentage(v)) => {
@@ -103,14 +107,18 @@ fn auto(style: &ComputedStyle, property: P, basis: f64) -> Result<Option<f64>, M
     }
 }
 
-fn padding(style: &ComputedStyle, property: P, basis: f64) -> Result<CssPx, MeasureError> {
+pub(crate) fn padding(
+    style: &ComputedStyle,
+    property: P,
+    basis: f64,
+) -> Result<CssPx, MeasureError> {
     match style.get(property) {
         V::LengthPercentage(v) => Ok(CssPx::new(lp(v, basis)?.max(0.0))?),
         _ => Err(MeasureError::InvalidComputedValue),
     }
 }
 
-fn border(style: &ComputedStyle, property: P) -> Result<CssPx, MeasureError> {
+pub(crate) fn border(style: &ComputedStyle, property: P) -> Result<CssPx, MeasureError> {
     match style.get(property) {
         V::BorderWidth(BorderWidth::Length(l)) if l.unit == LengthUnit::Px && l.value >= 0.0 => {
             Ok(CssPx::new(l.value)?)
@@ -145,19 +153,43 @@ pub fn measure_block_width(
     {
         return Err(MeasureError::UnsupportedFormatting);
     }
+    measure_in_band(style, containing_width, containing_direction, (0.0, 0.0))
+}
+
+/// Padding and border edges; percentages resolve against `basis` (CSS 2.2 §8.4).
+pub(crate) fn box_edges(style: &ComputedStyle, basis: f64) -> Result<(Edges, Edges), MeasureError> {
+    Ok((
+        Edges {
+            top: padding(style, P::PaddingTop, basis)?,
+            right: padding(style, P::PaddingRight, basis)?,
+            bottom: padding(style, P::PaddingBottom, basis)?,
+            left: padding(style, P::PaddingLeft, basis)?,
+        },
+        Edges {
+            top: border(style, P::BorderTopWidth)?,
+            right: border(style, P::BorderRightWidth)?,
+            bottom: border(style, P::BorderBottomWidth)?,
+            left: border(style, P::BorderLeftWidth)?,
+        },
+    ))
+}
+
+/// The normal-flow width equation inside a float-narrowed band.
+///
+/// `floors` are the distances by which floats intrude from the containing
+/// block's left and right edges. A margin smaller than its floor is raised to
+/// it (margins may overlap floats, borders may not); auto margins distribute
+/// the remaining band. Percentages still resolve against the full width.
+pub(crate) fn measure_in_band(
+    style: &ComputedStyle,
+    containing_width: CssPx,
+    containing_direction: Direction,
+    floors: (f64, f64),
+) -> Result<BlockMeasure, MeasureError> {
     let basis = containing_width.get();
-    let pad = Edges {
-        top: padding(style, P::PaddingTop, basis)?,
-        right: padding(style, P::PaddingRight, basis)?,
-        bottom: padding(style, P::PaddingBottom, basis)?,
-        left: padding(style, P::PaddingLeft, basis)?,
-    };
-    let borders = Edges {
-        top: border(style, P::BorderTopWidth)?,
-        right: border(style, P::BorderRightWidth)?,
-        bottom: border(style, P::BorderBottomWidth)?,
-        left: border(style, P::BorderLeftWidth)?,
-    };
+    let (pad, borders) = box_edges(style, basis)?;
+    let (floor_left, floor_right) = floors;
+    let band = basis - floor_left - floor_right;
     let extras = pad
         .left
         .checked_add(pad.right)?
@@ -171,8 +203,11 @@ pub fn measure_block_width(
             n.max(0.0)
         }
     };
-    let left = auto(style, P::MarginLeft, basis)?;
-    let right = auto(style, P::MarginRight, basis)?;
+    // Inside an intruded band, a margin keeps only its part beyond the float.
+    let lower =
+        |m: Option<f64>, floor: f64| m.map(|m| if floor > 0.0 { (m - floor).max(0.0) } else { m });
+    let left = lower(auto(style, P::MarginLeft, basis)?, floor_left);
+    let right = lower(auto(style, P::MarginRight, basis)?, floor_right);
     let specified = auto(style, P::Width, basis)?.map(box_adjust);
     let minimum = box_adjust(auto(style, P::MinWidth, basis)?.unwrap_or(0.0));
     let maximum = match style.get(P::MaxWidth) {
@@ -182,10 +217,10 @@ pub fn measure_block_width(
     };
     let mut ml = left.unwrap_or(0.0);
     let mut mr = right.unwrap_or(0.0);
-    let available = CssPx::new(basis - extras - ml - mr)?.get();
+    let available = CssPx::new(band - extras - ml - mr)?.get();
     let tentative = specified.unwrap_or(available.max(0.0));
     let width = maximum.map_or(tentative, |m| tentative.min(m)).max(minimum);
-    let underflow = CssPx::new(basis - extras - ml - mr - width)?.get();
+    let underflow = CssPx::new(band - extras - ml - mr - width)?.get();
     let fixed = specified.is_some() || width != tentative;
     if fixed && underflow >= 0.0 && (left.is_none() || right.is_none()) {
         match (left, right) {
@@ -208,8 +243,8 @@ pub fn measure_block_width(
         padding: pad,
         border: borders,
         margin: Edges {
-            left: CssPx::new(ml)?,
-            right: CssPx::new(mr)?,
+            left: CssPx::new(ml + floor_left)?,
+            right: CssPx::new(mr + floor_right)?,
             top: CssPx::new(auto(style, P::MarginTop, basis)?.unwrap_or(0.0))?,
             bottom: CssPx::new(auto(style, P::MarginBottom, basis)?.unwrap_or(0.0))?,
         },

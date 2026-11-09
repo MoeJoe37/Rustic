@@ -85,12 +85,14 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-35 | Watch | CSS / tests | The CSS conformance denominator follows property support | Guarded |
 | TD-36 | Deliberate | Style | Filtered `:nth-child(... of S)` mutations use full restyles | Open |
 | TD-37 | Deliberate | Layout | Normal flow normalization paid; flattened and pseudo trees pending | Partly paid, REN-01c |
-| TD-38 | Deliberate | Layout | Static block subset; margin-free restriction removed by REN-02a | Partly paid |
+| TD-38 | Deliberate | Layout | Static block subset; margins (REN-02a), positioning/floats/overflow (REN-02b) paid | Partly paid |
 | TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
 | TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
 | TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
 | TD-42 | Deliberate | Text | TrueType-only font adapter without discovery, shaping or CFF/WOFF | Open, REN-03 |
 | TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Open, REN-03 |
+| TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
+| TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -712,3 +714,49 @@ contract. **Pay:** carry em ratios in `MediaEnvironment` (initial font) and
 `ContainerFacts` (the container's computed font metrics) and add fixtures.
 **Trigger:** a page whose queries use font-relative units with real fonts, or
 the next change to either evaluation contract.
+
+#### TD-38 update — REN-02b positioning, floats and overflow paid
+
+Floats, clearance, relative/absolute/fixed positioning and non-visible overflow
+no longer fail. Each has source and test evidence in `layout.position`. Sticky
+positioning, text/inline content, other formatting contexts and
+special/replaced elements remain explicit unsupported cases.
+
+### TD-44 — Superlinear float placement metered by a fixed budget
+
+Placing a float scans every earlier float in its formatting context, so `n`
+floats cost O(n²). An auto-height formatting root beside floats can be laid out
+again once per float bottom below it, and nested retries multiply. Rather than
+trust these bounds, every box visit, float scan and containing-chain step is
+charged to `MAX_FLOW_WORK` (64,000,000 units). That also polls cancellation, and
+exceeding it fails atomically with `FlowError::WorkLimit`. The budget is a
+constant because `LayoutLimits` is built with struct literals in `rustic-cli`,
+and adding a field would break them. **Pay:** sort exclusions into bands (or an
+interval tree) and cache retry results per available width. Move the budget
+into a non-exhaustive limits type. **Trigger:** profiling of float-heavy pages,
+a fuzz finding that hits `WorkLimit` on small input, or the next `LayoutLimits`
+change.
+
+### TD-45 — Approximations in floats, static positions and scroll geometry
+
+REN-02b makes these choices where the spec allows a choice or leaves the case
+open:
+- A float or absolute static position met while margins are still collapsing
+  waits for the strut to resolve, as LayoutNG does.
+- A block that gets clearance is treated as resolved, so its own margins no
+  longer collapse through it.
+- Before clearance is decided, queued floats are placed at `cursor + strut`.
+- Block-only max-content sums consecutive floats and resets after in-flow
+  boxes.
+- Scrollable overflow has no end-padding inflation, there is no
+  `overflow-clip-margin`, and no scrollbar gutter is reserved, matching overlay
+  scrollbars.
+- Percentage `top`/`bottom` against an indefinite height are treated as `auto`
+  for relative boxes.
+
+**Reason:** the fixture-backed geometry is deterministic and every choice is
+documented, without inventing UI or text metrics. **Pay:** compare against
+layout WPT once text and reftests exist (REN-07), add scrollbar metrics with
+the platform UI, and use real intrinsic sizes after REN-03. **Trigger:**
+layout-WPT import, scrolling UI, or inline content inside floats.
+

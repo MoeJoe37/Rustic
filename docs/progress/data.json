@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "0a713b87dc469f1c3c8507a1e485a60e97dc10f3612bf2c5cc725b951c3173f8",
-  "percent": "22.97",
+  "source_fingerprint": "656d5dfa9c7331e3b91c2aba70891942306713ce94c757c2cbb6ad4f40b25ca8",
+  "percent": "23.70",
   "verified_percent": "20.27",
-  "partial_percent": "2.70",
+  "partial_percent": "3.43",
   "completed": 36,
-  "in_progress": 8,
+  "in_progress": 9,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 0,
       "total": 17,
-      "percent": "20.26",
+      "percent": "26.26",
       "verified_percent": "0.00",
-      "partial_percent": "20.26"
+      "partial_percent": "26.26"
     },
     {
       "id": "M4",
@@ -1831,8 +1831,8 @@
               "evidence": [
                 {
                   "kind": "source",
-                  "path": "crates/rustic-layout/src/margins.rs",
-                  "marker": "pub(crate) fn collapse_block"
+                  "path": "crates/rustic-layout/src/flow.rs",
+                  "marker": "fn exit_block"
                 },
                 {
                   "kind": "test",
@@ -1886,9 +1886,78 @@
           "label": "Floats, positioning and overflow",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "positioning",
+              "label": "Relative offsets and absolute/fixed containing-block equations",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/position.rs",
+                  "marker": "pub(crate) fn absolute_width"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn absolute_boxes_use_the_positioned_ancestor_padding_box"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn relative_offsets_shift_a_subtree_but_not_its_siblings"
+                }
+              ]
+            },
+            {
+              "id": "floats",
+              "label": "Float placement, clearance and float-avoiding formatting roots",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/exclusions.rs",
+                  "marker": "pub(crate) fn place"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn float_placement_matches_an_independent_row_raster_model"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn clearance_moves_blocks_below_selected_floats"
+                }
+              ]
+            },
+            {
+              "id": "overflow",
+              "label": "Overflow clipping, scroll-container geometry and viewport propagation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/overflow.rs",
+                  "marker": "pub(crate) fn assign"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn overflow_clips_follow_the_containing_block_chain"
+                }
+              ]
+            },
+            {
+              "id": "sticky",
+              "label": "Sticky positioning against scroll offsets",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "0.97"
         },
         {
@@ -1944,12 +2013,12 @@
       ],
       "points": 46,
       "completed": 0,
-      "in_progress": 2,
+      "in_progress": 3,
       "total": 10,
-      "contribution": "1.12",
-      "percent": "12.50",
+      "contribution": "1.85",
+      "percent": "20.65",
       "verified_percent": "0.00",
-      "partial_percent": "12.50"
+      "partial_percent": "20.65"
     },
     {
       "id": "paint",

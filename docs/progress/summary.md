@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 22.97%** = 20.27% verified complete + 2.70% partial credit. 36/172 capabilities complete, 8 in progress.
+**Overall completion: 23.70%** = 20.27% verified complete + 3.43% partial credit. 36/172 capabilities complete, 9 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `0a713b87dc469f1c3c8507a1e485a60e97dc10f3612bf2c5cc725b951c3173f8`.
+Catalog: `engine-v3`. Source fingerprint: `656d5dfa9c7331e3b91c2aba70891942306713ce94c757c2cbb6ad4f40b25ca8`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `0a713b87dc469f1c3c8507a1e485a60e97dc1
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 0/17 | 20.26% | 0.00% | 12.22% |
+| M3 Static renderer | 0/17 | 26.26% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -31,7 +31,7 @@ Catalog: `engine-v3`. Source fingerprint: `0a713b87dc469f1c3c8507a1e485a60e97dc1
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 1 | 10.22% | 0.00% | 4% | 0.40 |
-| Layout | 0/10 | 2 | 12.50% | 0.00% | 9% | 1.12 |
+| Layout | 0/10 | 3 | 20.65% | 0.00% | 9% | 1.85 |
 | Paint & raster | 0/7 | 4 | 15.74% | 0.00% | 6% | 0.94 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -140,11 +140,15 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **in progress 75.00%** `layout.block` — Block flow, margins and anonymous boxes · size 5 · M3 · 0.97% of engine
   - [x] Normal-flow non-replaced horizontal width equation ([source](../../crates/rustic-layout/src/sizing.rs), [test](../../crates/rustic-layout/tests/reference.rs))
   - [x] Vertical block flow and used geometry ([source](../../crates/rustic-layout/src/flow.rs), [test](../../crates/rustic-layout/tests/flow.rs), [test](../../crates/rustic-layout/tests/flow.rs))
-  - [x] Adjoining and parent-child margin collapse ([source](../../crates/rustic-layout/src/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs))
+  - [x] Adjoining and parent-child margin collapse ([source](../../crates/rustic-layout/src/flow.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs), [test](../../crates/rustic-layout/tests/margins.rs))
   - [ ] Mixed block/inline flow through anonymous boxes
 - **planned** `layout.inline` — Inline formatting, line boxes and baselines · size 5 · M3 · 0.97% of engine
 - **planned** `layout.sizing` — Intrinsic and replaced-element sizing · size 3 · M3 · 0.58% of engine
-- **planned** `layout.position` — Floats, positioning and overflow · size 5 · M3 · 0.97% of engine
+- **in progress 75.00%** `layout.position` — Floats, positioning and overflow · size 5 · M3 · 0.97% of engine
+  - [x] Relative offsets and absolute/fixed containing-block equations ([source](../../crates/rustic-layout/src/position.rs), [test](../../crates/rustic-layout/tests/position.rs), [test](../../crates/rustic-layout/tests/position.rs))
+  - [x] Float placement, clearance and float-avoiding formatting roots ([source](../../crates/rustic-layout/src/exclusions.rs), [test](../../crates/rustic-layout/tests/position.rs), [test](../../crates/rustic-layout/tests/position.rs))
+  - [x] Overflow clipping, scroll-container geometry and viewport propagation ([source](../../crates/rustic-layout/src/overflow.rs), [test](../../crates/rustic-layout/tests/position.rs))
+  - [ ] Sticky positioning against scroll offsets
 - **planned** `layout.flex` — Flexbox · size 5 · M3 · 0.97% of engine
 - **planned** `layout.grid` — Grid · size 5 · M9 · 0.97% of engine
 - **planned** `layout.tables` — Tables · size 5 · M9 · 0.97% of engine

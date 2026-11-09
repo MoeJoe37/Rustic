@@ -72,6 +72,16 @@ impl HeightConstraint {
         })
     }
 
+    /// A constraint already solved elsewhere (absolutely positioned boxes):
+    /// `Some` is a definite content height, `None` is content-based.
+    pub(crate) fn solved(definite: Option<CssPx>) -> Self {
+        Self {
+            specified: definite,
+            minimum: CssPx::ZERO,
+            maximum: None,
+        }
+    }
+
     pub(crate) fn used(&self, automatic: CssPx) -> CssPx {
         let tentative = self.specified.unwrap_or(automatic);
         let limited = self.maximum.map_or(
@@ -87,10 +97,6 @@ impl HeightConstraint {
 
     pub(crate) fn is_auto(&self) -> bool {
         self.specified.is_none()
-    }
-
-    pub(crate) fn minimum(&self) -> CssPx {
-        self.minimum
     }
 
     pub(crate) fn can_collapse_through(&self) -> bool {

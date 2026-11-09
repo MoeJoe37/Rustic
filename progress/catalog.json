@@ -1605,8 +1605,8 @@
               "evidence": [
                 {
                   "kind": "source",
-                  "path": "crates/rustic-layout/src/margins.rs",
-                  "marker": "pub(crate) fn collapse_block"
+                  "path": "crates/rustic-layout/src/flow.rs",
+                  "marker": "fn exit_block"
                 },
                 {
                   "kind": "test",
@@ -1654,8 +1654,77 @@
           "label": "Floats, positioning and overflow",
           "size": 5,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "positioning",
+              "label": "Relative offsets and absolute/fixed containing-block equations",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/position.rs",
+                  "marker": "pub(crate) fn absolute_width"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn absolute_boxes_use_the_positioned_ancestor_padding_box"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn relative_offsets_shift_a_subtree_but_not_its_siblings"
+                }
+              ]
+            },
+            {
+              "id": "floats",
+              "label": "Float placement, clearance and float-avoiding formatting roots",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/exclusions.rs",
+                  "marker": "pub(crate) fn place"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn float_placement_matches_an_independent_row_raster_model"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn clearance_moves_blocks_below_selected_floats"
+                }
+              ]
+            },
+            {
+              "id": "overflow",
+              "label": "Overflow clipping, scroll-container geometry and viewport propagation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/overflow.rs",
+                  "marker": "pub(crate) fn assign"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/position.rs",
+                  "marker": "fn overflow_clips_follow_the_containing_block_chain"
+                }
+              ]
+            },
+            {
+              "id": "sticky",
+              "label": "Sticky positioning against scroll offsets",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "layout.flex",

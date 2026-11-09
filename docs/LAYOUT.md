@@ -88,16 +88,17 @@ Styles must be recomputed for a changed viewport before layout when viewport
 units/media conditions change; layout itself re-resolves containing-block
 percentages. The geometry test exercises both resize paths.
 
-The accepted subset is explicit (TD-38): static non-replaced block/flow-root
-boxes and visible overflow. Horizontal margins (including auto/negative values)
-and collapsed vertical margins are supported. Pure CSS collapsible
-whitespace under normal/nowrap produces no fragment. Preserved whitespace,
-non-whitespace text, inline/list/flex/grid/table contexts, positioning/floats,
-overflow clipping/scrolling, replaced elements,
-native controls, special HTML layout and foreign content fail atomically with
-a typed reason. Empty inline boxes are not silently treated as empty blocks.
-No shaping metrics or anonymous line boxes are invented. This is useful for inspecting controlled nested block fixtures; it
-is not yet arbitrary article layout.
+The accepted subset is explicit (TD-38): non-replaced block/flow-root boxes.
+Horizontal margins (including auto/negative values) and collapsed vertical
+margins are supported; REN-02b adds floats, clearance, relative/absolute/fixed
+positioning and overflow clipping (below). Pure CSS collapsible whitespace
+under normal/nowrap produces no fragment. Preserved whitespace, non-whitespace
+text, inline/list/flex/grid/table contexts, sticky positioning, replaced
+elements, native controls, special HTML layout and foreign content fail
+atomically with a typed reason. Empty inline boxes are not silently treated as
+empty blocks. No shaping metrics or anonymous line boxes are invented. This is
+useful for inspecting controlled block fixtures; it is not yet arbitrary
+article layout.
 
 Layout checks its own node/fragment/depth/text limits, cancellation during
 traversal, long whitespace runs and all geometry passes, and coordinate bounds
@@ -119,8 +120,8 @@ Specification basis, reviewed 2026-11-08: CSS 2.2
 [normal flow](https://www.w3.org/TR/CSS22/visuren.html#normal-flow),
 [§10.5–10.7 heights](https://www.w3.org/TR/CSS22/visudet.html#the-height-property)
 and [margin collapse](https://www.w3.org/TR/CSS22/box.html#collapsing-margins).
-These are focused reference cases, not a layout-WPT result. Clearance awaits
-floats, which the reference still explicitly refuses.
+These are focused reference cases, not a layout-WPT result. Clearance and
+floats arrived with REN-02b.
 
 ## Adjoining margin collapse (REN-02a)
 
@@ -183,8 +184,9 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 
 1. Finish REN-01b: normalize principal/anonymous boxes and mixed inline/block
    content, then expand the initial block geometry reference.
-2. Finish REN-02: intrinsic/replaced sizing, overflow, positioning, floats and
-   clearance; static in-flow margin collapse is implemented.
+2. Finish REN-02: intrinsic sizing for text and replaced elements, and sticky
+   positioning once scroll offsets exist. Margin collapse, floats, clearance,
+   relative/absolute/fixed positioning and overflow clipping are implemented.
 3. REN-03/04: shaping/bidi/line layout, fragments and paint order
    (the REN-03a font adapter below is done).
    The first block display list exists ([PAINT.md](PAINT.md)).
@@ -323,4 +325,136 @@ CSS Fonts 4 [§5.2 font matching](https://www.w3.org/TR/css-fonts-4/#font-matchi
 and CSS Values 4 [§6.1.1 font-relative lengths](https://www.w3.org/TR/css-values-4/#font-relative-lengths).
 These are focused fixtures, not a font-conformance or WPT result. Remaining
 work is tracked in TD-42 and TD-43.
+
+## Floats, positioning and overflow (REN-02b)
+
+### One top-down walk
+
+`BlockLayout::compute` now lays out each block formatting context (BFC) in one
+iterative top-down walk with an explicit frame stack. Each BFC keeps a cursor,
+one unresolved margin strut and a queue. The strut resolves at a border or
+padding edge, a non-empty box, clearance, or a BFC boundary. Boxes still inside
+it get their top at that resolution point. An empty box that can collapse
+through takes `cursor + strut` before adding its own bottom margin, as in
+REN-02a. All REN-02a margin fixtures, the 192-layout adjacency-graph model and
+the prefix-sum model pass unchanged; the old bottom-up `collapse_block` pass was
+removed.
+
+BFC roots are the top-level boxes, `display:flow-root`, floats, absolute/fixed
+boxes and boxes whose used `overflow` is `hidden`, `scroll` or `auto`. Each BFC
+has its own coordinate space with the root's content box at the origin. A box
+stores its border origin relative to its parent's child space. Final rectangles
+are composed in preorder, so relative offsets move the whole subtree.
+
+### Floats and clearance
+
+Floats are blockified by M2, sized by CSS 2.2 §10.3.5 shrink-to-fit with auto
+margins as zero, and laid out as independent BFCs. A float met while the strut
+is unresolved waits in the queue. It is placed at the resolution point, which
+matches the later adjoining margins, and never above its containing block's
+content top. `exclusions.rs` places a margin box as high and then as far to its
+side as possible. The top stays at or below every earlier float (rule 6). A band
+narrower than the box moves it to the next float bottom. A box wider than an
+unintruded containing block keeps its side's edge. `inline-start`/`inline-end`
+floats and `clear` values use the containing block's direction. Negative-height
+margin boxes exclude nothing.
+
+Clearance (§9.5.2) first places queued floats at `cursor + strut` without
+resolving the strut. It then compares the hypothetical border top
+`cursor + (strut ∪ margin-top)` with the lowest relevant float bottom. If the
+hypothetical position is higher, the preceding strut resolves without the
+cleared box's top margin, and the border top moves to the float bottom.
+Otherwise the margin collapses normally. Floats clear earlier floats too.
+
+An in-flow BFC root's border box avoids float margin boxes in its BFC; its
+margins may overlap them. It narrows inside the free band: a margin smaller than
+the float intrusion is raised to it, and auto margins centre within the band. It
+moves down to the next float bottom when it cannot fit. A fixed height is
+checked over its whole extent before layout. An auto height is checked after
+layout. On overlap, the subtree is laid out again at the same top in the band
+over its laid-out extent. If that still overlaps without growing, it moves to
+the next float bottom. This matches trying layout opportunities in order. Each
+same-top retry needs a strictly larger extent, and every retry is charged to the
+work budget (TD-44). Auto-height BFC roots grow to contain their floats (§10.6.7); ordinary
+blocks do not.
+
+### Relative, absolute and fixed positioning
+
+Relative offsets (§9.4.3) apply after flow layout: `left` wins over `right` in
+an LTR containing block and loses in RTL, and `top` wins over `bottom`.
+Percentage `top`/`bottom` against an indefinite containing height are treated as
+`auto`. Siblings and parent heights ignore the shift.
+
+Absolute boxes use the padding box of the nearest `relative`/`absolute`/`fixed`
+ancestor, or the initial containing block. Fixed boxes use the viewport, since
+there is no transform or scrolling. They are out of flow: siblings skip them and
+margins collapse past them. They are laid out after their containing block in a
+FIFO pass, so its final size is known. `position.rs` solves the §10.3.7
+horizontal and §10.6.4 vertical equations: all six rules, both-auto margins
+(including the negative LTR/RTL case), over-constraint by containing direction,
+and max then min reruns. Shrink-to-fit uses block-only intrinsic sizes.
+Children resolve percentages against the box's height only when that height
+does not depend on content.
+
+The static position is the hypothetical margin edge in the parent's content box:
+the left edge for an LTR parent and the right edge for RTL. Its top is the
+strut's resolution point (the spec allows an approximation; TD-45). It is mapped
+to the containing block along the parent chain, including relative offsets of
+intermediate boxes for fixed boxes.
+
+### Overflow without scrolling UI
+
+Overflow values come from M2 after its axis pairing. The root's non-visible
+overflow, or else the HTML body's, propagates to the viewport (CSS Overflow 3
+§3.3), and that element then uses `visible`. The viewport turns `visible` into
+`auto` and `clip` into `hidden`. `viewport_overflow()` reports the result; the
+dump adds a `viewport` line only when it is not `auto/auto`.
+
+Each fragment reports its used `overflow()` and the `clip()` that ancestors
+apply to it: padding-box intervals on each non-visible axis, intersected along
+the containing-block chain. An absolute box therefore escapes the clip of a
+non-positioned ancestor between it and its containing block, and fixed boxes
+escape every clip. `overflow:clip` clips without making a scroll container, so
+margins still collapse through it. Scroll containers report
+`scrollable_overflow()`: the union of the padding box and contributing border
+boxes, each restricted by any intermediate `clip`. The area is clamped to what a
+scroll origin can reach: nothing above the top, nothing before the start edge in
+LTR, nothing past the right edge in RTL. The viewport reports the same for the
+initial containing block. Scroll positions stay at zero, and no scrollbar gutter
+is reserved, like overlay scrollbars. `overflow-clip-margin` and end-padding
+inflation are not implemented (TD-45).
+
+### Limits and evidence
+
+Float placement scans earlier floats, and BFC retries repeat subtrees. Every
+visit, float scan and chain step is charged to `MAX_FLOW_WORK` (64,000,000
+units) and also polls cancellation. Exceeding it returns `FlowError::WorkLimit`
+atomically (TD-44). Sticky positioning returns
+`UnsupportedFlow::Positioning`. The former `UnsupportedFlow::Overflow` refusal
+was removed.
+
+`tests/position.rs` has thirteen scenarios with exact geometry:
+- relative offsets in LTR and RTL, including percentages;
+- every absolute equation rule against a bordered, padded containing block;
+- static positions, shrink-to-fit, and definite versus content-based heights;
+- the initial containing block, fixed boxes and nested absolute boxes;
+- float stacking, wrapping and logical sides;
+- clearance with and without collapse;
+- float avoidance, including the retry case;
+- clip chains, scroll clamping and viewport propagation;
+- dump fields and atomic failure on sticky positioning.
+
+An independent model rasterizes 10px rows and moves one row at a time. It checks
+1,200 float positions from 150 generated eight-float sequences against the
+interval-scanning implementation.
+
+Specification basis, reviewed 2026-11-09: CSS 2.2
+[§9.3–9.7](https://www.w3.org/TR/CSS22/visuren.html#positioning-scheme),
+[§10.3.5/10.3.7](https://www.w3.org/TR/CSS22/visudet.html#float-width),
+[§10.6.4/10.6.7](https://www.w3.org/TR/CSS22/visudet.html#abs-non-replaced-height),
+CSS Position 3 [relative](https://www.w3.org/TR/css-position-3/#relpos-insets),
+CSS Overflow 3 [§2–3](https://www.w3.org/TR/css-overflow-3/#overflow-properties)
+and CSS Logical 1 [float/clear](https://www.w3.org/TR/css-logical-1/#float-clear).
+These are focused fixtures and models, not a layout-WPT or browser comparison
+result.
 

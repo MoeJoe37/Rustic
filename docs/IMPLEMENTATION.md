@@ -830,6 +830,29 @@ parity. A new `text-sfnt` fuzz target replays the fonts and their prefixes.
 Three of four `text.fonts` steps are credited; discovery, CFF/WOFF, shaping and
 query-unit fonts remain (TD-42, TD-43). See [LAYOUT.md](LAYOUT.md#font-adapter-ren-03a).
 
+## REN-02b — Floats, positioning and overflow
+
+The block reference is now one iterative top-down walk per block formatting
+context, with an unresolved margin strut and a queue for floats and static
+positions met before it resolves. REN-02a's margin fixtures and models pass
+unchanged. New: floats with shrink-to-fit widths and §9.5.1 placement;
+clearance against the hypothetical position; formatting roots that narrow
+beside or move below floats, laid out again when an auto height meets a float;
+relative offsets; absolute and fixed boxes solved by the §10.3.7/§10.6.4
+equations against their containing block after it is laid out. Overflow is
+supported without scrolling UI: used values with root/body-to-viewport
+propagation, clips that follow the containing-block chain, and clamped
+scrollable-overflow rectangles. Fragments gain `scheme()`,
+`relative_offset()`, `containing_block()`, `overflow()`, `clip()` and
+`scrollable_overflow()`. Dump lines add fields only for non-default values, so
+the existing CLI goldens are unchanged.
+
+Thirteen scenarios and an independent row-raster float model (1,200 positions)
+are the evidence. Work is metered by `MAX_FLOW_WORK` (TD-44); spec-permitted
+approximations are listed in TD-45. Sticky positioning stays an explicit
+refusal. `layout.position` gains positioning, float and overflow steps; sticky
+remains planned. See [LAYOUT.md](LAYOUT.md#floats-positioning-and-overflow-ren-02b).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

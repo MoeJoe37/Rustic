@@ -13,6 +13,7 @@
 mod exclusions;
 mod flow;
 mod formatting;
+mod fragments;
 mod geometry;
 mod height;
 mod inline;
@@ -33,6 +34,7 @@ pub use flow::{
 pub use formatting::{
     FormattingBox, FormattingError, FormattingKind, FormattingLimits, FormattingTree, InlineEdges,
 };
+pub use fragments::{FragmentKind, FragmentNode, FragmentTree};
 pub use geometry::{
     CssPoint, CssPx, CssRect, CssSize, DevicePx, DeviceScale, GeometryError, MAX_CSS_PX, View,
 };

@@ -168,6 +168,7 @@ fn resize_reflows_percentages_and_viewport_units_with_a_matching_style_snapshot(
             ComputeContext {
                 viewport_width: width,
                 viewport_height: 200.0,
+                ..ComputeContext::default()
             },
         );
         let t = BoxTree::build(

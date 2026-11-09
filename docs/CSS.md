@@ -485,10 +485,15 @@ Cascade 5 §4.4, with each property's "computed value" line):
 | `background-size` | Lengths become pixels |
 | Math functions | Lengths become pixels and the tree is simplified again; one value becomes a plain length or percentage clamped to the property's range, a pixel/percentage mix stays a calculation (CSS-03b) |
 
-Fonts are not loaded yet, so `ex` and `ch` use the specification's 0.5em
-fallback, `cap` 0.7em and `ic` 1em, and `normal` line height counts as 1.2 for
-`lh`. Computing them from loaded font metrics is planned for M3 with font
-loading (REN-03, catalog `text.fonts`). `style_tree` returns both the specified and computed style of each
+`ex`, `ch`, `cap` and `ic` (and `rex`, `rch`, `rcap`, `ric`) use the metrics
+of the element's first available font when `ComputeContext::fonts` supplies a
+`FontMetricsSource` (REN-03a, see [LAYOUT.md](LAYOUT.md#font-adapter-ren-03a)):
+x-height, the advance of `0`, cap height and the advance of 水. Units inside
+`font-size` use the parent's font, root units the root's, and the root's
+parent is the initial `serif` font at weight 400. Without a source or a
+matching font they keep the specification's 0.5em fallback for `ex` and `ch`,
+0.7em for `cap` and 1em for `ic`. `normal` line height counts as 1.2 for `lh`.
+Media and container queries still use the fallback ratios (TD-43). `style_tree` returns both the specified and computed style of each
 element and inherits computed values.
 
 ### User-agent stylesheet and `<style>` elements

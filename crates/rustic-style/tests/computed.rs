@@ -112,9 +112,13 @@ fn lengths_become_pixels_and_percentages_stay() {
     let small = ComputeContext {
         viewport_width: 400.0,
         viewport_height: 800.0,
+        ..ComputeContext::default()
     };
     let sheet = "#a { width: 50vmin; height: 25vmax }";
-    assert_eq!(computed_in(html, sheet, "a", "width", small), "200px");
+    assert_eq!(
+        computed_in(html, sheet, "a", "width", small.clone()),
+        "200px"
+    );
     assert_eq!(computed_in(html, sheet, "a", "height", small), "200px");
 }
 

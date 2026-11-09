@@ -87,6 +87,14 @@ flow remains planned; no whole block, fragment or M3 capability is marked done.
 As in the prior M3 commits, run `tools/progress.py --write` to regenerate the
 README block and SVG/JSON/Markdown outputs, then validate with `--check`.
 
+## REN-03a checkpoint (2026-11-09)
+
+The `engine-v3` denominator, weights and sizes are unchanged. `text.fonts`
+moves from planned to in progress with three of four verified steps: the
+bounds-checked TrueType parser, CSS face matching, and computed `ex`/`ch`/
+`cap`/`ic` from loaded metrics, each with source and test markers. System font
+discovery and CFF/WOFF formats stay planned, so the capability is not complete.
+
 ## engine-v2 scope change (2026-11-07)
 
 [ADR 0007](adr/0007-product-scope.md) adds required WebAssembly, Rustic-only

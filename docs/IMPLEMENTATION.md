@@ -805,6 +805,31 @@ errors. Catalog steps credited: `paint.display` (block display list),
 `paint.conformance` (deterministic PNG output). Shortcuts are TD-41. See
 [PAINT.md](PAINT.md). M3 is still in progress.
 
+## REN-03a — Font adapter and font-relative units
+
+The new `rustic-text` crate parses TrueType (`glyf`) sfnt fonts from scratch in
+safe Rust with no dependencies. Loading validates the table directory and the
+`head`, `hhea`, `maxp`, `hmtx`, `cmap` (formats 4 and 12), `name`, optional
+`OS/2` and `loca` tables with checked reads; outlines (simple and composite,
+with transforms) are parsed on demand through an explicit work stack under
+`FontLimits`. `FontDatabase` implements CSS Fonts 4 face matching (family list,
+generic mapping and fallback, then stretch, style and weight). Face metrics
+supply x-height and cap height (OS/2, else the `x`/`H` glyph tops) and the `0`
+and 水 advances, with CSS fallbacks when absent.
+
+`rustic-style` gains `FontMetricsSource` and an optional `ComputeContext::fonts`;
+computed `ex`/`ch`/`cap`/`ic` and their root forms now use the first available
+font, and `ComputedStyle::font_metrics` exposes the ratios. Without a source the
+earlier fallback values are unchanged. Four original CC0 test fonts are generated
+by `tools/generate_test_fonts.py` (checked byte for byte) and embedded by
+`rustic_text::bundled`. Fourteen font tests cover metrics, cmap differential
+lookup, short `hmtx`, outlines, matching, every truncation, 4,000 seeded
+mutations and limit/cycle/format rejections; eight style tests cover units,
+fallbacks, parent/root fonts, the query contract and incremental restyle
+parity. A new `text-sfnt` fuzz target replays the fonts and their prefixes.
+Three of four `text.fonts` steps are credited; discovery, CFF/WOFF, shaping and
+query-unit fonts remain (TD-42, TD-43). See [LAYOUT.md](LAYOUT.md#font-adapter-ren-03a).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -856,7 +881,7 @@ must keep all tiers green.
 | DOC-06d: `selectedcontent` mirroring | Done: last four known tree failures fixed; 1,776/1,776 runnable records |
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
-| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and nine fuzz targets with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
+| DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and parser fuzz targets (now twelve, including `paint-raster` and `text-sfnt`) with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
 | DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 | CSS-04: cascade and inheritance | Complete: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins added by CSS-07b |

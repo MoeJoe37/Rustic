@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "1f8e67718f7a3b7224673f3191487e762cc422154d35ad90a9d457ce6dcfacb7",
-  "percent": "22.56",
+  "source_fingerprint": "0a713b87dc469f1c3c8507a1e485a60e97dc10f3612bf2c5cc725b951c3173f8",
+  "percent": "22.97",
   "verified_percent": "20.27",
-  "partial_percent": "2.29",
+  "partial_percent": "2.70",
   "completed": 36,
-  "in_progress": 7,
+  "in_progress": 8,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 0,
       "total": 17,
-      "percent": "16.92",
+      "percent": "20.26",
       "verified_percent": "0.00",
-      "partial_percent": "16.92"
+      "partial_percent": "20.26"
     },
     {
       "id": "M4",
@@ -1566,9 +1566,88 @@
           "label": "Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "sfnt",
+              "label": "Bounds-checked TrueType sfnt parsing: tables, cmap and glyf outlines",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/face.rs",
+                  "marker": "pub fn parse(data: Vec<u8>, limits: &FontLimits)"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/glyf.rs",
+                  "marker": "pub(crate) fn outline("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn cmap_formats_4_and_12_agree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn mutated_fonts_never_panic"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn hostile_glyphs_hit_limits_not_recursion"
+                }
+              ]
+            },
+            {
+              "id": "matching",
+              "label": "CSS face matching by family, stretch, style and weight",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/database.rs",
+                  "marker": "pub fn best_face<'f>("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn database_matches_family_stretch_style_and_weight"
+                }
+              ]
+            },
+            {
+              "id": "units",
+              "label": "Computed ex/ch/cap/ic from the first available font's metrics",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/fonts.rs",
+                  "marker": "impl FontMetricsSource for FontDatabase"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/fonts.rs",
+                  "marker": "fn units_follow_the_selected_face"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/fonts.rs",
+                  "marker": "fn parent_and_root_fonts_feed_font_size_and_root_units"
+                }
+              ]
+            },
+            {
+              "id": "discovery",
+              "label": "System font discovery and CFF/WOFF formats",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "0.54"
         },
         {
@@ -1624,12 +1703,12 @@
       ],
       "points": 22,
       "completed": 0,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 6,
-      "contribution": "0.00",
-      "percent": "0.00",
+      "contribution": "0.40",
+      "percent": "10.22",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "10.22"
     },
     {
       "id": "layout",

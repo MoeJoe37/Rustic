@@ -42,6 +42,7 @@ mod cascade;
 mod computed;
 mod containers;
 mod dom;
+mod fonts;
 mod html;
 mod html_state;
 mod invalidation;
@@ -60,6 +61,7 @@ pub use dom::{
     DomElement, ElementStyle, query_selector_all, shadow_tree_context, style_tree,
     style_tree_with_sizes,
 };
+pub use fonts::{FontMetricsSource, FontQuery};
 pub use html::{
     HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,
     document_cascade_with, dump_computed_styles, html_user_agent_sheet,
@@ -71,6 +73,7 @@ pub use loading::{
     ImportReport, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader, StylesheetFetcher,
 };
 pub use matching::{MatchContext, matches, matches_complex};
+pub use rustic_text::EmRatios;
 pub use sheet::{
     ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
     parse_style_attribute,

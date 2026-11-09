@@ -1362,8 +1362,87 @@
           "label": "Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "sfnt",
+              "label": "Bounds-checked TrueType sfnt parsing: tables, cmap and glyf outlines",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/face.rs",
+                  "marker": "pub fn parse(data: Vec<u8>, limits: &FontLimits)"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/glyf.rs",
+                  "marker": "pub(crate) fn outline("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn cmap_formats_4_and_12_agree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn mutated_fonts_never_panic"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn hostile_glyphs_hit_limits_not_recursion"
+                }
+              ]
+            },
+            {
+              "id": "matching",
+              "label": "CSS face matching by family, stretch, style and weight",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/database.rs",
+                  "marker": "pub fn best_face<'f>("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/fonts.rs",
+                  "marker": "fn database_matches_family_stretch_style_and_weight"
+                }
+              ]
+            },
+            {
+              "id": "units",
+              "label": "Computed ex/ch/cap/ic from the first available font's metrics",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/fonts.rs",
+                  "marker": "impl FontMetricsSource for FontDatabase"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/fonts.rs",
+                  "marker": "fn units_follow_the_selected_face"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/fonts.rs",
+                  "marker": "fn parent_and_root_fonts_feed_font_size_and_root_units"
+                }
+              ]
+            },
+            {
+              "id": "discovery",
+              "label": "System font discovery and CFF/WOFF formats",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "text.shaping",

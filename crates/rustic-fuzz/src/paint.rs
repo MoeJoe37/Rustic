@@ -56,6 +56,7 @@ impl Target for PaintTarget {
         let context = ComputeContext {
             viewport_width: 37.0,
             viewport_height: 23.0,
+            ..ComputeContext::default()
         };
         let styles = style_tree(
             document,

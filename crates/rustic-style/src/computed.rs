@@ -9,36 +9,85 @@
 //! blockified. Percentages of a containing block (widths, margins, padding)
 //! stay percentages: they resolve during layout.
 //!
-//! Font metrics are not available before font loading (M3), so `ex` and `ch`
-//! use the specification's fallback of `0.5em`, `cap` uses `0.7em`, and `ic`
-//! uses `1em`; `lh` uses the element's computed line height with `normal`
-//! taken as `1.2`.
+//! `ex`, `ch`, `cap` and `ic` (and their root forms) use the metrics of the
+//! element's first available font from [`ComputeContext::fonts`] (REN-03a);
+//! without fonts they use the fallbacks in [`EmRatios::FALLBACK`] (`0.5em`
+//! for `ex`/`ch`, `0.7em` for `cap`, `1em` for `ic`). `lh` uses the
+//! element's computed line height with `normal` taken as `1.2`.
+
+use std::fmt;
+use std::sync::Arc;
 
 use rustic_css::{
-    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, Float, FontSize,
-    FontSizeKeyword, FontStretch, FontWeight, Length, LengthPercentage, LengthPercentageOrAuto,
-    LengthUnit, LineHeight, MaxSize, Overflow, Position, PositionComponent, PositionValue,
-    PropertyId, PropertyValue, Spacing, TextAlign, VerticalAlign,
+    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, FamilyName, Float,
+    FontSize, FontSizeKeyword, FontStretch, FontStyle, FontWeight, GenericFamily, Length,
+    LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, Overflow, Position,
+    PositionComponent, PositionValue, PropertyId, PropertyValue, Spacing, TextAlign, VerticalAlign,
 };
 
-use crate::{CustomProperties, SpecifiedStyle};
+use crate::fonts::{FontMetricsSource, FontQuery};
+use crate::{CustomProperties, EmRatios, SpecifiedStyle};
 
 /// The environment computed values depend on.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone)]
 pub struct ComputeContext {
     /// Viewport width in CSS pixels (for `vw`, `vi`, `vmin`, `vmax`, ...).
     pub viewport_width: f64,
     /// Viewport height in CSS pixels (for `vh`, `vb`, `vmin`, `vmax`, ...).
     pub viewport_height: f64,
+    /// Loaded fonts for `ex`, `ch`, `cap` and `ic`; `None` uses the CSS
+    /// fallback ratios. Two contexts are equal only when they share the
+    /// same source (`Arc` identity), since a source cannot be compared.
+    pub fonts: Option<Arc<dyn FontMetricsSource>>,
+}
+
+impl fmt::Debug for ComputeContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ComputeContext")
+            .field("viewport_width", &self.viewport_width)
+            .field("viewport_height", &self.viewport_height)
+            .field("fonts", &self.fonts.is_some())
+            .finish()
+    }
+}
+
+impl PartialEq for ComputeContext {
+    fn eq(&self, other: &Self) -> bool {
+        self.viewport_width == other.viewport_width
+            && self.viewport_height == other.viewport_height
+            && match (&self.fonts, &other.fonts) {
+                (None, None) => true,
+                (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                _ => false,
+            }
+    }
 }
 
 impl Default for ComputeContext {
-    /// A 1280×720 viewport, matching `rustic-engine`'s default.
+    /// A 1280×720 viewport, matching `rustic-engine`'s default, without fonts.
     fn default() -> Self {
         Self {
             viewport_width: 1280.0,
             viewport_height: 720.0,
+            fonts: None,
         }
+    }
+}
+
+impl ComputeContext {
+    /// The default viewport with `fonts` as the metrics source.
+    pub fn with_fonts(fonts: Arc<dyn FontMetricsSource>) -> Self {
+        Self {
+            fonts: Some(fonts),
+            ..Self::default()
+        }
+    }
+
+    fn em_ratios(&self, font: &FontQuery<'_>) -> EmRatios {
+        self.fonts
+            .as_ref()
+            .and_then(|source| source.em_ratios(font))
+            .unwrap_or(EmRatios::FALLBACK)
     }
 }
 
@@ -51,6 +100,7 @@ impl Default for ComputeContext {
 pub struct ComputedStyle {
     values: Vec<PropertyValue>,
     pub(crate) custom: CustomProperties,
+    font_ratios: EmRatios,
 }
 
 fn index(property: PropertyId) -> usize {
@@ -98,9 +148,11 @@ fn relative_weight(weight: FontWeight, parent: f64) -> f64 {
 struct Basis {
     font_px: f64,
     root_font_px: f64,
+    font: EmRatios,
+    root_font: EmRatios,
     line_px: f64,
     root_line_px: f64,
-    viewport: ComputeContext,
+    viewport: (f64, f64),
 }
 
 impl Basis {
@@ -109,16 +161,19 @@ impl Basis {
             return px;
         }
         let v = length.value;
-        let (w, h) = (self.viewport.viewport_width, self.viewport.viewport_height);
+        let (w, h) = self.viewport;
+        let (font, root) = (&self.font, &self.root_font);
         let result = match length.unit {
             LengthUnit::Em => v * self.font_px,
             LengthUnit::Rem => v * self.root_font_px,
-            LengthUnit::Ex | LengthUnit::Ch => v * self.font_px * 0.5,
-            LengthUnit::Rex | LengthUnit::Rch => v * self.root_font_px * 0.5,
-            LengthUnit::Cap => v * self.font_px * 0.7,
-            LengthUnit::Rcap => v * self.root_font_px * 0.7,
-            LengthUnit::Ic => v * self.font_px,
-            LengthUnit::Ric => v * self.root_font_px,
+            LengthUnit::Ex => v * self.font_px * font.x_height,
+            LengthUnit::Rex => v * self.root_font_px * root.x_height,
+            LengthUnit::Ch => v * self.font_px * font.zero_advance,
+            LengthUnit::Rch => v * self.root_font_px * root.zero_advance,
+            LengthUnit::Cap => v * self.font_px * font.cap_height,
+            LengthUnit::Rcap => v * self.root_font_px * root.cap_height,
+            LengthUnit::Ic => v * self.font_px * font.ideograph_advance,
+            LengthUnit::Ric => v * self.root_font_px * root.ideograph_advance,
             LengthUnit::Lh => v * self.line_px,
             LengthUnit::Rlh => v * self.root_line_px,
             LengthUnit::Vw
@@ -254,13 +309,16 @@ impl ComputedStyle {
     /// with the supplied formatting display. Registered custom properties obey
     /// their inheritance flag. This does not run selectors or the cascade.
     pub fn anonymous_flow(&self, display: Display) -> Self {
-        Self::compute(
+        let mut style = Self::compute(
             &SpecifiedStyle::anonymous(self, display),
             Some(self),
             None,
             false,
             &ComputeContext::default(),
-        )
+        );
+        // Every font property inherits, so the first available font does too.
+        style.font_ratios = self.font_ratios;
+        style
     }
 
     /// The computed initial values (the style a root inherits from).
@@ -288,6 +346,13 @@ impl ComputedStyle {
     /// The computed font size in pixels.
     pub fn font_size_px(&self) -> f64 {
         font_px_of(self)
+    }
+
+    /// The em ratios of this element's first available font, used for its
+    /// `ex`, `ch`, `cap` and `ic` units ([`EmRatios::FALLBACK`] without
+    /// fonts).
+    pub fn font_metrics(&self) -> EmRatios {
+        self.font_ratios
     }
 
     /// `property: value` lines for every longhand whose computed value differs
@@ -346,6 +411,24 @@ fn compute_values(
         _ => Color::rgb(0, 0, 0),
     };
 
+    // The first available font's metrics. The root's parent is the initial
+    // font: the initial `serif` family at weight 400, normal style/stretch.
+    let parent_ratios = match parent {
+        Some(p) => p.font_ratios,
+        None => cx.em_ratios(&FontQuery {
+            families: &[FamilyName::Generic(GenericFamily::Serif)],
+            weight: 400.0,
+            style: FontStyle::Normal,
+            stretch: 100.0,
+        }),
+    };
+    let font = font_query(specified, parent_weight);
+    let font_ratios = match parent {
+        Some(p) if font == font_query_of(p) => p.font_ratios,
+        _ => cx.em_ratios(&font),
+    };
+    let viewport = (cx.viewport_width, cx.viewport_height);
+
     // Font size first: other lengths resolve against it. Its own relative
     // units resolve against the parent (and `rem` on the root against the
     // initial 16px).
@@ -353,13 +436,15 @@ fn compute_values(
     let parent_basis = Basis {
         font_px: parent_font_px,
         root_font_px,
+        font: parent_ratios,
+        root_font: root.map_or(parent_ratios, |r| r.font_ratios),
         line_px: parent.map_or(parent_font_px * 1.2, |p| {
             line_px(p.get(P::LineHeight), parent_font_px)
         }),
         root_line_px: root.map_or(parent_font_px * 1.2, |r| {
             line_px(r.get(P::LineHeight), font_px_of(r))
         }),
-        viewport: *cx,
+        viewport,
     };
     let font_px = match specified.get(P::FontSize) {
         PropertyValue::FontSize(FontSize::Keyword(k)) => keyword_px(*k, parent_font_px),
@@ -384,9 +469,11 @@ fn compute_values(
     let mut basis = Basis {
         font_px,
         root_font_px,
+        font: font_ratios,
+        root_font: root.map_or(font_ratios, |r| r.font_ratios),
         line_px: font_px * 1.2,
         root_line_px: parent_basis.root_line_px,
-        viewport: *cx,
+        viewport,
     };
     let line_height = match specified.get(P::LineHeight) {
         PropertyValue::LineHeight(LineHeight::LengthPercentage(LengthPercentage::Percentage(
@@ -616,5 +703,55 @@ fn compute_values(
         custom: specified
             .custom_properties()
             .absolutize(&|lp| basis.lp(lp, false)),
+        font_ratios,
+    }
+}
+
+/// The font properties of a specified style, with the weight resolved
+/// against the parent's computed weight.
+fn font_query(specified: &SpecifiedStyle, parent_weight: f64) -> FontQuery<'_> {
+    use PropertyId as P;
+    FontQuery {
+        families: match specified.get(P::FontFamily) {
+            PropertyValue::FontFamily(families) => families,
+            _ => &[],
+        },
+        weight: match specified.get(P::FontWeight) {
+            PropertyValue::FontWeight(w) => relative_weight(*w, parent_weight),
+            _ => parent_weight,
+        },
+        style: match specified.get(P::FontStyle) {
+            PropertyValue::FontStyle(style) => *style,
+            _ => FontStyle::Normal,
+        },
+        stretch: stretch_percentage(specified.get(P::FontStretch)),
+    }
+}
+
+/// The font properties of a computed style.
+fn font_query_of(style: &ComputedStyle) -> FontQuery<'_> {
+    use PropertyId as P;
+    FontQuery {
+        families: match style.get(P::FontFamily) {
+            PropertyValue::FontFamily(families) => families,
+            _ => &[],
+        },
+        weight: match style.get(P::FontWeight) {
+            PropertyValue::FontWeight(FontWeight::Number(n)) => *n,
+            _ => 400.0,
+        },
+        style: match style.get(P::FontStyle) {
+            PropertyValue::FontStyle(style) => *style,
+            _ => FontStyle::Normal,
+        },
+        stretch: stretch_percentage(style.get(P::FontStretch)),
+    }
+}
+
+fn stretch_percentage(value: &PropertyValue) -> f64 {
+    match value {
+        PropertyValue::FontStretch(FontStretch::Keyword(k)) => k.percentage(),
+        PropertyValue::FontStretch(FontStretch::Percentage(p)) => *p,
+        _ => 100.0,
     }
 }

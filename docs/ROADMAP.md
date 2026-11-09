@@ -144,6 +144,7 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | REN-01 | Typed CSS/device geometry, box tree, anonymous boxes, block flow, margins/padding/borders | CSS-05 |
 | REN-02 | Intrinsic sizing, replaced elements, overflow, positioning, floats and margin collapse | REN-01 |
 | REN-03 | Font adapter, bundled test fonts, shaping, bidi, line breaking, inline layout and baselines; computed `ex`/`ch`/`cap`/`ic` from loaded font metrics (moved from M2 css.values) | CSS font values, REN-01 |
+| REN-03a | **Done** ([LAYOUT.md](LAYOUT.md#font-adapter-ren-03a)): `rustic-text` TrueType parser, bundled original test fonts, CSS face matching and computed `ex`/`ch`/`cap`/`ic`; CFF/WOFF, discovery and shaping remain (TD-42) | CSS font values |
 | REN-04 | Fragments, stacking contexts, paint order, clips, glyph/image display-list commands | REN-02, REN-03 |
 | REN-05 | CPU raster reference backend and bounded image decode; sRGB/alpha conventions | REN-04 |
 | REN-06 | `render` headless command, PNG output, layout/display-list dumps, resize and hit testing | REN-05 |

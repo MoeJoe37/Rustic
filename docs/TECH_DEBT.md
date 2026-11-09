@@ -89,6 +89,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
 | TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
 | TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
+| TD-42 | Deliberate | Text | TrueType-only font adapter without discovery, shaping or CFF/WOFF | Open, REN-03 |
+| TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Open, REN-03 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -679,3 +681,34 @@ with the CSS Color 4 reference tests; a deterministic deflate compressor
 (fixed Huffman plus LZ77 is enough) checked by a PNG decoder; corner joins
 rendered as one shape per pixel with per-side colors. **Trigger:** reftests
 that compare with other engines, or output size in CI artifacts.
+
+### TD-42 — TrueType-only font adapter
+
+REN-03a's `rustic-text` parses `glyf`-flavored sfnt fonts only. CFF/CFF2
+(`OTTO`), collections (`ttcf`), WOFF/WOFF2, variable fonts, hinting, shaping
+tables (GSUB/GPOS/kern), color/bitmap glyphs, vertical metrics and system font
+discovery all fail explicitly or are absent. Table checksums are read but not
+enforced (as browser sanitizers do), OS/2 tables shorter than their version
+requires are rejected, family names are decoded only from Windows/Unicode
+records and the ASCII subset of Mac Roman, and only cmap formats 4 and 12 are
+accepted. Embedders add faces explicitly; the CLI dumps still compute styles
+without fonts, so their output keeps the CSS fallback ratios. **Reason:** give
+font-relative units and future shaping a validated, deterministic face model
+with bundled original fonts before taking on more formats. **Pay:** add CFF and
+WOFF2 decoding behind the same limits, platform discovery in
+`rustic-platform`, and shaping/line layout in REN-03b+. **Trigger:** loading
+real pages' web fonts, shaping text, or desktop/mobile hosts needing system
+fonts.
+
+### TD-43 — Query font units ignore loaded fonts
+
+Computed styles use the first available font's `ex`, `ch`, `cap` and `ic`, but
+media queries still evaluate those units with fixed ratios of a 16px initial
+font (`rustic-css` media evaluation), and container queries use the
+container's font size with the 0.5em/0.7em/1em fallbacks. `rustic-css` cannot
+see fonts, so the ratios must be passed in. **Reason:** keep REN-03a inside
+computed values; query evaluation needs a font-aware environment/facts
+contract. **Pay:** carry em ratios in `MediaEnvironment` (initial font) and
+`ContainerFacts` (the container's computed font metrics) and add fixtures.
+**Trigger:** a page whose queries use font-relative units with real fonts, or
+the next change to either evaluation contract.

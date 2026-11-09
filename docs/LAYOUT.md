@@ -185,7 +185,8 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
    content, then expand the initial block geometry reference.
 2. Finish REN-02: intrinsic/replaced sizing, overflow, positioning, floats and
    clearance; static in-flow margin collapse is implemented.
-3. REN-03/04: font adapter, shaping/bidi/line layout, fragments and paint order.
+3. REN-03/04: shaping/bidi/line layout, fragments and paint order
+   (the REN-03a font adapter below is done).
    The first block display list exists ([PAINT.md](PAINT.md)).
 4. REN-05/06/07: the CPU raster reference and PNG `render` exist for blocks;
    bounded decode, glyph raster and reftests remain.
@@ -264,3 +265,62 @@ These are focused structural fixtures/model checks, not layout-WPT or browser
 comparison results. List markers, tables, flex/grid, floats/out-of-flow boxes,
 replaced/control/foreign elements, pseudo boxes and flattened shadow trees
 remain separate work and fail explicitly where required (TD-37/TD-39).
+
+## Font adapter (REN-03a)
+
+`rustic-text` is a platform-independent, dependency-free safe-Rust crate (the
+`rustic-text` row of [ARCHITECTURE.md](ARCHITECTURE.md)). `Face::parse` accepts
+a TrueType-flavored sfnt (`0x00010000` or `true`) and rejects CFF (`OTTO`),
+collections and WOFF/WOFF2 with typed `FontError::Unsupported` values. It reads
+every structure through a checked big-endian reader that reports the table on
+truncation. Directory records must lie inside the file and be unique; `head`
+(version, magic, units per em 16–16,384, loca format), `maxp` (glyph count),
+`hhea` (`numberOfHMetrics` within 1..=glyphs), `hmtx` length, `loca` length,
+`name` (typographic then legacy family; bounded length) and `OS/2` (version
+sized; weight, width class, `fsSelection`, typo metrics, x-height/cap height
+from version 2) are validated at load. The best Unicode `cmap` subtable
+(format 12, else format 4) is fully checked: sorted, non-overlapping ranges,
+the format 4 terminator, and `idRangeOffset` reads bounded per lookup. Glyph
+ids beyond the glyph count count as unmapped.
+
+`Face::outline` decodes simple glyphs (contour end points, repeated flags,
+short/same delta coordinates, quadratic on/off-curve points) and flattens
+composites with scale, x/y scale and 2×2 transforms, using OpenType's unscaled
+offsets unless the font asks for scaled ones. An explicit stack replaces
+recursion; `FontLimits` bounds file bytes, table count, points, components and
+nesting depth, so reference cycles fail with `LimitExceeded`. Point-matching
+composites are explicitly unsupported. Nothing is silently truncated.
+
+`FontDatabase` holds explicitly added faces, generic-family mappings and an
+optional fallback family. `select` walks a CSS family list (ASCII
+case-insensitive), maps generics, and picks the *first available font* by the
+CSS Fonts 4 §5.2 order: stretch, then style (italic → oblique → normal, and so
+on), then the weight rule around 400–500. `FontMetrics::em_ratios` gives
+x-height (OS/2 `sxHeight`, else the `x` glyph top), cap height (`sCapHeight`,
+else the `H` top, else ascent), and the `0` and 水 advances, with the CSS
+Values 4 fallbacks of 0.5em, ascent, 0.5em and 1em.
+
+`rustic-style` consumes it through `FontMetricsSource` (implemented for
+`FontDatabase`) on `ComputeContext::fonts`; see
+[CSS.md](CSS.md#computed-style). Elements whose font properties equal their
+parent's reuse its ratios, so a source is queried once per distinct font.
+There is still no system font discovery, shaping, glyph cache, line layout or
+painted text; the layout references continue to refuse unshaped text.
+
+The bundled faces in `crates/rustic-text/fonts/` are original CC0 fixtures
+written by `tools/generate_test_fonts.py` with distinctive metrics (1,000 and
+2,048 units per em, OS/2 versions 1 and 4, both loca formats, short and full `hmtx`, one
+or both cmap formats, a composite glyph). A Python test checks the committed
+binaries, whole-font checksum and directory. They were also cross-checked once
+with fontTools in a throwaway environment; that tool is not a dependency.
+
+Specification basis, reviewed 2026-11-09: OpenType 1.9
+([sfnt](https://learn.microsoft.com/en-us/typography/opentype/spec/otff),
+[cmap](https://learn.microsoft.com/en-us/typography/opentype/spec/cmap),
+[glyf](https://learn.microsoft.com/en-us/typography/opentype/spec/glyf),
+[OS/2](https://learn.microsoft.com/en-us/typography/opentype/spec/os2)),
+CSS Fonts 4 [§5.2 font matching](https://www.w3.org/TR/css-fonts-4/#font-matching-algorithm)
+and CSS Values 4 [§6.1.1 font-relative lengths](https://www.w3.org/TR/css-values-4/#font-relative-lengths).
+These are focused fixtures, not a font-conformance or WPT result. Remaining
+work is tracked in TD-42 and TD-43.
+

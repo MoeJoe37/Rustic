@@ -44,6 +44,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         "css" => seeds.extend(css_corpus_inputs(root)?),
         "css-selector" => seeds.extend(selector_inputs(root)?),
         "css-media" => seeds.extend(media_inputs(root)?),
+        "text-sfnt" => seeds.extend(crate::sfnt::seeds()),
         _ => {}
     }
     Ok(seeds)

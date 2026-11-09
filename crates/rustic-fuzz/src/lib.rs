@@ -19,6 +19,7 @@ mod harness;
 mod mutate;
 mod paint;
 mod rng;
+mod sfnt;
 mod targets;
 
 pub use corpus::{seed_inputs, workspace_root};

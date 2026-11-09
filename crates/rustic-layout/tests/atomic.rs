@@ -347,3 +347,23 @@ fn without_fonts_atomic_inlines_are_refused() {
         "{result:?}"
     );
 }
+
+#[test]
+fn flex_baseline_alignment_uses_first_line_boxes() {
+    let l = layout(
+        "<main><div id=a>x</div><div id=b>x<br>x</div><div id=c></div></main>",
+        "main { display:flex; align-items:baseline } #b { padding-top:10px } \
+         #c { height:30px; width:5px }",
+        100.0,
+    );
+    // First baselines below the margin-box tops: a 8, b 10 + 8 = 18; c has
+    // no line, so its border-box bottom (30) is synthesized. All align at 30.
+    assert_eq!(b(&l, 3).1, 22.0);
+    assert_eq!(b(&l, 4).1, 12.0);
+    assert_eq!(b(&l, 5).1, 0.0);
+    // The line is as tall as the deepest descent below the shared baseline.
+    assert_eq!(b(&l, 2).3, 42.0);
+    // Text items' own line baselines land on the shared baseline.
+    let baselines: Vec<f64> = l.texts().iter().map(|t| t.baseline().get()).collect();
+    assert_eq!(baselines, [30.0, 30.0, 40.0]);
+}

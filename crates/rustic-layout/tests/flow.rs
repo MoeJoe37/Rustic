@@ -207,7 +207,7 @@ fn whitespace_only_runs_vanish_but_preserved_or_non_css_whitespace_needs_inline_
 }
 
 #[test]
-fn unsupported_contexts_controls_and_sticky_return_typed_errors() {
+fn unsupported_contexts_and_controls_return_typed_errors() {
     for css in [
         "display:inline",
         "display:inline-flex",
@@ -221,11 +221,6 @@ fn unsupported_contexts_controls_and_sticky_return_typed_errors() {
             UnsupportedFlow::FormattingContext,
         );
     }
-    unsupported(
-        "<main></main>",
-        "main {position:sticky}",
-        UnsupportedFlow::Positioning,
-    );
     // Block-level replaced elements are laid out since REN-02c (tests/sizing.rs).
     for html in [
         "<input>",

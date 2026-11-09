@@ -314,8 +314,8 @@ fn unsupported_atomic_content_still_fails_atomically() {
             UnsupportedFlow::FormattingContext,
         ),
         (
-            "<p>x<span style='display:inline-block;position:sticky'></span>",
-            UnsupportedFlow::Positioning,
+            "<p>x<span style='display:inline-grid'></span>",
+            UnsupportedFlow::FormattingContext,
         ),
     ] {
         match try_layout(html, "", 100.0) {

@@ -31,6 +31,7 @@ use crate::overflow::{self, Clip};
 use crate::position::{self, AbsoluteContext, AbsoluteHeight};
 use crate::replaced::{self, NaturalSize};
 use crate::sizing::measure_in_band;
+use crate::sticky::StickyConstraint;
 use crate::text::{self, InlineFragment, LineFragment, TextFragment};
 use crate::tree::HtmlTag;
 use crate::{
@@ -54,7 +55,8 @@ pub enum UnsupportedFlow {
     TextLayout,
     /// Replaced elements, native controls, foreign content or special HTML layout.
     SpecialElement,
-    /// Sticky positioning, which needs scroll offsets.
+    /// A positioning scheme that is not implemented here (no longer used:
+    /// sticky positioning is supported).
     Positioning,
 }
 
@@ -73,6 +75,9 @@ pub enum PositionScheme {
     Absolute,
     /// Out of flow, against the viewport.
     Fixed,
+    /// Normal flow, then shifted by [`BlockFragment::relative_offset`] to
+    /// stay inside its scrollport ([`BlockFragment::sticky`]).
+    Sticky,
 }
 
 /// One non-replaced block's immutable, physical used geometry.
@@ -92,6 +97,7 @@ pub struct BlockFragment {
     clip: Clip,
     scrollable: Option<CssRect>,
     line: Option<usize>,
+    sticky: Option<StickyConstraint>,
 }
 
 impl BlockFragment {
@@ -162,6 +168,11 @@ impl BlockFragment {
     pub const fn line(self) -> Option<usize> {
         self.line
     }
+    /// For a sticky box, the inputs of its offset; the offset for the
+    /// initial scroll position is already applied.
+    pub const fn sticky(self) -> Option<StickyConstraint> {
+        self.sticky
+    }
 }
 
 /// A deterministic block reference layout. No glyphs or pixels yet.
@@ -215,6 +226,7 @@ struct Node<'a> {
     depth: usize,
     scheme: Scheme,
     relative: bool,
+    sticky: bool,
     bfc_root: bool,
     overflow: (Overflow, Overflow),
     containing: Option<usize>,
@@ -395,11 +407,7 @@ fn supported_box(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
     ) {
         return Err(fail(UnsupportedFlow::FormattingContext));
     }
-    let style = b.style().ok_or(FlowError::InvalidSnapshot)?;
-    if matches!(style.get(P::Position), V::Position(Position::Sticky)) {
-        return Err(fail(UnsupportedFlow::Positioning));
-    }
-    Ok(style)
+    b.style().ok_or(FlowError::InvalidSnapshot)
 }
 
 /// An atomic inline: `inline-block`, `inline-flex` or an inline replaced
@@ -418,11 +426,7 @@ fn supported_atomic(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
         BoxKind::Element(Display::Inline) if replaced => {}
         _ => return Err(fail(UnsupportedFlow::FormattingContext)),
     }
-    let style = b.style().ok_or(FlowError::InvalidSnapshot)?;
-    if matches!(style.get(P::Position), V::Position(Position::Sticky)) {
-        return Err(fail(UnsupportedFlow::Positioning));
-    }
-    Ok(style)
+    b.style().ok_or(FlowError::InvalidSnapshot)
 }
 
 fn ignorable_text(b: &BoxSnapshot, cancellation: &CancellationToken) -> Result<bool, FlowError> {
@@ -552,6 +556,7 @@ fn new_node<'a>(
         }
         _ => return Err(FlowError::InvalidSnapshot),
     };
+    let sticky = matches!(style.get(P::Position), V::Position(Position::Sticky));
     let flex_item = parent_flex && scheme == Scheme::Flow;
     // The nearest positioned ancestor; `None` is the initial containing block.
     let containing = match scheme {
@@ -559,7 +564,9 @@ fn new_node<'a>(
         Scheme::Absolute => {
             let mut c = parent;
             while let Some(p) = c {
-                if nodes[p].relative || matches!(nodes[p].scheme, Scheme::Absolute | Scheme::Fixed)
+                if nodes[p].relative
+                    || nodes[p].sticky
+                    || matches!(nodes[p].scheme, Scheme::Absolute | Scheme::Fixed)
                 {
                     break;
                 }
@@ -578,6 +585,7 @@ fn new_node<'a>(
         depth,
         scheme,
         relative,
+        sticky,
         bfc_root: false,
         overflow: overflow_pair(style)?,
         containing,
@@ -2195,6 +2203,7 @@ impl BlockLayout {
                 PositionScheme::FloatRight => Some("float-right"),
                 PositionScheme::Absolute => Some("absolute"),
                 PositionScheme::Fixed => Some("fixed"),
+                PositionScheme::Sticky => Some("sticky"),
             };
             if let Some(s) = scheme {
                 line.push_str(&format!(" scheme={s}"));
@@ -2293,11 +2302,99 @@ impl BlockLayout {
 }
 
 impl Engine<'_, '_> {
+    /// The sticky inputs of box `i` with unshifted border origin `origin`
+    /// and containing-block content origin `content`; `borders` holds the
+    /// final border origins of earlier boxes in preorder.
+    fn sticky_constraint(
+        &mut self,
+        i: usize,
+        origin: (f64, f64),
+        content: (f64, f64),
+        borders: &[(f64, f64)],
+    ) -> Result<StickyConstraint, FlowError> {
+        let rect = |(x, y): (f64, f64), w: f64, h: f64| -> Result<CssRect, FlowError> {
+            Ok(CssRect::new(
+                CssPoint {
+                    x: CssPx::new(x)?,
+                    y: CssPx::new(y)?,
+                },
+                CssSize::new(w.max(0.0), h.max(0.0))?,
+            )?)
+        };
+        let n = &self.nodes[i];
+        let p = n.parent.ok_or(FlowError::InvalidSnapshot)?;
+        let parent = &self.nodes[p];
+        let containing = rect(
+            content,
+            parent.measure.content_width.get(),
+            parent.content_height.get(),
+        )?;
+        let border = rect(origin, n.border_width(), n.border_height.get())?;
+        // The nearest ancestor scroll container, else the viewport.
+        let mut a = Some(p);
+        let mut port = None;
+        while let Some(x) = a {
+            self.work.charge(1)?;
+            if scroll_container(self.nodes[x].overflow) {
+                port = Some(x);
+                break;
+            }
+            a = self.nodes[x].parent;
+        }
+        let scrollport = match port {
+            Some(x) => {
+                let s = &self.nodes[x];
+                let m = s.measure;
+                rect(
+                    add(borders[x], (m.border.left.get(), m.border.top.get())),
+                    m.content_width.get() + m.padding.left.get() + m.padding.right.get(),
+                    s.content_height.get() + m.padding.top.get() + m.padding.bottom.get(),
+                )?
+            }
+            None => rect(
+                (0.0, 0.0),
+                self.viewport.width().get(),
+                self.viewport.height().get(),
+            )?,
+        };
+        let (w, h) = (
+            scrollport.size().width().get(),
+            scrollport.size().height().get(),
+        );
+        let style = n.style;
+        let inset = |property, basis| crate::sizing::auto(style, property, basis);
+        let m = n.measure.margin;
+        Ok(StickyConstraint {
+            scroll_container: port,
+            scrollport,
+            insets: [
+                inset(P::Top, h)?,
+                inset(P::Right, w)?,
+                inset(P::Bottom, h)?,
+                inset(P::Left, w)?,
+            ],
+            border,
+            margin: [m.top.get(), m.right.get(), m.bottom.get(), m.left.get()],
+            containing,
+        })
+    }
+
     fn finish(mut self, viewport_overflow: (Overflow, Overflow)) -> Result<BlockLayout, FlowError> {
         let n = self.nodes.len();
         let mut borders: Vec<(f64, f64)> = Vec::with_capacity(n);
-        for i in 0..n {
+        let mut sticky: Vec<Option<StickyConstraint>> = vec![None; n];
+        for (i, slot) in sticky.iter_mut().enumerate() {
             self.work.charge(1)?;
+            if self.nodes[i].sticky {
+                if let Some(p) = self.nodes[i].parent {
+                    let parent = &self.nodes[p];
+                    let content = add(borders[p], parent.edge());
+                    let origin = add(content, sub(self.nodes[i].pos, parent.child_origin()));
+                    let c = self.sticky_constraint(i, origin, content, &borders)?;
+                    self.nodes[i].rel = c.offset(CssPoint::default())?;
+                    *slot = Some(c);
+                }
+            }
             let node = &self.nodes[i];
             let origin = match node.scheme {
                 Scheme::Absolute | Scheme::Fixed => {
@@ -2326,7 +2423,9 @@ impl Engine<'_, '_> {
         }
         let mut fragments = Vec::with_capacity(n);
         for (i, node) in self.nodes.iter().enumerate() {
-            fragments.push(fragment(node, borders[i])?);
+            let mut f = fragment(node, borders[i])?;
+            f.sticky = sticky[i];
+            fragments.push(f);
         }
         let parents: Vec<Option<usize>> = self
             .nodes
@@ -2405,6 +2504,9 @@ impl Engine<'_, '_> {
             }
             f.parent = f.parent.and_then(|p| public[owner(p)]);
             f.containing_block = f.containing_block.and_then(|c| public[owner(c)]);
+            if let Some(c) = f.sticky.as_mut() {
+                c.scroll_container = c.scroll_container.and_then(|s| public[owner(s)]);
+            }
             kept.push(f);
         }
         Ok(BlockLayout {
@@ -2460,6 +2562,7 @@ fn fragment(node: &Node<'_>, border_origin: (f64, f64)) -> Result<BlockFragment,
     )?;
     let border = CssRect::new(border_origin, border_size)?;
     let scheme = match node.scheme {
+        Scheme::Flow if node.sticky => PositionScheme::Sticky,
         Scheme::Flow if node.relative => PositionScheme::Relative,
         Scheme::Flow => PositionScheme::Static,
         Scheme::Float(Side::Left) => PositionScheme::FloatLeft,
@@ -2482,6 +2585,7 @@ fn fragment(node: &Node<'_>, border_origin: (f64, f64)) -> Result<BlockFragment,
         clip: Clip::NONE,
         scrollable: None,
         line: None,
+        sticky: None,
     })
 }
 

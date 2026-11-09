@@ -19,10 +19,11 @@ use std::fmt;
 use std::sync::Arc;
 
 use rustic_css::{
-    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, FamilyName, Float,
-    FontSize, FontSizeKeyword, FontStretch, FontStyle, FontWeight, GenericFamily, Length,
-    LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, Overflow, Position,
-    PositionComponent, PositionValue, PropertyId, PropertyValue, Spacing, TextAlign, VerticalAlign,
+    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, FamilyName, FlexBasis,
+    Float, FontSize, FontSizeKeyword, FontStretch, FontStyle, FontWeight, Gap, GenericFamily,
+    Length, LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, Overflow,
+    Position, PositionComponent, PositionValue, PropertyId, PropertyValue, Size, Spacing,
+    TextAlign, VerticalAlign,
 };
 
 use crate::fonts::{FontMetricsSource, FontQuery};
@@ -222,6 +223,15 @@ impl Basis {
             }
             other => other,
         }
+    }
+}
+
+/// Compute the lengths inside a sizing value.
+fn compute_size(size: &Size, lp: &dyn Fn(&LengthPercentage) -> LengthPercentage) -> Size {
+    match size {
+        Size::LengthPercentage(v) => Size::LengthPercentage(lp(v)),
+        Size::FitContent(Some(v)) => Size::FitContent(Some(lp(v))),
+        other => other.clone(),
     }
 }
 
@@ -552,6 +562,18 @@ fn compute_values(
     );
     let floated =
         !positioned && !matches!(specified.get(P::Float), PropertyValue::Float(Float::None));
+    // Children of a flex or grid container are blockified too (CSS Display
+    // 3 §2.7, CSS Flexbox 1 §4); `display:contents` generates no box. The
+    // parent is the DOM parent's style, so a child promoted through a
+    // `display:contents` parent is not blockified (TD-47).
+    let container_child = parent.is_some_and(|p| {
+        matches!(
+            p.get(P::Display),
+            PropertyValue::Display(
+                Display::Flex | Display::InlineFlex | Display::Grid | Display::InlineGrid
+            )
+        )
+    });
     let overflow = match (specified.get(P::OverflowX), specified.get(P::OverflowY)) {
         (PropertyValue::Overflow(x), PropertyValue::Overflow(y)) => Some(overflow_pair(*x, *y)),
         _ => None,
@@ -564,6 +586,11 @@ fn compute_values(
             match property {
                 P::Display => match value {
                     PropertyValue::Display(d) if is_root || positioned || floated => {
+                        PropertyValue::Display(blockify(*d))
+                    }
+                    PropertyValue::Display(d)
+                        if container_child && !matches!(d, Display::Contents | Display::None) =>
+                    {
                         PropertyValue::Display(blockify(*d))
                     }
                     other => other.clone(),
@@ -690,6 +717,22 @@ fn compute_values(
                             PropertyValue::MaxSize(MaxSize::LengthPercentage(
                                 basis.lp(lp, nonnegative),
                             ))
+                        }
+                        PropertyValue::MaxSize(MaxSize::FitContent(Some(lp))) => {
+                            PropertyValue::MaxSize(MaxSize::FitContent(Some(
+                                basis.lp(lp, nonnegative),
+                            )))
+                        }
+                        PropertyValue::Size(size) => {
+                            PropertyValue::Size(compute_size(size, &|lp| basis.lp(lp, nonnegative)))
+                        }
+                        PropertyValue::FlexBasis(FlexBasis::Size(size)) => {
+                            PropertyValue::FlexBasis(FlexBasis::Size(compute_size(size, &|lp| {
+                                basis.lp(lp, nonnegative)
+                            })))
+                        }
+                        PropertyValue::Gap(Gap::LengthPercentage(lp)) => {
+                            PropertyValue::Gap(Gap::LengthPercentage(basis.lp(lp, nonnegative)))
                         }
                         other => other.clone(),
                     }

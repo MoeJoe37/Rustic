@@ -21,14 +21,15 @@ use std::{error::Error, fmt};
 
 use crate::exclusions::{Exclusions, Side};
 use crate::height::HeightConstraint;
+use crate::intrinsic::{self, Intrinsic};
 use crate::margins::MarginStrut;
 use crate::overflow::{self, Clip};
-use crate::position::{self, AbsoluteContext, AbsoluteHeight, Intrinsic};
+use crate::position::{self, AbsoluteContext, AbsoluteHeight};
 use crate::sizing::measure_in_band;
 use crate::tree::HtmlTag;
 use crate::{
     BlockMeasure, BoxKind, BoxSnapshot, BoxTree, CssPoint, CssPx, CssRect, CssSize, Edges,
-    GeometryError, LayoutLimits, MeasureError, measure_block_width,
+    GeometryError, LayoutLimits, MeasureError,
 };
 
 /// Work units (box visits, float scans, chain steps) one layout may spend.
@@ -566,7 +567,7 @@ impl<'a, 'c> Engine<'a, 'c> {
                     c = next;
                     continue;
                 }
-                let outer = position::outer_contribution(child.style, child.intrinsic)?;
+                let outer = intrinsic::outer_contribution(child.style, child.intrinsic)?;
                 min = min.max(outer.min);
                 match child.scheme {
                     Scheme::Float(side) => {
@@ -862,7 +863,14 @@ impl<'a, 'c> Engine<'a, 'c> {
         i: usize,
         pf: &Frame,
     ) -> Result<(), FlowError> {
-        let measure = measure_block_width(self.nodes[i].style, pf.width, pf.direction)?;
+        let n = &self.nodes[i];
+        let measure = measure_in_band(
+            n.style,
+            pf.width,
+            pf.direction,
+            (0.0, 0.0),
+            Some(n.intrinsic),
+        )?;
         self.begin(i, measure, pf)?;
         let x = pf.content_x + measure.margin.left.get();
         self.nodes[i].pos.0 = x;
@@ -972,7 +980,8 @@ impl<'a, 'c> Engine<'a, 'c> {
     ) -> Result<(), FlowError> {
         let pf = *frames.last().ok_or(FlowError::InvalidSnapshot)?;
         let style = self.nodes[i].style;
-        let plain = measure_in_band(style, pf.width, pf.direction, (0.0, 0.0))?;
+        let inner = Some(self.nodes[i].intrinsic);
+        let plain = measure_in_band(style, pf.width, pf.direction, (0.0, 0.0), inner)?;
         self.begin(i, plain, &pf)?;
         let (mut y, extent) = match retry {
             Some(retry) => retry,
@@ -1003,6 +1012,7 @@ impl<'a, 'c> Engine<'a, 'c> {
                 pf.width,
                 pf.direction,
                 (band.left - left, right - band.right),
+                inner,
             )?;
             let x = left + m.margin.left.get();
             let width = m.content_width.get()

@@ -1,9 +1,10 @@
 //! CSS 2.2 §10.3.3/10.4 block widths, with CSS Sizing border-box adjustment.
 
+use crate::intrinsic::{Intrinsic, Resolver, Sizing};
 use crate::{CssPx, GeometryError};
 use rustic_css::{
-    BorderWidth, BoxSizing, Direction, Display, Float, LengthPercentage, LengthPercentageOrAuto,
-    LengthUnit, MaxSize, Position, PropertyId as P, PropertyValue as V,
+    BorderWidth, Direction, Display, Float, LengthPercentage, LengthPercentageOrAuto, LengthUnit,
+    Position, PropertyId as P, PropertyValue as V,
 };
 use rustic_style::ComputedStyle;
 use std::{error::Error, fmt};
@@ -43,6 +44,9 @@ pub enum MeasureError {
     InvalidComputedValue,
     /// Arithmetic exceeded the checked geometry range.
     Geometry(GeometryError),
+    /// An intrinsic sizing keyword (`min-content`, `max-content`,
+    /// `fit-content`) needs content sizes that this entry point lacks.
+    IntrinsicSizeRequired,
 }
 
 impl From<GeometryError> for MeasureError {
@@ -59,6 +63,7 @@ impl fmt::Display for MeasureError {
             }
             Self::InvalidComputedValue => "width measurement requires computed CSS values",
             Self::Geometry(_) => "block dimensions exceed the geometry budget",
+            Self::IntrinsicSizeRequired => "an intrinsic sizing keyword needs content sizes",
         })
     }
 }
@@ -153,7 +158,13 @@ pub fn measure_block_width(
     {
         return Err(MeasureError::UnsupportedFormatting);
     }
-    measure_in_band(style, containing_width, containing_direction, (0.0, 0.0))
+    measure_in_band(
+        style,
+        containing_width,
+        containing_direction,
+        (0.0, 0.0),
+        None,
+    )
 }
 
 /// Padding and border edges; percentages resolve against `basis` (CSS 2.2 §8.4).
@@ -180,12 +191,22 @@ pub(crate) fn box_edges(style: &ComputedStyle, basis: f64) -> Result<(Edges, Edg
 /// block's left and right edges. A margin smaller than its floor is raised to
 /// it (margins may overlap floats, borders may not); auto margins distribute
 /// the remaining band. Percentages still resolve against the full width.
+/// `inner` supplies content sizes for intrinsic sizing keywords; without it
+/// a keyword fails with [`MeasureError::IntrinsicSizeRequired`].
 pub(crate) fn measure_in_band(
     style: &ComputedStyle,
     containing_width: CssPx,
     containing_direction: Direction,
     floors: (f64, f64),
+    inner: Option<Intrinsic>,
 ) -> Result<BlockMeasure, MeasureError> {
+    if inner.is_none() {
+        for p in [P::Width, P::MinWidth, P::MaxWidth] {
+            if Sizing::read(style, p)?.is_keyword() {
+                return Err(MeasureError::IntrinsicSizeRequired);
+            }
+        }
+    }
     let basis = containing_width.get();
     let (pad, borders) = box_edges(style, basis)?;
     let (floor_left, floor_right) = floors;
@@ -196,27 +217,16 @@ pub(crate) fn measure_in_band(
         .checked_add(borders.left)?
         .checked_add(borders.right)?
         .get();
-    let box_adjust = |n: f64| -> f64 {
-        if matches!(style.get(P::BoxSizing), V::BoxSizing(BoxSizing::BorderBox)) {
-            (n.max(0.0) - extras).max(0.0)
-        } else {
-            n.max(0.0)
-        }
-    };
     // Inside an intruded band, a margin keeps only its part beyond the float.
     let lower =
         |m: Option<f64>, floor: f64| m.map(|m| if floor > 0.0 { (m - floor).max(0.0) } else { m });
     let left = lower(auto(style, P::MarginLeft, basis)?, floor_left);
     let right = lower(auto(style, P::MarginRight, basis)?, floor_right);
-    let specified = auto(style, P::Width, basis)?.map(box_adjust);
-    let minimum = box_adjust(auto(style, P::MinWidth, basis)?.unwrap_or(0.0));
-    let maximum = match style.get(P::MaxWidth) {
-        V::MaxSize(MaxSize::None) => None,
-        V::MaxSize(MaxSize::LengthPercentage(v)) => Some(box_adjust(lp(v, basis)?)),
-        _ => return Err(MeasureError::InvalidComputedValue),
-    };
     let mut ml = left.unwrap_or(0.0);
     let mut mr = right.unwrap_or(0.0);
+    // `fit-content` sizes into the band left after margins, padding and borders.
+    let resolver = Resolver::new(style, Some(basis), extras, inner.unwrap_or_default());
+    let (specified, minimum, maximum) = resolver.widths(band - extras - ml - mr)?;
     let available = CssPx::new(band - extras - ml - mr)?.get();
     let tentative = specified.unwrap_or(available.max(0.0));
     let width = maximum.map_or(tentative, |m| tentative.min(m)).max(minimum);

@@ -1,9 +1,8 @@
 //! Used content heights for the block-only reference, CSS 2.2 §10.5–10.7.
 
-use rustic_css::{
-    BoxSizing, LengthPercentage, LengthPercentageOrAuto, MaxSize, PropertyId as P,
-    PropertyValue as V,
-};
+use rustic_css::{BoxSizing, LengthPercentage, PropertyId as P, PropertyValue as V};
+
+use crate::intrinsic::Sizing;
 use rustic_style::ComputedStyle;
 
 use crate::{CssPx, MeasureError};
@@ -33,12 +32,11 @@ fn auto(
     property: P,
     basis: Option<CssPx>,
 ) -> Result<Option<f64>, MeasureError> {
-    match style.get(property) {
-        V::LengthPercentageOrAuto(LengthPercentageOrAuto::Auto) => Ok(None),
-        V::LengthPercentageOrAuto(LengthPercentageOrAuto::LengthPercentage(value)) => {
-            resolve(value, basis)
-        }
-        _ => Err(MeasureError::InvalidComputedValue),
+    // Intrinsic keywords behave as the initial value in the block axis of a
+    // block container (CSS Sizing 3 §3.1).
+    match Sizing::read(style, property)?.length() {
+        Some(value) => resolve(value, basis),
+        None => Ok(None),
     }
 }
 
@@ -58,13 +56,7 @@ impl HeightConstraint {
         };
         let specified = auto(style, P::Height, basis)?.map(adjust).transpose()?;
         let minimum = adjust(auto(style, P::MinHeight, basis)?.unwrap_or(0.0))?;
-        let maximum = match style.get(P::MaxHeight) {
-            V::MaxSize(MaxSize::None) => None,
-            V::MaxSize(MaxSize::LengthPercentage(value)) => {
-                resolve(value, basis)?.map(adjust).transpose()?
-            }
-            _ => return Err(MeasureError::InvalidComputedValue),
-        };
+        let maximum = auto(style, P::MaxHeight, basis)?.map(adjust).transpose()?;
         Ok(Self {
             specified,
             minimum,

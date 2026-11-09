@@ -36,6 +36,9 @@ use crate::color::write_number;
 use crate::custom::{
     CustomValue, UnparsedValue, has_references, is_custom_property_name, valid_for_substitution,
 };
+use crate::flex::{
+    self, AlignProperty, Alignment, FlexBasis, FlexDirection, FlexWrap, Gap, Size, SizeKeyword,
+};
 use crate::serialize::{serialize_identifier, serialize_string};
 use crate::{
     Calc, Color, ComponentValue, Declaration, Length, LengthPercentage, LengthUnit, Token, Value,
@@ -462,13 +465,20 @@ pub enum LengthPercentageOrAuto {
     LengthPercentage(LengthPercentage),
 }
 
-/// `none | <length-percentage>`, for `max-width` and `max-height`.
+/// `none | <length-percentage> | min-content | max-content | fit-content |
+/// fit-content(<length-percentage>)`, for `max-width` and `max-height`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MaxSize {
     /// `none`.
     None,
     /// A length or percentage.
     LengthPercentage(LengthPercentage),
+    /// `min-content`.
+    MinContent,
+    /// `max-content`.
+    MaxContent,
+    /// `fit-content` (`None`) or `fit-content(<length-percentage>)`.
+    FitContent(Option<LengthPercentage>),
 }
 
 /// `thin | medium | thick | <length>`.
@@ -538,9 +548,10 @@ pub enum PropertyValue {
     /// `color`, `background-color`, `border-*-color`,
     /// `text-decoration-color`.
     Color(Color),
-    /// `margin-*`, `width`, `height`, `min-width`, `min-height`, `top`,
-    /// `right`, `bottom`, `left`.
+    /// `margin-*`, `top`, `right`, `bottom`, `left`.
     LengthPercentageOrAuto(LengthPercentageOrAuto),
+    /// `width`, `height`, `min-width`, `min-height`.
+    Size(Size),
     /// `padding-*` (nonnegative), `text-indent`.
     LengthPercentage(LengthPercentage),
     /// `max-width`, `max-height`.
@@ -612,6 +623,20 @@ pub enum PropertyValue {
     ContainerType(ContainerType),
     /// `container-name`: case-sensitive names; empty for `none`.
     ContainerName(Vec<String>),
+    /// `flex-direction`.
+    FlexDirection(FlexDirection),
+    /// `flex-wrap`.
+    FlexWrap(FlexWrap),
+    /// `flex-basis`.
+    FlexBasis(FlexBasis),
+    /// `flex-grow`, `flex-shrink`: a nonnegative number.
+    Number(f64),
+    /// `order`.
+    Integer(i32),
+    /// `justify-content`, `align-content`, `align-items`, `align-self`.
+    Alignment(Alignment),
+    /// `row-gap`, `column-gap`.
+    Gap(Gap),
 }
 
 macro_rules! property_ids {
@@ -721,6 +746,18 @@ property_ids! {
     BackgroundClip => "background-clip", false;
     ContainerType => "container-type", false;
     ContainerName => "container-name", false;
+    FlexDirection => "flex-direction", false;
+    FlexWrap => "flex-wrap", false;
+    FlexGrow => "flex-grow", false;
+    FlexShrink => "flex-shrink", false;
+    FlexBasis => "flex-basis", false;
+    Order => "order", false;
+    JustifyContent => "justify-content", false;
+    AlignContent => "align-content", false;
+    AlignItems => "align-items", false;
+    AlignSelf => "align-self", false;
+    RowGap => "row-gap", false;
+    ColumnGap => "column-gap", false;
 }
 
 impl PropertyId {
@@ -753,9 +790,7 @@ impl PropertyId {
             P::BorderTopColor | P::BorderRightColor | P::BorderBottomColor | P::BorderLeftColor => {
                 PropertyValue::Color(Color::CurrentColor)
             }
-            P::Width | P::Height | P::MinWidth | P::MinHeight => {
-                PropertyValue::LengthPercentageOrAuto(LengthPercentageOrAuto::Auto)
-            }
+            P::Width | P::Height | P::MinWidth | P::MinHeight => PropertyValue::Size(Size::Auto),
             P::MaxWidth | P::MaxHeight => PropertyValue::MaxSize(MaxSize::None),
             P::BoxSizing => PropertyValue::BoxSizing(BoxSizing::ContentBox),
             P::FontSize => PropertyValue::FontSize(FontSize::Keyword(FontSizeKeyword::Medium)),
@@ -808,6 +843,17 @@ impl PropertyId {
             P::BackgroundClip => PropertyValue::BackgroundBox(vec![VisualBox::BorderBox]),
             P::ContainerType => PropertyValue::ContainerType(ContainerType::Normal),
             P::ContainerName => PropertyValue::ContainerName(Vec::new()),
+            P::FlexDirection => PropertyValue::FlexDirection(FlexDirection::Row),
+            P::FlexWrap => PropertyValue::FlexWrap(FlexWrap::Nowrap),
+            P::FlexGrow => PropertyValue::Number(0.0),
+            P::FlexShrink => PropertyValue::Number(1.0),
+            P::FlexBasis => PropertyValue::FlexBasis(FlexBasis::Size(Size::Auto)),
+            P::Order => PropertyValue::Integer(0),
+            P::JustifyContent | P::AlignContent | P::AlignItems => {
+                PropertyValue::Alignment(Alignment::new(flex::AlignKeyword::Normal))
+            }
+            P::AlignSelf => PropertyValue::Alignment(Alignment::new(flex::AlignKeyword::Auto)),
+            P::RowGap | P::ColumnGap => PropertyValue::Gap(Gap::Normal),
         }
     }
 }
@@ -1048,6 +1094,9 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     const INSET: &[P] = &[P::Top, P::Right, P::Bottom, P::Left];
     const OVERFLOW: &[P] = &[P::OverflowX, P::OverflowY];
     const CONTAINER: &[P] = &[P::ContainerName, P::ContainerType];
+    const FLEX: &[P] = &[P::FlexGrow, P::FlexShrink, P::FlexBasis];
+    const FLEX_FLOW: &[P] = &[P::FlexDirection, P::FlexWrap];
+    const GAP: &[P] = &[P::RowGap, P::ColumnGap];
     const TEXT_DECORATION: &[P] = &[
         P::TextDecorationLine,
         P::TextDecorationStyle,
@@ -1086,6 +1135,9 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "inset" => INSET,
         "overflow" => OVERFLOW,
         "container" => CONTAINER,
+        "flex" => FLEX,
+        "flex-flow" => FLEX_FLOW,
+        "gap" => GAP,
         "text-decoration" => TEXT_DECORATION,
         "font" => FONT,
         "background" => BACKGROUND,
@@ -1292,16 +1344,98 @@ fn z_index(value: &Value) -> Option<ZIndex> {
     if keyword(value, "auto") {
         return Some(ZIndex::Auto);
     }
+    integer(value).map(ZIndex::Integer)
+}
+
+/// An `<integer>`, saturated to `i32`.
+fn integer(value: &Value) -> Option<i32> {
     if math_function(value) {
         // Math functions in an `<integer>` slot round to the nearest
         // integer, halfway cases toward +infinity (CSS Values 4 §10.9).
         let n = censor(Calc::parse_number(value)?);
-        return Some(ZIndex::Integer(saturate_i32((n + 0.5).floor())));
+        return Some(saturate_i32((n + 0.5).floor()));
     }
     match value.token()? {
-        Token::Number(n) if n.integer => Some(ZIndex::Integer(saturate_i32(n.value))),
+        Token::Number(n) if n.integer => Some(saturate_i32(n.value)),
         _ => None,
     }
+}
+
+/// A nonnegative `<number>` (`flex-grow`, `flex-shrink`).
+fn flex_factor(value: &Value) -> Option<f64> {
+    number_in(value, 0.0, f64::MAX)
+}
+
+/// `none | [<'flex-grow'> <'flex-shrink'>? || <'flex-basis'>]` (CSS Flexbox
+/// 1 §7.1). An omitted basis is `0`; a unitless zero that does not follow
+/// two flex factors is a flex factor.
+fn flex(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+    let zero = || {
+        FlexBasis::Size(Size::LengthPercentage(LengthPercentage::Length(
+            Length::px(0.0),
+        )))
+    };
+    let (grow, shrink, basis) = match parts {
+        [one] if keyword(one, "none") => (0.0, 0.0, FlexBasis::Size(Size::Auto)),
+        [one] if keyword(one, "auto") => (1.0, 1.0, FlexBasis::Size(Size::Auto)),
+        [g] => match flex_factor(g) {
+            Some(g) => (g, 1.0, zero()),
+            None => (1.0, 1.0, flex::flex_basis(g)?),
+        },
+        [a, b] => match (flex_factor(a), flex_factor(b)) {
+            (Some(g), Some(s)) => (g, s, zero()),
+            (Some(g), None) => (g, 1.0, flex::flex_basis(b)?),
+            (None, Some(g)) => (g, 1.0, flex::flex_basis(a)?),
+            (None, None) => return None,
+        },
+        [a, b, c] => match (flex_factor(a), flex_factor(b)) {
+            (Some(g), Some(s)) => (g, s, flex::flex_basis(c)?),
+            _ => (flex_factor(b)?, flex_factor(c)?, flex::flex_basis(a)?),
+        },
+        _ => return None,
+    };
+    if parts.iter().any(|v| keyword(v, "none")) && parts.len() > 1 {
+        return None;
+    }
+    Some(vec![
+        PropertyValue::Number(grow),
+        PropertyValue::Number(shrink),
+        PropertyValue::FlexBasis(basis),
+    ])
+}
+
+/// `<'flex-direction'> || <'flex-wrap'>`.
+fn flex_flow(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+    let (mut direction, mut wrap) = (None, None);
+    for v in parts {
+        let name = ident(v)?;
+        if let Some(d) = FlexDirection::from_name(name) {
+            direction.replace(d).is_none().then_some(())?;
+        } else {
+            wrap.replace(FlexWrap::from_name(name)?)
+                .is_none()
+                .then_some(())?;
+        }
+    }
+    (!parts.is_empty()).then_some(())?;
+    Some(vec![
+        PropertyValue::FlexDirection(direction.unwrap_or(FlexDirection::Row)),
+        PropertyValue::FlexWrap(wrap.unwrap_or(FlexWrap::Nowrap)),
+    ])
+}
+
+fn max_size(value: &Value) -> Option<MaxSize> {
+    if keyword(value, "none") {
+        return Some(MaxSize::None);
+    }
+    if let Some(k) = flex::size_keyword(value) {
+        return Some(match k {
+            SizeKeyword::Min => MaxSize::MinContent,
+            SizeKeyword::Max => MaxSize::MaxContent,
+            SizeKeyword::Fit(lp) => MaxSize::FitContent(lp),
+        });
+    }
+    nonnegative(value).map(MaxSize::LengthPercentage)
 }
 
 fn opacity(value: &Value) -> Option<f64> {
@@ -1542,6 +1676,15 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
                 .map(PropertyValue::BackgroundBox);
         }
         P::ContainerName => return container_name(parts).map(PropertyValue::ContainerName),
+        P::JustifyContent | P::AlignContent | P::AlignItems | P::AlignSelf => {
+            let which = match property {
+                P::JustifyContent => AlignProperty::JustifyContent,
+                P::AlignContent => AlignProperty::AlignContent,
+                P::AlignItems => AlignProperty::AlignItems,
+                _ => AlignProperty::AlignSelf,
+            };
+            return flex::alignment(parts, which).map(PropertyValue::Alignment);
+        }
         _ => {}
     }
     let [value] = parts else {
@@ -1560,7 +1703,17 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::BackgroundAttachment
         | P::BackgroundOrigin
         | P::BackgroundClip
-        | P::ContainerName => unreachable!("handled above"),
+        | P::ContainerName
+        | P::JustifyContent
+        | P::AlignContent
+        | P::AlignItems
+        | P::AlignSelf => unreachable!("handled above"),
+        P::FlexDirection => PropertyValue::FlexDirection(FlexDirection::from_name(name()?)?),
+        P::FlexWrap => PropertyValue::FlexWrap(FlexWrap::from_name(name()?)?),
+        P::FlexGrow | P::FlexShrink => PropertyValue::Number(flex_factor(value)?),
+        P::FlexBasis => PropertyValue::FlexBasis(flex::flex_basis(value)?),
+        P::Order => PropertyValue::Integer(integer(value)?),
+        P::RowGap | P::ColumnGap => PropertyValue::Gap(flex::gap(value)?),
         P::ContainerType => PropertyValue::ContainerType(ContainerType::from_name(name()?)?),
         P::FontVariantCaps => PropertyValue::FontVariantCaps(FontVariantCaps::from_name(name()?)?),
         P::FontStretch => PropertyValue::FontStretch(font_stretch(value)?),
@@ -1606,13 +1759,9 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
             PropertyValue::BorderStyle(BorderStyle::from_name(ident(value)?)?)
         }
         P::Width | P::Height | P::MinWidth | P::MinHeight => {
-            PropertyValue::LengthPercentageOrAuto(lp_or_auto(value, false)?)
+            PropertyValue::Size(flex::size(value)?)
         }
-        P::MaxWidth | P::MaxHeight => PropertyValue::MaxSize(if keyword(value, "none") {
-            MaxSize::None
-        } else {
-            MaxSize::LengthPercentage(nonnegative(value)?)
-        }),
+        P::MaxWidth | P::MaxHeight => PropertyValue::MaxSize(max_size(value)?),
         P::BoxSizing => PropertyValue::BoxSizing(BoxSizing::from_name(ident(value)?)?),
         P::FontSize => PropertyValue::FontSize(match ident(value) {
             Some(name) => FontSize::Keyword(FontSizeKeyword::from_name(name)?),
@@ -1705,6 +1854,16 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             ])
         }
         "font" => font(parts),
+        "flex" => flex(parts),
+        "flex-flow" => flex_flow(parts),
+        "gap" => {
+            let (row, column) = match parts {
+                [both] => (flex::gap(both)?, flex::gap(both)?),
+                [row, column] => (flex::gap(row)?, flex::gap(column)?),
+                _ => return None,
+            };
+            Some(vec![PropertyValue::Gap(row), PropertyValue::Gap(column)])
+        }
         "background" => background::shorthand(parts),
         "border" | "border-top" | "border-right" | "border-bottom" | "border-left" => {
             let (mut width, mut style, mut color) = (None, None, None);
@@ -1761,6 +1920,18 @@ impl fmt::Display for PropertyValue {
             Self::LengthPercentage(lp) => write!(f, "{lp}"),
             Self::MaxSize(MaxSize::None) => f.write_str("none"),
             Self::MaxSize(MaxSize::LengthPercentage(lp)) => write!(f, "{lp}"),
+            Self::MaxSize(MaxSize::MinContent) => f.write_str("min-content"),
+            Self::MaxSize(MaxSize::MaxContent) => f.write_str("max-content"),
+            Self::MaxSize(MaxSize::FitContent(None)) => f.write_str("fit-content"),
+            Self::MaxSize(MaxSize::FitContent(Some(lp))) => write!(f, "fit-content({lp})"),
+            Self::Size(v) => write!(f, "{v}"),
+            Self::FlexDirection(v) => write!(f, "{v}"),
+            Self::FlexWrap(v) => write!(f, "{v}"),
+            Self::FlexBasis(v) => write!(f, "{v}"),
+            Self::Number(n) => write_number(f, *n),
+            Self::Integer(n) => write!(f, "{n}"),
+            Self::Alignment(v) => write!(f, "{v}"),
+            Self::Gap(v) => write!(f, "{v}"),
             Self::BorderWidth(BorderWidth::Thin) => f.write_str("thin"),
             Self::BorderWidth(BorderWidth::Medium) => f.write_str("medium"),
             Self::BorderWidth(BorderWidth::Thick) => f.write_str("thick"),

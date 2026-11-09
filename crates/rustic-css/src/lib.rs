@@ -28,6 +28,7 @@ mod color;
 mod container;
 mod custom;
 mod error;
+mod flex;
 mod length;
 mod media;
 mod parser;
@@ -56,6 +57,9 @@ pub use custom::{
     is_custom_property_name,
 };
 pub use error::{CssError, Diagnostic, DiagnosticKind};
+pub use flex::{
+    AlignKeyword, Alignment, FlexBasis, FlexDirection, FlexWrap, Gap, OverflowPosition, Size,
+};
 pub use length::{Length, LengthPercentage, LengthUnit};
 pub use media::{
     ColorScheme, MAX_MEDIA_NESTING, MediaComparison, MediaCondition, MediaEnvironment,

@@ -15,6 +15,7 @@ mod flow;
 mod formatting;
 mod geometry;
 mod height;
+mod intrinsic;
 mod margins;
 mod overflow;
 mod position;

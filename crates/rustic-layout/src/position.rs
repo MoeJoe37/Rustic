@@ -2,121 +2,16 @@
 //! absolutely positioned width/height equations (§10.3.7, §10.6.4).
 
 use rustic_css::{
-    BoxSizing, Direction, LengthPercentage, LengthPercentageOrAuto, MaxSize, PropertyId as P,
-    PropertyValue as V,
+    BoxSizing, Direction, LengthPercentageOrAuto, PropertyId as P, PropertyValue as V,
 };
 use rustic_style::ComputedStyle;
 
+use crate::intrinsic::{Intrinsic, Resolver, Sizing, fixed};
 use crate::sizing::{auto, box_edges, lp};
 use crate::{BlockMeasure, CssPoint, CssPx, Edges, MeasureError};
 
-/// Content-box intrinsic inline sizes of block-only content.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct Intrinsic {
-    pub min: f64,
-    pub max: f64,
-}
-
-impl Intrinsic {
-    /// CSS 2.2 §10.3.5 shrink-to-fit.
-    pub(crate) fn fit(self, available: f64) -> f64 {
-        self.min.max(available).min(self.max)
-    }
-}
-
-/// A length with no percentage, or `None` (percentages are cyclic for
-/// intrinsic contributions and behave as their initial value).
-fn fixed(value: &LengthPercentage) -> Result<Option<f64>, MeasureError> {
-    let percentage = match value {
-        LengthPercentage::Percentage(_) => true,
-        LengthPercentage::Calc(calc) => calc.has_percentage(),
-        LengthPercentage::Length(_) => false,
-    };
-    if percentage {
-        Ok(None)
-    } else {
-        lp(value, 0.0).map(Some)
-    }
-}
-
-fn fixed_auto(style: &ComputedStyle, property: P) -> Result<Option<f64>, MeasureError> {
-    match style.get(property) {
-        V::LengthPercentageOrAuto(LengthPercentageOrAuto::Auto) => Ok(None),
-        V::LengthPercentageOrAuto(LengthPercentageOrAuto::LengthPercentage(v)) => fixed(v),
-        _ => Err(MeasureError::InvalidComputedValue),
-    }
-}
-
 fn border_box(style: &ComputedStyle) -> bool {
     matches!(style.get(P::BoxSizing), V::BoxSizing(BoxSizing::BorderBox))
-}
-
-/// Outer (margin-box) min/max-content contribution of a block-level box.
-pub(crate) fn outer_contribution(
-    style: &ComputedStyle,
-    inner: Intrinsic,
-) -> Result<Intrinsic, MeasureError> {
-    let mut extras = 0.0;
-    for p in [P::PaddingLeft, P::PaddingRight] {
-        if let V::LengthPercentage(v) = style.get(p) {
-            extras += fixed(v)?.unwrap_or(0.0).max(0.0);
-        } else {
-            return Err(MeasureError::InvalidComputedValue);
-        }
-    }
-    let (_, border) = box_edges(style, 0.0)?;
-    extras += border.left.get() + border.right.get();
-    let adjust = |n: f64| {
-        if border_box(style) {
-            (n.max(0.0) - extras).max(0.0)
-        } else {
-            n.max(0.0)
-        }
-    };
-    let minimum = fixed_auto(style, P::MinWidth)?.map_or(0.0, adjust);
-    let maximum = match style.get(P::MaxWidth) {
-        V::MaxSize(MaxSize::None) => None,
-        V::MaxSize(MaxSize::LengthPercentage(v)) => fixed(v)?.map(adjust),
-        _ => return Err(MeasureError::InvalidComputedValue),
-    };
-    let clamp = |n: f64| maximum.map_or(n, |m| n.min(m)).max(minimum);
-    let (min, max) = match fixed_auto(style, P::Width)? {
-        Some(w) => {
-            let w = clamp(adjust(w));
-            (w, w)
-        }
-        None => (clamp(inner.min), clamp(inner.max)),
-    };
-    let margins = fixed_auto(style, P::MarginLeft)?.unwrap_or(0.0)
-        + fixed_auto(style, P::MarginRight)?.unwrap_or(0.0);
-    let outer = |n: f64| (n + extras + margins).max(0.0);
-    Ok(Intrinsic {
-        min: outer(min),
-        max: outer(max),
-    })
-}
-
-/// Content-box width constraints against `basis`: (specified, min, max).
-fn width_constraints(
-    style: &ComputedStyle,
-    basis: f64,
-    extras: f64,
-) -> Result<(Option<f64>, f64, Option<f64>), MeasureError> {
-    let adjust = |n: f64| {
-        if border_box(style) {
-            (n.max(0.0) - extras).max(0.0)
-        } else {
-            n.max(0.0)
-        }
-    };
-    let specified = auto(style, P::Width, basis)?.map(adjust);
-    let minimum = auto(style, P::MinWidth, basis)?.map_or(0.0, adjust);
-    let maximum = match style.get(P::MaxWidth) {
-        V::MaxSize(MaxSize::None) => None,
-        V::MaxSize(MaxSize::LengthPercentage(v)) => Some(adjust(lp(v, basis)?)),
-        _ => return Err(MeasureError::InvalidComputedValue),
-    };
-    Ok((specified, minimum, maximum))
 }
 
 /// Run a solver with the tentative size, then max, then min (CSS 2.2 §10.4/§10.7).
@@ -147,7 +42,8 @@ pub(crate) fn measure_float(
     let extras = padding.left.get() + padding.right.get() + border.left.get() + border.right.get();
     let ml = auto(style, P::MarginLeft, basis)?.unwrap_or(0.0);
     let mr = auto(style, P::MarginRight, basis)?.unwrap_or(0.0);
-    let (specified, minimum, maximum) = width_constraints(style, basis, extras)?;
+    let resolver = Resolver::new(style, Some(basis), extras, intrinsic);
+    let (specified, minimum, maximum) = resolver.widths(basis - ml - mr - extras)?;
     let (width, ()) = constrain(specified, minimum, maximum, |w| {
         Ok((
             w.unwrap_or_else(|| intrinsic.fit(basis - ml - mr - extras)),
@@ -347,7 +243,15 @@ pub(crate) fn absolute_width(
         keep_start: cx.containing_direction == Direction::Ltr,
         horizontal: true,
     };
-    let (specified, minimum, maximum) = width_constraints(style, basis, extras)?;
+    // `fit-content` sizes into the space the non-auto offsets and margins leave.
+    let available = basis
+        - axis.start.unwrap_or(0.0)
+        - axis.end.unwrap_or(0.0)
+        - axis.margin_start.unwrap_or(0.0)
+        - axis.margin_end.unwrap_or(0.0)
+        - extras;
+    let resolver = Resolver::new(style, Some(basis), extras, intrinsic);
+    let (specified, minimum, maximum) = resolver.widths(available)?;
     let (width, solved) = constrain(specified, minimum, maximum, |w| {
         Ok(axis.solve(w, |available| intrinsic.fit(available)))
     })?;
@@ -365,6 +269,14 @@ pub(crate) fn absolute_width(
             },
         },
     })
+}
+
+/// A block-axis size against a definite basis; keywords act as the initial value.
+fn block_size(style: &ComputedStyle, property: P, basis: f64) -> Result<Option<f64>, MeasureError> {
+    Sizing::read(style, property)?
+        .length()
+        .map(|v| lp(v, basis))
+        .transpose()
 }
 
 /// Vertical inputs of an absolutely positioned box, before content layout.
@@ -405,13 +317,9 @@ impl AbsoluteHeight {
                 keep_start: true,
                 horizontal: false,
             },
-            specified: auto(style, P::Height, h)?.map(adjust),
-            minimum: auto(style, P::MinHeight, h)?.map_or(0.0, adjust),
-            maximum: match style.get(P::MaxHeight) {
-                V::MaxSize(MaxSize::None) => None,
-                V::MaxSize(MaxSize::LengthPercentage(v)) => Some(adjust(lp(v, h)?)),
-                _ => return Err(MeasureError::InvalidComputedValue),
-            },
+            specified: block_size(style, P::Height, h)?.map(adjust),
+            minimum: block_size(style, P::MinHeight, h)?.map_or(0.0, adjust),
+            maximum: block_size(style, P::MaxHeight, h)?.map(adjust),
         })
     }
 

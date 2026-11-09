@@ -910,3 +910,79 @@ fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled() {
     let blend = two.pixel(2, 0).unwrap();
     assert!(blend.r > 0 && blend.g > 0 && blend.b == 0, "{blend:?}");
 }
+
+#[test]
+fn decorations_propagate_to_in_flow_text_only_and_fail_on_unsupported_styles() {
+    let fonts = rustic_text::bundled::test_database();
+    let build = |html: &str, css: &str| {
+        let (doc, styles) = common::page(
+            html,
+            &format!("{RESET} * {{ font: 10px/10px 'Rustic Test' }} {css}"),
+        );
+        let tree = BoxTree::build(
+            &doc,
+            doc.root(),
+            &styles,
+            LayoutLimits::default(),
+            &CancellationToken::default(),
+        )
+        .unwrap();
+        let viewport = CssSize::new(100.0, 50.0).unwrap();
+        let layout = BlockLayout::compute_with_fonts(
+            &tree,
+            viewport,
+            LayoutLimits::default(),
+            &fonts,
+            &CancellationToken::default(),
+        )
+        .unwrap();
+        let list = DisplayList::build_with_fonts(
+            &doc,
+            &tree,
+            &layout,
+            viewport,
+            Some(&fonts),
+            PaintLimits::default(),
+            &CancellationToken::default(),
+        );
+        let page = Page {
+            doc,
+            tree,
+            layout,
+            viewport,
+        };
+        (page, list)
+    };
+    // The block decorates its own text and in-flow inline text, but not the
+    // float's text; both nested decorating boxes draw, outermost first.
+    let (page, list) = build(
+        "<div id=outer>a<span id=inner>b</span><i id=float>c</i></div>",
+        "#outer { text-decoration: underline red }
+         #inner { text-decoration: line-through blue }
+         #float { float: left }",
+    );
+    let roles: Vec<_> = list
+        .unwrap()
+        .items()
+        .iter()
+        .filter(|i| i.role == ItemRole::Decoration)
+        .map(|i| (page.id_name(i.node), i.color))
+        .collect();
+    assert_eq!(
+        roles,
+        [
+            ("outer".to_string(), rgb(255, 0, 0)),
+            ("outer".to_string(), rgb(255, 0, 0)),
+            ("inner".to_string(), rgb(0, 0, 255)),
+        ]
+    );
+    // Dotted, dashed and wavy fail atomically with the decorating node.
+    let (page, list) = build("<p id=p>x</p>", "#p { text-decoration: underline dashed }");
+    assert_eq!(
+        list,
+        Err(PaintError::Unsupported {
+            node: page.id("p"),
+            reason: UnsupportedPaint::DecorationStyle,
+        })
+    );
+}

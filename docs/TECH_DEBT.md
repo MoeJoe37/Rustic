@@ -99,7 +99,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
 | TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, refused atomic inlines, approximations | Open, REN-03b |
 | TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
-| TD-52 | Deliberate | Paint | First text painting: no decorations, hinting, system fonts or exact nonzero fill | Open, REN-04c |
+| TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting, system fonts or exact nonzero fill | Open, REN-04c |
 | TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -866,16 +866,21 @@ tagged images, or decode time showing in render profiles.
 
 ### TD-52 — First text painting slice
 
-REN-04c paints glyph outlines but no `text-decoration`, emphasis marks,
-`text-shadow` or selection. Glyphs are unhinted and positioned at fractional
+REN-04c paints glyph outlines but no emphasis marks, `text-shadow` or
+selection. REN-04d text decorations use fixed em fractions for thickness and
+position rather than the font's `post`/`OS/2` underline and strikeout metrics,
+use each fragment's own face rather than the decorating box's first available
+font, draw only `solid` and `double`, ignore `text-underline-offset`,
+`text-decoration-thickness` and `text-decoration-skip-ink`, and continue
+through atomic inlines once those exist. Glyphs are unhinted and positioned at fractional
 pixels, which keeps output identical across platforms but blurs small text.
 Coverage accumulation clamps `|winding|` to 1, which equals the nonzero rule
 when contours do not overlap with opposite winding inside one pixel; glyphs
 from fonts with overlapping contours of opposite direction can lose coverage
 there. The command line only knows the bundled test fonts: no system font
 discovery and no way to name a local font file. Hit testing finds inline boxes
-but never text nodes. **Pay:** decorations from the font's underline and
-strikeout metrics; an exact nonzero winding accumulator (per-pixel signed
+but never text nodes. **Pay:** decoration metrics from `post` and `OS/2`,
+the remaining decoration styles and properties; an exact nonzero winding accumulator (per-pixel signed
 winding with a separate coverage buffer); a `--font` option and system font
 discovery per platform behind the same `FontDatabase`; text-node hit regions.
 **Trigger:** the first real-page renders or text WPT reftests.

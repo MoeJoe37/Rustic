@@ -67,6 +67,9 @@ impl Target for PaintTarget {
             b"letter-spacing:1.5px",
             b"text-align:justify",
             b"white-space:pre",
+            b"text-decoration:underline overline line-through",
+            b"text-decoration:underline double red",
+            b"text-decoration-style:wavy",
             b"{",
             b"}",
         ]

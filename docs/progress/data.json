@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "e65b13e0a1cdf3d323c4a8bf30e7b5886d5381e3bc63503325f626a0eaa93369",
-  "percent": "28.13",
+  "source_fingerprint": "c2eef96d1d01e5c2c5247987b269a64bdb21f4c6755e066bc7d04de13f1a39ed",
+  "percent": "28.18",
   "verified_percent": "21.25",
-  "partial_percent": "6.88",
+  "partial_percent": "6.93",
   "completed": 37,
   "in_progress": 16,
   "total": 172,
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 1,
       "total": 17,
-      "percent": "62.46",
+      "percent": "62.91",
       "verified_percent": "7.99",
-      "partial_percent": "54.47"
+      "partial_percent": "54.92"
     },
     {
       "id": "M4",
@@ -2368,7 +2368,34 @@
             },
             {
               "id": "content",
-              "label": "Text, image, decoration and outline items",
+              "label": "Text, image and text decoration items",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "fn decorations"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn decorations_propagate_to_in_flow_text_only_and_fail_on_unsupported_styles"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
+                }
+              ]
+            },
+            {
+              "id": "outline",
+              "label": "Outline items",
               "status": "planned",
               "evidence": []
             },
@@ -2395,7 +2422,7 @@
               ]
             }
           ],
-          "credit": "66.66",
+          "credit": "75.00",
           "engine_share": "0.66"
         },
         {
@@ -2778,10 +2805,10 @@
       "completed": 0,
       "in_progress": 6,
       "total": 7,
-      "contribution": "2.51",
-      "percent": "41.97",
+      "contribution": "2.57",
+      "percent": "42.90",
       "verified_percent": "0.00",
-      "partial_percent": "41.97"
+      "partial_percent": "42.90"
     },
     {
       "id": "js",

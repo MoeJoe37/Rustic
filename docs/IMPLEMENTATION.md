@@ -936,6 +936,14 @@ reftests cover natural size, scaling, alpha and broken images.
 `paint.raster` credits image rasterization; gaps are TD-53. See
 [PAINT.md](PAINT.md#images).
 
+## REN-04d — Text decorations
+
+Underline, overline and line-through propagate from decorating boxes to the
+in-flow text inside them and paint as rectangles under or over the glyphs,
+with `solid` and `double` styles. Two decoration reftests and a propagation
+test cover it; `paint.display` credits its content step, and outlines are a
+new planned step. Approximations are in TD-52. See [PAINT.md](PAINT.md#text).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

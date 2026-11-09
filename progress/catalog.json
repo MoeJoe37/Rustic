@@ -2116,7 +2116,34 @@
             },
             {
               "id": "content",
-              "label": "Text, image, decoration and outline items",
+              "label": "Text, image and text decoration items",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "fn decorations"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn decorations_propagate_to_in_flow_text_only_and_fail_on_unsupported_styles"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
+                }
+              ]
+            },
+            {
+              "id": "outline",
+              "label": "Outline items",
               "status": "planned",
               "evidence": []
             },

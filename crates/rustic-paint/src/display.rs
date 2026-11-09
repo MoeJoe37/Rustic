@@ -6,8 +6,8 @@ use crate::color::{Srgba, srgba};
 use rustic_base::CancellationToken;
 use rustic_css::Overflow;
 use rustic_css::{
-    BorderStyle, Image as CssImage, PropertyId as P, PropertyValue as V, Visibility, VisualBox,
-    ZIndex,
+    BorderStyle, Float, Image as CssImage, Position, PropertyId as P, PropertyValue as V,
+    TextDecorationStyle, Visibility, VisualBox, ZIndex,
 };
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
@@ -129,6 +129,8 @@ pub enum ItemRole {
     Text,
     /// The content of a replaced element (its `color` is unused).
     Image,
+    /// One text decoration line over one text fragment.
+    Decoration,
 }
 
 /// A filled area in CSS pixels. Edges are not snapped to device pixels.
@@ -198,6 +200,8 @@ pub enum UnsupportedPaint {
     BackgroundImage,
     /// A visible border style other than `solid`.
     BorderStyle,
+    /// A `text-decoration-style` other than `solid` or `double`.
+    DecorationStyle,
 }
 
 /// The fonts a text layout was computed with, needed to paint its glyphs.
@@ -516,6 +520,62 @@ impl Builder<'_> {
         Ok(())
     }
 
+    /// One decoration line across `text`'s advance width, placed from the
+    /// fragment's face metrics: thickness `font-size / 16`; underline top
+    /// `font-size / 10` below the baseline; overline top at the ascent;
+    /// line-through centered half an x-height above the baseline. `double`
+    /// draws a second line one thickness further out (through: below).
+    fn decoration(
+        &mut self,
+        text: &TextFragment,
+        line: Decoration,
+        clip: Clip,
+    ) -> Result<(), PaintError> {
+        let face = self
+            .fonts
+            .and_then(|fonts| fonts.faces().get(text.face()))
+            .ok_or(PaintError::Font)?;
+        let size = text.font_size();
+        let metrics = face.metrics();
+        let em = f64::from(metrics.units_per_em);
+        let thickness = size / 16.0;
+        let baseline = text.baseline().get();
+        let x_height = metrics
+            .x_height
+            .map_or(size / 2.0, |x| f64::from(x) * size / em);
+        let (top, step) = match line.kind {
+            Line::Under => (baseline + size / 10.0, 2.0 * thickness),
+            Line::Over => (
+                baseline - f64::from(metrics.ascent) * size / em,
+                -2.0 * thickness,
+            ),
+            Line::Through => (baseline - x_height / 2.0 - thickness / 2.0, 2.0 * thickness),
+        };
+        let rect = text.rect();
+        let tops: &[f64] = if line.double {
+            &[top, top + step]
+        } else {
+            &[top]
+        };
+        for &y in tops {
+            let area = CssRect::new(
+                point(rect.origin().x.get(), y)?,
+                CssSize::new(rect.size().width().get(), thickness)
+                    .map_err(|_| PaintError::InvalidInput)?,
+            )
+            .map_err(|_| PaintError::InvalidInput)?;
+            self.push(DisplayItem {
+                source_box: line.source_box,
+                node: line.node,
+                role: ItemRole::Decoration,
+                shape: Shape::Rect(area),
+                color: line.color,
+                clip,
+            })?;
+        }
+        Ok(())
+    }
+
     /// One path item with every glyph of `text`, scaled from font units and
     /// placed on its baseline (font y grows upward, CSS y downward).
     fn text(
@@ -587,6 +647,87 @@ impl Builder<'_> {
         self.paths.push(path);
         Ok(())
     }
+}
+
+/// Which line a text decoration draws.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Line {
+    Under,
+    Over,
+    Through,
+}
+
+/// One decoration a text fragment carries from a decorating box.
+#[derive(Clone, Copy, Debug)]
+struct Decoration {
+    kind: Line,
+    color: Srgba,
+    double: bool,
+    node: NodeId,
+    source_box: usize,
+}
+
+/// The decorations propagated to the text of box `text` (CSS Text
+/// Decoration 3 §2.1): from each ancestor with a `text-decoration-line`,
+/// outermost first, stopping after a float or an absolutely positioned box
+/// (decorations do not propagate into out-of-flow descendants).
+fn decorations(tree: &BoxTree, text: usize) -> Result<Vec<Decoration>, PaintError> {
+    let boxes = tree.boxes();
+    let mut found = Vec::new();
+    let mut current = boxes.get(text).ok_or(PaintError::InvalidInput)?.parent();
+    let mut steps = 0usize;
+    while let Some(index) = current {
+        // Parents precede children, so this ends; the bound is a safeguard.
+        steps += 1;
+        if steps > boxes.len() {
+            return Err(PaintError::InvalidInput);
+        }
+        let b = &boxes[index];
+        let Some(style) = b.style() else {
+            break;
+        };
+        if let V::TextDecorationLine(line) = style.get(P::TextDecorationLine) {
+            if !line.is_none() {
+                let double = match style.get(P::TextDecorationStyle) {
+                    V::TextDecorationStyle(TextDecorationStyle::Solid) => false,
+                    V::TextDecorationStyle(TextDecorationStyle::Double) => true,
+                    _ => {
+                        return Err(PaintError::Unsupported {
+                            node: b.node(),
+                            reason: UnsupportedPaint::DecorationStyle,
+                        });
+                    }
+                };
+                let color = color(style, P::TextDecorationColor)?;
+                for (on, kind) in [
+                    (line.line_through, Line::Through),
+                    (line.overline, Line::Over),
+                    (line.underline, Line::Under),
+                ] {
+                    if on {
+                        found.push(Decoration {
+                            kind,
+                            color,
+                            double,
+                            node: b.node(),
+                            source_box: index,
+                        });
+                    }
+                }
+            }
+        }
+        let out_of_flow = !matches!(style.get(P::Float), V::Float(Float::None))
+            || matches!(
+                style.get(P::Position),
+                V::Position(Position::Absolute | Position::Fixed)
+            );
+        if out_of_flow {
+            break;
+        }
+        current = b.parent();
+    }
+    found.reverse();
+    Ok(found)
 }
 
 /// How a fragment takes part in painting (CSS 2.2 Appendix E, CSS 2.2 §9.9).
@@ -938,7 +1079,20 @@ impl DisplayList {
                                 let text = &layout.texts()[t];
                                 let style = box_style(text.source_box())?;
                                 if visible(style) {
-                                    builder.text(text, style, clip)?;
+                                    let lines = decorations(tree, text.source_box())?;
+                                    // Underlines and overlines under the text,
+                                    // line-throughs over it (CSS Text Decoration 3 §2.1).
+                                    for over in [false, true] {
+                                        if over {
+                                            builder.text(text, style, clip)?;
+                                        }
+                                        for line in lines
+                                            .iter()
+                                            .filter(|l| (l.kind == Line::Through) == over)
+                                        {
+                                            builder.decoration(text, *line, clip)?;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1122,6 +1276,7 @@ impl DisplayList {
                 ItemRole::Border => "border",
                 ItemRole::Text => "text",
                 ItemRole::Image => "image",
+                ItemRole::Decoration => "decoration",
             };
             let shape = match item.shape {
                 Shape::Rect(rect) => format!("rect=({})", r(rect)),

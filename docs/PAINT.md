@@ -153,6 +153,18 @@ to pixels, so text renders identically on every platform. `visibility:
 hidden` text is not painted, and `opacity: 0` contexts paint none. Inline
 boxes take hits; text nodes do not (their inline box or block does).
 
+Text decorations (CSS Text Decoration 3 §2) propagate from every ancestor
+box with a `text-decoration-line` to the text inside it, outermost first,
+stopping after a float or absolutely positioned box. Each line is one
+`ItemRole::Decoration` rectangle across the fragment's advance width in the
+decorating box's `text-decoration-color`; underlines and overlines paint
+before the glyphs and line-throughs after. Positions come from the
+fragment's face: thickness `font-size / 16`, underline top `font-size / 10`
+below the baseline, overline top at the ascent, line-through centered half
+an x-height above the baseline. `double` adds a second line one thickness
+further out; `dotted`, `dashed` and `wavy` fail with
+`UnsupportedPaint::DecorationStyle`.
+
 The command line lays out and paints with the bundled original test fonts
 (`rustic_text::bundled`), with every generic family and the fallback mapped to
 them; no system fonts are read. Their `x` is a plain rectangle (500 units
@@ -220,7 +232,8 @@ tolerance and a mismatch.
 
 ## Not yet implemented
 
-Text decorations, emphasis marks and shadows; `background-image`,
+Outlines, non-solid text decoration styles, `text-underline-offset` and
+`text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
 `border-radius`, outlines, box shadows, blend modes and filters, rounded or

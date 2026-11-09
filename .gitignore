@@ -8,3 +8,8 @@ __pycache__/
 /.DS_Store
 /.idea/
 /.vscode/
+
+# Python packages downloaded for helper scripts (e.g. Pillow for
+# tools/pngsuite_reference.py) must never be committed; Rustic has no
+# third-party dependencies.
+*.whl

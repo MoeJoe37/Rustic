@@ -521,9 +521,77 @@ fn dump_appends_positioning_and_overflow_fields_only_when_needed() {
 }
 
 #[test]
-fn sticky_positioning_fails_atomically() {
-    assert!(matches!(
-        try_layout("<main><div></div></main>", "div {position:sticky}"),
-        Err(FlowError::Unsupported { .. })
-    ));
+fn sticky_boxes_stay_in_flow_and_shift_inside_their_containing_block() {
+    // Viewport scrollport 300x200. A sticky box with `top:20px` at y=0 is
+    // pushed down 20px at the initial scroll position; its sibling is not.
+    let l = layout(
+        "<main><div id=s><p></p></div><div id=n></div></main>",
+        "main {height:100px} #s {position:sticky; top:20px; height:10px} \
+         #n {height:10px} p {height:5px}",
+    );
+    let s = l.fragments()[3];
+    assert_eq!(s.scheme(), PositionScheme::Sticky);
+    assert_eq!(border(&l, 3), (0.0, 20.0, 300.0, 10.0));
+    assert_eq!(s.relative_offset().y.get(), 20.0);
+    // Descendants move with it; the following sibling keeps its flow position.
+    assert_eq!(border(&l, 4), (0.0, 20.0, 300.0, 5.0));
+    assert_eq!(border(&l, 5), (0.0, 10.0, 300.0, 10.0));
+    let c = s.sticky().unwrap();
+    assert_eq!(c.scroll_container(), None);
+    assert_eq!(rect(c.static_border()), (0.0, 0.0, 300.0, 10.0));
+    assert_eq!(rect(c.containing_block()), (0.0, 0.0, 300.0, 100.0));
+    assert_eq!(c.insets(), [Some(20.0), None, None, None]);
+    // Scrolling 50px: the view top is at 70, the box sticks there...
+    let at = |y: f64| rustic_layout::CssPoint {
+        x: CssPx::ZERO,
+        y: CssPx::new(y).unwrap(),
+    };
+    assert_eq!(c.offset(at(50.0)).unwrap().y.get(), 70.0);
+    // ...until its margin box reaches the containing block's bottom (90).
+    assert_eq!(c.offset(at(200.0)).unwrap().y.get(), 90.0);
+    assert!(
+        l.dump(1 << 16)
+            .unwrap()
+            .contains("scheme=sticky offset=(0,20)")
+    );
+}
+
+#[test]
+fn sticky_boxes_use_the_nearest_scroll_container_and_bottom_insets() {
+    let l = layout(
+        "<main><section><div id=s></div></section></main>",
+        "main {overflow:hidden; height:50px; padding:5px} \
+         section {height:200px} \
+         #s {position:sticky; bottom:10%; height:10px}",
+    );
+    // The scrollport is main's padding box (0..60): the view's bottom edge
+    // is at 60 - 6 = 54, so the box at 5..15 is already inside it.
+    let s = l.fragments()[4];
+    let c = s.sticky().unwrap();
+    assert_eq!(c.scroll_container(), Some(2));
+    assert_eq!(rect(c.scrollport()), (0.0, 0.0, 300.0, 60.0));
+    assert_eq!(c.insets()[2], Some(6.0));
+    assert_eq!(border(&l, 4), (5.0, 5.0, 290.0, 10.0));
+    // A box below the view's bottom moves up, but not above its containing
+    // block's top.
+    let l = layout(
+        "<main><section><p></p><div id=s></div></section></main>",
+        "main {overflow:hidden; height:50px} section {height:200px} \
+         p {height:100px} #s {position:sticky; bottom:0; height:10px}",
+    );
+    assert_eq!(border(&l, 5), (0.0, 40.0, 300.0, 10.0));
+    assert_eq!(l.fragments()[5].relative_offset().y.get(), -60.0);
+}
+
+#[test]
+fn sticky_boxes_are_containing_blocks_for_absolute_descendants() {
+    let l = layout(
+        "<main><div id=s><i></i></div></main>",
+        "#s {position:sticky; top:30px; height:10px; margin-top:5px} \
+         main {height:150px} i {display:block; position:absolute; top:1px; height:2px}",
+    );
+    // The border edge (not the margin edge) meets the view's top at 30.
+    assert_eq!(border(&l, 3), (0.0, 30.0, 300.0, 10.0));
+    assert_eq!(l.fragments()[4].containing_block(), Some(3));
+    assert_eq!(border(&l, 4).1, 31.0);
 }

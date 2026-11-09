@@ -23,6 +23,7 @@ mod overflow;
 mod position;
 mod replaced;
 mod sizing;
+mod sticky;
 mod text;
 mod tree;
 
@@ -38,5 +39,6 @@ pub use geometry::{
 pub use overflow::{AxisRange, Clip};
 pub use replaced::NaturalSize;
 pub use sizing::{BlockMeasure, Edges, MeasureError, measure_block_width};
+pub use sticky::StickyConstraint;
 pub use text::{InlineFragment, LineFragment, PositionedGlyph, TextFragment};
 pub use tree::{BoxKind, BoxSnapshot, BoxTree, LayoutError, LayoutLimits};

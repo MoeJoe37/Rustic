@@ -1680,7 +1680,10 @@ impl DisplayList {
             };
             let positioned = matches!(
                 fragment.scheme(),
-                PositionScheme::Relative | PositionScheme::Absolute | PositionScheme::Fixed
+                PositionScheme::Relative
+                    | PositionScheme::Absolute
+                    | PositionScheme::Fixed
+                    | PositionScheme::Sticky
             );
             // The containing block's perspective applies to this box's
             // transform (CSS Transforms 2 §6).
@@ -1711,9 +1714,13 @@ impl DisplayList {
             } else {
                 parent.and_then(|p| space[p])
             });
+            // Fixed and sticky boxes always establish stacking contexts.
             let role = if parent.is_none()
                 || (positioned && z.is_some())
-                || fragment.scheme() == PositionScheme::Fixed
+                || matches!(
+                    fragment.scheme(),
+                    PositionScheme::Fixed | PositionScheme::Sticky
+                )
                 || alpha < 1.0
                 || !matches!(style.get(P::ClipPath), V::ClipPath(ClipPath::None))
                 || transformed

@@ -760,6 +760,12 @@ fn compute_values(
                         PropertyValue::Gap(Gap::LengthPercentage(lp)) => {
                             PropertyValue::Gap(Gap::LengthPercentage(basis.lp(lp, nonnegative)))
                         }
+                        PropertyValue::BorderRadius(r) => {
+                            PropertyValue::BorderRadius(rustic_css::CornerRadius {
+                                horizontal: basis.lp(&r.horizontal, true),
+                                vertical: basis.lp(&r.vertical, true),
+                            })
+                        }
                         other => other.clone(),
                     }
                 }

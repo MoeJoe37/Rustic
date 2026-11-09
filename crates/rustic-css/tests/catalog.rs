@@ -101,6 +101,20 @@ const VALID: &[(&str, &str)] = &[
         "outline: blue double",
         "outline-width: medium; outline-style: double; outline-color: rgb(0, 0, 255)",
     ),
+    // Rounded corners.
+    ("border-top-left-radius: 4px", "border-top-left-radius: 4px"),
+    (
+        "border-bottom-right-radius: 10% 2em",
+        "border-bottom-right-radius: 10% 2em",
+    ),
+    (
+        "border-radius: 1px 2px 3px",
+        "border-top-left-radius: 1px; border-top-right-radius: 2px; border-bottom-right-radius: 3px; border-bottom-left-radius: 2px",
+    ),
+    (
+        "border-radius: 4px / 10% 5px",
+        "border-top-left-radius: 4px 10%; border-top-right-radius: 4px 5px; border-bottom-right-radius: 4px 10%; border-bottom-left-radius: 4px 5px",
+    ),
     // Fonts.
     (
         "font-variant-caps: all-small-caps",
@@ -284,6 +298,11 @@ fn invalid_catalog_declarations_are_rejected() {
         "outline-offset: 10%",
         "outline: solid dashed",
         "outline: 1px 2px",
+        "border-top-left-radius: -1px",
+        "border-top-left-radius: 1px 2px 3px",
+        "border-radius: 1px / ",
+        "border-radius: 1px 2px 3px 4px 5px",
+        "border-radius: auto",
         "font-variant-caps: small",
         "font-stretch: -10%",
         "font-stretch: 100",

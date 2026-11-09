@@ -68,8 +68,8 @@ pub use media::{
 };
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
-    BorderStyle, BorderWidth, BoxSizing, Clear, ContainerType, CssWideKeyword, DeclaredValue,
-    Direction, Display, FamilyName, Float, FontSize, FontSizeKeyword, FontStretch,
+    BorderStyle, BorderWidth, BoxSizing, Clear, ContainerType, CornerRadius, CssWideKeyword,
+    DeclaredValue, Direction, Display, FamilyName, Float, FontSize, FontSizeKeyword, FontStretch,
     FontStretchKeyword, FontStyle, FontVariantCaps, FontWeight, GenericFamily,
     LengthPercentageOrAuto, LineHeight, MaxSize, OutlineStyle, Overflow, Position,
     PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,

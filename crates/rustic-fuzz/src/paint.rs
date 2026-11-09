@@ -73,6 +73,9 @@ impl Target for PaintTarget {
             b"outline:3px double blue",
             b"outline-offset:-9px",
             b"outline:2px auto",
+            b"border-radius:50%",
+            b"border-radius:9px 3px/40% 2px",
+            b"overflow:hidden;border-radius:12px",
             b"{",
             b"}",
         ]

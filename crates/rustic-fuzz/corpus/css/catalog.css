@@ -1,4 +1,4 @@
 a{position:absolute;inset:0 auto calc(1em - 2%) 3px;z-index:calc(2.5);float:left;clear:both;overflow:clip auto;visibility:hidden;opacity:50%;vertical-align:-10%}
-p{direction:rtl;text-align:match-parent;text-indent:-2em;text-transform:capitalize full-width;letter-spacing:.1em;word-spacing:normal;white-space:pre-wrap;text-decoration:red wavy underline overline;outline:thin dashed red;outline-offset:calc(1em - 2px)}
+p{direction:rtl;text-align:match-parent;text-indent:-2em;text-transform:capitalize full-width;letter-spacing:.1em;word-spacing:normal;white-space:pre-wrap;text-decoration:red wavy underline overline;outline:thin dashed red;outline-offset:calc(1em - 2px);border-radius:1em 10%/5px}
 b{font:italic small-caps 700 condensed 12px/1.5 "A B",serif;font-stretch:87.5%;font-variant-caps:all-petite-caps}
 i{background:url(a.png) no-repeat right 10px bottom 20%/2em auto fixed content-box,center/cover repeat-y padding-box border-box url(b) #0f0;background-position:left 1em top,3em;background-size:auto 10px,contain}

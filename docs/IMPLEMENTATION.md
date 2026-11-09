@@ -954,6 +954,18 @@ Two reftests and a paint test cover order, negative offsets and failure;
 `paint.display` credits its outline step. Gaps are TD-54. See
 [PAINT.md](PAINT.md#outlines).
 
+## REN-04f — Rounded corners
+
+`border-radius` parses and computes, and paint rounds backgrounds, borders
+(including mixed colors), outlines, overflow clips and image content, with
+rounded clips chained along the containing-block chain and honored by hit
+testing. Corner curves use constant tables so output stays identical on
+every platform. Three reftests (exact clip and border matches and a
+mismatch), a paint test for clip chains and hits, and unit tests for radius
+scaling cover it. Adding the properties brought 34 more WPT parsing cases
+into scope, all passing. Gaps are TD-55. See
+[PAINT.md](PAINT.md#rounded-corners).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

@@ -144,6 +144,25 @@ keywords! {
     }
 }
 
+/// One `border-*-radius` value (CSS Backgrounds 3 §5.1): the horizontal and
+/// vertical radii of a quarter ellipse, nonnegative; percentages refer to
+/// the border box's width and height.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CornerRadius {
+    /// Horizontal radius.
+    pub horizontal: LengthPercentage,
+    /// Vertical radius.
+    pub vertical: LengthPercentage,
+}
+
+impl CornerRadius {
+    /// A square corner.
+    pub const ZERO: Self = Self {
+        horizontal: LengthPercentage::ZERO,
+        vertical: LengthPercentage::ZERO,
+    };
+}
+
 keywords! {
     /// `outline-style` values (CSS UI 4 §5.3).
     OutlineStyle {
@@ -578,6 +597,8 @@ pub enum PropertyValue {
     BorderStyle(BorderStyle),
     /// `outline-style`.
     OutlineStyle(OutlineStyle),
+    /// `border-*-radius`.
+    BorderRadius(CornerRadius),
     /// `box-sizing`.
     BoxSizing(BoxSizing),
     /// `font-size`.
@@ -780,6 +801,10 @@ property_ids! {
     OutlineStyle => "outline-style", false;
     OutlineColor => "outline-color", false;
     OutlineOffset => "outline-offset", false;
+    BorderTopLeftRadius => "border-top-left-radius", false;
+    BorderTopRightRadius => "border-top-right-radius", false;
+    BorderBottomRightRadius => "border-bottom-right-radius", false;
+    BorderBottomLeftRadius => "border-bottom-left-radius", false;
 }
 
 impl PropertyId {
@@ -856,6 +881,10 @@ impl PropertyId {
             P::OutlineStyle => PropertyValue::OutlineStyle(OutlineStyle::None),
             P::OutlineColor => PropertyValue::Color(Color::CurrentColor),
             P::OutlineOffset => PropertyValue::LengthPercentage(zero),
+            P::BorderTopLeftRadius
+            | P::BorderTopRightRadius
+            | P::BorderBottomRightRadius
+            | P::BorderBottomLeftRadius => PropertyValue::BorderRadius(CornerRadius::ZERO),
             P::BackgroundImage => PropertyValue::BackgroundImage(vec![Image::None]),
             P::BackgroundPosition => {
                 PropertyValue::BackgroundPosition(vec![PositionValue::top_left()])
@@ -1124,6 +1153,12 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     const FLEX_FLOW: &[P] = &[P::FlexDirection, P::FlexWrap];
     const GAP: &[P] = &[P::RowGap, P::ColumnGap];
     const OUTLINE: &[P] = &[P::OutlineWidth, P::OutlineStyle, P::OutlineColor];
+    const BORDER_RADIUS: &[P] = &[
+        P::BorderTopLeftRadius,
+        P::BorderTopRightRadius,
+        P::BorderBottomRightRadius,
+        P::BorderBottomLeftRadius,
+    ];
     const TEXT_DECORATION: &[P] = &[
         P::TextDecorationLine,
         P::TextDecorationStyle,
@@ -1167,6 +1202,7 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "gap" => GAP,
         "text-decoration" => TEXT_DECORATION,
         "outline" => OUTLINE,
+        "border-radius" => BORDER_RADIUS,
         "font" => FONT,
         "background" => BACKGROUND,
         _ => {
@@ -1250,6 +1286,19 @@ fn lp_or_auto(value: &Value, allow_negative: bool) -> Option<LengthPercentageOrA
     }
     let lp = length_percentage(value)?;
     (allow_negative || !lp.is_negative()).then_some(LengthPercentageOrAuto::LengthPercentage(lp))
+}
+
+/// `<length-percentage [0,∞]>{1,2}`; one value sets both radii.
+fn corner_radius(parts: &[&Value]) -> Option<CornerRadius> {
+    let (horizontal, vertical) = match parts {
+        [both] => (nonnegative(both)?, nonnegative(both)?),
+        [h, v] => (nonnegative(h)?, nonnegative(v)?),
+        _ => return None,
+    };
+    Some(CornerRadius {
+        horizontal,
+        vertical,
+    })
 }
 
 fn border_width(value: &Value) -> Option<BorderWidth> {
@@ -1704,6 +1753,12 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
                 .map(PropertyValue::BackgroundBox);
         }
         P::ContainerName => return container_name(parts).map(PropertyValue::ContainerName),
+        P::BorderTopLeftRadius
+        | P::BorderTopRightRadius
+        | P::BorderBottomRightRadius
+        | P::BorderBottomLeftRadius => {
+            return corner_radius(parts).map(PropertyValue::BorderRadius);
+        }
         P::JustifyContent | P::AlignContent | P::AlignItems | P::AlignSelf => {
             let which = match property {
                 P::JustifyContent => AlignProperty::JustifyContent,
@@ -1735,7 +1790,11 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::JustifyContent
         | P::AlignContent
         | P::AlignItems
-        | P::AlignSelf => unreachable!("handled above"),
+        | P::AlignSelf
+        | P::BorderTopLeftRadius
+        | P::BorderTopRightRadius
+        | P::BorderBottomRightRadius
+        | P::BorderBottomLeftRadius => unreachable!("handled above"),
         P::FlexDirection => PropertyValue::FlexDirection(FlexDirection::from_name(name()?)?),
         P::FlexWrap => PropertyValue::FlexWrap(FlexWrap::from_name(name()?)?),
         P::FlexGrow | P::FlexShrink => PropertyValue::Number(flex_factor(value)?),
@@ -1871,6 +1930,36 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             Some(vec![PropertyValue::Overflow(x), PropertyValue::Overflow(y)])
         }
         "text-decoration" => text_decoration(parts),
+        "border-radius" => {
+            let (horizontal, vertical) = match parts
+                .iter()
+                .position(|v| v.token() == Some(&Token::Delim('/')))
+            {
+                Some(slash) => (&parts[..slash], &parts[slash + 1..]),
+                None => (parts, parts),
+            };
+            let side = |values: &[&Value]| -> Option<Vec<LengthPercentage>> {
+                four(
+                    values
+                        .iter()
+                        .map(|v| nonnegative(v))
+                        .collect::<Option<Vec<_>>>()?,
+                )
+            };
+            let (horizontal, vertical) = (side(horizontal)?, side(vertical)?);
+            Some(
+                horizontal
+                    .into_iter()
+                    .zip(vertical)
+                    .map(|(horizontal, vertical)| {
+                        PropertyValue::BorderRadius(CornerRadius {
+                            horizontal,
+                            vertical,
+                        })
+                    })
+                    .collect(),
+            )
+        }
         "outline" => {
             let (mut width, mut style, mut color) = (None, None, None);
             for v in parts {
@@ -2088,6 +2177,8 @@ impl fmt::Display for PropertyValue {
             }
             Self::TextDecorationStyle(v) => write!(f, "{v}"),
             Self::OutlineStyle(v) => write!(f, "{v}"),
+            Self::BorderRadius(r) if r.horizontal == r.vertical => write!(f, "{}", r.horizontal),
+            Self::BorderRadius(r) => write!(f, "{} {}", r.horizontal, r.vertical),
             Self::FontVariantCaps(v) => write!(f, "{v}"),
             Self::FontStretch(FontStretch::Keyword(k)) => write!(f, "{k}"),
             Self::FontStretch(FontStretch::Percentage(p)) => {

@@ -218,6 +218,16 @@ fn currentcolor_and_border_widths() {
     );
     assert_eq!(computed(html, outline, "a", "outline-offset"), "-16px");
     assert_eq!(computed(html, outline, "b", "outline-width"), "1px");
+    // Radii compute lengths to pixels and keep percentages.
+    let radius = "#a { border-radius: 1em 10% / calc(2em - 4px) }";
+    assert_eq!(
+        computed(html, radius, "a", "border-top-left-radius"),
+        "16px 28px"
+    );
+    assert_eq!(
+        computed(html, radius, "a", "border-top-right-radius"),
+        "10% 28px"
+    );
 }
 
 #[test]

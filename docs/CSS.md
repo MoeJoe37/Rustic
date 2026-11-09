@@ -910,9 +910,9 @@ skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
   implemented.
 * `.tentative` files test proposals and are never in scope.
 
-Of 2,916 cases, 1,455 are in scope and **1,115 pass** (invalid-selector
-102/104, invalid-value 470/471, valid-selector 108/199, valid-value 435/681).
-The other 1,461 are out of scope: properties `rustic-css` does not support yet,
+Of 2,916 cases, 1,489 are in scope and **1,149 pass** (invalid-selector
+102/104, invalid-value 481/482, valid-selector 108/199, valid-value 458/704).
+The other 1,427 are out of scope: properties `rustic-css` does not support yet,
 and tentative files. Both counts are pinned in the gate, so supporting or
 dropping a property changes them deliberately. Every other in-scope case is
 listed in `expected_failures.json` with a reason,

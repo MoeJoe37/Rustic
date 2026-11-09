@@ -3,6 +3,7 @@
 //! overflow clips; opacity groups; CSS Backgrounds 3 §2.11 canvas propagation.
 
 use crate::color::{Srgba, srgba};
+use crate::rounded::{RoundedRect, clip_convex, used_corners};
 use rustic_base::CancellationToken;
 use rustic_css::Overflow;
 use rustic_css::{
@@ -152,6 +153,17 @@ pub enum Shape {
     Quad([CssPoint; 4]),
     /// Index into [`DisplayList::paths`].
     Path(usize),
+    /// A rectangle with elliptical corners: index into
+    /// [`DisplayList::rounded`].
+    Rounded(usize),
+    /// The area between two rounded rectangles, `inner` inside `outer`
+    /// (indices into [`DisplayList::rounded`]).
+    RoundedRing {
+        /// Outer edge.
+        outer: usize,
+        /// Inner edge.
+        inner: usize,
+    },
     /// Image [`DisplayList::images`]`[image]` stretched over `rect`.
     Image {
         /// Destination rectangle (the replaced element's content box).
@@ -176,6 +188,19 @@ pub struct DisplayItem {
     pub color: Srgba,
     /// Ancestor overflow clip in CSS pixels (see [`BlockFragment::clip`]).
     pub clip: Clip,
+    /// The innermost rounded clip the item is also clipped by, as an index
+    /// into [`DisplayList::clips`]; that node's ancestors clip it too.
+    pub rounded_clip: Option<usize>,
+}
+
+/// One rounded clip: the padding edge curve of a box with `border-radius`
+/// that clips its overflow, or a replaced element's rounded content box.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClipNode {
+    /// The area kept.
+    pub shape: RoundedRect,
+    /// The next rounded clip out, if any.
+    pub parent: Option<usize>,
 }
 
 /// One display list command, in paint order.
@@ -263,6 +288,11 @@ pub struct DisplayList {
     paths: Vec<Path>,
     /// Images referenced by [`Shape::Image`].
     images: Vec<Arc<Image>>,
+    /// Rounded clips referenced by [`DisplayItem::rounded_clip`].
+    clips: Vec<ClipNode>,
+    /// Rounded rectangles referenced by [`Shape::Rounded`] and
+    /// [`Shape::RoundedRing`].
+    rounded: Vec<RoundedRect>,
     /// Hit-testable border boxes in paint order.
     hits: Vec<HitRegion>,
     /// The root fragment, the target when no box is hit.
@@ -283,10 +313,29 @@ struct HitRegion {
     hit: Hit,
     border: CssRect,
     clip: Clip,
+    /// The rounded border box, when any corner is rounded.
+    rounded: Option<RoundedRect>,
+    rounded_clip: Option<usize>,
+}
+
+/// Whether `(x, y)` survives the rounded clip `node` and its ancestors.
+fn in_clips(clips: &[ClipNode], mut node: Option<usize>, x: f64, y: f64) -> bool {
+    while let Some(n) = node.and_then(|i| clips.get(i)) {
+        if !n.shape.contains(x, y) {
+            return false;
+        }
+        node = n.parent;
+    }
+    true
 }
 
 impl HitRegion {
-    fn contains(&self, x: f64, y: f64) -> bool {
+    fn contains(&self, x: f64, y: f64, clips: &[ClipNode]) -> bool {
+        if self.rounded.is_some_and(|r| !r.contains(x, y))
+            || !in_clips(clips, self.rounded_clip, x, y)
+        {
+            return false;
+        }
         let (left, top, right, bottom) = edges(self.border);
         let inside = |range: Option<rustic_layout::AxisRange>, v: f64| {
             range.is_none_or(|r| r.start.get() <= v && v < r.end.get())
@@ -347,28 +396,100 @@ struct Geometry {
     padding: CssRect,
     content: CssRect,
     clip: Clip,
+    /// The rounded border box, when any corner is rounded.
+    rounded: Option<RoundedRect>,
+    rounded_clip: Option<usize>,
 }
 
 impl Geometry {
-    fn block(f: &BlockFragment) -> Self {
+    fn block(f: &BlockFragment, rounded: Option<RoundedRect>, rounded_clip: Option<usize>) -> Self {
         Self {
             node: f.node(),
             border: f.border(),
             padding: f.padding(),
             content: f.content(),
             clip: f.clip(),
+            rounded,
+            rounded_clip,
         }
     }
 
-    fn inline(f: &InlineFragment, clip: Clip) -> Self {
+    fn inline(
+        f: &InlineFragment,
+        clip: Clip,
+        rounded: Option<RoundedRect>,
+        rounded_clip: Option<usize>,
+    ) -> Self {
         Self {
             node: f.node(),
             border: f.border(),
             padding: f.padding(),
             content: f.content(),
             clip,
+            rounded,
+            rounded_clip,
         }
     }
+
+    /// `area` (one of this fragment's boxes) with the matching curve.
+    fn curve(&self, area: CssRect) -> Option<RoundedRect> {
+        self.rounded.map(|r| r.inset(area)).filter(|r| !r.is_rect())
+    }
+}
+
+/// The convex region owned by the border side from outer corner `a.0` to
+/// outer corner `b.0` (clockwise): bounded by the side and the rays from
+/// each outer corner through its inner corner, cut where the rays meet or
+/// `far` away from the corners.
+fn side_wedge(
+    a: ((f64, f64), (f64, f64)),
+    b: ((f64, f64), (f64, f64)),
+    far: f64,
+) -> Vec<(f64, f64)> {
+    let direction = |(o, i): ((f64, f64), (f64, f64))| {
+        let (dx, dy) = (i.0 - o.0, i.1 - o.1);
+        let len = (dx * dx + dy * dy).sqrt();
+        if len > 0.0 {
+            (dx / len, dy / len)
+        } else {
+            (0.0, 0.0)
+        }
+    };
+    let (da, db) = (direction(a), direction(b));
+    let (pa, pb) = (a.0, b.0);
+    // Solve pa + s·da = pb + t·db.
+    let det = db.0 * da.1 - da.0 * db.1;
+    if det.abs() > 1e-12 {
+        let (ex, ey) = (pb.0 - pa.0, pb.1 - pa.1);
+        let s = (db.0 * ey - db.1 * ex) / det;
+        let t = (da.0 * ey - da.1 * ex) / det;
+        if s > 0.0 && t > 0.0 && s < far && t < far {
+            return vec![pa, pb, (pa.0 + s * da.0, pa.1 + s * da.1)];
+        }
+    }
+    vec![
+        pa,
+        pb,
+        (pb.0 + far * db.0, pb.1 + far * db.1),
+        (pa.0 + far * da.0, pa.1 + far * da.1),
+    ]
+}
+
+/// The used rounded border box of a box, or `None` when every corner is
+/// square.
+fn rounded_box(style: &ComputedStyle, border: CssRect) -> Result<Option<RoundedRect>, PaintError> {
+    let radius = |property| match style.get(property) {
+        V::BorderRadius(r) => Ok(r),
+        _ => Err(PaintError::InvalidInput),
+    };
+    let radii = [
+        radius(P::BorderTopLeftRadius)?,
+        radius(P::BorderTopRightRadius)?,
+        radius(P::BorderBottomRightRadius)?,
+        radius(P::BorderBottomLeftRadius)?,
+    ];
+    let rounded = used_corners(radii, border).ok_or(PaintError::InvalidInput)?;
+    Ok((!rounded.is_rect()).then_some(rounded))
 }
 
 /// The clip a block applies to its own in-flow content: its ancestors' clip
@@ -407,9 +528,53 @@ struct Builder<'a> {
     /// Outlines by (face, glyph), each read once.
     outlines: HashMap<(usize, u16), rustic_text::Outline>,
     images: Vec<Arc<Image>>,
+    clips: Vec<ClipNode>,
+    rounded: Vec<RoundedRect>,
 }
 
 impl Builder<'_> {
+    /// Store a rounded rectangle for a shape.
+    fn rounded(&mut self, shape: RoundedRect) -> usize {
+        self.rounded.push(shape);
+        self.rounded.len() - 1
+    }
+
+    /// A rounded clip of `shape` inside `parent`, or `parent` when `shape`
+    /// has square corners (the rectangular part is in the axis clip).
+    fn rounded_clip(&mut self, shape: RoundedRect, parent: Option<usize>) -> Option<usize> {
+        if shape.is_rect() {
+            return parent;
+        }
+        self.clips.push(ClipNode { shape, parent });
+        Some(self.clips.len() - 1)
+    }
+
+    /// Store `contours` (polygons in CSS pixels) as a path.
+    fn polygon_path(&mut self, contours: Vec<Vec<(f64, f64)>>) -> Result<usize, PaintError> {
+        let points: usize = contours.iter().map(Vec::len).sum();
+        self.path_points = self
+            .path_points
+            .checked_add(points)
+            .filter(|&n| n <= self.limits.max_path_points)
+            .ok_or(PaintError::ItemLimit)?;
+        let path = Path {
+            contours: contours
+                .into_iter()
+                .map(|c| {
+                    c.into_iter()
+                        .map(|(x, y)| PathPoint {
+                            x,
+                            y,
+                            on_curve: true,
+                        })
+                        .collect()
+                })
+                .collect(),
+        };
+        self.paths.push(path);
+        Ok(self.paths.len() - 1)
+    }
+
     fn command(&mut self, command: DisplayCommand) -> Result<(), PaintError> {
         self.cancellation
             .check()
@@ -443,13 +608,19 @@ impl Builder<'_> {
             VisualBox::PaddingBox => fragment.padding,
             VisualBox::ContentBox => fragment.content,
         };
+        let color = color(style, P::BackgroundColor)?;
+        let shape = match fragment.curve(area) {
+            Some(r) if !color.is_transparent() => Shape::Rounded(self.rounded(r)),
+            _ => Shape::Rect(area),
+        };
         self.push(DisplayItem {
             source_box: source,
             node: fragment.node,
             role: ItemRole::Background,
-            shape: Shape::Rect(area),
-            color: color(style, P::BackgroundColor)?,
+            shape,
+            color,
             clip: fragment.clip,
+            rounded_clip: fragment.rounded_clip,
         })
     }
 
@@ -493,7 +664,51 @@ impl Builder<'_> {
             shape,
             color,
             clip: fragment.clip,
+            rounded_clip: fragment.rounded_clip,
         };
+        if let Some(outer) = fragment.rounded {
+            let inner = outer.inset(fragment.padding);
+            if colors.iter().all(|&c| c == colors[0]) {
+                if colors[0].is_transparent() {
+                    return Ok(());
+                }
+                let shape = Shape::RoundedRing {
+                    outer: self.rounded(outer),
+                    inner: self.rounded(inner),
+                };
+                return self.push(item(ItemRole::Border, shape, colors[0]));
+            }
+            // Each side is the ring cut by the rays from the outer corners
+            // through the inner ones (CSS Backgrounds 3 §5.5 leaves the
+            // exact color transition to the implementation).
+            let mut hole = inner.polygon();
+            hole.reverse();
+            let ring = [outer.polygon(), hole];
+            let corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)];
+            let inner_corners = [(ix0, iy0), (ix1, iy0), (ix1, iy1), (ix0, iy1)];
+            for side in 0..4 {
+                if widths[side] <= 0.0 || colors[side].is_transparent() {
+                    continue;
+                }
+                let (a, b) = (side, (side + 1) % 4);
+                let wedge = side_wedge(
+                    (corners[a], inner_corners[a]),
+                    (corners[b], inner_corners[b]),
+                    2.0 * ((x1 - x0) + (y1 - y0)) + 1.0,
+                );
+                let pieces: Vec<Vec<(f64, f64)>> = ring
+                    .iter()
+                    .map(|c| clip_convex(c, &wedge))
+                    .filter(|c| c.len() >= 3)
+                    .collect();
+                if pieces.is_empty() {
+                    continue;
+                }
+                let index = self.polygon_path(pieces)?;
+                self.push(item(ItemRole::Border, Shape::Path(index), colors[side]))?;
+            }
+            return Ok(());
+        }
         // Matching sides are one ring, so no antialiased seam appears at
         // the corner diagonals where separately composited quads would meet.
         if colors.iter().all(|&c| c == colors[0]) {
@@ -568,6 +783,9 @@ impl Builder<'_> {
             _ => return Err(PaintError::InvalidInput),
         };
         let color = color(style, P::OutlineColor)?;
+        if color.is_transparent() {
+            return Ok(());
+        }
         // Edges of the border box grown by `by` on every side; an axis that
         // collapses becomes empty at its center.
         let (x0, y0, x1, y1) = edges(fragment.border);
@@ -593,13 +811,36 @@ impl Builder<'_> {
         } else {
             &[(0.0, 1.0)]
         };
+        // With `border-radius`, each rounded corner's radii grow by the
+        // same distance as the edges (CSS UI 4 §5.1).
+        let round = |rect: CssRect, by: f64| {
+            fragment.rounded.map(|r| RoundedRect {
+                rect,
+                corners: r.corners.map(|c| {
+                    if c.x > 0.0 && c.y > 0.0 {
+                        crate::rounded::Corner {
+                            x: (c.x + by).max(0.0),
+                            y: (c.y + by).max(0.0),
+                        }
+                    } else {
+                        crate::rounded::Corner::default()
+                    }
+                }),
+            })
+        };
         for &(from, to) in rings {
-            let Some(outer) = grow(offset + width * (1.0 - from))? else {
+            let (out_by, in_by) = (offset + width * (1.0 - from), offset + width * (1.0 - to));
+            let Some(outer) = grow(out_by)? else {
                 continue;
             };
-            let shape = match grow(offset + width * (1.0 - to))? {
-                Some(inner) => Shape::Ring { outer, inner },
-                None => Shape::Rect(outer),
+            let shape = match (grow(in_by)?, round(outer, out_by)) {
+                (Some(inner), Some(rounded)) => Shape::RoundedRing {
+                    outer: self.rounded(rounded),
+                    inner: self.rounded(round(inner, in_by).unwrap_or(rounded)),
+                },
+                (Some(inner), None) => Shape::Ring { outer, inner },
+                (None, Some(rounded)) => Shape::Rounded(self.rounded(rounded)),
+                (None, None) => Shape::Rect(outer),
             };
             self.push(DisplayItem {
                 source_box: source,
@@ -608,6 +849,7 @@ impl Builder<'_> {
                 shape,
                 color,
                 clip: fragment.clip,
+                rounded_clip: fragment.rounded_clip,
             })?;
         }
         Ok(())
@@ -623,6 +865,7 @@ impl Builder<'_> {
         text: &TextFragment,
         line: Decoration,
         clip: Clip,
+        rounded_clip: Option<usize>,
     ) -> Result<(), PaintError> {
         let face = self
             .fonts
@@ -664,6 +907,7 @@ impl Builder<'_> {
                 shape: Shape::Rect(area),
                 color: line.color,
                 clip,
+                rounded_clip,
             })?;
         }
         Ok(())
@@ -676,6 +920,7 @@ impl Builder<'_> {
         text: &TextFragment,
         style: &ComputedStyle,
         clip: Clip,
+        rounded_clip: Option<usize>,
     ) -> Result<(), PaintError> {
         let fill = color(style, P::Color)?;
         if fill.is_transparent() || text.glyphs().is_empty() {
@@ -736,6 +981,7 @@ impl Builder<'_> {
             shape: Shape::Path(index),
             color: fill,
             clip,
+            rounded_clip,
         })?;
         self.paths.push(path);
         Ok(())
@@ -953,6 +1199,8 @@ impl DisplayList {
             path_points: 0,
             outlines: HashMap::new(),
             images: Vec::new(),
+            clips: Vec::new(),
+            rounded: Vec::new(),
         };
         let mut image_index: HashMap<NodeId, usize> = HashMap::new();
         let fragments = layout.fragments();
@@ -1109,6 +1357,34 @@ impl DisplayList {
                 .ok_or(PaintError::InvalidInput)?
                 .push(index);
         }
+        // Rounded border boxes, and the rounded clips that apply to each
+        // box (`outer`) and to its own content (`inner`), following the
+        // containing-block chain like the axis clips. A box whose overflow
+        // is clipped on both axes clips its content to its padding edge
+        // curve (CSS Backgrounds 3 §5.3).
+        let mut rounded = Vec::with_capacity(n);
+        let mut outer_clip: Vec<Option<usize>> = Vec::with_capacity(n);
+        let mut inner_clip: Vec<Option<usize>> = Vec::with_capacity(n);
+        for (i, f) in fragments.iter().enumerate() {
+            cancellation.check().map_err(|_| PaintError::Cancelled)?;
+            let shape = rounded_box(style_of(f)?, f.border())?;
+            let parent = match f.containing_block() {
+                Some(c) if c < i => inner_clip[c],
+                Some(_) => return Err(PaintError::InvalidInput),
+                None => None,
+            };
+            let (ox, oy) = f.overflow();
+            let inner = match shape {
+                Some(r) if ox != Overflow::Visible && oy != Overflow::Visible => {
+                    builder.rounded_clip(r.inset(f.padding()), parent)
+                }
+                _ => parent,
+            };
+            rounded.push(shape);
+            outer_clip.push(parent);
+            inner_clip.push(inner);
+        }
+
         // Outlines by stacking context, in tree order: each block, then the
         // inline boxes of its lines.
         let mut outlined: Vec<Vec<Outlined>> = vec![Vec::new(); n];
@@ -1145,7 +1421,10 @@ impl DisplayList {
                         let (geometry, source) = match entry {
                             Outlined::Block(b) => {
                                 let f = &fragments[b];
-                                (Geometry::block(f), f.source_box())
+                                (
+                                    Geometry::block(f, rounded[b], outer_clip[b]),
+                                    f.source_box(),
+                                )
                             }
                             Outlined::Inline(k) => {
                                 let inline = &layout.inlines()[k];
@@ -1153,8 +1432,15 @@ impl DisplayList {
                                     .get(inline.line())
                                     .ok_or(PaintError::InvalidInput)?
                                     .block();
-                                let clip = content_clip(&fragments[block]);
-                                (Geometry::inline(inline, clip), inline.source_box())
+                                let clip = content_clip(
+                                    fragments.get(block).ok_or(PaintError::InvalidInput)?,
+                                );
+                                let shape =
+                                    rounded_box(box_style(inline.source_box())?, inline.border())?;
+                                (
+                                    Geometry::inline(inline, clip, shape, inner_clip[block]),
+                                    inline.source_box(),
+                                )
                             }
                         };
                         let style = box_style(source)?;
@@ -1174,6 +1460,13 @@ impl DisplayList {
                                         builder.images.push(Arc::clone(image));
                                         builder.images.len() - 1
                                     });
+                                // Replaced content is clipped to the content
+                                // edge curve.
+                                let rounded_clip = match rounded[b] {
+                                    Some(r) => builder
+                                        .rounded_clip(r.inset(fragment.content()), outer_clip[b]),
+                                    None => outer_clip[b],
+                                };
                                 builder.push(DisplayItem {
                                     source_box: fragment.source_box(),
                                     node: fragment.node(),
@@ -1184,6 +1477,7 @@ impl DisplayList {
                                     },
                                     color: Srgba::WHITE,
                                     clip: fragment.clip(),
+                                    rounded_clip,
                                 })?;
                             }
                         }
@@ -1195,7 +1489,8 @@ impl DisplayList {
                                 if !visible(style) {
                                     continue;
                                 }
-                                let geometry = Geometry::inline(inline, clip);
+                                let shape = rounded_box(style, inline.border())?;
+                                let geometry = Geometry::inline(inline, clip, shape, inner_clip[b]);
                                 hits.push(HitRegion {
                                     hit: Hit {
                                         source_box: inline.source_box(),
@@ -1203,6 +1498,8 @@ impl DisplayList {
                                     },
                                     border: inline.border(),
                                     clip,
+                                    rounded: shape,
+                                    rounded_clip: inner_clip[b],
                                 });
                                 if !muted {
                                     builder.background(geometry, inline.source_box(), style)?;
@@ -1221,13 +1518,13 @@ impl DisplayList {
                                     // line-throughs over it (CSS Text Decoration 3 §2.1).
                                     for over in [false, true] {
                                         if over {
-                                            builder.text(text, style, clip)?;
+                                            builder.text(text, style, clip, inner_clip[b])?;
                                         }
                                         for line in lines
                                             .iter()
                                             .filter(|l| (l.kind == Line::Through) == over)
                                         {
-                                            builder.decoration(text, *line, clip)?;
+                                            builder.decoration(text, *line, clip, inner_clip[b])?;
                                         }
                                     }
                                 }
@@ -1246,18 +1543,17 @@ impl DisplayList {
                             },
                             border: fragment.border(),
                             clip: fragment.clip(),
+                            rounded: rounded[i],
+                            rounded_clip: outer_clip[i],
                         });
                         if muted {
                             continue;
                         }
+                        let geometry = Geometry::block(fragment, rounded[i], outer_clip[i]);
                         if canvas_source != Some(i) {
-                            builder.background(
-                                Geometry::block(fragment),
-                                fragment.source_box(),
-                                style,
-                            )?;
+                            builder.background(geometry, fragment.source_box(), style)?;
                         }
-                        builder.border(Geometry::block(fragment), fragment.source_box(), style)?;
+                        builder.border(geometry, fragment.source_box(), style)?;
                     }
                 }
                 Task::Layer(i, muted) => {
@@ -1304,6 +1600,8 @@ impl DisplayList {
             commands: builder.commands,
             paths: builder.paths,
             images: builder.images,
+            clips: builder.clips,
+            rounded: builder.rounded,
             hits,
             root,
         })
@@ -1341,9 +1639,20 @@ impl DisplayList {
         self.hits
             .iter()
             .rev()
-            .find(|region| region.contains(x, y))
+            .find(|region| region.contains(x, y, &self.clips))
             .map(|region| region.hit)
             .or(self.root)
+    }
+
+    /// Rounded rectangles, indexed by [`Shape::Rounded`] and
+    /// [`Shape::RoundedRing`].
+    pub fn rounded(&self) -> &[RoundedRect] {
+        &self.rounded
+    }
+
+    /// Rounded clips, indexed by [`DisplayItem::rounded_clip`].
+    pub fn clips(&self) -> &[ClipNode] {
+        &self.clips
     }
 
     /// Glyph paths, indexed by [`Shape::Path`].
@@ -1387,6 +1696,25 @@ impl DisplayList {
             hex(self.canvas)
         );
         append(&mut out, &line, max_bytes)?;
+        let rounded = |s: &RoundedRect| {
+            let mut text = format!("({}) radii=(", r(s.rect));
+            for (n, c) in s.corners.iter().enumerate() {
+                if n > 0 {
+                    text.push(' ');
+                }
+                // Writing to a String cannot fail.
+                let _ = write!(text, "{}/{}", c.x, c.y);
+            }
+            text.push(')');
+            text
+        };
+        for (n, node) in self.clips.iter().enumerate() {
+            let parent = node
+                .parent
+                .map_or_else(String::new, |p| format!(" parent={p}"));
+            line = format!("rclip {n} rounded={}{parent}\n", rounded(&node.shape));
+            append(&mut out, &line, max_bytes)?;
+        }
         let mut index = 0usize;
         for command in &self.commands {
             let item = match command {
@@ -1443,6 +1771,12 @@ impl DisplayList {
                         data.height
                     )
                 }
+                Shape::Rounded(shape) => format!("rounded={}", rounded(&self.rounded[shape])),
+                Shape::RoundedRing { outer, inner } => format!(
+                    "rounded-ring={} inner={}",
+                    rounded(&self.rounded[outer]),
+                    rounded(&self.rounded[inner])
+                ),
                 Shape::Path(index) => {
                     let path = &self.paths[index];
                     format!(
@@ -1457,6 +1791,10 @@ impl DisplayList {
                 String::new()
             } else {
                 format!(" clip={}", item.clip)
+            };
+            let clip = match item.rounded_clip {
+                Some(n) => format!("{clip} rclip={n}"),
+                None => clip,
             };
             line = format!(
                 "item {i} box={} node={}:{} {role} {shape} color={}{clip}\n",

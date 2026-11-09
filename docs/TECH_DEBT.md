@@ -102,6 +102,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting, system fonts or exact nonzero fill | Open, REN-04c |
 | TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
 | TD-54 | Deliberate | Paint | First outline painting: solid/double only, `auto` as solid, per-fragment inline outlines | Open, REN-04e |
+| TD-55 | Deliberate | Paint | First `border-radius`: single-axis overflow ignores radii, per-fragment inline curves, unsnapped side joins | Open, REN-04f |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -906,14 +907,29 @@ image WPT reftests.
 REN-04e paints `solid` and `double` outlines; `dotted`, `dashed`, `groove`,
 `ridge`, `inset` and `outset` fail atomically like non-solid borders, and
 `auto` paints as `solid` in `outline-color` rather than a platform focus
-ring. Corners are square (no `border-radius` following), an inline box broken
-across lines gets one outline per fragment instead of one enclosing shape,
+ring. An inline box broken across lines gets one outline per fragment
+instead of one enclosing shape,
 and the outlines of all boxes in a stacking context paint together after its
 content (CSS 2.2 Appendix E step 10) rather than per box as browsers do,
 which only matters where outlines of one context overlap other content of
 the same context. `double` splits the width in exact thirds without the
 device-pixel snapping browsers use. **Pay:** share one styled-stroke
-implementation with borders for the dashed, dotted and 3D styles; rounded
-outlines with `border-radius`; union outlines for fragmented inlines.
-**Trigger:** border styles or `border-radius` landing, or outline WPT
-reftests.
+implementation with borders for the dashed, dotted and 3D styles; union
+outlines for fragmented inlines. **Trigger:** border styles landing, or
+outline WPT reftests.
+
+### TD-55 — First rounded-corner slice
+
+REN-04f rounds backgrounds, borders, outlines, overflow clips and replaced
+content. A box that clips overflow on only one axis keeps a rectangular clip
+(the curve applies only when both axes clip). An inline box broken across
+lines rounds every fragment's corners, as if `box-decoration-break: clone`.
+Multi-colored rounded borders split at the rays from outer to inner
+corners, without the device-pixel snapping or gradient transition browsers
+use, and abut with antialiased seams. Rounded clips are re-rasterized for
+every item they clip, which is quadratic in deep nesting of rounded
+scrollers (bounded by the work budget). Corner curves are four quadratics
+(0.02% radial error). **Pay:** a cached clip mask per node in the tiled
+raster work (paint.raster performance); `box-decoration-break`; one-axis
+rounded clips. **Trigger:** the tiled raster step, or border-radius WPT
+reftests that need them.

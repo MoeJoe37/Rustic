@@ -33,8 +33,8 @@ const EXPECTED_FAILURES: &str = include_str!("fixtures/wpt-css/expected_failures
 /// or removing a supported property moves cases in or out of scope; this
 /// makes every such change deliberate and visible instead of silently
 /// growing or shrinking the denominator (docs/TECH_DEBT.md, TD-35).
-const IN_SCOPE: usize = 1455;
-const OUT_OF_SCOPE: usize = 1461;
+const IN_SCOPE: usize = 1489;
+const OUT_OF_SCOPE: usize = 1427;
 
 fn string(json: &Json) -> &str {
     match json {

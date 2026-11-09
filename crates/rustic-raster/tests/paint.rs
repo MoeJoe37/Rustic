@@ -1071,3 +1071,39 @@ fn outlines_paint_last_in_their_stacking_context_and_collapse_inward() {
         })
     );
 }
+
+#[test]
+fn rounded_clips_follow_containing_blocks_and_shape_hits() {
+    let p = page(
+        "<div id=clip><div id=child></div><div id=abs></div></div><div id=round></div>",
+        &format!(
+            "{RESET} #clip {{ width: 40px; height: 40px; border-radius: 20px; overflow: hidden }}
+             #child {{ height: 40px; background: red }}
+             #abs {{ position: absolute; top: 0; left: 0; width: 5px; height: 5px }}
+             #round {{ width: 40px; height: 40px; border-radius: 10px; background: blue }}"
+        ),
+        100.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    let item = |name: &str| {
+        list.items()
+            .into_iter()
+            .find(|i| i.node == p.id(name))
+            .unwrap()
+    };
+    // The child is clipped to the circle; the rounded box paints a curve.
+    let child = item("child");
+    let node = list.clips()[child.rounded_clip.unwrap()];
+    assert_eq!(node.shape.corners[0].x, 20.0);
+    assert!(matches!(item("round").shape, Shape::Rounded(_)));
+    // Corners of a rounded box do not take hits; the clip's circle limits
+    // its in-flow child, but the absolutely positioned box escapes it.
+    assert_eq!(hit(&p, &list, 1.0, 1.0).as_deref(), Some("abs"));
+    assert_eq!(hit(&p, &list, 6.0, 1.0).as_deref(), Some("body"));
+    assert_eq!(hit(&p, &list, 20.0, 20.0).as_deref(), Some("child"));
+    assert_eq!(hit(&p, &list, 10.0, 50.0).as_deref(), Some("round"));
+    let dump = list.dump(1 << 20).unwrap();
+    assert!(dump.contains("rclip 0 rounded=(0,0,40,40) radii=(20/20 20/20 20/20 20/20)"));
+    assert!(dump.contains(" rclip=0\n"), "{dump}");
+}

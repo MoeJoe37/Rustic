@@ -9,7 +9,8 @@ use rustic_base::CancellationToken;
 use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
 use rustic_paint::{
-    DisplayCommand, DisplayItem, DisplayList, Image, Path, PathPoint, Shape, Srgba,
+    ClipNode, DisplayCommand, DisplayItem, DisplayList, Image, Path, PathPoint, RoundedRect, Shape,
+    Srgba,
 };
 use std::{error::Error, fmt};
 
@@ -338,7 +339,7 @@ fn flatten(contour: &[PathPoint], scale: f64) -> Vec<Point> {
     out
 }
 
-fn contours(shape: &Shape, paths: &[Path], scale: f64) -> Vec<Vec<Point>> {
+fn contours(shape: &Shape, paths: &[Path], rounded: &[RoundedRect], scale: f64) -> Vec<Vec<Point>> {
     match *shape {
         // Images are drawn by `draw_image`, not filled.
         Shape::Image { .. } => Vec::new(),
@@ -356,6 +357,17 @@ fn contours(shape: &Shape, paths: &[Path], scale: f64) -> Vec<Vec<Point>> {
                 rect_points(inner, scale, true),
             ]
         }
+        Shape::Rounded(r) => rounded
+            .get(r)
+            .map_or_else(Vec::new, |r| vec![flatten(&r.contour(), scale)]),
+        Shape::RoundedRing { outer, inner } => match (rounded.get(outer), rounded.get(inner)) {
+            (Some(outer), Some(inner)) => {
+                let mut hole = flatten(&inner.contour(), scale);
+                hole.reverse();
+                vec![flatten(&outer.contour(), scale), hole]
+            }
+            _ => Vec::new(),
+        },
         Shape::Quad(points) => vec![
             points
                 .iter()
@@ -400,6 +412,100 @@ fn item_bounds(clip_rect: Clip, w: f64, h: f64, scale: f64) -> Option<Bounds> {
     (b.0 < b.2 && b.1 < b.3).then_some(b)
 }
 
+/// Device bounds of a rounded rectangle.
+fn rounded_bounds(r: &RoundedRect, scale: f64) -> Bounds {
+    let (l, t, rr, b) = r.edges();
+    (l * scale, t * scale, rr * scale, b * scale)
+}
+
+fn intersect(a: Bounds, b: Bounds) -> Option<Bounds> {
+    let r = (a.0.max(b.0), a.1.max(b.1), a.2.min(b.2), a.3.min(b.3));
+    (r.0 < r.2 && r.1 < r.3).then_some(r)
+}
+
+/// The rounded clips of an item, innermost first. Each node's parent must
+/// come before it, so the walk ends.
+fn chain(clips: &[ClipNode], first: Option<usize>) -> Result<Vec<&ClipNode>, RasterError> {
+    let mut out = Vec::new();
+    let mut next = first;
+    while let Some(i) = next {
+        let node = clips.get(i).ok_or(RasterError::InvalidList)?;
+        if node.parent.is_some_and(|p| p >= i) {
+            return Err(RasterError::InvalidList);
+        }
+        out.push(node);
+        next = node.parent;
+    }
+    Ok(out)
+}
+
+/// Exact-area coverage, clamped to one, of `contours` (device space) over
+/// the `bw`×`bh` pixel window at `(bx, by)`, row-major.
+fn coverage(
+    contours: &[Vec<Point>],
+    (bx, by): (f64, f64),
+    (bw, bh): (usize, usize),
+    work: &mut Work<'_>,
+) -> Result<Vec<f64>, RasterError> {
+    work.charge((bw as u64 + 2) * bh as u64)?;
+    let stride = bw + 2;
+    let mut acc = vec![0.0_f64; stride * bh];
+    let window = (bx, by, bx + bw as f64, by + bh as f64);
+    for contour in contours {
+        let contour = clip(contour, window);
+        if contour.len() < 3 {
+            continue;
+        }
+        let mut previous = contour[contour.len() - 1];
+        for &current in &contour {
+            accumulate_edge(
+                &mut acc,
+                stride,
+                bh,
+                (previous.0 - bx, previous.1 - by),
+                (current.0 - bx, current.1 - by),
+            );
+            previous = current;
+        }
+    }
+    let mut out = vec![0.0; bw * bh];
+    for row in 0..bh {
+        let mut sum = 0.0;
+        for col in 0..bw {
+            sum += acc[row * stride + col];
+            out[row * bw + col] = sum.abs().min(1.0);
+        }
+    }
+    Ok(out)
+}
+
+/// The product of the coverage of every rounded clip in `nodes` over a
+/// pixel window, or `None` when there are none.
+fn clip_mask(
+    nodes: &[&ClipNode],
+    origin: (f64, f64),
+    size: (usize, usize),
+    scale: f64,
+    work: &mut Work<'_>,
+) -> Result<Option<Vec<f64>>, RasterError> {
+    let mut mask: Option<Vec<f64>> = None;
+    for node in nodes {
+        let contour = flatten(&node.shape.contour(), scale);
+        work.charge(contour.len() as u64)?;
+        let cover = coverage(&[contour], origin, size, work)?;
+        mask = Some(match mask {
+            None => cover,
+            Some(mut m) => {
+                for (a, b) in m.iter_mut().zip(cover) {
+                    *a *= b;
+                }
+                m
+            }
+        });
+    }
+    Ok(mask)
+}
+
 /// Bilinear sample of `image` at image-space `(u, v)` (pixel centers at
 /// half-integers), clamped to the edges, as premultiplied RGBA in 0–255.
 fn sample(image: &Image, u: f64, v: f64) -> [f64; 4] {
@@ -439,18 +545,25 @@ fn draw_image(
     pixels: &mut [u8],
     (width, height): (u32, u32),
     item: &DisplayItem,
-    images: &[std::sync::Arc<Image>],
+    list: &DisplayList,
     scale: f64,
     work: &mut Work<'_>,
 ) -> Result<(), RasterError> {
     let Shape::Image { rect, image } = item.shape else {
         return Ok(());
     };
-    let image = images.get(image).ok_or(RasterError::InvalidList)?;
+    let image = list.images().get(image).ok_or(RasterError::InvalidList)?;
     let (w, h) = (f64::from(width), f64::from(height));
-    let Some(limit) = item_bounds(item.clip, w, h, scale) else {
+    let Some(mut limit) = item_bounds(item.clip, w, h, scale) else {
         return Ok(());
     };
+    let nodes = chain(list.clips(), item.rounded_clip)?;
+    for node in &nodes {
+        let Some(b) = intersect(limit, rounded_bounds(&node.shape, scale)) else {
+            return Ok(());
+        };
+        limit = b;
+    }
     let o = rect.origin();
     let (x0, y0) = (o.x.get() * scale, o.y.get() * scale);
     let (x1, y1) = (
@@ -472,6 +585,8 @@ fn draw_image(
     let (px0, py0) = (cx0.floor() as usize, cy0.floor() as usize);
     let (px1, py1) = (cx1.ceil() as usize, cy1.ceil() as usize);
     work.charge((px1 - px0) as u64 * (py1 - py0) as u64)?;
+    let window = (px1 - px0, py1 - py0);
+    let mask = clip_mask(&nodes, (px0 as f64, py0 as f64), window, scale, work)?;
     let (sx, sy) = (
         f64::from(image.width()) / (x1 - x0),
         f64::from(image.height()) / (y1 - y0),
@@ -485,7 +600,10 @@ fn draw_image(
         let cover_y = overlap(py, cy0, cy1);
         let v = (py as f64 + 0.5 - y0) * sy;
         for px in px0..px1 {
-            let coverage = overlap(px, cx0, cx1) * cover_y;
+            let masked = mask
+                .as_ref()
+                .map_or(1.0, |m| m[(py - py0) * window.0 + (px - px0)]);
+            let coverage = overlap(px, cx0, cx1) * cover_y * masked;
             if coverage <= 0.0 {
                 continue;
             }
@@ -505,18 +623,28 @@ fn fill(
     pixels: &mut [u8],
     (width, height): (u32, u32),
     item: &DisplayItem,
-    paths: &[Path],
+    list: &DisplayList,
     scale: f64,
     work: &mut Work<'_>,
 ) -> Result<(), RasterError> {
     let (w, h) = (f64::from(width), f64::from(height));
-    let Some(limit) = item_bounds(item.clip, w, h, scale) else {
+    let Some(mut limit) = item_bounds(item.clip, w, h, scale) else {
         return Ok(());
     };
+    let nodes = chain(list.clips(), item.rounded_clip)?;
+    for node in &nodes {
+        let Some(b) = intersect(limit, rounded_bounds(&node.shape, scale)) else {
+            return Ok(());
+        };
+        limit = b;
+    }
     let color = item.color;
-    let shape = contours(&item.shape, paths, scale);
-    if matches!(item.shape, Shape::Path(_)) {
-        // Flattened glyph points; box shapes are a few points each.
+    let shape = contours(&item.shape, list.paths(), list.rounded(), scale);
+    if matches!(
+        item.shape,
+        Shape::Path(_) | Shape::Rounded(_) | Shape::RoundedRing { .. }
+    ) {
+        // Flattened points; plain box shapes are a few points each.
         work.charge(shape.iter().map(|c| c.len() as u64).sum())?;
     }
     let clipped: Vec<Vec<Point>> = shape
@@ -536,27 +664,13 @@ fn fill(
     if bounds.0 >= bounds.2 || bounds.1 >= bounds.3 {
         return Ok(());
     }
-    // Work in a local buffer covering only the item's pixel bounds.
+    // Work in a local window covering only the item's pixel bounds.
     let bx = bounds.0.floor();
     let by = bounds.1.floor();
     let bw = (bounds.2.ceil() - bx) as usize;
     let bh = (bounds.3.ceil() - by) as usize;
-    work.charge((bw as u64 + 2) * bh as u64)?;
-    let stride = bw + 2;
-    let mut acc = vec![0.0_f64; stride * bh];
-    for contour in &clipped {
-        let mut previous = contour[contour.len() - 1];
-        for &current in contour {
-            accumulate_edge(
-                &mut acc,
-                stride,
-                bh,
-                (previous.0 - bx, previous.1 - by),
-                (current.0 - bx, current.1 - by),
-            );
-            previous = current;
-        }
-    }
+    let cover = coverage(&clipped, (bx, by), (bw, bh), work)?;
+    let mask = clip_mask(&nodes, (bx, by), (bw, bh), scale, work)?;
     let alpha = f64::from(color.a) / 255.0;
     let premultiplied = [
         f64::from(color.r) * alpha,
@@ -570,11 +684,10 @@ fn fill(
         work.cancellation
             .check()
             .map_err(|_| RasterError::Cancelled)?;
-        let mut sum = 0.0;
         let start = ((oy + row) * width + ox) * 4;
         for col in 0..bw {
-            sum += acc[row * stride + col];
-            let coverage = sum.abs().min(1.0);
+            let k = row * bw + col;
+            let coverage = cover[k] * mask.as_ref().map_or(1.0, |m| m[k]);
             if coverage <= 0.0 {
                 continue;
             }
@@ -654,9 +767,9 @@ pub fn rasterize(
                     None => &mut surface.pixels,
                 };
                 if matches!(item.shape, Shape::Image { .. }) {
-                    draw_image(target, size, item, list.images(), factor, &mut work)?;
+                    draw_image(target, size, item, list, factor, &mut work)?;
                 } else {
-                    fill(target, size, item, list.paths(), factor, &mut work)?;
+                    fill(target, size, item, list, factor, &mut work)?;
                 }
             }
             DisplayCommand::BeginGroup { opacity, .. } => {

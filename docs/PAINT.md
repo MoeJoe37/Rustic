@@ -228,7 +228,8 @@ are not followed yet.
 The checked suite lives in `crates/rustic-cli/tests/reftests` and runs at
 scales 1 and 2 in `cargo test`; it covers borders against nested backgrounds,
 z-index against tree order, overflow clipping, opacity groups with a fuzzy
-tolerance, solid and double outlines and a mismatch.
+tolerance, solid and double outlines, rounded borders and clips, and
+mismatches.
 
 ## Outlines
 
@@ -244,14 +245,43 @@ of a third of the width; `auto` paints as `solid`; other styles fail with
 `UnsupportedPaint::OutlineStyle`. Outlines are clipped by ancestors' overflow
 like the box's border and never take hits. See TD-54.
 
+## Rounded corners
+
+The `border-*-radius` longhands and the `border-radius` shorthand (with the
+`/` form) parse and compute; lengths become pixels and percentages stay. At
+paint time percentages resolve against the border box, and all radii scale
+down together when adjacent ones would overlap (CSS Backgrounds 3 §5.5).
+Each corner is four quadratic curves built from constant tables, within
+0.02% of the radius, so no platform math library is involved.
+
+* Backgrounds are [`Shape::Rounded`] over their `background-clip` box's curve
+  (the border curve shrunk by the border and padding widths, §5.2).
+* Borders with one color are a [`Shape::RoundedRing`]; with several colors,
+  each side is the ring cut by the rays from the outer corners through the
+  inner corners, stored as a polygon path.
+* Outlines follow the curve, with each rounded corner's radii grown by the
+  outline's distance from the border edge.
+* A box whose overflow is clipped on both axes clips its content to its
+  padding edge curve, and a replaced element clips its image to its content
+  edge curve. These are [`ClipNode`]s chained along the containing-block
+  chain like the axis clips, so absolutely positioned boxes escape them. Each
+  item names its innermost node; the rasterizer multiplies the item's
+  coverage by every node's coverage.
+* Hit testing excludes the corners outside a rounded border box and points
+  outside a box's rounded clips.
+
+Shapes and clips are stored once in [`DisplayList::rounded`] and
+[`DisplayList::clips`] and are listed in dumps as `rounded=` shapes and
+`rclip` lines. See TD-55.
+
 ## Not yet implemented
 
-Non-solid outline styles and rounded outlines, non-solid text decoration styles, `text-underline-offset` and
+Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
-`border-radius`, box shadows, blend modes and filters, rounded or
+box shadows, blend modes and filters, rounded or
 `clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53, TD-54 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55 and docs/ROADMAP.md (REN-04 to
 REN-07).

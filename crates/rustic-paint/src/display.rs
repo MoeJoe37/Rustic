@@ -137,6 +137,8 @@ pub enum ItemRole {
     Decoration,
     /// A box's outline (one ring, or two for `double`).
     Outline,
+    /// One `box-shadow`.
+    Shadow,
 }
 
 /// A filled area in CSS pixels. Edges are not snapped to device pixels.
@@ -166,6 +168,8 @@ pub enum Shape {
         /// Inner edge.
         inner: usize,
     },
+    /// A blurred box shadow: index into [`DisplayList::shadows`].
+    Shadow(usize),
     /// Image [`DisplayList::images`]`[image]` stretched over `rect`.
     Image {
         /// Destination rectangle (the replaced element's content box).
@@ -193,6 +197,25 @@ pub struct DisplayItem {
     /// The innermost rounded clip the item is also clipped by, as an index
     /// into [`DisplayList::clips`]; that node's ancestors clip it too.
     pub rounded_clip: Option<usize>,
+}
+
+/// A box shadow (CSS Backgrounds 3 §7.1): the coverage of `shape` (or, for
+/// an inset shadow, of everything outside it) blurred by a Gaussian of
+/// standard deviation `sigma`, then kept only outside `clip` (the border
+/// box) for an outer shadow or only inside it (the padding box) for an
+/// inset one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoxShadow {
+    /// The shadow's shape: the border box moved by the offset and spread,
+    /// or for an inset shadow the padding box moved and shrunk; `None` when
+    /// spreading left nothing.
+    pub shape: Option<RoundedRect>,
+    /// The Gaussian standard deviation in CSS pixels: half the blur radius.
+    pub sigma: f64,
+    /// The border box (outer) or padding box (inset), with its curve.
+    pub clip: RoundedRect,
+    /// Whether this is an inset shadow.
+    pub inset: bool,
 }
 
 /// One rounded clip: the padding edge curve of a box with `border-radius`
@@ -343,6 +366,8 @@ pub struct DisplayList {
     /// Rounded rectangles referenced by [`Shape::Rounded`] and
     /// [`Shape::RoundedRing`].
     rounded: Vec<RoundedRect>,
+    /// Box shadows referenced by [`Shape::Shadow`].
+    shadows: Vec<BoxShadow>,
     /// `clip-path` areas for hit testing.
     clip_paths: Vec<ClipPathNode>,
     /// Transformed stacking contexts referenced by
@@ -607,9 +632,67 @@ struct Builder<'a> {
     images: Vec<Arc<Image>>,
     clips: Vec<ClipNode>,
     rounded: Vec<RoundedRect>,
+    shadows: Vec<BoxShadow>,
 }
 
 impl Builder<'_> {
+    /// Paint a box's outer shadows (before its background) or inset ones
+    /// (after it), the first shadow on top.
+    fn shadows(
+        &mut self,
+        fragment: Geometry,
+        source: usize,
+        style: &ComputedStyle,
+        inset: bool,
+    ) -> Result<(), PaintError> {
+        let V::BoxShadow(shadows) = style.get(P::BoxShadow) else {
+            return Err(PaintError::InvalidInput);
+        };
+        let area = if inset {
+            fragment.padding
+        } else {
+            fragment.border
+        };
+        let clip = fragment.curve(area).unwrap_or(RoundedRect {
+            rect: area,
+            corners: [crate::rounded::Corner::default(); 4],
+        });
+        let px = |lp: Option<&LengthPercentage>| match lp {
+            None => Ok(0.0),
+            Some(lp) => crate::clip::length(lp, 0.0).ok_or(PaintError::InvalidInput),
+        };
+        for shadow in shadows.iter().rev().filter(|s| s.inset == inset) {
+            let color = match shadow.color {
+                Some(c) => srgba(&c).ok_or(PaintError::InvalidInput)?,
+                None => color(style, P::Color)?,
+            };
+            if color.is_transparent() {
+                continue;
+            }
+            let (dx, dy) = (px(Some(&shadow.x))?, px(Some(&shadow.y))?);
+            let blur = px(shadow.blur.as_ref())?.max(0.0);
+            let spread = px(shadow.spread.as_ref())?;
+            let shape = clip.shadow(dx, dy, if inset { -spread } else { spread });
+            self.shadows.push(BoxShadow {
+                shape,
+                sigma: blur / 2.0,
+                clip,
+                inset,
+            });
+            let index = self.shadows.len() - 1;
+            self.push(DisplayItem {
+                source_box: source,
+                node: fragment.node,
+                role: ItemRole::Shadow,
+                shape: Shape::Shadow(index),
+                color,
+                clip: fragment.clip,
+                rounded_clip: fragment.rounded_clip,
+            })?;
+        }
+        Ok(())
+    }
+
     /// The layer shape and hit area of a box's `clip-path`, or `None` for
     /// `none`. The reference box is the border box unless one is named;
     /// `fill-box` is the content box and `stroke-box` and `view-box` the
@@ -1347,6 +1430,7 @@ impl DisplayList {
             images: Vec::new(),
             clips: Vec::new(),
             rounded: Vec::new(),
+            shadows: Vec::new(),
         };
         let mut image_index: HashMap<NodeId, usize> = HashMap::new();
         let fragments = layout.fragments();
@@ -1731,8 +1815,11 @@ impl DisplayList {
                                     transform,
                                 });
                                 if !muted {
-                                    builder.background(geometry, inline.source_box(), style)?;
-                                    builder.border(geometry, inline.source_box(), style)?;
+                                    let source = inline.source_box();
+                                    builder.shadows(geometry, source, style, false)?;
+                                    builder.background(geometry, source, style)?;
+                                    builder.shadows(geometry, source, style, true)?;
+                                    builder.border(geometry, source, style)?;
                                 }
                             }
                             if muted {
@@ -1782,9 +1869,12 @@ impl DisplayList {
                         }
                         let geometry =
                             Geometry::block(fragment, local_clip[i], rounded[i], outer_clip[i]);
+                        let source = fragment.source_box();
+                        builder.shadows(geometry, source, style, false)?;
                         if canvas_source != Some(i) {
-                            builder.background(geometry, fragment.source_box(), style)?;
+                            builder.background(geometry, source, style)?;
                         }
+                        builder.shadows(geometry, source, style, true)?;
                         builder.border(geometry, fragment.source_box(), style)?;
                     }
                 }
@@ -1883,6 +1973,7 @@ impl DisplayList {
             images: builder.images,
             clips: builder.clips,
             rounded: builder.rounded,
+            shadows: builder.shadows,
             clip_paths,
             transforms,
             spaces,
@@ -1987,6 +2078,11 @@ impl DisplayList {
         &self.rounded
     }
 
+    /// Box shadows, indexed by [`Shape::Shadow`].
+    pub fn shadows(&self) -> &[BoxShadow] {
+        &self.shadows
+    }
+
     /// Rounded clips, indexed by [`DisplayItem::rounded_clip`].
     pub fn clips(&self) -> &[ClipNode] {
         &self.clips
@@ -2077,6 +2173,16 @@ impl DisplayList {
                 )
             }
             Shape::Rounded(shape) => format!("rounded={}", rounded(&self.rounded[shape])),
+            Shape::Shadow(index) => {
+                let s = &self.shadows[index];
+                let shape = s.shape.map_or_else(|| "none".to_owned(), |r| rounded(&r));
+                format!(
+                    "shadow={shape} sigma={} {}={}",
+                    s.sigma,
+                    if s.inset { "inside" } else { "outside" },
+                    rounded(&s.clip)
+                )
+            }
             Shape::RoundedRing { outer, inner } => format!(
                 "rounded-ring={} inner={}",
                 rounded(&self.rounded[outer]),
@@ -2177,6 +2283,7 @@ impl DisplayList {
                 ItemRole::Image => "image",
                 ItemRole::Decoration => "decoration",
                 ItemRole::Outline => "outline",
+                ItemRole::Shadow => "shadow",
             };
             let shape = shape_text(item.shape);
             // Unclipped items keep the REN-04a line format.

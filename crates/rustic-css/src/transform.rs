@@ -191,7 +191,7 @@ keywords! {
 
 /// An `<angle>` in degrees; a unitless zero is allowed (CSS Transforms 1
 /// §6.1 keeps it for compatibility).
-fn angle(value: &Value) -> Option<f64> {
+pub(crate) fn angle(value: &Value) -> Option<f64> {
     let degrees = match value.token()? {
         Token::Dimension(n, unit) => {
             n.value

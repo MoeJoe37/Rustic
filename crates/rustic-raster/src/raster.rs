@@ -343,8 +343,8 @@ fn flatten(contour: &[PathPoint], scale: f64) -> Vec<Point> {
 
 fn contours(shape: &Shape, paths: &[Path], rounded: &[RoundedRect], scale: f64) -> Vec<Vec<Point>> {
     match *shape {
-        // Images are drawn by `draw_image`, not filled.
-        Shape::Image { .. } => Vec::new(),
+        // Images and shadows are drawn by their own functions.
+        Shape::Image { .. } | Shape::Shadow(_) => Vec::new(),
         Shape::Path(index) => paths.get(index).map_or_else(Vec::new, |path| {
             path.contours()
                 .iter()
@@ -397,7 +397,7 @@ fn local_contours(shape: &Shape, list: &DisplayList) -> Vec<Vec<PathPoint>> {
         points
     };
     match *shape {
-        Shape::Image { .. } => Vec::new(),
+        Shape::Image { .. } | Shape::Shadow(_) => Vec::new(),
         Shape::Path(index) => list.paths().get(index).map_or_else(Vec::new, |path| {
             path.contours()
                 .iter()
@@ -712,6 +712,274 @@ fn draw_image_mapped(
         }
     }
     Ok(())
+}
+
+/// `e^-x` for `x >= 0` in plain arithmetic (halving, a Taylor series and
+/// squaring), so every platform computes the same value.
+fn exp_neg(x: f64) -> f64 {
+    if x.is_nan() || x < 0.0 || x > 745.0 {
+        return if x < 0.0 { 1.0 } else { 0.0 };
+    }
+    let mut halvings = 0;
+    let mut r = x;
+    while r > 0.5 {
+        r /= 2.0;
+        halvings += 1;
+    }
+    // e^-r for r in [0, 0.5]: the series' 16th term is below 1e-17.
+    let mut term = 1.0;
+    let mut sum = 1.0;
+    for k in 1..=16 {
+        term *= -r / f64::from(k);
+        sum += term;
+    }
+    for _ in 0..halvings {
+        sum *= sum;
+    }
+    sum
+}
+
+/// Replace each value of `line` by the mean of `line[x + lo ..= x + hi]`,
+/// edge values extending past the ends.
+fn box_pass(line: &mut [f64], lo: isize, hi: isize, prefix: &mut Vec<f64>) {
+    let n = line.len() as isize;
+    prefix.clear();
+    prefix.push(0.0);
+    let mut sum = 0.0;
+    for &v in line.iter() {
+        sum += v;
+        prefix.push(sum);
+    }
+    let (first, last) = (line[0], line[line.len() - 1]);
+    let width = (hi - lo + 1) as f64;
+    let out: Vec<f64> = (0..n)
+        .map(|x| {
+            let (a, b) = (x + lo, x + hi);
+            // Clamped parts beyond each end repeat the edge value.
+            let before = (-a).max(0).min(b - a + 1) as f64 * first;
+            let after = (b - (n - 1)).max(0).min(b - a + 1) as f64 * last;
+            let (ca, cb) = (a.clamp(0, n), (b + 1).clamp(0, n));
+            let inside = if cb > ca {
+                prefix[cb as usize] - prefix[ca as usize]
+            } else {
+                0.0
+            };
+            (before + inside + after) / width
+        })
+        .collect();
+    line.copy_from_slice(&out);
+}
+
+/// Blur one line by a Gaussian of standard deviation `sigma` pixels:
+/// exactly below two pixels, else by three box blurs as Filter Effects 1
+/// §15.17 (`feGaussianBlur`) allows.
+fn blur_line(line: &mut [f64], sigma: f64, kernel: &[f64], prefix: &mut Vec<f64>) {
+    if line.is_empty() {
+        return;
+    }
+    if sigma >= 2.0 {
+        let d = (sigma * 3.0 * (2.0 * std::f64::consts::PI).sqrt() / 4.0 + 0.5).floor() as isize;
+        if d % 2 == 1 {
+            let h = (d - 1) / 2;
+            for _ in 0..3 {
+                box_pass(line, -h, h, prefix);
+            }
+        } else {
+            let h = d / 2;
+            box_pass(line, -h, h - 1, prefix);
+            box_pass(line, -h + 1, h, prefix);
+            box_pass(line, -h, h, prefix);
+        }
+        return;
+    }
+    let r = kernel.len() / 2;
+    let n = line.len();
+    let input = line.to_vec();
+    for (x, out) in line.iter_mut().enumerate() {
+        let mut sum = 0.0;
+        for (k, w) in kernel.iter().enumerate() {
+            let i = (x + k).saturating_sub(r).min(n - 1);
+            sum += w * input[i];
+        }
+        *out = sum;
+    }
+}
+
+/// The normalized Gaussian kernel for `sigma` below two pixels.
+fn gaussian_kernel(sigma: f64) -> Vec<f64> {
+    if sigma >= 2.0 {
+        return Vec::new();
+    }
+    let r = (3.0 * sigma).ceil() as i32;
+    let weights: Vec<f64> = (-r..=r)
+        .map(|k| exp_neg(f64::from(k * k) / (2.0 * sigma * sigma)))
+        .collect();
+    let total: f64 = weights.iter().sum();
+    weights.into_iter().map(|w| w / total).collect()
+}
+
+/// Blur a `w`×`h` row-major buffer in place, rows then columns.
+fn blur(
+    values: &mut [f64],
+    (w, h): (usize, usize),
+    sigma: f64,
+    work: &mut Work<'_>,
+) -> Result<(), RasterError> {
+    if sigma.is_nan() || sigma <= 0.001 {
+        return Ok(());
+    }
+    let kernel = gaussian_kernel(sigma);
+    let passes = if kernel.is_empty() { 3 } else { kernel.len() } as u64;
+    work.charge(2 * passes * (w * h) as u64)?;
+    let mut prefix = Vec::new();
+    for row in values.chunks_exact_mut(w) {
+        blur_line(row, sigma, &kernel, &mut prefix);
+    }
+    let mut column = vec![0.0; h];
+    for x in 0..w {
+        work.cancellation
+            .check()
+            .map_err(|_| RasterError::Cancelled)?;
+        for (y, c) in column.iter_mut().enumerate() {
+            *c = values[y * w + x];
+        }
+        blur_line(&mut column, sigma, &kernel, &mut prefix);
+        for (y, c) in column.iter().enumerate() {
+            values[y * w + x] = *c;
+        }
+    }
+    Ok(())
+}
+
+/// Paint a box shadow item. `map` is the local-to-device map inside a
+/// transform (the blur then uses the map's stretch at the shape), else
+/// coordinates scale by `scale`.
+fn shadow(
+    pixels: &mut [u8],
+    (width, height): (u32, u32),
+    item: &DisplayItem,
+    list: &DisplayList,
+    map: Option<&Homography>,
+    scale: f64,
+    work: &mut Work<'_>,
+) -> Result<(), RasterError> {
+    let Shape::Shadow(index) = item.shape else {
+        return Ok(());
+    };
+    let s = list.shadows().get(index).ok_or(RasterError::InvalidList)?;
+    let device = |r: &RoundedRect| match map {
+        None => flatten(&r.contour(), scale),
+        Some(m) => project(&r.contour(), m, None),
+    };
+    let sigma = s.sigma
+        * match map {
+            None => scale,
+            Some(m) => stretch(m, &s.clip.contour()),
+        };
+    let reach = (3.0 * sigma).ceil() + 2.0;
+    let (w, h) = (f64::from(width), f64::from(height));
+    let mut limit: Bounds = (0.0, 0.0, w, h);
+    if map.is_none() {
+        let Some(b) = item_bounds(item.clip, w, h, scale) else {
+            return Ok(());
+        };
+        limit = b;
+    }
+    let shape = s.shape.as_ref().map(device);
+    let clip = device(&s.clip);
+    work.charge(clip.len() as u64 + shape.as_ref().map_or(0, |c| c.len() as u64))?;
+    // The pixels the shadow may reach.
+    let reaching = if s.inset {
+        window(std::slice::from_ref(&clip), (w, h))
+    } else {
+        shape.as_ref().and_then(|c| {
+            let mut b = (
+                f64::INFINITY,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::NEG_INFINITY,
+            );
+            for p in c {
+                b = (b.0.min(p.0), b.1.min(p.1), b.2.max(p.0), b.3.max(p.1));
+            }
+            let grown = (b.0 - reach, b.1 - reach, b.2 + reach, b.3 + reach);
+            let corners = vec![
+                (grown.0, grown.1),
+                (grown.2, grown.1),
+                (grown.2, grown.3),
+                (grown.0, grown.3),
+            ];
+            window(&[corners], (w, h))
+        })
+    };
+    let Some((tx, ty, tw, th)) = reaching else {
+        return Ok(());
+    };
+    let Some(target) = intersect((tx, ty, tx + tw as f64, ty + th as f64), limit) else {
+        return Ok(());
+    };
+    let (tx, ty) = (target.0.floor(), target.1.floor());
+    let (tw, th) = (
+        (target.2.ceil() - tx) as usize,
+        (target.3.ceil() - ty) as usize,
+    );
+    // Blur over the target grown by the blur's reach, so values flowing in
+    // from outside it are right.
+    let pad = reach as usize;
+    let (ex, ey) = (tx - reach, ty - reach);
+    let (ew, eh) = (tw + 2 * pad, th + 2 * pad);
+    let mut base = match &shape {
+        Some(c) => coverage(std::slice::from_ref(c), (ex, ey), (ew, eh), work)?,
+        None => vec![0.0; ew * eh],
+    };
+    if s.inset {
+        for v in &mut base {
+            *v = 1.0 - *v;
+        }
+    }
+    blur(&mut base, (ew, eh), sigma, work)?;
+    let edge = coverage(&[clip], (tx, ty), (tw, th), work)?;
+    let mut cover = vec![0.0; tw * th];
+    for row in 0..th {
+        for col in 0..tw {
+            let blurred = base[(row + pad) * ew + col + pad];
+            let e = edge[row * tw + col];
+            cover[row * tw + col] = blurred * if s.inset { e } else { 1.0 - e };
+        }
+    }
+    let nodes = chain(list.clips(), item.rounded_clip)?;
+    let mut mask = match map {
+        None => clip_mask(&nodes, (tx, ty), (tw, th), scale, work)?,
+        Some(m) => clip_mask_mapped(&nodes, m, (tx, ty), (tw, th), work)?,
+    };
+    if let (Some(m), false) = (map, item.clip.is_none()) {
+        let (x0, y0, x1, y1) = local_bounds(item.clip);
+        let on = |x, y| PathPoint {
+            x,
+            y,
+            on_curve: true,
+        };
+        let area = project(&[on(x0, y0), on(x1, y0), on(x1, y1), on(x0, y1)], m, None);
+        let axis = coverage(&[area], (tx, ty), (tw, th), work)?;
+        mask = Some(match mask {
+            None => axis,
+            Some(mut v) => {
+                for (a, b) in v.iter_mut().zip(axis) {
+                    *a *= b;
+                }
+                v
+            }
+        });
+    }
+    blend_color(
+        pixels,
+        width as usize,
+        (tx, ty, tw, th),
+        &cover,
+        mask.as_deref(),
+        item.color,
+        work,
+    )
 }
 
 struct Work<'a> {
@@ -1123,6 +1391,10 @@ pub fn rasterize(
         match command {
             DisplayCommand::Fill(item) => {
                 let pixels = target(&mut groups, &mut surface.pixels);
+                if matches!(item.shape, Shape::Shadow(_)) {
+                    shadow(pixels, size, item, list, maps.last(), factor, &mut work)?;
+                    continue;
+                }
                 let image = matches!(item.shape, Shape::Image { .. });
                 match (maps.last(), image) {
                     (None, true) => draw_image(pixels, size, item, list, factor, &mut work)?,
@@ -1407,6 +1679,50 @@ mod tests {
             assert!(close(*got, want), "{c:?}");
         }
         assert!(clip(&[(5.0, 5.0), (6.0, 5.0), (6.0, 6.0)], (0.0, 0.0, 3.0, 2.0)).is_empty());
+    }
+
+    #[test]
+    fn gaussian_blur_is_deterministic_conserves_mass_and_is_symmetric() {
+        for x in [0.0, 0.1, 0.5, 1.0, 2.5, 10.0, 100.0] {
+            let e = exp_neg(x);
+            assert!(
+                (e - (-x).exp()).abs() <= 1e-13 * (-x).exp().max(1e-300),
+                "{x}: {e}"
+            );
+        }
+        assert_eq!(exp_neg(1000.0), 0.0);
+        let cancel = CancellationToken::default();
+        let mut work = Work {
+            used: 0,
+            limit: u64::MAX,
+            cancellation: &cancel,
+        };
+        for sigma in [0.6, 1.5, 2.0, 3.3, 8.0] {
+            // A one-pixel impulse in the middle of a wide line.
+            let (w, h) = (101, 1);
+            let mut line = vec![0.0; w];
+            line[50] = 1.0;
+            blur(&mut line, (w, h), sigma, &mut work).unwrap();
+            let total: f64 = line.iter().sum();
+            assert!((total - 1.0).abs() < 1e-12, "{sigma}: {total}");
+            for k in 1..40 {
+                assert!((line[50 - k] - line[50 + k]).abs() < 1e-12, "{sigma} {k}");
+                assert!(line[50 + k] <= line[50 + k - 1] + 1e-15, "{sigma} {k}");
+            }
+            // The spread matches the standard deviation within a few percent.
+            let variance: f64 = line
+                .iter()
+                .enumerate()
+                .map(|(i, v)| v * (i as f64 - 50.0).powi(2))
+                .sum();
+            let ratio = variance.sqrt() / sigma;
+            assert!((0.9..1.1).contains(&ratio), "{sigma}: {ratio}");
+        }
+        // A step blurs to one half at the edge.
+        let mut step: Vec<f64> = (0..60).map(|i| if i < 30 { 1.0 } else { 0.0 }).collect();
+        blur(&mut step, (60, 1), 4.0, &mut work).unwrap();
+        assert!((step[29] + step[30] - 1.0).abs() < 1e-12);
+        assert!(step[0] > 0.999 && step[59] < 0.001);
     }
 
     #[test]

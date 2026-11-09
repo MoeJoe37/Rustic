@@ -1293,3 +1293,57 @@ fn transforms_map_paint_clips_and_hits_through_their_planes() {
     );
     assert_eq!(render(&p, 1.0), render(&p, 1.0));
 }
+
+#[test]
+fn box_shadows_paint_around_backgrounds_blur_and_take_no_hits() {
+    let p = page(
+        "<div id=s></div>",
+        &format!(
+            "{RESET} body {{ padding: 30px }}
+             #s {{ width: 40px; height: 40px; background: white; border: 1px solid black;
+                   box-shadow: inset 0 0 0 2px lime, 0 0 10px blue, 2px 2px red }}"
+        ),
+        100.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    // Outer shadows (last first) under the background, inset ones over it
+    // and under the border.
+    let roles: Vec<ItemRole> = list.items().iter().map(|i| i.role).collect();
+    assert_eq!(
+        roles,
+        [
+            ItemRole::Shadow,
+            ItemRole::Shadow,
+            ItemRole::Background,
+            ItemRole::Shadow,
+            ItemRole::Border
+        ]
+    );
+    let shadows = list.shadows();
+    assert_eq!(shadows.len(), 3);
+    assert!(!shadows[0].inset && shadows[0].sigma == 0.0);
+    assert!(!shadows[1].inset && shadows[1].sigma == 5.0);
+    assert!(shadows[2].inset);
+    let dump = list.dump(1 << 20).unwrap();
+    assert!(dump.contains(" shadow shadow=("), "{dump}");
+    assert!(dump.contains("sigma=5 outside="), "{dump}");
+    // Shadows take no hits.
+    assert_eq!(hit(&p, &list, 75.0, 50.0).as_deref(), Some("body"));
+    let surface = render(&p, 1.0);
+    // The blur fades away from the box, the same on opposite sides.
+    let blue = |x: u32, y: u32| 255 - surface.pixel(x, y).unwrap().r;
+    assert!(blue(29, 50) > blue(25, 50) && blue(25, 50) > blue(20, 50));
+    assert_eq!(blue(29, 50), blue(50, 29));
+    assert!(blue(15, 50) < 3);
+    // The hard red shadow peeks out 2px right of the box, under the blue
+    // blur listed before it; inside, the inset lime ring sits inside the
+    // border.
+    let under = surface.pixel(72, 50).unwrap();
+    assert!(under.r > 100 && under.g == 0 && under.b > 50, "{under:?}");
+    assert_eq!(surface.pixel(32, 50), Some(rgb(0, 255, 0)));
+    assert_eq!(surface.pixel(50, 50), Some(rgb(255, 255, 255)));
+    // Deterministic at another scale, too.
+    let p2 = render(&p, 1.5);
+    assert_eq!(p2, render(&p, 1.5));
+}

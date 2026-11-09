@@ -615,6 +615,14 @@ pub enum PropertyValue {
     BackfaceVisibility(crate::BackfaceVisibility),
     /// `transform-style`.
     TransformStyle(crate::TransformStyle),
+    /// `box-shadow`: shadows, front first; empty for `none`.
+    BoxShadow(Vec<crate::Shadow>),
+    /// `filter`: functions in order; empty for `none`.
+    Filter(Vec<crate::FilterFunction>),
+    /// `mix-blend-mode`.
+    BlendMode(crate::BlendMode),
+    /// `isolation`.
+    Isolation(crate::Isolation),
     /// `box-sizing`.
     BoxSizing(BoxSizing),
     /// `font-size`.
@@ -831,6 +839,10 @@ property_ids! {
     PerspectiveOrigin => "perspective-origin", false;
     BackfaceVisibility => "backface-visibility", false;
     TransformStyle => "transform-style", false;
+    BoxShadow => "box-shadow", false;
+    Filter => "filter", false;
+    MixBlendMode => "mix-blend-mode", false;
+    Isolation => "isolation", false;
 }
 
 impl PropertyId {
@@ -932,6 +944,10 @@ impl PropertyId {
                 PropertyValue::BackfaceVisibility(crate::BackfaceVisibility::Visible)
             }
             P::TransformStyle => PropertyValue::TransformStyle(crate::TransformStyle::Flat),
+            P::BoxShadow => PropertyValue::BoxShadow(Vec::new()),
+            P::Filter => PropertyValue::Filter(Vec::new()),
+            P::MixBlendMode => PropertyValue::BlendMode(crate::BlendMode::Normal),
+            P::Isolation => PropertyValue::Isolation(crate::Isolation::Auto),
             P::BackgroundImage => PropertyValue::BackgroundImage(vec![Image::None]),
             P::BackgroundPosition => {
                 PropertyValue::BackgroundPosition(vec![PositionValue::top_left()])
@@ -1295,7 +1311,7 @@ fn keyword(value: &Value, expected: &str) -> bool {
     ident(value).is_some_and(|i| i.eq_ignore_ascii_case(expected))
 }
 
-fn length(value: &Value) -> Option<Length> {
+pub(crate) fn length(value: &Value) -> Option<Length> {
     match value.token()? {
         Token::Dimension(n, unit) => Some(Length {
             value: n.value,
@@ -1306,7 +1322,7 @@ fn length(value: &Value) -> Option<Length> {
     }
 }
 
-fn math_function(value: &Value) -> bool {
+pub(crate) fn math_function(value: &Value) -> bool {
     matches!(&value.value, ComponentValue::Function { name, .. } if is_math_function(name))
 }
 
@@ -1434,7 +1450,7 @@ fn font_family(parts: &[&Value]) -> Option<Vec<FamilyName>> {
     Some(families)
 }
 
-fn number(value: &Value) -> Option<f64> {
+pub(crate) fn number(value: &Value) -> Option<f64> {
     match value.token()? {
         Token::Number(n) => Some(n.value),
         _ => None,
@@ -1801,6 +1817,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         }
         P::ContainerName => return container_name(parts).map(PropertyValue::ContainerName),
         P::ClipPath => return crate::shape::clip_path(parts).map(PropertyValue::ClipPath),
+        P::BoxShadow => return crate::effects::box_shadow(parts).map(PropertyValue::BoxShadow),
+        P::Filter => return crate::effects::filter(parts).map(PropertyValue::Filter),
         P::Transform => {
             return crate::transform::transform_list(parts).map(PropertyValue::Transform);
         }
@@ -1868,6 +1886,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::BorderBottomRightRadius
         | P::BorderBottomLeftRadius
         | P::ClipPath
+        | P::BoxShadow
+        | P::Filter
         | P::Transform
         | P::Translate
         | P::Rotate
@@ -1889,6 +1909,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::TransformStyle => {
             PropertyValue::TransformStyle(crate::TransformStyle::from_name(name()?)?)
         }
+        P::MixBlendMode => PropertyValue::BlendMode(crate::BlendMode::from_name(name()?)?),
+        P::Isolation => PropertyValue::Isolation(crate::Isolation::from_name(name()?)?),
         P::FlexDirection => PropertyValue::FlexDirection(FlexDirection::from_name(name()?)?),
         P::FlexWrap => PropertyValue::FlexWrap(FlexWrap::from_name(name()?)?),
         P::FlexGrow | P::FlexShrink => PropertyValue::Number(flex_factor(value)?),
@@ -2281,6 +2303,32 @@ impl fmt::Display for PropertyValue {
             Self::Perspective(Some(d)) => write!(f, "{d}"),
             Self::BackfaceVisibility(v) => write!(f, "{v}"),
             Self::TransformStyle(v) => write!(f, "{v}"),
+            Self::BoxShadow(shadows) => {
+                if shadows.is_empty() {
+                    return f.write_str("none");
+                }
+                for (i, s) in shadows.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{s}")?;
+                }
+                Ok(())
+            }
+            Self::Filter(functions) => {
+                if functions.is_empty() {
+                    return f.write_str("none");
+                }
+                for (i, function) in functions.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ")?;
+                    }
+                    write!(f, "{function}")?;
+                }
+                Ok(())
+            }
+            Self::BlendMode(v) => write!(f, "{v}"),
+            Self::Isolation(v) => write!(f, "{v}"),
             Self::BorderRadius(r) if r.horizontal == r.vertical => write!(f, "{}", r.horizontal),
             Self::BorderRadius(r) => write!(f, "{} {}", r.horizontal, r.vertical),
             Self::FontVariantCaps(v) => write!(f, "{v}"),

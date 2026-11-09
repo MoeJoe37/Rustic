@@ -80,6 +80,9 @@ impl Target for PaintTarget {
             b"clip-path:polygon(0 0,100% 0,0 100%)",
             b"clip-path:inset(2px round 50%) content-box",
             b"transform:rotate(30deg) scale(1.5)",
+            b"box-shadow:3px 4px 5px red",
+            b"box-shadow:inset -2px 1px 6px 2px rgb(0 0 0 / 50%), 0 0 0 4px blue",
+            b"box-shadow:1px 1px 40px -3px",
             b"transform:translate(3px,-50%) skew(10deg)",
             b"transform:perspective(20px) rotateY(60deg)",
             b"transform:matrix3d(1,0,0,0.01,0,1,0,0,0,0,1,0,0,0,0,1)",
@@ -204,6 +207,11 @@ impl Target for PaintTarget {
                     if let rustic_paint::Shape::Image { image, .. } = item.shape {
                         if image >= list.images().len() {
                             return Err("image item names a missing image".into());
+                        }
+                    }
+                    if let rustic_paint::Shape::Shadow(s) = item.shape {
+                        if s >= list.shadows().len() {
+                            return Err("item names a missing shadow".into());
                         }
                     }
                     let missing = match item.shape {

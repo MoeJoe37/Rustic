@@ -795,6 +795,45 @@ fn compute_values(
                                 *b,
                             ))
                         }
+                        PropertyValue::BoxShadow(shadows) => PropertyValue::BoxShadow(
+                            shadows
+                                .iter()
+                                .map(|shadow| rustic_css::Shadow {
+                                    color: Some(match shadow.color {
+                                        None | Some(Color::CurrentColor) => color,
+                                        Some(c) => c,
+                                    }),
+                                    ..shadow.map_lengths(&|lp| basis.lp(lp, false), &|lp| {
+                                        basis.lp(lp, true)
+                                    })
+                                })
+                                .collect(),
+                        ),
+                        PropertyValue::Filter(functions) => PropertyValue::Filter(
+                            functions
+                                .iter()
+                                .map(|function| {
+                                    let mapped = function
+                                        .map_lengths(&|lp| basis.lp(lp, false), &|lp| {
+                                            basis.lp(lp, true)
+                                        });
+                                    match mapped {
+                                        rustic_css::FilterFunction::DropShadow(shadow) => {
+                                            rustic_css::FilterFunction::DropShadow(
+                                                rustic_css::Shadow {
+                                                    color: Some(match shadow.color {
+                                                        None | Some(Color::CurrentColor) => color,
+                                                        Some(c) => c,
+                                                    }),
+                                                    ..shadow
+                                                },
+                                            )
+                                        }
+                                        other => other,
+                                    }
+                                })
+                                .collect(),
+                        ),
                         PropertyValue::BorderRadius(r) => {
                             PropertyValue::BorderRadius(rustic_css::CornerRadius {
                                 horizontal: basis.lp(&r.horizontal, true),

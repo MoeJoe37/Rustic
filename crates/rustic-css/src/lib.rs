@@ -27,6 +27,7 @@ mod calc;
 mod color;
 mod container;
 mod custom;
+mod effects;
 mod error;
 mod flex;
 mod length;
@@ -58,6 +59,7 @@ pub use custom::{
     CustomValue, MAX_SUBSTITUTED_VALUES, MAX_SUBSTITUTION_DEPTH, UnparsedValue,
     is_custom_property_name,
 };
+pub use effects::{BlendMode, FilterFunction, Isolation, Shadow};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
 pub use flex::{
     AlignKeyword, Alignment, FlexBasis, FlexDirection, FlexWrap, Gap, OverflowPosition, Size,

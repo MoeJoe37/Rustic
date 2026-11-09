@@ -167,6 +167,55 @@ impl RoundedRect {
     /// The curve inside this one at `inner`, whose edges lie the given
     /// distances inward (CSS Backgrounds 3 §5.2): each radius shrinks by
     /// the adjacent distance, stopping at zero.
+    /// This shape moved by `(dx, dy)` and grown by `spread` on every side
+    /// (shrunk when negative) for a box shadow (CSS Backgrounds 3 §7.1.1):
+    /// growing adds the spread to each radius, scaled by `1 + (r/s - 1)³`
+    /// when the radius `r` is under the spread `s`, so square corners stay
+    /// square; shrinking subtracts it. `None` when nothing is left.
+    pub(crate) fn shadow(&self, dx: f64, dy: f64, spread: f64) -> Option<Self> {
+        let (l, t, r, b) = self.edges();
+        let (w, h) = (r - l + 2.0 * spread, b - t + 2.0 * spread);
+        if !(w > 0.0 && h > 0.0) {
+            return None;
+        }
+        let rect = CssRect::new(
+            rustic_layout::CssPoint {
+                x: rustic_layout::CssPx::new(l - spread + dx).ok()?,
+                y: rustic_layout::CssPx::new(t - spread + dy).ok()?,
+            },
+            rustic_layout::CssSize::new(w, h).ok()?,
+        )
+        .ok()?;
+        let adjust = |radius: f64| {
+            if spread >= 0.0 {
+                let grow = if radius < spread {
+                    let ratio = radius / spread - 1.0;
+                    spread * (1.0 + ratio * ratio * ratio)
+                } else {
+                    spread
+                };
+                radius + grow
+            } else {
+                (radius + spread).max(0.0)
+            }
+        };
+        // Radii never outgrow their sides: both grow or shrink by the same
+        // amount as the sides at most. A corner with one zero radius is
+        // square.
+        let corners = self.corners.map(|c| {
+            let c = Corner {
+                x: adjust(c.x),
+                y: adjust(c.y),
+            };
+            if c.x > 0.0 && c.y > 0.0 {
+                c
+            } else {
+                Corner::default()
+            }
+        });
+        Some(Self { rect, corners })
+    }
+
     pub(crate) fn inset(&self, inner: CssRect) -> Self {
         let (l, t, r, b) = self.edges();
         let o = inner.origin();

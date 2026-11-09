@@ -97,7 +97,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-47 | Deliberate | Text | Untailored UAX #14/#29 segmentation and bidi without L3 | Open, REN-03b |
 | TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
-| TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, refused atomic inlines, approximations | Open, REN-03b |
+| TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, approximations (atomic inlines paid, TD-70) | Open, REN-03b |
 | TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
 | TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting, system fonts or exact nonzero fill | Open, REN-04c |
 | TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
@@ -107,6 +107,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
 | TD-58 | Deliberate | Paint | First shadows, blending and filters: sRGB filters, full-surface groups, no ink overflow, approximate blur under transforms | Open, REN-04i |
 | TD-59 | Deliberate | Paint | First tiled raster, damage and resize: each tile replays the whole list, a new filter margin repaints everything, list diff by common prefix and suffix, relayout from scratch | Open, REN-04j |
+| TD-70 | Deliberate | Layout | Atomic inlines and block-in-inline splitting: baseline, relative-offset and paint-order approximations | Open, M3 layout |
+| TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
+| TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 53 of 91 static pages fail (writing modes, images, tables, 6 undiagnosed) | Open, REN-08 |
+| TD-73 | Watch | Base | Layout keeps its own `CssPx`/`CssRect` beside the unit-typed `rustic-base` geometry | Guarded |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -839,9 +843,9 @@ or approximate the rest:
 
 - **No OpenType layout.** One glyph per character from `cmap`/`hmtx`, so no
   ligatures, kerning, mark positioning, Arabic joining or Indic reordering.
-- **Refused content.** Atomic inlines (`inline-block`, replaced elements),
-  blocks inside inline boxes, and floats or absolutely positioned boxes nested
-  in inline boxes return `UnsupportedFlow` errors.
+- **Refused content (paid 2026-11-09).** Atomic inlines, blocks inside
+  inline boxes and out-of-flow boxes nested in inline boxes are now laid
+  out; their remaining approximations are TD-70.
 - **Floats among inline content.** A float that is a direct child of an inline
   run ends the anonymous block before it, so it is placed below the previous
   line instead of on it.
@@ -1019,3 +1023,71 @@ margins per tile instead of per list; a retained tile cache with GPU
 upload in M5; restyle only what viewport-dependent values touch and
 incremental relayout. **Trigger:** frame-budget measurements in the paint
 performance gate, scrolling, animation, or the shell's window resizing.
+
+### TD-70 — Atomic inline and block-in-inline approximations
+
+`inline-block`, `inline-flex` and inline replaced elements are laid out as
+formatting roots before line breaking, and inline boxes split around
+block-level descendants. Approximations:
+
+- **Baselines.** An atomic inline's baseline is the last (inline-flex: first)
+  line box found in preorder through in-flow, non-root descendants; lines in
+  nested formatting roots (`overflow`, `flow-root`, nested flex containers)
+  are skipped, `order` is ignored for an inline-flex's first baseline, and
+  relative offsets are not applied. `inline-grid`/`inline-table` are refused.
+- **Split inline boxes.** `position: relative` on a split inline box shifts
+  its inline fragments but not the block-level box inside it. Floats and
+  absolutely positioned boxes inside an inline box split it like blocks do,
+  instead of staying on the line (the same as TD-50's top-level floats).
+  Sticky inline boxes stay in place (`inline.rs`).
+- **Paint order.** Atomic inlines are ordinary block fragments with
+  `BlockFragment::line`; paint still paints them in the block phase instead
+  of atomically in the inline phase of CSS 2.2 Appendix E.
+- **Cost.** Each atomic inline's baseline search scans its subtree, which is
+  O(n·depth) for nested inline-blocks; it is metered by `MAX_FLOW_WORK`.
+
+**Reason:** these cover the common inline-block/image cases with exact tests
+while keeping each spec corner its own unit. **Pay:** baseline sets on
+fragments (first/last per box, computed bottom up), relative offsets for
+split boxes, floats placed during line layout, Appendix E atomic painting in
+`rustic-paint`. **Trigger:** inline WPT reftests or real-page renders with
+`inline-block` navigation bars.
+
+### TD-71 — Sticky positioning approximations
+
+Sticky boxes get a `StickyConstraint` and the offset for the initial scroll
+position. The offset does not adjust scrollable overflow; a sticky box inside
+another sticky box (or inside a fixed box) ignores the ancestor's own shift
+when computing its view rectangle; a root-element sticky box never moves;
+sticky inline boxes (non-atomic) are not shifted at all; and there are no
+scrollbars, so the scrollport is the full padding box. **Reason:** the
+embedder has no scrolling yet, so the constraint API is what scrolling will
+need. **Pay:** compose ancestor sticky offsets in `StickyConstraint::offset`,
+inline sticky offsets on inline fragments, scrollbar gutters with the
+scrolling work. **Trigger:** scrolling in an embedder, or css-position WPT.
+
+### TD-72 — css-flexbox WPT comparison gaps
+
+`tests/wpt_flexbox.rs` checks the 91 static `checkLayout` pages of the pinned
+WPT revision; 38 pass. `expected_failures.txt` gives each failure's reason:
+23 need vertical writing modes, 12 need decoded images (the harness loads
+none), and tables, SVG, form controls, `fieldset`, `list-item`, quirks-mode
+percentages and `aspect-ratio` on non-replaced boxes cover most others; six
+are mismatches not yet diagnosed, and one percentage-height case. The harness
+approximates `offsetParent` (nearest positioned ancestor, else body with
+document coordinates), accepts values within 0.5px of the rounded result,
+treats any other expectation attribute as a failure, and has no Ahem font.
+60 pages with other scripts are not imported. **Pay:** diagnose the six,
+then writing modes and an image fixture loader. **Trigger:** any flex layout
+change (the list is exact, so passes and failures must be updated).
+
+### TD-73 — Two geometry type families
+
+`rustic-base` now has unit-typed `Length`/`Rect`/`Scale` and
+`SurfaceAllocation`, which raster surfaces use, but layout and paint still
+use layout's own `CssPx`/`CssRect`/`DevicePx` (same coordinate bound,
+`to_typed()` converts). **Reason:** moving every layout and paint API at once
+would collide with the threads changing them now. **Pay:** switch layout and
+paint signatures to the base types and remove the layout copies.
+**Trigger:** the next change that has to convert between them in more than
+one place.

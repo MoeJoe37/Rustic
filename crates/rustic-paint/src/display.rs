@@ -1,18 +1,23 @@
-//! Immutable display lists built from block fragments (CSS 2.2 Appendix E
-//! for the block-only subset, CSS Backgrounds 3 §2.11 canvas propagation).
+//! Immutable display lists built from block fragments: CSS 2.2 Appendix E
+//! paint order with stacking contexts, z-index, floats and positioned boxes;
+//! overflow clips; opacity groups; CSS Backgrounds 3 §2.11 canvas propagation.
 
 use crate::color::{Srgba, srgba};
 use rustic_base::CancellationToken;
-use rustic_css::{BorderStyle, Image, PropertyId as P, PropertyValue as V, Visibility, VisualBox};
+use rustic_css::{
+    BorderStyle, Image, PropertyId as P, PropertyValue as V, Visibility, VisualBox, ZIndex,
+};
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
-use rustic_layout::{BlockFragment, BlockLayout, BoxTree, CssPoint, CssPx, CssRect, CssSize};
+use rustic_layout::{
+    BlockFragment, BlockLayout, BoxTree, Clip, CssPoint, CssPx, CssRect, CssSize, PositionScheme,
+};
 use rustic_style::ComputedStyle;
 use std::{error::Error, fmt, fmt::Write as _};
 
 /// Display list budgets, independent of layout limits.
 #[derive(Clone, Copy, Debug)]
 pub struct PaintLimits {
-    /// Maximum display items.
+    /// Maximum display commands (fills plus group begin/end markers).
     pub max_items: usize,
 }
 
@@ -60,6 +65,26 @@ pub struct DisplayItem {
     pub shape: Shape,
     /// Straight-alpha sRGB color; never fully transparent.
     pub color: Srgba,
+    /// Ancestor overflow clip in CSS pixels (see [`BlockFragment::clip`]).
+    pub clip: Clip,
+}
+
+/// One display list command, in paint order.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DisplayCommand {
+    /// Fill one shape source-over into the current group.
+    Fill(DisplayItem),
+    /// Start a transparent group for a stacking context with `opacity < 1`.
+    BeginGroup {
+        /// Principal-box index of the stacking context root.
+        source_box: usize,
+        /// Source DOM node.
+        node: NodeId,
+        /// Group opacity, greater than 0 and less than 1.
+        opacity: f64,
+    },
+    /// Composite the innermost open group into its parent with its opacity.
+    EndGroup,
 }
 
 /// Why a box needs paint features this reference does not implement.
@@ -69,8 +94,6 @@ pub enum UnsupportedPaint {
     BackgroundImage,
     /// A visible border style other than `solid`.
     BorderStyle,
-    /// `opacity` below 1 needs group compositing.
-    Opacity,
 }
 
 /// An atomic failure to build a display list.
@@ -85,7 +108,7 @@ pub enum PaintError {
     },
     /// The layout does not belong to the box snapshot, or a style is invalid.
     InvalidInput,
-    /// More display items than [`PaintLimits::max_items`].
+    /// More display commands than [`PaintLimits::max_items`].
     ItemLimit,
     /// Cooperative cancellation.
     Cancelled,
@@ -114,7 +137,7 @@ impl Error for PaintError {}
 pub struct DisplayList {
     viewport: CssSize,
     canvas: Srgba,
-    items: Vec<DisplayItem>,
+    commands: Vec<DisplayCommand>,
 }
 
 fn color(style: &ComputedStyle, property: P) -> Result<Srgba, PaintError> {
@@ -157,24 +180,28 @@ fn point(x: f64, y: f64) -> Result<CssPoint, PaintError> {
 }
 
 struct Builder<'a> {
-    items: Vec<DisplayItem>,
+    commands: Vec<DisplayCommand>,
     limits: PaintLimits,
     cancellation: &'a CancellationToken,
 }
 
 impl Builder<'_> {
-    fn push(&mut self, item: DisplayItem) -> Result<(), PaintError> {
+    fn command(&mut self, command: DisplayCommand) -> Result<(), PaintError> {
         self.cancellation
             .check()
             .map_err(|_| PaintError::Cancelled)?;
-        if item.color.is_transparent() {
-            return Ok(());
-        }
-        if self.items.len() >= self.limits.max_items {
+        if self.commands.len() >= self.limits.max_items {
             return Err(PaintError::ItemLimit);
         }
-        self.items.push(item);
+        self.commands.push(command);
         Ok(())
+    }
+
+    fn push(&mut self, item: DisplayItem) -> Result<(), PaintError> {
+        if item.color.is_transparent() {
+            return self.cancellation.check().map_err(|_| PaintError::Cancelled);
+        }
+        self.command(DisplayCommand::Fill(item))
     }
 
     fn background(
@@ -198,6 +225,7 @@ impl Builder<'_> {
             role: ItemRole::Background,
             shape: Shape::Rect(area),
             color: color(style, P::BackgroundColor)?,
+            clip: fragment.clip(),
         })
     }
 
@@ -240,6 +268,7 @@ impl Builder<'_> {
             role,
             shape,
             color,
+            clip: fragment.clip(),
         };
         // Matching sides are one ring, so no antialiased seam appears at
         // the corner diagonals where separately composited quads would meet.
@@ -273,16 +302,54 @@ impl Builder<'_> {
     }
 }
 
+/// How a fragment takes part in painting (CSS 2.2 Appendix E, CSS 2.2 §9.9).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Role {
+    /// A stacking context with its z-index (0 for non-positioned contexts).
+    Context(i32),
+    /// A positioned box with `z-index:auto`: painted atomically in its
+    /// stacking context's z=0 layer, but its positioned descendants and
+    /// stacking contexts belong to the enclosing stacking context.
+    Positioned,
+    /// A non-positioned float, painted like `Positioned` in the float layer.
+    Float,
+    /// An in-flow, non-positioned block.
+    Block,
+}
+
+/// Paint-order lists of one stacking context or pseudo-context.
+#[derive(Default)]
+struct Layers {
+    negative: Vec<usize>,
+    blocks: Vec<usize>,
+    floats: Vec<usize>,
+    zero: Vec<usize>,
+    positive: Vec<usize>,
+}
+
+enum Task {
+    Layer(usize),
+    Own(usize),
+    End,
+}
+
 impl DisplayList {
     /// Build the display list for a block layout of `tree`.
     ///
     /// The canvas starts opaque white; the root element's background color,
     /// or an HTML root's first `body` child's when the root's is transparent
     /// and has no image, is painted across it, and that box then paints no
-    /// background of its own. Each block then paints its background color
-    /// (clipped to the bottom layer's `background-clip` box) and solid
-    /// borders, in preorder. `visibility:hidden` boxes paint nothing of their
-    /// own. Unsupported features fail atomically.
+    /// background of its own. Boxes paint in CSS 2.2 Appendix E order: each
+    /// stacking context paints its own background and border, then children
+    /// with negative z-index, in-flow blocks, floats, positioned boxes with
+    /// `z-index` auto or 0 (and opacity contexts) in tree order, then positive
+    /// z-index; equal z-index keeps tree order. Positioned boxes form stacking
+    /// contexts when `z-index` is an integer, fixed boxes and `opacity < 1`
+    /// always do. Each item carries its fragment's overflow clip. A context
+    /// with `opacity < 1` is a group; `opacity: 0` paints nothing. Backgrounds
+    /// are clipped to the bottom layer's `background-clip` box and borders
+    /// must be solid. `visibility:hidden` boxes paint nothing of their own.
+    /// Unsupported features fail atomically.
     pub fn build(
         document: &Document,
         tree: &BoxTree,
@@ -292,7 +359,7 @@ impl DisplayList {
         cancellation: &CancellationToken,
     ) -> Result<Self, PaintError> {
         let mut builder = Builder {
-            items: Vec::new(),
+            commands: Vec::new(),
             limits,
             cancellation,
         };
@@ -316,10 +383,10 @@ impl DisplayList {
                 && !has_image(root_style)?
                 && element_is(document, root.node(), "html")
             {
+                // The first `body` child of the root that generated a box.
                 let body = fragments
                     .iter()
                     .position(|f| f.parent() == Some(0) && element_is(document, f.node(), "body"));
-                // The first `body` child of the root that generated a box.
                 if let Some(body) = body {
                     source = body;
                 }
@@ -335,37 +402,142 @@ impl DisplayList {
             canvas = over(c, Srgba::WHITE);
             canvas_source = Some(source);
         }
-        for (index, fragment) in fragments.iter().enumerate() {
+
+        // Classify every fragment and file it under its paint-order owner.
+        let n = fragments.len();
+        let mut roles = Vec::with_capacity(n);
+        let mut opacity = Vec::with_capacity(n);
+        // Nearest stacking context, and nearest context/pseudo-context, at
+        // or above each fragment (tree ancestry, not containing blocks).
+        let mut context = Vec::with_capacity(n);
+        let mut layer = Vec::with_capacity(n);
+        let mut layers: Vec<Layers> = Vec::with_capacity(n);
+        let mut tops = Vec::new();
+        for (i, fragment) in fragments.iter().enumerate() {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             let style = style_of(fragment)?;
-            match style.get(P::Opacity) {
-                V::Opacity(o) if *o >= 1.0 => {}
-                V::Opacity(_) => {
-                    return Err(PaintError::Unsupported {
-                        node: fragment.node(),
-                        reason: UnsupportedPaint::Opacity,
-                    });
-                }
-                _ => return Err(PaintError::InvalidInput),
-            }
-            if canvas_source != Some(index) && has_image(style)? {
+            if canvas_source != Some(i) && has_image(style)? {
                 return Err(PaintError::Unsupported {
                     node: fragment.node(),
                     reason: UnsupportedPaint::BackgroundImage,
                 });
             }
-            if !matches!(style.get(P::Visibility), V::Visibility(Visibility::Visible)) {
+            let alpha = match style.get(P::Opacity) {
+                V::Opacity(o) if o.is_finite() => o.clamp(0.0, 1.0),
+                _ => return Err(PaintError::InvalidInput),
+            };
+            let z = match style.get(P::ZIndex) {
+                V::ZIndex(ZIndex::Auto) => None,
+                V::ZIndex(ZIndex::Integer(z)) => Some(*z),
+                _ => return Err(PaintError::InvalidInput),
+            };
+            let parent = match fragment.parent() {
+                Some(p) if p < i => Some(p),
+                Some(_) => return Err(PaintError::InvalidInput),
+                None => None,
+            };
+            let positioned = matches!(
+                fragment.scheme(),
+                PositionScheme::Relative | PositionScheme::Absolute | PositionScheme::Fixed
+            );
+            let role = if parent.is_none()
+                || (positioned && z.is_some())
+                || fragment.scheme() == PositionScheme::Fixed
+                || alpha < 1.0
+            {
+                // z-index applies only to positioned boxes here.
+                Role::Context(if positioned { z.unwrap_or(0) } else { 0 })
+            } else if positioned {
+                Role::Positioned
+            } else if matches!(
+                fragment.scheme(),
+                PositionScheme::FloatLeft | PositionScheme::FloatRight
+            ) {
+                Role::Float
+            } else {
+                Role::Block
+            };
+            roles.push(role);
+            opacity.push(alpha);
+            layers.push(Layers::default());
+            let own_layer = !matches!(role, Role::Block);
+            context.push(match (role, parent) {
+                (Role::Context(_), _) | (_, None) => i,
+                (_, Some(p)) => context[p],
+            });
+            layer.push(match parent {
+                Some(p) if !own_layer => layer[p],
+                _ => i,
+            });
+            let Some(p) = parent else {
+                tops.push(i);
                 continue;
+            };
+            match role {
+                Role::Context(z) if z < 0 => layers[context[p]].negative.push(i),
+                Role::Context(z) if z > 0 => layers[context[p]].positive.push(i),
+                Role::Context(_) | Role::Positioned => layers[context[p]].zero.push(i),
+                Role::Float => layers[layer[p]].floats.push(i),
+                Role::Block => layers[layer[p]].blocks.push(i),
             }
-            if canvas_source != Some(index) {
-                builder.background(fragment, fragment.source_box(), style)?;
+        }
+        for l in &mut layers {
+            cancellation.check().map_err(|_| PaintError::Cancelled)?;
+            // Stable sorts keep tree order among equal z-index values.
+            l.negative.sort_by_key(|&i| match roles[i] {
+                Role::Context(z) => z,
+                _ => 0,
+            });
+            l.positive.sort_by_key(|&i| match roles[i] {
+                Role::Context(z) => z,
+                _ => 0,
+            });
+        }
+
+        // Expand layers with an explicit stack: no content-controlled recursion.
+        let mut stack: Vec<Task> = tops.iter().rev().map(|&i| Task::Layer(i)).collect();
+        while let Some(task) = stack.pop() {
+            cancellation.check().map_err(|_| PaintError::Cancelled)?;
+            match task {
+                Task::End => builder.command(DisplayCommand::EndGroup)?,
+                Task::Own(i) => {
+                    let fragment = &fragments[i];
+                    let style = style_of(fragment)?;
+                    if matches!(style.get(P::Visibility), V::Visibility(Visibility::Visible)) {
+                        if canvas_source != Some(i) {
+                            builder.background(fragment, fragment.source_box(), style)?;
+                        }
+                        builder.border(fragment, fragment.source_box(), style)?;
+                    }
+                }
+                Task::Layer(i) => {
+                    if opacity[i] <= 0.0 {
+                        continue;
+                    }
+                    let group = opacity[i] < 1.0;
+                    if group {
+                        builder.command(DisplayCommand::BeginGroup {
+                            source_box: fragments[i].source_box(),
+                            node: fragments[i].node(),
+                            opacity: opacity[i],
+                        })?;
+                        stack.push(Task::End);
+                    }
+                    let l = std::mem::take(&mut layers[i]);
+                    // Pushed in reverse so they pop in paint order.
+                    stack.extend(l.positive.iter().rev().map(|&c| Task::Layer(c)));
+                    stack.extend(l.zero.iter().rev().map(|&c| Task::Layer(c)));
+                    stack.extend(l.floats.iter().rev().map(|&c| Task::Layer(c)));
+                    stack.extend(l.blocks.iter().rev().map(|&c| Task::Own(c)));
+                    stack.extend(l.negative.iter().rev().map(|&c| Task::Layer(c)));
+                    stack.push(Task::Own(i));
+                }
             }
-            builder.border(fragment, fragment.source_box(), style)?;
         }
         Ok(Self {
             viewport,
             canvas,
-            items: builder.items,
+            commands: builder.commands,
         })
     }
 
@@ -379,9 +551,20 @@ impl DisplayList {
         self.canvas
     }
 
-    /// Paint operations, in paint order.
-    pub fn items(&self) -> &[DisplayItem] {
-        &self.items
+    /// Paint commands, in paint order.
+    pub fn commands(&self) -> &[DisplayCommand] {
+        &self.commands
+    }
+
+    /// Copies of the fills alone, in paint order (group markers skipped).
+    pub fn items(&self) -> Vec<DisplayItem> {
+        self.commands
+            .iter()
+            .filter_map(|c| match c {
+                DisplayCommand::Fill(item) => Some(*item),
+                _ => None,
+            })
+            .collect()
     }
 
     /// Deterministic text dump with no page text; no partial output on overflow.
@@ -404,7 +587,30 @@ impl DisplayList {
             hex(self.canvas)
         );
         append(&mut out, &line, max_bytes)?;
-        for (i, item) in self.items.iter().enumerate() {
+        let mut index = 0usize;
+        for command in &self.commands {
+            let item = match command {
+                DisplayCommand::Fill(item) => item,
+                DisplayCommand::BeginGroup {
+                    source_box,
+                    node,
+                    opacity,
+                } => {
+                    line = format!(
+                        "group box={source_box} node={}:{} opacity={opacity}\n",
+                        node.slot(),
+                        node.generation()
+                    );
+                    append(&mut out, &line, max_bytes)?;
+                    continue;
+                }
+                DisplayCommand::EndGroup => {
+                    append(&mut out, "end-group\n", max_bytes)?;
+                    continue;
+                }
+            };
+            let i = index;
+            index += 1;
             let role = match item.role {
                 ItemRole::Background => "background",
                 ItemRole::Border => "border",
@@ -425,8 +631,14 @@ impl DisplayList {
                     s
                 }
             };
+            // Unclipped items keep the REN-04a line format.
+            let clip = if item.clip.is_none() {
+                String::new()
+            } else {
+                format!(" clip={}", item.clip)
+            };
             line = format!(
-                "item {i} box={} node={}:{} {role} {shape} color={}\n",
+                "item {i} box={} node={}:{} {role} {shape} color={}{clip}\n",
                 item.source_box,
                 item.node.slot(),
                 item.node.generation(),

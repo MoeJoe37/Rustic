@@ -93,6 +93,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Open, REN-03 |
 | TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
+| TD-46 | Deliberate | Paint | Opacity groups allocate a full surface each instead of their bounds | Open |
 | TD-47 | Deliberate | Text | Untailored UAX #14/#29 segmentation and bidi without L3 | Open, REN-03b |
 | TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
@@ -763,6 +764,17 @@ documented, without inventing UI or text metrics. **Pay:** compare against
 layout WPT once text and reftests exist (REN-07), add scrollbar metrics with
 the platform UI, and use real intrinsic sizes after REN-03. **Trigger:**
 layout-WPT import, scrolling UI, or inline content inside floats.
+
+### TD-46 — Full-surface opacity groups
+
+REN-04b composites each `opacity < 1` stacking context through a transparent
+buffer the size of the whole surface, and nested groups each add one. Memory
+is checked against `RasterLimits::max_bytes` before allocation and the
+composite costs one pass over the surface, both charged to the work budget,
+so the cost is bounded but proportional to the surface, not the group.
+**Pay:** size groups to the union of their items' clipped device bounds, and
+skip groups whose content is a single opaque-free fill (fold opacity into its
+color). **Trigger:** pages with many small translucent boxes, or tiled raster.
 
 ### TD-47 — Untailored segmentation and bidi
 

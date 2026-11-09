@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 26.55%** (21.25% verified complete + 5.30% partial credit) — 37/172 capabilities complete and 14 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 49.59% done.
+**Overall engine completion: 27.28%** (21.25% verified complete + 6.03% partial credit) — 37/172 capabilities complete and 15 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 55.49% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

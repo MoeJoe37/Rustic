@@ -877,6 +877,17 @@ text-align/indent/justify, line-height and vertical-align, and text-based
 shrink-to-fit. OpenType shaping, atomic inlines and the other gaps are TD-50.
 See [LAYOUT.md](LAYOUT.md#inline-formatting-and-text-fragments-ren-03b) and
 [TEXT.md](TEXT.md#shaping).
+## REN-04b — Paint order, stacking contexts, overflow clips and opacity
+
+The display list now follows CSS 2.2 Appendix E for the block reference:
+stacking contexts from the root, positioned boxes with integer `z-index`,
+fixed boxes and `opacity < 1`; negative, block, float, zero/auto and positive
+layers; pseudo-contexts for floats and `z-index: auto` positioned boxes that
+hand positioned descendants to the real context. Items carry the layout's
+containing-block clip chain, and the rasterizer clips geometrically. Opacity
+contexts are composited as groups (TD-46 for their memory shape). Steps
+credited: `paint.display` order, `paint.stacking` contexts and clips, and
+`paint.raster` clip/opacity layers. See [PAINT.md](PAINT.md).
 
 ## Queue status
 

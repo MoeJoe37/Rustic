@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "3cbf782948539987be13ab6c9189d3bbfe658b28af8a1d4f7ed2bc6e8dec7b60",
-  "percent": "26.55",
+  "source_fingerprint": "51523b2fb75dd2489d5d86fa6c2e116f03e5292cc5900c57ed29c78fdb5316ab",
+  "percent": "27.28",
   "verified_percent": "21.25",
-  "partial_percent": "5.30",
+  "partial_percent": "6.03",
   "completed": 37,
-  "in_progress": 14,
+  "in_progress": 15,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 1,
       "total": 17,
-      "percent": "49.59",
+      "percent": "55.49",
       "verified_percent": "7.99",
-      "partial_percent": "41.60"
+      "partial_percent": "47.50"
     },
     {
       "id": "M4",
@@ -2374,12 +2374,28 @@
             },
             {
               "id": "order",
-              "label": "Full CSS 2.2 Appendix E paint order with stacking contexts",
-              "status": "planned",
-              "evidence": []
+              "label": "CSS 2.2 Appendix E paint order with stacking contexts (blocks)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "enum Role"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn stacking_contexts_paint_in_appendix_e_order"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn pseudo_contexts_hand_positioned_descendants_to_the_real_context"
+                }
+              ]
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.66"
         },
         {
@@ -2387,9 +2403,57 @@
           "label": "Stacking, clips and transforms",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "contexts",
+              "label": "Stacking contexts and z-index ordering",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "Role::Context"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn equal_z_index_keeps_tree_order_and_fixed_boxes_form_contexts"
+                }
+              ]
+            },
+            {
+              "id": "clips",
+              "label": "Overflow clips along the containing-block chain",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn item_bounds"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn overflow_clips_follow_the_containing_block_chain"
+                }
+              ]
+            },
+            {
+              "id": "radius",
+              "label": "Rounded and clip-path clips",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "transforms",
+              "label": "2D/3D transforms",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.66"
         },
         {
@@ -2435,7 +2499,29 @@
             },
             {
               "id": "layers",
-              "label": "Clip, opacity and blend layers",
+              "label": "Clip and opacity group layers",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn composite"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn opacity_groups_composite_their_whole_context_once"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn layered_scene_matches_a_golden_checksum"
+                }
+              ]
+            },
+            {
+              "id": "blend",
+              "label": "Blend modes, filters and shadows",
               "status": "planned",
               "evidence": []
             },
@@ -2446,7 +2532,7 @@
               "evidence": []
             }
           ],
-          "credit": "25.00",
+          "credit": "40.00",
           "engine_share": "1.11"
         },
         {
@@ -2564,12 +2650,12 @@
       ],
       "points": 27,
       "completed": 0,
-      "in_progress": 4,
+      "in_progress": 5,
       "total": 7,
-      "contribution": "0.94",
-      "percent": "15.74",
+      "contribution": "1.66",
+      "percent": "27.77",
       "verified_percent": "0.00",
-      "partial_percent": "15.74"
+      "partial_percent": "27.77"
     },
     {
       "id": "js",

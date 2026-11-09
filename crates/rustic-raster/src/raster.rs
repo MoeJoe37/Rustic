@@ -6,8 +6,9 @@
 //! platform math calls, so output bytes are identical on every target.
 
 use rustic_base::CancellationToken;
+use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
-use rustic_paint::{DisplayList, Shape, Srgba};
+use rustic_paint::{DisplayCommand, DisplayItem, DisplayList, Shape, Srgba};
 use std::{error::Error, fmt};
 
 /// Surface and work budgets for one rasterization.
@@ -17,7 +18,8 @@ pub struct RasterLimits {
     pub max_width: u32,
     /// Maximum surface height in device pixels.
     pub max_height: u32,
-    /// Maximum surface bytes (4 per pixel).
+    /// Maximum surface bytes (4 per pixel), counting the surface and every
+    /// opacity group buffer alive at the same time.
     pub max_bytes: usize,
     /// Maximum pixel visits summed over every item's clipped bounds.
     pub max_work: u64,
@@ -41,6 +43,10 @@ pub enum RasterError {
     SurfaceSize,
     /// Pixel visits exceeded [`RasterLimits::max_work`].
     WorkLimit,
+    /// Nested opacity groups would exceed [`RasterLimits::max_bytes`].
+    MemoryLimit,
+    /// Unbalanced group markers in the display list.
+    InvalidList,
     /// Cooperative cancellation.
     Cancelled,
 }
@@ -50,6 +56,8 @@ impl fmt::Display for RasterError {
         f.write_str(match self {
             Self::SurfaceSize => "surface size is zero or exceeds its budget",
             Self::WorkLimit => "rasterization work limit exceeded",
+            Self::MemoryLimit => "opacity groups exceed the surface memory budget",
+            Self::InvalidList => "display list has unbalanced groups",
             Self::Cancelled => "rasterization cancelled",
         })
     }
@@ -140,11 +148,15 @@ pub(crate) fn unpremultiply(p: [u8; 4]) -> Srgba {
 
 type Point = (f64, f64);
 
-/// Sutherland–Hodgman clip of one closed contour to `[0,w]×[0,h]`.
-fn clip(contour: &[Point], w: f64, h: f64) -> Vec<Point> {
+/// Device-space clip rectangle as (left, top, right, bottom).
+type Bounds = (f64, f64, f64, f64);
+
+/// Sutherland–Hodgman clip of one closed contour to `bounds`.
+fn clip(contour: &[Point], bounds: Bounds) -> Vec<Point> {
     let mut points = contour.to_vec();
+    let (x0, y0, x1, y1) = bounds;
     // (axis, bound, keep_greater)
-    for (axis, bound, greater) in [(0, 0.0, true), (0, w, false), (1, 0.0, true), (1, h, false)] {
+    for (axis, bound, greater) in [(0, x0, true), (0, x1, false), (1, y0, true), (1, y1, false)] {
         if points.is_empty() {
             break;
         }
@@ -284,17 +296,36 @@ impl Work<'_> {
     }
 }
 
+/// The device-space area an item may touch: the surface intersected with its
+/// overflow clip. `None` when nothing remains.
+fn item_bounds(clip_rect: Clip, w: f64, h: f64, scale: f64) -> Option<Bounds> {
+    let mut b: Bounds = (0.0, 0.0, w, h);
+    if let Some(r) = clip_rect.x {
+        b.0 = b.0.max(r.start.get() * scale);
+        b.2 = b.2.min(r.end.get() * scale);
+    }
+    if let Some(r) = clip_rect.y {
+        b.1 = b.1.max(r.start.get() * scale);
+        b.3 = b.3.min(r.end.get() * scale);
+    }
+    (b.0 < b.2 && b.1 < b.3).then_some(b)
+}
+
 fn fill(
-    surface: &mut Surface,
-    shape: &Shape,
-    color: Srgba,
+    pixels: &mut [u8],
+    (width, height): (u32, u32),
+    item: &DisplayItem,
     scale: f64,
     work: &mut Work<'_>,
 ) -> Result<(), RasterError> {
-    let (w, h) = (f64::from(surface.width), f64::from(surface.height));
-    let clipped: Vec<Vec<Point>> = contours(shape, scale)
+    let (w, h) = (f64::from(width), f64::from(height));
+    let Some(limit) = item_bounds(item.clip, w, h, scale) else {
+        return Ok(());
+    };
+    let color = item.color;
+    let clipped: Vec<Vec<Point>> = contours(&item.shape, scale)
         .iter()
-        .map(|c| clip(c, w, h))
+        .map(|c| clip(c, limit))
         .filter(|c| c.len() >= 3)
         .collect();
     let mut bounds = (w, h, 0.0_f64, 0.0_f64);
@@ -337,7 +368,7 @@ fn fill(
         f64::from(color.b) * alpha,
         f64::from(color.a),
     ];
-    let width = surface.width as usize;
+    let width = width as usize;
     let (ox, oy) = (bx as usize, by as usize);
     for row in 0..bh {
         work.cancellation
@@ -353,13 +384,27 @@ fn fill(
             }
             let i = start + col * 4;
             let keep = 1.0 - alpha * coverage;
-            for (dst, &src) in surface.pixels[i..i + 4].iter_mut().zip(&premultiplied) {
+            for (dst, &src) in pixels[i..i + 4].iter_mut().zip(&premultiplied) {
                 let v = src * coverage + f64::from(*dst) * keep;
                 *dst = v.round().clamp(0.0, 255.0) as u8;
             }
         }
     }
     Ok(())
+}
+
+/// Composite a premultiplied group onto `dst` source-over at `opacity`.
+fn composite(dst: &mut [u8], group: &[u8], opacity: f64) {
+    for (d, g) in dst.chunks_exact_mut(4).zip(group.chunks_exact(4)) {
+        if g[3] == 0 {
+            continue;
+        }
+        let keep = 1.0 - f64::from(g[3]) * opacity / 255.0;
+        for c in 0..4 {
+            let v = f64::from(g[c]) * opacity + f64::from(d[c]) * keep;
+            d[c] = v.round().clamp(0.0, 255.0) as u8;
+        }
+    }
 }
 
 /// Rasterize `list` at `scale` device pixels per CSS pixel.
@@ -401,8 +446,43 @@ pub fn rasterize(
         .map_err(|_| RasterError::SurfaceSize)?
         .to_device(scale)
         .get();
-    for item in list.items() {
-        fill(&mut surface, &item.shape, item.color, factor, &mut work)?;
+    let size = (surface.width, surface.height);
+    let bytes = surface.pixels.len();
+    // Open opacity groups, innermost last, with their opacity.
+    let mut groups: Vec<(Vec<u8>, f64)> = Vec::new();
+    for command in list.commands() {
+        match command {
+            DisplayCommand::Fill(item) => {
+                let target = match groups.last_mut() {
+                    Some((pixels, _)) => pixels,
+                    None => &mut surface.pixels,
+                };
+                fill(target, size, item, factor, &mut work)?;
+            }
+            DisplayCommand::BeginGroup { opacity, .. } => {
+                // The surface, every open group and the new one.
+                if bytes
+                    .checked_mul(groups.len() + 2)
+                    .is_none_or(|n| n > limits.max_bytes)
+                {
+                    return Err(RasterError::MemoryLimit);
+                }
+                work.charge(u64::from(size.0) * u64::from(size.1))?;
+                groups.push((vec![0; bytes], *opacity));
+            }
+            DisplayCommand::EndGroup => {
+                let (group, opacity) = groups.pop().ok_or(RasterError::InvalidList)?;
+                work.charge(u64::from(size.0) * u64::from(size.1))?;
+                let target = match groups.last_mut() {
+                    Some((pixels, _)) => pixels,
+                    None => &mut surface.pixels,
+                };
+                composite(target, &group, opacity);
+            }
+        }
+    }
+    if !groups.is_empty() {
+        return Err(RasterError::InvalidList);
     }
     Ok(surface)
 }
@@ -414,7 +494,7 @@ mod tests {
     fn coverage(contour: &[Point], w: usize, h: usize) -> Vec<f64> {
         let stride = w + 2;
         let mut acc = vec![0.0; stride * h];
-        let clipped = clip(contour, w as f64, h as f64);
+        let clipped = clip(contour, (0.0, 0.0, w as f64, h as f64));
         let mut previous = clipped[clipped.len() - 1];
         for &current in &clipped {
             accumulate_edge(&mut acc, stride, h, previous, current);
@@ -471,7 +551,7 @@ mod tests {
         for (got, want) in c.iter().zip(expected) {
             assert!(close(*got, want), "{c:?}");
         }
-        assert!(clip(&[(5.0, 5.0), (6.0, 5.0), (6.0, 6.0)], 3.0, 2.0).is_empty());
+        assert!(clip(&[(5.0, 5.0), (6.0, 5.0), (6.0, 6.0)], (0.0, 0.0, 3.0, 2.0)).is_empty());
     }
 
     #[test]

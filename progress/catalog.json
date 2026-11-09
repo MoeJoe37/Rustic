@@ -2122,9 +2122,25 @@
             },
             {
               "id": "order",
-              "label": "Full CSS 2.2 Appendix E paint order with stacking contexts",
-              "status": "planned",
-              "evidence": []
+              "label": "CSS 2.2 Appendix E paint order with stacking contexts (blocks)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "enum Role"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn stacking_contexts_paint_in_appendix_e_order"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn pseudo_contexts_hand_positioned_descendants_to_the_real_context"
+                }
+              ]
             }
           ]
         },
@@ -2133,8 +2149,56 @@
           "label": "Stacking, clips and transforms",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "contexts",
+              "label": "Stacking contexts and z-index ordering",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "Role::Context"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn equal_z_index_keeps_tree_order_and_fixed_boxes_form_contexts"
+                }
+              ]
+            },
+            {
+              "id": "clips",
+              "label": "Overflow clips along the containing-block chain",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn item_bounds"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn overflow_clips_follow_the_containing_block_chain"
+                }
+              ]
+            },
+            {
+              "id": "radius",
+              "label": "Rounded and clip-path clips",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "transforms",
+              "label": "2D/3D transforms",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "paint.raster",
@@ -2179,7 +2243,29 @@
             },
             {
               "id": "layers",
-              "label": "Clip, opacity and blend layers",
+              "label": "Clip and opacity group layers",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn composite"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn opacity_groups_composite_their_whole_context_once"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn layered_scene_matches_a_golden_checksum"
+                }
+              ]
+            },
+            {
+              "id": "blend",
+              "label": "Blend modes, filters and shadows",
               "status": "planned",
               "evidence": []
             },

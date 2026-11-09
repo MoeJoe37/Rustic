@@ -43,10 +43,11 @@ dump-layout prints used content/padding/border rectangles for static non-replace
 blocks with collapsed vertical margins and visible overflow. Inline/text layout and
 other unsupported formatting fail explicitly.
 dump-paint prints the display list for that layout: the canvas color (with
-root/body background propagation), block background colors and solid borders.
+root/body background propagation), block background colors and solid borders
+in stacking-context paint order, with overflow clips and opacity groups.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). --scale sets device pixels per CSS pixel (default 1,
-at most 64). Text, images, non-solid borders and opacity fail explicitly; the
+at most 64). Text, images and non-solid borders fail explicitly; the
 PNG counts against --max-output-bytes.
 
 Options for all dump commands (positive integers; exceeding any limit except

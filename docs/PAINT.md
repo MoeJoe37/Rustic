@@ -16,8 +16,23 @@ beyond checking element names.
   transparent with no image, its first `body` child that generated a box
   supplies the canvas color instead (CSS Backgrounds 3 §2.11.2). The box whose
   background went to the canvas paints no background of its own.
-- **Order.** Each block paints its background, then its border, in preorder.
-  For in-flow, non-positioned blocks this is CSS 2.2 Appendix E order.
+- **Order (REN-04b).** CSS 2.2 Appendix E for boxes without inline content.
+  The root, positioned boxes with an integer `z-index`, fixed boxes and boxes
+  with `opacity < 1` form stacking contexts. Each context paints its own
+  background and border, then child contexts with negative `z-index`, in-flow
+  blocks, floats, positioned boxes with `z-index: auto` or 0 and `z-index: 0`
+  contexts (in tree order), then positive `z-index`. Equal values keep tree
+  order. Floats and `z-index: auto` positioned boxes paint atomically, but
+  their positioned descendants and real contexts join the enclosing context.
+  Membership follows the box tree; the list is built with an explicit stack.
+- **Clips.** Every item carries its fragment's overflow clip from layout, which
+  follows the containing-block chain (absolute boxes escape intermediate
+  clips, fixed boxes escape all). The rasterizer clips shapes geometrically,
+  so fractional clip edges antialias. `dump-paint` prints ` clip=(x,y)` ranges
+  for clipped items; unclipped lines keep the REN-04a format.
+- **Opacity.** A context with `opacity < 1` becomes a `BeginGroup`/`EndGroup`
+  pair: its content is painted into a transparent buffer, then composited once
+  at the group opacity. `opacity: 0` paints nothing, descendants included.
 - **Backgrounds.** Background color fills the box named by the last
   `background-clip` layer (border, padding or content box).
 - **Borders.** Solid borders only. When all four sides share a color the
@@ -28,7 +43,7 @@ beyond checking element names.
   Out-of-gamut channels clip (TD-41). Fully transparent items are dropped.
 - **Visibility.** `visibility: hidden/collapse` boxes paint nothing of their
   own; visible descendants still paint.
-- **Unsupported, fails atomically:** `opacity` below 1, any `background-image`,
+- **Unsupported, fails atomically:** any `background-image`,
   border styles other than `solid`, and everything layout already rejects
   (text, inline content, positioning, floats, overflow, replaced elements).
 - **Limits.** `PaintLimits::max_items` (default 400,000) and cancellation.
@@ -53,7 +68,8 @@ color and composites each item source-over.
   conversion for `lab()`/`color()` uses `powf` before rasterization, so those
   colors can differ by one ULP between platforms before rounding to 8 bits.)
 - **Limits.** `RasterLimits` bounds width, height and surface bytes before
-  allocation, and total pixel visits summed over item bounds (`max_work`,
+  allocation (the surface plus every open opacity group, each a full surface,
+  TD-46), and total pixel visits summed over item bounds (`max_work`,
   default 2³⁰). Each item uses a scratch buffer sized to its clipped bounds.
 
 `encode_png(surface, max_bytes)` writes straight-alpha RGBA8 PNG with stored
@@ -80,10 +96,17 @@ The PNG counts against `--max-output-bytes`; nothing is written on failure.
   HTML/CSS at two scales and checks surface size, opacity, determinism and the
   PNG length formula.
 
+Paint-order, clip and opacity tests: Appendix E order across all seven layers,
+pseudo-contexts handing positioned descendants to the real context, local
+`z-index` inside a context, fixed contexts, clip chains with an escaping
+absolute box and a half-covered clip row, group compositing versus per-fill
+alpha, `opacity: 0`, the group memory budget and a layered golden checksum.
+The fuzz target also checks one background per box and balanced groups.
+
 ## Not yet implemented
 
 Text and glyphs, images and decoding, gradients, non-solid borders,
-`border-radius`, outlines, box shadows, opacity/blend groups, clipping,
-stacking contexts and z-order, transforms, coverage-conflation-free corner
+`border-radius`, outlines, box shadows, blend modes and filters, rounded or
+`clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression and reftests. See TD-41 and docs/ROADMAP.md (REN-04 to
 REN-07).

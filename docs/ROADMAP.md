@@ -163,6 +163,8 @@ boundaries. REN-01c adds bounded normal-flow anonymous blocks, split inline
 continuations and `dump-formatting`. REN-04a/REN-05a add the first display
 list (canvas propagation, block backgrounds and solid borders), a deterministic
 CPU rasterizer, PNG output, `dump-paint` and `rustic render` ([PAINT.md](PAINT.md)).
+REN-04b paints in Appendix E order with stacking contexts, `z-index`, floats,
+positioned boxes, overflow clips and opacity groups.
 Inline used geometry/shaping, clearance with floats, stacking contexts and the
 final general fragment tree remain pending.
 See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.

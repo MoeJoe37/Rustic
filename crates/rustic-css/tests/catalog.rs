@@ -85,6 +85,22 @@ const VALID: &[(&str, &str)] = &[
         "text-decoration: none blue",
         "text-decoration-line: none; text-decoration-style: solid; text-decoration-color: rgb(0, 0, 255)",
     ),
+    // Outlines.
+    ("outline-style: auto", "outline-style: auto"),
+    ("outline-width: thick", "outline-width: thick"),
+    ("outline-offset: -2px", "outline-offset: -2px"),
+    (
+        "outline-offset: calc(1em - 2px)",
+        "outline-offset: calc(1em - 2px)",
+    ),
+    (
+        "outline: 2px dashed red",
+        "outline-width: 2px; outline-style: dashed; outline-color: rgb(255, 0, 0)",
+    ),
+    (
+        "outline: blue double",
+        "outline-width: medium; outline-style: double; outline-color: rgb(0, 0, 255)",
+    ),
     // Fonts.
     (
         "font-variant-caps: all-small-caps",
@@ -263,6 +279,11 @@ fn invalid_catalog_declarations_are_rejected() {
         "text-decoration: underline none",
         "text-decoration: solid dotted",
         "text-decoration: red blue",
+        "outline-style: hidden",
+        "outline-width: -1px",
+        "outline-offset: 10%",
+        "outline: solid dashed",
+        "outline: 1px 2px",
         "font-variant-caps: small",
         "font-stretch: -10%",
         "font-stretch: 100",

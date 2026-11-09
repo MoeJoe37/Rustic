@@ -228,16 +228,30 @@ are not followed yet.
 The checked suite lives in `crates/rustic-cli/tests/reftests` and runs at
 scales 1 and 2 in `cargo test`; it covers borders against nested backgrounds,
 z-index against tree order, overflow clipping, opacity groups with a fuzzy
-tolerance and a mismatch.
+tolerance, solid and double outlines and a mismatch.
+
+## Outlines
+
+`outline-width`, `outline-style`, `outline-color`, `outline-offset` and the
+`outline` shorthand parse and compute per CSS UI 4 (the width computes to 0
+when the style is `none`). Each stacking context paints the outlines of every
+visible box it owns, block boxes and inline box fragments in tree order, after
+all its other content and inside its opacity group (CSS 2.2 Appendix E step
+10). An outline is an [`ItemRole::Outline`] ring outside the border box grown
+by `outline-offset`, which may be negative; when a negative offset collapses
+the ring's inner edge, the remaining area is filled. `double` paints two rings
+of a third of the width; `auto` paints as `solid`; other styles fail with
+`UnsupportedPaint::OutlineStyle`. Outlines are clipped by ancestors' overflow
+like the box's border and never take hits. See TD-54.
 
 ## Not yet implemented
 
-Outlines, non-solid text decoration styles, `text-underline-offset` and
+Non-solid outline styles and rounded outlines, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
-`border-radius`, outlines, box shadows, blend modes and filters, rounded or
+`border-radius`, box shadows, blend modes and filters, rounded or
 `clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54 and docs/ROADMAP.md (REN-04 to
 REN-07).

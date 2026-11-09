@@ -944,6 +944,16 @@ with `solid` and `double` styles. Two decoration reftests and a propagation
 test cover it; `paint.display` credits its content step, and outlines are a
 new planned step. Approximations are in TD-52. See [PAINT.md](PAINT.md#text).
 
+## REN-04e — Outlines
+
+The outline longhands and shorthand parse and compute (width 0 when the style
+is `none`), and each stacking context paints its boxes' outlines last, inside
+its opacity group, as rings around the border box grown by `outline-offset`.
+`solid`, `double` and `auto` (as solid) paint; other styles fail atomically.
+Two reftests and a paint test cover order, negative offsets and failure;
+`paint.display` credits its outline step. Gaps are TD-54. See
+[PAINT.md](PAINT.md#outlines).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

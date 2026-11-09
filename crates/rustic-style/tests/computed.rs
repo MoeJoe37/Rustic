@@ -207,6 +207,17 @@ fn currentcolor_and_border_widths() {
         computed(html, "#a { border-style: solid }", "a", "border-left-width"),
         "3px"
     );
+    // Outlines: the width is 0 while the style is `none`, the color follows
+    // `color`, and the offset may be negative.
+    let outline = "#a { color: red; outline-width: thick; outline-offset: -1em } \
+                   #b { outline: thin auto }";
+    assert_eq!(computed(html, outline, "a", "outline-width"), "0px");
+    assert_eq!(
+        computed(html, outline, "a", "outline-color"),
+        "rgb(255, 0, 0)"
+    );
+    assert_eq!(computed(html, outline, "a", "outline-offset"), "-16px");
+    assert_eq!(computed(html, outline, "b", "outline-width"), "1px");
 }
 
 #[test]
@@ -289,7 +300,8 @@ fn style_elements_are_attached_in_tree_order() {
         "display: block\ncolor: rgb(255, 0, 0)\nmargin-top: 16px\nmargin-bottom: 16px\n\
          border-top-color: rgb(255, 0, 0)\nborder-right-color: rgb(255, 0, 0)\n\
          border-bottom-color: rgb(255, 0, 0)\nborder-left-color: rgb(255, 0, 0)\n\
-         width: 5px\nheight: 2px\ntext-decoration-color: rgb(255, 0, 0)\n"
+         width: 5px\nheight: 2px\ntext-decoration-color: rgb(255, 0, 0)\n\
+         outline-color: rgb(255, 0, 0)\n"
     );
 }
 

@@ -70,6 +70,9 @@ impl Target for PaintTarget {
             b"text-decoration:underline overline line-through",
             b"text-decoration:underline double red",
             b"text-decoration-style:wavy",
+            b"outline:3px double blue",
+            b"outline-offset:-9px",
+            b"outline:2px auto",
             b"{",
             b"}",
         ]

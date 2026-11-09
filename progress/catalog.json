@@ -2084,90 +2084,72 @@
           "label": "Immutable display lists and paint order",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "blocks",
-              "label": "Block background/border display list with canvas propagation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "pub struct DisplayList"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn body_background_propagates_to_the_canvas_unless_the_root_has_one"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn backgrounds_follow_background_clip_and_paint_in_preorder"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn dump_paint_matches_the_reviewed_display_list_and_output_budget"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "pub struct DisplayList"
             },
             {
-              "id": "content",
-              "label": "Text, image and text decoration items",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "fn decorations"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn decorations_propagate_to_in_flow_text_only_and_fail_on_unsupported_styles"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn body_background_propagates_to_the_canvas_unless_the_root_has_one"
             },
             {
-              "id": "outline",
-              "label": "Outline items",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn backgrounds_follow_background_clip_and_paint_in_preorder"
             },
             {
-              "id": "order",
-              "label": "CSS 2.2 Appendix E paint order with stacking contexts (blocks)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "enum Role"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn stacking_contexts_paint_in_appendix_e_order"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn pseudo_contexts_hand_positioned_descendants_to_the_real_context"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn dump_paint_matches_the_reviewed_display_list_and_output_budget"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "fn decorations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn decorations_propagate_to_in_flow_text_only_and_fail_on_unsupported_styles"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "fn outline("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn outlines_paint_last_in_their_stacking_context_and_collapse_inward"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "enum Role"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn stacking_contexts_paint_in_appendix_e_order"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn pseudo_contexts_hand_positioned_descendants_to_the_real_context"
             }
           ]
         },

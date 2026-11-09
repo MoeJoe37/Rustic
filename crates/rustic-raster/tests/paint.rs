@@ -986,3 +986,88 @@ fn decorations_propagate_to_in_flow_text_only_and_fail_on_unsupported_styles() {
         })
     );
 }
+
+#[test]
+fn outlines_paint_last_in_their_stacking_context_and_collapse_inward() {
+    let p = page(
+        "<div id=ctx><div id=a></div><div id=b></div></div><div id=z></div>\
+         <div id=shrunk></div><div id=gone></div><div id=hidden></div><div id=none></div>",
+        &format!(
+            "{RESET} div {{ height: 10px; width: 10px }}
+             #ctx {{ position: relative; z-index: 1; opacity: 0.5; width: auto; height: auto }}
+             #a {{ outline: 2px solid red }}
+             #b {{ background: blue }}
+             #z {{ position: relative; z-index: 2; background: lime }}
+             #shrunk {{ outline: 4px auto red; outline-offset: -8px }}
+             #gone {{ outline: 4px solid red; outline-offset: -20px }}
+             #hidden {{ outline: 4px solid red; visibility: hidden }}
+             #none {{ outline-width: 4px; outline-color: red }}"
+        ),
+        40.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    // The outline of `a` paints after its later sibling's background but
+    // inside its context's opacity group; the root context's outlines
+    // paint after even its positive z-index children.
+    let mut steps = Vec::new();
+    for command in list.commands() {
+        steps.push(match command {
+            DisplayCommand::Fill(item) => format!("{}:{:?}", p.id_name(item.node), item.role),
+            DisplayCommand::BeginGroup { .. } => "group".into(),
+            DisplayCommand::EndGroup => "end".into(),
+        });
+    }
+    assert_eq!(
+        steps,
+        [
+            "group",
+            "b:Background",
+            "a:Outline",
+            "end",
+            "z:Background",
+            "shrunk:Outline"
+        ]
+    );
+    let outline = |name: &str| {
+        list.items()
+            .into_iter()
+            .filter(|i| i.node == p.id(name) && i.role == ItemRole::Outline)
+            .map(|i| i.shape)
+            .collect::<Vec<_>>()
+    };
+    // a: border box (0,0) 10x10 grown by 2 on every side, hole at the box.
+    let Shape::Ring { outer, inner } = outline("a")[0] else {
+        panic!("ring expected");
+    };
+    assert_eq!(
+        (outer.origin().x.get(), outer.size().width().get()),
+        (-2.0, 14.0)
+    );
+    assert_eq!(
+        (inner.origin().x.get(), inner.size().width().get()),
+        (0.0, 10.0)
+    );
+    // A negative offset that collapses the inner edge fills what is left.
+    let Shape::Rect(rect) = outline("shrunk")[0] else {
+        panic!("rect expected");
+    };
+    assert_eq!(
+        (rect.size().width().get(), rect.size().height().get()),
+        (2.0, 2.0)
+    );
+    // Unsupported styles fail atomically with their node.
+    let p = page(
+        "<div id=d></div>",
+        "#d { outline: 1px dotted red }",
+        20.0,
+        20.0,
+    );
+    assert_eq!(
+        p.list(),
+        Err(PaintError::Unsupported {
+            node: p.id("d"),
+            reason: UnsupportedPaint::OutlineStyle,
+        })
+    );
+}

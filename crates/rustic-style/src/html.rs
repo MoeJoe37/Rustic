@@ -341,7 +341,8 @@ fn is_zero_width(value: &PropertyValue) -> bool {
 /// value (the root's is compared with the initial value), and any other
 /// property where it differs from its initial value. A border color is listed
 /// only when that side's border width is not zero, since it has no effect
-/// otherwise, and `text-decoration-color` only when a decoration line is
+/// otherwise (`outline-color` likewise with `outline-width`), and
+/// `text-decoration-color` only when a decoration line is
 /// set. Custom properties (which all inherit) follow, in name order, where
 /// they differ from the parent's.
 ///
@@ -352,8 +353,9 @@ pub fn dump_computed_styles(
     max_bytes: usize,
 ) -> Option<String> {
     use PropertyId as P;
-    const BORDERS: [(PropertyId, PropertyId); 4] = [
+    const BORDERS: [(PropertyId, PropertyId); 5] = [
         (P::BorderTopColor, P::BorderTopWidth),
+        (P::OutlineColor, P::OutlineWidth),
         (P::BorderRightColor, P::BorderRightWidth),
         (P::BorderBottomColor, P::BorderBottomWidth),
         (P::BorderLeftColor, P::BorderLeftWidth),

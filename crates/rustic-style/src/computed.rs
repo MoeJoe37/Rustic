@@ -246,6 +246,7 @@ const NEGATIVE_LENGTHS: &[PropertyId] = &[
     PropertyId::Bottom,
     PropertyId::Left,
     PropertyId::TextIndent,
+    PropertyId::OutlineOffset,
 ];
 
 /// `overflow-x`/`-y` (CSS Overflow 3 §3.1): if one axis is `visible` or
@@ -553,6 +554,20 @@ fn compute_values(
         PropertyValue::BorderWidth(BorderWidth::Length(Length::px(px)))
     };
 
+    // `outline-width` resolves like a border width whose style is not `none`.
+    let outline_width = |width: PropertyId| {
+        let px = match style_of(width) {
+            PropertyValue::BorderWidth(BorderWidth::Thin) => 1.0,
+            PropertyValue::BorderWidth(BorderWidth::Thick) => 5.0,
+            PropertyValue::BorderWidth(BorderWidth::Length(l)) => basis.px(*l),
+            PropertyValue::BorderWidth(BorderWidth::Calc(calc)) => {
+                calc.resolve(|l| basis.px(l), None).unwrap_or(0.0).max(0.0)
+            }
+            _ => 3.0,
+        };
+        PropertyValue::BorderWidth(BorderWidth::Length(Length::px(px)))
+    };
+
     // Absolutely positioned and floated boxes are blockified (CSS Display 3
     // §2.7), and absolute positioning makes `float` compute to `none` (CSS 2
     // §9.7).
@@ -624,7 +639,18 @@ fn compute_values(
                     }
                     other => other.clone(),
                 },
-                P::TextDecorationColor => resolve_color(value),
+                P::TextDecorationColor | P::OutlineColor => resolve_color(value),
+                // CSS UI 4 §5.2: computes to 0 when `outline-style` is `none`.
+                P::OutlineWidth => {
+                    if matches!(
+                        style_of(P::OutlineStyle),
+                        PropertyValue::OutlineStyle(rustic_css::OutlineStyle::None)
+                    ) {
+                        PropertyValue::BorderWidth(BorderWidth::Length(Length::px(0.0)))
+                    } else {
+                        outline_width(property)
+                    }
+                }
                 P::FontStretch => match value {
                     PropertyValue::FontStretch(FontStretch::Keyword(k)) => {
                         PropertyValue::FontStretch(FontStretch::Percentage(k.percentage()))

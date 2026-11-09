@@ -6,8 +6,9 @@ use crate::color::{Srgba, srgba};
 use rustic_base::CancellationToken;
 use rustic_css::Overflow;
 use rustic_css::{
-    BorderStyle, Float, Image as CssImage, Position, PropertyId as P, PropertyValue as V,
-    TextDecorationStyle, Visibility, VisualBox, ZIndex,
+    BorderStyle, BorderWidth, Float, Image as CssImage, LengthPercentage, LengthUnit, OutlineStyle,
+    Position, PropertyId as P, PropertyValue as V, TextDecorationStyle, Visibility, VisualBox,
+    ZIndex,
 };
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
@@ -131,6 +132,8 @@ pub enum ItemRole {
     Image,
     /// One text decoration line over one text fragment.
     Decoration,
+    /// A box's outline (one ring, or two for `double`).
+    Outline,
 }
 
 /// A filled area in CSS pixels. Edges are not snapped to device pixels.
@@ -202,6 +205,8 @@ pub enum UnsupportedPaint {
     BorderStyle,
     /// A `text-decoration-style` other than `solid` or `double`.
     DecorationStyle,
+    /// A visible `outline-style` other than `solid`, `double` or `auto`.
+    OutlineStyle,
 }
 
 /// The fonts a text layout was computed with, needed to paint its glyphs.
@@ -520,6 +525,94 @@ impl Builder<'_> {
         Ok(())
     }
 
+    /// The outline of one box fragment (CSS UI 4 §5): a ring of
+    /// `outline-width` outside the border box grown by `outline-offset`
+    /// (which may be negative), in `outline-color`. `auto` paints as
+    /// `solid`; `double` paints two rings of a third of the width each.
+    /// A negative offset that collapses the inner edge fills the area.
+    fn outline(
+        &mut self,
+        fragment: Geometry,
+        source: usize,
+        style: &ComputedStyle,
+    ) -> Result<(), PaintError> {
+        let width = match style.get(P::OutlineWidth) {
+            V::BorderWidth(BorderWidth::Length(l))
+                if l.unit == LengthUnit::Px && l.value.is_finite() =>
+            {
+                l.value.max(0.0)
+            }
+            _ => return Err(PaintError::InvalidInput),
+        };
+        let offset = match style.get(P::OutlineOffset) {
+            V::LengthPercentage(LengthPercentage::Length(l))
+                if l.unit == LengthUnit::Px && l.value.is_finite() =>
+            {
+                l.value
+            }
+            _ => return Err(PaintError::InvalidInput),
+        };
+        if width <= 0.0 {
+            return Ok(());
+        }
+        let double = match style.get(P::OutlineStyle) {
+            V::OutlineStyle(OutlineStyle::None) => return Ok(()),
+            V::OutlineStyle(OutlineStyle::Solid | OutlineStyle::Auto) => false,
+            V::OutlineStyle(OutlineStyle::Double) => true,
+            V::OutlineStyle(_) => {
+                return Err(PaintError::Unsupported {
+                    node: fragment.node,
+                    reason: UnsupportedPaint::OutlineStyle,
+                });
+            }
+            _ => return Err(PaintError::InvalidInput),
+        };
+        let color = color(style, P::OutlineColor)?;
+        // Edges of the border box grown by `by` on every side; an axis that
+        // collapses becomes empty at its center.
+        let (x0, y0, x1, y1) = edges(fragment.border);
+        let grow = |by: f64| -> Result<Option<CssRect>, PaintError> {
+            let axis = |a: f64, b: f64| {
+                let (lo, hi) = (a - by, b + by);
+                if lo <= hi {
+                    (lo, hi)
+                } else {
+                    ((a + b) / 2.0, (a + b) / 2.0)
+                }
+            };
+            let ((l, r), (t, b)) = (axis(x0, x1), axis(y0, y1));
+            let rect = CssRect::new(
+                point(l, t)?,
+                CssSize::new(r - l, b - t).map_err(|_| PaintError::InvalidInput)?,
+            )
+            .map_err(|_| PaintError::InvalidInput)?;
+            Ok((r > l && b > t).then_some(rect))
+        };
+        let rings: &[(f64, f64)] = if double {
+            &[(0.0, 1.0 / 3.0), (2.0 / 3.0, 1.0)]
+        } else {
+            &[(0.0, 1.0)]
+        };
+        for &(from, to) in rings {
+            let Some(outer) = grow(offset + width * (1.0 - from))? else {
+                continue;
+            };
+            let shape = match grow(offset + width * (1.0 - to))? {
+                Some(inner) => Shape::Ring { outer, inner },
+                None => Shape::Rect(outer),
+            };
+            self.push(DisplayItem {
+                source_box: source,
+                node: fragment.node,
+                role: ItemRole::Outline,
+                shape,
+                color,
+                clip: fragment.clip,
+            })?;
+        }
+        Ok(())
+    }
+
     /// One decoration line across `text`'s advance width, placed from the
     /// fragment's face metrics: thickness `font-size / 16`; underline top
     /// `font-size / 10` below the baseline; overline top at the ascent;
@@ -763,7 +856,17 @@ enum Task {
     /// The inline content (inline box backgrounds and borders, then text,
     /// line by line) of these in-flow blocks, in tree order.
     Inline(Vec<usize>, bool),
+    /// The outlines of every box in this stacking context, in tree order,
+    /// after all of its other content (CSS 2.2 Appendix E step 10).
+    Outlines(usize, bool),
     End,
+}
+
+/// A box whose outline a stacking context paints.
+#[derive(Clone, Copy)]
+enum Outlined {
+    Block(usize),
+    Inline(usize),
 }
 
 impl DisplayList {
@@ -1006,6 +1109,16 @@ impl DisplayList {
                 .ok_or(PaintError::InvalidInput)?
                 .push(index);
         }
+        // Outlines by stacking context, in tree order: each block, then the
+        // inline boxes of its lines.
+        let mut outlined: Vec<Vec<Outlined>> = vec![Vec::new(); n];
+        for i in 0..n {
+            outlined[context[i]].push(Outlined::Block(i));
+            for &line in &inline_lines[i] {
+                outlined[context[i]]
+                    .extend(line_inlines[line].iter().map(|&k| Outlined::Inline(k)));
+            }
+        }
         if !layout.texts().is_empty() && fonts.is_none() {
             return Err(PaintError::Font);
         }
@@ -1026,6 +1139,30 @@ impl DisplayList {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             match task {
                 Task::End => builder.command(DisplayCommand::EndGroup)?,
+                Task::Outlines(_, true) => {}
+                Task::Outlines(c, false) => {
+                    for &entry in &std::mem::take(&mut outlined[c]) {
+                        let (geometry, source) = match entry {
+                            Outlined::Block(b) => {
+                                let f = &fragments[b];
+                                (Geometry::block(f), f.source_box())
+                            }
+                            Outlined::Inline(k) => {
+                                let inline = &layout.inlines()[k];
+                                let block = lines
+                                    .get(inline.line())
+                                    .ok_or(PaintError::InvalidInput)?
+                                    .block();
+                                let clip = content_clip(&fragments[block]);
+                                (Geometry::inline(inline, clip), inline.source_box())
+                            }
+                        };
+                        let style = box_style(source)?;
+                        if visible(style) {
+                            builder.outline(geometry, source, style)?;
+                        }
+                    }
+                }
                 Task::Inline(blocks, muted) => {
                     for b in blocks {
                         let fragment = &fragments[b];
@@ -1134,6 +1271,9 @@ impl DisplayList {
                             opacity: opacity[i],
                         })?;
                         stack.push(Task::End);
+                    }
+                    if context[i] == i {
+                        stack.push(Task::Outlines(i, muted));
                     }
                     let l = std::mem::take(&mut layers[i]);
                     // Pushed in reverse so they pop in paint order.
@@ -1277,6 +1417,7 @@ impl DisplayList {
                 ItemRole::Text => "text",
                 ItemRole::Image => "image",
                 ItemRole::Decoration => "decoration",
+                ItemRole::Outline => "outline",
             };
             let shape = match item.shape {
                 Shape::Rect(rect) => format!("rect=({})", r(rect)),

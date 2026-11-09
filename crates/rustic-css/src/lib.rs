@@ -71,10 +71,10 @@ pub use properties::{
     BorderStyle, BorderWidth, BoxSizing, Clear, ContainerType, CssWideKeyword, DeclaredValue,
     Direction, Display, FamilyName, Float, FontSize, FontSizeKeyword, FontStretch,
     FontStretchKeyword, FontStyle, FontVariantCaps, FontWeight, GenericFamily,
-    LengthPercentageOrAuto, LineHeight, MaxSize, Overflow, Position, PropertyDeclaration,
-    PropertyError, PropertyId, PropertyName, PropertyValue, Spacing, TextAlign, TextCase,
-    TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign, VerticalAlignKeyword,
-    Visibility, WhiteSpace, ZIndex, parse_declaration,
+    LengthPercentageOrAuto, LineHeight, MaxSize, OutlineStyle, Overflow, Position,
+    PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,
+    TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, VerticalAlign,
+    VerticalAlignKeyword, Visibility, WhiteSpace, ZIndex, parse_declaration,
 };
 pub use registered::{
     PropertySyntax, RegisteredItem, RegisteredValue, SyntaxComponent, SyntaxMultiplier, SyntaxType,

@@ -145,6 +145,22 @@ keywords! {
 }
 
 keywords! {
+    /// `outline-style` values (CSS UI 4 §5.3).
+    OutlineStyle {
+        None => "none",
+        Auto => "auto",
+        Dotted => "dotted",
+        Dashed => "dashed",
+        Solid => "solid",
+        Double => "double",
+        Groove => "groove",
+        Ridge => "ridge",
+        Inset => "inset",
+        Outset => "outset",
+    }
+}
+
+keywords! {
     /// `border-style` values.
     BorderStyle {
         None => "none",
@@ -560,6 +576,8 @@ pub enum PropertyValue {
     BorderWidth(BorderWidth),
     /// `border-*-style`.
     BorderStyle(BorderStyle),
+    /// `outline-style`.
+    OutlineStyle(OutlineStyle),
     /// `box-sizing`.
     BoxSizing(BoxSizing),
     /// `font-size`.
@@ -758,6 +776,10 @@ property_ids! {
     AlignSelf => "align-self", false;
     RowGap => "row-gap", false;
     ColumnGap => "column-gap", false;
+    OutlineWidth => "outline-width", false;
+    OutlineStyle => "outline-style", false;
+    OutlineColor => "outline-color", false;
+    OutlineOffset => "outline-offset", false;
 }
 
 impl PropertyId {
@@ -830,6 +852,10 @@ impl PropertyId {
                 PropertyValue::TextDecorationStyle(TextDecorationStyle::Solid)
             }
             P::TextDecorationColor => PropertyValue::Color(Color::CurrentColor),
+            P::OutlineWidth => PropertyValue::BorderWidth(BorderWidth::Medium),
+            P::OutlineStyle => PropertyValue::OutlineStyle(OutlineStyle::None),
+            P::OutlineColor => PropertyValue::Color(Color::CurrentColor),
+            P::OutlineOffset => PropertyValue::LengthPercentage(zero),
             P::BackgroundImage => PropertyValue::BackgroundImage(vec![Image::None]),
             P::BackgroundPosition => {
                 PropertyValue::BackgroundPosition(vec![PositionValue::top_left()])
@@ -1097,6 +1123,7 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     const FLEX: &[P] = &[P::FlexGrow, P::FlexShrink, P::FlexBasis];
     const FLEX_FLOW: &[P] = &[P::FlexDirection, P::FlexWrap];
     const GAP: &[P] = &[P::RowGap, P::ColumnGap];
+    const OUTLINE: &[P] = &[P::OutlineWidth, P::OutlineStyle, P::OutlineColor];
     const TEXT_DECORATION: &[P] = &[
         P::TextDecorationLine,
         P::TextDecorationStyle,
@@ -1139,6 +1166,7 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "flex-flow" => FLEX_FLOW,
         "gap" => GAP,
         "text-decoration" => TEXT_DECORATION,
+        "outline" => OUTLINE,
         "font" => FONT,
         "background" => BACKGROUND,
         _ => {
@@ -1740,6 +1768,14 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
             PropertyValue::TextDecorationStyle(TextDecorationStyle::from_name(name()?)?)
         }
         P::TextDecorationColor => PropertyValue::Color(Color::parse(value)?),
+        P::OutlineWidth => PropertyValue::BorderWidth(border_width(value)?),
+        P::OutlineStyle => PropertyValue::OutlineStyle(OutlineStyle::from_name(ident(value)?)?),
+        P::OutlineColor => PropertyValue::Color(Color::parse(value)?),
+        P::OutlineOffset => PropertyValue::LengthPercentage(if math_function(value) {
+            LengthPercentage::Calc(Box::new(Calc::parse_length(value)?))
+        } else {
+            LengthPercentage::Length(length(value)?)
+        }),
         P::Color
         | P::BackgroundColor
         | P::BorderTopColor
@@ -1835,6 +1871,35 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             Some(vec![PropertyValue::Overflow(x), PropertyValue::Overflow(y)])
         }
         "text-decoration" => text_decoration(parts),
+        "outline" => {
+            let (mut width, mut style, mut color) = (None, None, None);
+            for v in parts {
+                if width.is_none() {
+                    if let Some(w) = border_width(v) {
+                        width = Some(w);
+                        continue;
+                    }
+                }
+                if style.is_none() {
+                    if let Some(s) = ident(v).and_then(OutlineStyle::from_name) {
+                        style = Some(s);
+                        continue;
+                    }
+                }
+                if color.is_none() {
+                    if let Some(c) = Color::parse(v) {
+                        color = Some(c);
+                        continue;
+                    }
+                }
+                return None;
+            }
+            Some(vec![
+                PropertyValue::BorderWidth(width.unwrap_or(BorderWidth::Medium)),
+                PropertyValue::OutlineStyle(style.unwrap_or(OutlineStyle::None)),
+                PropertyValue::Color(color.unwrap_or(Color::CurrentColor)),
+            ])
+        }
         "container" => {
             let (names, kind) = match parts
                 .iter()
@@ -2022,6 +2087,7 @@ impl fmt::Display for PropertyValue {
                 f.write_str(&words.join(" "))
             }
             Self::TextDecorationStyle(v) => write!(f, "{v}"),
+            Self::OutlineStyle(v) => write!(f, "{v}"),
             Self::FontVariantCaps(v) => write!(f, "{v}"),
             Self::FontStretch(FontStretch::Keyword(k)) => write!(f, "{k}"),
             Self::FontStretch(FontStretch::Percentage(p)) => {

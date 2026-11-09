@@ -645,3 +645,43 @@ fn reftest_rejects_output_and_invalid_arguments() {
         assert!(output.stdout.is_empty());
     }
 }
+
+#[test]
+fn hit_test_reports_the_topmost_box_at_each_point() {
+    let input = fixture("paint.html");
+    let input = input.to_str().unwrap();
+    let output = rustic(&[
+        "hit-test",
+        "--at",
+        "20,20",
+        "--at",
+        "30,32",
+        "--at",
+        "5,5",
+        "--at",
+        "1280,0",
+        "--at",
+        "0.5,719.9",
+        input,
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "hit 20,20 box=2 node=8:1 div\nhit 30,32 box=3 node=9:1 div\nhit 5,5 box=1 node=7:1 body\n\
+         hit 1280,0 none\nhit 0.5,719.9 box=0 node=2:1 html\n"
+    );
+    let output = rustic(&["hit-test", "--at", "1,1", "--max-output-bytes", "5", input]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    for args in [
+        vec!["hit-test", input],
+        vec!["hit-test", "--at", "1", input],
+        vec!["hit-test", "--at", "NaN,1", input],
+        vec!["hit-test", "--at"],
+        vec!["hit-test", "--at", "1,1"],
+    ] {
+        let output = rustic(&args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        assert!(output.stdout.is_empty());
+    }
+}

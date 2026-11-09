@@ -138,6 +138,41 @@ pub struct DisplayList {
     viewport: CssSize,
     canvas: Srgba,
     commands: Vec<DisplayCommand>,
+    /// Hit-testable border boxes in paint order.
+    hits: Vec<HitRegion>,
+    /// The root fragment, the target when no box is hit.
+    root: Option<Hit>,
+}
+
+/// The box a hit test found.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Hit {
+    /// Index of the box in the [`BoxTree`].
+    pub source_box: usize,
+    /// The element that generated the box.
+    pub node: NodeId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct HitRegion {
+    hit: Hit,
+    border: CssRect,
+    clip: Clip,
+}
+
+impl HitRegion {
+    fn contains(&self, x: f64, y: f64) -> bool {
+        let (left, top, right, bottom) = edges(self.border);
+        let inside = |range: Option<rustic_layout::AxisRange>, v: f64| {
+            range.is_none_or(|r| r.start.get() <= v && v < r.end.get())
+        };
+        left <= x
+            && x < right
+            && top <= y
+            && y < bottom
+            && inside(self.clip.x, x)
+            && inside(self.clip.y, y)
+    }
 }
 
 fn color(style: &ComputedStyle, property: P) -> Result<Srgba, PaintError> {
@@ -327,9 +362,11 @@ struct Layers {
     positive: Vec<usize>,
 }
 
+/// One step of the paint-order walk. `bool` is whether painting is muted
+/// (inside an `opacity: 0` context, which still takes hits).
 enum Task {
-    Layer(usize),
-    Own(usize),
+    Layer(usize, bool),
+    Own(usize, bool),
     End,
 }
 
@@ -495,26 +532,37 @@ impl DisplayList {
         }
 
         // Expand layers with an explicit stack: no content-controlled recursion.
-        let mut stack: Vec<Task> = tops.iter().rev().map(|&i| Task::Layer(i)).collect();
+        let mut stack: Vec<Task> = tops.iter().rev().map(|&i| Task::Layer(i, false)).collect();
+        let mut hits = Vec::new();
         while let Some(task) = stack.pop() {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             match task {
                 Task::End => builder.command(DisplayCommand::EndGroup)?,
-                Task::Own(i) => {
+                Task::Own(i, muted) => {
                     let fragment = &fragments[i];
                     let style = style_of(fragment)?;
                     if matches!(style.get(P::Visibility), V::Visibility(Visibility::Visible)) {
+                        hits.push(HitRegion {
+                            hit: Hit {
+                                source_box: fragment.source_box(),
+                                node: fragment.node(),
+                            },
+                            border: fragment.border(),
+                            clip: fragment.clip(),
+                        });
+                        if muted {
+                            continue;
+                        }
                         if canvas_source != Some(i) {
                             builder.background(fragment, fragment.source_box(), style)?;
                         }
                         builder.border(fragment, fragment.source_box(), style)?;
                     }
                 }
-                Task::Layer(i) => {
-                    if opacity[i] <= 0.0 {
-                        continue;
-                    }
-                    let group = opacity[i] < 1.0;
+                Task::Layer(i, muted) => {
+                    // `opacity: 0` paints nothing but still takes hits.
+                    let muted = muted || opacity[i] <= 0.0;
+                    let group = !muted && opacity[i] < 1.0;
                     if group {
                         builder.command(DisplayCommand::BeginGroup {
                             source_box: fragments[i].source_box(),
@@ -525,19 +573,28 @@ impl DisplayList {
                     }
                     let l = std::mem::take(&mut layers[i]);
                     // Pushed in reverse so they pop in paint order.
-                    stack.extend(l.positive.iter().rev().map(|&c| Task::Layer(c)));
-                    stack.extend(l.zero.iter().rev().map(|&c| Task::Layer(c)));
-                    stack.extend(l.floats.iter().rev().map(|&c| Task::Layer(c)));
-                    stack.extend(l.blocks.iter().rev().map(|&c| Task::Own(c)));
-                    stack.extend(l.negative.iter().rev().map(|&c| Task::Layer(c)));
-                    stack.push(Task::Own(i));
+                    stack.extend(l.positive.iter().rev().map(|&c| Task::Layer(c, muted)));
+                    stack.extend(l.zero.iter().rev().map(|&c| Task::Layer(c, muted)));
+                    stack.extend(l.floats.iter().rev().map(|&c| Task::Layer(c, muted)));
+                    stack.extend(l.blocks.iter().rev().map(|&c| Task::Own(c, muted)));
+                    stack.extend(l.negative.iter().rev().map(|&c| Task::Layer(c, muted)));
+                    stack.push(Task::Own(i, muted));
                 }
             }
         }
+        let root = fragments
+            .first()
+            .filter(|f| f.parent().is_none())
+            .map(|f| Hit {
+                source_box: f.source_box(),
+                node: f.node(),
+            });
         Ok(Self {
             viewport,
             canvas,
             commands: builder.commands,
+            hits,
+            root,
         })
     }
 
@@ -554,6 +611,28 @@ impl DisplayList {
     /// Paint commands, in paint order.
     pub fn commands(&self) -> &[DisplayCommand] {
         &self.commands
+    }
+
+    /// The topmost box whose border box contains `point` (CSS pixels from the
+    /// viewport origin) and whose overflow clips do not exclude it, in paint
+    /// order, as `document.elementFromPoint` would find it among blocks.
+    /// `visibility: hidden` boxes are skipped (their visible descendants are
+    /// not); `opacity: 0` boxes still take hits. A point inside the viewport
+    /// that hits no box finds the root element; a point outside it, or a
+    /// list with no boxes, finds nothing. Edges are half-open: a box covers
+    /// `left <= x < right` and `top <= y < bottom`.
+    pub fn hit_test(&self, point: CssPoint) -> Option<Hit> {
+        let (x, y) = (point.x.get(), point.y.get());
+        let (width, height) = (self.viewport.width().get(), self.viewport.height().get());
+        if !(0.0..width).contains(&x) || !(0.0..height).contains(&y) {
+            return None;
+        }
+        self.hits
+            .iter()
+            .rev()
+            .find(|region| region.contains(x, y))
+            .map(|region| region.hit)
+            .or(self.root)
     }
 
     /// Copies of the fills alone, in paint order (group markers skipped).

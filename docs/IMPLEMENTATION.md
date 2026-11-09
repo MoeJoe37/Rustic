@@ -908,6 +908,13 @@ and 2 under `cargo test`. `paint.conformance` credits its reftest step;
 deterministic clocks, allocation counters, reference chains and an imported WPT
 reftest subset remain for later REN-07 work. See [PAINT.md](PAINT.md#reftests).
 
+## REN-06a — Hit testing
+
+The display list records every visible box's border rectangle and clip in
+paint order, and `DisplayList::hit_test` finds the topmost one at a point;
+`rustic hit-test` prints it. `paint.hit` credits its hit-testing step; resize
+and zoom relayout remain. See [PAINT.md](PAINT.md#hit-testing).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

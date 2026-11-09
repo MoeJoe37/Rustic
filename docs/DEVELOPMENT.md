@@ -49,7 +49,8 @@ unsupported inline/text and other formatting rather than emitting partial output
 PNG through the CPU rasterizer ([PAINT.md](PAINT.md)). `reftest` renders a test
 page and its `rel=match`/`rel=mismatch` references and compares the pixels within
 the test's fuzzy tolerance; `cargo test -p rustic-cli --test reftests` runs the
-checked suite in `crates/rustic-cli/tests/reftests`.
+checked suite in `crates/rustic-cli/tests/reftests`. `hit-test --at X,Y` prints
+the topmost box at each point.
 While hosted Actions is unavailable, the maintainer has authorized sandbox-gated
 merges: run the local gates and compatibility/compile checks, record their
 actual scope, push the checked source to `feature`, and then merge that exact

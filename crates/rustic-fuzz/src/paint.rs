@@ -137,6 +137,30 @@ impl Target for PaintTarget {
         if depth != 0 {
             return Err("unclosed group".into());
         }
+        // Every hit inside the viewport names a laid-out box; outside, none.
+        for (x, y) in [
+            (0.0, 0.0),
+            (3.5, 7.25),
+            (18.0, 11.0),
+            (36.9, 22.9),
+            (37.0, 1.0),
+        ] {
+            let point = rustic_layout::CssPoint {
+                x: rustic_layout::CssPx::new(x).map_err(|e| e.to_string())?,
+                y: rustic_layout::CssPx::new(y).map_err(|e| e.to_string())?,
+            };
+            let known = |hit: rustic_paint::Hit| {
+                layout
+                    .fragments()
+                    .iter()
+                    .any(|f| f.node() == hit.node && f.source_box() == hit.source_box)
+            };
+            match list.hit_test(point) {
+                Some(hit) if x >= 37.0 => return Err(format!("hit {hit:?} outside the viewport")),
+                Some(hit) if !known(hit) => return Err("hit a box without a fragment".into()),
+                _ => {}
+            }
+        }
         for (scale, size) in [(1.0, (37, 23)), (1.5, (56, 35))] {
             let scale = DeviceScale::new(scale).map_err(|e| e.to_string())?;
             let surface = rasterize(&list, scale, RasterLimits::default(), &cancel)

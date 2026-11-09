@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "b486a310735dd70892c863655589147261f0f2c00f127b287082b0bd139b7759",
-  "percent": "27.61",
+  "source_fingerprint": "dca9767bfbb4548388b19ffe5a37b6911c6c99e503548bc1a426418e235d02be",
+  "percent": "27.83",
   "verified_percent": "21.25",
-  "partial_percent": "6.36",
+  "partial_percent": "6.58",
   "completed": 37,
-  "in_progress": 15,
+  "in_progress": 16,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 1,
       "total": 17,
-      "percent": "58.22",
+      "percent": "60.04",
       "verified_percent": "7.99",
-      "partial_percent": "50.23"
+      "partial_percent": "52.05"
     },
     {
       "id": "M4",
@@ -2613,9 +2613,39 @@
           "label": "Hit testing and resize/zoom geometry",
           "size": 2,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "hit",
+              "label": "Paint-order hit testing with clips and visibility",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "pub fn hit_test"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn hit_testing_follows_paint_order_clips_and_visibility"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn hit_test_reports_the_topmost_box_at_each_point"
+                }
+              ]
+            },
+            {
+              "id": "resize",
+              "label": "Viewport resize and zoom relayout",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.44"
         },
         {
@@ -2698,12 +2728,12 @@
       ],
       "points": 27,
       "completed": 0,
-      "in_progress": 5,
+      "in_progress": 6,
       "total": 7,
-      "contribution": "2.00",
-      "percent": "33.33",
+      "contribution": "2.22",
+      "percent": "37.03",
       "verified_percent": "0.00",
-      "partial_percent": "33.33"
+      "partial_percent": "37.03"
     },
     {
       "id": "js",

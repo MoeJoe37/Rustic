@@ -26,6 +26,7 @@ Usage:
   rustic dump-paint [OPTIONS] [--] <file>
   rustic render --output <png> [--scale N] [OPTIONS] [--] <file>
   rustic reftest [--scale N] [OPTIONS] [--] <test>
+  rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
@@ -57,6 +58,10 @@ the same way and compares the pixels, allowing the differences that
 number N meaning 0-N, or a range N-M). References load only from the test's
 directory or below it. It prints one line per reference and a final PASS or
 FAIL line, and exits 0 when every reference holds and 1 otherwise.
+hit-test lays out the file like dump-paint and prints, for each --at point in
+CSS pixels, the topmost box there in paint order (honoring overflow clips and
+visibility; the root element when no box is hit), or none outside the
+1280x720 viewport.
 
 Options for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
@@ -97,7 +102,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block background/border painting via dump-paint and render, reftests via reftest; text layout, JavaScript and networking: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block background/border painting via dump-paint and render, reftests via reftest, hit testing via hit-test; text layout, JavaScript and networking: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -118,6 +123,9 @@ fn main() -> ExitCode {
     }
     if args[0] == "render" {
         return render_command(&args[1..]);
+    }
+    if args[0] == "hit-test" {
+        return hit_test_command(&args[1..]);
     }
     if args[0] == "reftest" {
         return reftest_command(&args[1..]);
@@ -143,9 +151,19 @@ fn dump_command(
             return ExitCode::from(2);
         }
     };
-    match load(command, limits, &path, |parsed, path| {
+    dump_command_with(command, limits, &path, |parsed, path| {
         dump(parsed, path, limits)
-    }) {
+    })
+}
+
+/// Load a document, run `dump` and write its output to stdout.
+fn dump_command_with(
+    command: &str,
+    limits: LoaderLimits,
+    path: &OsString,
+    dump: impl FnOnce(&ParsedDocument, &Path) -> Result<String, LoadError>,
+) -> ExitCode {
+    match load(command, limits, path, dump) {
         Ok(dump) => {
             let mut stdout = io::stdout().lock();
             if stdout
@@ -267,6 +285,48 @@ fn render_command(args: &[OsString]) -> ExitCode {
         return ExitCode::from(1);
     }
     ExitCode::SUCCESS
+}
+
+fn hit_test_command(args: &[OsString]) -> ExitCode {
+    let mut points = Vec::new();
+    let mut rest = Vec::new();
+    let mut iter = args.iter();
+    let parsed: Result<(), String> = (|| {
+        while let Some(arg) = iter.next() {
+            match arg.to_str() {
+                Some("--") => {
+                    rest.push(arg.clone());
+                    rest.extend(iter.by_ref().cloned());
+                }
+                Some("--at") => {
+                    let point = iter
+                        .next()
+                        .and_then(|v| v.to_str())
+                        .and_then(|v| v.split_once(','))
+                        .and_then(|(x, y)| Some((x.parse::<f64>().ok()?, y.parse::<f64>().ok()?)))
+                        .filter(|(x, y)| x.is_finite() && y.is_finite())
+                        .ok_or("--at requires a point X,Y of finite numbers")?;
+                    points.push(point);
+                }
+                _ => rest.push(arg.clone()),
+            }
+        }
+        if points.is_empty() {
+            return Err("missing --at".into());
+        }
+        Ok(())
+    })();
+    let parsed = parsed.and_then(|()| parse_dump_args(&rest));
+    let (limits, path) = match parsed {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("rustic hit-test: {message}\n\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+    dump_command_with("hit-test", limits, &path, |parsed, path| {
+        loader::hit_test(parsed, path, limits, &points)
+    })
 }
 
 fn reftest_command(args: &[OsString]) -> ExitCode {

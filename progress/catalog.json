@@ -2353,8 +2353,38 @@
           "label": "Hit testing and resize/zoom geometry",
           "size": 2,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "hit",
+              "label": "Paint-order hit testing with clips and visibility",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/display.rs",
+                  "marker": "pub fn hit_test"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn hit_testing_follows_paint_order_clips_and_visibility"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn hit_test_reports_the_topmost_box_at_each_point"
+                }
+              ]
+            },
+            {
+              "id": "resize",
+              "label": "Viewport resize and zoom relayout",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "paint.formats",

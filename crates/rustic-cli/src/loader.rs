@@ -488,6 +488,44 @@ pub fn dump_paint(
         .map_err(LoadError::Paint)
 }
 
+/// Hit-test each point (CSS pixels from the viewport origin) against the
+/// display list and report one line per point: the box, node and element
+/// name found, or `none` outside the viewport.
+pub fn hit_test(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    points: &[(f64, f64)],
+) -> Result<String, LoadError> {
+    let list = display_list(parsed, path, limits)?;
+    let mut out = String::new();
+    for &(x, y) in points {
+        let point = rustic_layout::CssPx::new(x)
+            .and_then(|x| Ok((x, rustic_layout::CssPx::new(y)?)))
+            .map(|(x, y)| rustic_layout::CssPoint { x, y });
+        let line = match point.ok().and_then(|point| list.hit_test(point)) {
+            Some(hit) => {
+                let name = match parsed.document().node(hit.node).map(|n| n.kind()) {
+                    Ok(rustic_dom::NodeKind::Element(e)) => e.name().local().to_string(),
+                    _ => String::from("?"),
+                };
+                format!(
+                    "hit {x},{y} box={} node={}:{} {name}\n",
+                    hit.source_box,
+                    hit.node.slot(),
+                    hit.node.generation()
+                )
+            }
+            None => format!("hit {x},{y} none\n"),
+        };
+        if out.len() + line.len() > limits.max_dump_bytes {
+            return Err(LoadError::Dump(DumpError::OutputLimit));
+        }
+        out.push_str(&line);
+    }
+    Ok(out)
+}
+
 /// Rasterize the display list at `scale`. Only block backgrounds and solid
 /// borders are painted.
 pub fn render_surface(

@@ -651,3 +651,67 @@ fn png_output_round_trips_through_the_bounded_decoder() {
         }
     }
 }
+
+fn hit(p: &Page, list: &DisplayList, x: f64, y: f64) -> Option<String> {
+    let point = rustic_layout::CssPoint {
+        x: rustic_layout::CssPx::new(x).unwrap(),
+        y: rustic_layout::CssPx::new(y).unwrap(),
+    };
+    let found = list.hit_test(point)?;
+    assert_eq!(p.tree.boxes()[found.source_box].node(), found.node);
+    let doc = &p.doc;
+    let name = match doc.node(found.node).unwrap().kind() {
+        NodeKind::Element(e) => e
+            .attributes()
+            .iter()
+            .find(|a| a.name().local() == "id")
+            .map(|a| String::from_utf16_lossy(a.value().as_units()))
+            .unwrap_or_else(|| e.name().local().to_string()),
+        _ => unreachable!("only elements generate boxes"),
+    };
+    Some(name)
+}
+
+#[test]
+fn hit_testing_follows_paint_order_clips_and_visibility() {
+    let p = page(
+        "<div id=under></div><div id=over></div>\
+         <div id=clip><div id=wide></div></div>\
+         <div id=hidden><div id=shown></div></div>\
+         <div id=ghost></div><div id=neg></div>",
+        &format!(
+            "{RESET} div {{ position: absolute; width: 10px; height: 10px }}
+             #under {{ left: 0; top: 0; z-index: 2 }}
+             #over {{ left: 5px; top: 0; z-index: 1 }}
+             #clip {{ left: 0; top: 20px; overflow: hidden }}
+             #wide {{ left: 0; top: 0; width: 50px }}
+             #hidden {{ left: 30px; top: 0; visibility: hidden }}
+             #shown {{ left: 0; top: 0; width: 5px; visibility: visible }}
+             #ghost {{ left: 0; top: 40px; opacity: 0 }}
+             #neg {{ left: 20px; top: 40px; z-index: -1 }}"
+        ),
+        60.0,
+        60.0,
+    );
+    let list = p.list().unwrap();
+    let at = |x, y| hit(&p, &list, x, y);
+    // z-index 2 is above z-index 1 where they overlap, despite tree order.
+    assert_eq!(at(7.0, 5.0).as_deref(), Some("under"));
+    assert_eq!(at(12.0, 5.0).as_deref(), Some("over"));
+    // Half-open edges: x = 15 is just outside #over.
+    assert_eq!(at(15.0, 5.0).as_deref(), Some("html"));
+    // Overflow clips cut hits as they cut paint.
+    assert_eq!(at(5.0, 25.0).as_deref(), Some("wide"));
+    assert_eq!(at(20.0, 25.0).as_deref(), Some("html"));
+    // A hidden box is not a target; its visible child is.
+    assert_eq!(at(32.0, 5.0).as_deref(), Some("shown"));
+    assert_eq!(at(37.0, 5.0).as_deref(), Some("html"));
+    // opacity: 0 paints nothing but still takes hits.
+    assert!(list.items().iter().all(|i| i.node != p.id("ghost")));
+    assert_eq!(at(5.0, 45.0).as_deref(), Some("ghost"));
+    // Negative z-index sits above the root's own box.
+    assert_eq!(at(25.0, 45.0).as_deref(), Some("neg"));
+    // Outside the viewport nothing is hit.
+    assert_eq!(at(60.0, 5.0), None);
+    assert_eq!(at(-1.0, 5.0), None);
+}

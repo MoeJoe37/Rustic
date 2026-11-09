@@ -131,6 +131,19 @@ streams for stored, fixed and dynamic blocks; a decompression-bomb test; a
 round trip of `rustic render` output through the decoder; and the `codec-png`
 fuzz target seeded with PngSuite.
 
+## Hit testing
+
+`DisplayList::hit_test` returns the topmost box whose border box contains a
+point, walking boxes in reverse paint order, so z-index, floats and
+positioned boxes resolve overlaps the way painting does. Overflow clips
+exclude points as they exclude paint. `visibility: hidden` boxes are not
+targets (their visible descendants are); `opacity: 0` boxes paint nothing but
+still take hits. Edges are half-open. A point inside the viewport that hits
+no box finds the root element; a point outside it finds nothing. `rustic
+hit-test --at X,Y <file>` prints the result for each point. Text, inline
+boxes, `pointer-events`, scrolling offsets, transforms and rounded clips are
+not considered yet.
+
 ## Reftests
 
 `rustic reftest [--scale N] <test.html>` renders a test page and each

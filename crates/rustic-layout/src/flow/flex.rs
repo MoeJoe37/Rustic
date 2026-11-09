@@ -82,6 +82,10 @@ struct Item {
     cross: f64,
     main_pos: f64,
     cross_pos: f64,
+    /// First and last line-box baselines below the content-box top, from
+    /// the latest layout (`None`: synthesized from the border box).
+    first_baseline: Option<f64>,
+    last_baseline: Option<f64>,
 }
 
 impl Item {
@@ -113,6 +117,24 @@ impl Item {
     }
     fn cross_outer(&self, row: bool) -> f64 {
         self.main_outer(!row)
+    }
+    fn content_top(&self) -> f64 {
+        self.margin.top.get() + self.border.top.get() + self.padding.top.get()
+    }
+    /// The first baseline below the margin-box top (CSS Flexbox 1 §8.5):
+    /// the first line box, else synthesized from the border-box bottom.
+    fn baseline_above(&self) -> f64 {
+        match self.first_baseline {
+            Some(b) => self.content_top() + b,
+            None => self.margin.top.get() + self.cross + self.vertical_extras(),
+        }
+    }
+    /// The last baseline above the margin-box bottom.
+    fn baseline_below(&self, row: bool) -> f64 {
+        match self.last_baseline {
+            Some(b) => self.cross + self.cross_outer(row) - (self.content_top() + b),
+            None => self.margin.bottom.get(),
+        }
     }
     /// Whether either cross-axis margin is `auto`.
     fn cross_auto(&self, row: bool) -> bool {
@@ -424,6 +446,8 @@ impl Engine<'_, '_> {
                         cross: 0.0,
                         main_pos: 0.0,
                         cross_pos: 0.0,
+                        first_baseline: None,
+                        last_baseline: None,
                     });
                 }
             }
@@ -534,12 +558,17 @@ impl Engine<'_, '_> {
         node: usize,
         natural: f64,
     ) -> Result<(), FlowError> {
+        let first = self.content_baseline(node, false)?;
+        let last = self.content_baseline(node, true)?;
         let run = &mut self.flexes[k];
         let item = run.current.take().ok_or(FlowError::InvalidSnapshot)?;
         if run.items[item].node != node {
             return Err(FlowError::InvalidSnapshot);
         }
-        run.items[item].natural = natural;
+        let entry = &mut run.items[item];
+        entry.natural = natural;
+        entry.first_baseline = first;
+        entry.last_baseline = last;
         Ok(())
     }
 
@@ -717,8 +746,7 @@ impl Engine<'_, '_> {
             for item in &run.items[line.start..line.end] {
                 let outer = item.cross + item.cross_outer(row);
                 if row && matches!(item.align.keyword, K::Baseline) && !item.cross_auto(row) {
-                    // Synthesized from the border-box bottom (no text yet).
-                    let baseline = item.margin.top.get() + item.cross + item.vertical_extras();
+                    let baseline = item.baseline_above();
                     above = above.max(baseline);
                     below = below.max(outer - baseline);
                 } else {
@@ -980,10 +1008,10 @@ impl Engine<'_, '_> {
             let (mut above, mut below_last) = (0.0_f64, 0.0_f64);
             for item in items.iter() {
                 if row && item.align.keyword == K::Baseline && !item.cross_auto(row) {
-                    above = above.max(item.margin.top.get() + item.cross + item.vertical_extras());
+                    above = above.max(item.baseline_above());
                 }
                 if row && item.align.keyword == K::LastBaseline && !item.cross_auto(row) {
-                    below_last = below_last.max(item.margin.bottom.get());
+                    below_last = below_last.max(item.baseline_below(row));
                 }
             }
             for item in items.iter_mut() {
@@ -1010,9 +1038,9 @@ impl Engine<'_, '_> {
                     }
                     0.0
                 } else if row && item.align.keyword == K::Baseline {
-                    above - (item.margin.top.get() + item.cross + item.vertical_extras())
+                    above - item.baseline_above()
                 } else if row && item.align.keyword == K::LastBaseline {
-                    free - (below_last - item.margin.bottom.get())
+                    free - (below_last - item.baseline_below(row))
                 } else {
                     let mut a = item.align;
                     if matches!(
@@ -1110,6 +1138,8 @@ mod tests {
             cross: 0.0,
             main_pos: 0.0,
             cross_pos: 0.0,
+            first_baseline: None,
+            last_baseline: None,
         }
     }
 

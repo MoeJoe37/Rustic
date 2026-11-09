@@ -16,6 +16,8 @@ dependencies = [
  "rustic-engine",
  "rustic-html",
  "rustic-layout",
+ "rustic-paint",
+ "rustic-raster",
  "rustic-style",
  "rustic-url",
 ]
@@ -47,6 +49,8 @@ dependencies = [
  "rustic-dom",
  "rustic-html",
  "rustic-layout",
+ "rustic-paint",
+ "rustic-raster",
  "rustic-style",
  "rustic-url",
 ]
@@ -67,6 +71,30 @@ dependencies = [
  "rustic-css",
  "rustic-dom",
  "rustic-html",
+ "rustic-style",
+]
+
+[[package]]
+name = "rustic-paint"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-css",
+ "rustic-dom",
+ "rustic-layout",
+ "rustic-style",
+]
+
+[[package]]
+name = "rustic-raster"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-css",
+ "rustic-dom",
+ "rustic-html",
+ "rustic-layout",
+ "rustic-paint",
  "rustic-style",
 ]
 

@@ -165,7 +165,9 @@ Source indexes and continuation edges preserve identity without DOM reparenting.
 Anonymous styles inherit from their enclosing non-anonymous source and reset
 non-inherited values. Separate box/depth/work limits bound expansion; both trees
 use flat arenas. See [LAYOUT.md](LAYOUT.md). Other formatting contexts, inline
-geometry and general fragments remain pending. Generate a box tree distinct from DOM,
+geometry and general fragments remain pending. REN-04a/REN-05a add
+`rustic-paint` (display lists in paint order) and `rustic-raster` (exact-area CPU
+fills and PNG); see [PAINT.md](PAINT.md). Generate a box tree distinct from DOM,
 then fragments for block/inline formatting, anonymous boxes, line boxes, replaced
 elements, and later fragmentation. Distinguish CSS pixels, device pixels, logical
 inline/block axes, and font units in types. Resolve containing blocks, intrinsic

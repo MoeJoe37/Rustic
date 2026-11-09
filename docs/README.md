@@ -56,6 +56,7 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Weekly Rust/action dependency update checks | Configured | [Dependabot](../.github/dependabot.yml) |
 | Checked CSS/device geometry, principal boxes and block widths | Initial M3 slice (REN-01a) | `rustic-layout`, `dump-boxes`; [contracts and tests](LAYOUT.md) |
 | Block used rectangles, adjoining margin collapse and `dump-layout` | REN-01b/REN-02a static block subset; inline/special/positioned content remains unsupported | [Layout reference and flow tests](LAYOUT.md) |
+| Display list, CPU rasterizer, PNG output, `dump-paint` and `rustic render` | REN-04a/REN-05a: block backgrounds and solid borders; text/images/opacity unsupported | `rustic-paint`, `rustic-raster`; [paint reference and tests](PAINT.md) |
 | Remaining HTML tokenizer/tree rules, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | Pinned WPT URL data subset | Implemented offline runner | 887 selected URL records, including file and non-ASCII URLs; no full browser harness |

@@ -507,3 +507,98 @@ fn formatting_help_defaults_match_library_budgets() {
         );
     }
 }
+
+#[test]
+fn dump_paint_matches_the_reviewed_display_list_and_output_budget() {
+    let input = fixture("paint.html");
+    let input = input.to_str().unwrap();
+    let expected = fs::read(fixture("paint.dump")).unwrap();
+    for chunk in ["1", "65536"] {
+        let output = rustic(&["dump-paint", "--chunk-bytes", chunk, input]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(output.stdout, expected);
+    }
+    let short = (expected.len() - 1).to_string();
+    let output = rustic(&["dump-paint", "--max-output-bytes", &short, input]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
+fn render_writes_a_deterministic_png_at_the_requested_scale() {
+    let input = fixture("paint.html");
+    let input = input.to_str().unwrap();
+    let base = std::env::temp_dir().join(format!("rustic-cli-render-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    let out = base.join("out.png");
+    let out_str = out.to_str().unwrap();
+    let output = rustic(&["render", "--scale", "0.5", "--output", out_str, input]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(output.stdout.is_empty());
+    let png = fs::read(&out).unwrap();
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+    // IHDR: 640x360 RGBA8.
+    assert_eq!(&png[16..24], &[0, 0, 2, 128, 0, 0, 1, 104]);
+    assert_eq!(&png[24..26], &[8, 6]);
+    let again = base.join("again.png");
+    let output = rustic(&[
+        "render",
+        input,
+        "--output",
+        again.to_str().unwrap(),
+        "--scale",
+        "0.5",
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(fs::read(&again).unwrap(), png);
+
+    // The PNG counts against the output budget; nothing is written on failure.
+    let limited = base.join("limited.png");
+    let short = (png.len() - 1).to_string();
+    let output = rustic(&[
+        "render",
+        "--scale",
+        "0.5",
+        "--max-output-bytes",
+        &short,
+        "--output",
+        limited.to_str().unwrap(),
+        input,
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(!limited.exists());
+
+    // Text is not painted yet, so the load fails without creating a file.
+    let text = base.join("text.html");
+    fs::write(&text, "<p>hello</p>").unwrap();
+    let missing = base.join("missing.png");
+    let output = rustic(&[
+        "render",
+        "--output",
+        missing.to_str().unwrap(),
+        text.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(!missing.exists());
+    fs::remove_dir_all(&base).unwrap();
+}
+
+#[test]
+fn render_rejects_missing_output_and_invalid_scales() {
+    let input = fixture("paint.html");
+    let input = input.to_str().unwrap();
+    for args in [
+        vec!["render", input],
+        vec!["render", "--output"],
+        vec!["render", "--output", "x.png", "--scale", "0", input],
+        vec!["render", "--output", "x.png", "--scale", "65", input],
+        vec!["render", "--output", "x.png", "--scale", "NaN", input],
+        vec!["render", "--output", "x.png", "--scale", "inf", input],
+        vec!["render", "--output", "x.png", "--scale"],
+    ] {
+        let output = rustic(&args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        assert!(output.stdout.is_empty());
+    }
+    assert!(!Path::new("x.png").exists());
+}

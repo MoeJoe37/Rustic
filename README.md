@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 21.61%** (20.27% verified complete + 1.34% partial credit) — 36/172 capabilities complete and 3 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 9.19% done.
+**Overall engine completion: 22.56%** (20.27% verified complete + 2.29% partial credit) — 36/172 capabilities complete and 7 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 16.92% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -90,8 +90,10 @@ node and output budgets and prints a deterministic DOM dump, and
 same file. `rustic dump-boxes <file>` exposes M3's initial principal-box
 snapshot; `rustic dump-formatting <file>` shows anonymous flow boxes and inline
 continuations before shaping. `rustic dump-layout <file>` adds [used block rectangles](docs/LAYOUT.md)
-for a static block subset with adjoining-margin collapse. General block/inline flow, text
-shaping and image output remain pending. URLs and other
+for a static block subset with adjoining-margin collapse. `rustic dump-paint <file>` prints
+its [display list](docs/PAINT.md) and `rustic render --output out.png <file>` rasterizes
+block backgrounds and solid borders to a PNG on the CPU. General block/inline flow, text
+shaping and image decoding remain pending. URLs and other
 arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints
@@ -111,6 +113,7 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 `rustic-css` (CSS syntax, selectors, specificity and typed property values),
 `rustic-style` (selector matching, the cascade and computed style over a read-only DOM view),
 `rustic-layout` (checked geometry, principal boxes and reference block widths),
+`rustic-paint` (display lists) and `rustic-raster` (CPU rasterizer and PNG output),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

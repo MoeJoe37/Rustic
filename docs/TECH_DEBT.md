@@ -88,6 +88,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-38 | Deliberate | Layout | Static block subset; margin-free restriction removed by REN-02a | Partly paid |
 | TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
 | TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
+| TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -665,3 +666,16 @@ text budget is only 8 MiB. The box limit did not bound memory as intended.
 **Paid** (M3 review, 2026-11-09): snapshot styles are shared `Arc`s, text runs
 reuse their parent's style and normalization derives one anonymous inline style
 per shared parent style. A regression test checks the sharing by identity.
+
+### TD-41 — First paint/raster slice shortcuts
+
+REN-04a/REN-05a (see [PAINT.md](PAINT.md)) take three deliberate shortcuts.
+Out-of-gamut colors clip per channel instead of CSS Color 4 OKLCh gamut
+mapping. PNG output uses stored deflate blocks, so files are about as large as
+the raw pixels (a 1280×720 render is about 3.7 MB). Border sides of different
+colors are composited separately, so antialiased pixels on a corner diagonal
+let the background show through (coverage conflation). **Pay:** gamut mapping
+with the CSS Color 4 reference tests; a deterministic deflate compressor
+(fixed Huffman plus LZ77 is enough) checked by a PNG decoder; corner joins
+rendered as one shape per pixel with per-side colors. **Trigger:** reftests
+that compare with other engines, or output size in CI artifacts.

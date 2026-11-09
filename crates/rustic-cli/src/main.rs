@@ -22,6 +22,8 @@ Usage:
   rustic dump-boxes [OPTIONS] [--] <file>
   rustic dump-formatting [OPTIONS] [--] <file>
   rustic dump-layout [OPTIONS] [--] <file>
+  rustic dump-paint [OPTIONS] [--] <file>
+  rustic render --output <png> [--scale N] [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
@@ -39,7 +41,13 @@ split inline continuations, preserving unshaped text. Other formatting types,
 positioning/floats and special/replaced elements fail explicitly.
 dump-layout prints used content/padding/border rectangles for static non-replaced
 blocks with collapsed vertical margins and visible overflow. Inline/text layout and
-other unsupported formatting fail explicitly. No command paints pixels yet.
+other unsupported formatting fail explicitly.
+dump-paint prints the display list for that layout: the canvas color (with
+root/body background propagation), block background colors and solid borders.
+render rasterizes the same display list on the CPU and writes an RGBA PNG to
+--output (overwriting it). --scale sets device pixels per CSS pixel (default 1,
+at most 64). Text, images, non-solid borders and opacity fail explicitly; the
+PNG counts against --max-output-bytes.
 
 Options for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
@@ -80,7 +88,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting and block reference geometry via dump-layout; full layout, JavaScript, networking, and rendering: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block background/border painting via dump-paint and render; text layout, JavaScript and networking: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -95,6 +103,12 @@ fn main() -> ExitCode {
     }
     if args[0] == "dump-layout" {
         return dump_command("dump-layout", &args[1..], loader::dump_layout);
+    }
+    if args[0] == "dump-paint" {
+        return dump_command("dump-paint", &args[1..], loader::dump_paint);
+    }
+    if args[0] == "render" {
+        return render_command(&args[1..]);
     }
     if args[0] == "dump-formatting" {
         return dump_command("dump-formatting", &args[1..], loader::dump_formatting);
@@ -117,16 +131,9 @@ fn dump_command(
             return ExitCode::from(2);
         }
     };
-    let path = match loader::local_path(&path) {
-        Ok(path) => path,
-        Err(error) => {
-            eprintln!("rustic {command}: {error}");
-            return ExitCode::from(2);
-        }
-    };
-    let result = loader::load_document(&path, limits, CancellationToken::default())
-        .and_then(|parsed| dump(&parsed, &path, limits));
-    match result {
+    match load(command, limits, &path, |parsed, path| {
+        dump(parsed, path, limits)
+    }) {
         Ok(dump) => {
             let mut stdout = io::stdout().lock();
             if stdout
@@ -138,9 +145,31 @@ fn dump_command(
             }
             ExitCode::SUCCESS
         }
+        Err(code) => code,
+    }
+}
+
+/// Load a local document and run `then`, reporting errors on stderr.
+fn load<T>(
+    command: &str,
+    limits: LoaderLimits,
+    path: &OsString,
+    then: impl FnOnce(&ParsedDocument, &Path) -> Result<T, LoadError>,
+) -> Result<T, ExitCode> {
+    let path = match loader::local_path(path) {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("rustic {command}: {error}");
+            return Err(ExitCode::from(2));
+        }
+    };
+    let result = loader::load_document(&path, limits, CancellationToken::default())
+        .and_then(|parsed| then(&parsed, &path));
+    match result {
+        Ok(value) => Ok(value),
         Err(error @ LoadError::InvalidLimits) => {
             eprintln!("rustic {command}: {error}");
-            ExitCode::from(2)
+            Err(ExitCode::from(2))
         }
         Err(error) => {
             // The path is user input: escape it so control characters in a file
@@ -149,9 +178,67 @@ fn dump_command(
                 "rustic {command}: {}: {error}",
                 EscapedText(&path.to_string_lossy())
             );
-            ExitCode::from(1)
+            Err(ExitCode::from(1))
         }
     }
+}
+
+fn render_command(args: &[OsString]) -> ExitCode {
+    let usage = |message: String| {
+        eprintln!("rustic render: {message}\n\n{USAGE}");
+        ExitCode::from(2)
+    };
+    let mut output = None;
+    let mut scale = 1.0;
+    let mut rest = Vec::new();
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.to_str() {
+            Some("--") => {
+                rest.push(arg.clone());
+                rest.extend(iter.by_ref().cloned());
+            }
+            Some("--output") => match iter.next() {
+                Some(value) => output = Some(value.clone()),
+                None => return usage("--output requires a value".into()),
+            },
+            Some("--scale") => {
+                match iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.parse::<f64>().ok())
+                {
+                    Some(value) => scale = value,
+                    None => return usage("--scale requires a number".into()),
+                }
+            }
+            _ => rest.push(arg.clone()),
+        }
+    }
+    let Some(output) = output else {
+        return usage("missing --output".into());
+    };
+    let Ok(scale) = rustic_layout::DeviceScale::new(scale) else {
+        return usage("--scale must be greater than 0 and at most 64".into());
+    };
+    let (limits, path) = match parse_dump_args(&rest) {
+        Ok(parsed) => parsed,
+        Err(message) => return usage(message),
+    };
+    let png = match load("render", limits, &path, |parsed, path| {
+        loader::render_png(parsed, path, limits, scale)
+    }) {
+        Ok(png) => png,
+        Err(code) => return code,
+    };
+    if let Err(error) = std::fs::write(&output, png) {
+        eprintln!(
+            "rustic render: {}: {error}",
+            EscapedText(&Path::new(&output).to_string_lossy())
+        );
+        return ExitCode::from(1);
+    }
+    ExitCode::SUCCESS
 }
 
 fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String> {

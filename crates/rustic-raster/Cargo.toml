@@ -1,0 +1,23 @@
+[package]
+name = "rustic-raster"
+description = "Deterministic CPU display-list rasterizer and PNG output for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-layout = { path = "../rustic-layout" }
+rustic-paint = { path = "../rustic-paint" }
+
+[dev-dependencies]
+rustic-css = { path = "../rustic-css" }
+rustic-dom = { path = "../rustic-dom" }
+rustic-html = { path = "../rustic-html" }
+rustic-style = { path = "../rustic-style" }
+
+[lints]
+workspace = true

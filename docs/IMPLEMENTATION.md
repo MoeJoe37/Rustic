@@ -786,6 +786,25 @@ Only the existing normalized-box step of `layout.boxes` advances, with source
 and test evidence. General fragments and mixed inline/block *used flow* remain
 planned until REN-03 supplies shaping/line layout. M3 is still in progress.
 
+## REN-04a/REN-05a — First display list, CPU raster and PNG output
+
+`rustic-paint` builds an immutable display list from the block reference:
+canvas background with root/`body` propagation, background colors clipped to
+`background-clip`, and solid borders (one ring when the sides match, mitred
+quads otherwise). Computed colors in every supported color space convert to
+8-bit sRGB. `rustic-raster` clears a checked premultiplied surface, fills
+shapes with exact-area antialiasing and composites source-over using only IEEE
+`f64` arithmetic, so a golden checksum holds on every target. `encode_png`
+writes stored-block RGBA PNG within an exact size budget. The CLI gains
+`dump-paint` and `render --output <png> [--scale N]`; a `paint-raster` fuzz
+target checks determinism, opacity and PNG framing.
+
+Text, images, opacity, non-solid borders and stacking contexts fail with typed
+errors. Catalog steps credited: `paint.display` (block display list),
+`paint.raster` (fills/compositing), `paint.images` (color/alpha conversion) and
+`paint.conformance` (deterministic PNG output). Shortcuts are TD-41. See
+[PAINT.md](PAINT.md). M3 is still in progress.
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

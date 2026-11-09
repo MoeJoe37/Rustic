@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rustic-base", "crates/rustic-dom", "crates/rustic-url", "crates/rustic-html", "crates/rustic-engine", "crates/rustic-cli", "crates/rustic-css", "crates/rustic-fuzz", "crates/rustic-style", "crates/rustic-layout"]
+members = ["crates/rustic-base", "crates/rustic-dom", "crates/rustic-url", "crates/rustic-html", "crates/rustic-engine", "crates/rustic-cli", "crates/rustic-css", "crates/rustic-fuzz", "crates/rustic-style", "crates/rustic-layout", "crates/rustic-paint", "crates/rustic-raster"]
 resolver = "3"
 
 [workspace.package]

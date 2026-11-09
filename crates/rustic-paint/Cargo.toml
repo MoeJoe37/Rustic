@@ -1,0 +1,19 @@
+[package]
+name = "rustic-paint"
+description = "Paint order and immutable display lists for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-css = { path = "../rustic-css" }
+rustic-dom = { path = "../rustic-dom" }
+rustic-layout = { path = "../rustic-layout" }
+rustic-style = { path = "../rustic-style" }
+
+[lints]
+workspace = true

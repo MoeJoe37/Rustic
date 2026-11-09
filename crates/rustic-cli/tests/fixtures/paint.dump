@@ -1,0 +1,9 @@
+canvas 1280x720 color=#f0f4ffff
+item 0 box=2 node=8:1 background rect=(16,16,1248,44) color=#ffffffff
+item 1 box=2 node=8:1 border ring=(16,16,1248,44) inner=(18,18,1244,40) color=#3366ccff
+item 2 box=3 node=9:1 background rect=(28,28,1224,20) color=#ffaa0099
+item 3 box=5 node=11:1 background rect=(16,72,1248,34) color=#ffffffff
+item 4 box=5 node=11:1 border quad=(16,72 1264,72 1263,76 17,76) color=#ff0000ff
+item 5 box=5 node=11:1 border quad=(1264,72 1264,106 1263,102 1263,76) color=#008000ff
+item 6 box=5 node=11:1 border quad=(1264,106 16,106 17,102 1263,102) color=#0000ffff
+item 7 box=5 node=11:1 border quad=(16,106 16,72 17,76 17,102) color=#000000ff

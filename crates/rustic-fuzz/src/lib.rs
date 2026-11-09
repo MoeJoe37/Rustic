@@ -17,6 +17,7 @@ mod corpus;
 mod formatting;
 mod harness;
 mod mutate;
+mod paint;
 mod rng;
 mod targets;
 

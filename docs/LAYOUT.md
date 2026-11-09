@@ -186,7 +186,9 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 2. Finish REN-02: intrinsic/replaced sizing, overflow, positioning, floats and
    clearance; static in-flow margin collapse is implemented.
 3. REN-03/04: font adapter, shaping/bidi/line layout, fragments and paint order.
-4. REN-05/06/07: CPU raster reference, bounded decode, PNG `render` and reftests.
+   The first block display list exists ([PAINT.md](PAINT.md)).
+4. REN-05/06/07: the CPU raster reference and PNG `render` exist for blocks;
+   bounded decode, glyph raster and reftests remain.
 
 No image output or whole REN-01 completion is claimed by this first slice.
 

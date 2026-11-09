@@ -92,6 +92,12 @@ pub enum LoadError {
     Flow(rustic_layout::FlowError),
     /// Anonymous flow normalization failed.
     Formatting(rustic_layout::FormattingError),
+    /// Display list construction failed.
+    Paint(rustic_paint::PaintError),
+    /// Rasterization failed or exceeded its limits.
+    Raster(rustic_raster::RasterError),
+    /// The PNG would exceed the output limit.
+    Png(rustic_raster::PngError),
 }
 
 impl fmt::Display for LoadError {
@@ -110,6 +116,9 @@ impl fmt::Display for LoadError {
             Self::Layout(error) => error.fmt(f),
             Self::Flow(error) => error.fmt(f),
             Self::Formatting(error) => error.fmt(f),
+            Self::Paint(error) => error.fmt(f),
+            Self::Raster(error) => error.fmt(f),
+            Self::Png(error) => error.fmt(f),
         }
     }
 }
@@ -123,6 +132,9 @@ impl Error for LoadError {
             Self::Layout(error) => Some(error),
             Self::Flow(error) => Some(error),
             Self::Formatting(error) => Some(error),
+            Self::Paint(error) => Some(error),
+            Self::Raster(error) => Some(error),
+            Self::Png(error) => Some(error),
             _ => None,
         }
     }
@@ -418,6 +430,22 @@ pub fn dump_layout(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
+    let (_, layout, _) = block_layout(parsed, path, limits)?;
+    layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
+}
+
+fn block_layout(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<
+    (
+        rustic_layout::BoxTree,
+        rustic_layout::BlockLayout,
+        rustic_layout::CssSize,
+    ),
+    LoadError,
+> {
     let tree = box_tree(parsed, path, limits)?;
     let compute = ComputeContext::default();
     let viewport = rustic_layout::CssSize::new(compute.viewport_width, compute.viewport_height)
@@ -429,7 +457,54 @@ pub fn dump_layout(
         &CancellationToken::default(),
     )
     .map_err(LoadError::Flow)?;
-    layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
+    Ok((tree, layout, viewport))
+}
+
+fn display_list(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<rustic_paint::DisplayList, LoadError> {
+    let (tree, layout, viewport) = block_layout(parsed, path, limits)?;
+    rustic_paint::DisplayList::build(
+        parsed.document(),
+        &tree,
+        &layout,
+        viewport,
+        rustic_paint::PaintLimits::default(),
+        &CancellationToken::default(),
+    )
+    .map_err(LoadError::Paint)
+}
+
+/// Dump the display list for the block-only layout reference.
+pub fn dump_paint(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
+    display_list(parsed, path, limits)?
+        .dump(limits.max_dump_bytes)
+        .map_err(LoadError::Paint)
+}
+
+/// Rasterize the display list at `scale` and encode it as PNG, within the
+/// output byte limit. Only block backgrounds and solid borders are painted.
+pub fn render_png(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    scale: rustic_layout::DeviceScale,
+) -> Result<Vec<u8>, LoadError> {
+    let list = display_list(parsed, path, limits)?;
+    let surface = rustic_raster::rasterize(
+        &list,
+        scale,
+        rustic_raster::RasterLimits::default(),
+        &CancellationToken::default(),
+    )
+    .map_err(LoadError::Raster)?;
+    rustic_raster::encode_png(&surface, limits.max_dump_bytes).map_err(LoadError::Png)
 }
 
 #[cfg(test)]

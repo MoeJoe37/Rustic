@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 21.61%** = 20.27% verified complete + 1.34% partial credit. 36/172 capabilities complete, 3 in progress.
+**Overall completion: 22.56%** = 20.27% verified complete + 2.29% partial credit. 36/172 capabilities complete, 7 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `cd12cc5ed067ce8c8406d2be24cca0ee5bcba67956853282b9877c3d97498f01`.
+Catalog: `engine-v3`. Source fingerprint: `a4f4fb8aaddd6c19adbc774aa587d0b4f1651ad8bf1b65a54444c0b3cc167919`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `cd12cc5ed067ce8c8406d2be24cca0ee5bcba
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 0/17 | 9.19% | 0.00% | 12.22% |
+| M3 Static renderer | 0/17 | 16.92% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -32,7 +32,7 @@ Catalog: `engine-v3`. Source fingerprint: `cd12cc5ed067ce8c8406d2be24cca0ee5bcba
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Layout | 0/10 | 2 | 12.50% | 0.00% | 9% | 1.12 |
-| Paint & raster | 0/7 | 0 | 0.00% | 0.00% | 6% | 0.00 |
+| Paint & raster | 0/7 | 4 | 15.74% | 0.00% | 6% | 0.94 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -149,13 +149,26 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Paint & raster
 
-- **planned** `paint.display` — Immutable display lists and paint order · size 3 · M3 · 0.66% of engine
+- **in progress 33.33%** `paint.display` — Immutable display lists and paint order · size 3 · M3 · 0.66% of engine
+  - [x] Block background/border display list with canvas propagation ([source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs))
+  - [ ] Text, image, decoration and outline items
+  - [ ] Full CSS 2.2 Appendix E paint order with stacking contexts
 - **planned** `paint.stacking` — Stacking, clips and transforms · size 3 · M3 · 0.66% of engine
-- **planned** `paint.raster` — Deterministic CPU reference rasterizer · size 5 · M3 · 1.11% of engine
-- **planned** `paint.images` — Bounded images, color/alpha and resource lifecycle · size 3 · M3 · 0.66% of engine
+- **in progress 25.00%** `paint.raster` — Deterministic CPU reference rasterizer · size 5 · M3 · 1.11% of engine
+  - [x] Exact-area antialiased fills and source-over compositing ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs))
+  - [ ] Glyph and image rasterization
+  - [ ] Clip, opacity and blend layers
+  - [ ] Tiled, damage-limited raster within frame budgets
+- **in progress 33.33%** `paint.images` — Bounded images, color/alpha and resource lifecycle · size 3 · M3 · 0.66% of engine
+  - [x] CSS Color 4 conversion to sRGB with straight/premultiplied alpha ([source](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-raster/tests/paint.rs))
+  - [ ] Bounded PNG/JPEG/GIF/WebP decode
+  - [ ] Image resource lifecycle and memory budgets
 - **planned** `paint.hit` — Hit testing and resize/zoom geometry · size 2 · M3 · 0.44% of engine
 - **planned** `paint.formats` — SVG/MathML painting integration and Canvas 2D · size 8 · M9 · 1.77% of engine
-- **planned** `paint.conformance` — Reftest output, damage and paint conformance · size 3 · M3 · 0.66% of engine
+- **in progress 33.33%** `paint.conformance` — Reftest output, damage and paint conformance · size 3 · M3 · 0.66% of engine
+  - [x] Deterministic PNG render output ([source](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-cli/tests/cli.rs))
+  - [ ] Reftest harness and checked image fixtures
+  - [ ] Damage tracking and paint conformance gate
 
 ### JavaScript & GC
 

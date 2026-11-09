@@ -157,8 +157,11 @@ The first REN-01b block-only pass adds used rectangles and `dump-layout` for
 a static block subset. REN-02a adds sibling, parent-child and empty-through
 margin collapse, with signed struts and root/BFC/border/padding/min-height
 boundaries. REN-01c adds bounded normal-flow anonymous blocks, split inline
-continuations and `dump-formatting`. Inline used geometry/shaping, clearance
-with floats and the final general fragment tree remain pending.
+continuations and `dump-formatting`. REN-04a/REN-05a add the first display
+list (canvas propagation, block backgrounds and solid borders), a deterministic
+CPU rasterizer, PNG output, `dump-paint` and `rustic render` ([PAINT.md](PAINT.md)).
+Inline used geometry/shaping, clearance with floats, stacking contexts and the
+final general fragment tree remain pending.
 See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin

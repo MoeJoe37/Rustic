@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 23.70%** = 20.27% verified complete + 3.43% partial credit. 36/172 capabilities complete, 9 in progress.
+**Overall completion: 24.34%** = 20.27% verified complete + 4.07% partial credit. 36/172 capabilities complete, 11 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `656d5dfa9c7331e3b91c2aba70891942306713ce94c757c2cbb6ad4f40b25ca8`.
+Catalog: `engine-v3`. Source fingerprint: `1c2b204210f03fc6bc3b374bd6c9b5b5fd62344a284a9bc00245c9ee02a795c5`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `656d5dfa9c7331e3b91c2aba7089194230671
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 0/17 | 26.26% | 0.00% | 12.22% |
+| M3 Static renderer | 0/17 | 31.46% | 0.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -30,7 +30,7 @@ Catalog: `engine-v3`. Source fingerprint: `656d5dfa9c7331e3b91c2aba7089194230671
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
-| Text & fonts | 0/6 | 1 | 10.22% | 0.00% | 4% | 0.40 |
+| Text & fonts | 0/6 | 3 | 26.13% | 0.00% | 4% | 1.04 |
 | Layout | 0/10 | 3 | 20.65% | 0.00% | 9% | 1.85 |
 | Paint & raster | 0/7 | 4 | 15.74% | 0.00% | 6% | 0.94 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
@@ -126,8 +126,13 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Computed ex/ch/cap/ic from the first available font's metrics ([source](../../crates/rustic-style/src/fonts.rs), [test](../../crates/rustic-style/tests/fonts.rs), [test](../../crates/rustic-style/tests/fonts.rs))
   - [ ] System font discovery and CFF/WOFF formats
 - **planned** `text.shaping` — Shaping, fallback and glyph clusters · size 5 · M3 · 0.90% of engine
-- **planned** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.54% of engine
-- **planned** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.54% of engine
+- **in progress 50.00%** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.54% of engine
+  - [x] UAX #9 levels, brackets and line reordering (Unicode 17) ([source](../../crates/rustic-text/src/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs))
+  - [ ] Mixed-direction line fragments in layout
+- **in progress 66.66%** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.54% of engine
+  - [x] UAX #14 line break opportunities (Unicode 17, untailored) ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs))
+  - [x] UAX #29 extended grapheme clusters ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs))
+  - [ ] CSS white-space and soft wrapping applied in line layout
 - **planned** `text.writing` — Writing modes, vertical text and font loading · size 5 · M9 · 0.90% of engine
 - **planned** `text.conformance` — Text/font conformance and platform parity · size 3 · M9 · 0.54% of engine
 

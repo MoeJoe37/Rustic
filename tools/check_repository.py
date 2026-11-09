@@ -217,6 +217,19 @@ def main() -> int:
     except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         error(idna_manifest, f"invalid IDNA data manifest: {exc}")
 
+    text_manifest = ROOT / "crates/rustic-text/tests/fixtures/text_data_manifest.json"
+    try:
+        manifest = json.loads(text_manifest.read_text(encoding="utf-8"))
+        for output, digest in manifest["outputs"].items():
+            if hashlib.sha256((ROOT / output).read_bytes()).hexdigest() != digest:
+                error(ROOT / output, "generated text data differs from its manifest; rerun tools/generate_text_data.py")
+        if not (ROOT / "crates/rustic-text/UNICODE-LICENSE.md").is_file():
+            error(text_manifest, "missing Unicode license for generated text data")
+        if not re.fullmatch(r"[0-9a-f]{40}", manifest["unicodetools_revision"]):
+            error(text_manifest, "unicodetools_revision must be a full commit SHA")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        error(text_manifest, f"invalid text data manifest: {exc}")
+
     check_debt_markers(files)
     check_html_fixture("html5lib")
     check_html_fixture("references")

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "656d5dfa9c7331e3b91c2aba70891942306713ce94c757c2cbb6ad4f40b25ca8",
-  "percent": "23.70",
+  "source_fingerprint": "1c2b204210f03fc6bc3b374bd6c9b5b5fd62344a284a9bc00245c9ee02a795c5",
+  "percent": "24.34",
   "verified_percent": "20.27",
-  "partial_percent": "3.43",
+  "partial_percent": "4.07",
   "completed": 36,
-  "in_progress": 9,
+  "in_progress": 11,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 0,
       "total": 17,
-      "percent": "26.26",
+      "percent": "31.46",
       "verified_percent": "0.00",
-      "partial_percent": "26.26"
+      "partial_percent": "31.46"
     },
     {
       "id": "M4",
@@ -1665,9 +1665,39 @@
           "label": "Bidi and mixed-direction text",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "uax9",
+              "label": "UAX #9 levels, brackets and line reordering (Unicode 17)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/bidi.rs",
+                  "marker": "pub fn line_levels(&self, line: Range<usize>)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/bidi.rs",
+                  "marker": "fn bidi_test_sample_passes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/bidi.rs",
+                  "marker": "fn bidi_character_test_sample_passes"
+                }
+              ]
+            },
+            {
+              "id": "layout",
+              "label": "Mixed-direction line fragments in layout",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.54"
         },
         {
@@ -1675,9 +1705,51 @@
           "label": "Line breaking and grapheme navigation",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "uax14",
+              "label": "UAX #14 line break opportunities (Unicode 17, untailored)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/segment.rs",
+                  "marker": "pub fn line_breaks(text: &[char])"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/segment.rs",
+                  "marker": "fn line_break_test_passes_completely"
+                }
+              ]
+            },
+            {
+              "id": "uax29",
+              "label": "UAX #29 extended grapheme clusters",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/segment.rs",
+                  "marker": "pub fn grapheme_boundaries(text: &[char])"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/segment.rs",
+                  "marker": "fn grapheme_break_test_passes_completely"
+                }
+              ]
+            },
+            {
+              "id": "lines",
+              "label": "CSS white-space and soft wrapping applied in line layout",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "66.66",
           "engine_share": "0.54"
         },
         {
@@ -1703,12 +1775,12 @@
       ],
       "points": 22,
       "completed": 0,
-      "in_progress": 1,
+      "in_progress": 3,
       "total": 6,
-      "contribution": "0.40",
-      "percent": "10.22",
+      "contribution": "1.04",
+      "percent": "26.13",
       "verified_percent": "0.00",
-      "partial_percent": "10.22"
+      "partial_percent": "26.13"
     },
     {
       "id": "layout",

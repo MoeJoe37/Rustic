@@ -93,6 +93,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Open, REN-03 |
 | TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
+| TD-47 | Deliberate | Text | Untailored UAX #14/#29 segmentation and bidi without L3 | Open, REN-03b |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -760,3 +761,14 @@ layout WPT once text and reftests exist (REN-07), add scrollbar metrics with
 the platform UI, and use real intrinsic sizes after REN-03. **Trigger:**
 layout-WPT import, scrolling UI, or inline content inside floats.
 
+### TD-47 — Untailored segmentation and bidi
+
+REN-03b's `segment` and `bidi` modules implement the default Unicode 17
+algorithms only. CSS `line-break`, `word-break`, `overflow-wrap` and
+`hyphens` tailorings, dictionary-based breaking for `SA` scripts (Thai, Lao,
+Khmer, Myanmar), language-specific rules and UAX #9 rule L3 are absent; `SA`
+characters break as `AL`/`CM` per LB1. **Reason:** the default algorithms
+are fully conformance-tested and are what line layout needs first. **Pay:**
+add the CSS tailorings with the properties in `rustic-css`, then dictionary
+breaking behind a reviewed data source. **Trigger:** supporting
+`word-break`/`overflow-wrap`, or Southeast Asian text.

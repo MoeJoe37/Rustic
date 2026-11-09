@@ -853,6 +853,18 @@ approximations are listed in TD-45. Sticky positioning stays an explicit
 refusal. `layout.position` gains positioning, float and overflow steps; sticky
 remains planned. See [LAYOUT.md](LAYOUT.md#floats-positioning-and-overflow-ren-02b).
 
+## REN-03b (part 1) — Unicode segmentation and bidi
+
+`rustic-text` gains generated Unicode 17.0.0 tables
+(`tools/generate_text_data.py`, pinned inputs and outputs) and three modules:
+`segment` (UAX #29 grapheme clusters and default UAX #14 line breaks) and
+`bidi` (UAX #9 with isolates, bracket pairs and line rules L1–L2). The
+complete LineBreakTest and GraphemeBreakTest suites and deterministic samples
+of BidiTest and BidiCharacterTest are committed and pass; the full bidi files
+also pass from an `#[ignore]`d test. Tailoring and L3 are TD-47. Shaping,
+line boxes and text fragments are the next REN-03b units. See
+[TEXT.md](TEXT.md).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

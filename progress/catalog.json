@@ -1457,16 +1457,88 @@
           "label": "Bidi and mixed-direction text",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "uax9",
+              "label": "UAX #9 levels, brackets and line reordering (Unicode 17)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/bidi.rs",
+                  "marker": "pub fn line_levels(&self, line: Range<usize>)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/bidi.rs",
+                  "marker": "fn bidi_test_sample_passes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/bidi.rs",
+                  "marker": "fn bidi_character_test_sample_passes"
+                }
+              ]
+            },
+            {
+              "id": "layout",
+              "label": "Mixed-direction line fragments in layout",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "text.breaking",
           "label": "Line breaking and grapheme navigation",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "uax14",
+              "label": "UAX #14 line break opportunities (Unicode 17, untailored)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/segment.rs",
+                  "marker": "pub fn line_breaks(text: &[char])"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/segment.rs",
+                  "marker": "fn line_break_test_passes_completely"
+                }
+              ]
+            },
+            {
+              "id": "uax29",
+              "label": "UAX #29 extended grapheme clusters",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/segment.rs",
+                  "marker": "pub fn grapheme_boundaries(text: &[char])"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/segment.rs",
+                  "marker": "fn grapheme_break_test_passes_completely"
+                }
+              ]
+            },
+            {
+              "id": "lines",
+              "label": "CSS white-space and soft wrapping applied in line layout",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "text.writing",

@@ -19,6 +19,8 @@ use rustic_dom::NodeId;
 use rustic_style::ComputedStyle;
 use std::{error::Error, fmt};
 
+mod flex;
+
 use crate::exclusions::{Exclusions, Side};
 use crate::height::HeightConstraint;
 use crate::intrinsic::{self, Intrinsic};
@@ -207,6 +209,12 @@ struct Node<'a> {
     direction: Direction,
     /// Natural size of a replaced box; its descendants are not laid out.
     natural: Option<NaturalSize>,
+    /// `display:flex` (block-level flex container).
+    flex_container: bool,
+    /// An in-flow child of a flex container.
+    flex_item: bool,
+    /// Already in [`Engine::absolute`] (flex items can be laid out twice).
+    queued: bool,
     // Results of the current layout attempt.
     measure: BlockMeasure,
     height: Option<HeightConstraint>,
@@ -290,6 +298,9 @@ struct Frame {
     checkpoint: usize,
     /// Extent below its top over which an in-flow formatting root was placed.
     query: f64,
+    /// For a flex container, its run in [`Engine::flexes`]; its children are
+    /// laid out by the flex algorithm rather than this walk.
+    flex: Option<usize>,
 }
 
 fn direction(style: &ComputedStyle) -> Result<Direction, FlowError> {
@@ -361,7 +372,7 @@ fn supported_box(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
     }
     if !matches!(
         b.kind(),
-        BoxKind::Element(Display::Block | Display::FlowRoot)
+        BoxKind::Element(Display::Block | Display::FlowRoot | Display::Flex)
     ) {
         return Err(fail(UnsupportedFlow::FormattingContext));
     }
@@ -403,6 +414,8 @@ struct Engine<'a, 'c> {
     root_direction: Direction,
     absolute: Vec<usize>,
     work: Work<'c>,
+    /// Flex containers being laid out, innermost last.
+    flexes: Vec<flex::FlexRun>,
 }
 
 fn build_nodes<'a>(
@@ -460,6 +473,7 @@ fn build_nodes<'a>(
             return Err(FlowError::BoxLimit);
         }
         let style = supported_box(b)?;
+        let parent_flex = parent.is_some_and(|p| nodes[p].flex_container);
         let containing_direction = match parent {
             Some(p) => nodes[p].direction,
             None => direction(style)?,
@@ -468,14 +482,16 @@ fn build_nodes<'a>(
             V::Position(Position::Absolute) => (Scheme::Absolute, false),
             V::Position(Position::Fixed) => (Scheme::Fixed, false),
             V::Position(p) => {
+                // `float` does not apply to flex items (CSS Flexbox 1 §3).
                 let scheme = match float_side(style, containing_direction)? {
-                    Some(side) => Scheme::Float(side),
-                    None => Scheme::Flow,
+                    Some(side) if !parent_flex => Scheme::Float(side),
+                    _ => Scheme::Flow,
                 };
                 (scheme, *p == Position::Relative)
             }
             _ => return Err(FlowError::InvalidSnapshot),
         };
+        let flex_item = parent_flex && scheme == Scheme::Flow;
         // The nearest positioned ancestor; `None` is the initial containing block.
         let containing = match scheme {
             Scheme::Fixed => None,
@@ -508,6 +524,9 @@ fn build_nodes<'a>(
             intrinsic: Intrinsic::default(),
             direction: direction(style)?,
             natural: b.natural_size(),
+            flex_container: matches!(b.kind(), BoxKind::Element(Display::Flex)),
+            flex_item,
+            queued: false,
             measure: BlockMeasure {
                 content_width: CssPx::ZERO,
                 margin: Edges::default(),
@@ -574,7 +593,9 @@ impl<'a, 'c> Engine<'a, 'c> {
                 || node.scheme != Scheme::Flow
                 || matches!(node.style.get(P::Display), V::Display(Display::FlowRoot))
                 || scroll_container(node.overflow)
-                || node.natural.is_some();
+                || node.natural.is_some()
+                || node.flex_container
+                || node.flex_item;
         }
         // Block-only intrinsic sizes, bottom up (CSS Sizing 3 §5).
         for i in (0..n).rev() {
@@ -582,6 +603,10 @@ impl<'a, 'c> Engine<'a, 'c> {
                 // Percentages are cyclic here and behave as `auto`.
                 let (w, _) = replaced::used_size(self.nodes[i].style, natural, None, None)?;
                 self.nodes[i].intrinsic = Intrinsic { min: w, max: w };
+                continue;
+            }
+            if self.nodes[i].flex_container {
+                self.nodes[i].intrinsic = self.flex_intrinsic(i)?;
                 continue;
             }
             let (mut min, mut max) = (0.0_f64, 0.0_f64);
@@ -653,6 +678,29 @@ impl<'a, 'c> Engine<'a, 'c> {
         Ok(())
     }
 
+    /// The frame for a formatting-context root; a flex container starts its run.
+    fn root_frame(&mut self, i: usize) -> Result<Frame, FlowError> {
+        let mut frame = self.frame_for(i, 0.0)?;
+        if self.nodes[i].flex_container {
+            frame.flex = Some(self.start_flex(i)?);
+            frame.next = frame.end;
+        }
+        Ok(frame)
+    }
+
+    fn push_absolute(&mut self, i: usize) {
+        if !std::mem::replace(&mut self.nodes[i].queued, true) {
+            self.absolute.push(i);
+        }
+    }
+
+    fn truncate_absolute(&mut self, len: usize) {
+        for &i in self.absolute.get(len..).unwrap_or(&[]) {
+            self.nodes[i].queued = false;
+        }
+        self.absolute.truncate(len);
+    }
+
     fn frame_for(&self, i: usize, content_x: f64) -> Result<Frame, FlowError> {
         let n = &self.nodes[i];
         Ok(Frame {
@@ -666,6 +714,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             bfc_root: n.bfc_root,
             checkpoint: self.absolute.len(),
             query: 0.0,
+            flex: None,
         })
     }
 
@@ -781,6 +830,19 @@ impl<'a, 'c> Engine<'a, 'c> {
                 continue;
             }
             let frame = *frames.last().ok_or(FlowError::InvalidSnapshot)?;
+            if let Some(k) = frame.flex {
+                let Some(natural) = self.flex_step(&mut frames, &mut bfcs, k)? else {
+                    continue;
+                };
+                frames.pop();
+                bfcs.pop();
+                let i = frame.node.ok_or(FlowError::InvalidSnapshot)?;
+                if frames.is_empty() {
+                    return Ok(natural);
+                }
+                retry = self.close_root(&frames, &mut bfcs, i, natural, &frame)?;
+                continue;
+            }
             if frame.next < frame.end {
                 let i = frame.next;
                 self.work.charge(1)?;
@@ -806,17 +868,34 @@ impl<'a, 'c> Engine<'a, 'c> {
             if frame.bfc_root {
                 let auto = self.nodes[i].constraint()?.is_auto();
                 let natural = self.natural_root(&mut bfcs, auto)?;
-                self.set_height(i, natural)?;
-                match self.nodes[i].scheme {
-                    Scheme::Float(_) => self.exit_float(&frames, &mut bfcs, i)?,
-                    Scheme::Flow => {
-                        retry = self.exit_flow_root(&frames, &mut bfcs, i, &frame)?;
-                    }
-                    Scheme::Absolute | Scheme::Fixed => return Err(FlowError::InvalidSnapshot),
-                }
+                retry = self.close_root(&frames, &mut bfcs, i, natural, &frame)?;
             } else {
                 self.exit_block(&frames, &mut bfcs, i)?;
             }
+        }
+    }
+
+    /// Finish a formatting-context root that is not the walk's own root.
+    fn close_root(
+        &mut self,
+        frames: &[Frame],
+        bfcs: &mut [Bfc],
+        i: usize,
+        natural: f64,
+        frame: &Frame,
+    ) -> Result<Option<(usize, f64, f64)>, FlowError> {
+        if let Some(k) = frames.last().and_then(|f| f.flex) {
+            self.flex_item_done(k, i, natural)?;
+            return Ok(None);
+        }
+        self.set_height(i, natural)?;
+        match self.nodes[i].scheme {
+            Scheme::Float(_) => {
+                self.exit_float(frames, bfcs, i)?;
+                Ok(None)
+            }
+            Scheme::Flow => self.exit_flow_root(frames, bfcs, i, frame),
+            Scheme::Absolute | Scheme::Fixed => Err(FlowError::InvalidSnapshot),
         }
     }
 
@@ -840,7 +919,7 @@ impl<'a, 'c> Engine<'a, 'c> {
                 } else {
                     self.nodes[i].static_pos.1 = bfc.y;
                 }
-                self.absolute.push(i);
+                self.push_absolute(i);
                 Ok(())
             }
             Scheme::Float(_) => {
@@ -854,7 +933,7 @@ impl<'a, 'c> Engine<'a, 'c> {
                 )?;
                 self.begin(i, measure, &pf)?;
                 self.force_height(i, replaced)?;
-                frames.push(self.frame_for(i, 0.0)?);
+                frames.push(self.root_frame(i)?);
                 bfcs.push(Bfc::default());
                 Ok(())
             }
@@ -1100,7 +1179,7 @@ impl<'a, 'c> Engine<'a, 'c> {
         n.measure = measure;
         n.pos = (left + measure.margin.left.get(), y);
         n.top_resolved = true;
-        let mut frame = self.frame_for(i, 0.0)?;
+        let mut frame = self.root_frame(i)?;
         frame.query = query;
         frames.push(frame);
         bfcs.push(Bfc::default());
@@ -1124,7 +1203,7 @@ impl<'a, 'c> Engine<'a, 'c> {
         if !bfc.exclusions.is_empty() {
             let band = bfc.exclusions.band(y, y + h, left, right, &mut self.work)?;
             if band.intruded && (x < band.left || x + width > band.right) {
-                self.absolute.truncate(own.checkpoint);
+                self.truncate_absolute(own.checkpoint);
                 // First the narrower band over the laid-out extent at the same
                 // top (each such retry needs a strictly larger extent; the work
                 // budget bounds the rest), then the next float bottom.
@@ -1260,7 +1339,7 @@ impl<'a, 'c> Engine<'a, 'c> {
         };
         // Children see the solved height as definite only if it is not content-based.
         self.nodes[i].height = Some(HeightConstraint::solved(definite));
-        let frame = self.frame_for(i, 0.0)?;
+        let frame = self.root_frame(i)?;
         let natural = self.walk(frame)?;
         let solved = vertical.solve(natural)?;
         let n = &mut self.nodes[i];
@@ -1289,6 +1368,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             bfc_root: true,
             checkpoint: 0,
             query: 0.0,
+            flex: None,
         };
         self.walk(root)?;
         let mut q = 0;
@@ -1330,6 +1410,7 @@ impl BlockLayout {
             viewport,
             root_direction,
             absolute: Vec::new(),
+            flexes: Vec::new(),
             work: Work {
                 spent: 0,
                 cancellation,

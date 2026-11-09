@@ -38,6 +38,13 @@ impl Target for PaintTarget {
             b"width:150%",
             b"visibility:hidden",
             b"display:flow-root",
+            b"display:flex",
+            b"flex:1 0 2px",
+            b"flex-flow:column wrap-reverse",
+            b"align-items:baseline",
+            b"justify-content:space-around",
+            b"width:fit-content",
+            b"<canvas width=9 height=4>",
             b"{",
             b"}",
         ]

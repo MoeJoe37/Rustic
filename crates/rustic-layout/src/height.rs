@@ -87,6 +87,21 @@ impl HeightConstraint {
         }
     }
 
+    /// The specified content height, if definite.
+    pub(crate) fn specified(&self) -> Option<CssPx> {
+        self.specified
+    }
+
+    /// Used minimum content height.
+    pub(crate) fn minimum(&self) -> CssPx {
+        self.minimum
+    }
+
+    /// Used maximum content height, if any.
+    pub(crate) fn maximum(&self) -> Option<CssPx> {
+        self.maximum
+    }
+
     pub(crate) fn is_auto(&self) -> bool {
         self.specified.is_none()
     }

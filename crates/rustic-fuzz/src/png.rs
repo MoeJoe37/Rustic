@@ -54,7 +54,8 @@ impl Target for PngTarget {
     }
 }
 
-/// PngSuite images vendored for the decoder's conformance tests.
+/// PngSuite images vendored for the decoder's conformance tests, each also
+/// truncated halfway and without its final chunk.
 pub(crate) fn seeds(root: &Path) -> std::io::Result<Vec<Vec<u8>>> {
     let dir = root.join("crates/rustic-codecs/tests/pngsuite");
     let mut files: Vec<_> = std::fs::read_dir(dir)?
@@ -62,5 +63,14 @@ pub(crate) fn seeds(root: &Path) -> std::io::Result<Vec<Vec<u8>>> {
         .collect::<std::io::Result<_>>()?;
     files.retain(|p| p.extension().is_some_and(|e| e == "png"));
     files.sort();
-    files.iter().map(std::fs::read).collect()
+    let mut seeds = Vec::with_capacity(files.len() * 3);
+    for file in files {
+        let bytes = std::fs::read(file)?;
+        // Truncated halfway and with the last 12 bytes (IEND) dropped, to
+        // seed the error paths next to every valid image.
+        seeds.push(bytes[..bytes.len() / 2].to_vec());
+        seeds.push(bytes[..bytes.len().saturating_sub(12)].to_vec());
+        seeds.push(bytes);
+    }
+    Ok(seeds)
 }

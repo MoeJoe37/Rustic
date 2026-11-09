@@ -199,7 +199,13 @@ impl Target for PaintTarget {
         for command in list.commands() {
             match command {
                 DisplayCommand::Fill(item) => {
-                    let known = layout.fragments().iter().any(|f| f.node() == item.node)
+                    // A decoration names the box that declared it, which may
+                    // be an inline box split around a block with no fragment
+                    // of its own (CSS Text Decoration 3 §2.1).
+                    let decorating = item.role == ItemRole::Decoration
+                        && tree.boxes().get(item.source_box).map(|b| b.node()) == Some(item.node);
+                    let known = decorating
+                        || layout.fragments().iter().any(|f| f.node() == item.node)
                         || layout.inlines().iter().any(|f| f.node() == item.node)
                         || layout.texts().iter().any(|f| f.node() == item.node);
                     if !known {

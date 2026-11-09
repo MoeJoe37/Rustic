@@ -14,6 +14,15 @@ negative dimensions; `CssRect` checks its far edges before construction.
 coordinates, without implicit pixel rounding. These are explicit prototype
 coordinate limits, not a surface-allocation or total-memory guarantee.
 
+`rustic-base` holds the unit-typed form shared outside layout:
+`Length<U>`, `Point2<U>`, `Size2<U>`, `Rect<U>` and `Scale<S, D>` with `Css`
+and `Device` markers, so a CSS coordinate cannot be used as a device pixel
+without an explicit scale. `CssRect::to_typed` and `DeviceScale::to_typed`
+convert layout geometry into it. `SurfaceAllocation::check` and `covering`
+turn a device rectangle into a surface request with checked integer
+arithmetic against per-axis and byte limits; `rustic-raster` allocates its
+surfaces only through it. Layout keeps its own `CssPx` family (TD-73).
+
 ## Principal box snapshot
 
 `BoxTree::build(document, root, styles, limits, cancellation)` validates the
@@ -93,7 +102,7 @@ Horizontal margins (including auto/negative values) and collapsed vertical
 margins are supported; REN-02b adds floats, clearance, relative/absolute/fixed
 positioning and overflow clipping (below). Pure CSS collapsible whitespace
 under normal/nowrap produces no fragment. Preserved whitespace, non-whitespace
-text, inline/list/flex/grid/table contexts, sticky positioning, replaced
+text, inline/list/flex/grid/table contexts, replaced
 elements, native controls, special HTML layout and foreign content fail
 atomically with a typed reason. Empty inline boxes are not silently treated as
 empty blocks. No shaping metrics or anonymous line boxes are invented. This is
@@ -184,15 +193,14 @@ unshaped text fails with empty stdout. All dump commands remain local-only.
 
 1. Finish REN-01b: normalize principal/anonymous boxes and mixed inline/block
    content, then expand the initial block geometry reference.
-2. Finish REN-02: sticky positioning once scroll offsets exist. Margin
-   collapse, floats, clearance, positioning, overflow clipping, intrinsic
-   sizing keywords, block-level replaced sizing (REN-02c) and text min-/max-
-   content (REN-03b) are implemented. Flexbox (REN-08) is implemented for
-   block-level items; text directly in flex containers and `inline-flex`
-   remain refused.
-3. REN-03/04: line layout and text fragments exist
-   (`BlockLayout::compute_with_fonts`, below); OpenType shaping, atomic
-   inlines, glyph paint and paint order remain.
+2. REN-02 is implemented: margin collapse, floats, clearance, relative,
+   absolute, fixed and sticky positioning, overflow clipping, intrinsic
+   sizing keywords, replaced sizing (REN-02c) and text min-/max-content
+   (REN-03b). Flexbox (REN-08) lays out block-level items, text and
+   `inline-flex`; 38 of 91 static css-flexbox WPT pages pass (TD-72).
+3. REN-03/04: line layout, atomic inlines and the general fragment tree
+   exist (`BlockLayout::compute_with_fonts`, below); OpenType shaping, glyph
+   paint and the paint order of atomic inlines (TD-70) remain.
    The first block display list exists ([PAINT.md](PAINT.md)).
 4. REN-05/06/07: the CPU raster reference and PNG `render` paint blocks,
    inline boxes and text glyphs; bounded PNG decode, the reftest harness and
@@ -435,11 +443,25 @@ inflation are not implemented (TD-45).
 Float placement scans earlier floats, and BFC retries repeat subtrees. Every
 visit, float scan and chain step is charged to `MAX_FLOW_WORK` (64,000,000
 units) and also polls cancellation. Exceeding it returns `FlowError::WorkLimit`
-atomically (TD-44). Sticky positioning returns
-`UnsupportedFlow::Positioning`. The former `UnsupportedFlow::Overflow` refusal
-was removed.
+atomically (TD-44). The former `UnsupportedFlow::Overflow` and sticky
+`UnsupportedFlow::Positioning` refusals were removed.
 
-`tests/position.rs` has thirteen scenarios with exact geometry:
+### Sticky positioning
+
+A `position:sticky` box is laid out in normal flow (CSS Positioned Layout 3
+§3.4). Layout records a `StickyConstraint` per sticky fragment: the nearest
+scroll container (or the viewport), its scrollport at scroll offset zero, the
+used insets (percentages against the scrollport), the static border box, the
+margins and the containing block's content box. The offset for the initial
+scroll position is applied to the fragment and its descendants, and
+`StickyConstraint::offset(scroll)` gives the offset at any other position: the
+box shifts towards each non-`auto` inset edge of the view rectangle while its
+margin box stays inside the containing block, and the start inset wins when
+both apply. Sticky boxes are containing blocks for absolute descendants and
+always form stacking contexts in paint. Non-atomic inline sticky boxes are
+not shifted (TD-71).
+
+`tests/position.rs` has fifteen scenarios with exact geometry:
 - relative offsets in LTR and RTL, including percentages;
 - every absolute equation rule against a bordered, padded containing block;
 - static positions, shrink-to-fit, and definite versus content-based heights;
@@ -448,7 +470,12 @@ was removed.
 - clearance with and without collapse;
 - float avoidance, including the retry case;
 - clip chains, scroll clamping and viewport propagation;
-- dump fields and atomic failure on sticky positioning.
+- dump fields;
+- sticky boxes against the viewport and a nested scroll container, with top
+  and bottom insets, the containing-block limit and absolute descendants.
+
+`sticky.rs` checks the offset for four inset combinations at 501 scroll
+positions against an independent scan over every whole-pixel shift.
 
 An independent model rasterizes 10px rows and moves one row at a time. It checks
 1,200 float positions from 150 generated eight-float sequences against the
@@ -542,9 +569,11 @@ containers are more frames, never recursion. It implements CSS Flexbox 1 §9:
 
 An item is laid out again only when its size changed or became definite.
 Every step charges `MAX_FLOW_WORK`, so worst-case nested relayout fails with
-`FlowError::WorkLimit` rather than running long (TD-49). Text inside a flex
-container and `inline-flex` stay refused with `TextLayout` and
-`FormattingContext` until line layout exists.
+`FlowError::WorkLimit` rather than running long (TD-49). Text directly in a
+flex container becomes an anonymous flex item, and items with inline content
+take their first and last baselines from their line boxes. `inline-flex`
+containers are atomic inlines whose baseline is their first item's. Multi-line
+column containers stretch items to their line's cross size.
 
 ### Evidence
 
@@ -556,12 +585,20 @@ with positioned children, the explicit refusals, 120 nested containers, and
 60 generated rows checked for bounds, exact fill and equal growth. The fuzz
 corpus has a flex page (`paint-flex.html`) and flex dictionary tokens.
 
+`tests/wpt_flexbox.rs` lays out the 91 css-flexbox pages from the pinned WPT
+revision whose only script is `checkLayout(...)`, copied (scripts removed,
+`support/` stylesheets inlined) by `tools/import_wpt_flexbox_tests.py`, and
+compares every `data-expected-*`/`data-offset-*` attribute as
+`check-layout-th.js` would. 38 pages pass. `expected_failures.txt` lists the
+other 53 with a reviewed reason; the test fails when a listed page passes or
+an unlisted one fails (TD-72).
+
 Specification basis, reviewed 2026-11-09: CSS Flexible Box Layout 1
 [§4–§9](https://www.w3.org/TR/css-flexbox-1/#layout-algorithm), CSS Box
 Alignment 3 [§4–§8](https://www.w3.org/TR/css-align-3/), CSS Sizing 3
 [§3–§5](https://www.w3.org/TR/css-sizing-3/#sizing-values) and CSS 2.2
 [§10.3.2/§10.4/§10.6.2](https://www.w3.org/TR/CSS22/visudet.html#inline-replaced-width).
-These are focused fixtures and models, not a layout-WPT result.
+The WPT subset above is the only layout-WPT comparison so far.
 
 ## Inline formatting and text fragments (REN-03b)
 
@@ -653,12 +690,44 @@ same `MAX_FLOW_WORK` budget and poll cancellation. Text over
 `LayoutLimits::max_text_units` returns `FlowError::TextLimit`. Unsupported
 inline content fails the whole layout atomically:
 
-- atomic inline-level boxes (`inline-block` and other inline-level displays);
-- replaced elements;
-- blocks, floats or absolutely positioned boxes inside inline boxes;
-- sticky inline boxes.
+- `inline-grid` and `inline-table`;
+- native form controls and other replaced content without a natural size.
 
-Remaining approximations are listed under TD-50.
+Remaining approximations are listed under TD-50 and TD-70.
+
+### Atomic inlines and blocks inside inline boxes
+
+`inline-block`, `inline-flex` and inline replaced elements with a natural
+size (such as an `<img>` with a decoded size) are atomic inlines (CSS 2.2
+§9.2.2, §10.8). Each is laid out first as a formatting root, then enters line
+layout as one U+FFFC piece that breaks like an ideograph, so atomic inlines
+wrap between each other. Its baseline is its last line box, the first item's
+baseline for `inline-flex`, and the bottom margin edge for replaced elements,
+boxes with `overflow` other than `visible` and boxes without lines.
+`vertical-align` places it like any inline box. Its min-/max-content
+contributions feed intrinsic sizing of the surrounding block. An atomic
+inline's block fragment records its line (`BlockFragment::line`).
+
+A block inside an inline box splits the inline box around it (§9.2.1.1): the
+inline content before and after goes into anonymous blocks, and the inline
+box's start edge is on its first part and its end edge on its last. Floats
+and absolutely positioned boxes inside inline boxes split them the same way
+(TD-70).
+
+### Fragment tree
+
+`BlockLayout::fragment_tree` builds the general fragment tree over block,
+line, inline-box and text fragments in preorder, without recursion: each node
+has its kind, parent, depth, subtree end and border rectangle, and `dump`
+prints it with a byte limit. Lines hang off their block, inline boxes and
+texts off their line or enclosing inline box, and atomic inlines sit inside
+their inline box on their line.
+
+`tests/atomic.rs` has fourteen scenarios with exact geometry (baselines,
+shrink-to-fit, `vertical-align`, wrapping, intrinsic sizes, `inline-flex`,
+nesting and RTL, block-in-inline splits, refusals and flex baselines), and
+`tests/fragments.rs` five (nesting, atomic inlines, floats and positioned
+boxes, 200-deep trees and block-only layouts).
 
 `tests/inline.rs` has 18 scenarios with exact geometry over the bundled test
 fonts:

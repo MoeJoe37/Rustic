@@ -49,6 +49,8 @@ pub struct LoaderLimits {
     pub stylesheets: StyleLoadLimits,
     /// Anonymous flow normalization budgets for `dump-formatting`.
     pub formatting: rustic_layout::FormattingLimits,
+    /// `<img>` loading budgets for layout and paint.
+    pub images: crate::images::ImageLimits,
 }
 
 impl Default for LoaderLimits {
@@ -60,6 +62,7 @@ impl Default for LoaderLimits {
             parser: ParserLimits::default(),
             stylesheets: StyleLoadLimits::default(),
             formatting: rustic_layout::FormattingLimits::default(),
+            images: crate::images::ImageLimits::default(),
         }
     }
 }
@@ -430,7 +433,7 @@ pub fn dump_layout(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let (_, layout, _) = block_layout(parsed, path, limits)?;
+    let (_, layout, _, _) = block_layout(parsed, path, limits)?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
@@ -451,10 +454,24 @@ fn block_layout(
         rustic_layout::BoxTree,
         rustic_layout::BlockLayout,
         rustic_layout::CssSize,
+        crate::images::LoadedImages,
     ),
     LoadError,
 > {
-    let tree = box_tree(parsed, path, limits)?;
+    let mut tree = box_tree(parsed, path, limits)?;
+    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
+    let images = crate::images::load(
+        parsed.document(),
+        &tree,
+        &canonical,
+        limits.images,
+        limits.read_chunk_bytes,
+        &CancellationToken::default(),
+    );
+    if !images.sizes.is_empty() {
+        tree.set_natural_sizes(&images.sizes)
+            .map_err(LoadError::Layout)?;
+    }
     let compute = ComputeContext::default();
     let viewport = rustic_layout::CssSize::new(compute.viewport_width, compute.viewport_height)
         .map_err(|error| LoadError::Flow(error.into()))?;
@@ -466,7 +483,7 @@ fn block_layout(
         &CancellationToken::default(),
     )
     .map_err(LoadError::Flow)?;
-    Ok((tree, layout, viewport))
+    Ok((tree, layout, viewport, images))
 }
 
 fn display_list(
@@ -474,13 +491,17 @@ fn display_list(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<rustic_paint::DisplayList, LoadError> {
-    let (tree, layout, viewport) = block_layout(parsed, path, limits)?;
-    rustic_paint::DisplayList::build_with_fonts(
+    let (tree, layout, viewport, images) = block_layout(parsed, path, limits)?;
+    let resources = rustic_paint::Resources {
+        fonts: Some(fonts()),
+        images: images.images,
+    };
+    rustic_paint::DisplayList::build_with(
         parsed.document(),
         &tree,
         &layout,
         viewport,
-        Some(fonts()),
+        &resources,
         rustic_paint::PaintLimits::default(),
         &CancellationToken::default(),
     )

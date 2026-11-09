@@ -6,7 +6,8 @@ use crate::color::{Srgba, srgba};
 use rustic_base::CancellationToken;
 use rustic_css::Overflow;
 use rustic_css::{
-    BorderStyle, Image, PropertyId as P, PropertyValue as V, Visibility, VisualBox, ZIndex,
+    BorderStyle, Image as CssImage, PropertyId as P, PropertyValue as V, Visibility, VisualBox,
+    ZIndex,
 };
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
@@ -16,6 +17,7 @@ use rustic_layout::{
 use rustic_style::ComputedStyle;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::sync::Arc;
 use std::{error::Error, fmt, fmt::Write as _};
 
 /// Display list budgets, independent of layout limits.
@@ -49,6 +51,55 @@ pub struct PathPoint {
     pub on_curve: bool,
 }
 
+/// Decoded raster image content: straight-alpha sRGB RGBA, row-major.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Image {
+    width: u32,
+    height: u32,
+    pixels: Vec<u8>,
+}
+
+impl Image {
+    /// An image of `width × height` pixels; `None` unless both are positive
+    /// and `pixels` holds exactly four bytes per pixel.
+    pub fn new(width: u32, height: u32, pixels: Vec<u8>) -> Option<Self> {
+        let expected = usize::try_from(width)
+            .ok()?
+            .checked_mul(usize::try_from(height).ok()?)?
+            .checked_mul(4)?;
+        (width > 0 && height > 0 && pixels.len() == expected).then_some(Self {
+            width,
+            height,
+            pixels,
+        })
+    }
+
+    /// Width in image pixels.
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// Height in image pixels.
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// Straight-alpha RGBA bytes, row-major.
+    pub fn pixels(&self) -> &[u8] {
+        &self.pixels
+    }
+}
+
+/// Fonts and decoded images a display list paints with.
+#[derive(Clone, Debug, Default)]
+pub struct Resources<'a> {
+    /// The fonts the layout was computed with; required when it has text.
+    pub fonts: Fonts<'a>,
+    /// Decoded content of replaced elements, by element. Elements without
+    /// an entry paint no content (only their background and border).
+    pub images: HashMap<NodeId, Arc<Image>>,
+}
+
 /// Closed quadratic contours filled with the nonzero rule, such as the
 /// glyphs of one text fragment.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -76,6 +127,8 @@ pub enum ItemRole {
     Border,
     /// The glyphs of one text fragment, in the text's `color`.
     Text,
+    /// The content of a replaced element (its `color` is unused).
+    Image,
 }
 
 /// A filled area in CSS pixels. Edges are not snapped to device pixels.
@@ -94,6 +147,13 @@ pub enum Shape {
     Quad([CssPoint; 4]),
     /// Index into [`DisplayList::paths`].
     Path(usize),
+    /// Image [`DisplayList::images`]`[image]` stretched over `rect`.
+    Image {
+        /// Destination rectangle (the replaced element's content box).
+        rect: CssRect,
+        /// Index into [`DisplayList::images`].
+        image: usize,
+    },
 }
 
 /// One paint operation: fill `shape` with `color` using source-over.
@@ -192,6 +252,8 @@ pub struct DisplayList {
     commands: Vec<DisplayCommand>,
     /// Glyph paths referenced by [`Shape::Path`].
     paths: Vec<Path>,
+    /// Images referenced by [`Shape::Image`].
+    images: Vec<Arc<Image>>,
     /// Hit-testable border boxes in paint order.
     hits: Vec<HitRegion>,
     /// The root fragment, the target when no box is hit.
@@ -238,7 +300,7 @@ fn color(style: &ComputedStyle, property: P) -> Result<Srgba, PaintError> {
 
 fn has_image(style: &ComputedStyle) -> Result<bool, PaintError> {
     match style.get(P::BackgroundImage) {
-        V::BackgroundImage(layers) => Ok(layers.iter().any(|l| *l != Image::None)),
+        V::BackgroundImage(layers) => Ok(layers.iter().any(|l| *l != CssImage::None)),
         _ => Err(PaintError::InvalidInput),
     }
 }
@@ -335,6 +397,7 @@ struct Builder<'a> {
     path_points: usize,
     /// Outlines by (face, glyph), each read once.
     outlines: HashMap<(usize, u16), rustic_text::Outline>,
+    images: Vec<Arc<Image>>,
 }
 
 impl Builder<'_> {
@@ -607,6 +670,36 @@ impl DisplayList {
         limits: PaintLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, PaintError> {
+        let resources = Resources {
+            fonts,
+            images: HashMap::new(),
+        };
+        Self::build_with(
+            document,
+            tree,
+            layout,
+            viewport,
+            &resources,
+            limits,
+            cancellation,
+        )
+    }
+
+    /// Like [`DisplayList::build_with_fonts`], also painting replaced
+    /// content from `resources.images`: a block-level replaced element's
+    /// image paints atomically at the start of its inline-content step
+    /// (CSS 2.2 Appendix E step 7), stretched over its content box
+    /// (`object-fit: fill`) and clipped by its ancestors' overflow.
+    pub fn build_with(
+        document: &Document,
+        tree: &BoxTree,
+        layout: &BlockLayout,
+        viewport: CssSize,
+        resources: &Resources<'_>,
+        limits: PaintLimits,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, PaintError> {
+        let fonts = resources.fonts;
         let mut builder = Builder {
             commands: Vec::new(),
             limits,
@@ -615,7 +708,9 @@ impl DisplayList {
             paths: Vec::new(),
             path_points: 0,
             outlines: HashMap::new(),
+            images: Vec::new(),
         };
+        let mut image_index: HashMap<NodeId, usize> = HashMap::new();
         let fragments = layout.fragments();
         let style_of = |fragment: &BlockFragment| -> Result<&ComputedStyle, PaintError> {
             let b = tree
@@ -792,7 +887,29 @@ impl DisplayList {
                 Task::End => builder.command(DisplayCommand::EndGroup)?,
                 Task::Inline(blocks, muted) => {
                     for b in blocks {
-                        let clip = content_clip(&fragments[b]);
+                        let fragment = &fragments[b];
+                        if let Some(image) = resources.images.get(&fragment.node()) {
+                            let style = style_of(fragment)?;
+                            if !muted && visible(style) {
+                                let index =
+                                    *image_index.entry(fragment.node()).or_insert_with(|| {
+                                        builder.images.push(Arc::clone(image));
+                                        builder.images.len() - 1
+                                    });
+                                builder.push(DisplayItem {
+                                    source_box: fragment.source_box(),
+                                    node: fragment.node(),
+                                    role: ItemRole::Image,
+                                    shape: Shape::Image {
+                                        rect: fragment.content(),
+                                        image: index,
+                                    },
+                                    color: Srgba::WHITE,
+                                    clip: fragment.clip(),
+                                })?;
+                            }
+                        }
+                        let clip = content_clip(fragment);
                         for &line in &inline_lines[b] {
                             for &k in &line_inlines[line] {
                                 let inline = &layout.inlines()[k];
@@ -892,6 +1009,7 @@ impl DisplayList {
             canvas,
             commands: builder.commands,
             paths: builder.paths,
+            images: builder.images,
             hits,
             root,
         })
@@ -937,6 +1055,11 @@ impl DisplayList {
     /// Glyph paths, indexed by [`Shape::Path`].
     pub fn paths(&self) -> &[Path] {
         &self.paths
+    }
+
+    /// Images, indexed by [`Shape::Image`].
+    pub fn images(&self) -> &[Arc<Image>] {
+        &self.images
     }
 
     /// Copies of the fills alone, in paint order (group markers skipped).
@@ -998,6 +1121,7 @@ impl DisplayList {
                 ItemRole::Background => "background",
                 ItemRole::Border => "border",
                 ItemRole::Text => "text",
+                ItemRole::Image => "image",
             };
             let shape = match item.shape {
                 Shape::Rect(rect) => format!("rect=({})", r(rect)),
@@ -1013,6 +1137,15 @@ impl DisplayList {
                     }
                     s.push(')');
                     s
+                }
+                Shape::Image { rect, image } => {
+                    let data = &self.images[image];
+                    format!(
+                        "image={image} rect=({}) size={}x{}",
+                        r(rect),
+                        data.width,
+                        data.height
+                    )
                 }
                 Shape::Path(index) => {
                     let path = &self.paths[index];

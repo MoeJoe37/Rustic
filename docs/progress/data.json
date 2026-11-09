@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "324d0181bf7644707c0326f9ed3cda006aeb8b554ecca963ef2c0277c193b55f",
-  "percent": "27.94",
+  "source_fingerprint": "05917dac48afad0e4994a2fd36106f25188390f64c43a4b58bb008e36d10b9ab",
+  "percent": "28.13",
   "verified_percent": "21.25",
-  "partial_percent": "6.69",
+  "partial_percent": "6.88",
   "completed": 37,
   "in_progress": 16,
   "total": 172,
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 1,
       "total": 17,
-      "percent": "60.95",
+      "percent": "62.46",
       "verified_percent": "7.99",
-      "partial_percent": "52.96"
+      "partial_percent": "54.47"
     },
     {
       "id": "M4",
@@ -2521,8 +2521,29 @@
             {
               "id": "images",
               "label": "Image rasterization",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn draw_image"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/images.rs",
+                  "marker": "pub fn load"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn images_load_locally_within_budgets_and_break_cleanly"
+                }
+              ]
             },
             {
               "id": "layers",
@@ -2559,7 +2580,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "66.66",
           "engine_share": "1.11"
         },
         {
@@ -2757,10 +2778,10 @@
       "completed": 0,
       "in_progress": 6,
       "total": 7,
-      "contribution": "2.33",
-      "percent": "38.88",
+      "contribution": "2.51",
+      "percent": "41.97",
       "verified_percent": "0.00",
-      "partial_percent": "38.88"
+      "partial_percent": "41.97"
     },
     {
       "id": "js",

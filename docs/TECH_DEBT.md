@@ -100,6 +100,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, refused atomic inlines, approximations | Open, REN-03b |
 | TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
 | TD-52 | Deliberate | Paint | First text painting: no decorations, hinting, system fonts or exact nonzero fill | Open, REN-04c |
+| TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -878,3 +879,18 @@ strikeout metrics; an exact nonzero winding accumulator (per-pixel signed
 winding with a separate coverage buffer); a `--font` option and system font
 discovery per platform behind the same `FontDatabase`; text-node hit regions.
 **Trigger:** the first real-page renders or text WPT reftests.
+
+### TD-53 — First image painting slice
+
+REN-05c paints decoded PNGs for block-level replaced `img` boxes only:
+inline-level images wait for atomic inlines (TD-50). The content is always
+stretched over the content box (`object-fit: fill`, no `object-position`),
+always sampled bilinearly (no `image-rendering: pixelated`, no mipmaps, so
+strong downscaling aliases), and image density (`srcset`, `x` descriptors,
+EXIF orientation) is ignored. Broken images are zero-sized with no alt
+text or broken-image icon. Decoded images live for one command; there is no
+cache or sharing across documents. **Pay:** atomic inline images; parse and
+apply `object-fit`/`object-position`/`image-rendering`; area-averaged
+downscaling; alt text rendering; an image cache in the resource lifecycle
+work (`paint.images` lifecycle). **Trigger:** the first real-page renders or
+image WPT reftests.

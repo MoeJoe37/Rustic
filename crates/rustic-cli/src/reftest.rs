@@ -154,14 +154,14 @@ pub struct Manifest {
     pub invalid_fuzzy: Vec<String>,
 }
 
-fn attribute(element: DomElement<'_>, name: &str) -> Option<String> {
+pub(crate) fn attribute(element: DomElement<'_>, name: &str) -> Option<String> {
     element
         .attributes()
         .find(|a| a.namespace.is_none() && a.local == name)
         .map(|a| String::from_utf16_lossy(a.value))
 }
 
-fn is_html(element: DomElement<'_>, name: &str) -> bool {
+pub(crate) fn is_html(element: DomElement<'_>, name: &str) -> bool {
     element.local_name() == name && element.namespace() == Some(HTML_NAMESPACE)
 }
 
@@ -236,7 +236,13 @@ pub fn manifest(document: &Document, test: &Path) -> Manifest {
     manifest
 }
 
-fn resolve(href: &str, base: Option<&Url>, root: Option<&Path>) -> Result<PathBuf, &'static str> {
+/// Resolve `href` to a canonical file inside `root` (lexically, then after
+/// symbolic links resolve), or say why it cannot be read.
+pub(crate) fn resolve(
+    href: &str,
+    base: Option<&Url>,
+    root: Option<&Path>,
+) -> Result<PathBuf, &'static str> {
     let url = Url::parse(href, base).map_err(|_| "invalid URL")?;
     let path = url_path(&url).ok_or("not a local file")?;
     let root = root.ok_or("test has no directory")?;

@@ -45,6 +45,8 @@ impl Target for PaintTarget {
             b"justify-content:space-around",
             b"width:fit-content",
             b"<canvas width=9 height=4>",
+            b"<img>",
+            b"img{display:block;width:7.5px;height:3px}",
             b"position:relative",
             b"position:absolute;top:2px",
             b"position:fixed",
@@ -95,7 +97,7 @@ impl Target for PaintTarget {
         )
         .map_err(|e| e.to_string())?;
         let cancel = CancellationToken::default();
-        let Ok(tree) = BoxTree::build(
+        let Ok(mut tree) = BoxTree::build(
             document,
             document.root(),
             &styles,
@@ -105,7 +107,37 @@ impl Target for PaintTarget {
             return Ok(());
         };
         let viewport = CssSize::new(37.0, 23.0).map_err(|e| e.to_string())?;
+        // Every replaced box shows a 3×2 test image with mixed alpha.
+        let image = std::sync::Arc::new(
+            rustic_paint::Image::new(
+                3,
+                2,
+                [255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 0].repeat(2),
+            )
+            .ok_or("test image")?,
+        );
+        let replaced: Vec<_> = tree
+            .boxes()
+            .iter()
+            .filter(|b| b.natural_size().is_some())
+            .map(|b| b.node())
+            .collect();
+        let natural = rustic_layout::NaturalSize::from_dimensions(
+            rustic_layout::CssPx::new(3.0).map_err(|e| e.to_string())?,
+            rustic_layout::CssPx::new(2.0).map_err(|e| e.to_string())?,
+        );
+        let sizes: Vec<_> = replaced.iter().map(|&node| (node, natural)).collect();
+        if !sizes.is_empty() {
+            tree.set_natural_sizes(&sizes).map_err(|e| e.to_string())?;
+        }
         let fonts = fonts();
+        let resources = rustic_paint::Resources {
+            fonts: Some(fonts),
+            images: replaced
+                .iter()
+                .map(|&node| (node, std::sync::Arc::clone(&image)))
+                .collect(),
+        };
         let Ok(layout) = BlockLayout::compute_with_fonts(
             &tree,
             viewport,
@@ -115,12 +147,12 @@ impl Target for PaintTarget {
         ) else {
             return Ok(());
         };
-        let Ok(list) = DisplayList::build_with_fonts(
+        let Ok(list) = DisplayList::build_with(
             document,
             &tree,
             &layout,
             viewport,
-            Some(fonts),
+            &resources,
             PaintLimits::default(),
             &cancel,
         ) else {
@@ -142,6 +174,11 @@ impl Target for PaintTarget {
                     if let rustic_paint::Shape::Path(index) = item.shape {
                         if index >= list.paths().len() {
                             return Err("text item names a missing path".into());
+                        }
+                    }
+                    if let rustic_paint::Shape::Image { image, .. } = item.shape {
+                        if image >= list.images().len() {
+                            return Err("image item names a missing image".into());
                         }
                     }
                     if item.role == ItemRole::Background && !backgrounds.insert(item.node) {

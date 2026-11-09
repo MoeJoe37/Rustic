@@ -8,7 +8,9 @@
 use rustic_base::CancellationToken;
 use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
-use rustic_paint::{DisplayCommand, DisplayItem, DisplayList, Path, PathPoint, Shape, Srgba};
+use rustic_paint::{
+    DisplayCommand, DisplayItem, DisplayList, Image, Path, PathPoint, Shape, Srgba,
+};
 use std::{error::Error, fmt};
 
 /// Surface and work budgets for one rasterization.
@@ -338,6 +340,8 @@ fn flatten(contour: &[PathPoint], scale: f64) -> Vec<Point> {
 
 fn contours(shape: &Shape, paths: &[Path], scale: f64) -> Vec<Vec<Point>> {
     match *shape {
+        // Images are drawn by `draw_image`, not filled.
+        Shape::Image { .. } => Vec::new(),
         Shape::Path(index) => paths.get(index).map_or_else(Vec::new, |path| {
             path.contours()
                 .iter()
@@ -394,6 +398,107 @@ fn item_bounds(clip_rect: Clip, w: f64, h: f64, scale: f64) -> Option<Bounds> {
         b.3 = b.3.min(r.end.get() * scale);
     }
     (b.0 < b.2 && b.1 < b.3).then_some(b)
+}
+
+/// Bilinear sample of `image` at image-space `(u, v)` (pixel centers at
+/// half-integers), clamped to the edges, as premultiplied RGBA in 0–255.
+fn sample(image: &Image, u: f64, v: f64) -> [f64; 4] {
+    let (w, h) = (image.width() as usize, image.height() as usize);
+    let clamp = |t: f64, n: usize| t.clamp(0.0, (n - 1) as f64);
+    let (x, y) = (clamp(u - 0.5, w), clamp(v - 0.5, h));
+    let (x0, y0) = (x.floor() as usize, y.floor() as usize);
+    let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
+    let (fx, fy) = (x - x0 as f64, y - y0 as f64);
+    let pixels = image.pixels();
+    let texel = |x: usize, y: usize| {
+        let i = (y * w + x) * 4;
+        let a = f64::from(pixels[i + 3]);
+        [
+            f64::from(pixels[i]) * a / 255.0,
+            f64::from(pixels[i + 1]) * a / 255.0,
+            f64::from(pixels[i + 2]) * a / 255.0,
+            a,
+        ]
+    };
+    let (p00, p10, p01, p11) = (texel(x0, y0), texel(x1, y0), texel(x0, y1), texel(x1, y1));
+    let mut out = [0.0; 4];
+    for c in 0..4 {
+        let top = p00[c] + (p10[c] - p00[c]) * fx;
+        let bottom = p01[c] + (p11[c] - p01[c]) * fx;
+        out[c] = top + (bottom - top) * fy;
+    }
+    out
+}
+
+/// Draw an image item: each device pixel samples the image bilinearly at
+/// its center and composites source-over, weighted by how much of the pixel
+/// the destination rectangle (within the clip) covers. When the
+/// destination maps image pixels one-to-one onto device pixels, this copies
+/// them exactly.
+fn draw_image(
+    pixels: &mut [u8],
+    (width, height): (u32, u32),
+    item: &DisplayItem,
+    images: &[std::sync::Arc<Image>],
+    scale: f64,
+    work: &mut Work<'_>,
+) -> Result<(), RasterError> {
+    let Shape::Image { rect, image } = item.shape else {
+        return Ok(());
+    };
+    let image = images.get(image).ok_or(RasterError::InvalidList)?;
+    let (w, h) = (f64::from(width), f64::from(height));
+    let Some(limit) = item_bounds(item.clip, w, h, scale) else {
+        return Ok(());
+    };
+    let o = rect.origin();
+    let (x0, y0) = (o.x.get() * scale, o.y.get() * scale);
+    let (x1, y1) = (
+        (o.x.get() + rect.size().width().get()) * scale,
+        (o.y.get() + rect.size().height().get()) * scale,
+    );
+    if !(x1 > x0 && y1 > y0) {
+        return Ok(());
+    }
+    let (cx0, cy0, cx1, cy1) = (
+        x0.max(limit.0),
+        y0.max(limit.1),
+        x1.min(limit.2),
+        y1.min(limit.3),
+    );
+    if !(cx0 < cx1 && cy0 < cy1) {
+        return Ok(());
+    }
+    let (px0, py0) = (cx0.floor() as usize, cy0.floor() as usize);
+    let (px1, py1) = (cx1.ceil() as usize, cy1.ceil() as usize);
+    work.charge((px1 - px0) as u64 * (py1 - py0) as u64)?;
+    let (sx, sy) = (
+        f64::from(image.width()) / (x1 - x0),
+        f64::from(image.height()) / (y1 - y0),
+    );
+    let stride = width as usize;
+    let overlap = |p: usize, lo: f64, hi: f64| (hi.min(p as f64 + 1.0) - lo.max(p as f64)).max(0.0);
+    for py in py0..py1 {
+        work.cancellation
+            .check()
+            .map_err(|_| RasterError::Cancelled)?;
+        let cover_y = overlap(py, cy0, cy1);
+        let v = (py as f64 + 0.5 - y0) * sy;
+        for px in px0..px1 {
+            let coverage = overlap(px, cx0, cx1) * cover_y;
+            if coverage <= 0.0 {
+                continue;
+            }
+            let src = sample(image, (px as f64 + 0.5 - x0) * sx, v);
+            let keep = 1.0 - src[3] / 255.0 * coverage;
+            let i = (py * stride + px) * 4;
+            for (dst, s) in pixels[i..i + 4].iter_mut().zip(src) {
+                let value = s * coverage + f64::from(*dst) * keep;
+                *dst = value.round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn fill(
@@ -548,7 +653,11 @@ pub fn rasterize(
                     Some((pixels, _)) => pixels,
                     None => &mut surface.pixels,
                 };
-                fill(target, size, item, list.paths(), factor, &mut work)?;
+                if matches!(item.shape, Shape::Image { .. }) {
+                    draw_image(target, size, item, list.images(), factor, &mut work)?;
+                } else {
+                    fill(target, size, item, list.paths(), factor, &mut work)?;
+                }
             }
             DisplayCommand::BeginGroup { opacity, .. } => {
                 // The surface, every open group and the new one.

@@ -702,3 +702,34 @@ fn hit_test_reports_the_topmost_box_at_each_point() {
         assert!(output.stdout.is_empty());
     }
 }
+
+#[test]
+fn images_load_locally_within_budgets_and_break_cleanly() {
+    let input = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/reftests/image-scaled.html");
+    let input = input.to_str().unwrap();
+    let dump = |extra: &[&str]| {
+        let mut args = vec!["dump-paint"];
+        args.extend_from_slice(extra);
+        args.push(input);
+        let output = rustic(&args);
+        assert!(output.status.success(), "{}", stderr(&output));
+        String::from_utf8_lossy(&output.stdout).into_owned()
+    };
+    let loaded = dump(&[]);
+    assert!(
+        loaded.contains(" image image=0 rect=(7,7,50,30) size=1x1 "),
+        "{loaded}"
+    );
+    // Any exhausted budget breaks the image: no content, layout continues.
+    for limit in [
+        ["--max-image-bytes", "10"],
+        ["--max-image-decoded-bytes", "3"],
+    ] {
+        let broken = dump(&limit);
+        assert!(!broken.contains(" image "), "{limit:?}: {broken}");
+        assert!(broken.contains(" border "), "{limit:?}");
+    }
+    assert!(dump(&["--max-images", "1"]).contains(" image image=0 "));
+    let output = rustic(&["dump-paint", "--max-images", "0", input]);
+    assert_eq!(output.status.code(), Some(2));
+}

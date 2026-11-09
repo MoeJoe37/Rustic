@@ -926,6 +926,16 @@ commands load the bundled test fonts, so `dump-layout`, `dump-paint`, `render`,
 and 2. `paint.raster` credits glyph rasterization; gaps are TD-52. See
 [PAINT.md](PAINT.md#text).
 
+## REN-05c — Image painting
+
+The display list paints decoded images for block-level replaced elements
+(`Shape::Image`, bilinear sampling that copies exactly at one-to-one), and
+the command line loads local PNG `img` sources under the stylesheet
+confinement rules and image budgets, feeding natural sizes to layout. Image
+reftests cover natural size, scaling, alpha and broken images.
+`paint.raster` credits image rasterization; gaps are TD-53. See
+[PAINT.md](PAINT.md#images).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

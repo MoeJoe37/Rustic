@@ -159,6 +159,30 @@ them; no system fonts are read. Their `x` is a plain rectangle (500 units
 advance, 50 to 450 wide, 500 high, at 1000 units per em), which the text
 reftests use as an Ahem-style reference. See TD-52.
 
+## Images
+
+`DisplayList::build_with` takes `Resources`: the fonts plus decoded
+`Image`s (straight-alpha RGBA) by element. A block-level replaced element
+with an image paints it atomically at the start of its inline-content step
+(CSS 2.2 Appendix E step 7) as one `ItemRole::Image` item whose
+`Shape::Image` stretches the image over the content box (`object-fit: fill`),
+clipped by its ancestors' overflow. The rasterizer samples each device
+pixel's center bilinearly in premultiplied space with edges clamped, and
+weights partial edge pixels by covered area; when image pixels map one to
+one onto device pixels it copies them exactly. `image-rendering`,
+`object-fit`, `object-position` and inline-level images are not supported
+yet (TD-53).
+
+The command line loads each `img` that generated a box and has a non-empty
+`src`: the URL resolves against the document base and must name a file in
+the document's directory or below it (like linked stylesheets); the file is
+read in bounded chunks and decoded as PNG with `rustic-codecs`. One image
+pixel is one CSS pixel of natural size, passed to layout through
+`BoxTree::set_natural_sizes`. `--max-images`, `--max-image-bytes` and
+`--max-image-decoded-bytes` bound the count, encoded bytes and decoded bytes;
+an image that is blocked, missing, over budget or not a valid PNG is broken
+and keeps a zero natural size, and the load continues.
+
 ## Hit testing
 
 `DisplayList::hit_test` returns the topmost box whose border box contains a
@@ -196,10 +220,11 @@ tolerance and a mismatch.
 
 ## Not yet implemented
 
-Text decorations, emphasis marks and shadows; painting decoded images (`<img>`, `background-image`),
+Text decorations, emphasis marks and shadows; `background-image`,
+inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
 `border-radius`, outlines, box shadows, blend modes and filters, rounded or
 `clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53 and docs/ROADMAP.md (REN-04 to
 REN-07).

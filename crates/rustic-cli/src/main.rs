@@ -8,6 +8,7 @@ use rustic_engine::Viewport;
 use rustic_html::ParsedDocument;
 use std::path::Path;
 
+mod images;
 mod loader;
 mod reftest;
 mod stylesheets;
@@ -48,7 +49,9 @@ laid out with the bundled test fonts. Unsupported formatting fails explicitly.
 dump-paint prints the display list for that layout: the canvas color (with
 root/body background propagation), block and inline background colors, solid
 borders and text glyph paths in stacking-context paint order, with overflow
-clips and opacity groups. Layout and paint use the bundled test fonts only.
+clips and opacity groups, and block-level <img> content. Layout and paint use
+the bundled test fonts only; <img src> loads local PNG files from the
+document's directory or below it, like stylesheets.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). --scale sets device pixels per CSS pixel (default 1,
 at most 64). Images and non-solid borders fail explicitly; the
@@ -82,7 +85,12 @@ Normalization options for dump-formatting (exceeding one fails):
 Stylesheet options for styled dump commands (exceeding one skips the sheet, never fatal):
   --max-stylesheets N       linked and imported sheets fetched (default 64)
   --max-stylesheet-bytes N  total bytes of those sheets (default 8388608)
-  --max-import-depth N      @import nesting (default 16)";
+  --max-import-depth N      @import nesting (default 16)
+
+Image options for layout and paint commands (exceeding one breaks the image, never fatal):
+  --max-images N                 <img> files read (default 256)
+  --max-image-bytes N            total bytes of those files (default 33554432)
+  --max-image-decoded-bytes N    total decoded RGBA bytes (default 268435456)";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -437,6 +445,9 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
                 Some("--max-stylesheets") => Some(&mut limits.stylesheets.max_sheets),
                 Some("--max-stylesheet-bytes") => Some(&mut limits.stylesheets.max_total_bytes),
                 Some("--max-import-depth") => Some(&mut limits.stylesheets.max_import_depth),
+                Some("--max-images") => Some(&mut limits.images.max_images),
+                Some("--max-image-bytes") => Some(&mut limits.images.max_file_bytes),
+                Some("--max-image-decoded-bytes") => Some(&mut limits.images.max_decoded_bytes),
                 Some("--max-diagnostics") => {
                     Some(diagnostics.insert(limits.parser.max_tree_diagnostics))
                 }

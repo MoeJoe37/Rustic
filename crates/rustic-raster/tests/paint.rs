@@ -829,3 +829,84 @@ fn inline_content_paints_after_floats_and_before_positioned_boxes() {
     assert_eq!(surface.pixel(5, 4), Some(rgb(0, 0, 255)));
     assert_eq!(surface.pixel(5, 7), Some(rgb(255, 255, 255)));
 }
+
+#[test]
+fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled() {
+    let p = page(
+        "<div id=clip><img id=img></div>",
+        &format!(
+            "{RESET} #clip {{ width: 3px; overflow: hidden }}
+             img {{ display: block }}"
+        ),
+        10.0,
+        10.0,
+    );
+    // A 4×2 image: red green blue yellow / half-transparent black row.
+    let red = [255, 0, 0, 255];
+    let green = [0, 255, 0, 255];
+    let blue = [0, 0, 255, 255];
+    let yellow = [255, 255, 0, 255];
+    let shade = [0, 0, 0, 128];
+    let pixels: Vec<u8> = [red, green, blue, yellow, shade, shade, shade, shade].concat();
+    let image = std::sync::Arc::new(rustic_paint::Image::new(4, 2, pixels).unwrap());
+    assert!(rustic_paint::Image::new(4, 2, vec![0; 31]).is_none());
+    assert!(rustic_paint::Image::new(0, 2, Vec::new()).is_none());
+    // Natural size 4×2 from the embedder, as the CLI's image loader does.
+    let mut tree = p.tree.clone();
+    let node = p.id("img");
+    tree.set_natural_sizes(&[(
+        node,
+        rustic_layout::NaturalSize::from_dimensions(
+            rustic_layout::CssPx::new(4.0).unwrap(),
+            rustic_layout::CssPx::new(2.0).unwrap(),
+        ),
+    )])
+    .unwrap();
+    let layout = BlockLayout::compute(
+        &tree,
+        p.viewport,
+        LayoutLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let mut resources = rustic_paint::Resources::default();
+    resources.images.insert(node, image);
+    let list = DisplayList::build_with(
+        &p.doc,
+        &tree,
+        &layout,
+        p.viewport,
+        &resources,
+        PaintLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    assert!(
+        list.dump(usize::MAX)
+            .unwrap()
+            .contains(" image image=0 rect=(0,0,4,2) size=4x2 ")
+    );
+    let at = |scale| {
+        rasterize(
+            &list,
+            DeviceScale::new(scale).unwrap(),
+            RasterLimits::default(),
+            &CancellationToken::default(),
+        )
+        .unwrap()
+    };
+    // One image pixel per device pixel: exact copies, alpha composited over
+    // white, and the fourth column clipped by the 3px-wide overflow box.
+    let one = at(1.0);
+    assert_eq!(one.pixel(0, 0), Some(rgb(255, 0, 0)));
+    assert_eq!(one.pixel(1, 0), Some(rgb(0, 255, 0)));
+    assert_eq!(one.pixel(2, 0), Some(rgb(0, 0, 255)));
+    assert_eq!(one.pixel(3, 0), Some(rgb(255, 255, 255)));
+    assert_eq!(one.pixel(0, 1), Some(rgb(127, 127, 127)));
+    // At scale 2, image pixel centers keep their colors and the boundary
+    // between red and green is a bilinear blend.
+    let two = at(2.0);
+    assert_eq!(two.pixel(0, 0), Some(rgb(255, 0, 0)));
+    let blend = two.pixel(2, 0).unwrap();
+    assert!(blend.r > 0 && blend.g > 0 && blend.b == 0, "{blend:?}");
+}

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 27.94%** = 21.25% verified complete + 6.69% partial credit. 37/172 capabilities complete, 16 in progress.
+**Overall completion: 28.13%** = 21.25% verified complete + 6.88% partial credit. 37/172 capabilities complete, 16 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `324d0181bf7644707c0326f9ed3cda006aeb8b554ecca963ef2c0277c193b55f`.
+Catalog: `engine-v3`. Source fingerprint: `05917dac48afad0e4994a2fd36106f25188390f64c43a4b58bb008e36d10b9ab`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `324d0181bf7644707c0326f9ed3cda006aeb8
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 1/17 | 60.95% | 7.99% | 12.22% |
+| M3 Static renderer | 1/17 | 62.46% | 7.99% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -32,7 +32,7 @@ Catalog: `engine-v3`. Source fingerprint: `324d0181bf7644707c0326f9ed3cda006aeb8
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 4 | 37.12% | 0.00% | 4% | 1.48 |
 | Layout | 1/10 | 5 | 40.39% | 10.86% | 9% | 3.63 |
-| Paint & raster | 0/7 | 6 | 38.88% | 0.00% | 6% | 2.33 |
+| Paint & raster | 0/7 | 6 | 41.97% | 0.00% | 6% | 2.51 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -182,10 +182,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Overflow clips along the containing-block chain ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs))
   - [ ] Rounded and clip-path clips
   - [ ] 2D/3D transforms
-- **in progress 50.00%** `paint.raster` — Deterministic CPU reference rasterizer · size 5 · M3 · 1.11% of engine
+- **in progress 66.66%** `paint.raster` — Deterministic CPU reference rasterizer · size 5 · M3 · 1.11% of engine
   - [x] Exact-area antialiased fills and source-over compositing ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs))
   - [x] Glyph rasterization ([source](../../crates/rustic-raster/src/raster.rs), [source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs))
-  - [ ] Image rasterization
+  - [x] Image rasterization ([source](../../crates/rustic-raster/src/raster.rs), [source](../../crates/rustic-cli/src/images.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs))
   - [x] Clip and opacity group layers ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs))
   - [ ] Blend modes, filters and shadows
   - [ ] Tiled, damage-limited raster within frame budgets

@@ -1018,6 +1018,8 @@ fn outlines_paint_last_in_their_stacking_context_and_collapse_inward() {
             DisplayCommand::EndGroup => "end".into(),
             DisplayCommand::BeginClip { .. } => "clip".into(),
             DisplayCommand::EndClip => "end-clip".into(),
+            DisplayCommand::BeginTransform { .. } => "transform".into(),
+            DisplayCommand::EndTransform => "end-transform".into(),
         });
     }
     assert_eq!(
@@ -1138,6 +1140,8 @@ fn clip_paths_form_contexts_clip_descendants_and_hits() {
                 "clip".into()
             }
             DisplayCommand::EndClip => "end-clip".into(),
+            DisplayCommand::BeginTransform { .. } => "transform".into(),
+            DisplayCommand::EndTransform => "end-transform".into(),
             DisplayCommand::BeginGroup { .. } => "group".into(),
             DisplayCommand::EndGroup => "end".into(),
         });
@@ -1174,4 +1178,118 @@ fn clip_paths_form_contexts_clip_descendants_and_hits() {
             })
         );
     }
+}
+
+#[test]
+fn transforms_map_paint_clips_and_hits_through_their_planes() {
+    // A 40px square at (30, 30) turned 45° about its center (50, 50): a
+    // diamond reaching 28.28px from the center along the axes.
+    let p = page(
+        "<div id=t></div>",
+        &format!(
+            "{RESET} body {{ padding: 30px }}
+             #t {{ width: 40px; height: 40px; background: lime; transform: rotate(45deg) }}"
+        ),
+        100.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    let steps: Vec<String> = list
+        .commands()
+        .iter()
+        .map(|c| match c {
+            DisplayCommand::Fill(item) => p.id_name(item.node),
+            DisplayCommand::BeginTransform { .. } => "transform".into(),
+            DisplayCommand::EndTransform => "end-transform".into(),
+            _ => "other".into(),
+        })
+        .collect();
+    assert_eq!(steps, ["transform", "t", "end-transform"]);
+    let surface = render(&p, 1.0);
+    let white = rgb(255, 255, 255);
+    assert_eq!(surface.pixel(50, 50), Some(rgb(0, 255, 0)));
+    // The square's corner is outside the diamond; the diamond's tip is
+    // outside the square.
+    assert_eq!(surface.pixel(31, 31), Some(white));
+    assert_eq!(surface.pixel(49, 24), Some(rgb(0, 255, 0)));
+    assert_eq!(hit(&p, &list, 31.0, 31.0).as_deref(), Some("body"));
+    assert_eq!(hit(&p, &list, 50.0, 23.0).as_deref(), Some("t"));
+    // The diamond is symmetric about its center to within rounding.
+    for (x, y) in [(40, 35), (45, 28), (33, 47)] {
+        let a = surface.pixel(x, y).unwrap();
+        let b = surface.pixel(100 - x - 1, 100 - y - 1).unwrap();
+        assert!(a.r.abs_diff(b.r) <= 1, "({x},{y}): {a:?} vs {b:?}");
+    }
+    let dump = list.dump(1 << 20).unwrap();
+    assert!(dump.contains("transform box="), "{dump}");
+    assert!(dump.contains("end-transform\n"));
+
+    // An overflow clip outside the transform clips it in the outer plane,
+    // and hits outside that clip miss.
+    let p = page(
+        "<div id=clip><div id=moved></div></div>",
+        &format!(
+            "{RESET} #clip {{ width: 50px; height: 50px; overflow: hidden }}
+             #moved {{ height: 20px; background: blue; transform: translateX(30px) }}"
+        ),
+        100.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    let surface = render(&p, 2.0);
+    assert_eq!(surface.pixel(2 * 45, 10), Some(rgb(0, 0, 255)));
+    assert_eq!(surface.pixel(2 * 55, 10), Some(rgb(255, 255, 255)));
+    assert_eq!(hit(&p, &list, 45.0, 5.0).as_deref(), Some("moved"));
+    assert_eq!(hit(&p, &list, 10.0, 5.0).as_deref(), Some("clip"));
+    assert_eq!(hit(&p, &list, 55.0, 5.0).as_deref(), Some("body"));
+
+    // A containing block's perspective: translateZ(50px) at a distance of
+    // 100px doubles the size about the perspective origin (the center).
+    let p = page(
+        "<div id=stage><div id=near></div></div>",
+        &format!(
+            "{RESET} #stage {{ position: relative; width: 100px; height: 100px;
+                       perspective: 100px }}
+             #near {{ position: absolute; left: 40px; top: 40px; width: 20px; height: 20px;
+                      background: red; transform: translateZ(50px) }}"
+        ),
+        100.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    let surface = render(&p, 1.0);
+    assert_eq!(surface.pixel(31, 31), Some(rgb(255, 0, 0)));
+    assert_eq!(surface.pixel(68, 68), Some(rgb(255, 0, 0)));
+    assert_eq!(surface.pixel(29, 50), Some(rgb(255, 255, 255)));
+    assert_eq!(hit(&p, &list, 32.0, 50.0).as_deref(), Some("near"));
+    assert_eq!(hit(&p, &list, 28.0, 50.0).as_deref(), Some("stage"));
+
+    // A singular transform, or a hidden back face, paints and hits nothing.
+    for css in [
+        "transform: scale(0)",
+        "transform: rotateX(180deg); backface-visibility: hidden",
+    ] {
+        let p = page(
+            "<div id=gone></div>",
+            &format!("{RESET} #gone {{ height: 20px; background: red; {css} }}"),
+            40.0,
+            40.0,
+        );
+        let list = p.list().unwrap();
+        assert!(list.items().is_empty(), "{css}");
+        assert_eq!(hit(&p, &list, 5.0, 5.0).as_deref(), Some("body"), "{css}");
+    }
+
+    // A transform that tips the plane behind the viewer paints only the
+    // part in front of it, deterministically.
+    let p = page(
+        "<div id=stage><div id=tilt></div></div>",
+        &format!(
+            "{RESET} #stage {{ perspective: 30px }}
+             #tilt {{ height: 60px; background: blue; transform: rotateX(80deg) }}"
+        ),
+        60.0,
+        60.0,
+    );
+    assert_eq!(render(&p, 1.0), render(&p, 1.0));
 }

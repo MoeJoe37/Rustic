@@ -34,21 +34,23 @@ fn ellipse(cx: f64, cy: f64, rx: f64, ry: f64) -> Option<RoundedRect> {
     })
 }
 
+/// A computed length or percentage of `basis` in CSS pixels, which may be
+/// negative (`resolve` clamps at zero); `None` when it is not finite.
+pub(crate) fn length(lp: &LengthPercentage, basis: f64) -> Option<f64> {
+    let px = match lp {
+        LengthPercentage::Length(l) => l.value,
+        LengthPercentage::Percentage(p) => p / 100.0 * basis,
+        LengthPercentage::Calc(calc) => calc.resolve(|l| l.value, Some(basis))?,
+    };
+    px.is_finite().then_some(px)
+}
+
 /// Resolve `shape` in the reference box `(x, y, w, h)`; `None` when a value
 /// cannot resolve to a finite length.
 pub(crate) fn resolve_shape(
     shape: &BasicShape,
     (x, y, w, h): (f64, f64, f64, f64),
 ) -> Option<Resolved> {
-    let length = |lp: &LengthPercentage, basis: f64| -> Option<f64> {
-        // `resolve` clamps at zero; offsets and coordinates may be negative.
-        let px = match lp {
-            LengthPercentage::Length(l) => l.value,
-            LengthPercentage::Percentage(p) => p / 100.0 * basis,
-            LengthPercentage::Calc(calc) => calc.resolve(|l| l.value, Some(basis))?,
-        };
-        px.is_finite().then_some(px)
-    };
     let center = |c: &Option<rustic_css::PositionValue>| -> Option<(f64, f64)> {
         match c {
             None => Some((x + w / 2.0, y + h / 2.0)),

@@ -79,6 +79,16 @@ impl Target for PaintTarget {
             b"clip-path:circle(40% at 20% 30%)",
             b"clip-path:polygon(0 0,100% 0,0 100%)",
             b"clip-path:inset(2px round 50%) content-box",
+            b"transform:rotate(30deg) scale(1.5)",
+            b"transform:translate(3px,-50%) skew(10deg)",
+            b"transform:perspective(20px) rotateY(60deg)",
+            b"transform:matrix3d(1,0,0,0.01,0,1,0,0,0,0,1,0,0,0,0,1)",
+            b"rotate:x 120deg",
+            b"scale:0",
+            b"translate:2px 3px",
+            b"transform-origin:0 0",
+            b"perspective:30px",
+            b"backface-visibility:hidden",
             b"{",
             b"}",
         ]
@@ -175,6 +185,8 @@ impl Target for PaintTarget {
         let mut backgrounds = std::collections::HashSet::new();
         // Open layers: `true` for a clip-path layer, `false` for a group.
         let mut layers: Vec<bool> = Vec::new();
+        // Open transforms.
+        let mut transforms: Vec<usize> = Vec::new();
         for command in list.commands() {
             match command {
                 DisplayCommand::Fill(item) => {
@@ -239,9 +251,25 @@ impl Target for PaintTarget {
                         return Err("unbalanced clip-path end".into());
                     }
                 }
+                DisplayCommand::BeginTransform { transform, .. } => {
+                    let Some(node) = list.transforms().get(*transform) else {
+                        return Err("transform names a missing node".into());
+                    };
+                    if node.rounded_clip.is_some_and(|c| c >= list.clips().len())
+                        || node.parent.is_some_and(|p| p >= *transform)
+                    {
+                        return Err("transform node with an invalid link".into());
+                    }
+                    transforms.push(*transform);
+                }
+                DisplayCommand::EndTransform => {
+                    if transforms.pop().is_none() {
+                        return Err("unbalanced transform end".into());
+                    }
+                }
             }
         }
-        if !layers.is_empty() {
+        if !layers.is_empty() || !transforms.is_empty() {
             return Err("unclosed layer".into());
         }
         // Every hit inside the viewport names a laid-out box; outside, none.

@@ -980,6 +980,22 @@ edge's coverage one column over. Clamping fixes it, and a unit test covers
 it. `paint.stacking` credits its rounded and clip-path step. Gaps are
 TD-56. See [PAINT.md](PAINT.md#clip-paths).
 
+## REN-04h — Transforms
+
+Every transform property parses and computes, and transformed boxes paint
+through plane homographies: paint keeps local coordinates inside a
+transformed context and records its clips in the parent's coordinates, the
+rasterizer projects shapes, clips and images with a stack of maps, and hit
+testing inverts the chain. Perspective, singular matrices and hidden back
+faces follow CSS Transforms 2. Trigonometry is plain arithmetic so matrices
+match on every platform, and output without transforms is byte-identical to
+before. Five exact reftests (translate against offsets, a 90° rotation, a
+scale about the corner with a mirrored box, an overflow clip rotated 180°,
+and a flipped box with a hidden back face) plus a paint test for 45°
+coverage, outer clips, perspective, hits and degenerate cases cover it.
+`paint.stacking` credits its transforms step. Gaps are TD-57. See
+[PAINT.md](PAINT.md#transforms).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

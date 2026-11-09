@@ -601,6 +601,20 @@ pub enum PropertyValue {
     BorderRadius(CornerRadius),
     /// `clip-path`.
     ClipPath(crate::ClipPath),
+    /// `transform`.
+    Transform(crate::TransformList),
+    /// `translate`, `rotate`, `scale`.
+    IndividualTransform(crate::IndividualTransform),
+    /// `transform-origin`: a position and a z length.
+    TransformOrigin(PositionValue, LengthPercentage),
+    /// `perspective-origin`.
+    PerspectiveOrigin(PositionValue),
+    /// `perspective`: a nonnegative length, or `None` for `none`.
+    Perspective(Option<LengthPercentage>),
+    /// `backface-visibility`.
+    BackfaceVisibility(crate::BackfaceVisibility),
+    /// `transform-style`.
+    TransformStyle(crate::TransformStyle),
     /// `box-sizing`.
     BoxSizing(BoxSizing),
     /// `font-size`.
@@ -808,6 +822,15 @@ property_ids! {
     BorderBottomRightRadius => "border-bottom-right-radius", false;
     BorderBottomLeftRadius => "border-bottom-left-radius", false;
     ClipPath => "clip-path", false;
+    Transform => "transform", false;
+    Translate => "translate", false;
+    Rotate => "rotate", false;
+    Scale => "scale", false;
+    TransformOrigin => "transform-origin", false;
+    Perspective => "perspective", false;
+    PerspectiveOrigin => "perspective-origin", false;
+    BackfaceVisibility => "backface-visibility", false;
+    TransformStyle => "transform-style", false;
 }
 
 impl PropertyId {
@@ -889,6 +912,26 @@ impl PropertyId {
             | P::BorderBottomRightRadius
             | P::BorderBottomLeftRadius => PropertyValue::BorderRadius(CornerRadius::ZERO),
             P::ClipPath => PropertyValue::ClipPath(crate::ClipPath::None),
+            P::Transform => PropertyValue::Transform(crate::TransformList::default()),
+            P::Translate | P::Rotate | P::Scale => {
+                PropertyValue::IndividualTransform(crate::IndividualTransform(None))
+            }
+            P::TransformOrigin => PropertyValue::TransformOrigin(
+                PositionValue {
+                    x: crate::PositionComponent::Offset(LengthPercentage::Percentage(50.0)),
+                    y: crate::PositionComponent::Offset(LengthPercentage::Percentage(50.0)),
+                },
+                zero,
+            ),
+            P::PerspectiveOrigin => PropertyValue::PerspectiveOrigin(PositionValue {
+                x: crate::PositionComponent::Offset(LengthPercentage::Percentage(50.0)),
+                y: crate::PositionComponent::Offset(LengthPercentage::Percentage(50.0)),
+            }),
+            P::Perspective => PropertyValue::Perspective(None),
+            P::BackfaceVisibility => {
+                PropertyValue::BackfaceVisibility(crate::BackfaceVisibility::Visible)
+            }
+            P::TransformStyle => PropertyValue::TransformStyle(crate::TransformStyle::Flat),
             P::BackgroundImage => PropertyValue::BackgroundImage(vec![Image::None]),
             P::BackgroundPosition => {
                 PropertyValue::BackgroundPosition(vec![PositionValue::top_left()])
@@ -1758,6 +1801,30 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         }
         P::ContainerName => return container_name(parts).map(PropertyValue::ContainerName),
         P::ClipPath => return crate::shape::clip_path(parts).map(PropertyValue::ClipPath),
+        P::Transform => {
+            return crate::transform::transform_list(parts).map(PropertyValue::Transform);
+        }
+        P::Translate => {
+            return crate::transform::translate(parts).map(PropertyValue::IndividualTransform);
+        }
+        P::Rotate => {
+            return crate::transform::rotate(parts).map(PropertyValue::IndividualTransform);
+        }
+        P::Scale => return crate::transform::scale(parts).map(PropertyValue::IndividualTransform),
+        P::TransformOrigin => {
+            let (position, z) = match parts {
+                [x, y, z] => (
+                    background::position(&[*x, *y])?,
+                    length_percentage(z)
+                        .filter(|z| !matches!(z, LengthPercentage::Percentage(_)))?,
+                ),
+                _ => (background::position(parts)?, LengthPercentage::ZERO),
+            };
+            return Some(PropertyValue::TransformOrigin(position, z));
+        }
+        P::PerspectiveOrigin => {
+            return background::position(parts).map(PropertyValue::PerspectiveOrigin);
+        }
         P::BorderTopLeftRadius
         | P::BorderTopRightRadius
         | P::BorderBottomRightRadius
@@ -1800,7 +1867,28 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::BorderTopRightRadius
         | P::BorderBottomRightRadius
         | P::BorderBottomLeftRadius
-        | P::ClipPath => unreachable!("handled above"),
+        | P::ClipPath
+        | P::Transform
+        | P::Translate
+        | P::Rotate
+        | P::Scale
+        | P::TransformOrigin
+        | P::PerspectiveOrigin => unreachable!("handled above"),
+        P::Perspective => {
+            PropertyValue::Perspective(if keyword(value, "none") {
+                None
+            } else {
+                Some(length_percentage(value).filter(|d| {
+                    !d.is_negative() && !matches!(d, LengthPercentage::Percentage(_))
+                })?)
+            })
+        }
+        P::BackfaceVisibility => {
+            PropertyValue::BackfaceVisibility(crate::BackfaceVisibility::from_name(name()?)?)
+        }
+        P::TransformStyle => {
+            PropertyValue::TransformStyle(crate::TransformStyle::from_name(name()?)?)
+        }
         P::FlexDirection => PropertyValue::FlexDirection(FlexDirection::from_name(name()?)?),
         P::FlexWrap => PropertyValue::FlexWrap(FlexWrap::from_name(name()?)?),
         P::FlexGrow | P::FlexShrink => PropertyValue::Number(flex_factor(value)?),
@@ -2184,6 +2272,15 @@ impl fmt::Display for PropertyValue {
             Self::TextDecorationStyle(v) => write!(f, "{v}"),
             Self::OutlineStyle(v) => write!(f, "{v}"),
             Self::ClipPath(c) => write!(f, "{c}"),
+            Self::Transform(t) => write!(f, "{t}"),
+            Self::IndividualTransform(t) => write!(f, "{t}"),
+            Self::TransformOrigin(p, z) if *z == LengthPercentage::ZERO => write!(f, "{p}"),
+            Self::TransformOrigin(p, z) => write!(f, "{p} {z}"),
+            Self::PerspectiveOrigin(p) => write!(f, "{p}"),
+            Self::Perspective(None) => f.write_str("none"),
+            Self::Perspective(Some(d)) => write!(f, "{d}"),
+            Self::BackfaceVisibility(v) => write!(f, "{v}"),
+            Self::TransformStyle(v) => write!(f, "{v}"),
             Self::BorderRadius(r) if r.horizontal == r.vertical => write!(f, "{}", r.horizontal),
             Self::BorderRadius(r) => write!(f, "{} {}", r.horizontal, r.vertical),
             Self::FontVariantCaps(v) => write!(f, "{v}"),

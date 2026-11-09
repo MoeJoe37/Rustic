@@ -164,7 +164,7 @@ fn style_attributes_beat_rules_of_the_same_importance() {
         "width: 9px\n"
     );
     // Invalid declarations in the attribute are dropped with diagnostics.
-    let page = document("<p style='color: nonsense; width: 4px; transform: none'>");
+    let page = document("<p style='color: nonsense; width: 4px; cursor: pointer'>");
     let doc = page.document();
     let styled = style_tree(
         doc,

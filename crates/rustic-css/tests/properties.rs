@@ -125,7 +125,6 @@ fn valid_declarations_parse_to_typed_longhands() {
 fn invalid_declarations_are_rejected() {
     use PropertyError::*;
     let cases = [
-        ("transform: none", UnknownProperty),
         ("cursor: pointer", UnknownProperty),
         ("cursor: var(--x)", UnknownProperty),
         ("display: block inline", InvalidValue),

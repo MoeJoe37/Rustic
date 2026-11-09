@@ -294,6 +294,45 @@ without SVG layout. A reference box alone clips to that box's
 clip path. `url()` references and `polygon(evenodd, …)` fail with typed
 errors. See TD-56.
 
+## Transforms
+
+`transform`, `translate`, `rotate`, `scale`, `transform-origin`,
+`perspective`, `perspective-origin`, `backface-visibility` and
+`transform-style` parse and compute (CSS Transforms 1 and 2). Every
+transform function is supported, 3D ones included; angles take `deg`,
+`grad`, `rad` and `turn`. A box with a transform, or with `perspective`, is
+a stacking context. Its matrix is the containing block's perspective
+(`perspective(d)` about its `perspective-origin`), then `translate`,
+`rotate`, `scale` and `transform` about `transform-origin` in the border box.
+Trigonometry uses plain arithmetic (exact reduction to 45° and Taylor
+series), so matrices are identical on every platform.
+
+Layout ignores transforms. Paint keeps every item of a transformed context
+in its local layout coordinates and brackets the context with
+`DisplayCommand::BeginTransform` and `EndTransform`, which name a
+[`TransformNode`]: the plane homography of the 4×4 matrix (the z = 0 plane
+is all that is drawn, since 3D contexts are flattened) and the overflow and
+rounded clips of the ancestors around the box, in the parent's coordinates.
+Clips inside a transformed context restart there: a containing block in
+another coordinate space does not clip its descendant directly, its clips
+apply through the transform node instead.
+
+The rasterizer keeps a stack of local-to-device maps. Inside a transform,
+each shape is flattened finely enough for the local stretch of the map,
+clipped to its local overflow clip and to the half plane in front of the
+viewer (w > 10⁻⁶), and projected; polygons stay exact because projections
+map lines to lines. Rounded clips and clip paths are projected the same way,
+and images sample the local point each device pixel center comes from. A
+transform with clips around it opens a layer that is composited through
+those clips' coverage in the enclosing coordinates. Outside every
+transform, nothing changed, so earlier output is byte-identical.
+
+A matrix that is not finite or not invertible on the plane (`scale(0)`),
+and a `backface-visibility: hidden` box whose back faces the viewer, paint
+and hit nothing. Hit testing maps the point into each region's local plane
+through the inverse homographies and checks every enclosing transform's
+clips and clip path in its own coordinates. See TD-57.
+
 ## Not yet implemented
 
 Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
@@ -301,7 +340,7 @@ Non-solid outline styles, non-solid text decoration styles, `text-underline-offs
 inline-level images, `object-fit` and `image-rendering`,
 JPEG/GIF/WebP decoding, gradients, non-solid borders,
 box shadows, blend modes and filters, `clip-path` URLs and the
-`evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, transforms, scrolling offsets, coverage-conflation-free corner
+`evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57 and docs/ROADMAP.md (REN-04 to
 REN-07).

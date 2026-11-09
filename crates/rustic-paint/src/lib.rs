@@ -14,11 +14,13 @@
 mod clip;
 mod color;
 mod display;
+mod matrix;
 mod rounded;
 
 pub use color::{Srgba, srgba};
 pub use display::{
     ClipNode, DisplayCommand, DisplayItem, DisplayList, Fonts, Hit, Image, ItemRole, PaintError,
-    PaintLimits, Path, PathPoint, Resources, Shape, UnsupportedPaint,
+    PaintLimits, Path, PathPoint, Resources, Shape, TransformNode, UnsupportedPaint,
 };
+pub use matrix::Homography;
 pub use rounded::{Corner, RoundedRect};

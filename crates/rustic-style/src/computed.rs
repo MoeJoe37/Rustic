@@ -760,6 +760,35 @@ fn compute_values(
                         PropertyValue::Gap(Gap::LengthPercentage(lp)) => {
                             PropertyValue::Gap(Gap::LengthPercentage(basis.lp(lp, nonnegative)))
                         }
+                        PropertyValue::Transform(list) => {
+                            PropertyValue::Transform(rustic_css::TransformList(
+                                list.0
+                                    .iter()
+                                    .map(|f| f.map_lengths(&|lp| basis.lp(lp, false)))
+                                    .collect(),
+                            ))
+                        }
+                        PropertyValue::IndividualTransform(rustic_css::IndividualTransform(
+                            Some(f),
+                        )) => PropertyValue::IndividualTransform(rustic_css::IndividualTransform(
+                            Some(f.map_lengths(&|lp| basis.lp(lp, false))),
+                        )),
+                        PropertyValue::TransformOrigin(p, z) => PropertyValue::TransformOrigin(
+                            PositionValue {
+                                x: PositionComponent::Offset(basis.lp(&p.x.to_offset(), false)),
+                                y: PositionComponent::Offset(basis.lp(&p.y.to_offset(), false)),
+                            },
+                            basis.lp(z, false),
+                        ),
+                        PropertyValue::PerspectiveOrigin(p) => {
+                            PropertyValue::PerspectiveOrigin(PositionValue {
+                                x: PositionComponent::Offset(basis.lp(&p.x.to_offset(), false)),
+                                y: PositionComponent::Offset(basis.lp(&p.y.to_offset(), false)),
+                            })
+                        }
+                        PropertyValue::Perspective(Some(d)) => {
+                            PropertyValue::Perspective(Some(basis.lp(d, true)))
+                        }
                         PropertyValue::ClipPath(rustic_css::ClipPath::Shape(shape, b)) => {
                             PropertyValue::ClipPath(rustic_css::ClipPath::Shape(
                                 shape.map_lengths(&|lp| basis.lp(lp, false)),

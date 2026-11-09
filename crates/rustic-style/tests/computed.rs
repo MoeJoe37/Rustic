@@ -234,6 +234,23 @@ fn currentcolor_and_border_widths() {
         computed(html, clip, "a", "clip-path"),
         "circle(16px at calc(100% - 32px) 100%)"
     );
+    // Transforms compute lengths to pixels and origins to offsets.
+    let transform = "#a { transform: translateX(1em) perspective(2em); transform-origin: right 1em; \
+                     translate: 1em; perspective: 3em; perspective-origin: left }";
+    assert_eq!(
+        computed(html, transform, "a", "transform"),
+        "translate(16px, 0px) perspective(32px)"
+    );
+    assert_eq!(
+        computed(html, transform, "a", "transform-origin"),
+        "100% 16px"
+    );
+    assert_eq!(computed(html, transform, "a", "translate"), "16px");
+    assert_eq!(computed(html, transform, "a", "perspective"), "48px");
+    assert_eq!(
+        computed(html, transform, "a", "perspective-origin"),
+        "0% 50%"
+    );
 }
 
 #[test]

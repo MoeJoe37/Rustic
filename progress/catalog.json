@@ -2158,70 +2158,52 @@
           "label": "Stacking, clips and transforms",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "contexts",
-              "label": "Stacking contexts and z-index ordering",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "Role::Context"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn equal_z_index_keeps_tree_order_and_fixed_boxes_form_contexts"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "Role::Context"
             },
             {
-              "id": "clips",
-              "label": "Overflow clips along the containing-block chain",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn item_bounds"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn overflow_clips_follow_the_containing_block_chain"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn equal_z_index_keeps_tree_order_and_fixed_boxes_form_contexts"
             },
             {
-              "id": "radius",
-              "label": "Rounded and clip-path clips",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/clip.rs",
-                  "marker": "fn resolve_shape("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn rounded_clips_follow_containing_blocks_and_shape_hits"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn clip_paths_form_contexts_clip_descendants_and_hits"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn item_bounds"
             },
             {
-              "id": "transforms",
-              "label": "2D/3D transforms",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn overflow_clips_follow_the_containing_block_chain"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/clip.rs",
+              "marker": "fn resolve_shape("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn rounded_clips_follow_containing_blocks_and_shape_hits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn clip_paths_form_contexts_clip_descendants_and_hits"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/matrix.rs",
+              "marker": "fn box_transform("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn transforms_map_paint_clips_and_hits_through_their_planes"
             }
           ]
         },

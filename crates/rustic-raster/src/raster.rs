@@ -9,8 +9,8 @@ use rustic_base::CancellationToken;
 use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
 use rustic_paint::{
-    ClipNode, DisplayCommand, DisplayItem, DisplayList, Image, Path, PathPoint, RoundedRect, Shape,
-    Srgba,
+    ClipNode, DisplayCommand, DisplayItem, DisplayList, Homography, Image, Path, PathPoint,
+    RoundedRect, Shape, Srgba,
 };
 use std::{error::Error, fmt};
 
@@ -379,6 +379,341 @@ fn contours(shape: &Shape, paths: &[Path], rounded: &[RoundedRect], scale: f64) 
     }
 }
 
+/// The shape of an item as contours in its local CSS pixels, before any
+/// transform.
+fn local_contours(shape: &Shape, list: &DisplayList) -> Vec<Vec<PathPoint>> {
+    let on = |x: f64, y: f64| PathPoint {
+        x,
+        y,
+        on_curve: true,
+    };
+    let rect = |r: CssRect, reverse: bool| {
+        let (x0, y0) = (r.origin().x.get(), r.origin().y.get());
+        let (x1, y1) = (x0 + r.size().width().get(), y0 + r.size().height().get());
+        let mut points = vec![on(x0, y0), on(x1, y0), on(x1, y1), on(x0, y1)];
+        if reverse {
+            points.reverse();
+        }
+        points
+    };
+    match *shape {
+        Shape::Image { .. } => Vec::new(),
+        Shape::Path(index) => list.paths().get(index).map_or_else(Vec::new, |path| {
+            path.contours()
+                .iter()
+                .filter(|c| !c.is_empty())
+                .cloned()
+                .collect()
+        }),
+        Shape::Rect(r) => vec![rect(r, false)],
+        Shape::Ring { outer, inner } => vec![rect(outer, false), rect(inner, true)],
+        Shape::Rounded(r) => list
+            .rounded()
+            .get(r)
+            .map_or_else(Vec::new, |r| vec![r.contour()]),
+        Shape::RoundedRing { outer, inner } => {
+            match (list.rounded().get(outer), list.rounded().get(inner)) {
+                (Some(outer), Some(inner)) => {
+                    let mut hole = inner.contour();
+                    hole.reverse();
+                    vec![outer.contour(), hole]
+                }
+                _ => Vec::new(),
+            }
+        }
+        Shape::Quad(points) => vec![points.iter().map(|p| on(p.x.get(), p.y.get())).collect()],
+    }
+}
+
+/// Smallest homogeneous w kept when projecting: geometry at or behind the
+/// viewer's plane is cut off (CSS Transforms 2 §6.1).
+const W_MIN: f64 = 1e-6;
+
+/// Keep the part of a closed polygon where `a·x + b·y + c >= 0`.
+fn clip_half_plane(points: &[Point], (a, b, c): (f64, f64, f64)) -> Vec<Point> {
+    let value = |p: Point| a * p.0 + b * p.1 + c;
+    if points.iter().all(|&p| value(p) >= 0.0) {
+        return points.to_vec();
+    }
+    let mut out = Vec::with_capacity(points.len() + 2);
+    let Some(&last) = points.last() else {
+        return out;
+    };
+    let mut previous = last;
+    for &current in points {
+        let (vp, vc) = (value(previous), value(current));
+        let cross = || {
+            let t = vp / (vp - vc);
+            (
+                previous.0 + (current.0 - previous.0) * t,
+                previous.1 + (current.1 - previous.1) * t,
+            )
+        };
+        match (vp >= 0.0, vc >= 0.0) {
+            (true, true) => out.push(current),
+            (true, false) => out.push(cross()),
+            (false, true) => {
+                out.push(cross());
+                out.push(current);
+            }
+            (false, false) => {}
+        }
+        previous = current;
+    }
+    out
+}
+
+/// The most device pixels one local CSS pixel stretches to near the points
+/// of `contour` under `map`, for flattening curves before projecting them.
+fn stretch(map: &Homography, contour: &[PathPoint]) -> f64 {
+    let h = &map.0;
+    let mut most: f64 = 0.0;
+    for p in contour {
+        let w = map.w(p.x, p.y);
+        if w <= W_MIN {
+            continue;
+        }
+        let Some((x, y)) = map.apply(p.x, p.y) else {
+            continue;
+        };
+        // The Jacobian of the projection at p.
+        let j = [
+            (h[0] - x * h[6]) / w,
+            (h[1] - x * h[7]) / w,
+            (h[3] - y * h[6]) / w,
+            (h[4] - y * h[7]) / w,
+        ];
+        let norm = j.iter().map(|v| v * v).sum::<f64>().sqrt();
+        if norm.is_finite() {
+            most = most.max(norm);
+        }
+    }
+    if most > 0.0 {
+        most.clamp(1e-3, 1e6)
+    } else {
+        1.0
+    }
+}
+
+/// Flatten a local contour, keep what lies inside `bounds` (local CSS
+/// pixels) and in front of the viewer, and map it to device pixels.
+/// Polygon clipping commutes with the projection, which maps lines to
+/// lines; curves are flattened finely enough for the local stretch.
+fn project(contour: &[PathPoint], map: &Homography, bounds: Option<Bounds>) -> Vec<Point> {
+    let k = stretch(map, contour);
+    let mut points: Vec<Point> = flatten(contour, k)
+        .into_iter()
+        .map(|(x, y)| (x / k, y / k))
+        .collect();
+    if let Some(b) = bounds {
+        points = clip(&points, b);
+    }
+    let h = &map.0;
+    clip_half_plane(&points, (h[6], h[7], h[8] - W_MIN))
+        .into_iter()
+        .filter_map(|(x, y)| map.apply(x, y))
+        .filter(|p| p.0.is_finite() && p.1.is_finite())
+        .collect()
+}
+
+/// An axis clip as local bounds, unbounded axes reaching far beyond any
+/// layout.
+fn local_bounds(clip: Clip) -> Bounds {
+    const FAR: f64 = 1e9;
+    let (x0, x1) = clip.x.map_or((-FAR, FAR), |r| (r.start.get(), r.end.get()));
+    let (y0, y1) = clip.y.map_or((-FAR, FAR), |r| (r.start.get(), r.end.get()));
+    (x0, y0, x1, y1)
+}
+
+/// The device pixel window covering `contours`, within the surface.
+fn window(contours: &[Vec<Point>], (w, h): (f64, f64)) -> Option<(f64, f64, usize, usize)> {
+    let mut b = (
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+    );
+    for p in contours.iter().filter(|c| c.len() >= 3).flatten() {
+        b = (b.0.min(p.0), b.1.min(p.1), b.2.max(p.0), b.3.max(p.1));
+    }
+    let (x0, y0) = (b.0.max(0.0).floor(), b.1.max(0.0).floor());
+    let (x1, y1) = (b.2.min(w).ceil(), b.3.min(h).ceil());
+    (x0 < x1 && y0 < y1).then_some((x0, y0, (x1 - x0) as usize, (y1 - y0) as usize))
+}
+
+/// Like [`clip_mask`], for rounded clips in the local coordinates of `map`.
+fn clip_mask_mapped(
+    nodes: &[&ClipNode],
+    map: &Homography,
+    origin: (f64, f64),
+    size: (usize, usize),
+    work: &mut Work<'_>,
+) -> Result<Option<Vec<f64>>, RasterError> {
+    let mut mask: Option<Vec<f64>> = None;
+    for node in nodes {
+        let contour = project(&node.shape.contour(), map, None);
+        work.charge(contour.len() as u64)?;
+        let cover = coverage(&[contour], origin, size, work)?;
+        mask = Some(match mask {
+            None => cover,
+            Some(mut m) => {
+                for (a, b) in m.iter_mut().zip(cover) {
+                    *a *= b;
+                }
+                m
+            }
+        });
+    }
+    Ok(mask)
+}
+
+/// Fill an item whose coordinates `map` takes to device pixels.
+fn fill_mapped(
+    pixels: &mut [u8],
+    (width, height): (u32, u32),
+    item: &DisplayItem,
+    list: &DisplayList,
+    map: &Homography,
+    work: &mut Work<'_>,
+) -> Result<(), RasterError> {
+    let local = local_contours(&item.shape, list);
+    work.charge(local.iter().map(|c| c.len() as u64).sum())?;
+    let bounds = local_bounds(item.clip);
+    let shape: Vec<Vec<Point>> = local
+        .iter()
+        .map(|c| project(c, map, Some(bounds)))
+        .collect();
+    work.charge(shape.iter().map(|c| c.len() as u64).sum())?;
+    let Some((bx, by, bw, bh)) = window(&shape, (f64::from(width), f64::from(height))) else {
+        return Ok(());
+    };
+    let cover = coverage(&shape, (bx, by), (bw, bh), work)?;
+    let nodes = chain(list.clips(), item.rounded_clip)?;
+    let mask = clip_mask_mapped(&nodes, map, (bx, by), (bw, bh), work)?;
+    blend_color(
+        pixels,
+        width as usize,
+        (bx, by, bw, bh),
+        &cover,
+        mask.as_deref(),
+        item.color,
+        work,
+    )
+}
+
+/// Composite `color` over a window of the surface, weighted per pixel by
+/// `cover` and `mask`.
+fn blend_color(
+    pixels: &mut [u8],
+    width: usize,
+    (bx, by, bw, bh): (f64, f64, usize, usize),
+    cover: &[f64],
+    mask: Option<&[f64]>,
+    color: Srgba,
+    work: &Work<'_>,
+) -> Result<(), RasterError> {
+    let alpha = f64::from(color.a) / 255.0;
+    let premultiplied = [
+        f64::from(color.r) * alpha,
+        f64::from(color.g) * alpha,
+        f64::from(color.b) * alpha,
+        f64::from(color.a),
+    ];
+    let (ox, oy) = (bx as usize, by as usize);
+    for row in 0..bh {
+        work.cancellation
+            .check()
+            .map_err(|_| RasterError::Cancelled)?;
+        let start = ((oy + row) * width + ox) * 4;
+        for col in 0..bw {
+            let k = row * bw + col;
+            let coverage = cover[k] * mask.map_or(1.0, |m| m[k]);
+            if coverage <= 0.0 {
+                continue;
+            }
+            let i = start + col * 4;
+            let keep = 1.0 - alpha * coverage;
+            for (dst, &src) in pixels[i..i + 4].iter_mut().zip(&premultiplied) {
+                let v = src * coverage + f64::from(*dst) * keep;
+                *dst = v.round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Draw an image item whose coordinates `map` takes to device pixels: each
+/// device pixel samples the image bilinearly at the local point its center
+/// comes from, weighted by how much of the pixel the mapped destination
+/// (within the clips) covers.
+fn draw_image_mapped(
+    pixels: &mut [u8],
+    (width, height): (u32, u32),
+    item: &DisplayItem,
+    list: &DisplayList,
+    map: &Homography,
+    work: &mut Work<'_>,
+) -> Result<(), RasterError> {
+    let Shape::Image { rect, image } = item.shape else {
+        return Ok(());
+    };
+    let image = list.images().get(image).ok_or(RasterError::InvalidList)?;
+    let Some(inverse) = map.inverse() else {
+        return Ok(());
+    };
+    let (x0, y0) = (rect.origin().x.get(), rect.origin().y.get());
+    let (rw, rh) = (rect.size().width().get(), rect.size().height().get());
+    if !(rw > 0.0 && rh > 0.0) {
+        return Ok(());
+    }
+    let local = local_contours(&Shape::Rect(rect), list);
+    let shape: Vec<Vec<Point>> = local
+        .iter()
+        .map(|c| project(c, map, Some(local_bounds(item.clip))))
+        .collect();
+    let Some((bx, by, bw, bh)) = window(&shape, (f64::from(width), f64::from(height))) else {
+        return Ok(());
+    };
+    let cover = coverage(&shape, (bx, by), (bw, bh), work)?;
+    let nodes = chain(list.clips(), item.rounded_clip)?;
+    let mask = clip_mask_mapped(&nodes, map, (bx, by), (bw, bh), work)?;
+    let (sx, sy) = (
+        f64::from(image.width()) / rw,
+        f64::from(image.height()) / rh,
+    );
+    let stride = width as usize;
+    let (ox, oy) = (bx as usize, by as usize);
+    for row in 0..bh {
+        work.cancellation
+            .check()
+            .map_err(|_| RasterError::Cancelled)?;
+        for col in 0..bw {
+            let k = row * bw + col;
+            let coverage = cover[k] * mask.as_ref().map_or(1.0, |m| m[k]);
+            if coverage <= 0.0 {
+                continue;
+            }
+            let (px, py) = (ox + col, oy + row);
+            let center = (px as f64 + 0.5, py as f64 + 0.5);
+            let w = inverse.w(center.0, center.1);
+            if w == 0.0 {
+                continue;
+            }
+            let h = &inverse.0;
+            let lx = (h[0] * center.0 + h[1] * center.1 + h[2]) / w;
+            let ly = (h[3] * center.0 + h[4] * center.1 + h[5]) / w;
+            let src = sample(image, (lx - x0) * sx, (ly - y0) * sy);
+            let keep = 1.0 - src[3] / 255.0 * coverage;
+            let i = (py * stride + px) * 4;
+            for (dst, s) in pixels[i..i + 4].iter_mut().zip(src) {
+                let value = s * coverage + f64::from(*dst) * keep;
+                *dst = value.round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+    Ok(())
+}
+
 struct Work<'a> {
     used: u64,
     limit: u64,
@@ -673,35 +1008,15 @@ fn fill(
     let bh = (bounds.3.ceil() - by) as usize;
     let cover = coverage(&clipped, (bx, by), (bw, bh), work)?;
     let mask = clip_mask(&nodes, (bx, by), (bw, bh), scale, work)?;
-    let alpha = f64::from(color.a) / 255.0;
-    let premultiplied = [
-        f64::from(color.r) * alpha,
-        f64::from(color.g) * alpha,
-        f64::from(color.b) * alpha,
-        f64::from(color.a),
-    ];
-    let width = width as usize;
-    let (ox, oy) = (bx as usize, by as usize);
-    for row in 0..bh {
-        work.cancellation
-            .check()
-            .map_err(|_| RasterError::Cancelled)?;
-        let start = ((oy + row) * width + ox) * 4;
-        for col in 0..bw {
-            let k = row * bw + col;
-            let coverage = cover[k] * mask.as_ref().map_or(1.0, |m| m[k]);
-            if coverage <= 0.0 {
-                continue;
-            }
-            let i = start + col * 4;
-            let keep = 1.0 - alpha * coverage;
-            for (dst, &src) in pixels[i..i + 4].iter_mut().zip(&premultiplied) {
-                let v = src * coverage + f64::from(*dst) * keep;
-                *dst = v.round().clamp(0.0, 255.0) as u8;
-            }
-        }
-    }
-    Ok(())
+    blend_color(
+        pixels,
+        width as usize,
+        (bx, by, bw, bh),
+        &cover,
+        mask.as_deref(),
+        color,
+        work,
+    )
 }
 
 /// Composite a premultiplied group onto `dst` source-over at `opacity`.
@@ -718,11 +1033,29 @@ fn composite(dst: &mut [u8], group: &[u8], opacity: f64) {
     }
 }
 
-/// An open layer: an opacity group or a `clip-path` layer.
+/// An open layer: an opacity group, a `clip-path` layer with the map its
+/// shape is drawn with, or a transform with the clips around it.
 #[derive(Clone, Copy)]
 enum Layer {
     Opacity(f64),
-    Clip(Shape),
+    Clip(Shape, Option<Homography>),
+    Transform {
+        clip: Clip,
+        rounded_clip: Option<usize>,
+    },
+}
+
+/// The pixels painting goes to: the innermost open layer with a buffer, or
+/// the surface.
+fn target<'a>(groups: &'a mut [(Option<Vec<u8>>, Layer)], surface: &'a mut [u8]) -> &'a mut [u8] {
+    match groups
+        .iter_mut()
+        .rev()
+        .find_map(|(pixels, _)| pixels.as_mut())
+    {
+        Some(pixels) => pixels,
+        None => surface,
+    }
 }
 
 /// Composite a premultiplied layer onto `dst` source-over, each pixel
@@ -781,22 +1114,60 @@ pub fn rasterize(
         .get();
     let size = (surface.width, surface.height);
     let bytes = surface.pixels.len();
-    // Open layers, innermost last: an opacity group or a clip-path layer.
-    let mut groups: Vec<(Vec<u8>, Layer)> = Vec::new();
+    // Open layers, innermost last; a transform without clips has no buffer.
+    let mut groups: Vec<(Option<Vec<u8>>, Layer)> = Vec::new();
+    // Local-to-device maps of the open transforms, innermost last.
+    let mut maps: Vec<Homography> = Vec::new();
+    let window_size = (size.0 as usize, size.1 as usize);
     for command in list.commands() {
         match command {
             DisplayCommand::Fill(item) => {
-                let target = match groups.last_mut() {
-                    Some((pixels, _)) => pixels,
-                    None => &mut surface.pixels,
-                };
-                if matches!(item.shape, Shape::Image { .. }) {
-                    draw_image(target, size, item, list, factor, &mut work)?;
-                } else {
-                    fill(target, size, item, list, factor, &mut work)?;
+                let pixels = target(&mut groups, &mut surface.pixels);
+                let image = matches!(item.shape, Shape::Image { .. });
+                match (maps.last(), image) {
+                    (None, true) => draw_image(pixels, size, item, list, factor, &mut work)?,
+                    (None, false) => fill(pixels, size, item, list, factor, &mut work)?,
+                    (Some(map), true) => {
+                        draw_image_mapped(pixels, size, item, list, map, &mut work)?;
+                    }
+                    (Some(map), false) => fill_mapped(pixels, size, item, list, map, &mut work)?,
                 }
             }
-            DisplayCommand::BeginGroup { .. } | DisplayCommand::BeginClip { .. } => {
+            DisplayCommand::BeginGroup { .. }
+            | DisplayCommand::BeginClip { .. }
+            | DisplayCommand::BeginTransform { .. } => {
+                let layer = match command {
+                    DisplayCommand::BeginGroup { opacity, .. } => Layer::Opacity(*opacity),
+                    DisplayCommand::BeginClip { shape, .. } => {
+                        Layer::Clip(*shape, maps.last().copied())
+                    }
+                    DisplayCommand::BeginTransform { transform, .. } => {
+                        let node = list
+                            .transforms()
+                            .get(*transform)
+                            .ok_or(RasterError::InvalidList)?;
+                        let outer = maps
+                            .last()
+                            .copied()
+                            .unwrap_or_else(|| Homography::scale(factor));
+                        maps.push(outer.then_after(&node.matrix));
+                        Layer::Transform {
+                            clip: node.clip,
+                            rounded_clip: node.rounded_clip,
+                        }
+                    }
+                    _ => return Err(RasterError::InvalidList),
+                };
+                let buffered = match layer {
+                    Layer::Transform {
+                        clip, rounded_clip, ..
+                    } => !clip.is_none() || rounded_clip.is_some(),
+                    _ => true,
+                };
+                if !buffered {
+                    groups.push((None, layer));
+                    continue;
+                }
                 // The surface, every open layer and the new one.
                 if bytes
                     .checked_mul(groups.len() + 2)
@@ -805,38 +1176,69 @@ pub fn rasterize(
                     return Err(RasterError::MemoryLimit);
                 }
                 work.charge(u64::from(size.0) * u64::from(size.1))?;
-                let layer = match command {
-                    DisplayCommand::BeginGroup { opacity, .. } => Layer::Opacity(*opacity),
-                    DisplayCommand::BeginClip { shape, .. } => Layer::Clip(*shape),
-                    _ => return Err(RasterError::InvalidList),
-                };
-                groups.push((vec![0; bytes], layer));
+                groups.push((Some(vec![0; bytes]), layer));
             }
-            DisplayCommand::EndGroup | DisplayCommand::EndClip => {
+            DisplayCommand::EndGroup | DisplayCommand::EndClip | DisplayCommand::EndTransform => {
                 let (group, layer) = groups.pop().ok_or(RasterError::InvalidList)?;
-                work.charge(u64::from(size.0) * u64::from(size.1))?;
                 let mask = match (command, layer) {
                     (DisplayCommand::EndGroup, Layer::Opacity(opacity)) => {
-                        let target = match groups.last_mut() {
-                            Some((pixels, _)) => pixels,
-                            None => &mut surface.pixels,
-                        };
-                        composite(target, &group, opacity);
+                        let group = group.ok_or(RasterError::InvalidList)?;
+                        work.charge(u64::from(size.0) * u64::from(size.1))?;
+                        composite(target(&mut groups, &mut surface.pixels), &group, opacity);
                         continue;
                     }
-                    (DisplayCommand::EndClip, Layer::Clip(shape)) => {
+                    (DisplayCommand::EndClip, Layer::Clip(shape, None)) => {
                         let contours = contours(&shape, list.paths(), list.rounded(), factor);
                         work.charge(contours.iter().map(|c| c.len() as u64).sum())?;
-                        let window = (size.0 as usize, size.1 as usize);
-                        coverage(&contours, (0.0, 0.0), window, &mut work)?
+                        coverage(&contours, (0.0, 0.0), window_size, &mut work)?
+                    }
+                    (DisplayCommand::EndClip, Layer::Clip(shape, Some(map))) => {
+                        let local = local_contours(&shape, list);
+                        let contours: Vec<Vec<Point>> =
+                            local.iter().map(|c| project(c, &map, None)).collect();
+                        work.charge(contours.iter().map(|c| c.len() as u64).sum())?;
+                        coverage(&contours, (0.0, 0.0), window_size, &mut work)?
+                    }
+                    (
+                        DisplayCommand::EndTransform,
+                        Layer::Transform {
+                            clip, rounded_clip, ..
+                        },
+                    ) => {
+                        maps.pop().ok_or(RasterError::InvalidList)?;
+                        if group.is_none() {
+                            continue;
+                        }
+                        // The clips around the transformed box, in the
+                        // enclosing coordinates.
+                        let outer = maps
+                            .last()
+                            .copied()
+                            .unwrap_or_else(|| Homography::scale(factor));
+                        let (x0, y0, x1, y1) = local_bounds(clip);
+                        let on = |x, y| PathPoint {
+                            x,
+                            y,
+                            on_curve: true,
+                        };
+                        let rect = [on(x0, y0), on(x1, y0), on(x1, y1), on(x0, y1)];
+                        let area = project(&rect, &outer, None);
+                        let mut mask = coverage(&[area], (0.0, 0.0), window_size, &mut work)?;
+                        let nodes = chain(list.clips(), rounded_clip)?;
+                        if let Some(rounded) =
+                            clip_mask_mapped(&nodes, &outer, (0.0, 0.0), window_size, &mut work)?
+                        {
+                            for (a, b) in mask.iter_mut().zip(rounded) {
+                                *a *= b;
+                            }
+                        }
+                        mask
                     }
                     _ => return Err(RasterError::InvalidList),
                 };
-                let target = match groups.last_mut() {
-                    Some((pixels, _)) => pixels,
-                    None => &mut surface.pixels,
-                };
-                composite_masked(target, &group, &mask);
+                let group = group.ok_or(RasterError::InvalidList)?;
+                work.charge(u64::from(size.0) * u64::from(size.1))?;
+                composite_masked(target(&mut groups, &mut surface.pixels), &group, &mask);
             }
         }
     }

@@ -104,6 +104,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-54 | Deliberate | Paint | First outline painting: solid/double only, `auto` as solid, per-fragment inline outlines | Open, REN-04e |
 | TD-55 | Deliberate | Paint | First `border-radius`: single-axis overflow ignores radii, per-fragment inline curves, unsnapped side joins | Open, REN-04f |
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
+| TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -950,3 +951,26 @@ context's ink overflow in the tiled raster; an even-odd accumulator; the
 remaining shape functions with SVG paths in M4 (`paint.formats`).
 **Trigger:** the tiled raster step, SVG integration, or clip-path WPT
 reftests.
+
+### TD-57 — First transforms
+
+REN-04h paints 2D and 3D transforms, but every context is flattened:
+`transform-style: preserve-3d` parses and computes and is ignored, so there
+is no 3D rendering context, depth sorting or plane intersection, and
+`backface-visibility` looks only at the box's own matrix. Layout does not
+know about transforms: a transformed box should be the containing block of
+its absolutely positioned and fixed descendants (CSS Transforms 1 §2), but
+layout still places them against the nearest positioned ancestor or the
+viewport, and then paint clips them only by clips inside their coordinate
+space plus the transformed box's own. Scrollable overflow ignores
+transformed extents. Under a projective map, quadratic curves are flattened
+in local space for an estimated stretch, so tolerance is not guaranteed
+near the w = 0 plane; affine maps are exact up to flattening. A transform
+with clips around it opens a full-surface layer. `calc()` in angles,
+`transform-box` and the `zoom` property are unsupported, and transforms do
+not create a containing block for `clip-path` hit areas outside the box.
+**Pay:** preserve-3d with BSP depth sorting (M4 compositing); layout
+containing blocks for transformed boxes (layout thread, with REN-02
+positioning); bounded layers in the tiled raster. **Trigger:** 3D WPT
+reftests, sites relying on transformed containing blocks, or the tiled
+raster step.

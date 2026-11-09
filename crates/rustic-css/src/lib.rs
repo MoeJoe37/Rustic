@@ -40,6 +40,7 @@ mod serialize;
 mod shape;
 mod token;
 mod tokenizer;
+mod transform;
 mod values;
 
 pub use anb::parse_an_plus_b;
@@ -92,4 +93,7 @@ pub use serialize::{serialize_identifier, serialize_string};
 pub use shape::{BasicShape, ClipPath, GeometryBox, ShapeRadius};
 pub use token::{Numeric, Token};
 pub use tokenizer::SpannedToken;
+pub use transform::{
+    BackfaceVisibility, IndividualTransform, TransformFunction, TransformList, TransformStyle,
+};
 pub use values::{BlockKind, ComponentValue, Value};

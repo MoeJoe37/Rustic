@@ -4,13 +4,14 @@
 
 use crate::clip::{Resolved, polygon_contains, resolve_shape};
 use crate::color::{Srgba, srgba};
+use crate::matrix::{BoxTransform, Homography, box_transform, perspective_of};
 use crate::rounded::{RoundedRect, clip_convex, used_corners};
 use rustic_base::CancellationToken;
 use rustic_css::Overflow;
 use rustic_css::{
-    BasicShape, BorderStyle, BorderWidth, ClipPath, Float, GeometryBox, Image as CssImage,
-    LengthPercentage, LengthUnit, OutlineStyle, Position, PropertyId as P, PropertyValue as V,
-    TextDecorationStyle, Visibility, VisualBox, ZIndex,
+    BackfaceVisibility, BasicShape, BorderStyle, BorderWidth, ClipPath, Float, GeometryBox,
+    Image as CssImage, LengthPercentage, LengthUnit, OutlineStyle, Position, PropertyId as P,
+    PropertyValue as V, TextDecorationStyle, Visibility, VisualBox, ZIndex,
 };
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
@@ -204,6 +205,23 @@ pub struct ClipNode {
     pub parent: Option<usize>,
 }
 
+/// One transformed stacking context: its items are in the box's local
+/// (untransformed layout) coordinates, which `matrix` maps into its
+/// parent's coordinates.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TransformNode {
+    /// The plane map from local to parent coordinates.
+    pub matrix: Homography,
+    /// The ancestors' overflow clip around the transformed box, in the
+    /// parent's coordinates.
+    pub clip: Clip,
+    /// The ancestors' innermost rounded clip around the box, in the parent's
+    /// coordinates.
+    pub rounded_clip: Option<usize>,
+    /// The next transform out, if any.
+    pub parent: Option<usize>,
+}
+
 /// One display list command, in paint order.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DisplayCommand {
@@ -233,6 +251,20 @@ pub enum DisplayCommand {
     /// Composite the innermost open clip layer into its parent, keeping only
     /// what its shape covers.
     EndClip,
+    /// Start a transformed stacking context: until the matching
+    /// [`DisplayCommand::EndTransform`], coordinates are local to
+    /// [`DisplayList::transforms`]`[transform]`, and what is painted is
+    /// clipped by that node's clips in its parent's coordinates.
+    BeginTransform {
+        /// Principal-box index of the stacking context root.
+        source_box: usize,
+        /// Source DOM node.
+        node: NodeId,
+        /// Index into [`DisplayList::transforms`].
+        transform: usize,
+    },
+    /// Return to the enclosing coordinates.
+    EndTransform,
 }
 
 /// Why a box needs paint features this reference does not implement.
@@ -313,6 +345,12 @@ pub struct DisplayList {
     rounded: Vec<RoundedRect>,
     /// `clip-path` areas for hit testing.
     clip_paths: Vec<ClipPathNode>,
+    /// Transformed stacking contexts referenced by
+    /// [`DisplayCommand::BeginTransform`].
+    transforms: Vec<TransformNode>,
+    /// For each transform, the map from its local coordinates to the
+    /// viewport.
+    spaces: Vec<Homography>,
     /// Hit-testable border boxes in paint order.
     hits: Vec<HitRegion>,
     /// The root fragment, the target when no box is hit.
@@ -339,6 +377,9 @@ struct HitRegion {
     /// The innermost `clip-path` around the box, an index into
     /// [`DisplayList::clip_paths`].
     clip_path: Option<usize>,
+    /// The innermost transform around the box, whose local coordinates the
+    /// other fields are in.
+    transform: Option<usize>,
 }
 
 /// A `clip-path` area for hit testing, inside its `parent`.
@@ -346,21 +387,16 @@ struct HitRegion {
 struct ClipPathNode {
     shape: Resolved,
     parent: Option<usize>,
+    /// The transform whose local coordinates `shape` is in.
+    transform: Option<usize>,
 }
 
-/// Whether `(x, y)` lies in `node`'s clip path and every enclosing one.
-fn in_clip_paths(nodes: &[ClipPathNode], mut node: Option<usize>, x: f64, y: f64) -> bool {
-    while let Some(n) = node.and_then(|i| nodes.get(i)) {
-        let inside = match &n.shape {
-            Resolved::Rounded(r) => r.contains(x, y),
-            Resolved::Polygon(points) => polygon_contains(points, x, y),
-        };
-        if !inside {
-            return false;
-        }
-        node = n.parent;
-    }
-    true
+/// Whether `(x, y)` lies within `clip` on both axes (half-open).
+fn in_axis_clip(clip: Clip, x: f64, y: f64) -> bool {
+    let inside = |range: Option<rustic_layout::AxisRange>, v: f64| {
+        range.is_none_or(|r| r.start.get() <= v && v < r.end.get())
+    };
+    inside(clip.x, x) && inside(clip.y, y)
 }
 
 /// Whether `(x, y)` survives the rounded clip `node` and its ancestors.
@@ -382,15 +418,7 @@ impl HitRegion {
             return false;
         }
         let (left, top, right, bottom) = edges(self.border);
-        let inside = |range: Option<rustic_layout::AxisRange>, v: f64| {
-            range.is_none_or(|r| r.start.get() <= v && v < r.end.get())
-        };
-        left <= x
-            && x < right
-            && top <= y
-            && y < bottom
-            && inside(self.clip.x, x)
-            && inside(self.clip.y, y)
+        left <= x && x < right && top <= y && y < bottom && in_axis_clip(self.clip, x, y)
     }
 }
 
@@ -447,13 +475,18 @@ struct Geometry {
 }
 
 impl Geometry {
-    fn block(f: &BlockFragment, rounded: Option<RoundedRect>, rounded_clip: Option<usize>) -> Self {
+    fn block(
+        f: &BlockFragment,
+        clip: Clip,
+        rounded: Option<RoundedRect>,
+        rounded_clip: Option<usize>,
+    ) -> Self {
         Self {
             node: f.node(),
             border: f.border(),
             padding: f.padding(),
             content: f.content(),
-            clip: f.clip(),
+            clip,
             rounded,
             rounded_clip,
         }
@@ -538,8 +571,8 @@ fn rounded_box(style: &ComputedStyle, border: CssRect) -> Result<Option<RoundedR
 }
 
 /// The clip a block applies to its own in-flow content: its ancestors' clip
-/// narrowed to its padding box on axes whose overflow is not visible.
-fn content_clip(f: &BlockFragment) -> Clip {
+/// `clip` narrowed to its padding box on axes whose overflow is not visible.
+fn content_clip(f: &BlockFragment, clip: Clip) -> Clip {
     let own = |overflow: Overflow, start: CssPx, size: CssPx| {
         (overflow != Overflow::Visible).then(|| AxisRange {
             start,
@@ -556,7 +589,6 @@ fn content_clip(f: &BlockFragment) -> Clip {
         (a, None) => a,
         (None, b) => b,
     };
-    let clip = f.clip();
     Clip {
         x: narrow(clip.x, own(ox, p.origin().x, p.size().width())),
         y: narrow(clip.y, own(oy, p.origin().y, p.size().height())),
@@ -1217,6 +1249,9 @@ enum Task {
     /// Leave a `clip-path` context: restore the enclosing clip path and
     /// close its layer if one was opened.
     EndClip(Option<usize>, bool),
+    /// Leave a transformed context: restore the enclosing transform and
+    /// close it if it was opened.
+    EndTransform(Option<usize>, bool),
 }
 
 /// A box whose outline a stacking context paints.
@@ -1364,6 +1399,14 @@ impl DisplayList {
         let mut layer = Vec::with_capacity(n);
         let mut layers: Vec<Layers> = Vec::with_capacity(n);
         let mut tops = Vec::new();
+        // Each box's transform, and the nearest transformed box at or above
+        // it, whose local coordinates it paints in.
+        let mut matrices: Vec<BoxTransform> = Vec::with_capacity(n);
+        let mut space: Vec<Option<usize>> = Vec::with_capacity(n);
+        let rect = |r: CssRect| {
+            let (x0, y0, x1, y1) = edges(r);
+            (x0, y0, x1 - x0, y1 - y0)
+        };
         for (i, fragment) in fragments.iter().enumerate() {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             let style = style_of(fragment)?;
@@ -1391,11 +1434,42 @@ impl DisplayList {
                 fragment.scheme(),
                 PositionScheme::Relative | PositionScheme::Absolute | PositionScheme::Fixed
             );
+            // The containing block's perspective applies to this box's
+            // transform (CSS Transforms 2 §6).
+            let perspective = match fragment.containing_block() {
+                Some(c) if c < i => {
+                    let f = &fragments[c];
+                    perspective_of(style_of(f)?, rect(f.border()))
+                        .map_err(|_| PaintError::InvalidInput)?
+                }
+                Some(_) => return Err(PaintError::InvalidInput),
+                None => None,
+            };
+            let mut transform = box_transform(style, rect(fragment.border()), perspective)
+                .map_err(|_| PaintError::InvalidInput)?;
+            if let BoxTransform::Matrix(m) = transform {
+                let hidden = matches!(
+                    style.get(P::BackfaceVisibility),
+                    V::BackfaceVisibility(BackfaceVisibility::Hidden)
+                );
+                if hidden && m.back_facing() {
+                    transform = BoxTransform::Degenerate;
+                }
+            }
+            let transformed = transform != BoxTransform::None;
+            matrices.push(transform);
+            space.push(if transformed {
+                Some(i)
+            } else {
+                parent.and_then(|p| space[p])
+            });
             let role = if parent.is_none()
                 || (positioned && z.is_some())
                 || fragment.scheme() == PositionScheme::Fixed
                 || alpha < 1.0
                 || !matches!(style.get(P::ClipPath), V::ClipPath(ClipPath::None))
+                || transformed
+                || matches!(style.get(P::Perspective), V::Perspective(Some(_)))
             {
                 // z-index applies only to positioned boxes here.
                 Role::Context(if positioned { z.unwrap_or(0) } else { 0 })
@@ -1469,22 +1543,47 @@ impl DisplayList {
                 .ok_or(PaintError::InvalidInput)?
                 .push(index);
         }
-        // Rounded border boxes, and the rounded clips that apply to each
-        // box (`outer`) and to its own content (`inner`), following the
-        // containing-block chain like the axis clips. A box whose overflow
-        // is clipped on both axes clips its content to its padding edge
-        // curve (CSS Backgrounds 3 §5.3).
+        // Rounded border boxes, and the axis and rounded clips that apply
+        // to each box (`local`, `outer`) and to its own content (`inner`),
+        // following the containing-block chain within one coordinate space.
+        // A transformed box paints in its own space, so the clips around it
+        // go to its transform node instead (`transform_clip`); clips from a
+        // containing block in another space do not apply. A box whose
+        // overflow is clipped on both axes clips its content to its padding
+        // edge curve (CSS Backgrounds 3 §5.3).
         let mut rounded = Vec::with_capacity(n);
+        let mut local_clip: Vec<Clip> = Vec::with_capacity(n);
+        let mut inner_axis: Vec<Clip> = Vec::with_capacity(n);
         let mut outer_clip: Vec<Option<usize>> = Vec::with_capacity(n);
         let mut inner_clip: Vec<Option<usize>> = Vec::with_capacity(n);
+        let mut transform_clip: Vec<(Clip, Option<usize>)> = vec![(Clip::NONE, None); n];
         for (i, f) in fragments.iter().enumerate() {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             let shape = rounded_box(style_of(f)?, f.border())?;
-            let parent = match f.containing_block() {
-                Some(c) if c < i => inner_clip[c],
+            let cb = match f.containing_block() {
+                Some(c) if c < i => Some(c),
                 Some(_) => return Err(PaintError::InvalidInput),
                 None => None,
             };
+            // The space the box sits in: its parent's.
+            let around = f.parent().and_then(|p| space[p]);
+            let rounded_parent = cb
+                .filter(|&c| space[c] == around)
+                .and_then(|c| inner_clip[c]);
+            // Outside every transform the layout's clip is exact.
+            let axis = match (around, cb) {
+                (None, _) => f.clip(),
+                (Some(_), Some(c)) if space[c] == around => inner_axis[c],
+                _ => Clip::NONE,
+            };
+            let (axis, parent) = if matrices[i] == BoxTransform::None {
+                (axis, rounded_parent)
+            } else {
+                transform_clip[i] = (axis, rounded_parent);
+                (Clip::NONE, None)
+            };
+            local_clip.push(axis);
+            inner_axis.push(content_clip(f, axis));
             let (ox, oy) = f.overflow();
             let inner = match shape {
                 Some(r) if ox != Overflow::Visible && oy != Overflow::Visible => {
@@ -1525,6 +1624,9 @@ impl DisplayList {
         let mut hits = Vec::new();
         let mut clip_paths: Vec<ClipPathNode> = Vec::new();
         let mut clip_path: Option<usize> = None;
+        let mut transforms: Vec<TransformNode> = Vec::new();
+        let mut spaces: Vec<Homography> = Vec::new();
+        let mut transform: Option<usize> = None;
         while let Some(task) = stack.pop() {
             cancellation.check().map_err(|_| PaintError::Cancelled)?;
             match task {
@@ -1535,6 +1637,12 @@ impl DisplayList {
                         builder.command(DisplayCommand::EndClip)?;
                     }
                 }
+                Task::EndTransform(previous, opened) => {
+                    transform = previous;
+                    if opened {
+                        builder.command(DisplayCommand::EndTransform)?;
+                    }
+                }
                 Task::Outlines(_, true) => {}
                 Task::Outlines(c, false) => {
                     for &entry in &std::mem::take(&mut outlined[c]) {
@@ -1542,7 +1650,7 @@ impl DisplayList {
                             Outlined::Block(b) => {
                                 let f = &fragments[b];
                                 (
-                                    Geometry::block(f, rounded[b], outer_clip[b]),
+                                    Geometry::block(f, local_clip[b], rounded[b], outer_clip[b]),
                                     f.source_box(),
                                 )
                             }
@@ -1552,9 +1660,8 @@ impl DisplayList {
                                     .get(inline.line())
                                     .ok_or(PaintError::InvalidInput)?
                                     .block();
-                                let clip = content_clip(
-                                    fragments.get(block).ok_or(PaintError::InvalidInput)?,
-                                );
+                                let clip =
+                                    *inner_axis.get(block).ok_or(PaintError::InvalidInput)?;
                                 let shape =
                                     rounded_box(box_style(inline.source_box())?, inline.border())?;
                                 (
@@ -1596,12 +1703,12 @@ impl DisplayList {
                                         image: index,
                                     },
                                     color: Srgba::WHITE,
-                                    clip: fragment.clip(),
+                                    clip: local_clip[b],
                                     rounded_clip,
                                 })?;
                             }
                         }
-                        let clip = content_clip(fragment);
+                        let clip = inner_axis[b];
                         for &line in &inline_lines[b] {
                             for &k in &line_inlines[line] {
                                 let inline = &layout.inlines()[k];
@@ -1621,6 +1728,7 @@ impl DisplayList {
                                     rounded: shape,
                                     rounded_clip: inner_clip[b],
                                     clip_path,
+                                    transform,
                                 });
                                 if !muted {
                                     builder.background(geometry, inline.source_box(), style)?;
@@ -1663,15 +1771,17 @@ impl DisplayList {
                                 node: fragment.node(),
                             },
                             border: fragment.border(),
-                            clip: fragment.clip(),
+                            clip: local_clip[i],
                             rounded: rounded[i],
                             rounded_clip: outer_clip[i],
                             clip_path,
+                            transform,
                         });
                         if muted {
                             continue;
                         }
-                        let geometry = Geometry::block(fragment, rounded[i], outer_clip[i]);
+                        let geometry =
+                            Geometry::block(fragment, local_clip[i], rounded[i], outer_clip[i]);
                         if canvas_source != Some(i) {
                             builder.background(geometry, fragment.source_box(), style)?;
                         }
@@ -1679,8 +1789,36 @@ impl DisplayList {
                     }
                 }
                 Task::Layer(i, muted) => {
+                    // A box whose transform renders nothing, or whose hidden
+                    // back faces the viewer, paints and hits nothing.
+                    let matrix = match matrices[i] {
+                        BoxTransform::Degenerate => continue,
+                        BoxTransform::None => None,
+                        BoxTransform::Matrix(m) => Some(m.plane()),
+                    };
                     // `opacity: 0` paints nothing but still takes hits.
                     let muted = muted || opacity[i] <= 0.0;
+                    if let Some(matrix) = matrix {
+                        let (clip, rounded_clip) = transform_clip[i];
+                        let outer = transform.map_or(Homography::IDENTITY, |t| spaces[t]);
+                        transforms.push(TransformNode {
+                            matrix,
+                            clip,
+                            rounded_clip,
+                            parent: transform,
+                        });
+                        spaces.push(outer.then_after(&matrix));
+                        let index = transforms.len() - 1;
+                        if !muted {
+                            builder.command(DisplayCommand::BeginTransform {
+                                source_box: fragments[i].source_box(),
+                                node: fragments[i].node(),
+                                transform: index,
+                            })?;
+                        }
+                        stack.push(Task::EndTransform(transform, !muted));
+                        transform = Some(index);
+                    }
                     let group = !muted && opacity[i] < 1.0;
                     if group {
                         builder.command(DisplayCommand::BeginGroup {
@@ -1706,6 +1844,7 @@ impl DisplayList {
                             clip_paths.push(ClipPathNode {
                                 shape: area,
                                 parent: clip_path,
+                                transform,
                             });
                             clip_path = Some(clip_paths.len() - 1);
                         }
@@ -1745,6 +1884,8 @@ impl DisplayList {
             clips: builder.clips,
             rounded: builder.rounded,
             clip_paths,
+            transforms,
+            spaces,
             hits,
             root,
         })
@@ -1782,12 +1923,62 @@ impl DisplayList {
         self.hits
             .iter()
             .rev()
-            .find(|region| {
-                region.contains(x, y, &self.clips)
-                    && in_clip_paths(&self.clip_paths, region.clip_path, x, y)
-            })
+            .find(|region| self.hits_region(region, x, y))
             .map(|region| region.hit)
             .or(self.root)
+    }
+
+    /// `(x, y)` in the viewport mapped into the local coordinates of
+    /// `transform`, or `None` where no point of that plane shows there.
+    fn to_space(&self, transform: Option<usize>, x: f64, y: f64) -> Option<(f64, f64)> {
+        match transform {
+            None => Some((x, y)),
+            Some(t) => self.spaces.get(t)?.unapply(x, y),
+        }
+    }
+
+    /// Whether the viewport point `(x, y)` hits `region`: inside its box and
+    /// its clips, every enclosing transform's clips and every enclosing
+    /// clip path, each tested in its own coordinates.
+    fn hits_region(&self, region: &HitRegion, x: f64, y: f64) -> bool {
+        let Some((lx, ly)) = self.to_space(region.transform, x, y) else {
+            return false;
+        };
+        if !region.contains(lx, ly, &self.clips) {
+            return false;
+        }
+        let mut transform = region.transform;
+        while let Some(node) = transform.and_then(|t| self.transforms.get(t)) {
+            let Some((px, py)) = self.to_space(node.parent, x, y) else {
+                return false;
+            };
+            if !in_axis_clip(node.clip, px, py) || !in_clips(&self.clips, node.rounded_clip, px, py)
+            {
+                return false;
+            }
+            transform = node.parent;
+        }
+        let mut clip_path = region.clip_path;
+        while let Some(node) = clip_path.and_then(|c| self.clip_paths.get(c)) {
+            let Some((px, py)) = self.to_space(node.transform, x, y) else {
+                return false;
+            };
+            let inside = match &node.shape {
+                Resolved::Rounded(r) => r.contains(px, py),
+                Resolved::Polygon(points) => polygon_contains(points, px, py),
+            };
+            if !inside {
+                return false;
+            }
+            clip_path = node.parent;
+        }
+        true
+    }
+
+    /// Transformed stacking contexts, indexed by
+    /// [`DisplayCommand::BeginTransform`].
+    pub fn transforms(&self) -> &[TransformNode] {
+        &self.transforms
     }
 
     /// Rounded rectangles, indexed by [`Shape::Rounded`] and
@@ -1937,6 +2128,43 @@ impl DisplayList {
                 }
                 DisplayCommand::EndClip => {
                     append(&mut out, "end-clip-path\n", max_bytes)?;
+                    continue;
+                }
+                DisplayCommand::BeginTransform {
+                    source_box,
+                    node,
+                    transform,
+                } => {
+                    let t = &self.transforms[*transform];
+                    let mut matrix = String::new();
+                    for (n, v) in t.matrix.0.iter().enumerate() {
+                        let separator = match n {
+                            0 => "",
+                            3 | 6 => "; ",
+                            _ => " ",
+                        };
+                        // Writing to a String cannot fail.
+                        let _ = write!(matrix, "{separator}{v}");
+                    }
+                    let clip = if t.clip.is_none() {
+                        String::new()
+                    } else {
+                        format!(" clip={}", t.clip)
+                    };
+                    let clip = match t.rounded_clip {
+                        Some(n) => format!("{clip} rclip={n}"),
+                        None => clip,
+                    };
+                    line = format!(
+                        "transform box={source_box} node={}:{} matrix=({matrix}){clip}\n",
+                        node.slot(),
+                        node.generation()
+                    );
+                    append(&mut out, &line, max_bytes)?;
+                    continue;
+                }
+                DisplayCommand::EndTransform => {
+                    append(&mut out, "end-transform\n", max_bytes)?;
                     continue;
                 }
             };

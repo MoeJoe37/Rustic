@@ -79,15 +79,14 @@ pub struct Surface {
 impl Surface {
     /// Allocate a transparent surface after checking every budget.
     pub fn new(width: u32, height: u32, limits: RasterLimits) -> Result<Self, RasterError> {
-        if width == 0 || height == 0 || width > limits.max_width || height > limits.max_height {
-            return Err(RasterError::SurfaceSize);
-        }
-        let bytes = usize::try_from(width)
-            .ok()
-            .zip(usize::try_from(height).ok())
-            .and_then(|(w, h)| w.checked_mul(h)?.checked_mul(4))
-            .filter(|&n| n <= limits.max_bytes)
-            .ok_or(RasterError::SurfaceSize)?;
+        let surface = rustic_base::SurfaceLimits {
+            max_width: limits.max_width,
+            max_height: limits.max_height,
+            max_bytes: limits.max_bytes,
+        };
+        let bytes = rustic_base::SurfaceAllocation::check(width, height, 4, surface)
+            .map_err(|_| RasterError::SurfaceSize)?
+            .bytes();
         Ok(Self {
             width,
             height,

@@ -2,7 +2,7 @@
 
 **Overall completion: 25.22%** = 20.27% verified complete + 4.95% partial credit. 36/172 capabilities complete, 13 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `0f995b1ce5c939559febf4e8b2d184c4c00a63ebe8e1b9e10804372e1591fd96`.
+Catalog: `engine-v3`. Source fingerprint: `2a6558f23421553b23cc8248c5ef575d1197d81cd4daa704a24acdd510e7f2bc`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 

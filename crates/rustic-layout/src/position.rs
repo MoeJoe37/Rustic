@@ -36,6 +36,7 @@ pub(crate) fn measure_float(
     style: &ComputedStyle,
     containing_width: CssPx,
     intrinsic: Intrinsic,
+    forced: Option<f64>,
 ) -> Result<BlockMeasure, MeasureError> {
     let basis = containing_width.get();
     let (padding, border) = box_edges(style, basis)?;
@@ -43,7 +44,11 @@ pub(crate) fn measure_float(
     let ml = auto(style, P::MarginLeft, basis)?.unwrap_or(0.0);
     let mr = auto(style, P::MarginRight, basis)?.unwrap_or(0.0);
     let resolver = Resolver::new(style, Some(basis), extras, intrinsic);
-    let (specified, minimum, maximum) = resolver.widths(basis - ml - mr - extras)?;
+    // A replaced box's used width is already constrained (CSS 2.2 §10.4).
+    let (specified, minimum, maximum) = match forced {
+        Some(w) => (Some(w), 0.0, None),
+        None => resolver.widths(basis - ml - mr - extras)?,
+    };
     let (width, ()) = constrain(specified, minimum, maximum, |w| {
         Ok((
             w.unwrap_or_else(|| intrinsic.fit(basis - ml - mr - extras)),
@@ -227,6 +232,7 @@ pub(crate) fn absolute_width(
     style: &ComputedStyle,
     cx: &AbsoluteContext,
     intrinsic: Intrinsic,
+    forced: Option<f64>,
 ) -> Result<AbsoluteWidth, MeasureError> {
     let basis = cx.width;
     let (padding, border) = box_edges(style, basis)?;
@@ -251,7 +257,11 @@ pub(crate) fn absolute_width(
         - axis.margin_end.unwrap_or(0.0)
         - extras;
     let resolver = Resolver::new(style, Some(basis), extras, intrinsic);
-    let (specified, minimum, maximum) = resolver.widths(available)?;
+    // A replaced box's used width is already constrained (CSS 2.2 §10.4).
+    let (specified, minimum, maximum) = match forced {
+        Some(w) => (Some(w), 0.0, None),
+        None => resolver.widths(available)?,
+    };
     let (width, solved) = constrain(specified, minimum, maximum, |w| {
         Ok(axis.solve(w, |available| intrinsic.fit(available)))
     })?;
@@ -293,6 +303,7 @@ impl AbsoluteHeight {
         cx: &AbsoluteContext,
         padding: Edges,
         border: Edges,
+        forced: Option<f64>,
     ) -> Result<Self, MeasureError> {
         let extras =
             padding.top.get() + padding.bottom.get() + border.top.get() + border.bottom.get();
@@ -317,9 +328,18 @@ impl AbsoluteHeight {
                 keep_start: true,
                 horizontal: false,
             },
-            specified: block_size(style, P::Height, h)?.map(adjust),
-            minimum: block_size(style, P::MinHeight, h)?.map_or(0.0, adjust),
-            maximum: block_size(style, P::MaxHeight, h)?.map(adjust),
+            specified: match forced {
+                Some(h) => Some(h),
+                None => block_size(style, P::Height, h)?.map(adjust),
+            },
+            minimum: match forced {
+                Some(_) => 0.0,
+                None => block_size(style, P::MinHeight, h)?.map_or(0.0, adjust),
+            },
+            maximum: match forced {
+                Some(_) => None,
+                None => block_size(style, P::MaxHeight, h)?.map(adjust),
+            },
         })
     }
 

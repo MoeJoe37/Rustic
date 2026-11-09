@@ -164,6 +164,7 @@ pub fn measure_block_width(
         containing_direction,
         (0.0, 0.0),
         None,
+        None,
     )
 }
 
@@ -199,6 +200,7 @@ pub(crate) fn measure_in_band(
     containing_direction: Direction,
     floors: (f64, f64),
     inner: Option<Intrinsic>,
+    forced: Option<f64>,
 ) -> Result<BlockMeasure, MeasureError> {
     if inner.is_none() {
         for p in [P::Width, P::MinWidth, P::MaxWidth] {
@@ -226,7 +228,11 @@ pub(crate) fn measure_in_band(
     let mut mr = right.unwrap_or(0.0);
     // `fit-content` sizes into the band left after margins, padding and borders.
     let resolver = Resolver::new(style, Some(basis), extras, inner.unwrap_or_default());
-    let (specified, minimum, maximum) = resolver.widths(band - extras - ml - mr)?;
+    // A replaced box's used width is already constrained (CSS 2.2 §10.4).
+    let (specified, minimum, maximum) = match forced {
+        Some(w) => (Some(w), 0.0, None),
+        None => resolver.widths(band - extras - ml - mr)?,
+    };
     let available = CssPx::new(band - extras - ml - mr)?.get();
     let tentative = specified.unwrap_or(available.max(0.0));
     let width = maximum.map_or(tentative, |m| tentative.min(m)).max(minimum);

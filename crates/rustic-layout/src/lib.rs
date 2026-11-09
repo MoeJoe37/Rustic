@@ -19,6 +19,7 @@ mod intrinsic;
 mod margins;
 mod overflow;
 mod position;
+mod replaced;
 mod sizing;
 mod tree;
 
@@ -32,5 +33,6 @@ pub use geometry::{
     CssPoint, CssPx, CssRect, CssSize, DevicePx, DeviceScale, GeometryError, MAX_CSS_PX,
 };
 pub use overflow::{AxisRange, Clip};
+pub use replaced::NaturalSize;
 pub use sizing::{BlockMeasure, Edges, MeasureError, measure_block_width};
 pub use tree::{BoxKind, BoxSnapshot, BoxTree, LayoutError, LayoutLimits};

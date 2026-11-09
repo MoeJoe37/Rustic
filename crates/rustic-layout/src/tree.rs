@@ -6,6 +6,9 @@ use rustic_dom::{Document, DomError, NodeId, NodeKind};
 use rustic_style::{ComputedStyle, ElementStyle};
 use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 
+use crate::CssPx;
+use crate::replaced::{NaturalSize, canvas_size};
+
 /// Independent work, box and depth limits. These are not total process memory.
 #[derive(Clone, Copy, Debug)]
 pub struct LayoutLimits {
@@ -50,6 +53,7 @@ pub struct BoxSnapshot {
     text: Vec<u16>,
     special_layout: bool,
     html_tag: HtmlTag,
+    natural: Option<NaturalSize>,
 }
 
 /// HTML elements whose `overflow` can propagate to the viewport.
@@ -82,6 +86,14 @@ impl BoxSnapshot {
     /// Original UTF-16 text, including lone surrogates; empty for elements.
     pub fn text(&self) -> &[u16] {
         &self.text
+    }
+
+    /// For a replaced element (`img`, `canvas`, `video`, `iframe`, `embed`,
+    /// `object`), its natural size: `img` starts at 0×0 until the embedder
+    /// supplies a decoded size, `canvas` uses its attributes and the others
+    /// have none (300×150 by default).
+    pub fn natural_size(&self) -> Option<NaturalSize> {
+        self.natural
     }
 
     pub(crate) fn requires_special_layout(&self) -> bool {
@@ -184,6 +196,29 @@ impl BoxTree {
                 }
                 _ => false,
             };
+            let natural = match node.kind() {
+                NodeKind::Element(element)
+                    if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
+                {
+                    let attribute = |name: &str| {
+                        element
+                            .attributes()
+                            .iter()
+                            .find(|a| {
+                                a.name().namespace().is_none()
+                                    && a.name().local().eq_ignore_ascii_case(name)
+                            })
+                            .map(|a| a.value().as_units())
+                    };
+                    match element.name().local().to_ascii_lowercase().as_str() {
+                        "img" => Some(NaturalSize::from_dimensions(CssPx::ZERO, CssPx::ZERO)),
+                        "canvas" => Some(canvas_size(attribute("width"), attribute("height"))),
+                        "video" | "iframe" | "embed" | "object" => Some(NaturalSize::NONE),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
             let html_tag = match node.kind() {
                 NodeKind::Element(element)
                     if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
@@ -263,10 +298,45 @@ impl BoxTree {
                 text,
                 special_layout,
                 html_tag,
+                natural: natural.filter(|_| matches!(kind, BoxKind::Element(_))),
             });
             parents.push((depth, Some(current), shared));
         }
         Ok(Self { boxes })
+    }
+
+    /// Supply natural sizes for replaced elements, typically decoded image
+    /// dimensions. Every node must be a replaced box in this snapshot; on an
+    /// error nothing is changed.
+    pub fn set_natural_sizes(
+        &mut self,
+        sizes: &[(NodeId, NaturalSize)],
+    ) -> Result<(), LayoutError> {
+        let wanted: HashMap<NodeId, NaturalSize> = sizes.iter().copied().collect();
+        let mut found = 0usize;
+        for b in &self.boxes {
+            if b.natural.is_some() && wanted.contains_key(&b.node) {
+                found += 1;
+            }
+        }
+        if found != wanted.len() {
+            let missing = sizes
+                .iter()
+                .find(|(node, _)| {
+                    !self
+                        .boxes
+                        .iter()
+                        .any(|b| b.node == *node && b.natural.is_some())
+                })
+                .map_or(sizes[0].0, |(node, _)| *node);
+            return Err(LayoutError::NotReplaced(missing));
+        }
+        for b in &mut self.boxes {
+            if let (Some(size), Some(_)) = (wanted.get(&b.node), b.natural) {
+                b.natural = Some(*size);
+            }
+        }
+        Ok(())
     }
 
     /// Principal/text boxes in preorder. Indexes are valid only in this snapshot.
@@ -321,6 +391,8 @@ pub enum LayoutError {
     ShadowTree,
     /// Dump would exceed its byte limit.
     OutputLimit,
+    /// A natural size was supplied for a node that is not a replaced box.
+    NotReplaced(NodeId),
 }
 impl From<DomError> for LayoutError {
     fn from(value: DomError) -> Self {

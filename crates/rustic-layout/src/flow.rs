@@ -25,6 +25,7 @@ use crate::intrinsic::{self, Intrinsic};
 use crate::margins::MarginStrut;
 use crate::overflow::{self, Clip};
 use crate::position::{self, AbsoluteContext, AbsoluteHeight};
+use crate::replaced::{self, NaturalSize};
 use crate::sizing::measure_in_band;
 use crate::tree::HtmlTag;
 use crate::{
@@ -204,6 +205,8 @@ struct Node<'a> {
     containing: Option<usize>,
     intrinsic: Intrinsic,
     direction: Direction,
+    /// Natural size of a replaced box; its descendants are not laid out.
+    natural: Option<NaturalSize>,
     // Results of the current layout attempt.
     measure: BlockMeasure,
     height: Option<HeightConstraint>,
@@ -346,7 +349,14 @@ fn supported_box(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
         node: b.node(),
         reason,
     };
-    if b.requires_special_layout() {
+    // Block-level replaced elements are laid out; inline-level ones need
+    // inline layout, and controls and foreign content stay unsupported.
+    let replaced_block = b.natural_size().is_some()
+        && matches!(
+            b.kind(),
+            BoxKind::Element(Display::Block | Display::FlowRoot)
+        );
+    if b.requires_special_layout() && !replaced_block {
         return Err(fail(UnsupportedFlow::SpecialElement));
     }
     if !matches!(
@@ -403,8 +413,18 @@ fn build_nodes<'a>(
     let mut nodes: Vec<Node<'_>> = Vec::new();
     let mut index: Vec<Option<usize>> = Vec::with_capacity(tree.boxes().len());
     let mut text_units = 0usize;
+    // Boxes inside a replaced element (fallback content) are not rendered.
+    let mut pruned: Vec<bool> = Vec::with_capacity(tree.boxes().len());
     for (source, b) in tree.boxes().iter().enumerate() {
         cancellation.check().map_err(|_| FlowError::Cancelled)?;
+        let hidden = b.parent().is_some_and(|p| {
+            pruned.get(p).copied().unwrap_or(false) || tree.boxes()[p].natural_size().is_some()
+        });
+        pruned.push(hidden);
+        if hidden {
+            index.push(None);
+            continue;
+        }
         let parent = match b.parent() {
             Some(p) => Some(
                 index
@@ -487,6 +507,7 @@ fn build_nodes<'a>(
             containing,
             intrinsic: Intrinsic::default(),
             direction: direction(style)?,
+            natural: b.natural_size(),
             measure: BlockMeasure {
                 content_width: CssPx::ZERO,
                 margin: Edges::default(),
@@ -552,10 +573,17 @@ impl<'a, 'c> Engine<'a, 'c> {
             node.bfc_root = node.parent.is_none()
                 || node.scheme != Scheme::Flow
                 || matches!(node.style.get(P::Display), V::Display(Display::FlowRoot))
-                || scroll_container(node.overflow);
+                || scroll_container(node.overflow)
+                || node.natural.is_some();
         }
         // Block-only intrinsic sizes, bottom up (CSS Sizing 3 §5).
         for i in (0..n).rev() {
+            if let Some(natural) = self.nodes[i].natural {
+                // Percentages are cyclic here and behave as `auto`.
+                let (w, _) = replaced::used_size(self.nodes[i].style, natural, None, None)?;
+                self.nodes[i].intrinsic = Intrinsic { min: w, max: w };
+                continue;
+            }
             let (mut min, mut max) = (0.0_f64, 0.0_f64);
             let (mut left, mut right) = (0.0_f64, 0.0_f64);
             let mut c = i + 1;
@@ -594,6 +622,33 @@ impl<'a, 'c> Engine<'a, 'c> {
                 c = next;
             }
             self.nodes[i].intrinsic = Intrinsic { min, max };
+        }
+        Ok(())
+    }
+
+    /// A replaced box's used content size against a containing block.
+    fn replaced_size(
+        &self,
+        i: usize,
+        width: f64,
+        height: Option<CssPx>,
+    ) -> Result<Option<(f64, f64)>, FlowError> {
+        let n = &self.nodes[i];
+        Ok(match n.natural {
+            Some(natural) => Some(replaced::used_size(
+                n.style,
+                natural,
+                Some(width),
+                height.map(CssPx::get),
+            )?),
+            None => None,
+        })
+    }
+
+    /// Fix a replaced box's content height after [`Self::begin`].
+    fn force_height(&mut self, i: usize, size: Option<(f64, f64)>) -> Result<(), FlowError> {
+        if let Some((_, h)) = size {
+            self.nodes[i].height = Some(HeightConstraint::solved(Some(CssPx::new(h)?)));
         }
         Ok(())
     }
@@ -789,9 +844,16 @@ impl<'a, 'c> Engine<'a, 'c> {
                 Ok(())
             }
             Scheme::Float(_) => {
+                let replaced = self.replaced_size(i, pf.width.get(), pf.definite)?;
                 let n = &self.nodes[i];
-                let measure = position::measure_float(n.style, pf.width, n.intrinsic)?;
+                let measure = position::measure_float(
+                    n.style,
+                    pf.width,
+                    n.intrinsic,
+                    replaced.map(|(w, _)| w),
+                )?;
                 self.begin(i, measure, &pf)?;
+                self.force_height(i, replaced)?;
                 frames.push(self.frame_for(i, 0.0)?);
                 bfcs.push(Bfc::default());
                 Ok(())
@@ -870,6 +932,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             pf.direction,
             (0.0, 0.0),
             Some(n.intrinsic),
+            None,
         )?;
         self.begin(i, measure, pf)?;
         let x = pf.content_x + measure.margin.left.get();
@@ -981,8 +1044,11 @@ impl<'a, 'c> Engine<'a, 'c> {
         let pf = *frames.last().ok_or(FlowError::InvalidSnapshot)?;
         let style = self.nodes[i].style;
         let inner = Some(self.nodes[i].intrinsic);
-        let plain = measure_in_band(style, pf.width, pf.direction, (0.0, 0.0), inner)?;
+        let replaced = self.replaced_size(i, pf.width.get(), pf.definite)?;
+        let forced = replaced.map(|(w, _)| w);
+        let plain = measure_in_band(style, pf.width, pf.direction, (0.0, 0.0), inner, forced)?;
         self.begin(i, plain, &pf)?;
+        self.force_height(i, replaced)?;
         let (mut y, extent) = match retry {
             Some(retry) => retry,
             None => (
@@ -1013,6 +1079,7 @@ impl<'a, 'c> Engine<'a, 'c> {
                 pf.direction,
                 (band.left - left, right - band.right),
                 inner,
+                forced,
             )?;
             let x = left + m.margin.left.get();
             let width = m.content_width.get()
@@ -1178,10 +1245,13 @@ impl<'a, 'c> Engine<'a, 'c> {
             static_direction,
             containing_direction,
         };
+        let replaced = self.replaced_size(i, cx.width, CssPx::new(cx.height).ok())?;
         let n = &self.nodes[i];
-        let horizontal = position::absolute_width(n.style, &cx, n.intrinsic)?;
+        let horizontal =
+            position::absolute_width(n.style, &cx, n.intrinsic, replaced.map(|(w, _)| w))?;
         let m = horizontal.measure;
-        let vertical = AbsoluteHeight::new(n.style, &cx, m.padding, m.border)?;
+        let vertical =
+            AbsoluteHeight::new(n.style, &cx, m.padding, m.border, replaced.map(|(_, h)| h))?;
         let definite = vertical.definite().map(CssPx::new).transpose()?;
         let extras = {
             let n = &mut self.nodes[i];

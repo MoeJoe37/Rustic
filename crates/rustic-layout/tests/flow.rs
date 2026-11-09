@@ -226,8 +226,8 @@ fn unsupported_contexts_controls_and_sticky_return_typed_errors() {
         "main {position:sticky}",
         UnsupportedFlow::Positioning,
     );
+    // Block-level replaced elements are laid out since REN-02c (tests/sizing.rs).
     for html in [
-        "<img>",
         "<input>",
         "<button></button>",
         "<svg></svg>",

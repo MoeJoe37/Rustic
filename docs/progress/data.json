@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "0a02a79cd741e9b5ec6c2b94766861b52bba4adab5dc61d7729388888a6509d5",
-  "percent": "28.52",
-  "verified_percent": "21.91",
-  "partial_percent": "6.61",
-  "completed": 38,
-  "in_progress": 15,
+  "source_fingerprint": "a33ab48eab897d7dfa448f56de4023165c8afde471b88f0139ad6ade0a8ba9dc",
+  "percent": "30.34",
+  "verified_percent": "26.40",
+  "partial_percent": "3.94",
+  "completed": 44,
+  "in_progress": 10,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -35,11 +35,11 @@
       "id": "M3",
       "label": "Static renderer",
       "share": "12.22",
-      "completed": 2,
+      "completed": 8,
       "total": 17,
-      "percent": "65.64",
-      "verified_percent": "13.45",
-      "partial_percent": "52.19"
+      "percent": "80.57",
+      "verified_percent": "50.11",
+      "partial_percent": "30.46"
     },
     {
       "id": "M4",
@@ -228,9 +228,35 @@
           "label": "Typed CSS/device geometry and checked surface allocation",
           "size": 3,
           "milestone": "M3",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/geometry.rs",
+              "marker": "pub struct SurfaceAllocation"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-base/src/geometry.rs",
+              "marker": "pub struct Length<U>"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/tests/geometry.rs",
+              "marker": "fn surfaces_are_checked_before_allocation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-base/tests/geometry.rs",
+              "marker": "fn units_change_only_through_an_explicit_scale"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/reference.rs",
+              "marker": "fn layout_geometry_converts_to_unit_typed_base_geometry"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.37"
         },
         {
@@ -276,12 +302,12 @@
         }
       ],
       "points": 16,
-      "completed": 6,
+      "completed": 7,
       "in_progress": 0,
       "total": 8,
-      "contribution": "1.25",
-      "percent": "62.50",
-      "verified_percent": "62.50",
+      "contribution": "1.62",
+      "percent": "81.25",
+      "verified_percent": "81.25",
       "partial_percent": "0.00"
     },
     {
@@ -1872,61 +1898,55 @@
           "label": "Box/fragment trees and checked geometry",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "geometry",
-              "label": "Checked CSS/device units and geometry arithmetic",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/geometry.rs",
-                  "marker": "pub struct CssPx"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/reference.rs",
-                  "marker": "fn geometry_rejects_nonfinite_and_out_of_budget_edges_before_conversion"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/geometry.rs",
+              "marker": "pub struct CssPx"
             },
             {
-              "id": "normalized",
-              "label": "Normalized principal and anonymous box tree",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/formatting.rs",
-                  "marker": "pub struct FormattingTree"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/formatting.rs",
-                  "marker": "fn exhaustive_short_runs_match_an_independent_block_group_model"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/formatting.rs",
-                  "marker": "fn nested_inline_ancestors_split_and_keep_open_edges"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn dump_formatting_matches_reviewed_structure_across_chunks_and_output_boundaries"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/reference.rs",
+              "marker": "fn geometry_rejects_nonfinite_and_out_of_budget_edges_before_conversion"
             },
             {
-              "id": "fragments",
-              "label": "Fragment tree with layout geometry",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/formatting.rs",
+              "marker": "pub struct FormattingTree"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/formatting.rs",
+              "marker": "fn exhaustive_short_runs_match_an_independent_block_group_model"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/formatting.rs",
+              "marker": "fn nested_inline_ancestors_split_and_keep_open_edges"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn dump_formatting_matches_reviewed_structure_across_chunks_and_output_boundaries"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/fragments.rs",
+              "marker": "pub struct FragmentTree"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/fragments.rs",
+              "marker": "fn blocks_lines_inline_boxes_and_text_nest_in_document_order"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/fragments.rs",
+              "marker": "fn deep_trees_are_built_without_recursion"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.58"
         },
         {
@@ -2000,71 +2020,70 @@
           "label": "Inline formatting, line boxes and baselines",
           "size": 5,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "lines",
-              "label": "Line boxes: greedy breaking, white-space, alignment, line-height and vertical-align baselines",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/lines.rs",
-                  "marker": "pub(crate) fn layout("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "pub(crate) fn build<"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn line_height_and_vertical_align_build_baselines"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn greedy_breaking_matches_an_independent_model"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/lines.rs",
+              "marker": "pub(crate) fn layout("
             },
             {
-              "id": "fragments",
-              "label": "Text and inline fragments, anonymous blocks, float avoidance and text intrinsic sizes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow.rs",
-                  "marker": "pub fn compute_with_fonts("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/text.rs",
-                  "marker": "pub struct TextFragment"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn lines_shorten_beside_floats_and_move_below_when_nothing_fits"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn shrink_to_fit_uses_text_min_and_max_content"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "pub(crate) fn build<"
             },
             {
-              "id": "atomic",
-              "label": "Atomic inlines, replaced elements and blocks inside inline boxes",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn line_height_and_vertical_align_build_baselines"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn greedy_breaking_matches_an_independent_model"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow.rs",
+              "marker": "pub fn compute_with_fonts("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/text.rs",
+              "marker": "pub struct TextFragment"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn lines_shorten_beside_floats_and_move_below_when_nothing_fits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn shrink_to_fit_uses_text_min_and_max_content"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "pub(crate) fn is_atomic"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow.rs",
+              "marker": "fn enter_atomic("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/atomic.rs",
+              "marker": "fn inline_block_baseline_is_its_last_line_and_its_width_shrinks_to_fit"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/atomic.rs",
+              "marker": "fn blocks_inside_inline_boxes_split_them"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.97"
         },
         {
@@ -2072,61 +2091,55 @@
           "label": "Intrinsic and replaced-element sizing",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "keywords",
-              "label": "min-content, max-content and fit-content widths with shrink-to-fit contributions",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/intrinsic.rs",
-                  "marker": "pub(crate) fn outer_contribution"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/sizing.rs",
-                  "marker": "fn width_keywords_use_min_and_max_content"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/sizing.rs",
-                  "marker": "fn keyword_widths_propagate_through_intrinsic_contributions"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/intrinsic.rs",
+              "marker": "pub(crate) fn outer_contribution"
             },
             {
-              "id": "replaced",
-              "label": "Block-level replaced sizing with natural sizes, ratios and the 300x150 default",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/replaced.rs",
-                  "marker": "pub(crate) fn used_size"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/sizing.rs",
-                  "marker": "fn replaced_sizes_follow_the_aspect_ratio_and_min_max_table"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/sizing.rs",
-                  "marker": "fn embedders_supply_decoded_image_sizes"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/sizing.rs",
+              "marker": "fn width_keywords_use_min_and_max_content"
             },
             {
-              "id": "text",
-              "label": "Text min-/max-content and inline-level replaced elements",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/sizing.rs",
+              "marker": "fn keyword_widths_propagate_through_intrinsic_contributions"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/replaced.rs",
+              "marker": "pub(crate) fn used_size"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/sizing.rs",
+              "marker": "fn replaced_sizes_follow_the_aspect_ratio_and_min_max_table"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/sizing.rs",
+              "marker": "fn embedders_supply_decoded_image_sizes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/lines.rs",
+              "marker": "pub(crate) fn intrinsic"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/atomic.rs",
+              "marker": "fn atomic_inlines_feed_intrinsic_sizes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/atomic.rs",
+              "marker": "fn overflow_and_replaced_elements_use_the_bottom_margin_edge"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.58"
         },
         {
@@ -2134,78 +2147,65 @@
           "label": "Floats, positioning and overflow",
           "size": 5,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "positioning",
-              "label": "Relative offsets and absolute/fixed containing-block equations",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/position.rs",
-                  "marker": "pub(crate) fn absolute_width"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/position.rs",
-                  "marker": "fn absolute_boxes_use_the_positioned_ancestor_padding_box"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/position.rs",
-                  "marker": "fn relative_offsets_shift_a_subtree_but_not_its_siblings"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/position.rs",
+              "marker": "pub(crate) fn absolute_width"
             },
             {
-              "id": "floats",
-              "label": "Float placement, clearance and float-avoiding formatting roots",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/exclusions.rs",
-                  "marker": "pub(crate) fn place"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/position.rs",
-                  "marker": "fn float_placement_matches_an_independent_row_raster_model"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/position.rs",
-                  "marker": "fn clearance_moves_blocks_below_selected_floats"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/position.rs",
+              "marker": "fn absolute_boxes_use_the_positioned_ancestor_padding_box"
             },
             {
-              "id": "overflow",
-              "label": "Overflow clipping, scroll-container geometry and viewport propagation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/overflow.rs",
-                  "marker": "pub(crate) fn assign"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/position.rs",
-                  "marker": "fn overflow_clips_follow_the_containing_block_chain"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/position.rs",
+              "marker": "fn relative_offsets_shift_a_subtree_but_not_its_siblings"
             },
             {
-              "id": "sticky",
-              "label": "Sticky positioning against scroll offsets",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/exclusions.rs",
+              "marker": "pub(crate) fn place"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/position.rs",
+              "marker": "fn float_placement_matches_an_independent_row_raster_model"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/position.rs",
+              "marker": "fn clearance_moves_blocks_below_selected_floats"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/overflow.rs",
+              "marker": "pub(crate) fn assign"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/position.rs",
+              "marker": "fn overflow_clips_follow_the_containing_block_chain"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/sticky.rs",
+              "marker": "pub struct StickyConstraint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/src/sticky.rs",
+              "marker": "fn offsets_match_an_independent_scan_over_scroll_positions"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/position.rs",
+              "marker": "fn sticky_boxes_use_the_nearest_scroll_container_and_bottom_insets"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.97"
         },
         {
@@ -2213,67 +2213,70 @@
           "label": "Flexbox",
           "size": 5,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "properties",
-              "label": "Flex and box alignment properties with blockified items",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/flex.rs",
-                  "marker": "pub(crate) fn alignment"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/flex.rs",
-                  "marker": "fn flex_and_sizing_declarations_parse_to_typed_longhands"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/flex.rs",
+              "marker": "pub(crate) fn alignment"
             },
             {
-              "id": "algorithm",
-              "label": "Flex layout algorithm for block-level items (lines, flexing, alignment, reversal)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/flex.rs",
-                  "marker": "fn resolve_line"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/flex.rs",
-                  "marker": "fn generated_rows_fill_the_line_within_their_bounds"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/flex.rs",
-                  "marker": "fn wrapping_builds_lines_and_wrap_reverse_stacks_them_upwards"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/flex.rs",
-                  "marker": "fn deep_nested_flex_containers_are_laid_out_without_recursion"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-css/tests/flex.rs",
+              "marker": "fn flex_and_sizing_declarations_parse_to_typed_longhands"
             },
             {
-              "id": "inline",
-              "label": "Text items, inline-flex and line baselines",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/flex.rs",
+              "marker": "fn resolve_line"
             },
             {
-              "id": "wpt",
-              "label": "css-flexbox layout WPT comparison",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/flex.rs",
+              "marker": "fn generated_rows_fill_the_line_within_their_bounds"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/flex.rs",
+              "marker": "fn wrapping_builds_lines_and_wrap_reverse_stacks_them_upwards"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/flex.rs",
+              "marker": "fn deep_nested_flex_containers_are_laid_out_without_recursion"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow.rs",
+              "marker": "pub(super) fn content_baseline("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/atomic.rs",
+              "marker": "fn inline_flex_uses_its_first_baseline_and_lays_out_items"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/atomic.rs",
+              "marker": "fn flex_baseline_alignment_uses_first_line_boxes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn text_sizes_keywords_and_flex_items"
+            },
+            {
+              "kind": "source",
+              "path": "tools/import_wpt_flexbox_tests.py",
+              "marker": "def extract("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/wpt_flexbox.rs",
+              "marker": "fn flexbox_layout_matches_the_reviewed_wpt_expectations"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.97"
         },
         {
@@ -2318,13 +2321,13 @@
         }
       ],
       "points": 46,
-      "completed": 1,
-      "in_progress": 5,
+      "completed": 6,
+      "in_progress": 0,
       "total": 10,
-      "contribution": "3.63",
-      "percent": "40.39",
-      "verified_percent": "10.86",
-      "partial_percent": "29.53"
+      "contribution": "5.08",
+      "percent": "56.52",
+      "verified_percent": "56.52",
+      "partial_percent": "0.00"
     },
     {
       "id": "paint",

@@ -23,6 +23,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-codecs"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+]
+
+[[package]]
 name = "rustic-css"
 version = "0.1.0"
 dependencies = [
@@ -45,6 +52,7 @@ name = "rustic-fuzz"
 version = "0.1.0"
 dependencies = [
  "rustic-base",
+ "rustic-codecs",
  "rustic-css",
  "rustic-dom",
  "rustic-html",
@@ -92,6 +100,7 @@ name = "rustic-raster"
 version = "0.1.0"
 dependencies = [
  "rustic-base",
+ "rustic-codecs",
  "rustic-css",
  "rustic-dom",
  "rustic-html",

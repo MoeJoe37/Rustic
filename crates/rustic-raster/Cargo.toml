@@ -14,6 +14,7 @@ rustic-layout = { path = "../rustic-layout" }
 rustic-paint = { path = "../rustic-paint" }
 
 [dev-dependencies]
+rustic-codecs = { path = "../rustic-codecs" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-html = { path = "../rustic-html" }

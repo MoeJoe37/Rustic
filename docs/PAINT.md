@@ -103,9 +103,38 @@ absolute box and a half-covered clip row, group compositing versus per-fill
 alpha, `opacity: 0`, the group memory budget and a layered golden checksum.
 The fuzz target also checks one background per box and balanced groups.
 
+## Image decoding (`rustic-codecs`)
+
+`rustic-codecs` holds from-scratch decoders for untrusted data, the "codec
+adapters" of ARCHITECTURE.md. `inflate`/`zlib_decompress` implement RFC 1951
+stored, fixed and dynamic Huffman blocks and the RFC 1950 wrapper with its
+Adler-32 check, under an exact output limit and cancellation, so a
+decompression bomb stops at its budget. Huffman codes are validated
+(over-subscribed and incomplete codes are rejected, except the single one-bit
+code RFC 1951 allows) and back-references cannot reach before the output.
+
+`decode_png(bytes, limits, cancellation)` returns straight-alpha RGBA8. It
+handles every color type and bit depth, palettes, `tRNS` (compared at the
+original sample depth), the five row filters and Adam7 interlacing. Chunk CRCs
+are verified, chunk order is enforced, unknown critical chunks are rejected,
+and the zlib stream must inflate to exactly the size the header implies.
+`PngLimits` caps width, height, decoded bytes and chunk count; the size check
+happens when `IHDR` is read, before any pixel allocation. 16-bit samples are
+rounded to 8 bits. Color-management chunks are ignored (TD-51).
+
+Evidence: 51 PngSuite images (vendored with their license in
+`crates/rustic-codecs/tests/pngsuite`) match references from an independent
+decoder (`tools/pngsuite_reference.py`); interlaced images match their
+progressive twins; every truncation of twelve images fails cleanly and
+single-bit flips never panic; exact limit and cancellation tests; RFC test
+streams for stored, fixed and dynamic blocks; a decompression-bomb test; a
+round trip of `rustic render` output through the decoder; and the `codec-png`
+fuzz target seeded with PngSuite.
+
 ## Not yet implemented
 
-Text and glyphs, images and decoding, gradients, non-solid borders,
+Text and glyphs, painting decoded images (`<img>`, `background-image`),
+JPEG/GIF/WebP decoding, gradients, non-solid borders,
 `border-radius`, outlines, box shadows, blend modes and filters, rounded or
 `clip-path` clips, transforms, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression and reftests. See TD-41 and docs/ROADMAP.md (REN-04 to

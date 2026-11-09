@@ -18,6 +18,7 @@ mod formatting;
 mod harness;
 mod mutate;
 mod paint;
+mod png;
 mod rng;
 mod sfnt;
 mod targets;

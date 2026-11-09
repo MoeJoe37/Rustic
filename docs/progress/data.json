@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "51523b2fb75dd2489d5d86fa6c2e116f03e5292cc5900c57ed29c78fdb5316ab",
-  "percent": "27.28",
+  "source_fingerprint": "249ecd82b83c9291fb112adca3a879e56a8b90928840302703f7593196a20dd2",
+  "percent": "27.39",
   "verified_percent": "21.25",
-  "partial_percent": "6.03",
+  "partial_percent": "6.14",
   "completed": 37,
   "in_progress": 15,
   "total": 172,
@@ -37,9 +37,9 @@
       "share": "12.22",
       "completed": 1,
       "total": 17,
-      "percent": "55.49",
+      "percent": "56.40",
       "verified_percent": "7.99",
-      "partial_percent": "47.50"
+      "partial_percent": "48.41"
     },
     {
       "id": "M4",
@@ -2566,8 +2566,35 @@
               ]
             },
             {
-              "id": "decode",
-              "label": "Bounded PNG/JPEG/GIF/WebP decode",
+              "id": "png",
+              "label": "Bounded inflate and PNG decoding",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-codecs/src/png.rs",
+                  "marker": "pub fn decode_png"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-codecs/src/inflate.rs",
+                  "marker": "pub fn zlib_decompress"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-codecs/tests/pngsuite.rs",
+                  "marker": "fn every_suite_image_matches_its_reference"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-codecs/src/inflate.rs",
+                  "marker": "fn output_limit_and_cancellation_stop_bombs"
+                }
+              ]
+            },
+            {
+              "id": "formats",
+              "label": "Bounded JPEG, GIF and WebP decoding",
               "status": "planned",
               "evidence": []
             },
@@ -2578,7 +2605,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "50.00",
           "engine_share": "0.66"
         },
         {
@@ -2652,10 +2679,10 @@
       "completed": 0,
       "in_progress": 5,
       "total": 7,
-      "contribution": "1.66",
-      "percent": "27.77",
+      "contribution": "1.77",
+      "percent": "29.62",
       "verified_percent": "0.00",
-      "partial_percent": "27.77"
+      "partial_percent": "29.62"
     },
     {
       "id": "js",

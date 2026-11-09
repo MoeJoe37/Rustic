@@ -889,6 +889,15 @@ contexts are composited as groups (TD-46 for their memory shape). Steps
 credited: `paint.display` order, `paint.stacking` contexts and clips, and
 `paint.raster` clip/opacity layers. See [PAINT.md](PAINT.md).
 
+## REN-05b — Bounded inflate and PNG decoding
+
+`rustic-codecs` adds RFC 1950/1951 decompression and a PNG decoder for every
+color type, bit depth, filter and Adam7, with CRC, chunk-order and exact-size
+checks, limits applied before allocation, and cancellation. PngSuite images
+match an independent decoder's references; a `codec-png` fuzz target covers
+mutations. `paint.images` credits its PNG decode step; painting images waits
+for replaced-element sizing. Shortcuts are TD-51. See [PAINT.md](PAINT.md).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

@@ -30,7 +30,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 27.28%** (21.25% verified complete + 6.03% partial credit) — 37/172 capabilities complete and 15 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 55.49% done.
+**Overall engine completion: 27.39%** (21.25% verified complete + 6.14% partial credit) — 37/172 capabilities complete and 15 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 56.40% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -113,7 +113,8 @@ clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tr
 `rustic-css` (CSS syntax, selectors, specificity and typed property values),
 `rustic-style` (selector matching, the cascade and computed style over a read-only DOM view),
 `rustic-layout` (checked geometry, principal boxes and reference block widths),
-`rustic-paint` (display lists) and `rustic-raster` (CPU rasterizer and PNG output),
+`rustic-paint` (display lists), `rustic-raster` (CPU rasterizer and PNG output),
+`rustic-codecs` (bounded inflate and PNG decoding),
 `rustic-engine` (bounded viewport configuration), `rustic-cli`
 (development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
 are created only when their milestone needs them. All packages are unpublished.

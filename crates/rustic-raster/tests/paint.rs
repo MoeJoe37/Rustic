@@ -622,3 +622,32 @@ fn layered_scene_matches_a_golden_checksum() {
         "update after reviewing the image: {hash:#x}"
     );
 }
+
+#[test]
+fn png_output_round_trips_through_the_bounded_decoder() {
+    let p = page(
+        "<div id=a></div>",
+        &format!(
+            "{RESET} body {{ background: rgb(10 20 30) }}
+             #a {{ margin: 1.5px; height: 3.25px; background: rgb(250 0 100 / 40%); border: 0.5px solid lime }}"
+        ),
+        9.0,
+        7.0,
+    );
+    let surface = render(&p, 1.0);
+    let png = encode_png(&surface, usize::MAX).unwrap();
+    let image = rustic_codecs::decode_png(
+        &png,
+        rustic_codecs::PngLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    assert_eq!((image.width, image.height), (9, 7));
+    for y in 0..7 {
+        for x in 0..9 {
+            let c = surface.pixel(x, y).unwrap();
+            let i = ((y * 9 + x) * 4) as usize;
+            assert_eq!(&image.pixels[i..i + 4], &[c.r, c.g, c.b, c.a]);
+        }
+    }
+}

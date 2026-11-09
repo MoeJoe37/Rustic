@@ -1,0 +1,15 @@
+[package]
+name = "rustic-codecs"
+description = "Bounded, from-scratch image and compression decoders for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+
+[lints]
+workspace = true

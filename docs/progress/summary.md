@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 27.28%** = 21.25% verified complete + 6.03% partial credit. 37/172 capabilities complete, 15 in progress.
+**Overall completion: 27.39%** = 21.25% verified complete + 6.14% partial credit. 37/172 capabilities complete, 15 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `51523b2fb75dd2489d5d86fa6c2e116f03e5292cc5900c57ed29c78fdb5316ab`.
+Catalog: `engine-v3`. Source fingerprint: `249ecd82b83c9291fb112adca3a879e56a8b90928840302703f7593196a20dd2`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `51523b2fb75dd2489d5d86fa6c2e116f03e52
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 1/17 | 55.49% | 7.99% | 12.22% |
+| M3 Static renderer | 1/17 | 56.40% | 7.99% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -32,7 +32,7 @@ Catalog: `engine-v3`. Source fingerprint: `51523b2fb75dd2489d5d86fa6c2e116f03e52
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 4 | 37.12% | 0.00% | 4% | 1.48 |
 | Layout | 1/10 | 5 | 40.39% | 10.86% | 9% | 3.63 |
-| Paint & raster | 0/7 | 5 | 27.77% | 0.00% | 6% | 1.66 |
+| Paint & raster | 0/7 | 5 | 29.62% | 0.00% | 6% | 1.77 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -188,9 +188,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Clip and opacity group layers ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs))
   - [ ] Blend modes, filters and shadows
   - [ ] Tiled, damage-limited raster within frame budgets
-- **in progress 33.33%** `paint.images` — Bounded images, color/alpha and resource lifecycle · size 3 · M3 · 0.66% of engine
+- **in progress 50.00%** `paint.images` — Bounded images, color/alpha and resource lifecycle · size 3 · M3 · 0.66% of engine
   - [x] CSS Color 4 conversion to sRGB with straight/premultiplied alpha ([source](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-raster/tests/paint.rs))
-  - [ ] Bounded PNG/JPEG/GIF/WebP decode
+  - [x] Bounded inflate and PNG decoding ([source](../../crates/rustic-codecs/src/png.rs), [source](../../crates/rustic-codecs/src/inflate.rs), [test](../../crates/rustic-codecs/tests/pngsuite.rs), [test](../../crates/rustic-codecs/src/inflate.rs))
+  - [ ] Bounded JPEG, GIF and WebP decoding
   - [ ] Image resource lifecycle and memory budgets
 - **planned** `paint.hit` — Hit testing and resize/zoom geometry · size 2 · M3 · 0.44% of engine
 - **planned** `paint.formats` — SVG/MathML painting integration and Canvas 2D · size 8 · M9 · 1.77% of engine

@@ -2308,8 +2308,35 @@
               ]
             },
             {
-              "id": "decode",
-              "label": "Bounded PNG/JPEG/GIF/WebP decode",
+              "id": "png",
+              "label": "Bounded inflate and PNG decoding",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-codecs/src/png.rs",
+                  "marker": "pub fn decode_png"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-codecs/src/inflate.rs",
+                  "marker": "pub fn zlib_decompress"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-codecs/tests/pngsuite.rs",
+                  "marker": "fn every_suite_image_matches_its_reference"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-codecs/src/inflate.rs",
+                  "marker": "fn output_limit_and_cancellation_stop_bombs"
+                }
+              ]
+            },
+            {
+              "id": "formats",
+              "label": "Bounded JPEG, GIF and WebP decoding",
               "status": "planned",
               "evidence": []
             },

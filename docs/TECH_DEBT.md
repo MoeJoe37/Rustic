@@ -98,6 +98,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
 | TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, refused atomic inlines, approximations | Open, REN-03b |
+| TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -849,3 +850,14 @@ with exact tests, while each missing piece is its own unit. **Pay:** GSUB/GPOS
 shaping on `rustic-text`, atomic inlines and block-in-inline splitting with
 the formatting-context work, `unicode-bidi` embeddings, then glyph raster.
 **Trigger:** any real-page text rendering, or the first WPT text reftests.
+### TD-51 — First PNG decoder shortcuts
+
+`decode_png` treats every image as sRGB: `gAMA`, `cHRM`, `iCCP`, `sRGB` and
+`cICP` are read past without effect, so images with other color spaces or
+gamma display with the wrong tones. Animated PNG shows only its default image.
+`inflate` decodes each Huffman symbol one bit at a time (at most 15 steps),
+which is linear but several times slower than table lookup. **Pay:** color
+management with the paint pipeline's working space; table-driven Huffman
+decoding with the same tests and fuzz target. **Trigger:** real pages with
+tagged images, or decode time showing in render profiles.
+

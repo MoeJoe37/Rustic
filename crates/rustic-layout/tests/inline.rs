@@ -386,22 +386,11 @@ fn unsupported_inline_content_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     for (html, reason) in [
         (
-            "<p>x<span style='display:inline-block'>x</span>",
+            "<p>x<span style='display:inline-grid'>x</span>",
             UnsupportedFlow::FormattingContext,
         ),
-        ("<p>x<img>", UnsupportedFlow::SpecialElement),
-        (
-            "<div>x<span><div>x</div></span></div>",
-            UnsupportedFlow::FormattingContext,
-        ),
-        (
-            "<p>x<b><span style='float:left'>x</span></b>",
-            UnsupportedFlow::FormattingContext,
-        ),
-        (
-            "<p>x<span style='position:sticky'>x</span>",
-            UnsupportedFlow::Positioning,
-        ),
+        ("<p>x<input>", UnsupportedFlow::SpecialElement),
+        ("<p>x<select></select>", UnsupportedFlow::SpecialElement),
     ] {
         match try_layout(html, "", 100.0) {
             Err(FlowError::Unsupported { reason: got, .. }) => assert_eq!(got, reason, "{html}"),
@@ -563,13 +552,16 @@ fn text_sizes_keywords_and_flex_items() {
         texts(&l).iter().map(|t| t.2.0).collect::<Vec<_>>(),
         [0.0, 10.0]
     );
-    // Text directly in a flex container needs anonymous flex items.
-    match try_layout("<main>x<div>x</div></main>", "main { display:flex }", 100.0) {
-        Err(FlowError::Unsupported { reason, .. }) => {
-            assert_eq!(reason, rustic_layout::UnsupportedFlow::TextLayout);
-        }
-        other => panic!("{other:?}"),
-    }
+    // Text directly in a flex container gets an anonymous flex item, which
+    // has no fragment of its own; its line belongs to the container.
+    let l = layout(
+        "<main>xx<div>x</div></main>",
+        "main { display:flex }",
+        100.0,
+    );
+    assert_eq!(r(l.fragments()[3].border()), (10.0, 0.0, 5.0, 10.0));
+    assert_eq!(texts(&l)[0].2, (0.0, 0.0, 10.0, 10.0));
+    assert_eq!(l.lines()[0].block(), 2);
     // Fallback content of a replaced element is not laid out.
     let l = layout("<canvas style='display:block'>xx</canvas>", "", 100.0);
     assert!(l.lines().is_empty() && l.texts().is_empty());

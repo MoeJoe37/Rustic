@@ -388,10 +388,19 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     assert!(output.status.success(), "{}", stderr(&output));
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("\nline 0 block=") && stdout.contains("\ntext 0 line=0 "));
-    // Atomic inlines are not supported yet: no partial output.
+    // Atomic inlines lay out on their line.
     fs::write(
         &path,
         "<style>* {margin:0}</style><main>a <span style=display:inline-block>b</span></main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains(" line=0\n"));
+    // Inline tables are not supported yet: no partial output.
+    fs::write(
+        &path,
+        "<style>* {margin:0}</style><main>a <span style=display:inline-table>b</span></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);

@@ -61,12 +61,23 @@ pub(crate) struct RawInline {
     pub ends: bool,
 }
 
+/// An atomic inline's margin box position on a line.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct RawAtomic {
+    pub line: usize,
+    pub atomic: usize,
+    /// Top-left corner of the margin box.
+    pub x: f64,
+    pub y: f64,
+}
+
 /// The lines of one inline formatting context.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct LineSet {
     pub lines: Vec<RawLine>,
     pub texts: Vec<RawText>,
     pub inlines: Vec<RawInline>,
+    pub atomics: Vec<RawAtomic>,
 }
 
 /// A chosen line: pieces `start..end` with their measured widths.
@@ -81,8 +92,9 @@ struct Break {
     empty: bool,
 }
 
-/// Greedy breaking from `start` within `available` pixels after `indent`.
-fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64) -> Break {
+/// Greedy breaking from `start` within `available` pixels after `indent`;
+/// `atomic` holds the outer width of each atomic inline.
+fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64, atomic: &[f64]) -> Break {
     let n = ifc.pieces.len();
     let mut committed = indent;
     let mut pending = 0.0;
@@ -106,6 +118,7 @@ fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64) -> Break
         let mut w = match piece {
             Piece::Edge { width, .. } => *width,
             Piece::Cluster { width, .. } => *width,
+            Piece::Atomic { atomic: a, .. } => atomic.get(*a).copied().unwrap_or(0.0),
         };
         if let Space::Tab(interval) = space {
             let x = committed + pending - indent;
@@ -124,7 +137,7 @@ fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64) -> Break
                 pending = 0.0;
             }
         }
-        if let Piece::Cluster { .. } = piece {
+        if let Piece::Cluster { .. } | Piece::Atomic { .. } = piece {
             if space != Space::Collapsible {
                 seen_text = true;
                 needs_line = true;
@@ -168,10 +181,28 @@ pub(crate) fn intrinsic(ifc: &Ifc<'_>, work: &mut Work<'_>) -> Result<Intrinsic,
     };
     let mut result = Intrinsic::default();
     for (available, slot) in [(0.0, 0), (f64::INFINITY, 1)] {
+        // Atomic inlines contribute their outer min-/max-content sizes.
+        let atomic: Vec<f64> = ifc
+            .atomics
+            .iter()
+            .map(|a| {
+                if slot == 0 {
+                    a.contribution.min
+                } else {
+                    a.contribution.max
+                }
+            })
+            .collect();
         let mut start = 0;
         let mut first = true;
         while start < ifc.pieces.len() {
-            let line = break_line(ifc, start, available, if first { indent } else { 0.0 });
+            let line = break_line(
+                ifc,
+                start,
+                available,
+                if first { indent } else { 0.0 },
+                &atomic,
+            );
             work.charge(line.end - start)?;
             let width = trimmed_width(ifc, &line) + if first { indent } else { 0.0 };
             if slot == 0 {
@@ -243,6 +274,7 @@ pub(crate) fn layout(
         V::TextAlign(a) => *a,
         _ => return Err(FlowError::InvalidSnapshot),
     };
+    let atomic: Vec<f64> = ifc.atomics.iter().map(|a| a.size.0).collect();
     let mut set = LineSet::default();
     let mut y = area.top;
     let mut start = 0;
@@ -261,7 +293,13 @@ pub(crate) fn layout(
                 },
             };
             let available = (band.right - band.left).max(0.0);
-            let line = break_line(ifc, start, available, if first { indent } else { 0.0 });
+            let line = break_line(
+                ifc,
+                start,
+                available,
+                if first { indent } else { 0.0 },
+                &atomic,
+            );
             work.charge(line.end - start)?;
             if line.overflow && band.intruded {
                 if let Some(e) = area.exclusions {
@@ -296,11 +334,12 @@ pub(crate) fn layout(
                     }
                 }
             }
-            let (line_box, texts, inlines) = placed;
+            let (line_box, texts, inlines, atomics) = placed;
             y += line_box.height;
             set.lines.push(line_box);
             set.texts.extend(texts);
             set.inlines.extend(inlines);
+            set.atomics.extend(atomics);
             first = false;
             start = line.end.max(start + 1);
             break;
@@ -317,10 +356,7 @@ fn visual_order(ifc: &Ifc<'_>, line: &Break, drawn: &[usize]) -> (Vec<usize>, Ve
         Level::LTR
     };
     let chars: Vec<std::ops::Range<usize>> = (line.start..line.end)
-        .filter_map(|k| match &ifc.pieces[k] {
-            Piece::Cluster { chars, .. } => Some(chars.clone()),
-            Piece::Edge { .. } => None,
-        })
+        .filter_map(|k| ifc.pieces[k].chars().cloned())
         .collect();
     let (c0, c1) = match (chars.first(), chars.last()) {
         (Some(a), Some(b)) => (a.start, b.end),
@@ -334,27 +370,23 @@ fn visual_order(ifc: &Ifc<'_>, line: &Break, drawn: &[usize]) -> (Vec<usize>, Ve
     let level_at = |c: usize| line_levels.get(c.wrapping_sub(c0)).copied().unwrap_or(para);
     let mut levels = Vec::with_capacity(drawn.len());
     for (i, &k) in drawn.iter().enumerate() {
+        let level_of = |j: usize| ifc.pieces[j].chars().map(|c| level_at(c.start));
         levels.push(match &ifc.pieces[k] {
-            Piece::Cluster { chars, .. } => level_at(chars.start),
-            Piece::Edge { open: true, .. } => drawn[i..]
-                .iter()
-                .find_map(|&j| match &ifc.pieces[j] {
-                    Piece::Cluster { chars, .. } => Some(level_at(chars.start)),
-                    Piece::Edge { .. } => None,
-                })
-                .unwrap_or(para),
+            Piece::Cluster { chars, .. } | Piece::Atomic { chars, .. } => level_at(chars.start),
+            Piece::Edge { open: true, .. } => {
+                drawn[i..].iter().find_map(|&j| level_of(j)).unwrap_or(para)
+            }
             Piece::Edge { open: false, .. } => drawn[..i]
                 .iter()
                 .rev()
-                .find_map(|&j| match &ifc.pieces[j] {
-                    Piece::Cluster { chars, .. } => Some(level_at(chars.start)),
-                    Piece::Edge { .. } => None,
-                })
+                .find_map(|&j| level_of(j))
                 .unwrap_or(para),
         });
     }
     (BidiInfo::reorder(&levels), levels)
 }
+
+type PlacedLine = (RawLine, Vec<RawText>, Vec<RawInline>, Vec<RawAtomic>);
 
 #[allow(clippy::too_many_arguments, reason = "one line's geometry inputs")]
 fn place(
@@ -367,7 +399,7 @@ fn place(
     align: TextAlign,
     index: usize,
     work: &mut Work<'_>,
-) -> Result<(RawLine, Vec<RawText>, Vec<RawInline>), FlowError> {
+) -> Result<PlacedLine, FlowError> {
     let (dropped, hanging) = trailing(ifc, line);
     let drawn: Vec<usize> = (line.start..line.end)
         .filter(|&k| !dropped[k - line.start])
@@ -429,8 +461,11 @@ fn place(
 
     // Vertical metrics (CSS 2.2 §10.8.1): offsets from each alignment
     // root's baseline, positive downwards.
+    // Alignment subjects: inline boxes `0..nb`, then atomic inlines.
     let nb = ifc.boxes.len();
+    let na = ifc.atomics.len();
     let mut present = vec![false; nb];
+    let mut atomic_present = vec![false; na];
     let mark = |mut b: Option<usize>, present: &mut Vec<bool>, work: &mut Work<'_>| {
         while let Some(i) = b {
             if present[i] {
@@ -446,13 +481,17 @@ fn place(
         match &ifc.pieces[k] {
             Piece::Cluster { text, .. } => mark(ifc.texts[*text].parent, &mut present, work)?,
             Piece::Edge { ibox, .. } => mark(Some(*ibox), &mut present, work)?,
+            Piece::Atomic { atomic, .. } => {
+                atomic_present[*atomic] = true;
+                mark(ifc.atomics[*atomic].parent, &mut present, work)?;
+            }
         }
     }
     let layout_top = |f: &FontBox| -(f.ascent + f.half_leading());
     let layout_bottom = |f: &FontBox| f.descent + f.half_leading();
     // Alignment groups: None is the root inline box; Some(b) a top/bottom box.
-    let mut offset_of = vec![0.0; nb];
-    let mut group_of: Vec<Option<usize>> = vec![None; nb];
+    let mut offset_of = vec![0.0; nb + na];
+    let mut group_of: Vec<Option<usize>> = vec![None; nb + na];
     let mut root_extent = (layout_top(&ifc.root_font), layout_bottom(&ifc.root_font));
     let mut groups: Vec<(usize, f64, f64)> = Vec::new();
     for b in 0..nb {
@@ -486,6 +525,48 @@ fn place(
             },
         }
     }
+    // Atomic inlines align their margin boxes (CSS 2.2 §10.8.1), with the
+    // baseline the flow engine found (or the bottom margin edge).
+    for a in 0..na {
+        if !atomic_present[a] {
+            continue;
+        }
+        work.charge(1)?;
+        let at = &ifc.atomics[a];
+        let (po, pg, pf) = match at.parent {
+            Some(p) => (offset_of[p], group_of[p], ifc.boxes[p].font),
+            None => (0.0, None, ifc.root_font),
+        };
+        let height = at.size.1;
+        let (above, below) = (at.baseline, height - at.baseline);
+        let (o, g) = match at.align {
+            Align::Shift(s) => (po + s, pg),
+            Align::TextTop => (po - pf.ascent + above, pg),
+            Align::TextBottom => (po + pf.descent - below, pg),
+            Align::Middle => (po - pf.x_height / 2.0 + above - height / 2.0, pg),
+            Align::Top | Align::Bottom => (0.0, Some(nb + a)),
+        };
+        offset_of[nb + a] = o;
+        group_of[nb + a] = g;
+        let (t, bo) = (o - above, o + below);
+        match g {
+            None => root_extent = (root_extent.0.min(t), root_extent.1.max(bo)),
+            Some(root) => match groups.iter_mut().find(|e| e.0 == root) {
+                Some(e) => {
+                    e.1 = e.1.min(t);
+                    e.2 = e.2.max(bo);
+                }
+                None => groups.push((root, t, bo)),
+            },
+        }
+    }
+    let align_of = |s: usize| {
+        if s < nb {
+            ifc.boxes[s].align
+        } else {
+            ifc.atomics[s - nb].align
+        }
+    };
     let mut height = root_extent.1 - root_extent.0;
     for &(_, t, b) in &groups {
         height = height.max(b - t);
@@ -504,7 +585,7 @@ fn place(
                             .copied()
                             .find(|e| e.0 == g)
                             .unwrap_or((g, 0.0, 0.0));
-                        match ifc.boxes[g].align {
+                        match align_of(g) {
                             Align::Bottom => y + height - bo,
                             _ => y - t,
                         }
@@ -528,6 +609,7 @@ fn place(
     let (order, levels) = visual_order(ifc, line, &drawn);
     let mut x = band_left + offset + if rtl { 0.0 } else { indent };
     let mut texts: Vec<RawText> = Vec::new();
+    let mut atomics: Vec<RawAtomic> = Vec::new();
     let mut extents: Vec<Option<(f64, f64)>> = vec![None; nb];
     let mut edges: Vec<(bool, bool)> = vec![(false, false); nb];
     for &v in &order {
@@ -540,6 +622,7 @@ fn place(
         let owner = match &ifc.pieces[k] {
             Piece::Cluster { text, .. } => ifc.texts[*text].parent,
             Piece::Edge { ibox, .. } => Some(*ibox),
+            Piece::Atomic { atomic, .. } => ifc.atomics[*atomic].parent,
         };
         let mut b = owner;
         while let Some(i) = b {
@@ -550,6 +633,16 @@ fn place(
             b = ifc.boxes[i].parent;
         }
         match &ifc.pieces[k] {
+            Piece::Atomic { atomic, .. } => {
+                let at = &ifc.atomics[*atomic];
+                let (dx, dy) = relative(at.parent);
+                atomics.push(RawAtomic {
+                    line: index,
+                    atomic: *atomic,
+                    x: x + dx,
+                    y: baseline_of(Some(nb + *atomic)) - at.baseline + dy,
+                });
+            }
             Piece::Edge { ibox, open, .. } => {
                 let ltr = ifc.boxes[*ibox].direction == Direction::Ltr;
                 // (left edge on this line, right edge on this line)
@@ -660,6 +753,7 @@ fn place(
         },
         texts,
         inlines,
+        atomics,
     ))
 }
 
@@ -683,5 +777,9 @@ pub(crate) fn translate(set: &mut LineSet, dx: f64, dy: f64) {
             r.0 += dx;
             r.1 += dy;
         }
+    }
+    for a in &mut set.atomics {
+        a.x += dx;
+        a.y += dy;
     }
 }

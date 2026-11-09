@@ -23,7 +23,7 @@ mod flex;
 
 use crate::exclusions::{Exclusions, Side};
 use crate::height::HeightConstraint;
-use crate::inline::{self, Ifc};
+use crate::inline::{self, Entry, Ifc};
 use crate::intrinsic::{self, Intrinsic};
 use crate::lines::{self, LineArea, LineSet};
 use crate::margins::MarginStrut;
@@ -91,6 +91,7 @@ pub struct BlockFragment {
     overflow: (Overflow, Overflow),
     clip: Clip,
     scrollable: Option<CssRect>,
+    line: Option<usize>,
 }
 
 impl BlockFragment {
@@ -155,6 +156,11 @@ impl BlockFragment {
     /// so no gutter is reserved and the scroll position is the origin.
     pub const fn scrollable_overflow(self) -> Option<CssRect> {
         self.scrollable
+    }
+    /// For an atomic inline (`inline-block`, `inline-flex` or an inline
+    /// replaced element), the index of its line in [`BlockLayout::lines`].
+    pub const fn line(self) -> Option<usize> {
+        self.line
     }
 }
 
@@ -238,6 +244,8 @@ struct Node<'a> {
     anonymous: bool,
     /// Index of this block container's inline formatting context, if any.
     inline: Option<usize>,
+    /// An atomic inline: (inline formatting context, atomic index).
+    atomic: Option<(usize, usize)>,
 }
 
 impl Node<'_> {
@@ -386,6 +394,29 @@ fn supported_box(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
         BoxKind::Element(Display::Block | Display::FlowRoot | Display::Flex)
     ) {
         return Err(fail(UnsupportedFlow::FormattingContext));
+    }
+    let style = b.style().ok_or(FlowError::InvalidSnapshot)?;
+    if matches!(style.get(P::Position), V::Position(Position::Sticky)) {
+        return Err(fail(UnsupportedFlow::Positioning));
+    }
+    Ok(style)
+}
+
+/// An atomic inline: `inline-block`, `inline-flex` or an inline replaced
+/// element. Inline grids/tables, controls and foreign content stay refused.
+fn supported_atomic(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
+    let fail = |reason| FlowError::Unsupported {
+        node: b.node(),
+        reason,
+    };
+    let replaced = b.natural_size().is_some();
+    if b.requires_special_layout() && !replaced {
+        return Err(fail(UnsupportedFlow::SpecialElement));
+    }
+    match b.kind() {
+        BoxKind::Element(Display::InlineBlock | Display::InlineFlex) => {}
+        BoxKind::Element(Display::Inline) if replaced => {}
+        _ => return Err(fail(UnsupportedFlow::FormattingContext)),
     }
     let style = b.style().ok_or(FlowError::InvalidSnapshot)?;
     if matches!(style.get(P::Position), V::Position(Position::Sticky)) {
@@ -553,7 +584,10 @@ fn new_node<'a>(
         intrinsic: Intrinsic::default(),
         direction: direction(style)?,
         natural: b.natural_size(),
-        flex_container: matches!(b.kind(), BoxKind::Element(Display::Flex)),
+        flex_container: matches!(
+            b.kind(),
+            BoxKind::Element(Display::Flex | Display::InlineFlex)
+        ),
         flex_item,
         queued: false,
         measure: BlockMeasure {
@@ -571,24 +605,31 @@ fn new_node<'a>(
         static_pos: (0.0, 0.0),
         anonymous: false,
         inline: None,
+        atomic: None,
     })
 }
 
 /// How a child takes part in its block container's content.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Participation {
-    /// Inline-level content of an inline formatting context.
+    /// Inline-level content of an inline formatting context (including
+    /// atomic inlines).
     Inline,
     /// Collapsible whitespace that disappears next to block-level siblings.
     Whitespace,
     /// A block-level box (including floats and absolutely positioned boxes).
     Block,
+    /// An inline box with a block-level descendant, which splits it.
+    Mixed,
 }
 
 fn participation(
     b: &BoxSnapshot,
     cancellation: &CancellationToken,
 ) -> Result<Participation, FlowError> {
+    if inline::is_atomic(b) {
+        return Ok(Participation::Inline);
+    }
     Ok(match b.kind() {
         BoxKind::Text if ignorable_text(b, cancellation)? => Participation::Whitespace,
         BoxKind::Text => Participation::Inline,
@@ -606,6 +647,73 @@ fn participation(
         }
         BoxKind::Element(_) => Participation::Block,
     })
+}
+
+/// [`participation`] of every box; an inline box with a block-level
+/// descendant (through other inline boxes) is [`Participation::Mixed`].
+fn participations(tree: &BoxTree, work: &mut Work<'_>) -> Result<Vec<Participation>, FlowError> {
+    let boxes = tree.boxes();
+    let mut kinds = Vec::with_capacity(boxes.len());
+    for b in boxes {
+        work.charge(1)?;
+        kinds.push(participation(b, work.cancellation)?);
+    }
+    for i in (0..boxes.len()).rev() {
+        if !matches!(kinds[i], Participation::Block | Participation::Mixed) {
+            continue;
+        }
+        if let Some(p) = boxes[i].parent() {
+            if kinds[p] == Participation::Inline && !inline::is_atomic(&boxes[p]) {
+                kinds[p] = Participation::Mixed;
+            }
+        }
+    }
+    Ok(kinds)
+}
+
+/// One step of a block container's flattened content.
+#[derive(Clone, Copy, Debug)]
+enum Item {
+    Block(usize),
+    Inline(usize),
+    Whitespace(usize),
+    Open(usize),
+    Close(usize),
+}
+
+/// A block container's content in document order, descending into inline
+/// boxes that block-level descendants split (CSS 2.2 §9.2.1.1).
+fn flatten(
+    ends: &[usize],
+    kinds: &[Participation],
+    container: usize,
+    work: &mut Work<'_>,
+) -> Result<Vec<Item>, FlowError> {
+    let mut out = Vec::new();
+    let mut stack: Vec<(Option<usize>, usize, usize)> =
+        vec![(None, container + 1, ends[container])];
+    while let Some(top) = stack.last_mut() {
+        let (owner, c, end) = *top;
+        if c >= end {
+            stack.pop();
+            if let Some(o) = owner {
+                out.push(Item::Close(o));
+            }
+            continue;
+        }
+        top.1 = ends[c];
+        work.charge(1)?;
+        match kinds[c] {
+            Participation::Block => out.push(Item::Block(c)),
+            Participation::Inline => out.push(Item::Inline(c)),
+            Participation::Whitespace => out.push(Item::Whitespace(c)),
+            Participation::Mixed => {
+                out.push(Item::Open(c));
+                stack.push((Some(c), c + 1, ends[c]));
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Subtree ends (exclusive) of every principal box, from parent links.
@@ -641,11 +749,13 @@ enum Pending {
     Box {
         source: usize,
         parent: Option<usize>,
+        /// For an atomic inline: (inline formatting context, atomic index).
+        atomic: Option<(usize, usize)>,
     },
     Anonymous {
         parent: usize,
         container: usize,
-        children: Vec<usize>,
+        entries: Vec<Entry>,
     },
 }
 
@@ -654,23 +764,27 @@ enum Pending {
 fn anonymous_styles(
     tree: &BoxTree,
     ends: &[usize],
-    cancellation: &CancellationToken,
+    kinds: &[Participation],
 ) -> Result<(Vec<ComputedStyle>, Vec<Option<usize>>), FlowError> {
     let boxes = tree.boxes();
     let mut styles = Vec::new();
     let mut of = vec![None; boxes.len()];
     for (i, b) in boxes.iter().enumerate() {
-        if !matches!(
-            b.kind(),
-            BoxKind::Element(Display::Block | Display::FlowRoot)
-        ) {
-            continue;
-        }
-        let (mut inline, mut block) = (false, false);
+        let flex = match b.kind() {
+            BoxKind::Element(Display::Block | Display::FlowRoot | Display::InlineBlock) => false,
+            // Text directly in a flex container gets anonymous flex items.
+            BoxKind::Element(Display::Flex | Display::InlineFlex) => true,
+            _ => continue,
+        };
+        let (mut inline, mut block) = (false, flex);
         for c in children_of(ends, Some(i)) {
-            match participation(&boxes[c], cancellation)? {
+            match kinds[c] {
                 Participation::Inline => inline = true,
                 Participation::Block => block = true,
+                Participation::Mixed => {
+                    inline = true;
+                    block = true;
+                }
                 Participation::Whitespace => {}
             }
         }
@@ -684,8 +798,11 @@ fn anonymous_styles(
 }
 
 /// Build flow nodes when fonts are available: block containers with inline
-/// content get an inline formatting context, and inline runs next to
-/// block-level siblings are wrapped in anonymous blocks.
+/// content get an inline formatting context, inline runs next to
+/// block-level siblings are wrapped in anonymous blocks (anonymous flex
+/// items in flex containers), inline boxes are split around block-level
+/// descendants, and atomic inlines become formatting-root nodes under the
+/// block that owns their inline formatting context.
 #[allow(
     clippy::too_many_arguments,
     reason = "the snapshot, its indexes and budgets"
@@ -693,6 +810,7 @@ fn anonymous_styles(
 fn build_text_nodes<'a>(
     tree: &'a BoxTree,
     ends: &[usize],
+    kinds: &[Participation],
     anonymous: &'a [ComputedStyle],
     anonymous_of: &[Option<usize>],
     fonts: &FontDatabase,
@@ -717,8 +835,20 @@ fn build_text_nodes<'a>(
         .map(|source| Pending::Box {
             source,
             parent: None,
+            atomic: None,
         })
         .collect();
+    // Atomic inlines of a new inline formatting context, pushed so that
+    // they are built next, in preorder, as children of `owner`.
+    let push_atomics = |stack: &mut Vec<Pending>, ifc: &Ifc<'_>, k: usize, owner: usize| {
+        for (a, item) in ifc.atomics.iter().enumerate().rev() {
+            stack.push(Pending::Box {
+                source: item.source,
+                parent: Some(owner),
+                atomic: Some((k, a)),
+            });
+        }
+    };
     while let Some(pending) = stack.pop() {
         work.charge(1)?;
         let parent = match &pending {
@@ -733,7 +863,11 @@ fn build_text_nodes<'a>(
             return Err(FlowError::DepthLimit);
         }
         match pending {
-            Pending::Box { source, parent } => {
+            Pending::Box {
+                source,
+                parent,
+                atomic,
+            } => {
                 let b = &boxes[source];
                 if b.kind() == BoxKind::Text {
                     if !ignorable_text(b, work.cancellation)? {
@@ -747,81 +881,117 @@ fn build_text_nodes<'a>(
                 if nodes.len() >= limits.max_boxes {
                     return Err(FlowError::BoxLimit);
                 }
-                let style = supported_box(b)?;
-                let node = new_node(&nodes, source, b, style, parent, depth)?;
+                let style = match atomic {
+                    Some(_) => supported_atomic(b)?,
+                    None => supported_box(b)?,
+                };
+                let mut node = new_node(&nodes, source, b, style, parent, depth)?;
+                node.atomic = atomic;
                 nodes.push(node);
                 let index = nodes.len() - 1;
+                if let Some((k, a)) = atomic {
+                    let item = ifcs
+                        .get_mut(k)
+                        .and_then(|ifc| ifc.atomics.get_mut(a))
+                        .ok_or(FlowError::InvalidSnapshot)?;
+                    item.node = index;
+                }
                 // Fallback content inside a replaced element is not rendered.
                 if nodes[index].natural.is_some() {
                     continue;
                 }
-                let children = children_of(ends, Some(source));
-                let mut kinds = Vec::with_capacity(children.len());
-                for &c in &children {
-                    kinds.push(participation(&boxes[c], work.cancellation)?);
-                }
-                let has_block = kinds.contains(&Participation::Block);
-                let has_inline = kinds.contains(&Participation::Inline);
-                if has_inline && nodes[index].flex_container {
-                    // Text directly in a flex container needs anonymous flex
-                    // items, which are not implemented.
-                    let first = children
-                        .iter()
-                        .zip(&kinds)
-                        .find(|(_, k)| **k == Participation::Inline)
-                        .map_or(b.node(), |(&c, _)| boxes[c].node());
-                    return Err(FlowError::Unsupported {
-                        node: first,
-                        reason: UnsupportedFlow::TextLayout,
-                    });
-                }
-                if !has_block {
+                let items = flatten(ends, kinds, source, work)?;
+                let has_block = items.iter().any(|i| matches!(i, Item::Block(_)));
+                let has_inline = items.iter().any(|i| matches!(i, Item::Inline(_)));
+                if !has_block && !nodes[index].flex_container {
                     if has_inline {
-                        let ifc = inline::build(tree, ends, style, &children, fonts, work)?;
+                        let entries: Vec<Entry> = items
+                            .iter()
+                            .map(|i| match *i {
+                                Item::Inline(c) | Item::Whitespace(c) => Ok(Entry::Box(c)),
+                                _ => Err(FlowError::InvalidSnapshot),
+                            })
+                            .collect::<Result<_, _>>()?;
+                        let ifc = inline::build(tree, ends, style, &entries, fonts, work)?;
                         ifcs.push(ifc);
-                        nodes[index].inline = Some(ifcs.len() - 1);
+                        let k = ifcs.len() - 1;
+                        nodes[index].inline = Some(k);
+                        push_atomics(&mut stack, &ifcs[k], k, index);
                     }
                     continue;
                 }
                 // Group inline runs; push in reverse so preorder is kept.
                 let mut groups: Vec<Pending> = Vec::new();
-                let mut run: Vec<usize> = Vec::new();
+                let mut run: Vec<Entry> = Vec::new();
                 let mut run_inline = false;
-                let flush =
-                    |run: &mut Vec<usize>, run_inline: &mut bool, groups: &mut Vec<Pending>| {
-                        if *run_inline {
-                            groups.push(Pending::Anonymous {
-                                parent: index,
-                                container: source,
-                                children: std::mem::take(run),
-                            });
-                        }
-                        run.clear();
-                        *run_inline = false;
-                    };
-                for (&c, &kind) in children.iter().zip(&kinds) {
-                    match kind {
-                        Participation::Block => {
-                            flush(&mut run, &mut run_inline, &mut groups);
+                // Inline boxes split by the block-level boxes seen so far.
+                let mut open: Vec<usize> = Vec::new();
+                for item in items {
+                    match item {
+                        Item::Block(c) => {
+                            if run_inline {
+                                for &o in open.iter().rev() {
+                                    run.push(Entry::Close {
+                                        source: o,
+                                        last: false,
+                                    });
+                                }
+                                groups.push(Pending::Anonymous {
+                                    parent: index,
+                                    container: source,
+                                    entries: std::mem::take(&mut run),
+                                });
+                            }
+                            run.clear();
+                            run_inline = false;
+                            for &o in &open {
+                                run.push(Entry::Open {
+                                    source: o,
+                                    first: false,
+                                });
+                            }
                             groups.push(Pending::Box {
                                 source: c,
                                 parent: Some(index),
+                                atomic: None,
                             });
                         }
-                        Participation::Inline => {
-                            run.push(c);
+                        Item::Inline(c) => {
+                            run.push(Entry::Box(c));
                             run_inline = true;
                         }
-                        Participation::Whitespace => run.push(c),
+                        Item::Whitespace(c) => run.push(Entry::Box(c)),
+                        Item::Open(c) => {
+                            run.push(Entry::Open {
+                                source: c,
+                                first: true,
+                            });
+                            open.push(c);
+                            run_inline = true;
+                        }
+                        Item::Close(c) => {
+                            run.push(Entry::Close {
+                                source: c,
+                                last: true,
+                            });
+                            open.pop();
+                            run_inline = true;
+                        }
                     }
                 }
-                flush(&mut run, &mut run_inline, &mut groups);
+                if run_inline {
+                    groups.push(Pending::Anonymous {
+                        parent: index,
+                        container: source,
+                        entries: run,
+                    });
+                }
                 stack.extend(groups.into_iter().rev());
             }
             Pending::Anonymous {
                 parent,
                 container,
-                children,
+                entries,
             } => {
                 if nodes.len() >= limits.max_boxes {
                     return Err(FlowError::BoxLimit);
@@ -841,11 +1011,15 @@ fn build_text_nodes<'a>(
                 node.anonymous = true;
                 node.natural = None;
                 node.flex_container = false;
-                node.flex_item = false;
-                let ifc = inline::build(tree, ends, style, &children, fonts, work)?;
+                // In a flex container this is an anonymous flex item.
+                node.flex_item = nodes[parent].flex_container;
+                let ifc = inline::build(tree, ends, style, &entries, fonts, work)?;
                 ifcs.push(ifc);
-                node.inline = Some(ifcs.len() - 1);
+                let k = ifcs.len() - 1;
+                node.inline = Some(k);
                 nodes.push(node);
+                let index = nodes.len() - 1;
+                push_atomics(&mut stack, &ifcs[k], k, index);
             }
         }
     }
@@ -901,7 +1075,8 @@ impl<'a, 'c> Engine<'a, 'c> {
                 || scroll_container(node.overflow)
                 || node.natural.is_some()
                 || node.flex_container
-                || node.flex_item;
+                || node.flex_item
+                || node.atomic.is_some();
         }
         // Block-only intrinsic sizes, bottom up (CSS Sizing 3 §5).
         for i in (0..n).rev() {
@@ -922,7 +1097,10 @@ impl<'a, 'c> Engine<'a, 'c> {
                 self.work.charge(1)?;
                 let child = &self.nodes[c];
                 let next = child.end;
-                if matches!(child.scheme, Scheme::Absolute | Scheme::Fixed) {
+                // Atomic inlines contribute through their line content.
+                if matches!(child.scheme, Scheme::Absolute | Scheme::Fixed)
+                    || child.atomic.is_some()
+                {
                     c = next;
                     continue;
                 }
@@ -953,6 +1131,12 @@ impl<'a, 'c> Engine<'a, 'c> {
                 c = next;
             }
             if let Some(k) = self.nodes[i].inline {
+                for a in 0..self.ifcs[k].atomics.len() {
+                    self.work.charge(1)?;
+                    let node = &self.nodes[self.ifcs[k].atomics[a].node];
+                    let outer = intrinsic::outer_contribution(node.style, node.intrinsic)?;
+                    self.ifcs[k].atomics[a].contribution = outer;
+                }
                 let text = lines::intrinsic(&self.ifcs[k], &mut self.work)?;
                 min = min.max(text.min);
                 max = max.max(text.max);
@@ -1200,6 +1384,10 @@ impl<'a, 'c> Engine<'a, 'c> {
         natural: f64,
         frame: &Frame,
     ) -> Result<Option<(usize, f64, f64)>, FlowError> {
+        if self.nodes[i].atomic.is_some() {
+            self.set_height(i, natural)?;
+            return self.atomic_done(i).map(|()| None);
+        }
         if let Some(k) = frames.last().and_then(|f| f.flex) {
             self.flex_item_done(k, i, natural)?;
             return Ok(None);
@@ -1248,6 +1436,18 @@ impl<'a, 'c> Engine<'a, 'c> {
         bfc.y = bottom;
         bfc.strut = MarginStrut::default();
         bfc.pending = false;
+        // Atomic inlines: margin box on the line, in this block's child space.
+        for placed in &set.atomics {
+            self.work.charge(1)?;
+            let node = self.ifcs[k].atomics[placed.atomic].node;
+            let n = self.nodes.get_mut(node).ok_or(FlowError::InvalidSnapshot)?;
+            let m = n.measure;
+            n.pos = (
+                placed.x + m.margin.left.get(),
+                placed.y + m.margin.top.get(),
+            );
+            n.top_resolved = true;
+        }
         let (ox, oy) = self.nodes[i].child_origin();
         lines::translate(&mut set, -ox, -oy);
         self.line_sets[k] = Some(set);
@@ -1291,6 +1491,9 @@ impl<'a, 'c> Engine<'a, 'c> {
                 frames.push(self.root_frame(i)?);
                 bfcs.push(Bfc::default());
                 Ok(())
+            }
+            Scheme::Flow if self.nodes[i].atomic.is_some() => {
+                self.enter_atomic(frames, bfcs, i, &pf)
             }
             Scheme::Flow if self.nodes[i].bfc_root => self.enter_flow_root(frames, bfcs, i, None),
             Scheme::Flow => self.enter_block(frames, bfcs, i, &pf),
@@ -1348,6 +1551,107 @@ impl<'a, 'c> Engine<'a, 'c> {
             let at = bfc.y + bfc.strut.value()?.get();
             self.resolve(bfcs, at)?;
             return Ok(Some(at));
+        }
+        Ok(None)
+    }
+
+    /// Size an atomic inline against its block container and lay out its
+    /// content; [`Self::layout_inline`] places it on a line afterwards.
+    fn enter_atomic(
+        &mut self,
+        frames: &mut Vec<Frame>,
+        bfcs: &mut Vec<Bfc>,
+        i: usize,
+        pf: &Frame,
+    ) -> Result<(), FlowError> {
+        let replaced = self.replaced_size(i, pf.width.get(), pf.definite)?;
+        let n = &self.nodes[i];
+        // `inline-block` widths are shrink-to-fit like floats (CSS 2.2 §10.3.9).
+        let measure =
+            position::measure_float(n.style, pf.width, n.intrinsic, replaced.map(|(w, _)| w))?;
+        self.begin(i, measure, pf)?;
+        self.force_height(i, replaced)?;
+        self.nodes[i].top_resolved = true;
+        frames.push(self.root_frame(i)?);
+        bfcs.push(Bfc::default());
+        Ok(())
+    }
+
+    /// Record a laid-out atomic inline's margin box and baseline (CSS 2.2
+    /// §10.8.1: the last line box in normal flow; the bottom margin edge
+    /// for replaced elements, `overflow` other than `visible`, or no line
+    /// boxes; CSS Flexbox 1 §8.5: an `inline-flex` uses its first baseline).
+    fn atomic_done(&mut self, i: usize) -> Result<(), FlowError> {
+        let n = &self.nodes[i];
+        let (k, a) = n.atomic.ok_or(FlowError::InvalidSnapshot)?;
+        let m = n.measure;
+        let width = m.margin.left.get() + n.border_width() + m.margin.right.get();
+        let height = m.margin.top.get() + n.border_height.get() + m.margin.bottom.get();
+        let content_top = m.margin.top.get() + m.border.top.get() + m.padding.top.get();
+        let own = n.natural.is_none() && !scroll_container(n.overflow);
+        let last = !n.flex_container;
+        let baseline = match own {
+            true => self.content_baseline(i, last)?,
+            false => None,
+        };
+        let item = self
+            .ifcs
+            .get_mut(k)
+            .and_then(|ifc| ifc.atomics.get_mut(a))
+            .ok_or(FlowError::InvalidSnapshot)?;
+        item.size = (width, height);
+        item.baseline = baseline.map_or(height, |b| content_top + b);
+        Ok(())
+    }
+
+    /// The first (or last) line box baseline in normal flow inside box `i`,
+    /// below its content-box top. Lines inside nested formatting roots,
+    /// floats, absolutely positioned boxes and atomic inlines are skipped;
+    /// flex items count (their container's baseline comes from them).
+    pub(super) fn content_baseline(
+        &mut self,
+        i: usize,
+        last: bool,
+    ) -> Result<Option<f64>, FlowError> {
+        let end = self.nodes[i].end;
+        let len = end - i;
+        for step in 0..len {
+            self.work.charge(1)?;
+            let j = if last { end - 1 - step } else { i + step };
+            let Some(k) = self.nodes[j].inline else {
+                continue;
+            };
+            let Some(set) = self.line_sets[k].as_ref() else {
+                continue;
+            };
+            let line = if last {
+                set.lines.last()
+            } else {
+                set.lines.first()
+            };
+            let Some(line) = line else {
+                continue;
+            };
+            let mut y = line.baseline;
+            let mut p = j;
+            let reachable = loop {
+                self.work.charge(1)?;
+                if p == i {
+                    break true;
+                }
+                let n = &self.nodes[p];
+                let Some(parent) = n.parent else {
+                    break false;
+                };
+                if n.scheme != Scheme::Flow || n.atomic.is_some() || (n.bfc_root && !n.flex_item) {
+                    break false;
+                }
+                y += n.pos.1 + n.edge().1 - self.nodes[parent].child_origin().1;
+                p = parent;
+            };
+            if reachable {
+                return Ok(Some(y));
+            }
         }
         Ok(None)
     }
@@ -1796,10 +2100,11 @@ impl BlockLayout {
             None => build_nodes(tree, limits, cancellation)?,
             Some(fonts) => {
                 ends = subtree_ends(tree)?;
-                let (styles, of) = anonymous_styles(tree, &ends, cancellation)?;
+                let kinds = participations(tree, &mut work)?;
+                let (styles, of) = anonymous_styles(tree, &ends, &kinds)?;
                 anonymous = styles;
                 build_text_nodes(
-                    tree, &ends, &anonymous, &of, fonts, limits, &mut work, &mut ifcs,
+                    tree, &ends, &kinds, &anonymous, &of, fonts, limits, &mut work, &mut ifcs,
                 )?
             }
         };
@@ -1919,6 +2224,9 @@ impl BlockLayout {
             }
             if let Some(s) = f.scrollable {
                 line.push_str(&format!(" scroll=({})", rect(s)));
+            }
+            if let Some(l) = f.line {
+                line.push_str(&format!(" line={l}"));
             }
             line.push('\n');
             push(line, &mut out)?;
@@ -2073,6 +2381,12 @@ impl Engine<'_, '_> {
             };
             let origin = fragments[i].content().origin();
             let block = public[owner(i)].ok_or(FlowError::InvalidSnapshot)?;
+            let base = lines_out.len();
+            for placed in &set.atomics {
+                let node = self.ifcs[k].atomics[placed.atomic].node;
+                let f = fragments.get_mut(node).ok_or(FlowError::InvalidSnapshot)?;
+                f.line = Some(base + placed.line);
+            }
             text::convert(
                 &self.ifcs[k],
                 set,
@@ -2167,6 +2481,7 @@ fn fragment(node: &Node<'_>, border_origin: (f64, f64)) -> Result<BlockFragment,
         overflow: node.overflow,
         clip: Clip::NONE,
         scrollable: None,
+        line: None,
     })
 }
 

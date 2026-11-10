@@ -6,7 +6,8 @@ use rustic_paint::{
     DisplayCommand, DisplayList, ItemRole, PaintError, PaintLimits, Shape, Srgba, UnsupportedPaint,
 };
 use rustic_raster::{
-    DeviceRect, RasterError, RasterLimits, Surface, encode_png, rasterize, rasterize_region,
+    DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, damage, encode_png, rasterize,
+    rasterize_region, repaint,
 };
 mod common;
 
@@ -1512,4 +1513,70 @@ fn regions_rasterize_to_exactly_the_pixels_of_the_full_surface() {
         ),
         Err(RasterError::SurfaceSize)
     );
+}
+
+#[test]
+fn damaged_tiles_repaint_to_exactly_the_new_surface() {
+    const HTML: &str = "<div id=a></div><div id=b></div><div id=c></div>\
+        <div id=d></div><div id=e></div><div id=f><div id=g></div></div>";
+    const BASE: &str = "
+        /* #e's shadow and #g's blur reach across tile seams their boxes do not. */
+        #a, #b, #c, #d, #e, #f, #g { position: absolute; width: 40px; height: 30px }
+        #a { left: 10px; top: 10px; background: red }
+        #b { left: 300px; top: 20px; background: blue; border-radius: 8px }
+        #c { left: 520px; top: 40px; background: green; opacity: 0.6 }
+        #d { left: 30px; top: 270px; background: purple; transform: rotate(10deg) }
+        #e { left: 208px; top: 200px; background: teal; box-shadow: 4px 4px 6px black }
+        #f { left: 462px; top: 280px; filter: blur(3px) }
+        #g { left: 5px; top: 5px; background: orange }";
+    let variants = [
+        "#a { background: lime }",
+        "#b { left: 330px }",
+        "#c { opacity: 0.3 }",
+        "#d { transform: rotate(25deg) }",
+        "#e { box-shadow: -6px 2px 9px 3px red }",
+        "#g { background: navy }",
+        "#e { display: none }",
+        "#f { filter: blur(5px) }",
+        "body { background: yellow }",
+    ];
+    let cancel = CancellationToken::default();
+    let list = |extra: &str| {
+        page(HTML, &format!("{RESET}{BASE}{extra}"), 600.0, 340.0)
+            .list()
+            .unwrap()
+    };
+    let old = list("");
+    let tiles =
+        |s: &Surface| (s.width().div_ceil(TILE_SIZE) * s.height().div_ceil(TILE_SIZE)) as usize;
+    // Every change at scale 1; at 1.5 the tile grid falls elsewhere.
+    for (scale, variants) in [(1.0, &variants[..]), (1.5, &variants[3..6])] {
+        let scale = DeviceScale::new(scale).unwrap();
+        let before = rasterize(&old, scale, RasterLimits::default(), &cancel).unwrap();
+        assert_eq!(damage(&old, &old, scale), Ok(Vec::new()));
+        for &extra in variants {
+            let new = list(extra);
+            let regions = damage(&old, &new, scale).unwrap();
+            let mut surface = before.clone();
+            repaint(
+                &mut surface,
+                &new,
+                scale,
+                &regions,
+                RasterLimits::default(),
+                &cancel,
+            )
+            .unwrap();
+            let want = rasterize(&new, scale, RasterLimits::default(), &cancel).unwrap();
+            assert!(
+                surface.premultiplied() == want.premultiplied(),
+                "{extra}: repainting {regions:?} differs from a full raster"
+            );
+            // A change in one place repaints only the tiles near it; a new
+            // filter margin or canvas color repaints everything.
+            let all = extra.starts_with("#f") || extra.starts_with("body");
+            assert_eq!(regions.len() == tiles(&before), all, "{extra}: {regions:?}");
+            assert!(!regions.is_empty(), "{extra}");
+        }
+    }
 }

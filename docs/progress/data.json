@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "6f8aa64d1c745ab5ea658c13e1e5b327c0b2cc28243c313a87f62e3db6bc96ed",
-  "percent": "28.87",
-  "verified_percent": "22.58",
-  "partial_percent": "6.29",
-  "completed": 39,
-  "in_progress": 14,
+  "source_fingerprint": "77407ad1c6ac27db27a13f3b6605c0d4baedb8f5c76dc69f15cc42a29a4a7adc",
+  "percent": "29.09",
+  "verified_percent": "23.25",
+  "partial_percent": "5.84",
+  "completed": 40,
+  "in_progress": 13,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -35,11 +35,11 @@
       "id": "M3",
       "label": "Static renderer",
       "share": "12.22",
-      "completed": 3,
+      "completed": 4,
       "total": 17,
-      "percent": "68.52",
-      "verified_percent": "18.90",
-      "partial_percent": "49.62"
+      "percent": "70.33",
+      "verified_percent": "24.35",
+      "partial_percent": "45.98"
     },
     {
       "id": "M4",
@@ -2734,77 +2734,71 @@
           "label": "Reftest output, damage and paint conformance",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "png",
-              "label": "Deterministic PNG render output",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/png.rs",
-                  "marker": "pub fn encode_png"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/src/png.rs",
-                  "marker": "fn one_pixel_png_has_the_exact_expected_bytes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn render_writes_a_deterministic_png_at_the_requested_scale"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-raster/src/png.rs",
+              "marker": "pub fn encode_png"
             },
             {
-              "id": "reftests",
-              "label": "Reftest harness and checked image fixtures",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/reftest.rs",
-                  "marker": "pub fn manifest"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/compare.rs",
-                  "marker": "pub fn compare"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/reftests.rs",
-                  "marker": "fn every_reftest_passes_at_scales_one_and_two"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn reftest_reports_each_reference_and_fails_when_one_does_not_hold"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/src/png.rs",
+              "marker": "fn one_pixel_png_has_the_exact_expected_bytes"
             },
             {
-              "id": "damage",
-              "label": "Damage tracking and paint conformance gate",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn render_writes_a_deterministic_png_at_the_requested_scale"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/reftest.rs",
+              "marker": "pub fn manifest"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/compare.rs",
+              "marker": "pub fn compare"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/reftests.rs",
+              "marker": "fn every_reftest_passes_at_scales_one_and_two"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn reftest_reports_each_reference_and_fails_when_one_does_not_hold"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/damage.rs",
+              "marker": "pub fn damage"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "pub fn damage_repaints_exactly"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn damaged_tiles_repaint_to_exactly_the_new_surface"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.66"
         }
       ],
       "points": 27,
-      "completed": 2,
-      "in_progress": 4,
+      "completed": 3,
+      "in_progress": 3,
       "total": 7,
-      "contribution": "3.25",
-      "percent": "54.32",
-      "verified_percent": "22.22",
-      "partial_percent": "32.10"
+      "contribution": "3.48",
+      "percent": "58.02",
+      "verified_percent": "33.33",
+      "partial_percent": "24.69"
     },
     {
       "id": "js",

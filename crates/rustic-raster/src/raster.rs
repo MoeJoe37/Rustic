@@ -157,7 +157,7 @@ pub(crate) fn unpremultiply(p: [u8; 4]) -> Srgba {
 type Point = (f64, f64);
 
 /// Device-space clip rectangle as (left, top, right, bottom).
-type Bounds = (f64, f64, f64, f64);
+pub(crate) type Bounds = (f64, f64, f64, f64);
 
 /// The device pixels being rasterized: a rectangle of the full surface,
 /// in its coordinates. Every buffer covers the frame; geometry stays in
@@ -492,7 +492,7 @@ fn clip_half_plane(points: &[Point], (a, b, c): (f64, f64, f64)) -> Vec<Point> {
 
 /// The most device pixels one local CSS pixel stretches to near the points
 /// of `contour` under `map`, for flattening curves before projecting them.
-fn stretch(map: &Homography, contour: &[PathPoint]) -> f64 {
+pub(crate) fn stretch(map: &Homography, contour: &[PathPoint]) -> f64 {
     let h = &map.0;
     let mut most: f64 = 0.0;
     for p in contour {
@@ -526,7 +526,11 @@ fn stretch(map: &Homography, contour: &[PathPoint]) -> f64 {
 /// pixels) and in front of the viewer, and map it to device pixels.
 /// Polygon clipping commutes with the projection, which maps lines to
 /// lines; curves are flattened finely enough for the local stretch.
-fn project(contour: &[PathPoint], map: &Homography, bounds: Option<Bounds>) -> Vec<Point> {
+pub(crate) fn project(
+    contour: &[PathPoint],
+    map: &Homography,
+    bounds: Option<Bounds>,
+) -> Vec<Point> {
     let k = stretch(map, contour);
     let mut points: Vec<Point> = flatten(contour, k)
         .into_iter()
@@ -545,7 +549,7 @@ fn project(contour: &[PathPoint], map: &Homography, bounds: Option<Bounds>) -> V
 
 /// An axis clip as local bounds, unbounded axes reaching far beyond any
 /// layout.
-fn local_bounds(clip: Clip) -> Bounds {
+pub(crate) fn local_bounds(clip: Clip) -> Bounds {
     const FAR: f64 = 1e9;
     let (x0, x1) = clip.x.map_or((-FAR, FAR), |r| (r.start.get(), r.end.get()));
     let (y0, y1) = clip.y.map_or((-FAR, FAR), |r| (r.start.get(), r.end.get()));
@@ -773,7 +777,7 @@ fn box_size(sigma: f64) -> isize {
 
 /// How far a blur of `sigma` device pixels reaches, including how far the
 /// clamped edges of a finite buffer can disturb it.
-fn blur_reach(sigma: f64) -> usize {
+pub(crate) fn blur_reach(sigma: f64) -> usize {
     if sigma.is_nan() || sigma <= 0.001 {
         return 0;
     }
@@ -1086,7 +1090,10 @@ fn intersect(a: Bounds, b: Bounds) -> Option<Bounds> {
 
 /// The rounded clips of an item, innermost first. Each node's parent must
 /// come before it, so the walk ends.
-fn chain(clips: &[ClipNode], first: Option<usize>) -> Result<Vec<&ClipNode>, RasterError> {
+pub(crate) fn chain(
+    clips: &[ClipNode],
+    first: Option<usize>,
+) -> Result<Vec<&ClipNode>, RasterError> {
     let mut out = Vec::new();
     let mut next = first;
     while let Some(i) = next {
@@ -1703,7 +1710,7 @@ pub fn surface_size(list: &DisplayList, scale: DeviceScale) -> Result<(u32, u32)
 }
 
 /// Device pixels per CSS pixel.
-fn device_factor(scale: DeviceScale) -> Result<f64, RasterError> {
+pub(crate) fn device_factor(scale: DeviceScale) -> Result<f64, RasterError> {
     Ok(rustic_layout::CssPx::new(1.0)
         .map_err(|_| RasterError::SurfaceSize)?
         .to_device(scale)
@@ -1734,7 +1741,7 @@ pub fn rasterize(
 /// How far, in device pixels, filters can move color across the surface:
 /// the largest sum of blur reaches and drop shadow offsets over nested
 /// filter groups. Rasterizing a region needs this much context around it.
-fn effect_margin(list: &DisplayList, factor: f64) -> Result<usize, RasterError> {
+pub(crate) fn effect_margin(list: &DisplayList, factor: f64) -> Result<usize, RasterError> {
     let mut maps: Vec<Option<Homography>> = Vec::new();
     let mut open: Vec<usize> = Vec::new();
     let mut total = 0usize;
@@ -1784,7 +1791,7 @@ fn effect_margin(list: &DisplayList, factor: f64) -> Result<usize, RasterError> 
 }
 
 /// Device pixels per CSS pixel for a group opened under `map`.
-fn group_scale(map: Option<&Homography>, factor: f64) -> f64 {
+pub(crate) fn group_scale(map: Option<&Homography>, factor: f64) -> f64 {
     map.map_or(factor, |m| {
         stretch(
             m,
@@ -1798,7 +1805,7 @@ fn group_scale(map: Option<&Homography>, factor: f64) -> f64 {
 }
 
 /// How far one filter operation moves color, in device pixels.
-fn filter_reach(op: &FilterOp, scale: f64) -> usize {
+pub(crate) fn filter_reach(op: &FilterOp, scale: f64) -> usize {
     let px = |v: f64| {
         let v = (v.abs() * scale).ceil();
         if v.is_finite() && v < 1e9 {
@@ -1896,6 +1903,48 @@ pub fn rasterize_region(
         }
     }
     Ok(out)
+}
+
+/// Repaint `regions` of `surface`, a surface [`rasterize`] produced at
+/// `scale`, from `list`: afterwards each region holds exactly the pixels
+/// `rasterize(list, scale, …)` would. With the regions [`damage`] reports
+/// for the list the surface was painted from, the whole surface then
+/// equals a full rasterization of `list`.
+///
+/// [`damage`]: crate::damage
+pub fn repaint(
+    surface: &mut Surface,
+    list: &DisplayList,
+    scale: DeviceScale,
+    regions: &[DeviceRect],
+    limits: RasterLimits,
+    cancellation: &CancellationToken,
+) -> Result<(), RasterError> {
+    if surface_size(list, scale)? != (surface.width, surface.height) {
+        return Err(RasterError::SurfaceSize);
+    }
+    let into = Frame {
+        x: 0,
+        y: 0,
+        w: surface.width as usize,
+        h: surface.height as usize,
+    };
+    for &region in regions {
+        let painted = rasterize_region(list, scale, region, limits, cancellation)?;
+        let from = Frame {
+            x: region.x as usize,
+            y: region.y as usize,
+            w: region.width as usize,
+            h: region.height as usize,
+        };
+        let row = from.w * 4;
+        for y in from.y..from.y + from.h {
+            let a = from.offset(from.x, y);
+            let b = into.offset(from.x, y);
+            surface.pixels[b..b + row].copy_from_slice(&painted.pixels[a..a + row]);
+        }
+    }
+    Ok(())
 }
 
 /// Rasterize `frame` of the surface into a surface of the frame's size.

@@ -353,10 +353,10 @@ fn reftest_command(args: &[OsString]) -> ExitCode {
     let (limits, scale) = (args.limits, args.scale);
     let loaded = load("reftest", limits, &args.path, |parsed, path| {
         let test = std::fs::canonicalize(path).map_err(loader::LoadError::Io)?;
-        let surface = loader::render_surface(parsed, path, limits, scale)?;
-        Ok((surface, reftest::manifest(parsed.document(), &test)))
+        let rendered = loader::render_list(parsed, path, limits, scale)?;
+        Ok((rendered, reftest::manifest(parsed.document(), &test)))
     });
-    let (surface, manifest) = match loaded {
+    let (rendered, manifest) = match loaded {
         Ok(loaded) => loaded,
         Err(code) => return code,
     };
@@ -370,20 +370,29 @@ fn reftest_command(args: &[OsString]) -> ExitCode {
     if manifest.references.is_empty() {
         eprintln!("rustic reftest: {shown}: no rel=match or rel=mismatch reference");
     }
+    let surface = &rendered.1;
     let mut report = String::new();
     let mut all = manifest.invalid_fuzzy.is_empty() && !manifest.references.is_empty();
     for reference in &manifest.references {
         let detail = match &reference.path {
             Err(reason) => Err((*reason).to_owned()),
             Ok(path) => load("reftest", limits, path.as_os_str(), |parsed, path| {
-                loader::render_surface(parsed, path, limits, scale)
+                let other = loader::render_list(parsed, path, limits, scale)?;
+                // Paint conformance for damage: repainting what changed
+                // from the reference to the test gives the test exactly.
+                let exact = loader::damage_repaints_exactly(&other, &rendered, scale)?;
+                Ok((other.1, exact))
             })
             .map_err(|_| "failed to render".to_owned()),
         };
         let (pass, detail) = match detail {
             Err(reason) => (false, reason),
-            Ok(other) => {
-                let difference = rustic_raster::compare(&surface, &other);
+            Ok((_, false)) => (
+                false,
+                "repainting the damaged tiles does not give the test's pixels".to_owned(),
+            ),
+            Ok((other, true)) => {
+                let difference = rustic_raster::compare(surface, &other);
                 let detail = match difference {
                     None => "sizes differ".to_owned(),
                     Some(d) => format!(

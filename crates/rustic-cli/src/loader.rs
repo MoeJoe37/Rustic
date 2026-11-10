@@ -565,14 +565,50 @@ pub fn render_surface(
     limits: LoaderLimits,
     scale: rustic_layout::DeviceScale,
 ) -> Result<rustic_raster::Surface, LoadError> {
+    render_list(parsed, path, limits, scale).map(|(_, surface)| surface)
+}
+
+/// Rasterize like [`render_surface`], keeping the display list.
+pub fn render_list(
+    parsed: &ParsedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    scale: rustic_layout::DeviceScale,
+) -> Result<(rustic_paint::DisplayList, rustic_raster::Surface), LoadError> {
     let list = display_list(parsed, path, limits)?;
-    rustic_raster::rasterize(
+    let surface = rustic_raster::rasterize(
         &list,
         scale,
         rustic_raster::RasterLimits::default(),
         &CancellationToken::default(),
     )
-    .map_err(LoadError::Raster)
+    .map_err(LoadError::Raster)?;
+    Ok((list, surface))
+}
+
+/// Whether repainting the tiles [`rustic_raster::damage`] reports between
+/// `old` and `new` over `old`'s surface gives exactly `new`'s surface.
+pub fn damage_repaints_exactly(
+    (old, old_surface): &(rustic_paint::DisplayList, rustic_raster::Surface),
+    (new, new_surface): &(rustic_paint::DisplayList, rustic_raster::Surface),
+    scale: rustic_layout::DeviceScale,
+) -> Result<bool, LoadError> {
+    if (old_surface.width(), old_surface.height()) != (new_surface.width(), new_surface.height()) {
+        // A new size repaints the whole surface: nothing to compare.
+        return Ok(true);
+    }
+    let regions = rustic_raster::damage(old, new, scale).map_err(LoadError::Raster)?;
+    let mut surface = old_surface.clone();
+    rustic_raster::repaint(
+        &mut surface,
+        new,
+        scale,
+        &regions,
+        rustic_raster::RasterLimits::default(),
+        &CancellationToken::default(),
+    )
+    .map_err(LoadError::Raster)?;
+    Ok(surface.premultiplied() == new_surface.premultiplied())
 }
 
 /// Rasterize like [`render_surface`] and encode the result as PNG, within

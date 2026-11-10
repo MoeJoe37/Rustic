@@ -2470,63 +2470,57 @@
           "label": "Reftest output, damage and paint conformance",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "png",
-              "label": "Deterministic PNG render output",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/png.rs",
-                  "marker": "pub fn encode_png"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/src/png.rs",
-                  "marker": "fn one_pixel_png_has_the_exact_expected_bytes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn render_writes_a_deterministic_png_at_the_requested_scale"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-raster/src/png.rs",
+              "marker": "pub fn encode_png"
             },
             {
-              "id": "reftests",
-              "label": "Reftest harness and checked image fixtures",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/reftest.rs",
-                  "marker": "pub fn manifest"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/compare.rs",
-                  "marker": "pub fn compare"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/reftests.rs",
-                  "marker": "fn every_reftest_passes_at_scales_one_and_two"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn reftest_reports_each_reference_and_fails_when_one_does_not_hold"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/src/png.rs",
+              "marker": "fn one_pixel_png_has_the_exact_expected_bytes"
             },
             {
-              "id": "damage",
-              "label": "Damage tracking and paint conformance gate",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn render_writes_a_deterministic_png_at_the_requested_scale"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/reftest.rs",
+              "marker": "pub fn manifest"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/compare.rs",
+              "marker": "pub fn compare"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/reftests.rs",
+              "marker": "fn every_reftest_passes_at_scales_one_and_two"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn reftest_reports_each_reference_and_fails_when_one_does_not_hold"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/damage.rs",
+              "marker": "pub fn damage"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "pub fn damage_repaints_exactly"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn damaged_tiles_repaint_to_exactly_the_new_surface"
             }
           ]
         }

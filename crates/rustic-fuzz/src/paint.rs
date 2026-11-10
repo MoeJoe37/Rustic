@@ -7,7 +7,7 @@ use rustic_css::CssParser;
 use rustic_html::HtmlDocumentParser;
 use rustic_layout::{BlockLayout, BoxTree, CssSize, DeviceScale, LayoutLimits};
 use rustic_paint::{DisplayCommand, DisplayList, ItemRole, PaintLimits};
-use rustic_raster::{RasterLimits, encode_png, rasterize};
+use rustic_raster::{RasterLimits, damage, encode_png, rasterize};
 use rustic_style::{ComputeContext, MatchContext, document_cascade, style_tree};
 
 pub(crate) struct PaintTarget;
@@ -329,6 +329,12 @@ impl Target for PaintTarget {
                 .map_err(|e| e.to_string())?;
             if again != surface {
                 return Err("rasterization is not deterministic".into());
+            }
+            if !damage(&list, &list, scale)
+                .map_err(|e| e.to_string())?
+                .is_empty()
+            {
+                return Err("an unchanged list reports damage".into());
             }
             let png = encode_png(&surface, usize::MAX).map_err(|e| e.to_string())?;
             let raw = (surface.width() as usize * 4 + 1) * surface.height() as usize;

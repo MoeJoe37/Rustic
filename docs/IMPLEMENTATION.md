@@ -1012,6 +1012,24 @@ cover it. `box-shadow` brought 78 WPT parsing cases into scope; 50 pass and
 credits its blend step. Gaps are TD-58. See
 [PAINT.md](PAINT.md#shadows-blending-and-filters).
 
+## REN-04j — Tiled raster and damage
+
+The rasterizer paints a fixed 256-pixel tile grid, each tile in a frame
+grown by the list's filter reach, with fixed-point blur sums, so
+`rasterize_region` gives exactly the full surface's pixels for any region.
+`damage(old, new, scale)` lists the tiles whose pixels can change: fills
+are keyed by resolved content and by the groups, clips and transforms
+around them, and the fills outside the lists' common prefix and suffix
+damage their device bounds, grown by shadow blur and enclosing filters.
+`repaint` paints those tiles over the old surface. A paint test checks
+that repainting equals a full raster for color, position, opacity,
+transform, shadow, filtered-child, removal, filter and canvas changes at
+two scales, with shadows and blurs crossing tile seams; `rustic reftest`
+also repaints each reference into its test through damage and fails if
+the pixels differ (the paint conformance gate), and the paint fuzz target
+checks that an unchanged list reports no damage. Gaps are TD-59. See
+[PAINT.md](PAINT.md#rasterizer-rustic-raster).
+
 ## Queue status
 
 The README now includes an automatically regenerated engine progress map. Its

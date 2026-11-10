@@ -106,6 +106,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
 | TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
 | TD-58 | Deliberate | Paint | First shadows, blending and filters: sRGB filters, full-surface groups, no ink overflow, approximate blur under transforms | Open, REN-04i |
+| TD-59 | Deliberate | Paint | First tiled raster and damage: each tile replays the whole list, a new filter margin repaints everything, list diff by common prefix and suffix | Open, REN-04j |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -995,3 +996,22 @@ implemented. **Pay:** filter regions and groups bounded by ink overflow
 in the tiled raster; linearRGB as an option; ink overflow in layout.
 **Trigger:** the tiled raster step, filter WPT reftests, or SVG filters in
 M4.
+
+### TD-59 — First tiled raster and damage
+
+REN-04j paints the surface in 256-pixel tiles and repaints only damaged
+tiles. Each tile replays the whole display list into a frame grown by the
+list's largest filter reach and skips nothing by bounds first, so a tile
+costs a scan of every command and full-frame group buffers; there is no
+spatial index, no tile cache between frames and no threading. Damage
+compares the two lists' fills by their common prefix and suffix, so one
+change in the middle damages everything between the first and last
+difference, and an item that only moved in paint order damages both
+places. A change in the list-wide filter margin, the canvas color or the
+surface size repaints every tile, because a tile's frame (and so its float
+coverage rounding) depends on the margin. Fill bounds ignore rounded
+clips, clip paths and transform clips (they only shrink paint). **Pay:**
+bin commands per tile once per list; a per-item diff keyed by box and
+generation; margins per tile instead of per list; a retained tile cache
+with GPU upload in M5. **Trigger:** frame-budget measurements in the
+paint performance gate, scrolling, or animation.

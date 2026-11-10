@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 28.87%** = 22.58% verified complete + 6.29% partial credit. 39/172 capabilities complete, 14 in progress.
+**Overall completion: 29.09%** = 23.25% verified complete + 5.84% partial credit. 40/172 capabilities complete, 13 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `6f8aa64d1c745ab5ea658c13e1e5b327c0b2cc28243c313a87f62e3db6bc96ed`.
+Catalog: `engine-v3`. Source fingerprint: `77407ad1c6ac27db27a13f3b6605c0d4baedb8f5c76dc69f15cc42a29a4a7adc`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `6f8aa64d1c745ab5ea658c13e1e5b327c0b2c
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 3/17 | 68.52% | 18.90% | 12.22% |
+| M3 Static renderer | 4/17 | 70.33% | 24.35% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -32,7 +32,7 @@ Catalog: `engine-v3`. Source fingerprint: `6f8aa64d1c745ab5ea658c13e1e5b327c0b2c
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
 | Text & fonts | 0/6 | 4 | 37.12% | 0.00% | 4% | 1.48 |
 | Layout | 1/10 | 5 | 40.39% | 10.86% | 9% | 3.63 |
-| Paint & raster | 2/7 | 4 | 54.32% | 22.22% | 6% | 3.25 |
+| Paint & raster | 3/7 | 3 | 58.02% | 33.33% | 6% | 3.48 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
@@ -191,10 +191,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Paint-order hit testing with clips and visibility ([source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs))
   - [ ] Viewport resize and zoom relayout
 - **planned** `paint.formats` — SVG/MathML painting integration and Canvas 2D · size 8 · M9 · 1.77% of engine
-- **in progress 66.66%** `paint.conformance` — Reftest output, damage and paint conformance · size 3 · M3 · 0.66% of engine
-  - [x] Deterministic PNG render output ([source](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-  - [x] Reftest harness and checked image fixtures ([source](../../crates/rustic-cli/src/reftest.rs), [source](../../crates/rustic-raster/src/compare.rs), [test](../../crates/rustic-cli/tests/reftests.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-  - [ ] Damage tracking and paint conformance gate
+- **complete** `paint.conformance` — Reftest output, damage and paint conformance · size 3 · M3 · 0.66% of engine ([source](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-cli/src/reftest.rs), [source](../../crates/rustic-raster/src/compare.rs), [test](../../crates/rustic-cli/tests/reftests.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-raster/src/damage.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs))
 
 ### JavaScript & GC
 

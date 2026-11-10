@@ -80,6 +80,17 @@ color and composites each item source-over.
   that meet `region` and returns exactly the pixels `rasterize` would; blur
   box sums are fixed point so they do not depend on where a frame starts.
 
+- **Damage.** `damage(old, new, scale)` returns the tiles whose pixels can
+  differ between two lists. Each fill is keyed by what it paints (shape with
+  side-table data resolved, color, axis and rounded clips) and by the chain of
+  groups, clip paths and transforms around it; node and box ids are not part
+  of the key. Fills outside the common prefix and suffix of both lists damage
+  their device bounds (mapped through transforms, grown by shadow blur, the
+  reach of enclosing filters and one pixel). A different surface size, canvas
+  color or filter margin damages every tile. `repaint(surface, list, scale,
+  regions, …)` repaints regions in place; `rustic reftest` checks that
+  repainting a reference's damage gives the test's pixels exactly. See TD-59.
+
 `encode_png(surface, max_bytes)` writes straight-alpha RGBA8 PNG with stored
 (uncompressed) deflate blocks, after checking the exact output size against
 `max_bytes`. CRC-32 and Adler-32 are computed in the crate.
@@ -377,5 +388,5 @@ JPEG/GIF/WebP decoding, gradients, non-solid borders,
 `text-shadow`, `background-blend-mode`, `backdrop-filter`, `filter` URLs, `clip-path` URLs and the
 `evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58, TD-59 and docs/ROADMAP.md (REN-04 to
 REN-07).

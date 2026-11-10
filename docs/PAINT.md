@@ -228,6 +228,18 @@ pixel is one CSS pixel of natural size, passed to layout through
 an image that is blocked, missing, over budget or not a valid PNG is broken
 and keeps a zero natural size, and the load continues.
 
+## Atomic inlines
+
+A non-positioned `inline-block`, `inline-flex` or inline replaced element
+(a block fragment with `BlockFragment::line`) paints in the inline phase
+(CSS 2.2 Appendix E step 7.2.1.4): after its line's inline box backgrounds,
+borders and text, atomically, as if it were a stacking context, so it lies
+above floats and later in-flow blocks. Its positioned descendants and
+stacking contexts still belong to the enclosing stacking context. A
+positioned atomic inline paints in the positioned layer like any positioned
+box. Within one line, atomic inlines follow all of the line's text rather
+than interleaving in tree order (TD-70).
+
 ## Hit testing
 
 `DisplayList::hit_test` returns the topmost box whose border box contains a

@@ -1036,6 +1036,12 @@ reference exceeds. The `frame_budget` example measured a one-box repaint
 at 3.5 ms (scale 1) and 11 ms (scale 2) on the sandbox, so `paint.raster`
 credits its performance step.
 
+Atomic inlines from the M3 layout work now paint atomically after their
+line in the inline phase instead of in the block phase; a paint test checks
+they land above a later block and a float, after the line's text, with
+their own content (TD-70's paint-order part is paid). See
+[PAINT.md](PAINT.md#atomic-inlines).
+
 `rustic_layout::View` (window size at 100% zoom, device pixel ratio, page
 zoom from 25% to 500%) drives resize and zoom: styles recompute against its
 viewport (media queries and viewport units), layout and paint rerun, and

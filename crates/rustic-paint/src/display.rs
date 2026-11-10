@@ -1466,6 +1466,10 @@ enum Role {
     Positioned,
     /// A non-positioned float, painted like `Positioned` in the float layer.
     Float,
+    /// A non-positioned atomic inline (`inline-block`, `inline-flex` or an
+    /// inline replaced element), painted like `Positioned` in the inline
+    /// layer, after the rest of its line (CSS 2.2 Appendix E step 7.2.1.4).
+    Atomic,
     /// An in-flow, non-positioned block.
     Block,
 }
@@ -1486,8 +1490,9 @@ enum Task {
     Layer(usize, bool),
     Own(usize, bool),
     /// The inline content (inline box backgrounds and borders, then text,
-    /// line by line) of these in-flow blocks, in tree order.
-    Inline(Vec<usize>, bool),
+    /// then atomic inlines, line by line) of these in-flow blocks, in tree
+    /// order, resuming at block position `.1`, line position `.2`.
+    Inline(Vec<usize>, usize, usize, bool),
     /// The outlines of every box in this stacking context, in tree order,
     /// after all of its other content (CSS 2.2 Appendix E step 10).
     Outlines(usize, bool),
@@ -1640,6 +1645,8 @@ impl DisplayList {
         // Classify every fragment and file it under its paint-order owner.
         let n = fragments.len();
         let mut roles = Vec::with_capacity(n);
+        // Atomic inlines by the line they sit on, in tree order.
+        let mut atomic_lines: Vec<Vec<usize>> = vec![Vec::new(); layout.lines().len()];
         let mut opacity = Vec::with_capacity(n);
         // Nearest stacking context, and nearest context/pseudo-context, at
         // or above each fragment (tree ancestry, not containing blocks).
@@ -1738,6 +1745,8 @@ impl DisplayList {
                 PositionScheme::FloatLeft | PositionScheme::FloatRight
             ) {
                 Role::Float
+            } else if fragment.line().is_some() {
+                Role::Atomic
             } else {
                 Role::Block
             };
@@ -1763,6 +1772,13 @@ impl DisplayList {
                 Role::Context(_) | Role::Positioned => layers[context[p]].zero.push(i),
                 Role::Float => layers[layer[p]].floats.push(i),
                 Role::Block => layers[layer[p]].blocks.push(i),
+                Role::Atomic => {
+                    let line = fragment.line().ok_or(PaintError::InvalidInput)?;
+                    atomic_lines
+                        .get_mut(line)
+                        .ok_or(PaintError::InvalidInput)?
+                        .push(i);
+                }
             }
         }
         // Contexts that must isolate blending children, and those that
@@ -1947,10 +1963,14 @@ impl DisplayList {
                         }
                     }
                 }
-                Task::Inline(blocks, muted) => {
-                    for b in blocks {
+                Task::Inline(blocks, from_block, from_line, muted) => {
+                    'blocks: for (position, &b) in blocks.iter().enumerate().skip(from_block) {
                         let fragment = &fragments[b];
-                        if let Some(image) = resources.images.get(&fragment.node()) {
+                        let resumed = position == from_block && from_line > 0;
+                        let first_line = if position == from_block { from_line } else { 0 };
+                        if let (false, Some(image)) =
+                            (resumed, resources.images.get(&fragment.node()))
+                        {
                             let style = style_of(fragment)?;
                             if !muted && visible(style) {
                                 let index =
@@ -1980,7 +2000,9 @@ impl DisplayList {
                             }
                         }
                         let clip = inner_axis[b];
-                        for &line in &inline_lines[b] {
+                        for (line_position, &line) in
+                            inline_lines[b].iter().enumerate().skip(first_line)
+                        {
                             for &k in &line_inlines[line] {
                                 let inline = &layout.inlines()[k];
                                 let style = box_style(inline.source_box())?;
@@ -2009,10 +2031,14 @@ impl DisplayList {
                                     builder.border(geometry, source, style)?;
                                 }
                             }
-                            if muted {
-                                continue;
-                            }
-                            for &t in &line_texts[line] {
+                            // Atomic inlines paint after their line, each
+                            // atomically; the rest of the content resumes
+                            // after them.
+                            let atomics = &atomic_lines[line];
+                            let resume = (!atomics.is_empty()).then(|| {
+                                Task::Inline(blocks.clone(), position, line_position + 1, muted)
+                            });
+                            for &t in line_texts[line].iter().filter(|_| !muted) {
                                 let text = &layout.texts()[t];
                                 let style = box_style(text.source_box())?;
                                 if visible(style) {
@@ -2031,6 +2057,11 @@ impl DisplayList {
                                         }
                                     }
                                 }
+                            }
+                            if let Some(resume) = resume {
+                                stack.push(resume);
+                                stack.extend(atomics.iter().rev().map(|&a| Task::Layer(a, muted)));
+                                break 'blocks;
                             }
                         }
                     }
@@ -2158,7 +2189,7 @@ impl DisplayList {
                     let mut inline = Vec::with_capacity(l.blocks.len() + 1);
                     inline.push(i);
                     inline.extend(&l.blocks);
-                    stack.push(Task::Inline(inline, muted));
+                    stack.push(Task::Inline(inline, 0, 0, muted));
                     stack.extend(l.floats.iter().rev().map(|&c| Task::Layer(c, muted)));
                     stack.extend(l.blocks.iter().rev().map(|&c| Task::Own(c, muted)));
                     stack.extend(l.negative.iter().rev().map(|&c| Task::Layer(c, muted)));

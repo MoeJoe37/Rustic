@@ -1042,17 +1042,18 @@ block-level descendants. Approximations:
   absolutely positioned boxes inside an inline box split it like blocks do,
   instead of staying on the line (the same as TD-50's top-level floats).
   Sticky inline boxes stay in place (`inline.rs`).
-- **Paint order.** Atomic inlines are ordinary block fragments with
-  `BlockFragment::line`; paint still paints them in the block phase instead
-  of atomically in the inline phase of CSS 2.2 Appendix E.
+- **Paint order (paid).** Atomic inlines are block fragments with
+  `BlockFragment::line`; paint now paints each non-positioned one atomically
+  after the rest of its line (inline boxes and text), in the inline phase of
+  CSS 2.2 Appendix E. Within a line it follows all text instead of tree
+  order among the line's boxes.
 - **Cost.** Each atomic inline's baseline search scans its subtree, which is
   O(n·depth) for nested inline-blocks; it is metered by `MAX_FLOW_WORK`.
 
 **Reason:** these cover the common inline-block/image cases with exact tests
 while keeping each spec corner its own unit. **Pay:** baseline sets on
 fragments (first/last per box, computed bottom up), relative offsets for
-split boxes, floats placed during line layout, Appendix E atomic painting in
-`rustic-paint`. **Trigger:** inline WPT reftests or real-page renders with
+split boxes, floats placed during line layout. **Trigger:** inline WPT reftests or real-page renders with
 `inline-block` navigation bars.
 
 ### TD-71 — Sticky positioning approximations

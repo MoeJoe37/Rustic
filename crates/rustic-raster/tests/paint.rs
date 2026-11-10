@@ -1744,3 +1744,48 @@ fn text_list(html: &str, css: &str, width: f64, height: f64) -> DisplayList {
     )
     .unwrap()
 }
+
+#[test]
+fn atomic_inlines_paint_after_their_line_above_later_blocks_and_floats() {
+    let list = text_list(
+        "<div id=wrap><div id=float></div>ab<span id=ib><span id=inner></span></span>cd</div>\
+         <div id=after></div>",
+        &format!(
+            "{RESET} #wrap {{ font: 10px/10px 'Rustic Test' }}
+             #float {{ float: left; width: 5px; height: 5px; background: rgb(1 0 0) }}
+             #ib {{ display: inline-block; width: 8px; height: 8px; background: rgb(2 0 0) }}
+             #inner {{ display: block; height: 2px; background: rgb(3 0 0) }}
+             #after {{ height: 10px; margin-top: -10px; background: rgb(4 0 0) }}"
+        ),
+        100.0,
+        40.0,
+    );
+    let items = list.items();
+    let at = |r: u8| {
+        items
+            .iter()
+            .position(|i| i.role == ItemRole::Background && i.color == rgb(r, 0, 0))
+            .unwrap_or_else(|| panic!("no background rgb({r} 0 0)"))
+    };
+    let texts: Vec<usize> = items
+        .iter()
+        .enumerate()
+        .filter(|(_, i)| i.role == ItemRole::Text)
+        .map(|(k, _)| k)
+        .collect();
+    assert!(!texts.is_empty());
+    // CSS 2.2 Appendix E: in-flow blocks (step 4), floats (step 5), then the
+    // inline content of the line (step 7), where the inline-block paints
+    // atomically, its own block content included.
+    assert!(at(4) < at(1), "the later block paints under the float");
+    assert!(at(1) < at(2), "the float paints under the inline-block");
+    assert!(
+        texts.iter().all(|&t| t < at(2)),
+        "the line's text paints first"
+    );
+    assert_eq!(
+        at(3),
+        at(2) + 1,
+        "the inline-block's content paints with it"
+    );
+}

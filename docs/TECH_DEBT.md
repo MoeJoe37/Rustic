@@ -111,6 +111,11 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
 | TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 53 of 91 static pages fail (writing modes, images, tables, 6 undiagnosed) | Open, REN-08 |
 | TD-73 | Watch | Base | Layout keeps its own `CssPx`/`CssRect` beside the unit-typed `rustic-base` geometry | Guarded |
+| TD-80 | Deliberate | Codecs | JPEG: no arithmetic coding, lossless, hierarchical, 12-bit or `DNL`; color management ignored | Open, paint.images |
+| TD-81 | Deliberate | Codecs | WebP and PNG ignore ICC/EXIF metadata; only JPEG applies EXIF orientation | Open, paint.images |
+| TD-82 | Deliberate | Paint | Animated GIF/WebP decode every frame but paint only the first | Open, paint.images |
+| TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Open, paint.images |
+| TD-84 | Deliberate | Codecs | Decoder speed: bit-serial VP8L/JPEG slow paths, per-pixel loops; simple VP8 filter and multi-partition frames lack reference images | Open, paint.images |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -901,10 +906,11 @@ REN-05c paints decoded PNGs for block-level replaced `img` boxes only:
 inline-level images wait for atomic inlines (TD-50). The content is always
 stretched over the content box (`object-fit: fill`, no `object-position`),
 always sampled bilinearly (no `image-rendering: pixelated`, no mipmaps, so
-strong downscaling aliases), and image density (`srcset`, `x` descriptors,
-EXIF orientation) is ignored. Broken images are zero-sized with no alt
-text or broken-image icon. Decoded images live for one command; there is no
-cache or sharing across documents. **Pay:** atomic inline images; parse and
+strong downscaling aliases), and image density (`srcset`, `x` descriptors) is ignored (JPEG EXIF
+orientation is applied by the decoder since the formats step; see TD-81). Broken images are zero-sized with no alt
+text or broken-image icon. Decoded images live for one command; within a document the
+`ImageStore` shares one entry per file, but nothing is shared across
+documents. **Pay:** atomic inline images; parse and
 apply `object-fit`/`object-position`/`image-rendering`; area-averaged
 downscaling; alt text rendering; an image cache in the resource lifecycle
 work (`paint.images` lifecycle). **Trigger:** the first real-page renders or
@@ -1094,3 +1100,65 @@ would collide with the threads changing them now. **Pay:** switch layout and
 paint signatures to the base types and remove the layout copies.
 **Trigger:** the next change that has to convert between them in more than
 one place.
+
+### TD-80 — JPEG decoder scope
+
+`decode_jpeg` handles Huffman-coded baseline, extended 8-bit and
+progressive frames, which is what the web serves. Arithmetic coding,
+lossless (SOF3), hierarchical frames, 12-bit samples and a height defined
+by `DNL` fail as `ImageError::Unsupported`. ICC profiles (`APP2`) are
+ignored, so CMYK and wide-gamut JPEGs display with naive conversions. The
+IDCT is an exact integer matrix product and upsampling uses the IJG
+triangle filter for 2× factors, so output differs from libjpeg-turbo by at
+most 3 per channel on the conformance images (allowed by T.81, which
+specifies accuracy rather than bits). Non-integral sampling ratios use
+nearest samples. **Pay:** arithmetic decoding (T.81 annex D) if real pages
+need it; color management with TD-51. **Trigger:** a real page serving one
+of these, or color-managed paint.
+
+### TD-81 — Image metadata
+
+ICC profiles, EXIF and XMP are skipped in WebP (`ICCP`, `EXIF`, `XMP `
+chunks) and PNG (`iCCP`, `eXIf`); only JPEG applies EXIF orientation, so
+a rotated PNG or WebP displays unrotated although CSS `image-orientation:
+from-image` is the initial value. `image-orientation: none` is not
+supported for JPEG either: the decoder always orients. **Pay:** a shared
+EXIF reader for the three containers and an orientation flag on decoding
+that paint chooses from the computed `image-orientation`. **Trigger:** the
+`image-orientation` property in style, or real photos from phones.
+
+### TD-82 — Animated images paint their first frame
+
+`decode_animation` composites every GIF and WebP frame (disposal,
+blending, delays, loop count) and the store keeps them, but the page
+loader paints only frame 0 because there is no animation timeline or
+damage tracking yet. GIF delays are reported raw: browsers raise delays
+of 10 ms or less to 100 ms when they play them. **Pay:** a frame clock in
+the engine that picks the current frame and invalidates paint, with the
+browsers' delay clamp. **Trigger:** M3 damage tracking or M4 event loop.
+
+### TD-83 — Image store budget scope
+
+`ImageStore` charges decoded pixels it retains and evicts least recently
+used entries to stay within `max_decoded_bytes`. Callers holding an
+`Arc<Animation>` keep evicted pixels alive outside the budget, and while a
+new image decodes the old entries are still resident, so the peak is up to
+twice the budget. Eviction scans all entries (linear per eviction). The
+command line loader takes the pixels out of the store and charges its own
+per-document budget instead. **Pay:** hand out weak handles or lease
+counts that the budget can see; decode into a reserved allocation; an
+ordered LRU index. **Trigger:** a long-lived engine with many documents,
+or memory pressure reports.
+
+### TD-84 — Image decoder speed and untested paths
+
+The decoders favour clarity: VP8L and the JPEG slow path read Huffman codes
+bit by bit, VP8L applies transforms per pixel with bounds checks, and the
+JPEG IDCT is a 1,024-multiply matrix product per block. Large images
+decode several times slower than libwebp or libjpeg-turbo. The VP8 simple
+loop filter and multi-partition token data are implemented from RFC 6386
+but Pillow cannot produce them, so no reference image covers them (the
+fuzz target still exercises both). **Pay:** table-driven Huffman lookup,
+a separable fast IDCT with the same rounding, and reference images made
+with `cwebp -f`/`-partitions` outside the repository. **Trigger:** decode
+time showing in render profiles, or a mismatch report.

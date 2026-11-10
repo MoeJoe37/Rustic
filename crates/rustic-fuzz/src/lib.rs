@@ -16,6 +16,7 @@
 mod corpus;
 mod formatting;
 mod harness;
+mod images;
 mod mutate;
 mod paint;
 mod png;

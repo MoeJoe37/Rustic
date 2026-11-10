@@ -46,6 +46,9 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         "css-media" => seeds.extend(media_inputs(root)?),
         "text-sfnt" => seeds.extend(crate::sfnt::seeds()),
         "codec-png" => seeds.extend(crate::png::seeds(root)?),
+        "codec-jpeg" => seeds.extend(crate::images::JPEG.seeds(root)?),
+        "codec-gif" => seeds.extend(crate::images::GIF.seeds(root)?),
+        "codec-webp" => seeds.extend(crate::images::WEBP.seeds(root)?),
         _ => {}
     }
     Ok(seeds)

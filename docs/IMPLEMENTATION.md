@@ -898,6 +898,17 @@ match an independent decoder's references; a `codec-png` fuzz target covers
 mutations. `paint.images` credits its PNG decode step; painting images waits
 for replaced-element sizing. Shortcuts are TD-51. See [PAINT.md](PAINT.md).
 
+
+## REN-05d — JPEG, GIF and WebP decoding and the image store
+
+`rustic-codecs` adds bounded decoders for JPEG (baseline and progressive),
+GIF (with animation) and WebP (lossless, lossy, alpha and animation), format
+sniffing, header probing and `ImageStore`, which shares entries by URL,
+decodes lazily within a memory budget with LRU eviction and keeps failures
+sticky. 47 synthetic reference images match Pillow (JPEG within 3, GIF and
+WebP exactly), three fuzz targets cover mutations, and two reftests show the
+formats in `rustic render`. `paint.images` credits its formats and
+lifecycle steps. Debt is TD-80 to TD-84. See [PAINT.md](PAINT.md).
 ## REN-07a — Reftest harness
 
 `rustic reftest` renders a test and each `<link rel=match|mismatch>` reference

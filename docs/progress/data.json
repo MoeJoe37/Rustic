@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "ffba10ea4b29f8c2b7cfe8913c56cd4b6a14f50490f339be9f212a2d656a1fae",
-  "percent": "31.32",
-  "verified_percent": "29.28",
-  "partial_percent": "2.04",
-  "completed": 48,
-  "in_progress": 6,
+  "source_fingerprint": "2824da805da190e30169ff0e266aa8b6536c2c9ab482eef9c184f65025198541",
+  "percent": "31.66",
+  "verified_percent": "29.95",
+  "partial_percent": "1.71",
+  "completed": 49,
+  "in_progress": 5,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -35,11 +35,11 @@
       "id": "M3",
       "label": "Static renderer",
       "share": "12.22",
-      "completed": 12,
+      "completed": 13,
       "total": 17,
-      "percent": "88.60",
-      "verified_percent": "73.73",
-      "partial_percent": "14.87"
+      "percent": "91.32",
+      "verified_percent": "79.18",
+      "partial_percent": "12.14"
     },
     {
       "id": "M4",
@@ -2592,72 +2592,105 @@
           "label": "Bounded images, color/alpha and resource lifecycle",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "color",
-              "label": "CSS Color 4 conversion to sRGB with straight/premultiplied alpha",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/color.rs",
-                  "marker": "pub fn srgba"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-paint/src/color.rs",
-                  "marker": "fn reference_colors_match_css_color_4_examples"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn translucent_items_composite_source_over_in_paint_order"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/color.rs",
+              "marker": "pub fn srgba"
             },
             {
-              "id": "png",
-              "label": "Bounded inflate and PNG decoding",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-codecs/src/png.rs",
-                  "marker": "pub fn decode_png"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-codecs/src/inflate.rs",
-                  "marker": "pub fn zlib_decompress"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-codecs/tests/pngsuite.rs",
-                  "marker": "fn every_suite_image_matches_its_reference"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-codecs/src/inflate.rs",
-                  "marker": "fn output_limit_and_cancellation_stop_bombs"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-paint/src/color.rs",
+              "marker": "fn reference_colors_match_css_color_4_examples"
             },
             {
-              "id": "formats",
-              "label": "Bounded JPEG, GIF and WebP decoding",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn translucent_items_composite_source_over_in_paint_order"
             },
             {
-              "id": "lifecycle",
-              "label": "Image resource lifecycle and memory budgets",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/png.rs",
+              "marker": "pub fn decode_png"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/inflate.rs",
+              "marker": "pub fn zlib_decompress"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/tests/pngsuite.rs",
+              "marker": "fn every_suite_image_matches_its_reference"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/src/inflate.rs",
+              "marker": "fn output_limit_and_cancellation_stop_bombs"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/jpeg.rs",
+              "marker": "pub fn decode_jpeg"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/gif.rs",
+              "marker": "pub fn decode_gif"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/webp.rs",
+              "marker": "pub fn decode_webp"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/tests/images.rs",
+              "marker": "fn every_jpeg_matches_its_reference"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/tests/images.rs",
+              "marker": "fn every_gif_matches_its_reference"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/tests/images.rs",
+              "marker": "fn every_webp_matches_its_reference"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/tests/images.rs",
+              "marker": "fn every_truncation_and_bit_flip_fails_or_decodes_cleanly"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/store.rs",
+              "marker": "pub struct ImageStore"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/images.rs",
+              "marker": "ImageStore::new"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/src/store.rs",
+              "marker": "fn the_decoded_budget_evicts_least_recently_used_entries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/src/store.rs",
+              "marker": "fn failures_are_sticky_and_budgets_refuse_inserts"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-codecs/tests/images.rs",
+              "marker": "fn limits_and_cancellation_stop_before_decoding"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.66"
         },
         {
@@ -2779,13 +2812,13 @@
         }
       ],
       "points": 27,
-      "completed": 5,
-      "in_progress": 1,
+      "completed": 6,
+      "in_progress": 0,
       "total": 7,
-      "contribution": "3.88",
-      "percent": "64.81",
-      "verified_percent": "59.25",
-      "partial_percent": "5.56"
+      "contribution": "4.22",
+      "percent": "70.37",
+      "verified_percent": "70.37",
+      "partial_percent": "0.00"
     },
     {
       "id": "js",

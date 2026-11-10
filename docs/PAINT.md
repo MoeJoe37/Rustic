@@ -164,6 +164,61 @@ streams for stored, fixed and dynamic blocks; a decompression-bomb test; a
 round trip of `rustic render` output through the decoder; and the `codec-png`
 fuzz target seeded with PngSuite.
 
+### JPEG, GIF and WebP
+
+`decode_image` sniffs the format (WHATWG MIME Sniffing image patterns, see
+`sniff`) and returns the first frame as straight RGBA8; `decode_animation`
+returns every composited frame with its delay and the loop count. All three
+decoders take `DecodeLimits` (width, height, total decoded bytes across
+frames, frame count), check sizes before allocating, poll cancellation and
+fail atomically with `ImageError`.
+
+- **JPEG** (`jpeg.rs`, ITU-T T.81): Huffman baseline, extended and
+  progressive (spectral selection and successive approximation) frames,
+  1/3/4 components, sampling factors 1–4, restart intervals, 8/16-bit
+  quantization tables, YCbCr, RGB (Adobe transform 0), CMYK and YCCK
+  (Adobe-inverted). The IDCT is an exact integer product, chroma uses the
+  IJG triangle filter for 2× factors, and EXIF orientation is applied, so
+  natural sizes are post-rotation as `image-orientation: from-image`
+  requires. Entropy data that ends early decodes as zero bits, like
+  browsers. Block visits across scans are capped at 48 per block and scans
+  at 1,000, bounding the work of tiny malicious progressive files. TD-80.
+- **GIF** (`gif.rs`, GIF89a): LZW with deferred clear, global and local
+  palettes, interlacing, Graphic Control Extension transparency, delays and
+  disposal (none, background, previous), NETSCAPE2.0 loops. The canvas
+  starts transparent. A file cut after a complete frame keeps the complete
+  frames.
+- **WebP** (`webp.rs`, `vp8l.rs`, `vp8.rs`, RFC 9649 and RFC 6386): the
+  RIFF container, lossless VP8L (all four transforms, color cache, meta
+  prefix codes, LZ77), lossy VP8 key frames (segmentation, probability
+  updates, all intra modes, WHT/DCT, normal and simple loop filters, token
+  partitions), `ALPH` (raw or lossless, all filters) and `ANIM`/`ANMF`
+  animation with libwebp's straight-alpha blending. Chroma upsampling and
+  YUV→RGB use libwebp's fixed-point arithmetic, so output is bit-exact with
+  libwebp. The VP8 tables in `vp8_tables.rs` are RFC 6386 constants.
+
+`probe` reads the format and natural size from the header alone.
+
+Evidence: `tests/images` holds 47 synthetic images drawn and encoded by
+`tools/codec_reference.py` (libjpeg-turbo, Pillow's GIF writer, libwebp; no
+downloaded files) with RGBA references decoded by Pillow. JPEG matches
+within 3 per channel, GIF and WebP (including 6 animations) exactly.
+Truncations and bit flips of every image never panic, limits and
+cancellation are checked per image, and `codec-jpeg`, `codec-gif` and
+`codec-webp` fuzz targets check determinism and still/animation agreement.
+
+### Image resource lifecycle
+
+`ImageStore` holds encoded bytes by key (the resolved URL), so elements
+naming the same file share one entry. `insert` probes the header (the HTML
+*available size* state); `decode` produces frames lazily and keeps them
+under `max_decoded_bytes`, evicting the least recently used decoded entries
+(their encoded bytes stay, and they decode again on demand); any decoding
+failure other than cancellation leaves the entry *broken* for good.
+`max_entries` and `max_encoded_bytes` refuse further inserts, and
+`release` forgets an entry. The command line loader decodes through a
+per-document store. TD-83.
+
 ## Text
 
 `DisplayList::build_with_fonts` paints the inline content the layout
@@ -221,11 +276,12 @@ yet (TD-53).
 The command line loads each `img` that generated a box and has a non-empty
 `src`: the URL resolves against the document base and must name a file in
 the document's directory or below it (like linked stylesheets); the file is
-read in bounded chunks and decoded as PNG with `rustic-codecs`. One image
+read in bounded chunks into an `ImageStore` and decoded as PNG, JPEG, GIF or
+WebP with `rustic-codecs`; animated images show their first frame (TD-82). One image
 pixel is one CSS pixel of natural size, passed to layout through
 `BoxTree::set_natural_sizes`. `--max-images`, `--max-image-bytes` and
 `--max-image-decoded-bytes` bound the count, encoded bytes and decoded bytes;
-an image that is blocked, missing, over budget or not a valid PNG is broken
+an image that is blocked, missing, over budget or not a decodable image is broken
 and keeps a zero natural size, and the load continues.
 
 ## Atomic inlines
@@ -427,9 +483,9 @@ group. `url()` filters fail with a typed error. See TD-58.
 Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 inline-level images, `object-fit` and `image-rendering`,
-JPEG/GIF/WebP decoding, gradients, non-solid borders,
+animated image playback, gradients, non-solid borders,
 `text-shadow`, `background-blend-mode`, `backdrop-filter`, `filter` URLs, `clip-path` URLs and the
 `evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, scrolling offsets, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
-reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58, TD-59 and docs/ROADMAP.md (REN-04 to
+reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58, TD-59, TD-80 to TD-84 and docs/ROADMAP.md (REN-04 to
 REN-07).

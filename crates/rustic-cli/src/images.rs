@@ -4,9 +4,12 @@
 //! is resolved against the document base URL (the first `<base href>`, else
 //! the document's `file:` URL) and read only if it names a file in the
 //! document's directory or below it, under the same policy as linked
-//! stylesheets. Files are read in bounded chunks and decoded as PNG within
-//! the remaining budgets. An image that is blocked, missing, too large or
-//! not a valid PNG is broken: it keeps a zero natural size and paints no
+//! stylesheets. Files are read in bounded chunks into a per-document
+//! [`ImageStore`], which shares one entry between elements naming the same
+//! file, reads natural sizes from headers and decodes PNG, JPEG, GIF and
+//! WebP within the decoded-byte budget. Animated images show their first
+//! frame (TD-82). An image that is blocked, missing, too large or not a
+//! valid image is broken: it keeps a zero natural size and paints no
 //! content, and the load continues. One image pixel is one CSS pixel.
 
 use std::collections::HashMap;
@@ -16,6 +19,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rustic_base::CancellationToken;
+use rustic_codecs::{ImageStore, StoreLimits};
 use rustic_dom::{Document, NodeId};
 use rustic_layout::{BoxTree, CssPx, NaturalSize};
 use rustic_paint::Image;
@@ -115,43 +119,67 @@ pub fn load(
         }
     }
     let base = base.flatten().or(document_url);
-    let (mut files, mut file_bytes, mut decoded_bytes) = (0usize, 0usize, 0usize);
+    let mut store = ImageStore::new(StoreLimits {
+        max_entries: limits.max_images,
+        max_encoded_bytes: limits.max_file_bytes,
+        max_decoded_bytes: limits.max_decoded_bytes,
+        ..StoreLimits::default()
+    });
+    let mut decoded: HashMap<rustic_codecs::ImageId, Option<Arc<Image>>> = HashMap::new();
+    let mut decoded_bytes = 0usize;
     for (node, src) in sources {
-        if cancellation.check().is_err() || files >= limits.max_images {
+        if cancellation.check().is_err() {
             break;
         }
         let Ok(file) = resolve(&src, base.as_ref(), root) else {
             continue;
         };
-        files += 1;
-        let Some(bytes) = read_bounded(&file, limits.max_file_bytes - file_bytes, chunk_bytes)
-        else {
-            continue;
+        let key = file.to_string_lossy().into_owned();
+        let id = match store.lookup(&key) {
+            Some(id) => id,
+            None => {
+                let stats = store.stats();
+                if stats.entries >= limits.max_images {
+                    break;
+                }
+                let remaining = limits.max_file_bytes - stats.encoded_bytes;
+                let Some(bytes) = read_bounded(&file, remaining, chunk_bytes) else {
+                    continue;
+                };
+                let Ok(id) = store.insert(&key, bytes) else {
+                    continue;
+                };
+                id
+            }
         };
-        file_bytes += bytes.len();
-        let png_limits = rustic_codecs::PngLimits {
-            max_bytes: limits.max_decoded_bytes - decoded_bytes,
-            ..rustic_codecs::PngLimits::default()
-        };
-        let Ok(decoded) = rustic_codecs::decode_png(&bytes, png_limits, cancellation) else {
+        let image = decoded.entry(id).or_insert_with(|| {
+            let animation = store.decode(id, cancellation).ok()?;
+            // Paint owns the pixels from here: drop the store's copy and
+            // charge the document budget instead.
+            store.evict(id);
+            let animation = Arc::try_unwrap(animation).unwrap_or_else(|a| (*a).clone());
+            let first = animation.frames.into_iter().next()?.image;
+            let bytes = first.pixels.len();
+            if bytes > limits.max_decoded_bytes - decoded_bytes {
+                return None;
+            }
+            decoded_bytes += bytes;
+            Image::new(first.width, first.height, first.pixels).map(Arc::new)
+        });
+        let Some(image) = image.clone() else {
             continue;
         };
         let size = (
-            CssPx::new(f64::from(decoded.width)),
-            CssPx::new(f64::from(decoded.height)),
+            CssPx::new(f64::from(image.width())),
+            CssPx::new(f64::from(image.height())),
         );
-        let (width, height) = (decoded.width, decoded.height);
-        let Some(image) = Image::new(width, height, decoded.pixels) else {
-            continue;
-        };
         let (Ok(w), Ok(h)) = size else {
             continue;
         };
-        decoded_bytes += image.pixels().len();
         loaded
             .sizes
             .push((node, NaturalSize::from_dimensions(w, h)));
-        loaded.images.insert(node, Arc::new(image));
+        loaded.images.insert(node, image);
     }
     loaded
 }

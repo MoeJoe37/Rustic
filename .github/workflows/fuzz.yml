@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [html-tokenizer, html-document, html-fragment, css, css-selector, css-cascade, css-media, css-invalidation, layout-formatting, paint-raster, codec-png, text-sfnt, url]
+        target: [html-tokenizer, html-document, html-fragment, css, css-selector, css-cascade, css-media, css-invalidation, layout-formatting, paint-raster, codec-png, codec-jpeg, codec-gif, codec-webp, text-sfnt, url]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

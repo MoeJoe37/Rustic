@@ -1,0 +1,10 @@
+JPEG, GIF and WebP conformance images
+-------------------------------------
+
+Every image here is a synthetic picture drawn by tools/codec_reference.py
+from a fixed seed and encoded with Pillow 12.3 (libjpeg-turbo, Pillow's GIF
+writer, libwebp 1.6.0). Each *.rgba file is the RGBA8 decode of the image of
+the same name by Pillow, with EXIF orientation applied for JPEG and every
+composited frame concatenated for animations. MANIFEST lists
+"file width height frames tolerance" per image. Nothing was downloaded; the
+images are released with the repository.

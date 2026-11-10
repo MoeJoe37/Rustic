@@ -1832,7 +1832,7 @@ pub const TILE_SIZE: u32 = 256;
 
 /// Rasterize the pixels of `region` of the surface [`rasterize`] would
 /// produce, into a surface of the region's size. The surface is painted in
-/// [`TILE_SIZE`] tiles on a grid from its origin; this paints only the
+/// `TILE_SIZE` tiles on a grid from its origin; this paints only the
 /// tiles that meet `region`, each with enough context around it for every
 /// filter (see `effect_margin`), so every pixel equals the full surface's.
 pub fn rasterize_region(

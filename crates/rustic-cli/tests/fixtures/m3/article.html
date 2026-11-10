@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en-US">
+<meta charset="utf-8">
+<title>Rustic M3 static renderer</title>
+<style>
+* { box-sizing:border-box; margin:0 }
+body { background:#edf2f7; color:#173047; font-family:"Noto Sans",sans-serif; font-size:15px; line-height:1.5 }
+main { margin:20px; padding:22px; background:white; border:1px solid #ccd8e3; border-radius:12px }
+h1 { font-size:28px; line-height:1.2; margin-bottom:8px }
+h2 { font-size:17px; margin-bottom:8px }
+p { margin-bottom:12px; hyphens:auto }
+.kicker { color:#117c72; font-size:12px; letter-spacing:1px; margin-bottom:10px }
+.cards { display:flex; flex-wrap:wrap; gap:12px; margin:18px 0 }
+.card { flex:1 1 180px; padding:14px; border:1px solid #c5d5e2; background:#f5f9fc; border-radius:8px }
+.arabic { font-family:"Rustic Arabic Fixture"; font-size:23px; direction:rtl; unicode-bidi:isolate; color:#0d6e68 }
+.indic { font-family:"Rustic Devanagari Fixture"; font-size:20px }
+.clip { width:100%; overflow:hidden; border:1px solid #c5d5e2; padding:10px; white-space:nowrap }
+img { width:36px; height:24px; vertical-align:middle; margin-right:8px }
+footer { color:#60788a; font-size:12px; margin-top:16px }
+</style>
+<main>
+<p class="kicker">RUSTIC / STATIC RENDERER</p>
+<h1>One original rendering pipeline</h1>
+<p>A local article with shaped text, nested blocks, flexible cards and an inline image <img src="swatch.png" alt="color swatch"> flows through Rustic's own layout and CPU paint pipeline.</p>
+<section class="cards">
+<div class="card"><h2>Text and typography</h2><p>Kerning, ligatures, justification opportunities and language-aware hyphenation belong to the same layout.</p></div>
+<div class="card"><h2>Mixed directions</h2><p>Latin text with <bdi dir="rtl" class="arabic">سلام</bdi> inside an isolated span.</p><p class="arabic" lang="ar">العربية سلام</p><p class="indic" lang="hi">हिन्दी नमस्ते</p></div>
+</section>
+<div class="clip">This clipped line demonstrates overflow geometry while the viewport is resized.</div>
+<footer>Explicit local font grants. No script execution or page network loading.</footer>
+</main>
+</html>

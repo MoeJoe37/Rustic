@@ -29,7 +29,7 @@ pub struct OutlinePoint {
 /// A glyph outline: closed contours in font units.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Outline {
-    contours: Vec<Vec<OutlinePoint>>,
+    pub(crate) contours: Vec<Vec<OutlinePoint>>,
 }
 
 /// An axis-aligned bounding box in font units.

@@ -1,0 +1,10 @@
+{
+  "language": "en-US",
+  "upstream": "https://github.com/hyphenation/tex-hyphen",
+  "revision": "5684c0f51c0b81133db2efbe60a408b4155a3ff5",
+  "path": "hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-en-us.tex",
+  "sha256": "f4ffcd96c5cbc886bdad23f95dcae8edc3cd3620eae62f7946eceda97c4e68f8",
+  "license": "Copyright and redistribution permission retained in en-us.tex",
+  "left_min": 2,
+  "right_min": 3
+}

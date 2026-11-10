@@ -14,9 +14,12 @@ use rustic_css::{
 };
 use rustic_dom::NodeId;
 use rustic_style::ComputedStyle;
-use rustic_text::bidi::{BidiInfo, Level};
-use rustic_text::segment::{BreakOpportunity, line_breaks};
-use rustic_text::shape::{ShapeOptions, ShapedGlyph, is_word_separator, shape};
+use rustic_text::bidi::{BidiInfo, BidiScope, Level, ScopeStyle};
+use rustic_text::segment::BreakOpportunity;
+use rustic_text::shape::{
+    ShapeContext, ShapeLimits, ShapeOptions, ShapedGlyph, is_word_separator, shape,
+    shape_with_context,
+};
 use rustic_text::{FaceQuery, FaceStyle, FamilyRef, FontDatabase};
 
 use crate::flow::{FlowError, UnsupportedFlow, Work};
@@ -116,6 +119,7 @@ pub(crate) struct TextItem<'a> {
     pub parent: Option<usize>,
     pub chain: Vec<usize>,
     pub font: FontBox,
+    pub language: Option<String>,
 }
 
 /// How a cluster behaves at a line edge (CSS Text 3 §4.1.2–4.1.3).
@@ -223,6 +227,8 @@ pub(crate) struct Ifc<'a> {
     /// Whether a line may end after piece `k` (and whether it must).
     pub breaks: Vec<Option<BreakOpportunity>>,
     pub bidi: BidiInfo,
+    pub emergency: Vec<bool>,
+    pub hyphens: Vec<Option<crate::tailoring::Discretionary>>,
     /// Whether any piece needs a line (content, edges or preserved spaces).
     pub has_content: bool,
 }
@@ -239,10 +245,6 @@ pub(crate) fn direction_of(style: &ComputedStyle) -> Result<Direction, FlowError
         V::Direction(d) => Ok(*d),
         _ => Err(FlowError::InvalidSnapshot),
     }
-}
-
-fn wraps(w: WhiteSpace) -> bool {
-    !matches!(w, WhiteSpace::Nowrap | WhiteSpace::Pre)
 }
 
 fn collapses_spaces(w: WhiteSpace) -> bool {
@@ -383,6 +385,8 @@ enum Event {
     Atomic { atomic: usize, at: usize },
     Open(usize),
     Close(usize),
+    BidiOpen(usize),
+    BidiClose(usize),
 }
 
 /// Character flags recorded by white-space processing.
@@ -579,6 +583,7 @@ impl<'a> Collector<'a, '_, '_> {
         let (chain, font) = font_of(style, self.fonts)?;
         self.ifc.texts.push(TextItem {
             source,
+            language: self.tree.boxes()[source].language().map(str::to_owned),
             node: self.tree.boxes()[source].node(),
             style,
             parent,
@@ -616,6 +621,8 @@ pub(crate) fn build<'a>(
             pieces: Vec::new(),
             breaks: Vec::new(),
             bidi: BidiInfo::new(&[], None),
+            emergency: Vec::new(),
+            hyphens: Vec::new(),
             has_content: false,
         },
         kinds: Vec::new(),
@@ -641,6 +648,9 @@ pub(crate) fn build<'a>(
                     outer.last().copied(),
                     fonts,
                 )?;
+                if !first {
+                    c.events.push(Event::BidiOpen(index));
+                }
                 if first {
                     c.events.push(Event::Open(index));
                     c.after_break = false;
@@ -652,6 +662,8 @@ pub(crate) fn build<'a>(
                 let index = outer.pop().ok_or(FlowError::InvalidSnapshot)?;
                 if last {
                     c.events.push(Event::Close(index));
+                } else {
+                    c.events.push(Event::BidiClose(index));
                 }
                 continue;
             }
@@ -725,16 +737,9 @@ pub(crate) fn build<'a>(
         events,
         ..
     } = c;
-    ifc.bidi = BidiInfo::new(
-        &ifc.chars,
-        Some(if direction == Direction::Rtl {
-            Level::RTL
-        } else {
-            Level::LTR
-        }),
-    );
+    ifc.bidi = scoped_bidi(&ifc, &events)?;
     shape_events(&mut ifc, &kinds, &events, fonts, work)?;
-    ifc.breaks = break_opportunities(&ifc, work)?;
+    crate::tailoring::apply(&mut ifc, fonts, work)?;
     ifc.has_content = ifc.pieces.iter().any(|p| match p {
         Piece::Cluster { space, .. } => *space != Space::Collapsible,
         Piece::Edge { width, .. } => *width != 0.0,
@@ -811,6 +816,7 @@ fn shape_events(
     let levels = ifc.bidi.levels().to_vec();
     for event in events {
         match *event {
+            Event::BidiOpen(_) | Event::BidiClose(_) => {}
             Event::Open(b) | Event::Close(b) => {
                 let open = matches!(event, Event::Open(_));
                 ifc.pieces.push(Piece::Edge {
@@ -852,13 +858,22 @@ fn shape_events(
                         word_spacing: word,
                     };
                     let chain = &ifc.texts[item].chain;
-                    let clusters =
-                        shape(fonts, chain, &ifc.chars[start..end], &options).map_err(|_| {
-                            FlowError::Unsupported {
-                                node: ifc.texts[item].node,
-                                reason: UnsupportedFlow::TextLayout,
-                            }
-                        })?;
+                    let clusters = shape_with_context(
+                        fonts,
+                        chain,
+                        &ifc.chars[start..end],
+                        &options,
+                        ShapeContext {
+                            before: &ifc.chars[..start],
+                            after: &ifc.chars[end..],
+                        },
+                        &ShapeLimits::default(),
+                        work.cancellation(),
+                    )
+                    .map_err(|_| FlowError::Unsupported {
+                        node: ifc.texts[item].node,
+                        reason: UnsupportedFlow::TextLayout,
+                    })?;
                     for cluster in clusters {
                         let range = cluster.range.start + start..cluster.range.end + start;
                         let first = ifc.chars[range.start];
@@ -911,10 +926,10 @@ fn shape_events(
 
 /// The nearest common inline ancestor's `white-space` decides soft wraps
 /// between two characters (CSS Text 3 §5.1).
-fn wrap_style(ifc: &Ifc<'_>, a: usize, b: usize) -> Result<WhiteSpace, FlowError> {
+pub(crate) fn wrap_style<'a>(ifc: &Ifc<'a>, a: usize, b: usize) -> &'a ComputedStyle {
     let (ta, tb) = (ifc.sources[a].text, ifc.sources[b].text);
     if ta == tb {
-        return white_space(ifc.texts[ta].style);
+        return ifc.texts[ta].style;
     }
     let mut x = ifc.texts[ta].parent;
     let mut y = ifc.texts[tb].parent;
@@ -929,50 +944,70 @@ fn wrap_style(ifc: &Ifc<'_>, a: usize, b: usize) -> Result<WhiteSpace, FlowError
         x = x.and_then(|i| ifc.boxes[i].parent);
         y = y.and_then(|i| ifc.boxes[i].parent);
     }
-    white_space(x.map_or(ifc.root, |i| ifc.boxes[i].style))
+    x.map_or(ifc.root, |i| ifc.boxes[i].style)
 }
 
-fn break_opportunities(
-    ifc: &Ifc<'_>,
-    work: &mut Work<'_>,
-) -> Result<Vec<Option<BreakOpportunity>>, FlowError> {
-    work.charge(ifc.chars.len())?;
-    let uax14 = line_breaks(&ifc.chars);
-    let at_char = |e: usize| -> Result<Option<BreakOpportunity>, FlowError> {
-        if e == 0 || e >= ifc.chars.len() {
-            return Ok(None);
-        }
-        Ok(match uax14[e] {
-            BreakOpportunity::Mandatory => Some(BreakOpportunity::Mandatory),
-            o => {
-                let ws = wrap_style(ifc, e - 1, e)?;
-                let spaces = ws == WhiteSpace::BreakSpaces && ifc.chars[e - 1] == ' ';
-                (wraps(ws) && (o == BreakOpportunity::Allowed || spaces))
-                    .then_some(BreakOpportunity::Allowed)
-            }
-        })
-    };
-    let n = ifc.pieces.len();
-    let mut breaks = vec![None; n];
-    for (k, slot) in breaks.iter_mut().enumerate() {
-        let next_close = matches!(ifc.pieces.get(k + 1), Some(Piece::Edge { open: false, .. }));
-        *slot = match &ifc.pieces[k] {
-            Piece::Cluster { chars, space, .. } => {
-                if next_close {
-                    None
-                } else if *space == Space::Forced {
-                    Some(BreakOpportunity::Mandatory)
-                } else {
-                    at_char(chars.end)?
+fn scoped_bidi(ifc: &Ifc<'_>, events: &[Event]) -> Result<BidiInfo, FlowError> {
+    use rustic_css::UnicodeBidi as U;
+    let scope =
+        |style: &ComputedStyle, range: Range<usize>| -> Result<Option<BidiScope>, FlowError> {
+            let kind = match style.get(P::UnicodeBidi) {
+                V::UnicodeBidi(U::Normal) => return Ok(None),
+                V::UnicodeBidi(U::Embed) => ScopeStyle::Embed,
+                V::UnicodeBidi(U::BidiOverride) => ScopeStyle::Override,
+                V::UnicodeBidi(U::Isolate) => ScopeStyle::Isolate,
+                V::UnicodeBidi(U::IsolateOverride) => ScopeStyle::IsolateOverride,
+                V::UnicodeBidi(U::Plaintext) => ScopeStyle::Plaintext,
+                _ => return Err(FlowError::InvalidSnapshot),
+            };
+            Ok(Some(BidiScope {
+                range,
+                rtl: direction_of(style)? == Direction::Rtl,
+                style: kind,
+            }))
+        };
+    let mut scopes = Vec::new();
+    let mut stack = Vec::new();
+    let mut cursor = 0;
+    for e in events {
+        match e {
+            Event::Text { chars, .. } => cursor = chars.end,
+            Event::Atomic { at, .. } => cursor = at + 1,
+            Event::Open(b) | Event::BidiOpen(b) => stack.push((*b, cursor)),
+            Event::Close(b) | Event::BidiClose(b) => {
+                let (open, start) = stack.pop().ok_or(FlowError::InvalidSnapshot)?;
+                if open != *b {
+                    return Err(FlowError::InvalidSnapshot);
+                }
+                if let Some(s) = scope(ifc.boxes[*b].style, start..cursor)? {
+                    scopes.push(s);
                 }
             }
-            Piece::Atomic { chars, .. } if !next_close => at_char(chars.end)?,
-            Piece::Atomic { .. } => None,
-            Piece::Edge {
-                open: false, at, ..
-            } if !next_close => at_char(*at)?,
-            Piece::Edge { .. } => None,
-        };
+        }
     }
-    Ok(breaks)
+    let plaintext = matches!(ifc.root.get(P::UnicodeBidi), V::UnicodeBidi(U::Plaintext));
+    if !plaintext
+        && matches!(
+            ifc.root.get(P::UnicodeBidi),
+            V::UnicodeBidi(U::BidiOverride | U::IsolateOverride)
+        )
+    {
+        if let Some(s) = scope(ifc.root, 0..ifc.chars.len())? {
+            scopes.insert(0, s);
+        }
+    }
+    BidiInfo::with_scopes(
+        &ifc.chars,
+        if plaintext {
+            None
+        } else {
+            Some(if ifc.direction == Direction::Rtl {
+                Level::RTL
+            } else {
+                Level::LTR
+            })
+        },
+        &scopes,
+    )
+    .map_err(|_| FlowError::InvalidSnapshot)
 }

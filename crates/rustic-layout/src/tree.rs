@@ -54,6 +54,7 @@ pub struct BoxSnapshot {
     special_layout: bool,
     html_tag: HtmlTag,
     natural: Option<NaturalSize>,
+    language: Option<Arc<str>>,
 }
 
 /// HTML elements whose `overflow` can propagate to the viewport.
@@ -90,6 +91,11 @@ impl BoxSnapshot {
     /// Original UTF-16 text, including lone surrogates; empty for elements.
     pub fn text(&self) -> &[u16] {
         &self.text
+    }
+
+    /// Normalized inherited HTML/XML language, if explicitly known.
+    pub fn language(&self) -> Option<&str> {
+        self.language.as_deref()
     }
 
     /// For a replaced element (`img`, `canvas`, `video`, `iframe`, `embed`,
@@ -150,9 +156,26 @@ impl BoxTree {
         let initial = Arc::new(ComputedStyle::initial());
         let mut hidden = None;
         let mut text_units = 0usize;
+        let mut languages: Vec<(usize, Option<Arc<str>>)> = Vec::new();
+        let mut initial_language = None;
+        let mut ancestors = 0usize;
+        let mut ancestor = document.node(root)?.parent();
+        while let Some(id) = ancestor {
+            cancellation.check().map_err(|_| LayoutError::Cancelled)?;
+            ancestors = ancestors
+                .checked_add(1)
+                .filter(|&n| n < limits.max_nodes)
+                .ok_or(LayoutError::NodeLimit)?;
+            let node = document.node(id)?;
+            if let Some(lang) = explicit_language(node.kind()) {
+                initial_language = lang;
+                break;
+            }
+            ancestor = node.parent();
+        }
         for (visited, (id, depth)) in document.walk(root)?.enumerate() {
             cancellation.check().map_err(|_| LayoutError::Cancelled)?;
-            if visited >= limits.max_nodes {
+            if visited >= limits.max_nodes.saturating_sub(ancestors) {
                 return Err(LayoutError::NodeLimit);
             }
             if depth > limits.max_depth {
@@ -168,6 +191,15 @@ impl BoxTree {
             let parent = parents.last().and_then(|&(_, parent, _)| parent);
             let inherited = parents.last().and_then(|(_, _, style)| style.clone());
             let node = document.node(id)?;
+            while languages.last().is_some_and(|(d, _)| *d >= depth) {
+                languages.pop();
+            }
+            let language = explicit_language(node.kind()).unwrap_or_else(|| {
+                languages
+                    .last()
+                    .map_or_else(|| initial_language.clone(), |(_, l)| l.clone())
+            });
+            languages.push((depth, language.clone()));
             // A computed `display:block` cannot turn a replaced element, a
             // native control or foreign content into a generic CSS block.
             let special_layout = match node.kind() {
@@ -300,6 +332,7 @@ impl BoxTree {
             };
             boxes.push(BoxSnapshot {
                 node: id,
+                language,
                 parent,
                 kind,
                 style: Some(style),
@@ -416,3 +449,28 @@ impl fmt::Display for LayoutError {
     }
 }
 impl Error for LayoutError {}
+
+fn explicit_language(kind: &NodeKind) -> Option<Option<Arc<str>>> {
+    let NodeKind::Element(element) = kind else {
+        return None;
+    };
+    let attribute = element
+        .attributes()
+        .iter()
+        .find(|a| a.name().local().eq_ignore_ascii_case("lang") && a.name().namespace().is_none())
+        .or_else(|| {
+            element.attributes().iter().find(|a| {
+                a.name().local() == "lang"
+                    && a.name().namespace() == Some("http://www.w3.org/XML/1998/namespace")
+            })
+        })?;
+    let units = attribute.value().as_units();
+    if units.is_empty() || units.len() > 63 {
+        return Some(None);
+    }
+    let s = String::from_utf16(units).ok()?;
+    if !s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        return Some(None);
+    }
+    Some(Some(Arc::from(s.to_ascii_lowercase())))
+}

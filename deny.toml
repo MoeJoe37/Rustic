@@ -1,0 +1,15 @@
+[advisories]
+yanked = "deny"
+
+[licenses]
+allow = ["AGPL-3.0-only", "MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "Zlib"]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

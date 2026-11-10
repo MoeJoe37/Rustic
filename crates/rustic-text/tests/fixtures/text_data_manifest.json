@@ -17,7 +17,7 @@
     "cases": 19338
   },
   "outputs": {
-    "crates/rustic-text/src/unicode/tables.rs": "9656a396cc2f8f12f07a6b032b55c1e30cc7eeaf5254657589ed5bb99d2f53e8",
+    "crates/rustic-text/src/unicode/tables.rs": "8964afbd7f5334429de32235d3ff89168dd85291a4a17f31e2ae45ff1acb2ba1",
     "crates/rustic-text/tests/fixtures/bidi_character_cases.txt": "a5ea8b1890ac722772819ba58f278004cea43d16135b1ee73d4625d8eba4581c",
     "crates/rustic-text/tests/fixtures/bidi_class_cases.txt": "ff1751a8ba855ee8cf5deca1cb502efb5fb85582746b2eb296c0d9b6fceb4393",
     "crates/rustic-text/tests/fixtures/grapheme_cases.txt": "e0b4117ffa00a2d6c76486fe12ac7ad68683dde2fc23b18c9e17200c0ccb1133",

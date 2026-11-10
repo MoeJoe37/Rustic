@@ -199,6 +199,10 @@ fn every_longhand_has_an_initial_value_that_reparses() {
             "text-transform",
             "letter-spacing",
             "word-spacing",
+            "line-break",
+            "word-break",
+            "overflow-wrap",
+            "hyphens",
             "white-space",
         ]
     );
@@ -213,4 +217,50 @@ fn absolute_lengths_convert_to_pixels() {
     assert_eq!(px(1.0, LengthUnit::Pc), Some(16.0));
     assert!((px(2.54, LengthUnit::Cm).unwrap() - 96.0).abs() < 1e-9);
     assert_eq!(px(1.0, LengthUnit::Em), None);
+}
+
+#[test]
+fn text_policies_parse_serialize_and_reject_invalid_keywords() {
+    for (property, values) in [
+        (
+            "unicode-bidi",
+            &[
+                "normal",
+                "embed",
+                "bidi-override",
+                "isolate",
+                "isolate-override",
+                "plaintext",
+            ][..],
+        ),
+        (
+            "line-break",
+            &["auto", "loose", "normal", "strict", "anywhere"],
+        ),
+        (
+            "word-break",
+            &[
+                "normal",
+                "break-all",
+                "keep-all",
+                "break-word",
+                "manual",
+                "auto-phrase",
+            ],
+        ),
+        ("overflow-wrap", &["normal", "break-word", "anywhere"]),
+        ("hyphens", &["none", "manual", "auto"]),
+    ] {
+        for value in values {
+            let s = format!("{property}: {value}");
+            assert_eq!(parse(&s), Ok(s.clone()));
+        }
+        assert!(parse(&format!("{property}: invalid")).is_err());
+        assert!(parse(&format!("{property}: normal normal")).is_err());
+    }
+    assert_eq!(
+        parse("word-wrap: anywhere"),
+        Ok("overflow-wrap: anywhere".into())
+    );
+    assert!(!PropertyId::UnicodeBidi.inherited());
 }

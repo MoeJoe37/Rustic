@@ -78,8 +78,12 @@ nobr { white-space: nowrap }
 u, ins { text-decoration: underline }
 s, strike, del { text-decoration: line-through }
 
-[dir=ltr i] { direction: ltr }
-[dir=rtl i] { direction: rtl }
+[dir=ltr i] { direction: ltr; unicode-bidi:isolate }
+[dir=rtl i] { direction: rtl; unicode-bidi:isolate }
+[dir=auto i] { unicode-bidi:plaintext }
+bdi { unicode-bidi:isolate }
+bdi:not([dir]) { unicode-bidi:plaintext }
+bdo, bdo[dir] { unicode-bidi:bidi-override }
 
 hr { color: gray; border-style: inset; border-width: 1px; margin: 0.5em auto }
 fieldset { display: block; margin-left: 2px; margin-right: 2px; border: 2px groove gray }

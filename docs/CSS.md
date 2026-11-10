@@ -910,7 +910,7 @@ skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
   implemented.
 * `.tentative` files test proposals and are never in scope.
 
-Of 2,916 cases, 1,567 are in scope and **1,199 pass** (invalid-selector
+Of 2,916 cases, 1,609 are in scope and **1,241 pass** (invalid-selector
 102/104, invalid-value 521/522, valid-selector 108/199, valid-value 468/742).
 The other 1,349 are out of scope: properties `rustic-css` does not support yet,
 and tentative files. Both counts are pinned in the gate, so supporting or
@@ -934,3 +934,16 @@ Before the gate, four serialization bugs it found were fixed: `[|a]` and
 before a pseudo-element is omitted, and `background-size` writes `<w> auto`.
 Keyword-like words (`cursive serif`) in an unquoted family name are now
 rejected.
+
+
+### Static renderer text controls
+
+`unicode-bidi`, `line-break`, `word-break`, `overflow-wrap` (with `word-wrap`
+alias) and `hyphens` parse as typed values, serialize and participate in computed
+initial/inherited values. Unicode-bidi is not inherited. The other controls are
+inherited. Rendering policies, language resources and explicit Level 4
+`auto-phrase` refusal are documented in [TEXT.md](TEXT.md). Adding these supported
+properties expands the pinned parsing scope by 42 cases to 1,609, with no expected
+failure changes; 1,241 pass (102/104 invalid selectors, 543/544 invalid values,
+108/199 valid selectors, 488/762 valid values). The full 2,916-case source corpus
+and the larger engine denominator are unchanged.

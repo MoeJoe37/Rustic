@@ -15,14 +15,11 @@ RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets
 Device shells, rendering, input, and runtime validation are still planned. See
 [platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: late M1 document core, with M2 styles started.** This repository contains the project
-architecture, implementation plan, shared engine primitives, and continuous
-integration. Bounded DOM/URL foundations, HTML tokenization,
-[document and fragment tree construction](docs/HTML_TREE.md), parser fuzzing and
-[CSS syntax, selector matching, typed property values, the cascade and computed style](docs/CSS.md) are implemented.
-It does not yet execute JavaScript, fetch web pages, or render content.
-A complete modern browser engine is a sustained, multi-year
-engineering effort; milestones below describe targets, not existing support.
+**Current stage: M3 static renderer.** The original pipeline covers local HTML,
+computed CSS, block/inline/flex layout, OpenType text, image paint, CPU raster,
+resize/zoom and hit testing. See the [implementation ledger](docs/IMPLEMENTATION.md)
+for precise tested contracts. JavaScript execution, web-page networking and
+native host acceptance remain later milestone work.
 
 <!-- rustic-progress:start -->
 
@@ -30,7 +27,7 @@ engineering effort; milestones below describe targets, not existing support.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 31.66%** (29.95% verified complete + 1.71% partial credit) — 49/172 capabilities complete and 5 in progress across 21 subsystems. Current milestone: **M3 Static renderer**, 91.32% done.
+**Overall engine completion: 32.72%** (32.50% verified complete + 0.22% partial credit) — 53/172 capabilities complete and 1 in progress across 21 subsystems. Current milestone: **M4 ECMAScript runtime**, 0.00% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -92,10 +89,12 @@ snapshot; `rustic dump-formatting <file>` shows anonymous flow boxes and inline
 continuations before shaping. `rustic dump-layout <file>` adds [used block rectangles](docs/LAYOUT.md)
 for a static block subset with adjoining-margin collapse. `rustic dump-paint <file>` prints
 its [display list](docs/PAINT.md) and `rustic render --output out.png <file>` rasterizes
-block backgrounds and solid borders to a PNG on the CPU; `rustic reftest <test>`
-compares a page's render with its `rel=match` references. Text lays out and
-paints with bundled test fonts, and local PNG `<img>` files paint. OpenType
-shaping, inline images and system fonts remain pending. URLs and other
+the full supported display list to a PNG on the CPU; `rustic reftest <test>`
+compares a page's render with its `rel=match` references. Text uses OpenType shaping with Arabic/Indic and CSS wrapping/bidi policies;
+local PNG/JPEG/GIF/WebP images paint. `--font FILE` loads granted local
+TTF/OTF/WOFF/WOFF2 files for font metrics, shaping and paint. Without it, bundled
+test fonts keep results deterministic. [Text contracts and limits](docs/TEXT.md)
+include the remaining native font services and broader conformance work. URLs and other
 arguments return an error instead of implying navigation.
 
 The `tree` example builds nodes directly through the internal DOM API and prints

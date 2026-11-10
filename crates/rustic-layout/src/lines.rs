@@ -45,7 +45,7 @@ pub(crate) struct RawText {
     pub level: u8,
     pub face: usize,
     pub size: f64,
-    pub glyphs: Vec<(GlyphId, f64)>,
+    pub glyphs: Vec<(GlyphId, f64, f64)>,
 }
 
 /// One inline box's fragment on one line.
@@ -90,27 +90,49 @@ struct Break {
     forced: bool,
     /// Nothing that needs a line box (CSS 2.2 §9.4.2 empty lines).
     empty: bool,
+    hyphen: Option<usize>,
 }
 
 /// Greedy breaking from `start` within `available` pixels after `indent`;
 /// `atomic` holds the outer width of each atomic inline.
-fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64, atomic: &[f64]) -> Break {
+fn break_line(
+    ifc: &Ifc<'_>,
+    start: usize,
+    available: f64,
+    indent: f64,
+    atomic: &[f64],
+    use_emergency: bool,
+) -> Break {
     let n = ifc.pieces.len();
     let mut committed = indent;
     let mut pending = 0.0;
     let mut widths = Vec::new();
     let mut best: Option<(usize, usize)> = None;
+    let mut emergency_best: Option<(usize, usize)> = None;
     let mut overflow = false;
     let mut seen_text = false;
     let mut needs_line = false;
     let finish =
-        |end: usize, widths: Vec<f64>, overflow: bool, forced: bool, needs_line: bool| Break {
-            start,
-            end,
-            widths,
-            overflow,
-            forced,
-            empty: !needs_line,
+        |end: usize, mut widths: Vec<f64>, overflow: bool, forced: bool, needs_line: bool| {
+            let hyphen = if !forced && end < n && end > start && ifc.hyphens[end - 1].is_some() {
+                Some(end - 1)
+            } else {
+                None
+            };
+            if let Some(k) = hyphen {
+                if let Some(w) = widths.last_mut() {
+                    *w += ifc.hyphens[k].as_ref().map_or(0.0, |h| h.width);
+                }
+            }
+            Break {
+                start,
+                end,
+                widths,
+                overflow,
+                forced,
+                empty: !needs_line,
+                hyphen,
+            }
         };
     for k in start..n {
         let piece = &ifc.pieces[k];
@@ -148,7 +170,7 @@ fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64, atomic: 
         widths.push(w);
         let content = !matches!(space, Space::Collapsible | Space::Hanging);
         if content && committed > available + EPSILON {
-            if let Some((end, len)) = best {
+            if let Some((end, len)) = best.or(if use_emergency { emergency_best } else { None }) {
                 widths.truncate(len);
                 return finish(end, widths, false, false, true);
             }
@@ -162,9 +184,18 @@ fn break_line(ifc: &Ifc<'_>, start: usize, available: f64, indent: f64, atomic: 
                 if overflow {
                     return finish(k + 1, widths, true, false, needs_line);
                 }
-                best = Some((k + 1, widths.len()));
+                let extra = ifc.hyphens[k].as_ref().map_or(0.0, |h| h.width);
+                if committed + extra <= available + EPSILON {
+                    best = Some((k + 1, widths.len()));
+                }
             }
             _ => {}
+        }
+        if use_emergency && ifc.emergency[k] && k + 1 < n {
+            if overflow {
+                return finish(k + 1, widths, true, false, needs_line);
+            }
+            emergency_best = Some((k + 1, widths.len()));
         }
     }
     finish(n, widths, overflow, false, needs_line)
@@ -202,6 +233,7 @@ pub(crate) fn intrinsic(ifc: &Ifc<'_>, work: &mut Work<'_>) -> Result<Intrinsic,
                 available,
                 if first { indent } else { 0.0 },
                 &atomic,
+                false,
             );
             work.charge(line.end - start)?;
             let width = trimmed_width(ifc, &line) + if first { indent } else { 0.0 };
@@ -299,6 +331,7 @@ pub(crate) fn layout(
                 available,
                 if first { indent } else { 0.0 },
                 &atomic,
+                true,
             );
             work.charge(line.end - start)?;
             if line.overflow && band.intruded {
@@ -412,7 +445,17 @@ fn place(
         .map(|&k| width_of(k))
         .sum::<f64>()
         + indent;
-    let rtl = ifc.direction == Direction::Rtl;
+    let rtl = if matches!(
+        ifc.root.get(P::UnicodeBidi),
+        V::UnicodeBidi(rustic_css::UnicodeBidi::Plaintext)
+    ) {
+        (line.start..line.end)
+            .find_map(|k| ifc.pieces[k].chars())
+            .and_then(|c| ifc.bidi.paragraph_at(c.start))
+            .is_some_and(|p| p.level.is_rtl())
+    } else {
+        ifc.direction == Direction::Rtl
+    };
     let free = available - content;
     let last = line.forced || line.end >= ifc.pieces.len();
     let justify: Vec<usize> = if align == TextAlign::Justify && !last && free > EPSILON {
@@ -668,15 +711,16 @@ fn place(
                     ifc.sources[chars.start].start,
                     ifc.sources[chars.end - 1].end,
                 );
-                let mut pen = x + dx;
-                let mut placed: Vec<(GlyphId, f64)> = Vec::with_capacity(glyphs.len());
-                let ordered: Box<dyn Iterator<Item = _>> = if level.is_rtl() {
-                    Box::new(glyphs.iter().rev())
+                let hyphen_width = if line.hyphen == Some(k) {
+                    ifc.hyphens[k].as_ref().map_or(0.0, |h| h.width)
                 } else {
-                    Box::new(glyphs.iter())
+                    0.0
                 };
-                for g in ordered {
-                    placed.push((g.glyph, pen));
+                let text_width = w - hyphen_width;
+                let mut pen = x + dx + if level.is_rtl() { hyphen_width } else { 0.0 };
+                let mut placed: Vec<(GlyphId, f64, f64)> = Vec::with_capacity(glyphs.len());
+                for g in glyphs {
+                    placed.push((g.glyph, pen + g.x_offset, baseline - g.y_offset));
                     pen += g.advance;
                 }
                 let joins = texts.last().is_some_and(|t: &RawText| {
@@ -687,7 +731,7 @@ fn place(
                 });
                 if joins {
                     if let Some(t) = texts.last_mut() {
-                        t.width += w;
+                        t.width += text_width;
                         t.utf16 = (t.utf16.0.min(src.0), t.utf16.1.max(src.1));
                         t.glyphs.extend(placed);
                     }
@@ -697,7 +741,7 @@ fn place(
                         text: *text,
                         utf16: src,
                         x: x + dx,
-                        width: w,
+                        width: text_width,
                         top: baseline - font.ascent,
                         height: font.ascent + font.descent,
                         baseline,
@@ -707,6 +751,49 @@ fn place(
                         glyphs: placed,
                     });
                 }
+            }
+        }
+        if line.hyphen == Some(k) {
+            if let Some(h) = &ifc.hyphens[k] {
+                let item = &ifc.texts[h.text];
+                let parent = item.parent;
+                let (dx, dy) = relative(parent);
+                let font = parent.map_or(ifc.root_font, |p| ifc.boxes[p].font);
+                let baseline = baseline_of(parent) + dy;
+                let mut pen = if level.is_rtl() {
+                    x + dx
+                } else {
+                    x + w - h.width + dx
+                };
+                let mut glyphs = Vec::new();
+                for g in &h.glyphs {
+                    glyphs.push((g.glyph, pen + g.x_offset, baseline - g.y_offset));
+                    pen += g.advance;
+                }
+                let source = ifc.sources[h.at];
+                let start = if ifc.chars[h.at] == '\u{AD}' {
+                    source.start
+                } else {
+                    source.end
+                };
+                texts.push(RawText {
+                    line: index,
+                    text: h.text,
+                    utf16: (start, source.end),
+                    x: if level.is_rtl() {
+                        x + dx
+                    } else {
+                        x + w - h.width + dx
+                    },
+                    width: h.width,
+                    top: baseline - font.ascent,
+                    height: font.ascent + font.descent,
+                    baseline,
+                    level: level.number(),
+                    face: h.face,
+                    size: item.font.size,
+                    glyphs,
+                });
             }
         }
         x += w;
@@ -770,6 +857,7 @@ pub(crate) fn translate(set: &mut LineSet, dx: f64, dy: f64) {
         t.baseline += dy;
         for g in &mut t.glyphs {
             g.1 += dx;
+            g.2 += dy;
         }
     }
     for f in &mut set.inlines {

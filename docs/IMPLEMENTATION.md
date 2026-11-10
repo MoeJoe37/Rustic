@@ -1099,6 +1099,28 @@ first 32-bit run found a DOM test that built a multi-gigabyte dump, impossible i
 a 32-bit address space; TD-18's linear dump format removes it. Every later task
 must keep all tiers green.
 
+## REN-03 completion: font formats, shaping and text policies
+
+Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,
+Arabic/Indic shaping and glyph offsets in paint. Font discovery walks sorted
+host-granted local roots under independent bounds and publishes accepted faces
+atomically. `--font FILE` configures computed metrics and rendering explicitly;
+there are no implicit system-font reads or network downloads.
+
+CSS `unicode-bidi` scopes map virtual controls back to original source indexes;
+HTML dir/bdi/bdo rules and paragraph plaintext alignment are integrated. CSS Text
+3 line-break/word-break/overflow-wrap/hyphens control real line geometry and
+intrinsic sizes. Soft hyphen glyphs are measured and painted only at the selected
+break. Pinned English patterns require known `en`/`en-US`; DOM language survives
+contents/subtree snapshots. Source UTF-16 text is unchanged.
+
+See [TEXT.md](TEXT.md), [ADR 0014](adr/0014-reviewed-font-adapters.md) and
+TD-85/86/87 for bounds, independent reference tests, exact dependency review and
+remaining native services, break reshaping, carets and language resources.
+Earlier REN-03a/03b descriptions above are historical slices; their former
+OpenType/format/tailoring gaps are paid by this completion. Broad text standards
+acceptance and native platform runtime gates remain separate M9/M8 work.
+
 | First implementation queue item | Status |
 | --- | --- |
 | DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |

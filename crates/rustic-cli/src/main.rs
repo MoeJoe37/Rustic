@@ -8,6 +8,7 @@ use rustic_engine::Viewport;
 use rustic_html::ParsedDocument;
 use std::path::Path;
 
+mod fonts;
 mod images;
 mod loader;
 mod reftest;
@@ -15,7 +16,7 @@ mod stylesheets;
 
 use loader::{LoadError, LoaderLimits};
 
-const USAGE: &str = "Rustic browser engine development scaffold
+const USAGE: &str = "Rustic browser engine development tools
 
 Usage:
   rustic info
@@ -50,14 +51,14 @@ dump-paint prints the display list for that layout: the canvas color (with
 root/body background propagation), block and inline background colors, solid
 borders and text glyph paths in stacking-context paint order, with overflow
 clips and opacity groups, and block-level <img> content. Layout and paint use
-the bundled test fonts only; <img src> loads local PNG files from the
+explicit --font files when supplied, otherwise the bundled test fonts; <img src> loads local PNG files from the
 document's directory or below it, like stylesheets.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). VIEW options set the window: --viewport WxH is its
 size in pixels at 100% zoom (default 1280x720), --scale the device pixel ratio
 (default 1) and --zoom the page zoom (0.25 to 5, default 1). Zoom lays the page
 out in a viewport of the window over the zoom and paints it at scale times
-zoom (at most 64), so the PNG is the window size times the scale. Images and non-solid borders fail explicitly; the
+zoom (at most 64), so the PNG is the window size times the scale. The
 PNG counts against --max-output-bytes.
 reftest renders a test page and every <link rel=match|mismatch href> reference
 the same way and compares the pixels, allowing the differences that
@@ -72,6 +73,7 @@ visibility; the root element when no box is hit), or none outside the
 
 Options for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
+  --font FILE            explicit TTF/OTF/WOFF/WOFF2 (repeat up to 64; bounded local files)
   --max-input-bytes N    file and tokenizer input bytes (default 8388608)
   --max-output-bytes N   dump output bytes (default 67108864)
   --chunk-bytes N        bytes read per step (default 65536)
@@ -96,7 +98,13 @@ Image options for layout and paint commands (exceeding one breaks the image, nev
   --max-image-decoded-bytes N    total decoded RGBA bytes (default 268435456)";
 
 fn main() -> ExitCode {
-    let args: Vec<_> = env::args_os().skip(1).collect();
+    let args = match fonts::configure(env::args_os().skip(1).collect()) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("rustic: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     if args.is_empty() || (args.len() == 1 && args[0] == "--help") {
         println!("{USAGE}");
         return ExitCode::SUCCESS;
@@ -107,14 +115,14 @@ fn main() -> ExitCode {
     }
     if args.len() == 1 && args[0] == "info" {
         let viewport = Viewport::new(1280, 720).expect("built-in viewport is within limits");
-        println!("Rustic {} — foundation stage", env!("CARGO_PKG_VERSION"));
+        println!("Rustic {} — static renderer", env!("CARGO_PKG_VERSION"));
         println!(
             "Default viewport: {}x{}",
             viewport.width(),
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; text layout, JavaScript and networking: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; OpenType text shaping and CSS wrapping available; JavaScript and networking: not implemented"
         );
         return ExitCode::SUCCESS;
     }

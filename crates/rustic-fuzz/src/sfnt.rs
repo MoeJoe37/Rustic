@@ -15,7 +15,12 @@ pub(crate) fn seeds() -> impl Iterator<Item = Vec<u8>> {
             .step_by(16)
             .map(move |len| bytes[..len].to_vec())
     });
-    whole.chain(prefixes)
+    whole.chain(prefixes).chain([
+        include_bytes!("../../rustic-text/tests/fonts/shaping/RusticCFFTest.otf").to_vec(),
+        include_bytes!("../../rustic-text/tests/fonts/shaping/RusticCFF2Test.otf").to_vec(),
+        include_bytes!("../../rustic-text/tests/fonts/shaping/RusticCFFTest.woff").to_vec(),
+        include_bytes!("../../rustic-text/tests/fonts/shaping/RusticCFFTest.woff2").to_vec(),
+    ])
 }
 
 impl Target for SfntTarget {
@@ -39,6 +44,11 @@ impl Target for SfntTarget {
             b"glyf",
             b"name",
             b"OS/2",
+            b"GSUB",
+            b"GPOS",
+            b"CFF ",
+            b"wOFF",
+            b"wOF2",
             b"\xff\xff",
             b"\x00\x00",
             b"\x7f\xff",
@@ -102,6 +112,22 @@ impl Target for SfntTarget {
                     return Err(format!("glyph {g} has a non-finite point"));
                 }
             }
+        }
+        // Exercise layout tables from accepted mutated fonts as well.
+        let mut database = rustic_text::FontDatabase::new();
+        if database.load(input.to_vec(), &limits).is_ok() {
+            let options = rustic_text::shape::ShapeOptions {
+                size: 16.0,
+                rtl: false,
+                letter_spacing: 0.0,
+                word_spacing: 0.0,
+            };
+            let _ = rustic_text::shape::shape(
+                &database,
+                &[0],
+                &['f', 'i', 'A', 'V', 'x', '\u{301}'],
+                &options,
+            );
         }
         Ok(())
     }

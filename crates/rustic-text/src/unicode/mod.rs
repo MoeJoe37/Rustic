@@ -177,6 +177,11 @@ pub fn is_east_asian_wide(c: char) -> bool {
     contains(&tables::EAST_ASIAN_FWH, c)
 }
 
+/// Whether `c` has East_Asian_Width Ambiguous, for CSS CJK tailoring.
+pub fn is_east_asian_ambiguous(c: char) -> bool {
+    contains(&tables::EAST_ASIAN_A, c)
+}
+
 /// Whether `c` is `Extended_Pictographic`.
 pub fn is_extended_pictographic(c: char) -> bool {
     contains(&tables::EXTENDED_PICTOGRAPHIC, c)

@@ -1,0 +1,23 @@
+name: Dependency audit
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  RUST_VERSION: "1.99.1"
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install reviewed audit tool
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          cargo install cargo-deny --version 0.20.2 --locked
+      - name: Check advisories, licenses, duplicate crates and sources
+        run: cargo deny --locked check advisories licenses bans sources

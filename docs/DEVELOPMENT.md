@@ -162,3 +162,20 @@ there is an actual release contract. Do not grant CI write permission or store
 release credentials merely to make a first scaffold commit. See the
 [roadmap](ROADMAP.md) for release gates and [contributing](../CONTRIBUTING.md) for
 review expectations.
+
+
+## Local static renderer demo with explicit fonts
+
+After building `rustic`, render the M3 article with a granted Latin font and the
+committed renamed Arabic/Indic fixtures:
+
+```sh
+cargo run --locked -p rustic-cli -- render --viewport 720x720 --font /path/to/NotoSans-Regular.ttf --font crates/rustic-text/tests/fonts/shaping/Arabic.ttf --font crates/rustic-text/tests/fonts/shaping/Devanagari.ttf --output target/m3-article.png crates/rustic-cli/tests/fixtures/m3/article.html
+```
+
+Try `--viewport 400x900` and `--zoom 1.25` for relayout. The original image swatch is generated
+by `tools/generate_m3_swatch.py` using only Python's standard library. The Latin font is a host grant,
+not downloaded by the engine. The first supplied family maps the CSS generics;
+additional supplied families provide fallback. Inputs and decoded bytes are
+bounded as described in [TEXT.md](TEXT.md). Without grants, bundled geometric test
+fonts make tests reproducible but are not intended for reading articles.

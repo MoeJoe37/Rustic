@@ -1,6 +1,6 @@
 [package]
 name = "rustic-text"
-description = "From-scratch sfnt/TrueType font parsing, face matching and font metrics for Rustic"
+description = "Font selection, Unicode text algorithms and bounded OpenType adapters for Rustic"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,11 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+harfrust = { version = "=0.15.0", default-features = false, features = ["std"] }
+skrifa = { version = "=0.49.0", default-features = false, features = ["std"] }
+wuff = { version = "=0.2.10", default-features = false, features = ["brotli"] }
+rustic-base = { path = "../rustic-base" }
+rustic-codecs = { path = "../rustic-codecs" }
 
 [lints]
 workspace = true

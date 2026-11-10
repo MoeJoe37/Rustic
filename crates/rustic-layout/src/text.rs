@@ -42,6 +42,8 @@ pub struct PositionedGlyph {
     pub glyph: GlyphId,
     /// Pen position (absolute x of the glyph origin) in CSS pixels.
     pub x: f64,
+    /// Absolute glyph origin y, including OpenType mark/cursive offsets.
+    pub y: f64,
 }
 
 /// A run of glyphs from one text box, face and bidi level on one line.
@@ -230,9 +232,14 @@ pub(crate) fn convert(
         }
         let item = &ifc.texts[t.text];
         let mut glyphs = Vec::with_capacity(t.glyphs.len());
-        for (glyph, x) in t.glyphs {
+        for (glyph, x, y) in t.glyphs {
             CssPx::new(x + ox)?;
-            glyphs.push(PositionedGlyph { glyph, x: x + ox });
+            CssPx::new(y + oy)?;
+            glyphs.push(PositionedGlyph {
+                glyph,
+                x: x + ox,
+                y: y + oy,
+            });
         }
         texts.push(TextFragment {
             line: base + t.line,

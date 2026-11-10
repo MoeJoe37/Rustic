@@ -145,7 +145,7 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | REN-02 | Intrinsic sizing, replaced elements, overflow, positioning, floats and margin collapse | REN-01 |
 | REN-02c | **Done** ([LAYOUT.md](LAYOUT.md#intrinsic-and-replaced-sizing-ren-02c)): intrinsic sizing keywords, shrink-to-fit contributions and block-level replaced sizing with embedder natural sizes; text intrinsic sizes wait for REN-03 (TD-49) | REN-02b |
 | REN-03 | Font adapter, bundled test fonts, shaping, bidi, line breaking, inline layout and baselines; computed `ex`/`ch`/`cap`/`ic` from loaded font metrics (moved from M2 css.values) | CSS font values, REN-01 |
-| REN-03a | **Done** ([LAYOUT.md](LAYOUT.md#font-adapter-ren-03a)): `rustic-text` TrueType parser, bundled original test fonts, CSS face matching and computed `ex`/`ch`/`cap`/`ic`; CFF/WOFF, discovery and shaping remain (TD-42) | CSS font values |
+| REN-03a | **Done** ([LAYOUT.md](LAYOUT.md#font-adapter-ren-03a)): `rustic-text` TrueType parser, bundled original test fonts, CSS face matching and computed `ex`/`ch`/`cap`/`ic`; CFF/WOFF, discovery and shaping complete in REN-03 (TD-85/86/87 record remaining scope) | CSS font values |
 | REN-04 | Fragments, stacking contexts, paint order, clips, glyph/image display-list commands | REN-02, REN-03 |
 | REN-05 | CPU raster reference backend and bounded image decode; sRGB/alpha conventions | REN-04 |
 | REN-06 | `render` headless command, PNG output, layout/display-list dumps, resize and hit testing | REN-05 |
@@ -154,23 +154,14 @@ full recomputation. Paint/layout must not invent a second cascade implementation
 | REN-08a | **Done** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): flexbox formatting context for block-level items, taken ahead of REN-07; text items and `inline-flex` wait for line layout, layout-WPT comparison for REN-07 (TD-49) | REN-02c |
 | MOB-03/04 | Android/iOS local-fixture CPU surfaces through narrow native bridges | REN-05; mobile core checks |
 
-**Current slice:** REN-01a implements checked CSS/device geometry, bounded
-principal-box snapshots, horizontal block width measurement and `dump-boxes`.
-The first REN-01b block-only pass adds used rectangles and `dump-layout` for
-a static block subset. REN-02a adds sibling, parent-child and empty-through
-margin collapse, with signed struts and root/BFC/border/padding/min-height
-boundaries. REN-01c adds bounded normal-flow anonymous blocks, split inline
-continuations and `dump-formatting`. REN-04a/REN-05a add the first display
-list (canvas propagation, block backgrounds and solid borders), a deterministic
-CPU rasterizer, PNG output, `dump-paint` and `rustic render` ([PAINT.md](PAINT.md)).
-REN-04b paints in Appendix E order with stacking contexts, `z-index`, floats,
-positioned boxes, overflow clips and opacity groups. REN-05b adds bounded
-inflate and PNG decoding (`rustic-codecs`), and REN-07a the `rustic reftest`
-harness with a checked reftest suite; REN-06a adds paint-order hit testing
-(`rustic hit-test`); REN-04c/d paint text glyphs and decorations with the bundled fonts, REN-04e paints outlines, REN-04f rounded corners and clips, REN-04g `clip-path`, REN-04h 2D/3D transforms, REN-04i shadows, blend modes and filters, REN-04j a tiled raster with damage-limited repaint and resize/zoom relayout, and REN-05c paints local PNG images.
-OpenType shaping, inline images, resize/zoom, text decorations and the
-final general fragment tree remain pending.
-See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.
+**Current slice:** the declared static renderer capabilities include block,
+inline and flex layout, positioned/replaced content, glyph/image paint, CPU
+raster, resize/zoom, hit testing and pinned layout/reftest gates. REN-03 completes
+font discovery/formats, GSUB/GPOS with Arabic/Indic, CSS bidi scopes and wrapping/
+hyphenation. See [TEXT.md](TEXT.md) and TD-85/86/87 for precise contracts and
+remaining text refinements. The M3 catalog gate has 17 capabilities; its
+completion does not claim full web compatibility or native Android/iOS surface
+acceptance. Those existing M9/M8 catalog gates remain open.
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin
 mixed text, resize, and overflow render through Rustic's pipeline. Early debug

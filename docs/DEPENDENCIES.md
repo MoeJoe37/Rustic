@@ -111,3 +111,18 @@ there are still no external Rust dependencies.
 The AGPL license already present in the repository is retained. Workspace package
 metadata uses `AGPL-3.0-only`; changing the licensing policy is a maintainer
 decision, not an incidental dependency or scaffolding change.
+
+## M3 font adoption (2026-11-10)
+
+The historic zero-external-dependency statements above describe earlier slices.
+[ADR 0014](adr/0014-reviewed-font-adapters.md) adopts exact HarfRust 0.15.0, Skrifa
+0.49.0 and Wuff 0.2.10 for the remaining low-level font functions. Default features
+are disabled; only `std`, `std`, and safe `brotli` are enabled respectively.
+The 24-package graph, checksums, source revisions, license expressions and
+retained notices live in [the reviewed manifest](../third_party/rust-dependencies.json).
+All dependencies compile with Rust 1.85. No native runtime/FFI library, font
+network client, browser engine or JS VM is introduced. Build-time derives are
+reviewed as part of the graph. Auditing is configured with `cargo-deny 0.20.2`;
+run `cargo deny --locked check advisories licenses bans sources` before merging.
+Font discovery is a separate host-granted local I/O API; the shaping libraries
+receive immutable bytes. TD-85/86/87 record the limits that remain.

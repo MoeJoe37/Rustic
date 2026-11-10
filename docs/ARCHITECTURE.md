@@ -301,3 +301,14 @@ property. Add a crate only for a real ownership, testability, or dependency
 boundary. Any change to original-engine scope, GC, process authority, JS host
 capabilities, public API stability, or graphics backend requires an
 [architecture decision](adr/README.md), regression tests, and roadmap updates.
+
+
+## Text adapter boundary
+
+Rustic owns font selection, source indexes, Unicode 17 segmentation/bidi, CSS
+line policies, layout and paint. The reviewed HarfRust/Skrifa/Wuff adapter gets
+immutable bounded font data and returns glyphs/outlines, without I/O authority.
+Discovery is a separate explicit host grant. Sharing bytes and lazy caches does
+not make those caches a global memory budget; TD-85 records the next accounting
+work. Source-aware shaping and break policies remain Rustic responsibilities
+(TD-86/87). See [ADR 0014](adr/0014-reviewed-font-adapters.md).

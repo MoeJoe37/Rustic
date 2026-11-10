@@ -121,20 +121,70 @@ def check_dependencies(members: list[str]) -> None:
             found.extend(target.get(key, {}) for key in DEPENDENCY_KEYS)
         return found
 
+    review_path = ROOT / "third_party/rust-dependencies.json"
+    review = {"direct": {}, "packages": []}
+    if review_path.is_file():
+        try:
+            review = json.loads(review_path.read_text(encoding="utf-8"))
+            if not (ROOT / review["decision"]).is_file():
+                error(review_path, "missing dependency decision")
+            for package in review["packages"]:
+                if not package["notices"]:
+                    error(review_path, f"missing license notices for {package['name']}")
+                for name, digest in package["notices"].items():
+                    if hashlib.sha256((ROOT / name).read_bytes()).hexdigest() != digest:
+                        error(review_path, f"license notice digest changed: {name}")
+        except (OSError, KeyError, TypeError, ValueError) as exc:
+            error(review_path, f"invalid dependency review: {exc}")
+            review = {"direct": {}, "packages": []}
+    seen = set()
     for member in members:
         path = ROOT / member / "Cargo.toml"
         for table in tables(tomllib.loads(path.read_text(encoding="utf-8"))):
             for name, spec in table.items():
-                if not (isinstance(spec, dict) and ("path" in spec or spec.get("workspace"))):
-                    error(path, f"external dependency {name!r} needs a reviewed entry in "
-                          "docs/DEPENDENCIES.md, an ADR and an update to this check")
+                if isinstance(spec, dict) and ("path" in spec or spec.get("workspace")):
+                    continue
+                key = member + ":" + name
+                seen.add(key)
+                if review["direct"].get(key) != spec:
+                    error(path, f"external dependency {name!r} needs an exact reviewed entry in "
+                          "docs/DEPENDENCIES.md, an ADR and third_party/rust-dependencies.json")
+    if set(review["direct"]) != seen:
+        error(review_path, "reviewed direct dependency set differs from manifests")
     workspace_deps = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"].get("dependencies", {})
     for name, spec in workspace_deps.items():
         if not (isinstance(spec, dict) and "path" in spec):
             error(ROOT / "Cargo.toml", f"external workspace dependency {name!r} is not reviewed")
+    reviewed = {(p["name"], p["version"]): p for p in review["packages"]}
+    actual = set()
     for package in tomllib.loads((ROOT / "Cargo.lock").read_text())["package"]:
-        if "source" in package:
-            error(ROOT / "Cargo.lock", f"lockfile contains external package {package['name']!r}")
+        if "source" not in package:
+            continue
+        key = (package["name"], package["version"])
+        actual.add(key)
+        expected = reviewed.get(key, {})
+        if any(package.get(k) != expected.get(k) for k in ("name", "version", "source", "checksum")):
+            error(ROOT / "Cargo.lock", f"lockfile contains external package {package['name']!r} without exact reviewed source/checksum")
+    if actual != set(reviewed):
+        error(review_path, "reviewed transitive package graph differs from Cargo.lock")
+
+
+def check_font_resources() -> None:
+    """Font and language resources stay pinned and retain redistributable notices."""
+    fonts = ROOT / "crates/rustic-text/tests/fonts/shaping"
+    try:
+        manifest = json.loads((fonts / "manifest.json").read_text(encoding="utf-8"))
+        for name, digest in {**manifest["outputs"], **manifest["notices"]}.items():
+            if hashlib.sha256((fonts / name).read_bytes()).hexdigest() != digest:
+                error(fonts / name, "font fixture digest differs from manifest")
+        if not (fonts / "OFL-LICENSE.txt").is_file() or not (fonts / "README.md").is_file():
+            error(fonts, "font fixture licenses are missing")
+        hyphen = ROOT / "crates/rustic-text/data/hyphenation"
+        manifest = json.loads((hyphen / "manifest.json").read_text(encoding="utf-8"))
+        if hashlib.sha256((hyphen / "en-us.tex").read_bytes()).hexdigest() != manifest["sha256"]:
+            error(hyphen, "hyphenation source digest differs from manifest")
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        error(fonts, f"invalid text resource metadata: {exc}")
 
 
 def check_debt_markers(files: list[Path]) -> None:

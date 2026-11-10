@@ -759,3 +759,15 @@ and CSS Writing Modes 4
 [§2](https://www.w3.org/TR/css-writing-modes-4/#text-direction).
 These are focused fixtures and models, not a layout-WPT or browser comparison
 result.
+
+
+## REN-03 completion update
+
+The earlier font/inline sections describe the initial slices. CFF/CFF2, WOFF1/2,
+host-granted discovery, OpenType/Arabic/Indic shaping, mark offsets, scoped bidi,
+CSS wrapping and manual/language-gated automatic hyphenation are now integrated.
+Absolute `PositionedGlyph.y` carries vertical offsets and translations into
+paint. Min-content includes anywhere/hyphen opportunities and excludes emergency
+break-word. [TEXT.md](TEXT.md) is the current complete text contract; TD-85/86/87
+record the limits still pending. No native service or full CSS Text conformance
+claim follows from the static-renderer milestone.

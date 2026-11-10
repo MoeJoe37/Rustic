@@ -199,6 +199,10 @@ pub(crate) struct Work<'c> {
 }
 
 impl Work<'_> {
+    pub(crate) fn cancellation(&self) -> &CancellationToken {
+        self.cancellation
+    }
+
     pub(crate) fn charge(&mut self, units: usize) -> Result<(), FlowError> {
         let before = self.spent;
         self.spent = self

@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::ops::Range;
+use std::sync::{Arc, OnceLock};
 
 use crate::cmap::CharMap;
 use crate::error::{FontError, Tag};
@@ -60,12 +61,13 @@ pub struct GlyphId(pub u16);
 /// One parsed TrueType face. It owns its bytes; every table it uses was
 /// bounds-checked and validated when it was created.
 pub struct Face {
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
+    shaping: OnceLock<Option<harfrust::Font>>,
     tables: Tables,
     units_per_em: u16,
     glyph_count: u16,
     h_metrics: u16,
-    loca: Loca,
+    loca: Option<Loca>,
     cmap: CharMap,
     families: Vec<String>,
     weight: f64,
@@ -99,6 +101,7 @@ struct Tables {
     glyf: Range<usize>,
     name: Range<usize>,
     os2: Option<Range<usize>>,
+    cff: bool,
 }
 
 fn invalid(table: Tag, reason: &'static str) -> FontError {
@@ -109,8 +112,7 @@ fn invalid(table: Tag, reason: &'static str) -> FontError {
 fn directory(data: &[u8], limits: &FontLimits) -> Result<Tables, FontError> {
     let mut r = Reader::new(data, Tag::DIRECTORY);
     match r.u32().map_err(|_| FontError::NotSfnt)? {
-        0x0001_0000 | 0x7472_7565 => {}
-        0x4F54_544F => return Err(FontError::Unsupported("CFF (OTTO) outlines")),
+        0x0001_0000 | 0x7472_7565 | 0x4F54_544F => {}
         0x7474_6366 => return Err(FontError::Unsupported("font collections")),
         0x774F_4646 | 0x774F_4632 => return Err(FontError::Unsupported("WOFF/WOFF2 wrapping")),
         _ => return Err(FontError::NotSfnt),
@@ -146,6 +148,10 @@ fn directory(data: &[u8], limits: &FontLimits) -> Result<Tables, FontError> {
             Tag::LOCA => Some((5, &mut tables.loca)),
             Tag::GLYF => Some((6, &mut tables.glyf)),
             Tag::NAME => Some((7, &mut tables.name)),
+            Tag([b'C', b'F', b'F', b' ']) | Tag([b'C', b'F', b'F', b'2']) => {
+                tables.cff = true;
+                None
+            }
             Tag::OS2 => {
                 tables.os2 = Some(range.clone());
                 None
@@ -167,6 +173,16 @@ fn directory(data: &[u8], limits: &FontLimits) -> Result<Tables, FontError> {
         Tag::GLYF,
         Tag::NAME,
     ];
+    if data.get(..4) != Some(b"OTTO") && tables.cff {
+        return Err(invalid(Tag::DIRECTORY, "outline flavor mismatch"));
+    }
+    if data.get(..4) == Some(b"OTTO") {
+        if !tables.cff {
+            return Err(FontError::MissingTable(Tag(*b"CFF ")));
+        }
+        found[5] = true;
+        found[6] = true;
+    }
     if let Some(i) = found.iter().position(|&f| !f) {
         return Err(FontError::MissingTable(REQUIRED[i]));
     }
@@ -353,12 +369,13 @@ fn family_names(table: &[u8], limits: &FontLimits) -> Result<Vec<String>, FontEr
 }
 
 impl Face {
-    /// Parse a TrueType (`glyf`-flavored sfnt) font. The whole table set
+    /// Parse TrueType/CFF OpenType, WOFF1 or WOFF2. The whole table set
     /// used later is validated here; outlines are parsed on demand.
     pub fn parse(data: Vec<u8>, limits: &FontLimits) -> Result<Self, FontError> {
         if data.len() > limits.max_font_bytes {
             return Err(FontError::LimitExceeded("font size"));
         }
+        let data = crate::containers::decode(data, limits)?;
         let tables = directory(&data, limits)?;
         let head = head(&data[tables.head.clone()])?;
 
@@ -388,7 +405,15 @@ impl Face {
             return Err(FontError::Truncated(Tag::HMTX));
         }
 
-        let loca = Loca::parse(&data[tables.loca.clone()], head.long_loca, glyph_count)?;
+        let loca = if tables.cff {
+            None
+        } else {
+            Some(Loca::parse(
+                &data[tables.loca.clone()],
+                head.long_loca,
+                glyph_count,
+            )?)
+        };
         let cmap = CharMap::parse(&data[tables.cmap.clone()])?;
         let families = family_names(&data[tables.name.clone()], limits)?;
 
@@ -429,7 +454,8 @@ impl Face {
         };
 
         let mut face = Self {
-            data,
+            data: Arc::new(data),
+            shaping: OnceLock::new(),
             tables,
             units_per_em: head.units_per_em,
             glyph_count,
@@ -535,13 +561,33 @@ impl Face {
 
     /// The outline of `glyph` in font units, composites flattened.
     pub fn outline(&self, glyph: GlyphId) -> Result<Outline, FontError> {
+        if glyph.0 >= self.glyph_count {
+            return Err(FontError::GlyphOutOfRange(u32::from(glyph.0)));
+        }
+        if self.tables.cff {
+            return crate::cff::outline(&self.data, glyph, &self.limits);
+        }
         glyf::outline(
-            &self.loca,
+            &self.loca.ok_or(FontError::MissingTable(Tag::LOCA))?,
             &self.data[self.tables.loca.clone()],
             &self.data[self.tables.glyf.clone()],
             glyph.0,
             &self.limits,
         )
+    }
+
+    /// Retained decoded sfnt bytes, for aggregate host font accounting.
+    pub fn byte_len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub(crate) fn shaping_font(&self) -> Option<&harfrust::Font> {
+        self.shaping
+            .get_or_init(|| {
+                let bytes: Arc<dyn AsRef<[u8]> + Send + Sync> = self.data.clone();
+                harfrust::Font::new(harfrust::font::Blob::from(bytes), 0)
+            })
+            .as_ref()
     }
 
     fn char_advance(&self, c: char) -> Option<u16> {
@@ -551,9 +597,16 @@ impl Face {
     /// The glyph header's yMax for `c`.
     fn glyph_top(&self, c: char) -> Option<i16> {
         let glyph = self.glyph_index(c)?;
+        if self.tables.cff {
+            return self
+                .outline(glyph)
+                .ok()?
+                .bounds()
+                .map(|b| b.y_max.round() as i16);
+        }
         let glyf = &self.data[self.tables.glyf.clone()];
         let (start, end) = self
-            .loca
+            .loca?
             .range(&self.data[self.tables.loca.clone()], glyf.len(), glyph.0)
             .ok()?;
         glyf::header_bounds(&glyf[start..end]).ok()?.map(|b| b[3])

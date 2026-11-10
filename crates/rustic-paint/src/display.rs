@@ -1317,7 +1317,6 @@ impl Builder<'_> {
             .and_then(|fonts| fonts.faces().get(text.face()))
             .ok_or(PaintError::Font)?;
         let scale = text.font_size() / f64::from(face.units_per_em());
-        let baseline = text.baseline().get();
         let mut path = Path::default();
         for glyph in text.glyphs() {
             self.cancellation
@@ -1341,7 +1340,7 @@ impl Builder<'_> {
                         .iter()
                         .map(|p| PathPoint {
                             x: glyph.x + p.x * scale,
-                            y: baseline - p.y * scale,
+                            y: glyph.y - p.y * scale,
                             on_curve: p.on_curve,
                         })
                         .collect(),

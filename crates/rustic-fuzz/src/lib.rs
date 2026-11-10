@@ -22,6 +22,7 @@ mod paint;
 mod png;
 mod rng;
 mod sfnt;
+mod shaping;
 mod targets;
 
 pub use corpus::{seed_inputs, workspace_root};

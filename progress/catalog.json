@@ -1388,85 +1388,82 @@
           "label": "Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "sfnt",
-              "label": "Bounds-checked TrueType sfnt parsing: tables, cmap and glyf outlines",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/face.rs",
-                  "marker": "pub fn parse(data: Vec<u8>, limits: &FontLimits)"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/glyf.rs",
-                  "marker": "pub(crate) fn outline("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/fonts.rs",
-                  "marker": "fn cmap_formats_4_and_12_agree"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/fonts.rs",
-                  "marker": "fn mutated_fonts_never_panic"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/fonts.rs",
-                  "marker": "fn hostile_glyphs_hit_limits_not_recursion"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-text/src/face.rs",
+              "marker": "pub fn parse(data: Vec<u8>, limits: &FontLimits)"
             },
             {
-              "id": "matching",
-              "label": "CSS face matching by family, stretch, style and weight",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/database.rs",
-                  "marker": "pub fn best_face<'f>("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/fonts.rs",
-                  "marker": "fn database_matches_family_stretch_style_and_weight"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-text/src/glyf.rs",
+              "marker": "pub(crate) fn outline("
             },
             {
-              "id": "units",
-              "label": "Computed ex/ch/cap/ic from the first available font's metrics",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/fonts.rs",
-                  "marker": "impl FontMetricsSource for FontDatabase"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/fonts.rs",
-                  "marker": "fn units_follow_the_selected_face"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/fonts.rs",
-                  "marker": "fn parent_and_root_fonts_feed_font_size_and_root_units"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-text/tests/fonts.rs",
+              "marker": "fn cmap_formats_4_and_12_agree"
             },
             {
-              "id": "discovery",
-              "label": "System font discovery and CFF/WOFF formats",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-text/tests/fonts.rs",
+              "marker": "fn mutated_fonts_never_panic"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/fonts.rs",
+              "marker": "fn hostile_glyphs_hit_limits_not_recursion"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/database.rs",
+              "marker": "pub fn best_face<'f>("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/fonts.rs",
+              "marker": "fn database_matches_family_stretch_style_and_weight"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/fonts.rs",
+              "marker": "impl FontMetricsSource for FontDatabase"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/fonts.rs",
+              "marker": "fn units_follow_the_selected_face"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/fonts.rs",
+              "marker": "fn parent_and_root_fonts_feed_font_size_and_root_units"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/discovery.rs",
+              "marker": "pub fn discover("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/containers.rs",
+              "marker": "pub(crate) fn decode("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/cff.rs",
+              "marker": "pub(crate) fn outline("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn cff_cff2_and_web_wrappers_preserve_metrics_and_outlines"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn discovery_is_sorted_bounded_and_atomic"
             }
           ]
         },
@@ -1475,47 +1472,52 @@
           "label": "Shaping, fallback and glyph clusters",
           "size": 5,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "clusters",
-              "label": "Grapheme clusters, per-cluster font fallback, advances, mirroring and spacing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/shape.rs",
-                  "marker": "pub fn shape("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/shape.rs",
-                  "marker": "pub fn fallback_chain<"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/shape.rs",
-                  "marker": "fn clusters_take_one_face_and_unmapped_text_uses_notdef"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/shape.rs",
-                  "marker": "fn letter_and_word_spacing_follow_css_text"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-text/src/shape.rs",
+              "marker": "pub fn shape("
             },
             {
-              "id": "opentype",
-              "label": "OpenType GSUB/GPOS: ligatures, kerning and mark positioning",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-text/src/shape.rs",
+              "marker": "pub fn fallback_chain<"
             },
             {
-              "id": "complex",
-              "label": "Complex scripts (Arabic joining, Indic reordering)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-text/tests/shape.rs",
+              "marker": "fn clusters_take_one_face_and_unmapped_text_uses_notdef"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/shape.rs",
+              "marker": "fn letter_and_word_spacing_follow_css_text"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/shape.rs",
+              "marker": "pub fn shape_with_context("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn gsub_gpos_and_tracking_have_measured_effects"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn arabic_joining_ligatures_and_join_controls_preserve_source_ranges"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn indic_conjuncts_and_prebase_vowels_are_shaped_as_original_clusters"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/shaping_reference.rs",
+              "marker": "fn native_harfbuzz_glyphs_advances_and_offsets_match"
             }
           ]
         },
@@ -1524,53 +1526,52 @@
           "label": "Bidi and mixed-direction text",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "uax9",
-              "label": "UAX #9 levels, brackets and line reordering (Unicode 17)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/bidi.rs",
-                  "marker": "pub fn line_levels(&self, line: Range<usize>)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/bidi.rs",
-                  "marker": "fn bidi_test_sample_passes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/bidi.rs",
-                  "marker": "fn bidi_character_test_sample_passes"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-text/src/bidi.rs",
+              "marker": "pub fn line_levels(&self, line: Range<usize>)"
             },
             {
-              "id": "layout",
-              "label": "Mixed-direction line fragments in layout",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/lines.rs",
-                  "marker": "fn visual_order("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn right_to_left_and_mixed_direction_lines_reorder"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-text/tests/bidi.rs",
+              "marker": "fn bidi_test_sample_passes"
             },
             {
-              "id": "unicode-bidi",
-              "label": "unicode-bidi embeddings and isolates on inline boxes",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-text/tests/bidi.rs",
+              "marker": "fn bidi_character_test_sample_passes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/lines.rs",
+              "marker": "fn visual_order("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn right_to_left_and_mixed_direction_lines_reorder"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/bidi.rs",
+              "marker": "pub fn with_scopes("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn scoped_bidi("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/scopes.rs",
+              "marker": "fn virtual_css_scopes_match_explicit_uax_controls"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/text_policies.rs",
+              "marker": "fn inline_bidi_scopes_keep_source_text_and_override_levels"
             }
           ]
         },
@@ -1579,70 +1580,67 @@
           "label": "Line breaking and grapheme navigation",
           "size": 3,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "uax14",
-              "label": "UAX #14 line break opportunities (Unicode 17, untailored)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/segment.rs",
-                  "marker": "pub fn line_breaks(text: &[char])"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/segment.rs",
-                  "marker": "fn line_break_test_passes_completely"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-text/src/segment.rs",
+              "marker": "pub fn line_breaks(text: &[char])"
             },
             {
-              "id": "uax29",
-              "label": "UAX #29 extended grapheme clusters",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/segment.rs",
-                  "marker": "pub fn grapheme_boundaries(text: &[char])"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/segment.rs",
-                  "marker": "fn grapheme_break_test_passes_completely"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-text/tests/segment.rs",
+              "marker": "fn line_break_test_passes_completely"
             },
             {
-              "id": "lines",
-              "label": "CSS white-space and soft wrapping applied in line layout",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn break_opportunities("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn white_space_collapses_across_elements_and_preserves_where_asked"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/inline.rs",
-                  "marker": "fn words_wrap_at_spaces_and_trailing_spaces_are_removed"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-text/src/segment.rs",
+              "marker": "pub fn grapheme_boundaries(text: &[char])"
             },
             {
-              "id": "tailoring",
-              "label": "CSS line-break, word-break, overflow-wrap and hyphens tailoring",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-text/tests/segment.rs",
+              "marker": "fn grapheme_break_test_passes_completely"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tailoring.rs",
+              "marker": "pub(crate) fn apply("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn white_space_collapses_across_elements_and_preserves_where_asked"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn words_wrap_at_spaces_and_trailing_spaces_are_removed"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/hyphen.rs",
+              "marker": "pub fn hyphenation_points("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/text_policies.rs",
+              "marker": "fn break_all_keep_all_and_anywhere_use_grapheme_boundaries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/text_policies.rs",
+              "marker": "fn emergency_wraps_do_not_change_min_content_but_anywhere_does"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/text_policies.rs",
+              "marker": "fn manual_hyphens_are_measured_and_drawn_only_at_selected_breaks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/text_policies.rs",
+              "marker": "fn automatic_hyphenation_requires_known_language_and_respects_explicit_hints"
             }
           ]
         },

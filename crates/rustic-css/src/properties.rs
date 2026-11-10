@@ -332,6 +332,59 @@ keywords! {
 }
 
 keywords! {
+    /// `unicode-bidi` values.
+    UnicodeBidi {
+        Normal => "normal",
+        Embed => "embed",
+        BidiOverride => "bidi-override",
+        Isolate => "isolate",
+        IsolateOverride => "isolate-override",
+        Plaintext => "plaintext",
+    }
+}
+
+keywords! {
+    /// `line-break` values.
+    LineBreak {
+        Auto => "auto",
+        Loose => "loose",
+        Normal => "normal",
+        Strict => "strict",
+        Anywhere => "anywhere",
+    }
+}
+
+keywords! {
+    /// `word-break` values.
+    WordBreak {
+        Normal => "normal",
+        BreakAll => "break-all",
+        KeepAll => "keep-all",
+        BreakWord => "break-word",
+        Manual => "manual",
+        AutoPhrase => "auto-phrase",
+    }
+}
+
+keywords! {
+    /// `overflow-wrap` values.
+    OverflowWrap {
+        Normal => "normal",
+        BreakWord => "break-word",
+        Anywhere => "anywhere",
+    }
+}
+
+keywords! {
+    /// `hyphens` values.
+    Hyphens {
+        None => "none",
+        Manual => "manual",
+        Auto => "auto",
+    }
+}
+
+keywords! {
     /// `white-space` values (the CSS Text 3 keywords; the Level 4 longhands
     /// it expands to are not separate properties yet).
     WhiteSpace {
@@ -661,6 +714,17 @@ pub enum PropertyValue {
     /// `letter-spacing`, `word-spacing`.
     Spacing(Spacing),
     /// `white-space`.
+    /// CSS `unicode-bidi`.
+    UnicodeBidi(UnicodeBidi),
+    /// CSS `line-break`.
+    LineBreak(LineBreak),
+    /// CSS `word-break`.
+    WordBreak(WordBreak),
+    /// CSS `overflow-wrap`.
+    OverflowWrap(OverflowWrap),
+    /// CSS `hyphens`.
+    Hyphens(Hyphens),
+    /// CSS `white-space`.
     WhiteSpace(WhiteSpace),
     /// `text-decoration-line`.
     TextDecorationLine(TextDecorationLine),
@@ -716,6 +780,7 @@ macro_rules! property_ids {
 
             /// The longhand named `name`, ASCII case-insensitively.
             pub fn from_name(name: &str) -> Option<Self> {
+                if name.eq_ignore_ascii_case("word-wrap") {return Some(Self::OverflowWrap);}
                 match name.to_ascii_lowercase().as_str() {
                     $($name => Some(Self::$variant),)*
                     _ => None,
@@ -796,6 +861,11 @@ property_ids! {
     TextTransform => "text-transform", true;
     LetterSpacing => "letter-spacing", true;
     WordSpacing => "word-spacing", true;
+    UnicodeBidi => "unicode-bidi", false;
+    LineBreak => "line-break", true;
+    WordBreak => "word-break", true;
+    OverflowWrap => "overflow-wrap", true;
+    Hyphens => "hyphens", true;
     WhiteSpace => "white-space", true;
     TextDecorationLine => "text-decoration-line", false;
     TextDecorationStyle => "text-decoration-style", false;
@@ -907,6 +977,11 @@ impl PropertyId {
             P::TextIndent => PropertyValue::LengthPercentage(zero),
             P::TextTransform => PropertyValue::TextTransform(TextTransform::default()),
             P::LetterSpacing | P::WordSpacing => PropertyValue::Spacing(Spacing::Normal),
+            P::UnicodeBidi => PropertyValue::UnicodeBidi(UnicodeBidi::Normal),
+            P::LineBreak => PropertyValue::LineBreak(LineBreak::Auto),
+            P::WordBreak => PropertyValue::WordBreak(WordBreak::Normal),
+            P::OverflowWrap => PropertyValue::OverflowWrap(OverflowWrap::Normal),
+            P::Hyphens => PropertyValue::Hyphens(Hyphens::Manual),
             P::WhiteSpace => PropertyValue::WhiteSpace(WhiteSpace::Normal),
             P::TextDecorationLine => {
                 PropertyValue::TextDecorationLine(TextDecorationLine::default())
@@ -1938,6 +2013,11 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::TextAlign => PropertyValue::TextAlign(TextAlign::from_name(name()?)?),
         P::TextIndent => PropertyValue::LengthPercentage(length_percentage(value)?),
         P::LetterSpacing | P::WordSpacing => PropertyValue::Spacing(spacing(value)?),
+        P::UnicodeBidi => PropertyValue::UnicodeBidi(UnicodeBidi::from_name(name()?)?),
+        P::LineBreak => PropertyValue::LineBreak(LineBreak::from_name(name()?)?),
+        P::WordBreak => PropertyValue::WordBreak(WordBreak::from_name(name()?)?),
+        P::OverflowWrap => PropertyValue::OverflowWrap(OverflowWrap::from_name(name()?)?),
+        P::Hyphens => PropertyValue::Hyphens(Hyphens::from_name(name()?)?),
         P::WhiteSpace => PropertyValue::WhiteSpace(WhiteSpace::from_name(name()?)?),
         P::TextDecorationStyle => {
             PropertyValue::TextDecorationStyle(TextDecorationStyle::from_name(name()?)?)
@@ -2275,6 +2355,11 @@ impl fmt::Display for PropertyValue {
             }
             Self::Spacing(Spacing::Normal) => f.write_str("normal"),
             Self::Spacing(Spacing::LengthPercentage(lp)) => write!(f, "{lp}"),
+            Self::UnicodeBidi(v) => write!(f, "{v}"),
+            Self::LineBreak(v) => write!(f, "{v}"),
+            Self::WordBreak(v) => write!(f, "{v}"),
+            Self::OverflowWrap(v) => write!(f, "{v}"),
+            Self::Hyphens(v) => write!(f, "{v}"),
             Self::WhiteSpace(v) => write!(f, "{v}"),
             Self::TextDecorationLine(line) => {
                 let flags = [

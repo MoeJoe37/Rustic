@@ -35,8 +35,8 @@ impl Default for FaceQuery {
 
 /// Loaded faces plus generic-family and last-resort mappings.
 ///
-/// There is no system font discovery here (that is `rustic-platform`
-/// work); the embedder or test adds faces explicitly.
+/// The embedder loads faces explicitly or grants roots to the bounded
+/// discovery API. Native font services remain platform work (TD-85).
 #[derive(Debug, Default)]
 pub struct FontDatabase {
     faces: Vec<Face>,
@@ -55,6 +55,10 @@ impl FontDatabase {
         let face = Face::parse(data, limits)?;
         self.faces.push(face);
         Ok(self.faces.len() - 1)
+    }
+
+    pub(crate) fn append_faces(&mut self, faces: Vec<Face>) {
+        self.faces.extend(faces);
     }
 
     /// Every face, in load order.

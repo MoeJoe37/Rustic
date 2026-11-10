@@ -413,7 +413,7 @@ fn malformed_containers_and_tables_are_rejected() {
     data[..4].copy_from_slice(b"OTTO");
     assert_eq!(
         parse(data).unwrap_err(),
-        FontError::Unsupported("CFF (OTTO) outlines")
+        FontError::MissingTable(rustic_text::Tag(*b"CFF "))
     );
     let mut data = base.clone();
     data[..4].copy_from_slice(b"ttcf");
@@ -423,7 +423,7 @@ fn malformed_containers_and_tables_are_rejected() {
     );
     let mut data = base.clone();
     data[..4].copy_from_slice(b"wOF2");
-    assert!(matches!(parse(data), Err(FontError::Unsupported(_))));
+    assert!(parse(data).is_err());
     let mut data = base.clone();
     data[..4].copy_from_slice(b"\x00\x02\x00\x00");
     assert_eq!(parse(data).unwrap_err(), FontError::NotSfnt);

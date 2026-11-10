@@ -118,6 +118,15 @@ const DOTTED_CIRCLE: char = '\u{25CC}';
 /// boundary before `text[i]`. Entry 0 is always [`BreakOpportunity::Prohibited`]
 /// (LB2) and the last is always [`BreakOpportunity::Mandatory`] (LB3).
 pub fn line_breaks(text: &[char]) -> Vec<BreakOpportunity> {
+    line_breaks_tailored(text, false)
+}
+
+/// UAX #14 with CSS Text 3 break-all letter/number classes treated as ID.
+/// Grapheme boundaries are enforced by the layout caller.
+pub fn line_breaks_for_break_all(text: &[char]) -> Vec<BreakOpportunity> {
+    line_breaks_tailored(text, true)
+}
+fn line_breaks_tailored(text: &[char], break_all: bool) -> Vec<BreakOpportunity> {
     let mut out = vec![BreakOpportunity::Prohibited; text.len() + 1];
     if let Some(last) = out.last_mut() {
         *last = BreakOpportunity::Mandatory;
@@ -127,6 +136,11 @@ pub fn line_breaks(text: &[char]) -> Vec<BreakOpportunity> {
     let mut units: Vec<Unit> = Vec::with_capacity(text.len());
     for (i, &c) in text.iter().enumerate() {
         let class = resolved_class(c);
+        let class = if break_all && matches!(class, Lb::Al | Lb::Hl | Lb::Nu | Lb::Sa) {
+            Lb::Id
+        } else {
+            class
+        };
         if matches!(class, Lb::Cm | Lb::Zwj) {
             if let Some(unit) = units.last_mut() {
                 if !matches!(

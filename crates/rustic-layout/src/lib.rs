@@ -25,6 +25,7 @@ mod position;
 mod replaced;
 mod sizing;
 mod sticky;
+mod tailoring;
 mod text;
 mod tree;
 

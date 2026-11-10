@@ -53,6 +53,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(crate::images::GIF),
         Box::new(crate::images::WEBP),
         Box::new(crate::sfnt::SfntTarget),
+        Box::new(crate::shaping::ShapingTarget),
         Box::new(UrlTarget),
     ]
 }

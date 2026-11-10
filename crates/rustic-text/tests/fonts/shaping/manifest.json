@@ -1,0 +1,62 @@
+{
+  "generator": "tools/generate_shaping_fonts.py",
+  "fonttools": "4.61.1",
+  "brotli": "1.1.0",
+  "original_license": "CC0-1.0",
+  "sources": [
+    {
+      "path": "NotoSansArabic-Regular.ttf",
+      "sha256": "504d7407d86875acf7d04dfaa0fd7524d0b8797723bc4aa18022f29db25b0b6e",
+      "version": "Version 2.005; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D arab -f none -a qsq -X \"\"",
+      "unicode_ranges": [
+        [
+          32,
+          126
+        ],
+        [
+          1536,
+          1791
+        ],
+        [
+          8204,
+          8205
+        ]
+      ],
+      "license": "OFL-1.1",
+      "upstream": "https://github.com/notofonts/noto-fonts"
+    },
+    {
+      "path": "NotoSansDevanagari-Regular.ttf",
+      "sha256": "79a470365ccb210fa3c7d8d8ff2e005ef9d983cfd067f735a0caf7e15070ca9f",
+      "version": "Version 2.001; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D deva -f none -a qsq -X \"\"",
+      "unicode_ranges": [
+        [
+          32,
+          126
+        ],
+        [
+          2304,
+          2431
+        ],
+        [
+          8204,
+          8205
+        ]
+      ],
+      "license": "OFL-1.1",
+      "upstream": "https://github.com/notofonts/noto-fonts"
+    }
+  ],
+  "outputs": {
+    "Arabic.ttf": "b0bcc9c647ce0e56fee896dc92a056ba1e5182a76f81d9a2b4d82e9fa7c41a95",
+    "Devanagari.ttf": "f9d5791d39b1c558f77cd44155669a9f741c4271fd427902a6565749053d790f",
+    "RusticCFF2Test.otf": "97cd23cd964a02781e1db944c169a688ea213892aac18a958024747e0431d703",
+    "RusticCFFTest.otf": "bca65a421eeb30287dcdc89a2442b5040b0bd6c0e6def97d08b57ab2f4845955",
+    "RusticCFFTest.woff": "3e2b1b9b51826fcffe25000a07132feeac3ddc30579dd3a9447760498a5d9d1d",
+    "RusticCFFTest.woff2": "2c9778b574e5d94dd57dda93c2abb85f70b5c335f3a2f0346d7dedcaefa61090"
+  },
+  "notices": {
+    "OFL-LICENSE.txt": "4898b4a2368d4956ec57e42d06f9e5495b7d351cb3cb3d87cffb05dbd9b4bc96",
+    "README.md": "f00e8c2c4d827e3326db5365a9e790019769f7b21baa64f4dc22bffcefcd3a9f"
+  }
+}

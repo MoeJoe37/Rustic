@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 31.66%** = 29.95% verified complete + 1.71% partial credit. 49/172 capabilities complete, 5 in progress.
+**Overall completion: 32.72%** = 32.50% verified complete + 0.22% partial credit. 53/172 capabilities complete, 1 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `b587d9e858728398b9dbad3f6a1d97d75b220878e1b4da2714a9484a8672d718`.
+Catalog: `engine-v3`. Source fingerprint: `9f15c1594f526eeb743f23af0e50735d75fa92c0ea596db5edf8114bdcc59824`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -12,7 +12,7 @@ Catalog: `engine-v3`. Source fingerprint: `b587d9e858728398b9dbad3f6a1d97d75b220
 | --- | --- | --- | --- | --- |
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
-| M3 Static renderer | 13/17 | 91.32% | 79.18% | 12.22% |
+| M3 Static renderer | 17/17 | 100.00% | 100.00% | 12.22% |
 | M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
@@ -30,7 +30,7 @@ Catalog: `engine-v3`. Source fingerprint: `b587d9e858728398b9dbad3f6a1d97d75b220
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 6% | 3.39 |
 | HTML | 9/10 | 0 | 89.65% | 89.65% | 6% | 5.37 |
 | CSS & style | 8/8 | 0 | 100.00% | 100.00% | 9% | 9.00 |
-| Text & fonts | 0/6 | 4 | 37.12% | 0.00% | 4% | 1.48 |
+| Text & fonts | 4/6 | 0 | 63.63% | 63.63% | 4% | 2.54 |
 | Layout | 6/10 | 0 | 56.52% | 56.52% | 9% | 5.08 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 6% | 4.22 |
 | JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
@@ -120,24 +120,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Text & fonts
 
-- **in progress 75.00%** `text.fonts` — Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts · size 3 · M3 · 0.54% of engine
-  - [x] Bounds-checked TrueType sfnt parsing: tables, cmap and glyf outlines ([source](../../crates/rustic-text/src/face.rs), [source](../../crates/rustic-text/src/glyf.rs), [test](../../crates/rustic-text/tests/fonts.rs), [test](../../crates/rustic-text/tests/fonts.rs), [test](../../crates/rustic-text/tests/fonts.rs))
-  - [x] CSS face matching by family, stretch, style and weight ([source](../../crates/rustic-text/src/database.rs), [test](../../crates/rustic-text/tests/fonts.rs))
-  - [x] Computed ex/ch/cap/ic from the first available font's metrics ([source](../../crates/rustic-style/src/fonts.rs), [test](../../crates/rustic-style/tests/fonts.rs), [test](../../crates/rustic-style/tests/fonts.rs))
-  - [ ] System font discovery and CFF/WOFF formats
-- **in progress 33.33%** `text.shaping` — Shaping, fallback and glyph clusters · size 5 · M3 · 0.90% of engine
-  - [x] Grapheme clusters, per-cluster font fallback, advances, mirroring and spacing ([source](../../crates/rustic-text/src/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [test](../../crates/rustic-text/tests/shape.rs))
-  - [ ] OpenType GSUB/GPOS: ligatures, kerning and mark positioning
-  - [ ] Complex scripts (Arabic joining, Indic reordering)
-- **in progress 66.66%** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.54% of engine
-  - [x] UAX #9 levels, brackets and line reordering (Unicode 17) ([source](../../crates/rustic-text/src/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs))
-  - [x] Mixed-direction line fragments in layout ([source](../../crates/rustic-layout/src/lines.rs), [test](../../crates/rustic-layout/tests/inline.rs))
-  - [ ] unicode-bidi embeddings and isolates on inline boxes
-- **in progress 75.00%** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.54% of engine
-  - [x] UAX #14 line break opportunities (Unicode 17, untailored) ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs))
-  - [x] UAX #29 extended grapheme clusters ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs))
-  - [x] CSS white-space and soft wrapping applied in line layout ([source](../../crates/rustic-layout/src/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs))
-  - [ ] CSS line-break, word-break, overflow-wrap and hyphens tailoring
+- **complete** `text.fonts` — Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts · size 3 · M3 · 0.54% of engine ([source](../../crates/rustic-text/src/face.rs), [source](../../crates/rustic-text/src/glyf.rs), [test](../../crates/rustic-text/tests/fonts.rs), [test](../../crates/rustic-text/tests/fonts.rs), [test](../../crates/rustic-text/tests/fonts.rs), [source](../../crates/rustic-text/src/database.rs), [test](../../crates/rustic-text/tests/fonts.rs), [source](../../crates/rustic-style/src/fonts.rs), [test](../../crates/rustic-style/tests/fonts.rs), [test](../../crates/rustic-style/tests/fonts.rs), [source](../../crates/rustic-text/src/discovery.rs), [source](../../crates/rustic-text/src/containers.rs), [source](../../crates/rustic-text/src/cff.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs))
+- **complete** `text.shaping` — Shaping, fallback and glyph clusters · size 5 · M3 · 0.90% of engine ([source](../../crates/rustic-text/src/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/shaping_reference.rs))
+- **complete** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.54% of engine ([source](../../crates/rustic-text/src/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [source](../../crates/rustic-layout/src/lines.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-text/src/bidi.rs), [source](../../crates/rustic-layout/src/inline.rs), [test](../../crates/rustic-text/tests/scopes.rs), [test](../../crates/rustic-layout/tests/text_policies.rs))
+- **complete** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.54% of engine ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs), [source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs), [source](../../crates/rustic-layout/src/tailoring.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-text/src/hyphen.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs))
 - **planned** `text.writing` — Writing modes, vertical text and font loading · size 5 · M9 · 0.90% of engine
 - **planned** `text.conformance` — Text/font conformance and platform parity · size 3 · M9 · 0.54% of engine
 

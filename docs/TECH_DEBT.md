@@ -89,15 +89,15 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
 | TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
 | TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
-| TD-42 | Deliberate | Text | TrueType-only font adapter without discovery, shaping or CFF/WOFF | Open, REN-03 |
+| TD-42 | Deliberate | Text | CFF/WOFF and discovery paid; advanced fonts/native services remain (TD-85) | Partly paid, REN-03 |
 | TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Open, REN-03 |
 | TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
 | TD-46 | Deliberate | Paint | Opacity groups allocate a full surface each instead of their bounds | Open |
-| TD-47 | Deliberate | Text | Untailored UAX #14/#29 segmentation and bidi without L3 | Open, REN-03b |
+| TD-47 | Deliberate | Text | CSS policies and bidi scopes paid; locale resources/full text conformance remain (TD-87) | Partly paid |
 | TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
-| TD-50 | Deliberate | Layout | First inline layout: no OpenType shaping, approximations (atomic inlines paid, TD-70) | Open, REN-03b |
+| TD-50 | Deliberate | Layout | OpenType/complex scripts paid; cross-source ligatures/break reshaping remain (TD-86) | Partly paid |
 | TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
 | TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting, system fonts or exact nonzero fill | Open, REN-04c |
 | TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
@@ -116,6 +116,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-82 | Deliberate | Paint | Animated GIF/WebP decode every frame but paint only the first | Open, paint.images |
 | TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Open, paint.images |
 | TD-84 | Deliberate | Codecs | Decoder speed: bit-serial VP8L/JPEG slow paths, per-pixel loops; simple VP8 filter and multi-partition frames lack reference images | Open, paint.images |
+| TD-85 | Deliberate | Fonts | Backend caches, temporary memory and native/advanced font services | Open, M8/M9 |
+| TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
+| TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -709,6 +712,8 @@ that compare with other engines, or output size in CI artifacts.
 
 ### TD-42 — TrueType-only font adapter
 
+**2026-11-10 update:** CFF/CFF2, WOFF1/2 and deterministic bounded host-granted discovery are now implemented. The remaining advanced formats and native services are tracked by TD-85. The original entry below is retained for history.
+
 REN-03a's `rustic-text` parses `glyf`-flavored sfnt fonts only. CFF/CFF2
 (`OTTO`), collections (`ttcf`), WOFF/WOFF2, variable fonts, hinting, shaping
 tables (GSUB/GPOS/kern), color/bitmap glyphs, vertical metrics and system font
@@ -796,6 +801,8 @@ color). **Trigger:** pages with many small translucent boxes, or tiled raster.
 
 ### TD-47 — Untailored segmentation and bidi
 
+**2026-11-10 update:** CSS Text 3 policies, language-aware English hyphenation and CSS bidi scopes are now implemented. Remaining locale and conformance work is tracked by TD-87. The original entry below is retained for history.
+
 REN-03b's `segment` and `bidi` modules implement the default Unicode 17
 algorithms only. CSS `line-break`, `word-break`, `overflow-wrap` and
 `hyphens` tailorings, dictionary-based breaking for `SA` scripts (Thai, Lao,
@@ -842,6 +849,8 @@ css-sizing WPT directories. **Trigger:** REN-03 line boxes, layout-WPT
 import, or a fuzz finding that hits the work budget through nested flex.
 
 ### TD-50 — First inline layout slice
+
+**2026-11-10 update:** GSUB/GPOS/kern, Arabic/Indic shaping and positioned marks are now implemented. Cross-source and selected-break refinements are tracked by TD-86. The original entry below is retained for history.
 
 REN-03b's shaper and line layout cover the common Latin/RTL cases and refuse
 or approximate the rest:
@@ -1162,3 +1171,52 @@ fuzz target still exercises both). **Pay:** table-driven Huffman lookup,
 a separable fast IDCT with the same rounding, and reference images made
 with `cwebp -f`/`-partitions` outside the repository. **Trigger:** decode
 time showing in render profiles, or a mismatch report.
+
+### TD-85 — Font adapter memory and platform services
+
+The three reviewed font libraries are bounded at Rustic's input, decoded table,
+outline output and shaping run boundaries. Their temporary allocations and lazy
+caches are not charged to one global memory quota. Local discovery checks
+symlinks and sorts host-granted roots, but native font services, per-user/configured
+font directories, collection enumeration, variations, hinting and color glyph
+painting remain outside this slice. Native paths are suggestions, not a universal
+OS font database. A host-mutated directory can race portable metadata/open checks;
+production brokered discovery needs platform handle-based traversal.
+
+Pay before loading arbitrary remote fonts or native platform font integration:
+add global temporary/cache accounting, native service adapters and native device
+acceptance. The current host grants local files explicitly; neither shaping nor
+layout performs I/O or downloads fonts.
+
+### TD-86 — Shaping across source boundaries and selected breaks
+
+Joining context crosses text/style-node boundaries (up to the backend's eight
+neighboring scalars), but optional ligatures are not formed across separate
+source nodes. Very long unbroken shaping runs over 4,096 scalars fail explicitly;
+longer text splits only at existing soft-break opportunities. Output clusters
+may span original graphemes for required or optional ligatures. A discretionary
+point inside such a ligature is not exposed, and kerning/optional ligatures are
+not reshaped around the finally selected line break. General caret maps and
+advanced cursive justification are still pending. These are observable limits,
+not proof of full text conformance.
+
+Pay with a source-aware paragraph shaping cache, safe-to-break glyph metadata,
+selected-break reshaping and carets; validate with broader shaping/layout corpora
+and independent native comparisons under the existing M9 text conformance gate.
+
+### TD-87 — Language resources and Level 4 text policies
+
+Automatic hyphenation ships pinned English/US patterns, with two characters
+left and three right, only for declared `en`/`en-US` and ASCII words up to 256
+characters. Unknown/unsupported languages are not guessed. Explicit soft hyphens
+suppress other automatic points in that word; the optional second pass allowing
+automatic points when the remainder still overflows is not implemented.
+Dictionary/phrase breaking for SA scripts and broader language spelling changes
+remain pending. CSS Text 3 CJK required distinctions are implemented; `auto`
+chooses the normal policy. Level 4 `word-break:auto-phrase` parses but fails
+layout explicitly until phrase resources exist; `manual` uses available untailored
+opportunities without language dictionaries. No full CSS Text WPT pass is claimed.
+
+Pay with reviewed locale resources, SA/phrase segmenters, language-specific
+hyphen replacement models and the M9 text conformance suites. Keep licenses,
+source revisions and bounded work/output accounting for each added resource.

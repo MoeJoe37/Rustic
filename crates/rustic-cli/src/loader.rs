@@ -369,7 +369,9 @@ fn compute_styles(
     let compute = ComputeContext {
         viewport_width: width,
         viewport_height: height,
-        ..ComputeContext::default()
+        ..crate::fonts::explicit().map_or_else(ComputeContext::default, |fonts| {
+            ComputeContext::with_fonts(fonts)
+        })
     };
     let mut cx = MatchContext::html();
     cx.quirks = parsed.mode() == DocumentMode::Quirks;
@@ -453,8 +455,7 @@ pub fn dump_layout(
 /// with every generic family and the fallback mapped to them. No system
 /// fonts are read.
 fn fonts() -> &'static rustic_text::FontDatabase {
-    static FONTS: std::sync::OnceLock<rustic_text::FontDatabase> = std::sync::OnceLock::new();
-    FONTS.get_or_init(rustic_text::bundled::test_database)
+    crate::fonts::database()
 }
 
 fn block_layout(

@@ -118,3 +118,22 @@ small reliable conformance set. Add heavy conformance/fuzz/sanitizer jobs on a
 schedule when their harnesses exist. Artifacts need bounded sizes/retention and
 must not include profiles or credentials. A green initial CI means the scaffold
 works; it says nothing about browser compatibility or sandbox correctness.
+
+
+## M3 text completion evidence
+
+Font tests cover CFF/CFF2/WOFF equivalence, GSUB/GPOS, Arabic/Indic, source
+clusters, bounds, cancellation, discovery atomicity and hostile inputs. Ten
+layout policy tests exercise CJK distinctions, bidi scopes, emergency intrinsic
+sizes, selected hyphens, language inheritance, cross-node Arabic and absolute
+mark positions. CLI tests compare CFF/WOFF2 rendered PNG bytes and computed ex.
+Thirty committed native HarfBuzz 10.2.0 glyph/position cases run offline in Rust;
+regenerate or independently verify with `tools/compare_shaping.py` after building
+`shape_font`. Native HarfBuzz is not a runtime dependency. Unicode 17 tests and
+source pins remain unchanged apart from adding the ambiguous-width table.
+
+The 17th mutation target, `text-shaping`, checks contiguous source/grapheme
+partitions, valid face/glyph IDs and finite positions. `text-sfnt` also mutates
+CFF/web wrappers and invokes shaping on accepted mutated layout tables. Required
+local checks include `cargo deny --locked check advisories licenses bans sources`.
+Native platform runtime acceptance and complete CSS Text WPT remain open gates.

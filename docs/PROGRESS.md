@@ -209,3 +209,16 @@ commit SHAs are embedded: the source fingerprint identifies the exact content
 snapshot while avoiding an endless update loop. Publication tests exercise a
 local bare Git remote to verify changed/unchanged updates, CI dispatch, exclusion
 of unrelated files and protection against a newer source head.
+
+## REN-03 completion (2026-11-10)
+
+Four remaining M3 text capabilities complete with format/discovery,
+OpenType/complex-script, scoped bidi and CSS wrapping/hyphenation evidence.
+Their step evidence is retained in completed capability evidence, following prior
+completion commits. The `engine-v3` scope, all 172 identities/sizes/milestones and
+21 weights remain unchanged. M3 becomes **17/17, 100.00%**, and whole-engine
+progress **32.72%** (32.50% verified + 0.22% partial). See the
+[completion review](reviews/2026-11-10-m3-completion.md) for sandbox evidence and
+TD-85/86/87. Native acceptance and broader standards conformance remain in their
+existing later catalog gates. Generated outputs still come only from
+`tools/progress.py --write`.

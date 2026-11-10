@@ -12,21 +12,27 @@
 //! opportunities, and [`bidi`] the UAX #9 bidi algorithm, from generated
 //! Unicode 17.0.0 tables ([`unicode`]); see docs/TEXT.md.
 //!
-//! CFF/CFF2 outlines, font collections, WOFF/WOFF2, variations, hinting,
-//! shaping (GSUB/GPOS/kern) and system font discovery are not implemented
-//! here (TD-42); segmentation is untailored (TD-47).
+//! CFF/CFF2 and WOFF formats and OpenType shaping use reviewed low-level
+//! adapters (ADR 0014). Discovery is explicit host-granted local I/O. See
+//! docs/TEXT.md and TD-85/86/87 for limits and remaining native/font scope.
 
 #![warn(missing_docs)]
 
 pub mod bidi;
 pub mod bundled;
+mod cff;
 mod cmap;
+mod containers;
+mod discovery;
+pub mod hyphen;
+pub use discovery::{DiscoveryError, DiscoveryLimits, DiscoveryReport, system_font_roots};
 mod database;
 mod error;
 mod face;
 mod glyf;
 mod metrics;
 mod reader;
+mod scopes;
 pub mod segment;
 pub mod shape;
 pub mod unicode;

@@ -154,6 +154,7 @@ def generate_tables(text: dict[str, str]) -> tuple[str, dict]:
 
     lb_runs = idna.ranges(line_break, lambda value: value != "XX")
     east_asian_runs = idna.ranges([value in ("F", "W", "H") for value in east_asian], bool)
+    ambiguous_runs = idna.ranges([value == "A" for value in east_asian], bool)
     pictographic_unassigned = idna.ranges(
         [pictographic[code] and gc(code) == "Cn" for code in range(MAX_CODE_POINT + 1)], bool)
     pictographic_runs = idna.ranges(pictographic, bool)
@@ -195,6 +196,7 @@ def generate_tables(text: dict[str, str]) -> tuple[str, dict]:
     out += range_table("LINE_BREAK", "(u32, u32, Lb)", lb_runs,
                        lambda r: f"(0x{r[0]:X}, 0x{r[1]:X}, Lb::{variant(r[2])})")
     out += range_table("EAST_ASIAN_FWH", "(u32, u32)", east_asian_runs, span)
+    out += range_table("EAST_ASIAN_A", "(u32, u32)", ambiguous_runs, span)
     out += range_table("EXTENDED_PICTOGRAPHIC", "(u32, u32)", pictographic_runs, span)
     out += range_table("PICTOGRAPHIC_UNASSIGNED", "(u32, u32)", pictographic_unassigned, span)
     out += range_table("SA_MARKS", "(u32, u32)", sa_marks, span)

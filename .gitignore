@@ -10,6 +10,6 @@ __pycache__/
 /.vscode/
 
 # Python packages downloaded for helper scripts (e.g. Pillow for
-# tools/pngsuite_reference.py) must never be committed; Rustic has no
-# third-party dependencies.
+# tools/pngsuite_reference.py) must never be committed; reviewed runtime
+# dependencies are pinned through Cargo.lock and third_party/rust-dependencies.json.
 *.whl

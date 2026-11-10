@@ -812,3 +812,50 @@ fn render_lays_the_page_out_again_for_the_window_and_zoom() {
     }
     fs::remove_dir_all(&base).unwrap();
 }
+
+#[test]
+fn explicit_font_formats_feed_computed_metrics_and_identical_pixels() {
+    let dir = std::env::temp_dir().join(format!("rustic-cli-fonts-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir(&dir).unwrap();
+    let input = dir.join("fonts.html");
+    fs::write(
+        &input,
+        "<!doctype html><style>*{margin:0;font-size:10px}p{width:2ex}</style><p>fiAVx</p>",
+    )
+    .unwrap();
+    let font_root =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../rustic-text/tests/fonts/shaping");
+    let input = input.to_str().unwrap();
+    let mut pngs = Vec::new();
+    for name in ["RusticCFFTest.otf", "RusticCFFTest.woff2"] {
+        let font = font_root.join(name);
+        let font = font.to_str().unwrap();
+        let styles = rustic(&["dump-style", "--font", font, input]);
+        assert!(styles.status.success(), "{}", stderr(&styles));
+        assert!(String::from_utf8_lossy(&styles.stdout).contains("width: 10px"));
+        let output = dir.join(format!("{name}.png"));
+        let rendered = rustic(&[
+            "render",
+            "--font",
+            font,
+            "--viewport",
+            "40x30",
+            "--output",
+            output.to_str().unwrap(),
+            input,
+        ]);
+        assert!(rendered.status.success(), "{}", stderr(&rendered));
+        pngs.push(fs::read(output).unwrap());
+    }
+    assert_eq!(pngs[0], pngs[1]);
+    for args in [
+        vec!["render", "--font"],
+        vec!["dump-style", "--font", input, input],
+    ] {
+        let failed = rustic(&args);
+        assert!(!failed.status.success());
+        assert!(failed.stdout.is_empty());
+    }
+    fs::remove_dir_all(dir).unwrap();
+}

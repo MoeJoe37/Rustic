@@ -157,3 +157,17 @@ fn right_to_left_runs_try_mirrored_glyphs_first() {
         shape(&db, &[REGULAR], &chars("x"), &options()).unwrap()[0].glyphs[0].glyph
     );
 }
+
+#[test]
+fn invisible_controls_never_become_visible_notdef_glyphs() {
+    let db = test_database();
+    for c in ['\0', '\t', '\n', '\u{7F}', '\u{85}', '\u{2028}', '\u{2029}'] {
+        let out = shape(&db, &[REGULAR], &[c, 'x', c], &options()).unwrap();
+        assert_eq!(
+            out.iter().map(|c| c.glyphs.len()).sum::<usize>(),
+            1,
+            "U+{:04X}",
+            u32::from(c)
+        );
+    }
+}

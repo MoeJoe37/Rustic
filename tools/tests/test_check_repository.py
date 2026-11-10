@@ -1,5 +1,7 @@
 from pathlib import Path
 import sys
+import json
+import hashlib
 import tempfile
 import unittest
 
@@ -55,6 +57,26 @@ class DebtGuardrailTests(unittest.TestCase):
         self.assertIn("'libc'", joined)
         self.assertIn("lockfile contains external package 'serde'", joined)
         self.assertNotIn("'local'", joined)
+
+    def test_reviewed_dependency_features_checksums_and_notices_are_exact(self):
+        self.write("Cargo.toml", '[workspace]\nmembers = ["a"]\n')
+        self.write("a/Cargo.toml", '[dependencies]\nfont = { version = "=1.0.0", default-features = false, features = ["std"] }\n')
+        lock = 'version = 4\n[[package]]\nname = "font"\nversion = "1.0.0"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "abc"\n'
+        self.write("Cargo.lock", lock)
+        self.write("docs/adr/review.md", "Reviewed font adapter\n")
+        notice = self.write("third_party/licenses/font.txt", "MIT notice\n")
+        review = {"decision": "docs/adr/review.md", "direct": {"a:font": {"version": "=1.0.0", "default-features": False, "features": ["std"]}}, "packages": [{"name": "font", "version": "1.0.0", "source": "registry+https://github.com/rust-lang/crates.io-index", "checksum": "abc", "notices": {"third_party/licenses/font.txt": hashlib.sha256(notice.read_bytes()).hexdigest()}}]}
+        self.write("third_party/rust-dependencies.json", json.dumps(review))
+        check_repository.check_dependencies(["a"])
+        self.assertEqual(check_repository.ERRORS, [])
+        self.write("a/Cargo.toml", '[dependencies]\nfont = { version = "=1.0.0", features = ["unsafe"] }\n')
+        self.write("Cargo.lock", lock.replace('checksum = "abc"', 'checksum = "changed"'))
+        notice.write_text("changed notice\n")
+        check_repository.check_dependencies(["a"])
+        joined = "\n".join(check_repository.ERRORS)
+        self.assertIn("license notice digest changed", joined)
+        self.assertIn("exact reviewed entry", joined)
+        self.assertIn("without exact reviewed source/checksum", joined)
 
     def test_every_workflow_uses_the_pinned_toolchain(self):
         self.write(".github/workflows/ci.yml", 'env:\n  RUST_VERSION: "1.99.1"\n')

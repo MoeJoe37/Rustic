@@ -8,6 +8,7 @@
 //! Mirroring (L4) is exposed through [`crate::unicode::mirrored`]; L3
 //! (combining marks) is not applied.
 
+pub use crate::scopes::{BidiScope, ScopeError, ScopeStyle};
 use std::ops::Range;
 
 use crate::unicode::{BidiClass, bidi_class, paired_bracket};
@@ -120,6 +121,30 @@ impl BidiInfo {
     pub fn new(text: &[char], base: Option<Level>) -> Self {
         let classes: Vec<BidiClass> = text.iter().map(|&c| bidi_class(c)).collect();
         Self::resolve(classes, Some(text), base)
+    }
+
+    /// Resolve CSS scopes without changing original source character indexes.
+    pub fn with_scopes(
+        text: &[char],
+        base: Option<Level>,
+        scopes: &[BidiScope],
+    ) -> Result<Self, ScopeError> {
+        let resolved = crate::scopes::resolve(text, base, scopes)?;
+        Ok(Self {
+            classes: text.iter().copied().map(bidi_class).collect(),
+            levels: resolved
+                .indexes
+                .iter()
+                .map(|&i| resolved.info.levels[i])
+                .collect(),
+            removed: text
+                .iter()
+                .copied()
+                .map(bidi_class)
+                .map(removed_by_x9)
+                .collect(),
+            paragraphs: resolved.paragraphs,
+        })
     }
 
     /// Resolve a sequence of classes (no bracket pairs, as in BidiTest.txt).

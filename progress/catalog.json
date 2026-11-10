@@ -2424,36 +2424,42 @@
           "label": "Hit testing and resize/zoom geometry",
           "size": 2,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "hit",
-              "label": "Paint-order hit testing with clips and visibility",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "pub fn hit_test"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn hit_testing_follows_paint_order_clips_and_visibility"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn hit_test_reports_the_topmost_box_at_each_point"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "pub fn hit_test"
             },
             {
-              "id": "resize",
-              "label": "Viewport resize and zoom relayout",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn hit_testing_follows_paint_order_clips_and_visibility"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn hit_test_reports_the_topmost_box_at_each_point"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/geometry.rs",
+              "marker": "pub struct View"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "cascade.set_environment(environment)"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn resizing_and_zooming_relayout_paint_and_hit_test_through_the_view"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn render_lays_the_page_out_again_for_the_window_and_zoom"
             }
           ]
         },

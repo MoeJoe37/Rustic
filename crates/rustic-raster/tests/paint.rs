@@ -1580,3 +1580,70 @@ fn damaged_tiles_repaint_to_exactly_the_new_surface() {
         }
     }
 }
+
+#[test]
+fn resizing_and_zooming_relayout_paint_and_hit_test_through_the_view() {
+    use rustic_layout::View;
+    let css = format!("{RESET} #a {{ width: 50%; height: 20px; background: red }}");
+    // Lay out and paint `view`; return the device pixel and the box at a
+    // device point of the window.
+    let probe = |view: View, x: f64, y: f64| {
+        let viewport = view.viewport();
+        let p = page(
+            "<div id=a></div>",
+            &css,
+            viewport.width().get(),
+            viewport.height().get(),
+        );
+        let list = p.list().unwrap();
+        let surface = rasterize(
+            &list,
+            view.scale(),
+            RasterLimits::default(),
+            &CancellationToken::default(),
+        )
+        .unwrap();
+        let point = view.to_css(x, y).unwrap();
+        let found = hit(&p, &list, point.x.get(), point.y.get());
+        let pixel = surface.pixel(x as u32, y as u32).unwrap();
+        ((surface.width(), surface.height()), pixel, found)
+    };
+    let red = rgb(255, 0, 0);
+    let white = rgb(255, 255, 255);
+    let view = View::new(400.0, 100.0, 1.0, 1.0).unwrap();
+    assert_eq!(
+        probe(view, 150.0, 10.0),
+        ((400, 100), red, Some("a".into()))
+    );
+    assert_eq!(
+        probe(view, 250.0, 10.0),
+        ((400, 100), white, Some("body".into()))
+    );
+    // Narrowing the window reflows the percentage width.
+    let narrow = view.resized(200.0, 100.0).unwrap();
+    assert_eq!(
+        probe(narrow, 150.0, 10.0),
+        ((200, 100), white, Some("body".into()))
+    );
+    // At 200% the viewport is half the window and everything paints twice
+    // as large: the box is 100 CSS pixels, 200 device pixels, 40 tall.
+    let zoomed = view.zoomed(2.0).unwrap();
+    assert_eq!(zoomed.viewport().width().get(), 200.0);
+    assert_eq!(
+        probe(zoomed, 150.0, 30.0),
+        ((400, 100), red, Some("a".into()))
+    );
+    assert_eq!(
+        probe(zoomed, 150.0, 41.0),
+        ((400, 100), white, Some("html".into()))
+    );
+    // A device pixel ratio composes with zoom, and an odd zoom's surface is
+    // still the window times the ratio.
+    let dense = View::new(400.0, 100.0, 1.5, 1.1).unwrap();
+    assert_eq!(probe(dense, 10.0, 10.0).0, (600, 150));
+    // Out-of-range views are refused.
+    assert!(View::new(400.0, 100.0, 1.0, 6.0).is_err());
+    assert!(View::new(400.0, 100.0, 1.0, 0.2).is_err());
+    assert!(View::new(0.0, 100.0, 1.0, 1.0).is_err());
+    assert!(View::new(400.0, 100.0, 40.0, 2.0).is_err());
+}

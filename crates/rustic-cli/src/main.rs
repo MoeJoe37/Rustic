@@ -25,8 +25,8 @@ Usage:
   rustic dump-formatting [OPTIONS] [--] <file>
   rustic dump-layout [OPTIONS] [--] <file>
   rustic dump-paint [OPTIONS] [--] <file>
-  rustic render --output <png> [--scale N] [OPTIONS] [--] <file>
-  rustic reftest [--scale N] [OPTIONS] [--] <test>
+  rustic render --output <png> [VIEW] [OPTIONS] [--] <file>
+  rustic reftest [VIEW] [OPTIONS] [--] <test>
   rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
   rustic --help | --version
 
@@ -53,8 +53,11 @@ clips and opacity groups, and block-level <img> content. Layout and paint use
 the bundled test fonts only; <img src> loads local PNG files from the
 document's directory or below it, like stylesheets.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
---output (overwriting it). --scale sets device pixels per CSS pixel (default 1,
-at most 64). Images and non-solid borders fail explicitly; the
+--output (overwriting it). VIEW options set the window: --viewport WxH is its
+size in pixels at 100% zoom (default 1280x720), --scale the device pixel ratio
+(default 1) and --zoom the page zoom (0.25 to 5, default 1). Zoom lays the page
+out in a viewport of the window over the zoom and paints it at scale times
+zoom (at most 64), so the PNG is the window size times the scale. Images and non-solid borders fail explicitly; the
 PNG counts against --max-output-bytes.
 reftest renders a test page and every <link rel=match|mismatch href> reference
 the same way and compares the pixels, allowing the differences that
@@ -222,18 +225,18 @@ fn load<T>(
     }
 }
 
-/// Arguments of the rendering commands: `--output`, `--scale` and the dump
-/// options and file path.
+/// Arguments of the rendering commands: `--output`, the view options
+/// (`--viewport`, `--scale`, `--zoom`) and the dump options and file path.
 struct RenderArgs {
     output: Option<OsString>,
-    scale: rustic_layout::DeviceScale,
+    view: rustic_layout::View,
     limits: LoaderLimits,
     path: OsString,
 }
 
 fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     let mut output = None;
-    let mut scale = 1.0;
+    let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -253,15 +256,37 @@ fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
                     .and_then(|v| v.parse::<f64>().ok())
                     .ok_or("--scale requires a number")?;
             }
+            Some("--zoom") => {
+                zoom = iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .ok_or("--zoom requires a number")?;
+            }
+            Some("--viewport") => {
+                window = iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.split_once('x'))
+                    .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
+                    .filter(|&(w, h)| (1..=16_384).contains(&w) && (1..=16_384).contains(&h))
+                    .map(|(w, h)| (f64::from(w), f64::from(h)))
+                    .ok_or("--viewport requires WxH with each side from 1 to 16384")?;
+            }
             _ => rest.push(arg.clone()),
         }
     }
-    let scale = rustic_layout::DeviceScale::new(scale)
+    rustic_layout::DeviceScale::new(scale)
         .map_err(|_| "--scale must be greater than 0 and at most 64")?;
+    if !(rustic_layout::View::MIN_ZOOM..=rustic_layout::View::MAX_ZOOM).contains(&zoom) {
+        return Err("--zoom must be from 0.25 to 5".into());
+    }
+    let view = rustic_layout::View::new(window.0, window.1, scale, zoom)
+        .map_err(|_| "--scale times --zoom must be at most 64")?;
     let (limits, path) = parse_dump_args(&rest)?;
     Ok(RenderArgs {
         output,
-        scale,
+        view,
         limits,
         path,
     })
@@ -279,9 +304,9 @@ fn render_command(args: &[OsString]) -> ExitCode {
     let Some(output) = args.output else {
         return usage("missing --output".into());
     };
-    let (limits, scale) = (args.limits, args.scale);
+    let (limits, view) = (args.limits, args.view);
     let png = match load("render", limits, &args.path, |parsed, path| {
-        loader::render_png(parsed, path, limits, scale)
+        loader::render_png(parsed, path, limits, view)
     }) {
         Ok(png) => png,
         Err(code) => return code,
@@ -350,10 +375,10 @@ fn reftest_command(args: &[OsString]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let (limits, scale) = (args.limits, args.scale);
+    let (limits, view) = (args.limits, args.view);
     let loaded = load("reftest", limits, &args.path, |parsed, path| {
         let test = std::fs::canonicalize(path).map_err(loader::LoadError::Io)?;
-        let rendered = loader::render_list(parsed, path, limits, scale)?;
+        let rendered = loader::render_list(parsed, path, limits, view)?;
         Ok((rendered, reftest::manifest(parsed.document(), &test)))
     });
     let (rendered, manifest) = match loaded {
@@ -377,10 +402,10 @@ fn reftest_command(args: &[OsString]) -> ExitCode {
         let detail = match &reference.path {
             Err(reason) => Err((*reason).to_owned()),
             Ok(path) => load("reftest", limits, path.as_os_str(), |parsed, path| {
-                let other = loader::render_list(parsed, path, limits, scale)?;
+                let other = loader::render_list(parsed, path, limits, view)?;
                 // Paint conformance for damage: repainting what changed
                 // from the reference to the test gives the test exactly.
-                let exact = loader::damage_repaints_exactly(&other, &rendered, scale)?;
+                let exact = loader::damage_repaints_exactly(&other, &rendered, view.scale())?;
                 Ok((other.1, exact))
             })
             .map_err(|_| "failed to render".to_owned()),

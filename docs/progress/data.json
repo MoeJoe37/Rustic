@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "77407ad1c6ac27db27a13f3b6605c0d4baedb8f5c76dc69f15cc42a29a4a7adc",
-  "percent": "29.09",
-  "verified_percent": "23.25",
-  "partial_percent": "5.84",
-  "completed": 40,
-  "in_progress": 13,
+  "source_fingerprint": "9d4729eb95b1034a4e8c36c7621c0561f307857680d44d51d929ebe313e9345b",
+  "percent": "29.31",
+  "verified_percent": "23.69",
+  "partial_percent": "5.62",
+  "completed": 41,
+  "in_progress": 12,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -35,11 +35,11 @@
       "id": "M3",
       "label": "Static renderer",
       "share": "12.22",
-      "completed": 4,
+      "completed": 5,
       "total": 17,
-      "percent": "70.33",
-      "verified_percent": "24.35",
-      "partial_percent": "45.98"
+      "percent": "72.15",
+      "verified_percent": "27.98",
+      "partial_percent": "44.17"
     },
     {
       "id": "M4",
@@ -2684,39 +2684,45 @@
           "label": "Hit testing and resize/zoom geometry",
           "size": 2,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "hit",
-              "label": "Paint-order hit testing with clips and visibility",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "pub fn hit_test"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn hit_testing_follows_paint_order_clips_and_visibility"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn hit_test_reports_the_topmost_box_at_each_point"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "pub fn hit_test"
             },
             {
-              "id": "resize",
-              "label": "Viewport resize and zoom relayout",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn hit_testing_follows_paint_order_clips_and_visibility"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn hit_test_reports_the_topmost_box_at_each_point"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/geometry.rs",
+              "marker": "pub struct View"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "cascade.set_environment(environment)"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn resizing_and_zooming_relayout_paint_and_hit_test_through_the_view"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn render_lays_the_page_out_again_for_the_window_and_zoom"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.44"
         },
         {
@@ -2792,13 +2798,13 @@
         }
       ],
       "points": 27,
-      "completed": 3,
-      "in_progress": 3,
+      "completed": 4,
+      "in_progress": 2,
       "total": 7,
-      "contribution": "3.48",
-      "percent": "58.02",
-      "verified_percent": "33.33",
-      "partial_percent": "24.69"
+      "contribution": "3.70",
+      "percent": "61.72",
+      "verified_percent": "40.74",
+      "partial_percent": "20.98"
     },
     {
       "id": "js",

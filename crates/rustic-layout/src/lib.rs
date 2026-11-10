@@ -33,7 +33,7 @@ pub use formatting::{
     FormattingBox, FormattingError, FormattingKind, FormattingLimits, FormattingTree, InlineEdges,
 };
 pub use geometry::{
-    CssPoint, CssPx, CssRect, CssSize, DevicePx, DeviceScale, GeometryError, MAX_CSS_PX,
+    CssPoint, CssPx, CssRect, CssSize, DevicePx, DeviceScale, GeometryError, MAX_CSS_PX, View,
 };
 pub use overflow::{AxisRange, Clip};
 pub use replaced::NaturalSize;

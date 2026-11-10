@@ -1012,7 +1012,7 @@ cover it. `box-shadow` brought 78 WPT parsing cases into scope; 50 pass and
 credits its blend step. Gaps are TD-58. See
 [PAINT.md](PAINT.md#shadows-blending-and-filters).
 
-## REN-04j — Tiled raster and damage
+## REN-04j — Tiled raster, damage, resize and zoom
 
 The rasterizer paints a fixed 256-pixel tile grid, each tile in a frame
 grown by the list's filter reach, with fixed-point blur sums, so
@@ -1027,8 +1027,20 @@ transform, shadow, filtered-child, removal, filter and canvas changes at
 two scales, with shadows and blurs crossing tile seams; `rustic reftest`
 also repaints each reference into its test through damage and fails if
 the pixels differ (the paint conformance gate), and the paint fuzz target
-checks that an unchanged list reports no damage. Gaps are TD-59. See
-[PAINT.md](PAINT.md#rasterizer-rustic-raster).
+checks that an unchanged list reports no damage.
+
+`rustic_layout::View` (window size at 100% zoom, device pixel ratio, page
+zoom from 25% to 500%) drives resize and zoom: styles recompute against its
+viewport (media queries and viewport units), layout and paint rerun, and
+rasterization uses ratio × zoom; `View::to_css` maps window device points
+for hit testing. `rustic render` and `rustic reftest` take `--viewport` and
+`--zoom`. A paint test checks reflow, paint size and hits across a resize
+and a zoom, and a command-line test checks that a zoomed render equals the
+pre-zoomed page in the smaller viewport, with a media query and `vw`
+switching, and that a resize reflows. `paint.conformance` is complete and
+`paint.hit` credits its resize step. Gaps are TD-59. See
+[PAINT.md](PAINT.md#rasterizer-rustic-raster) and
+[PAINT.md](PAINT.md#resize-and-zoom).
 
 ## Queue status
 

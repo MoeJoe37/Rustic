@@ -733,3 +733,73 @@ fn images_load_locally_within_budgets_and_break_cleanly() {
     let output = rustic(&["dump-paint", "--max-images", "0", input]);
     assert_eq!(output.status.code(), Some(2));
 }
+
+#[test]
+fn render_lays_the_page_out_again_for_the_window_and_zoom() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-view-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    let write = |name: &str, html: &str| {
+        let path = base.join(name);
+        fs::write(&path, html).unwrap();
+        path
+    };
+    // Viewport units and media queries follow the layout viewport.
+    let page = write(
+        "page.html",
+        "<style>html, body { margin: 0 } div { width: 50vw; height: 10px; background: blue }
+         @media (max-width: 150px) { div { background: red } }</style><div></div>",
+    );
+    let narrow = write(
+        "narrow.html",
+        "<style>html, body { margin: 0 } div { width: 50px; height: 10px; background: red }</style><div></div>",
+    );
+    let wide = write(
+        "wide.html",
+        "<style>html, body { margin: 0 } div { width: 150px; height: 10px; background: blue }</style><div></div>",
+    );
+    let render = |input: &Path, name: &str, args: &[&str]| {
+        let out = base.join(name);
+        let mut all = vec!["render", "--output", out.to_str().unwrap()];
+        all.extend_from_slice(args);
+        all.push(input.to_str().unwrap());
+        let output = rustic(&all);
+        assert!(output.status.success(), "{}", stderr(&output));
+        fs::read(out).unwrap()
+    };
+    // A 200x100 window at 200% zoom lays out in a 100x50 viewport painted
+    // at scale 2: exactly the narrow page in that viewport at scale 2.
+    let zoomed = render(
+        &page,
+        "zoomed.png",
+        &["--viewport", "200x100", "--zoom", "2"],
+    );
+    let expected = render(
+        &narrow,
+        "narrow.png",
+        &["--viewport", "100x50", "--scale", "2"],
+    );
+    assert_eq!(zoomed, expected);
+    // IHDR: the PNG is the window size, 200x100.
+    assert_eq!(&zoomed[16..24], &[0, 0, 0, 200, 0, 0, 0, 100]);
+    // Resizing the same page to a 300-pixel window reflows it again.
+    let resized = render(&page, "resized.png", &["--viewport", "300x100"]);
+    assert_eq!(
+        resized,
+        render(&wide, "wide.png", &["--viewport", "300x100"])
+    );
+    // Out-of-range views are usage errors.
+    for args in [
+        ["--zoom", "6"],
+        ["--zoom", "x"],
+        ["--viewport", "0x10"],
+        ["--viewport", "100"],
+    ] {
+        let out = base.join("bad.png");
+        let mut all = vec!["render", "--output", out.to_str().unwrap()];
+        all.extend_from_slice(&args);
+        all.push(page.to_str().unwrap());
+        assert_eq!(rustic(&all).status.code(), Some(2), "{args:?}");
+        assert!(!out.exists());
+    }
+    fs::remove_dir_all(&base).unwrap();
+}

@@ -167,7 +167,7 @@ REN-04b paints in Appendix E order with stacking contexts, `z-index`, floats,
 positioned boxes, overflow clips and opacity groups. REN-05b adds bounded
 inflate and PNG decoding (`rustic-codecs`), and REN-07a the `rustic reftest`
 harness with a checked reftest suite; REN-06a adds paint-order hit testing
-(`rustic hit-test`); REN-04c/d paint text glyphs and decorations with the bundled fonts, REN-04e paints outlines, REN-04f rounded corners and clips, REN-04g `clip-path`, REN-04h 2D/3D transforms, REN-04i shadows, blend modes and filters, REN-04j a tiled raster with damage-limited repaint, and REN-05c paints local PNG images.
+(`rustic hit-test`); REN-04c/d paint text glyphs and decorations with the bundled fonts, REN-04e paints outlines, REN-04f rounded corners and clips, REN-04g `clip-path`, REN-04h 2D/3D transforms, REN-04i shadows, blend modes and filters, REN-04j a tiled raster with damage-limited repaint and resize/zoom relayout, and REN-05c paints local PNG images.
 OpenType shaping, inline images, resize/zoom, text decorations and the
 final general fragment tree remain pending.
 See [LAYOUT.md](LAYOUT.md) for contracts, tests and the next units.

@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 use rustic_base::CancellationToken;
 use rustic_base::EscapedText;
-use rustic_css::CssParser;
+use rustic_css::{CssParser, MediaEnvironment};
 use rustic_dom::DumpError;
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
 use rustic_style::{
@@ -290,7 +290,7 @@ pub fn dump_style(
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
     let document = parsed.document();
-    let (styles, sheets) = compute_styles(parsed, path, limits)?;
+    let (styles, sheets) = compute_styles(parsed, path, limits, default_view())?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
         let status = status_text(sheet.status);
@@ -331,6 +331,7 @@ fn compute_styles(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
+    view: rustic_layout::View,
 ) -> Result<
     (
         Vec<rustic_style::ElementStyle>,
@@ -356,20 +357,24 @@ fn compute_styles(
         None => &mut no_fetch,
     };
     let mut loader = StyleLoader::new(fetcher, limits.stylesheets);
-    let (cascade, sheets) =
+    let (mut cascade, sheets) =
         document_cascade_with(document, &parser, document_url.as_ref(), &mut loader)
             .map_err(node_error)?;
+    // Media queries and viewport units see the view's layout viewport.
+    let viewport = view.viewport();
+    let (width, height) = (viewport.width().get(), viewport.height().get());
+    let mut environment = MediaEnvironment::screen(width, height);
+    environment.resolution = view.scale().get();
+    cascade.set_environment(environment);
+    let compute = ComputeContext {
+        viewport_width: width,
+        viewport_height: height,
+        ..ComputeContext::default()
+    };
     let mut cx = MatchContext::html();
     cx.quirks = parsed.mode() == DocumentMode::Quirks;
-    let styles = style_tree(
-        document,
-        document.root(),
-        &cascade,
-        &parser,
-        &cx,
-        &ComputeContext::default(),
-    )
-    .map_err(node_error)?;
+    let styles = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)
+        .map_err(node_error)?;
     Ok((styles, sheets))
 }
 
@@ -380,7 +385,7 @@ pub fn dump_boxes(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    box_tree(parsed, path, limits)?
+    box_tree(parsed, path, limits, default_view())?
         .dump(limits.max_dump_bytes)
         .map_err(LoadError::Layout)
 }
@@ -391,7 +396,7 @@ pub fn dump_formatting(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let principal = box_tree(parsed, path, limits)?;
+    let principal = box_tree(parsed, path, limits, default_view())?;
     rustic_layout::FormattingTree::build(
         &principal,
         limits.formatting,
@@ -405,8 +410,9 @@ fn box_tree(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
+    view: rustic_layout::View,
 ) -> Result<rustic_layout::BoxTree, LoadError> {
-    let (styles, _) = compute_styles(parsed, path, limits)?;
+    let (styles, _) = compute_styles(parsed, path, limits, view)?;
     rustic_layout::BoxTree::build(
         parsed.document(),
         parsed.document().root(),
@@ -415,6 +421,12 @@ fn box_tree(
         &CancellationToken::default(),
     )
     .map_err(LoadError::Layout)
+}
+
+/// The view every dump command uses: a 1280×720 window at ratio 1 and
+/// 100% zoom.
+pub fn default_view() -> rustic_layout::View {
+    rustic_layout::View::new(1280.0, 720.0, 1.0, 1.0).expect("the default view is valid")
 }
 
 fn layout_limits(limits: LoaderLimits) -> rustic_layout::LayoutLimits {
@@ -433,7 +445,7 @@ pub fn dump_layout(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let (_, layout, _, _) = block_layout(parsed, path, limits)?;
+    let (_, layout, _, _) = block_layout(parsed, path, limits, default_view())?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
@@ -449,6 +461,7 @@ fn block_layout(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
+    view: rustic_layout::View,
 ) -> Result<
     (
         rustic_layout::BoxTree,
@@ -458,7 +471,7 @@ fn block_layout(
     ),
     LoadError,
 > {
-    let mut tree = box_tree(parsed, path, limits)?;
+    let mut tree = box_tree(parsed, path, limits, view)?;
     let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
     let images = crate::images::load(
         parsed.document(),
@@ -472,9 +485,7 @@ fn block_layout(
         tree.set_natural_sizes(&images.sizes)
             .map_err(LoadError::Layout)?;
     }
-    let compute = ComputeContext::default();
-    let viewport = rustic_layout::CssSize::new(compute.viewport_width, compute.viewport_height)
-        .map_err(|error| LoadError::Flow(error.into()))?;
+    let viewport = view.viewport();
     let layout = rustic_layout::BlockLayout::compute_with_fonts(
         &tree,
         viewport,
@@ -490,8 +501,9 @@ fn display_list(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
+    view: rustic_layout::View,
 ) -> Result<rustic_paint::DisplayList, LoadError> {
-    let (tree, layout, viewport, images) = block_layout(parsed, path, limits)?;
+    let (tree, layout, viewport, images) = block_layout(parsed, path, limits, view)?;
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),
         images: images.images,
@@ -514,7 +526,7 @@ pub fn dump_paint(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    display_list(parsed, path, limits)?
+    display_list(parsed, path, limits, default_view())?
         .dump(limits.max_dump_bytes)
         .map_err(LoadError::Paint)
 }
@@ -528,7 +540,7 @@ pub fn hit_test(
     limits: LoaderLimits,
     points: &[(f64, f64)],
 ) -> Result<String, LoadError> {
-    let list = display_list(parsed, path, limits)?;
+    let list = display_list(parsed, path, limits, default_view())?;
     let mut out = String::new();
     for &(x, y) in points {
         let point = rustic_layout::CssPx::new(x)
@@ -563,9 +575,9 @@ pub fn render_surface(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
-    scale: rustic_layout::DeviceScale,
+    view: rustic_layout::View,
 ) -> Result<rustic_raster::Surface, LoadError> {
-    render_list(parsed, path, limits, scale).map(|(_, surface)| surface)
+    render_list(parsed, path, limits, view).map(|(_, surface)| surface)
 }
 
 /// Rasterize like [`render_surface`], keeping the display list.
@@ -573,12 +585,12 @@ pub fn render_list(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
-    scale: rustic_layout::DeviceScale,
+    view: rustic_layout::View,
 ) -> Result<(rustic_paint::DisplayList, rustic_raster::Surface), LoadError> {
-    let list = display_list(parsed, path, limits)?;
+    let list = display_list(parsed, path, limits, view)?;
     let surface = rustic_raster::rasterize(
         &list,
-        scale,
+        view.scale(),
         rustic_raster::RasterLimits::default(),
         &CancellationToken::default(),
     )
@@ -617,9 +629,9 @@ pub fn render_png(
     parsed: &ParsedDocument,
     path: &Path,
     limits: LoaderLimits,
-    scale: rustic_layout::DeviceScale,
+    view: rustic_layout::View,
 ) -> Result<Vec<u8>, LoadError> {
-    let surface = render_surface(parsed, path, limits, scale)?;
+    let surface = render_surface(parsed, path, limits, view)?;
     rustic_raster::encode_png(&surface, limits.max_dump_bytes).map_err(LoadError::Png)
 }
 

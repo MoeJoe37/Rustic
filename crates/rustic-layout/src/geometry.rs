@@ -66,6 +66,100 @@ impl DeviceScale {
         }
         Ok(Self(value))
     }
+
+    /// Device pixels per CSS pixel.
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
+/// The window a page is laid out and painted in: its size in pixels at
+/// 100% zoom (CSS pixels before zoom, as `window.innerWidth` reports at
+/// 100%), the device pixel ratio and the page zoom.
+///
+/// Page zoom scales CSS pixels: the layout viewport is the window divided
+/// by the zoom, and the device scale is the ratio times the zoom, so a
+/// zoomed page reflows into a narrower viewport and paints larger. Resizing
+/// or zooming means laying the page out again with [`View::viewport`],
+/// computing styles against it first (viewport units and media queries
+/// depend on it), and painting at [`View::scale`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct View {
+    window: CssSize,
+    ratio: f64,
+    zoom: f64,
+}
+
+impl View {
+    /// The smallest page zoom accepted (25%).
+    pub const MIN_ZOOM: f64 = 0.25;
+    /// The largest page zoom accepted (500%).
+    pub const MAX_ZOOM: f64 = 5.0;
+
+    /// A view of a `width` × `height` window at `ratio` device pixels per
+    /// pixel and page `zoom`. Fails unless the window is at least one pixel
+    /// each way, the zoom is within [`Self::MIN_ZOOM`]..=[`Self::MAX_ZOOM`]
+    /// and `ratio × zoom` is a valid [`DeviceScale`].
+    pub fn new(width: f64, height: f64, ratio: f64, zoom: f64) -> Result<Self, GeometryError> {
+        if !(width >= 1.0 && height >= 1.0) || !(Self::MIN_ZOOM..=Self::MAX_ZOOM).contains(&zoom) {
+            return Err(GeometryError);
+        }
+        DeviceScale::new(ratio)?;
+        DeviceScale::new(ratio * zoom)?;
+        CssSize::new(width / zoom, height / zoom)?;
+        Ok(Self {
+            window: CssSize::new(width, height)?,
+            ratio,
+            zoom,
+        })
+    }
+
+    /// The same view with the window resized.
+    pub fn resized(self, width: f64, height: f64) -> Result<Self, GeometryError> {
+        Self::new(width, height, self.ratio, self.zoom)
+    }
+
+    /// The same view at another page zoom.
+    pub fn zoomed(self, zoom: f64) -> Result<Self, GeometryError> {
+        Self::new(
+            self.window.width.get(),
+            self.window.height.get(),
+            self.ratio,
+            zoom,
+        )
+    }
+
+    /// The window size at 100% zoom.
+    pub const fn window(self) -> CssSize {
+        self.window
+    }
+
+    /// The page zoom.
+    pub const fn zoom(self) -> f64 {
+        self.zoom
+    }
+
+    /// The layout viewport in CSS pixels: the window over the zoom.
+    pub fn viewport(self) -> CssSize {
+        CssSize {
+            width: CssPx(self.window.width.get() / self.zoom),
+            height: CssPx(self.window.height.get() / self.zoom),
+        }
+    }
+
+    /// Device pixels per CSS pixel: the device pixel ratio times the zoom.
+    pub fn scale(self) -> DeviceScale {
+        DeviceScale(self.ratio * self.zoom)
+    }
+
+    /// The CSS point under a window point given in device pixels.
+    pub fn to_css(self, device_x: f64, device_y: f64) -> Result<CssPoint, GeometryError> {
+        let scale = self.ratio * self.zoom;
+        Ok(CssPoint {
+            x: CssPx::new(device_x / scale)?,
+            y: CssPx::new(device_y / scale)?,
+        })
+    }
 }
 
 /// A point in CSS pixels.

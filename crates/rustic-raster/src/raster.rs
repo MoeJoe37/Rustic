@@ -1688,14 +1688,15 @@ impl DeviceRect {
 }
 
 /// The surface size `list` rasterizes to at `scale`: the viewport times
-/// `scale`, rounded up.
+/// `scale`, rounded up past a millionth of a pixel (so float error in a
+/// zoomed viewport, the window over the zoom, does not add a pixel).
 pub fn surface_size(list: &DisplayList, scale: DeviceScale) -> Result<(u32, u32), RasterError> {
     let device = |css: f64| -> Result<u32, RasterError> {
         let v = rustic_layout::CssPx::new(css)
             .map_err(|_| RasterError::SurfaceSize)?
             .to_device(scale)
-            .get()
-            .ceil();
+            .get();
+        let v = (v - 1e-6).ceil();
         if v.is_finite() && v >= 1.0 && v <= f64::from(u32::MAX) {
             Ok(v as u32)
         } else {

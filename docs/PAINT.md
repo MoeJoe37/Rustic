@@ -95,9 +95,10 @@ color and composites each item source-over.
 (uncompressed) deflate blocks, after checking the exact output size against
 `max_bytes`. CRC-32 and Adler-32 are computed in the crate.
 
-`rustic render --output out.png [--scale N] <file>` loads a local file the same
-way as the dump commands, renders at a 1280×720 CSS viewport and writes the PNG.
-The PNG counts against `--max-output-bytes`; nothing is written on failure.
+`rustic render --output out.png [--viewport WxH] [--scale N] [--zoom Z] <file>`
+loads a local file the same way as the dump commands, lays it out for the view
+(default a 1280×720 window at ratio 1 and 100% zoom) and writes the PNG. The PNG
+counts against `--max-output-bytes`; nothing is written on failure.
 
 ## Tests
 
@@ -223,9 +224,26 @@ exclude points as they exclude paint. `visibility: hidden` boxes are not
 targets (their visible descendants are); `opacity: 0` boxes paint nothing but
 still take hits. Edges are half-open. A point inside the viewport that hits
 no box finds the root element; a point outside it finds nothing. `rustic
-hit-test --at X,Y <file>` prints the result for each point. Text, inline
-boxes, `pointer-events`, scrolling offsets, transforms and rounded clips are
-not considered yet.
+hit-test --at X,Y <file>` prints the result for each point. Transformed boxes
+are hit through their planes and rounded clips and clip paths cut hits as they
+cut paint. Text, inline boxes, `pointer-events` and scrolling offsets are not
+considered yet.
+
+### Resize and zoom
+
+`rustic_layout::View` is the window a page is shown in: its size in pixels at
+100% zoom, the device pixel ratio and the page zoom (25% to 500%). The layout
+viewport is the window over the zoom and the paint scale is the ratio times the
+zoom, so zooming in reflows the page into a narrower viewport and paints it
+larger, as browsers do. A resize or zoom recomputes styles against the new
+viewport (media queries see its size and resolution, viewport units its
+dimensions), lays the page out again, rebuilds the display list and rasterizes
+at `View::scale`; `View::to_css` maps a device point of the window to the CSS
+point to hit-test. The surface is the window times the ratio (float error in
+the zoomed viewport is ignored when rounding the surface size up). `rustic
+render` and `rustic reftest` take `--viewport WxH` and `--zoom Z` alongside
+`--scale`. Relayout is from scratch: no style or layout work is reused across
+views (TD-59).
 
 ## Reftests
 

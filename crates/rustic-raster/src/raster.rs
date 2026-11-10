@@ -5,6 +5,7 @@
 //! accumulation, nonzero winding clamped to one), computed in `f64` with no
 //! platform math calls, so output bytes are identical on every target.
 
+use crate::damage::Culling;
 use rustic_base::CancellationToken;
 use rustic_layout::Clip;
 use rustic_layout::{CssRect, DeviceScale};
@@ -1841,6 +1842,36 @@ pub fn rasterize_region(
     limits: RasterLimits,
     cancellation: &CancellationToken,
 ) -> Result<Surface, RasterError> {
+    paint_region(list, scale, region, limits, true, cancellation)
+}
+
+/// Rasterize like [`rasterize`] without skipping any command by its
+/// bounds: every tile runs every command. This is the reference that
+/// skipping must match exactly, kept for tests.
+pub fn rasterize_reference(
+    list: &DisplayList,
+    scale: DeviceScale,
+    limits: RasterLimits,
+    cancellation: &CancellationToken,
+) -> Result<Surface, RasterError> {
+    let (width, height) = surface_size(list, scale)?;
+    let all = DeviceRect {
+        x: 0,
+        y: 0,
+        width,
+        height,
+    };
+    paint_region(list, scale, all, limits, false, cancellation)
+}
+
+fn paint_region(
+    list: &DisplayList,
+    scale: DeviceScale,
+    region: DeviceRect,
+    limits: RasterLimits,
+    cull: bool,
+    cancellation: &CancellationToken,
+) -> Result<Surface, RasterError> {
     cancellation.check().map_err(|_| RasterError::Cancelled)?;
     let (width, height) = surface_size(list, scale)?;
     if region.width == 0
@@ -1855,6 +1886,11 @@ pub fn rasterize_region(
     }
     let factor = device_factor(scale)?;
     let margin = effect_margin(list, factor)?;
+    let culling = if cull {
+        Some(Culling::new(list, factor)?)
+    } else {
+        None
+    };
     let mut out = Surface::new(region.width, region.height, limits)?;
     let mut work = Work {
         used: 0,
@@ -1884,7 +1920,7 @@ pub fn rasterize_region(
                 w: fw,
                 h: fh,
             };
-            let painted = render(list, factor, frame, limits, &mut work)?;
+            let painted = render(list, factor, frame, limits, culling.as_ref(), &mut work)?;
             // Copy the part of the tile inside the region.
             let (cx0, cy0) = (x0.max(rx0), y0.max(ry0));
             let (cx1, cy1) = (x1.min(rx1), y1.min(ry1));
@@ -1953,6 +1989,7 @@ fn render(
     factor: f64,
     frame: Frame,
     limits: RasterLimits,
+    culling: Option<&Culling>,
     work: &mut Work<'_>,
 ) -> Result<Surface, RasterError> {
     let to_u32 = |v: usize| u32::try_from(v).map_err(|_| RasterError::SurfaceSize);
@@ -1967,7 +2004,25 @@ fn render(
     let mut maps: Vec<Homography> = Vec::new();
     let window_size = (frame.w, frame.h);
     let origin = (frame.x as f64, frame.y as f64);
-    for command in list.commands() {
+    let commands = list.commands();
+    let mut next = 0;
+    while let Some(command) = commands.get(next) {
+        let index = next;
+        next += 1;
+        // Skip a fill or a whole layer that cannot change the frame.
+        if let (
+            Some(culling),
+            DisplayCommand::Fill(_)
+            | DisplayCommand::BeginGroup { .. }
+            | DisplayCommand::BeginClip { .. }
+            | DisplayCommand::BeginTransform { .. },
+        ) = (culling, command)
+        {
+            if let Some(after) = culling.skip(index, frame.bounds()) {
+                next = after;
+                continue;
+            }
+        }
         match command {
             DisplayCommand::Fill(item) => {
                 let pixels = target(&mut groups, &mut surface.pixels);

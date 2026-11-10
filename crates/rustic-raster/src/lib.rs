@@ -16,6 +16,6 @@ pub use compare::{Difference, compare};
 pub use damage::damage;
 pub use png::{PngError, encode_png};
 pub use raster::{
-    DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, rasterize, rasterize_region,
-    repaint, surface_size,
+    DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, rasterize, rasterize_reference,
+    rasterize_region, repaint, surface_size,
 };

@@ -1027,7 +1027,14 @@ transform, shadow, filtered-child, removal, filter and canvas changes at
 two scales, with shadows and blurs crossing tile seams; `rustic reftest`
 also repaints each reference into its test through damage and fails if
 the pixels differ (the paint conformance gate), and the paint fuzz target
-checks that an unchanged list reports no damage.
+checks that an unchanged list reports no damage. Tiles skip fills and
+whole layers whose bounds miss their frame; a paint test checks the culled
+raster against `rasterize_reference` byte for byte (with and without
+filters, at two scales, with shadows, transforms and text near seams) and
+that culling keeps a sparse 1280×720 page within a work budget the
+reference exceeds. The `frame_budget` example measured a one-box repaint
+at 3.5 ms (scale 1) and 11 ms (scale 2) on the sandbox, so `paint.raster`
+credits its performance step.
 
 `rustic_layout::View` (window size at 100% zoom, device pixel ratio, page
 zoom from 25% to 500%) drives resize and zoom: styles recompute against its

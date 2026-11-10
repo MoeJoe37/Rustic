@@ -2215,139 +2215,117 @@
           "label": "Deterministic CPU reference rasterizer",
           "size": 5,
           "milestone": "M3",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "fill",
-              "label": "Exact-area antialiased fills and source-over compositing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "pub fn rasterize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn diagonal_edges_split_pixels_by_area_and_sum_to_the_polygon_area"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn fractional_geometry_and_device_scale_antialias_by_exact_area"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn rendering_is_deterministic_and_matches_a_golden_checksum"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "pub fn rasterize"
             },
             {
-              "id": "glyphs",
-              "label": "Glyph rasterization",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn flatten"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/display.rs",
-                  "marker": "pub fn build_with_fonts"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn quadratic_contours_flatten_within_tolerance"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn diagonal_edges_split_pixels_by_area_and_sum_to_the_polygon_area"
             },
             {
-              "id": "images",
-              "label": "Image rasterization",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn draw_image"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/images.rs",
-                  "marker": "pub fn load"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn images_load_locally_within_budgets_and_break_cleanly"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn fractional_geometry_and_device_scale_antialias_by_exact_area"
             },
             {
-              "id": "layers",
-              "label": "Clip and opacity group layers",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn composite"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn opacity_groups_composite_their_whole_context_once"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn layered_scene_matches_a_golden_checksum"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn rendering_is_deterministic_and_matches_a_golden_checksum"
             },
             {
-              "id": "blend",
-              "label": "Blend modes, filters and shadows",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn composite_blend("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn blend_modes_and_filters_composite_groups_in_order"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn box_shadows_paint_around_backgrounds_blur_and_take_no_hits"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn flatten"
             },
             {
-              "id": "performance",
-              "label": "Tiled, damage-limited raster within frame budgets",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-paint/src/display.rs",
+              "marker": "pub fn build_with_fonts"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn quadratic_contours_flatten_within_tolerance"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn inline_content_paints_after_floats_and_before_positioned_boxes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn draw_image"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/images.rs",
+              "marker": "pub fn load"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn images_copy_exactly_at_one_to_one_and_smooth_when_scaled"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn images_load_locally_within_budgets_and_break_cleanly"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn composite"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn opacity_groups_composite_their_whole_context_once"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn layered_scene_matches_a_golden_checksum"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn composite_blend("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn blend_modes_and_filters_composite_groups_in_order"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn box_shadows_paint_around_backgrounds_blur_and_take_no_hits"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/damage.rs",
+              "marker": "pub(crate) struct Culling"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/examples/frame_budget.rs",
+              "marker": "16_667"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn tiles_skip_what_cannot_reach_them_and_match_the_reference_exactly"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn damaged_tiles_repaint_to_exactly_the_new_surface"
             }
           ]
         },

@@ -79,6 +79,19 @@ color and composites each item source-over.
   tile. `rasterize_region(list, scale, region, …)` paints just the tiles
   that meet `region` and returns exactly the pixels `rasterize` would; blur
   box sums are fixed point so they do not depend on where a frame starts.
+- **Culling.** Before painting, each fill's device bounds (mapped through
+  transforms, grown by shadow blur, enclosing filter reach and a pixel) and
+  each layer's union of its contents are computed once; a tile skips fills
+  and whole layers (with their buffers) whose bounds miss its frame.
+  `rasterize_reference` runs every command in every tile and is the
+  reference culling must match byte for byte. The `frame_budget` example
+  (`cargo run --release -p rustic-raster --example frame_budget`) measures a
+  1280×720 page with shadows, groups, a transform, a filter, blending and
+  text: on the development sandbox a full raster took 77 ms at scale 1
+  (262 ms without culling) and 195 ms at scale 2 (1.1 s without), and
+  repainting the two or four tiles damaged by one changed box took 3.5 ms
+  and 11 ms, inside a 16.7 ms frame. Timings vary by machine; CI does not
+  gate on them (TD-59).
 
 - **Damage.** `damage(old, new, scale)` returns the tiles whose pixels can
   differ between two lists. Each fill is keyed by what it paints (shape with

@@ -67,6 +67,47 @@ struct Flat<'a> {
     /// Each scope with its parent.
     scopes: Vec<(Scope<'a>, Option<usize>)>,
     entries: Vec<Entry<'a>>,
+    /// Per command: what a fill can change, or the union of that over a
+    /// layer's contents for a begin command.
+    reach: Vec<Option<Bounds>>,
+    /// Per begin command, the index of its matching end.
+    ends: Vec<usize>,
+}
+
+/// The device pixels each command can change and where each layer ends,
+/// so a frame can skip what cannot touch it (see [`Culling::skip`]).
+pub(crate) struct Culling {
+    reach: Vec<Option<Bounds>>,
+    ends: Vec<usize>,
+}
+
+impl Culling {
+    pub(crate) fn new(list: &DisplayList, factor: f64) -> Result<Self, RasterError> {
+        let flat = flatten(list, factor)?;
+        Ok(Self {
+            reach: flat.reach,
+            ends: flat.ends,
+        })
+    }
+
+    /// For command `i`, where to continue when it paints nothing inside
+    /// `frame`: past a fill, or past a layer's matching end. `None` when it
+    /// must run.
+    pub(crate) fn skip(&self, i: usize, frame: Bounds) -> Option<usize> {
+        let misses = match self.reach.get(i)? {
+            None => true,
+            Some(b) => b.2 <= frame.0 || b.0 >= frame.2 || b.3 <= frame.1 || b.1 >= frame.3,
+        };
+        misses.then(|| self.ends.get(i).copied().unwrap_or(i) + 1)
+    }
+}
+
+fn union(a: Option<Bounds>, b: Option<Bounds>) -> Option<Bounds> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some((a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3))),
+        (a, None) => a,
+        (None, b) => b,
+    }
 }
 
 fn resolve<'a>(shape: &Shape, list: &'a DisplayList) -> Result<Resolved<'a>, RasterError> {
@@ -185,13 +226,17 @@ fn flatten(list: &DisplayList, factor: f64) -> Result<Flat<'_>, RasterError> {
     let mut flat = Flat {
         scopes: Vec::new(),
         entries: Vec::new(),
+        reach: vec![None; list.commands().len()],
+        ends: (0..list.commands().len()).collect(),
     };
+    // Begin commands of the open layers, innermost last.
+    let mut begins: Vec<usize> = Vec::new();
     // Innermost open scope, its map and filter reach, innermost last.
     let mut open: Vec<(Option<usize>, Option<Homography>, usize)> = Vec::new();
     let mut scope: Option<usize> = None;
     let mut reach = 0usize;
     let base = Homography::scale(factor);
-    for command in list.commands() {
+    for (index, command) in list.commands().iter().enumerate() {
         let map = open.iter().rev().find_map(|o| o.1);
         match command {
             DisplayCommand::Fill(item) => {
@@ -202,6 +247,10 @@ fn flatten(list: &DisplayList, factor: f64) -> Result<Flat<'_>, RasterError> {
                         let pad = reach as f64 + 1.0;
                         (b.0 - pad, b.1 - pad, b.2 + pad, b.3 + pad)
                     });
+                flat.reach[index] = bounds;
+                if let Some(&begin) = begins.last() {
+                    flat.reach[begin] = union(flat.reach[begin], bounds);
+                }
                 flat.entries.push(Entry {
                     scope,
                     role: item.role,
@@ -242,6 +291,7 @@ fn flatten(list: &DisplayList, factor: f64) -> Result<Flat<'_>, RasterError> {
                     scope,
                 ));
                 open.push((scope, None, r));
+                begins.push(index);
                 reach = reach.saturating_add(r);
                 scope = Some(flat.scopes.len() - 1);
             }
@@ -249,6 +299,7 @@ fn flatten(list: &DisplayList, factor: f64) -> Result<Flat<'_>, RasterError> {
                 flat.scopes
                     .push((Scope::Clip(resolve(shape, list)?), scope));
                 open.push((scope, None, 0));
+                begins.push(index);
                 scope = Some(flat.scopes.len() - 1);
             }
             DisplayCommand::BeginTransform { transform, .. } => {
@@ -266,9 +317,15 @@ fn flatten(list: &DisplayList, factor: f64) -> Result<Flat<'_>, RasterError> {
                     scope,
                 ));
                 open.push((scope, Some(inner), 0));
+                begins.push(index);
                 scope = Some(flat.scopes.len() - 1);
             }
             DisplayCommand::EndGroup | DisplayCommand::EndClip | DisplayCommand::EndTransform => {
+                let begin = begins.pop().ok_or(RasterError::InvalidList)?;
+                flat.ends[begin] = index;
+                if let Some(&outer) = begins.last() {
+                    flat.reach[outer] = union(flat.reach[outer], flat.reach[begin]);
+                }
                 let (outer, _, r) = open.pop().ok_or(RasterError::InvalidList)?;
                 scope = outer;
                 reach = reach.saturating_sub(r);

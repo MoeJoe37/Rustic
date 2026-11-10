@@ -106,7 +106,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
 | TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
 | TD-58 | Deliberate | Paint | First shadows, blending and filters: sRGB filters, full-surface groups, no ink overflow, approximate blur under transforms | Open, REN-04i |
-| TD-59 | Deliberate | Paint | First tiled raster, damage and resize: each tile replays the whole list, a new filter margin repaints everything, list diff by common prefix and suffix, relayout from scratch | Open, REN-04j |
+| TD-59 | Deliberate | Paint | First tiled raster, damage and resize: each tile scans the whole list, no CI frame-time gate, a new filter margin repaints everything, list diff by common prefix and suffix, relayout from scratch | Open, REN-04j |
 | TD-70 | Deliberate | Layout | Atomic inlines and block-in-inline splitting: baseline, relative-offset and paint-order approximations | Open, M3 layout |
 | TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
 | TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 53 of 91 static pages fail (writing modes, images, tables, 6 undiagnosed) | Open, REN-08 |
@@ -1004,10 +1004,12 @@ M4.
 ### TD-59 — First tiled raster, damage and resize
 
 REN-04j paints the surface in 256-pixel tiles and repaints only damaged
-tiles. Each tile replays the whole display list into a frame grown by the
-list's largest filter reach and skips nothing by bounds first, so a tile
-costs a scan of every command and full-frame group buffers; there is no
-spatial index, no tile cache between frames and no threading. Damage
+tiles. Each tile scans the whole display list into a frame grown by the
+list's largest filter reach, skipping fills and layers whose bounds miss
+the frame, but layers that do meet it still get full-frame buffers; there
+is no spatial index, no tile cache between frames and no threading. Frame
+times are measured by the `frame_budget` example, not gated in CI (wall
+time on emulated targets means nothing). Damage
 compares the two lists' fills by their common prefix and suffix, so one
 change in the middle damages everything between the first and last
 difference, and an item that only moved in paint order damages both

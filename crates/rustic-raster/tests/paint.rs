@@ -7,7 +7,7 @@ use rustic_paint::{
 };
 use rustic_raster::{
     DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, damage, encode_png, rasterize,
-    rasterize_region, repaint,
+    rasterize_reference, rasterize_region, repaint,
 };
 mod common;
 
@@ -1646,4 +1646,101 @@ fn resizing_and_zooming_relayout_paint_and_hit_test_through_the_view() {
     assert!(View::new(400.0, 100.0, 1.0, 0.2).is_err());
     assert!(View::new(0.0, 100.0, 1.0, 1.0).is_err());
     assert!(View::new(400.0, 100.0, 40.0, 2.0).is_err());
+}
+
+#[test]
+fn tiles_skip_what_cannot_reach_them_and_match_the_reference_exactly() {
+    // Groups, clips, transforms, shadows, text and filters spread over
+    // several tiles, some reaching across seams. Without the filter each
+    // tile's frame is the tile itself, so a fill whose bounds were
+    // underestimated near a seam would go missing.
+    for filter in ["blur(4px) drop-shadow(8px 8px 2px red)", "none"] {
+        let list = text_list(
+            "<div id=a><div id=b></div></div><div id=c></div><div id=d></div>\
+             <div id=e></div><div id=f><div id=g></div></div><p id=t>Tiles</p>",
+            &format!(
+                "{RESET} div, p {{ position: absolute; width: 60px; height: 40px; margin: 0 }}
+                 #a {{ left: 230px; top: 10px; opacity: 0.5; background: red;
+                       border-radius: 9px; overflow: hidden }}
+                 #b {{ left: 20px; top: 5px; background: blue; transform: rotate(30deg) }}
+                 #c {{ left: 500px; top: 230px; background: green; mix-blend-mode: multiply;
+                       clip-path: circle(25px) }}
+                 #d {{ left: 10px; top: 300px; background: purple;
+                       transform: perspective(90px) rotateY(35deg) }}
+                 #e {{ left: 440px; top: 40px; background: teal;
+                       box-shadow: 0 0 30px 10px black }}
+                 #f {{ left: 240px; top: 240px; filter: {filter} }}
+                 #g {{ left: 5px; top: 5px; background: orange }}
+                 #t {{ left: 250px; top: 250px; width: 80px; font: 20px 'Rustic Test';
+                       transform: rotate(-20deg) }}"
+            ),
+            700.0,
+            400.0,
+        );
+        let cancel = CancellationToken::default();
+        for scale in [1.0, 1.5] {
+            let scale = DeviceScale::new(scale).unwrap();
+            let culled = rasterize(&list, scale, RasterLimits::default(), &cancel).unwrap();
+            let reference =
+                rasterize_reference(&list, scale, RasterLimits::default(), &cancel).unwrap();
+            assert!(
+                culled == reference,
+                "culling changed pixels at {scale:?} with filter {filter}"
+            );
+        }
+    }
+    let cancel = CancellationToken::default();
+    // Culling is what keeps a mostly empty page cheap: one small group in
+    // one of 15 tiles costs its layer buffers in that tile only.
+    let sparse = page(
+        "<div id=a></div>",
+        &format!("{RESET} #a {{ width: 20px; height: 20px; opacity: 0.5; background: red }}"),
+        1280.0,
+        720.0,
+    )
+    .list()
+    .unwrap();
+    let budget = RasterLimits {
+        max_work: 1280 * 720 * 2,
+        ..RasterLimits::default()
+    };
+    let scale = DeviceScale::new(1.0).unwrap();
+    assert!(rasterize(&sparse, scale, budget, &cancel).is_ok());
+    assert_eq!(
+        rasterize_reference(&sparse, scale, budget, &cancel),
+        Err(RasterError::WorkLimit)
+    );
+}
+
+/// The display list of a page laid out and painted with the bundled fonts.
+fn text_list(html: &str, css: &str, width: f64, height: f64) -> DisplayList {
+    let fonts = rustic_text::bundled::test_database();
+    let (doc, styles) = common::page(html, css);
+    let tree = BoxTree::build(
+        &doc,
+        doc.root(),
+        &styles,
+        LayoutLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let viewport = CssSize::new(width, height).unwrap();
+    let layout = BlockLayout::compute_with_fonts(
+        &tree,
+        viewport,
+        LayoutLimits::default(),
+        &fonts,
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    DisplayList::build_with_fonts(
+        &doc,
+        &tree,
+        &layout,
+        viewport,
+        Some(&fonts),
+        PaintLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap()
 }

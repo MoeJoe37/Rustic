@@ -28,7 +28,7 @@ of every slot.
 **The heap is typed arenas indexed by `u32`.** Objects, strings, symbols and
 BigInts each live in a `Vec`-backed arena owned by one `Heap`, and values name
 them by index. Script cannot forge an index; host-facing handles add
-generations in JS-03 (as `HostObjectId` does). There is no `Rc`, `RefCell` or
+generations (`HostRoot`, ADR 0016). There is no `Rc`, `RefCell` or
 per-object allocation header. Every arena allocation is charged to a
 `rustic_base::Budget`, so a page that exceeds its heap limit gets a catchable
 failure, not process growth.

@@ -2,8 +2,7 @@
 //! cloning, adoption and tracing.
 
 use rustic_dom::{
-    Document, DocumentLimits, DomError, HostHeap, HostHeapLimits, NodeId, NodeKind, QualifiedName,
-    ShadowRootMode, Traced,
+    Document, DocumentLimits, DomError, NodeId, NodeKind, QualifiedName, ShadowRootMode,
 };
 
 fn document() -> Document {
@@ -202,24 +201,29 @@ fn clones_drop_shadow_roots_and_adoption_moves_them() {
     target.check_invariants().unwrap();
 }
 
+/// Collect with only `held` (and the document tree) live.
+fn collect(doc: &mut Document, held: &[NodeId]) -> usize {
+    let mut marks = doc.tree_marks().unwrap();
+    doc.mark_document_tree(&mut marks, &mut |_| {}).unwrap();
+    for &node in held {
+        doc.mark_tree(&mut marks, node, &mut |_| {}).unwrap();
+    }
+    doc.sweep_unmarked_trees(&marks).unwrap()
+}
+
 #[test]
 fn hosts_and_shadow_roots_keep_each_other_alive() {
     let mut doc = document();
-    let mut heap = HostHeap::new(&doc, HostHeapLimits::default());
     let host = html(&mut doc, "div");
     let root = doc.attach_shadow(host, ShadowRootMode::Open).unwrap();
     let inner = html(&mut doc, "span");
     doc.append_child(root, inner).unwrap();
 
-    heap.root(&doc, Traced::Node(inner)).unwrap();
-    assert_eq!(heap.collect(&mut doc).unwrap().nodes_destroyed, 0);
+    assert_eq!(collect(&mut doc, &[inner]), 0);
     assert!(doc.node(host).is_ok());
-    heap.unroot(&doc, Traced::Node(inner)).unwrap();
-    heap.root(&doc, Traced::Node(host)).unwrap();
-    assert_eq!(heap.collect(&mut doc).unwrap().nodes_destroyed, 0);
+    assert_eq!(collect(&mut doc, &[host]), 0);
     assert!(doc.node(inner).is_ok());
-    heap.unroot(&doc, Traced::Node(host)).unwrap();
-    assert_eq!(heap.collect(&mut doc).unwrap().nodes_destroyed, 3);
+    assert_eq!(collect(&mut doc, &[]), 3);
     assert_eq!(doc.node_count(), 1);
     doc.check_invariants().unwrap();
 }

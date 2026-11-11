@@ -470,18 +470,15 @@ tested depth, not proof of absence of defects.
 
 ## DOC-09 — DOM/host tracing prototype and DOM conformance gate
 
-`HostHeap` (`crates/rustic-dom/src/document/tracing.rs`) is a stop-the-world,
-nonmoving mark/sweep model of the future JS heap, bound to one document, so the
-DOM side of the tracing contract is tested before a runtime exists
-([ADR 0012](adr/0012-dom-tracing-prototype.md), [DOM.md](DOM.md)). Objects have
-generation-checked `HostObjectId`s; node → object, object → node and
-object → object edges and counted node/object roots are registered explicitly
-and bounded by `HostHeapLimits`. Holding any node keeps its whole tree; a
-template and its contents keep each other; the document's tree is always live.
-`collect` reserves all temporary storage first, marks iteratively, destroys
-unreachable parentless trees through `destroy_subtree` (their IDs go stale),
-frees unreachable objects, and prunes entries naming nodes destroyed or adopted
-away by the engine.
+DOC-09 first tested the DOM side of the tracing contract against a prototype
+`HostHeap` inside `rustic-dom`
+([ADR 0012](adr/0012-dom-tracing-prototype.md), [DOM.md](DOM.md)). JS-03
+replaced that stand-in with the real JavaScript heap: the DOM keeps tree
+marking (`tree_marks`, `mark_tree`, `sweep_unmarked_trees`), and
+`rustic-bindings` runs the shared collection. The rules are unchanged: holding
+any node keeps its whole tree; a template and its contents keep each other; the
+document's tree is always live; unreachable parentless trees are destroyed
+through `destroy_subtree` (their IDs go stale).
 
 The gate half adds `Document::check_invariants`, a linear structural checker,
 and `tests/conformance.rs`, which runs all 25,230 (parent, node, reference
@@ -1138,8 +1135,24 @@ atoms, and the byte budget reset to the exact live footprint. Collection runs
 at caller safe points with explicit `Roots`; hosts keep values alive through
 generation-checked `HostRoot`s. Twelve tests and the 19th fuzz target,
 `js-heap` (a shadow-model check), cover it. Weak references and DOM
-host-object tracing (TD-96), native-function safe points (TD-94) and
-incremental marking (TD-95) remain.
+host-object tracing, native-function safe points (TD-94) and incremental
+marking (TD-95) remained after the first part.
+
+## JS-03 — Weak references and DOM collection (second part)
+
+Weak objects: the internal slots and operations of `WeakRef`, `WeakMap`,
+`WeakSet` and `FinalizationRegistry`, with weak-map entries marked as
+ephemerons to a fixpoint, dead targets cleared and held values queued for the
+host. Host objects: an object created with `Agent::new_host_object` carries a
+`u64` for the embedder, and `collect_garbage_with` asks a `HostTracer` for its
+roots and each reachable host object's edges and reports collected ones.
+`Heap::set_gc_stress` makes every safe point collect. The new
+`rustic-bindings` crate uses these for the DOM: `DomHeap` keeps one wrapper per
+node and node-held values, and collects a document and an agent together. The
+DOC-09 scenarios, a seeded reachability model and a stress run pass against the
+real heap, and the prototype `HostHeap` is removed (TD-17 narrowed, TD-96
+paid). The constructors and prototype methods of the weak built-ins arrive with
+JS-05.
 
 ## REN-03 completion: font formats, shaping and text policies
 
@@ -1186,7 +1199,7 @@ lists the next tasks.
 | DOC-06c: fragment parsing algorithm | Done: all 192 html5lib fragment records at every split; DOM-string input and `innerHTML` bindings pending |
 | DOC-07: bounded HTML loader/CLI | Complete: local-only `dump-dom` with file, parser and output budgets; tree coverage follows DOC-06 |
 | DOC-08: parser corpus/fuzzing | Complete: tokenizer corpora, the full runnable html5lib tree corpus (documents and fragments) at every split, exact limits, and parser fuzz targets (now twelve, including `paint-raster` and `text-sfnt`) with a required CI smoke job; coverage-guided fuzzing and sanitizers await dependency review |
-| DOC-09: traced node/JS ownership prototype | Complete prototype: `HostHeap` roots/edges/mark-sweep, `check_invariants`, 25,230-case pre-insert conformance gate; the real heap arrives with JS-03 |
+| DOC-09: traced node/JS ownership prototype | Complete: tree marking and sweep in `rustic-dom`, collected with the JS heap through `rustic-bindings` (the prototype `HostHeap` is replaced), `check_invariants`, 25,230-case pre-insert conformance gate |
 | CSS-01: CSS syntax tokenizer/parser | Complete: tokens, component values, rules, declarations, nested block contents; 139/149 pinned corpus cases |
 | CSS-04: cascade and inheritance | Complete: origins, importance, style attributes, specificity, order, CSS-wide keywords and inheritance; layers, shadow contexts and animation origins added by CSS-07b |
 | CSS-07b: cascade layers, shadow contexts, animation origins | Complete: `@layer` and layered `revert-layer`, DOM shadow roots, per-tree sheets with `:host`, context precedence, animation/transition tiers; slots, `::slotted()`/`::part()` and `@import layer()` pending |
@@ -1202,7 +1215,7 @@ lists the next tasks.
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; no collection yet (TD-91), partial BigInt conversions (TD-92); see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
-| JS-03: heap, roots and collection | First part complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and the `js-heap` fuzz target; weak references and DOM host tracing remain (TD-96); see [JS.md](JS.md) |
+| JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
 
 M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and
 cross-document adoption; mutation records and observers are an M5 gate

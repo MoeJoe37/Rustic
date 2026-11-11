@@ -20,7 +20,7 @@
 use super::agent::Agent;
 use super::env::EnvId;
 use super::heap::{ATOM_BYTES, Heap, OutOfMemory, Symbol};
-use super::object::Object;
+use super::object::{Internal, Object};
 use super::shape::{PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
 use super::value::{Kind, StringId, Value};
@@ -164,6 +164,40 @@ struct Marks {
     shapes: BitSet,
 }
 
+impl Marks {
+    /// Whether a weakly held value survives: primitives always do.
+    fn is_live(&self, value: Value) -> bool {
+        match value.kind() {
+            Kind::Object(id) => self.objects.get(id.0),
+            Kind::Symbol(id) => self.symbols.get(id.0),
+            _ => true,
+        }
+    }
+}
+
+/// What the embedder contributes to a collection: the edges of its host
+/// objects. The JS heap knows a host object only by the `u64` it was
+/// created with (ADR 0016); a DOM binding uses it to name a node.
+pub trait HostTracer {
+    /// Report values the host keeps alive on its own (wrappers and
+    /// listeners of nodes in a document, for example).
+    fn roots(&mut self, _sink: &mut dyn FnMut(Value)) {}
+
+    /// A host object created with `data` is reachable: report every value
+    /// it keeps alive. Called once per reachable host object.
+    fn trace(&mut self, data: u64, sink: &mut dyn FnMut(Value));
+
+    /// A host object created with `data` was collected.
+    fn finalize(&mut self, _data: u64) {}
+}
+
+/// A host with no host objects.
+struct NoHost;
+
+impl HostTracer for NoHost {
+    fn trace(&mut self, _: u64, _: &mut dyn FnMut(Value)) {}
+}
+
 enum Gray {
     Object(u32),
     Env(u32),
@@ -175,6 +209,15 @@ struct Marker<'h> {
     work: Vec<Gray>,
     /// Scratch for keys of newly marked shapes.
     keys: Vec<PropertyKey>,
+    /// Reachable host objects whose edges the host has not reported yet.
+    hosts: Vec<u64>,
+    /// Reachable weak objects, fixed up after marking.
+    weak_refs: Vec<u32>,
+    weak_maps: Vec<u32>,
+    registries: Vec<u32>,
+    /// A symbol or object was newly marked since the flag was cleared, so
+    /// another ephemeron pass may find more live keys.
+    progress: bool,
 }
 
 impl Tracer for Marker<'_> {
@@ -183,6 +226,7 @@ impl Tracer for Marker<'_> {
             Kind::String(id) => self.string(id),
             Kind::Symbol(id) => {
                 if self.marks.symbols.insert(id.0) {
+                    self.progress = true;
                     if let Some(description) = self.heap.symbol(id).description {
                         self.string(description);
                     }
@@ -193,6 +237,7 @@ impl Tracer for Marker<'_> {
             }
             Kind::Object(id) => {
                 if self.marks.objects.insert(id.0) {
+                    self.progress = true;
                     self.work.push(Gray::Object(id.0));
                 }
             }
@@ -216,17 +261,44 @@ impl Tracer for Marker<'_> {
 }
 
 impl Marker<'_> {
-    fn drain(&mut self) {
-        while let Some(gray) = self.work.pop() {
+    /// Mark everything reachable from the worklist, asking `host` for the
+    /// edges of host objects and treating weak-map entries as ephemerons:
+    /// a value is marked only once its key is. Repeats until nothing new
+    /// is found.
+    fn drain(&mut self, host: &mut dyn HostTracer) {
+        loop {
+            while let Some(gray) = self.work.pop() {
+                let heap = self.heap;
+                match gray {
+                    Gray::Object(index) => self.trace_object(index, heap.objects.get(index)),
+                    Gray::Env(index) => heap.envs.get(index).trace(self),
+                }
+            }
+            while let Some(data) = self.hosts.pop() {
+                host.trace(data, &mut |value| self.value(value));
+            }
+            if !self.work.is_empty() {
+                continue;
+            }
+            self.progress = false;
             let heap = self.heap;
-            match gray {
-                Gray::Object(index) => self.trace_object(heap.objects.get(index)),
-                Gray::Env(index) => heap.envs.get(index).trace(self),
+            for at in 0..self.weak_maps.len() {
+                let map = heap.objects.get(self.weak_maps[at]);
+                if let Some(Internal::WeakMap(entries)) = map.internal() {
+                    for (&key, &value) in entries {
+                        if self.marks.is_live(Value::from_raw(key)) {
+                            self.value(value);
+                        }
+                    }
+                }
+            }
+            if !self.progress {
+                return;
             }
         }
     }
 
-    fn trace_object(&mut self, object: &Object) {
+    fn trace_object(&mut self, index: u32, object: &Object) {
         if let Some(proto) = object.proto() {
             self.value(Value::object(proto));
         }
@@ -258,9 +330,29 @@ impl Marker<'_> {
             if let Some(primitive) = extra.primitive {
                 self.value(primitive);
             }
+            match &extra.internal {
+                None => {}
+                Some(Internal::Host(data)) => self.hosts.push(*data),
+                // The target is weak: cleared after marking if nothing
+                // else reaches it.
+                Some(Internal::WeakRef(_)) => self.weak_refs.push(index),
+                Some(Internal::WeakMap(_)) => self.weak_maps.push(index),
+                Some(Internal::Registry { cells, pending }) => {
+                    for cell in cells {
+                        self.value(cell.held);
+                    }
+                    for &held in pending {
+                        self.value(held);
+                    }
+                    self.registries.push(index);
+                }
+            }
         }
     }
 }
+
+/// Budget charge per weak-map entry or registry cell.
+pub(crate) const WEAK_ENTRY_BYTES: usize = 24;
 
 /// Bytes an object is charged for: the header, its slots and elements,
 /// and the out-of-line dictionary and sparse entries.
@@ -274,6 +366,13 @@ fn object_footprint(object: &Object) -> usize {
         if let Some(sparse) = &extra.sparse {
             bytes += 48 * sparse.len();
         }
+        bytes += match &extra.internal {
+            Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
+            Some(Internal::Registry { cells, pending }) => {
+                WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()
+            }
+            _ => 0,
+        };
     }
     bytes
 }
@@ -327,7 +426,7 @@ impl Agent {
     /// Whether the heap has grown enough since the last collection that
     /// the caller should collect at its next safe point.
     pub fn should_collect(&self) -> bool {
-        self.heap.bytes_used() >= self.heap.gc_threshold
+        self.heap.gc_stress || self.heap.bytes_used() >= self.heap.gc_threshold
     }
 
     /// Collect everything not reachable from the agent's intrinsics, the
@@ -335,6 +434,13 @@ impl Agent {
     /// must be reachable from one of them: a collected cell's index is
     /// reused, and reading a freed one panics.
     pub fn collect_garbage(&mut self, roots: Roots<'_>) -> GcStats {
+        self.collect_garbage_with(roots, &mut NoHost)
+    }
+
+    /// [`Agent::collect_garbage`] for an embedder with host objects:
+    /// `host` adds its own roots, reports the edges of each reachable host
+    /// object, and learns which host objects were collected.
+    pub fn collect_garbage_with(&mut self, roots: Roots<'_>, host: &mut dyn HostTracer) -> GcStats {
         let heap = &self.heap;
         let mut marker = Marker {
             heap,
@@ -348,6 +454,11 @@ impl Agent {
             },
             work: Vec::new(),
             keys: Vec::new(),
+            hosts: Vec::new(),
+            weak_refs: Vec::new(),
+            weak_maps: Vec::new(),
+            registries: Vec::new(),
+            progress: false,
         };
         marker.marks.shapes.insert(ROOT_SHAPE.0);
         for name in self.names.all() {
@@ -368,15 +479,61 @@ impl Agent {
         for &env in roots.envs {
             marker.env(env);
         }
-        marker.drain();
-        let marks = marker.marks;
+        host.roots(&mut |value| marker.value(value));
+        marker.drain(host);
+        let Marker {
+            marks,
+            weak_refs,
+            weak_maps,
+            registries,
+            ..
+        } = marker;
 
         let heap = &mut self.heap;
         let bytes_before = heap.bytes_used();
+        // Weak fix-ups, while every cell is still readable. Marking is
+        // complete, so held values moved to `pending` are already marked.
+        for index in weak_refs {
+            if let Some(Internal::WeakRef(target)) = heap.objects.get_mut(index).internal_mut() {
+                if !marks.is_live(*target) {
+                    *target = Value::UNINITIALIZED;
+                }
+            }
+        }
+        for index in weak_maps {
+            if let Some(Internal::WeakMap(entries)) = heap.objects.get_mut(index).internal_mut() {
+                entries.retain(|&key, _| marks.is_live(Value::from_raw(key)));
+                if entries.capacity() > 2 * entries.len() + 8 {
+                    entries.shrink_to_fit();
+                }
+            }
+        }
+        for index in registries {
+            if let Some(Internal::Registry { cells, pending }) =
+                heap.objects.get_mut(index).internal_mut()
+            {
+                cells.retain_mut(|cell| {
+                    if !marks.is_live(cell.target) {
+                        pending.push(cell.held);
+                        return false;
+                    }
+                    if !marks.is_live(cell.token) {
+                        cell.token = Value::UNINITIALIZED;
+                    }
+                    true
+                });
+            }
+        }
+        let mut finalized = Vec::new();
+        let objects_freed = heap.objects.sweep_with(&marks.objects, |object| {
+            if let Some(Internal::Host(data)) = object.internal() {
+                finalized.push(*data);
+            }
+        });
         let stats = GcStats {
             bytes_before,
             bytes_after: 0,
-            objects_freed: heap.objects.sweep(&marks.objects),
+            objects_freed,
             strings_freed: heap.strings.sweep(&marks.strings),
             symbols_freed: heap.symbols.sweep(&marks.symbols),
             bigints_freed: heap.bigints.sweep(&marks.bigints),
@@ -395,6 +552,9 @@ impl Agent {
         }
         heap.gc_threshold = next_threshold(heap.bytes_used(), heap.byte_limit());
         heap.collections += 1;
+        for data in finalized {
+            host.finalize(data);
+        }
         GcStats {
             bytes_after: heap.bytes_used(),
             ..stats

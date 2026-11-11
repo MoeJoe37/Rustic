@@ -220,6 +220,11 @@ impl Value {
         self == Value::UNDEFINED || self == Value::NULL
     }
 
+    /// The value with these bits, which must come from [`Value::bits`].
+    pub(crate) const fn from_raw(bits: u64) -> Value {
+        Value(bits)
+    }
+
     /// The raw encoding, for hashing and tests.
     pub fn bits(self) -> u64 {
         self.0

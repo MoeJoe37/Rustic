@@ -32,7 +32,7 @@ tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 34.93%** (32.50% verified complete + 2.43% partial credit) — 53/172 capabilities complete and 5 in progress across 21 subsystems. Current milestone: **M4 ECMAScript runtime**, 20.71% done.
+**Overall engine completion: 35.46%** (33.81% verified complete + 1.65% partial credit) — 54/172 capabilities complete and 4 in progress across 21 subsystems. Current milestone: **M4 ECMAScript runtime**, 25.64% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -119,7 +119,8 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-paint` | Display lists and paint order |
 | `rustic-raster` | CPU rasterizer and PNG output |
 | `rustic-codecs` | Bounded inflate, PNG, JPEG, GIF and WebP decoders |
-| `rustic-js` | ECMAScript lexer and parser (runtime in progress) |
+| `rustic-js` | ECMAScript lexer and parser, runtime data model and garbage collector (interpreter in progress) |
+| `rustic-bindings` | Node wrappers and the shared DOM/JS garbage collection |
 | `rustic-engine` | Viewport configuration |
 | `rustic-cli` | The `rustic` development tool |
 | `rustic-fuzz` | Deterministic mutation fuzzing (19 targets) |

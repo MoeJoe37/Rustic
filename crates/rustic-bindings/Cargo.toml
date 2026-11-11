@@ -1,0 +1,17 @@
+[package]
+name = "rustic-bindings"
+description = "JavaScript/DOM bindings: node wrappers and the shared DOM/JS garbage collection"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-dom = { path = "../rustic-dom" }
+rustic-js = { path = "../rustic-js" }
+
+[lints]
+workspace = true

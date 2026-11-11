@@ -1,7 +1,6 @@
 # ADR 0016: JavaScript garbage collection
 
-Date: 2026-11-11. Status: accepted for JS-03 (collector core); weak references
-and DOM host-object tracing follow in the second part of JS-03.
+Date: 2026-11-11. Status: accepted for JS-03.
 
 ## Context
 
@@ -63,6 +62,25 @@ value.
 up as a deterministic panic at the first use, never as silent aliasing of
 another object. In safe Rust it cannot be memory corruption in any case.
 
+**Weak edges are fixed up after marking.** A `WeakRef` target and a registry
+cell's target and token are not traced. A weak-map entry is an ephemeron: after
+the worklist empties, every reachable weak map is scanned and the value of each
+entry whose key is marked is traced, repeating until a pass marks nothing new.
+Then dead targets are cleared, dead entries removed, and the held values of
+dead registry targets moved to a queue the host drains. All of this happens
+before sweep, while every cell is still readable.
+
+**Host objects are opaque to the JS heap.** A host object carries a `u64` the
+embedder chose. During marking the collector hands each reachable host
+object's `u64` to a `HostTracer`, which reports the values it keeps alive; the
+tracer also contributes roots and is told which host objects died. The JS crate
+has no DOM dependency (ADR 0002). `rustic-bindings` implements the tracer for
+one document: a reachable wrapper marks its node's whole tree in the DOM's own
+mark table, each newly marked node reports its wrapper and node-held values
+back, and after the JS sweep the DOM destroys unmarked trees. That is one
+marking phase over both heaps, so node/wrapper/listener cycles need no special
+case.
+
 **Policy.** Collect when charged bytes reach a threshold: 1 MiB at first, then
 twice the live footprint after each collection (at least 1 MiB above it), and
 never above seven eighths of the heap limit, so a heap near its limit collects
@@ -80,6 +98,9 @@ before an allocation fails.
   collection anywhere, at the cost of registering every temporary in every
   runtime function. Safe points give the same bound on growth for interpreter
   code at no per-operation cost; long-running native functions are TD-94.
+- *A separate DOM heap with cross-heap handles* (the DOC-09 prototype): two
+  collectors cannot free a cycle that crosses between them without a shared
+  marking phase, which is what the host tracer provides.
 - *Mark bits in the object header*: no side allocation, but adds a byte (padded
   to eight) to every object or steals a flag bit and forces a full clearing
   pass.
@@ -95,12 +116,16 @@ rule and generation-checked host roots contain.
 
 ## Validation and revisit trigger
 
-`tests/gc.rs` checks each root kind, every reference kind inside an object,
+`tests/gc.rs` checks weak references, ephemeron chains, registries and host
+tracing, each root kind, every reference kind inside an object,
 cycles, 200,000-deep prototype and scope chains, atom and shape reclamation,
 index reuse without disturbing survivors, host root generations, the policy
 and exact budget return to the bare-agent baseline. The `js-heap` fuzz target
 drives random allocation, mutation, linking, rooting and collection against a
 shadow model and requires every modeled read to match and the budget to return
-to baseline. Revisit when JS-07 heap profiles show pause times over the
+to baseline. `rustic-bindings/tests/dom_gc.rs` runs the DOC-09 scenarios, a
+seeded reachability model and a collect-at-every-safe-point stress run
+against the real heap. The ephemeron fixpoint rescans every weak map per
+round, which is quadratic for long ephemeron chains. Revisit when JS-07 heap profiles show pause times over the
 PERFORMANCE.md budget, fragmentation from interleaved long-lived cells, or
 native functions that allocate far past the threshold between safe points.

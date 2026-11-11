@@ -64,7 +64,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
-| TD-17 | Deliberate | DOM / JS | Prototype `HostHeap` lives in `rustic-dom` and is bound to one document | Open, pay with JS-03 |
+| TD-17 | Deliberate | DOM / JS | DOM/JS collection is bound to one document; adoption does not retarget wrappers | Open, WEB-02 |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
@@ -127,7 +127,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Open, JS-04 |
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
-| TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Open, JS-03 part 2 |
+| TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -320,18 +320,15 @@ the first script-visible node wrapper (WEB-02). The DOC-09 prototype heap prunes
 
 ### TD-17 — Prototype host heap lives in the DOM crate, one document only
 
-`HostHeap` (ADR 0012) stands in for the JS heap so DOC-09 could test roots,
-detached-tree retention and node/object cycles before a runtime exists. ADR 0002
-says the runtime owns its heap without depending on the DOM crate, so this type
-is not the final home. It is bound to one document: edges to another document's
-nodes are rejected, and adoption prunes the source heap's entries (TD-16) rather
-than retargeting them. Its edge registry is a flat vector sorted per collection,
-and collection is stop-the-world. **Why deliberate:** it is the smallest thing
-that tests the contract, it fails loudly instead of leaking, and the DOM side
-(per-tree marking, sweep through `destroy_subtree`) is what carries forward.
-**Pay:** JS-03 owns objects and roots; the DOM keeps tree-closure marking and
-exposes it to a shared marking phase across documents; adoption retargets edges
-through `Adopted::ids`. **Trigger:** JS-03, or a second document sharing a heap.
+The prototype `HostHeap` that stood in for the JS heap is gone: JS-03 owns
+objects and roots, the DOM keeps tree marking, and `rustic-bindings::DomHeap`
+runs one collection over both (ADR 0016). What remains is that a `DomHeap` is
+bound to one document: a realm spanning several documents needs one marking
+phase across all of them, and adoption reissues node IDs (TD-16), so a
+wrapper of an adopted node stops naming it instead of following it through
+`Adopted::ids`. **Why deliberate:** nothing creates wrappers for script yet.
+**Pay:** WEB-02 keeps a wrapper table per realm and retargets on adoption.
+**Trigger:** the first generated binding, or a second document in a realm.
 
 ### TD-18 — Tree dumps grew quadratically with nested template contents (Paid)
 
@@ -1349,11 +1346,10 @@ corpus, then add incremental marking (worklist budget per step with a write
 barrier) or a nursery if the PERFORMANCE.md budget is missed. Trigger: a
 measured pause over budget.
 
-### TD-96 — No weak references or DOM host tracing yet
+### TD-96 — No weak references or DOM host tracing yet (Paid)
 
-The collector has strong edges only. `WeakRef`, `WeakMap`, `WeakSet` and
-`FinalizationRegistry` need weak cells and ephemeron marking, and DOM wrappers
-need a host-object class whose edges the DOM reports during marking, replacing
-the DOC-09 `HostHeap` stand-in (TD-17).
-
-Pay with the second part of JS-03, before WEB-02 generates bindings.
+The first part of JS-03 had strong edges only. Paid by its second part: weak
+references, weak maps and sets with ephemeron marking and finalization
+registries in `runtime/weak.rs`; host objects and `HostTracer`; and
+`rustic-bindings::DomHeap`, which replaced the DOC-09 `HostHeap`. One document
+per heap remains (TD-17).

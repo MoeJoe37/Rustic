@@ -2,7 +2,8 @@
 //!
 //! This is an internal tree core, not a complete implementation of browser DOM
 //! APIs. Detached nodes remain allocated until explicitly destroyed. Destruction
-//! is an engine operation, not a substitute for the future tracing collector.
+//! is an engine operation; garbage collection marks whole trees through
+//! [`TreeMarks`] from the JavaScript heap's collector (`rustic-bindings`).
 //!
 //! ```
 //! use rustic_dom::{Document, DocumentLimits, DomString, NodeKind, QualifiedName};
@@ -29,9 +30,7 @@ mod storage;
 mod string;
 mod traversal;
 
-pub use document::tracing::{
-    CollectionStats, HostHeap, HostHeapError, HostHeapLimits, HostObjectId, Traced,
-};
+pub use document::marking::TreeMarks;
 pub use document::{Adopted, Document, DocumentLimits, InvariantViolation, ReadyState};
 pub use dump::DumpError;
 pub use error::DomError;

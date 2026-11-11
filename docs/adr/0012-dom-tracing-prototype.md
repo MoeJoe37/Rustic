@@ -1,7 +1,7 @@
 # ADR 0012: DOM/host tracing prototype and DOM conformance gate
 
 - Date: 2026-11-08
-- Status: Accepted prototype contract (DOC-09); the real heap arrives with JS-03
+- Status: Contract accepted (DOC-09). The prototype `HostHeap` described below was replaced in JS-03 by the JavaScript heap and `rustic-bindings` (ADR 0016); the reachability rules and the tree-marking half in `rustic-dom` carry forward
 
 ## Context
 

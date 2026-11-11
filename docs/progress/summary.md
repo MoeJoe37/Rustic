@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 34.93%** = 32.50% verified complete + 2.43% partial credit. 53/172 capabilities complete, 5 in progress.
+**Overall completion: 35.46%** = 33.81% verified complete + 1.65% partial credit. 54/172 capabilities complete, 4 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `0e422908f6ab178a23f566952769045ac26696fdd8eeebeb22e643a5801058f3`.
+Catalog: `engine-v3`. Source fingerprint: `0bbeba122ddd5a05fffd2ac7d847ac012fa52adc3c40678843d1debdd4b48b68`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v3`. Source fingerprint: `0e422908f6ab178a23f566952769045ac2669
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 12.22% |
-| M4 ECMAScript runtime | 0/13 | 20.71% | 0.00% | 10.68% |
+| M4 ECMAScript runtime | 1/13 | 25.64% | 12.30% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 4.46% |
@@ -33,7 +33,7 @@ Catalog: `engine-v3`. Source fingerprint: `0e422908f6ab178a23f566952769045ac2669
 | Text & fonts | 4/6 | 0 | 63.63% | 63.63% | 4% | 2.54 |
 | Layout | 6/10 | 0 | 56.52% | 56.52% | 9% | 5.08 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 6% | 4.22 |
-| JavaScript & GC | 0/15 | 4 | 18.44% | 0.00% | 12% | 2.21 |
+| JavaScript & GC | 1/15 | 3 | 22.83% | 10.95% | 12% | 2.73 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
 | Network & navigation | 0/7 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -92,7 +92,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Slot assignment, the flat tree and slotchange
   - [ ] Declarative shadow DOM in the HTML parser
   - [ ] Custom element registry, upgrades and lifecycle callbacks
-- **complete** `dom.tracing` — Tracing integration and DOM conformance gate · size 5 · M1 · 0.88% of engine ([source](../../crates/rustic-dom/src/document/tracing.rs), [test](../../crates/rustic-dom/tests/tracing.rs), [test](../../crates/rustic-dom/tests/tracing.rs), [source](../../crates/rustic-dom/src/document/invariants.rs), [test](../../crates/rustic-dom/tests/conformance.rs))
+- **complete** `dom.tracing` — Tracing integration and DOM conformance gate · size 5 · M1 · 0.88% of engine ([source](../../crates/rustic-dom/src/document/marking.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [source](../../crates/rustic-dom/src/document/invariants.rs), [test](../../crates/rustic-dom/tests/conformance.rs))
 
 ### HTML
 
@@ -169,12 +169,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Ordinary internal methods and property descriptor validation ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
   - [x] Array and String exotic objects ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
   - [ ] Arguments, bound function and Proxy exotic objects
-- **in progress 60.00%** `js.heap` — Rooted traced heap and host-object cycle collection · size 8 · M4 · 1.31% of engine
-  - [x] Free-list arenas and iterative nonmoving mark/sweep from explicit roots ([source](../../crates/rustic-js/src/runtime/gc.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [x] Shape and atom collection, arena tail return and exact budget reset ([source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [x] Generation-checked host roots, collection policy and the js-heap shadow-model fuzz target ([source](../../crates/rustic-fuzz/src/js_heap.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [ ] Weak references and ephemeron marking (TD-96)
-  - [ ] DOM host-object tracing replacing the DOC-09 HostHeap (TD-17, TD-96)
+- **complete** `js.heap` — Rooted traced heap and host-object cycle collection · size 8 · M4 · 1.31% of engine ([source](../../crates/rustic-js/src/runtime/gc.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-fuzz/src/js_heap.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/weak.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-bindings/src/heap.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs))
 - **planned** `js.interpreter` — Original interpreter/bytecode and control flow · size 8 · M4 · 1.31% of engine
 - **planned** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.82% of engine
 - **planned** `js.builtins` — Core built-ins and collections · size 8 · M4 · 1.31% of engine

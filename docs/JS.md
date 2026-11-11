@@ -186,10 +186,26 @@ The collector is a nonmoving, stop-the-world mark/sweep over the arenas
 - **Safety.** Using a handle that was collected panics at once instead of
   reading another value.
 
+- **Weak objects.** `Agent::new_weak_ref`, `new_weak_map`, `new_weak_set` and
+  `new_finalization_registry` create the internal slots of the weak built-ins
+  (their constructors and methods are JS-05). A weak target does not keep its
+  value alive and reads `undefined` once it is collected. A weak-map entry is
+  an ephemeron: its value is marked only once its key is, repeated to a
+  fixpoint, so a key reachable only from its own value is collected. A
+  registry keeps held values alive, and `registry_take_finalized` returns
+  those whose targets died, for the host to run cleanup jobs.
+- **Host objects.** `Agent::new_host_object(proto, data)` makes an object the
+  embedder knows by a `u64`. `collect_garbage_with` takes a `HostTracer`,
+  which adds roots, reports the values each reachable host object keeps
+  alive, and is told which host objects were collected. `rustic-bindings`
+  uses this for DOM node wrappers ([DOM.md](DOM.md#garbage-collection-doc-09-js-03)).
+- **Stress mode.** `Heap::set_gc_stress(true)` makes `should_collect` answer
+  yes at every safe point.
+
 `GcStats` reports bytes before and after and the cells freed per kind.
 `tests/gc.rs` covers each root and reference kind, cycles, 200,000-deep
-chains, shape and atom reclamation, index reuse and exact budget return. The
-`js-heap` fuzz target checks random allocate/mutate/link/root/collect
-sequences against a shadow model. Weak references and DOM host-object tracing
-are the remaining part of JS-03 (TD-96); collection is not incremental
-(TD-95).
+chains, shape and atom reclamation, index reuse, exact budget return, weak
+references, ephemeron chains, registries and host tracing. The `js-heap` fuzz
+target checks random allocate/mutate/link/root/collect sequences against a
+shadow model. Collection is not incremental (TD-95) and native functions
+cannot collect mid-run (TD-94).

@@ -2,9 +2,11 @@
 //! kind of root, freeing and reuse of every arena, atoms and shapes,
 //! budget return, deep graphs, host roots and the collection policy.
 
+use std::collections::{HashMap, HashSet};
+
 use rustic_js::runtime::{
-    Agent, BigInt, JsResult, Kind, MIN_GC_THRESHOLD, ObjectId, PropertyDescriptor, PropertyKey,
-    Roots, Value,
+    Abrupt, Agent, BigInt, HostTracer, JsResult, Kind, MIN_GC_THRESHOLD, ObjectId,
+    PropertyDescriptor, PropertyKey, Roots, Value,
 };
 
 fn agent() -> Agent {
@@ -395,4 +397,288 @@ fn freed_tails_return_arena_memory() {
     let fresh = a.new_object().unwrap();
     assert!(fresh.index() < first[9].index() + 2);
     assert!(a.heap.bytes_used() < base + 2000);
+}
+
+// ---- weak objects -------------------------------------------------------
+
+fn is_type_error(agent: &Agent, result: JsResult<impl std::fmt::Debug>) -> bool {
+    match result {
+        Err(Abrupt::Throw(v)) => {
+            agent.get_prototype_of(v.as_object().unwrap())
+                == Some(agent.intrinsics.type_error_prototype)
+        }
+        _ => false,
+    }
+}
+
+#[test]
+fn weak_refs_do_not_keep_their_target_and_clear_when_it_dies() {
+    let mut a = agent();
+    let target = a.new_object().unwrap();
+    let weak = a.new_weak_ref(Value::object(target)).unwrap();
+    let symbol = a.heap.alloc_symbol(None).unwrap();
+    let weak_symbol = a.new_weak_ref(Value::symbol(symbol)).unwrap();
+    let r = a.new_weak_ref(Value::number(1.0));
+    assert!(is_type_error(&a, r));
+    let holders = [Value::object(weak), Value::object(weak_symbol)];
+
+    // While something else holds the target, the reference reads it.
+    let mut all = holders.to_vec();
+    all.extend([Value::object(target), Value::symbol(symbol)]);
+    a.collect_garbage(holding(&all));
+    assert_eq!(a.weak_ref_deref(weak), Value::object(target));
+    assert_eq!(a.weak_ref_deref(weak_symbol), Value::symbol(symbol));
+
+    let stats = a.collect_garbage(holding(&holders));
+    assert_eq!((stats.objects_freed, stats.symbols_freed), (1, 1));
+    assert_eq!(a.weak_ref_deref(weak), Value::UNDEFINED);
+    assert_eq!(a.weak_ref_deref(weak_symbol), Value::UNDEFINED);
+    // The freed index is reused; the cleared reference must not see it.
+    let reused = a.new_object().unwrap();
+    assert_eq!(reused, target);
+    assert_eq!(a.weak_ref_deref(weak), Value::UNDEFINED);
+    assert_eq!(a.weak_ref_deref(reused), Value::UNDEFINED);
+}
+
+#[test]
+fn weak_map_entries_live_exactly_as_long_as_their_keys() {
+    let mut a = agent();
+    let map = a.new_weak_map().unwrap();
+    let set = a.new_weak_set().unwrap();
+    let kept = a.new_object().unwrap();
+    let dropped = a.new_object().unwrap();
+    let kept_value = a.new_object().unwrap();
+    let dropped_value = a.new_object().unwrap();
+    a.weak_map_set(map, Value::object(kept), Value::object(kept_value))
+        .unwrap();
+    a.weak_map_set(map, Value::object(dropped), Value::object(dropped_value))
+        .unwrap();
+    a.weak_map_set(set, Value::object(dropped), Value::UNDEFINED)
+        .unwrap();
+    let r = a.weak_map_set(map, Value::TRUE, Value::NULL);
+    assert!(is_type_error(&a, r));
+    let r = a.weak_map_set(kept, Value::object(kept), Value::NULL);
+    assert!(is_type_error(&a, r));
+    assert!(a.weak_map_has(set, Value::object(dropped)));
+    // Replacing a value does not add an entry.
+    a.weak_map_set(map, Value::object(kept), Value::object(kept_value))
+        .unwrap();
+    assert_eq!(a.weak_map_len(map), 2);
+
+    let roots = [Value::object(map), Value::object(set), Value::object(kept)];
+    let stats = a.collect_garbage(holding(&roots));
+    // `dropped` and its value go (with the two thrown TypeErrors); the map
+    // keeps `kept_value` alive.
+    assert_eq!(stats.objects_freed, 4);
+    assert_eq!((a.weak_map_len(map), a.weak_map_len(set)), (1, 0));
+    assert_eq!(
+        a.weak_map_get(map, Value::object(kept)),
+        Value::object(kept_value)
+    );
+    assert!(!a.weak_map_has(map, Value::object(dropped)));
+    assert!(a.weak_map_delete(map, Value::object(kept)));
+    assert!(!a.weak_map_delete(map, Value::object(kept)));
+    let stats = a.collect_garbage(holding(&roots));
+    assert_eq!(stats.objects_freed, 1);
+}
+
+#[test]
+fn ephemerons_do_not_leak_keys_reachable_only_from_their_own_values() {
+    let mut a = agent();
+    let base = baseline(&mut a);
+    let map = a.new_weak_map().unwrap();
+    let back = key(&mut a, "back");
+    // value -> key cycles, and a chain where each value holds the next key.
+    let head = a.new_object().unwrap();
+    let mut previous = head;
+    for _ in 0..500 {
+        let k = a.new_object().unwrap();
+        let v = a.new_object().unwrap();
+        a.create_data_property_or_throw(v, back, Value::object(k))
+            .unwrap();
+        a.weak_map_set(map, Value::object(k), Value::object(v))
+            .unwrap();
+        let next = a.new_object().unwrap();
+        let holder = a.new_object().unwrap();
+        a.create_data_property_or_throw(holder, back, Value::object(next))
+            .unwrap();
+        a.weak_map_set(map, Value::object(previous), Value::object(holder))
+            .unwrap();
+        previous = next;
+    }
+    assert_eq!(a.weak_map_len(map), 1000);
+    // Holding the head keeps the whole chain (found only through
+    // ephemeron values), but none of the self-referential pairs.
+    let stats = a.collect_garbage(holding(&[Value::object(map), Value::object(head)]));
+    assert_eq!(stats.objects_freed, 1000);
+    assert_eq!(a.weak_map_len(map), 500);
+    let mut walk = head;
+    for _ in 0..500 {
+        let holder = a
+            .weak_map_get(map, Value::object(walk))
+            .as_object()
+            .unwrap();
+        walk = a.get(holder, back).unwrap().as_object().unwrap();
+    }
+    assert_eq!(walk, previous);
+    // Without the head everything goes, although the map survives.
+    let stats = a.collect_garbage(holding(&[Value::object(map)]));
+    assert_eq!(stats.objects_freed, 1001);
+    assert_eq!(a.weak_map_len(map), 0);
+    a.collect_garbage(Roots::default());
+    assert_eq!(a.heap.bytes_used(), base);
+}
+
+#[test]
+fn finalization_registries_queue_held_values_of_dead_targets() {
+    let mut a = agent();
+    let registry = a.new_finalization_registry().unwrap();
+    let alive = a.new_object().unwrap();
+    let dying = a.new_object().unwrap();
+    let cancelled = a.new_object().unwrap();
+    let token = a.new_object().unwrap();
+    let held = a.string("held for dying").unwrap();
+    a.registry_register(registry, Value::object(alive), Value::number(1.0), None)
+        .unwrap();
+    a.registry_register(registry, Value::object(dying), held, None)
+        .unwrap();
+    a.registry_register(
+        registry,
+        Value::object(cancelled),
+        Value::number(3.0),
+        Some(Value::object(token)),
+    )
+    .unwrap();
+    let r = a.registry_register(registry, Value::number(1.0), Value::NULL, None);
+    assert!(is_type_error(&a, r));
+    let r = a.registry_register(registry, Value::object(alive), Value::object(alive), None);
+    assert!(is_type_error(&a, r));
+    let r = a.registry_register(
+        registry,
+        Value::object(alive),
+        Value::NULL,
+        Some(Value::TRUE),
+    );
+    assert!(is_type_error(&a, r));
+    assert!(
+        a.registry_unregister(registry, Value::object(token))
+            .unwrap()
+    );
+    assert!(
+        !a.registry_unregister(registry, Value::object(token))
+            .unwrap()
+    );
+
+    let roots = [Value::object(registry), Value::object(alive)];
+    a.collect_garbage(holding(&roots));
+    let finalized = a.registry_take_finalized(registry);
+    assert_eq!(finalized.len(), 1);
+    assert_eq!(a.display(finalized[0]), "held for dying");
+    assert!(a.registry_take_finalized(registry).is_empty());
+    // A queued held value survives further collections until taken.
+    a.registry_register(registry, Value::object(alive), held, None)
+        .unwrap();
+    a.collect_garbage(holding(&[Value::object(registry)]));
+    a.collect_garbage(holding(&[Value::object(registry)]));
+    let finalized = a.registry_take_finalized(registry);
+    assert_eq!(finalized.len(), 2);
+    assert_eq!(finalized[0], Value::number(1.0));
+    assert_eq!(a.display(finalized[1]), "held for dying");
+}
+
+// ---- host objects -------------------------------------------------------
+
+/// A toy host: each host object `n` keeps the listed values alive, and
+/// some values are rooted by the host itself.
+#[derive(Default)]
+struct Host {
+    edges: HashMap<u64, Vec<Value>>,
+    rooted: Vec<Value>,
+    traced: Vec<u64>,
+    finalized: HashSet<u64>,
+}
+
+impl HostTracer for Host {
+    fn roots(&mut self, sink: &mut dyn FnMut(Value)) {
+        for &value in &self.rooted {
+            sink(value);
+        }
+    }
+
+    fn trace(&mut self, data: u64, sink: &mut dyn FnMut(Value)) {
+        self.traced.push(data);
+        for &value in self.edges.get(&data).into_iter().flatten() {
+            sink(value);
+        }
+    }
+
+    fn finalize(&mut self, data: u64) {
+        assert!(self.finalized.insert(data), "finalized twice");
+    }
+}
+
+#[test]
+fn host_objects_report_edges_and_learn_of_their_death() {
+    let mut a = agent();
+    let mut host = Host::default();
+    // wrapper 1 -> listener -> wrapper 2 -> payload; wrapper 3 <-> wrapper 4
+    // is an unreachable cycle through host edges; wrapper 5 is host-rooted.
+    let wrappers: Vec<ObjectId> = (1..=5)
+        .map(|n| a.new_host_object(None, n).unwrap())
+        .collect();
+    assert_eq!(a.host_data(wrappers[1]), Some(2));
+    let plain = a.new_object().unwrap();
+    assert_eq!(a.host_data(plain), None);
+    let listener = a.new_object().unwrap();
+    let target = key(&mut a, "target");
+    a.create_data_property_or_throw(listener, target, Value::object(wrappers[1]))
+        .unwrap();
+    let payload = a.string("payload").unwrap();
+    host.edges.insert(1, vec![Value::object(listener)]);
+    host.edges.insert(2, vec![payload]);
+    host.edges.insert(3, vec![Value::object(wrappers[3])]);
+    host.edges.insert(4, vec![Value::object(wrappers[2])]);
+    host.rooted.push(Value::object(wrappers[4]));
+
+    let stats = a.collect_garbage_with(holding(&[Value::object(wrappers[0])]), &mut host);
+    // `plain`, wrapper 3 and wrapper 4 go.
+    assert_eq!(stats.objects_freed, 3);
+    host.traced.sort_unstable();
+    assert_eq!(host.traced, [1, 2, 5]);
+    assert_eq!(host.finalized, HashSet::from([3, 4]));
+    assert_eq!(a.display(payload), "payload");
+    assert_eq!(a.get(listener, target).unwrap(), Value::object(wrappers[1]));
+    // Host objects are ordinary objects too.
+    a.create_data_property_or_throw(wrappers[0], target, Value::TRUE)
+        .unwrap();
+    assert_eq!(a.get(wrappers[0], target).unwrap(), Value::TRUE);
+
+    // A plain collection treats host objects as leaves.
+    host.traced.clear();
+    let stats = a.collect_garbage(Roots::default());
+    assert_eq!(stats.objects_freed, 4);
+}
+
+#[test]
+fn weak_map_values_reached_through_host_edges_are_found() {
+    // key <- host edge of a wrapper that is itself only an ephemeron value.
+    let mut a = agent();
+    let mut host = Host::default();
+    let map = a.new_weak_map().unwrap();
+    let first = a.new_object().unwrap();
+    let wrapper = a.new_host_object(None, 7).unwrap();
+    let second = a.new_object().unwrap();
+    let last = a.string("found").unwrap();
+    a.weak_map_set(map, Value::object(first), Value::object(wrapper))
+        .unwrap();
+    host.edges.insert(7, vec![Value::object(second)]);
+    a.weak_map_set(map, Value::object(second), last).unwrap();
+    let roots = [Value::object(map), Value::object(first)];
+    let stats = a.collect_garbage_with(holding(&roots), &mut host);
+    assert_eq!(stats.objects_freed, 0);
+    assert_eq!(stats.strings_freed, 0);
+    assert_eq!(
+        a.display(a.weak_map_get(map, Value::object(second))),
+        "found"
+    );
 }

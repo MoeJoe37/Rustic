@@ -30,6 +30,17 @@ pub enum Class {
     Symbol,
     /// A BigInt object.
     BigInt,
+    /// A host object: its meaning and outgoing edges belong to the
+    /// embedder (a DOM wrapper, for example).
+    Host,
+    /// A WeakRef (§26.1).
+    WeakRef,
+    /// A WeakMap (§24.3).
+    WeakMap,
+    /// A WeakSet (§24.4).
+    WeakSet,
+    /// A FinalizationRegistry (§26.2).
+    FinalizationRegistry,
 }
 
 /// A complete or partial property descriptor (§6.2.6).
@@ -209,6 +220,38 @@ pub(crate) struct Extra {
     pub primitive: Option<Value>,
     /// The behavior of a native function.
     pub native: Option<NativeFn>,
+    /// Internal slots of host and weak objects.
+    pub internal: Option<Internal>,
+}
+
+/// One registration in a FinalizationRegistry (§26.2).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RegistryCell {
+    /// `[[WeakRefTarget]]`, held weakly.
+    pub target: Value,
+    /// `[[HeldValue]]`, held strongly.
+    pub held: Value,
+    /// `[[UnregisterToken]]`, held weakly; `UNINITIALIZED` when absent or
+    /// collected.
+    pub token: Value,
+}
+
+/// Internal slots the collector treats specially.
+#[derive(Clone, Debug)]
+pub(crate) enum Internal {
+    /// A host object's embedder data.
+    Host(u64),
+    /// `[[WeakRefTarget]]`; `UNINITIALIZED` once the target is collected.
+    WeakRef(Value),
+    /// `[[WeakMapData]]` or `[[WeakSetData]]` keyed by the key's bits. An
+    /// entry is an ephemeron: its value is live only while its key is.
+    WeakMap(HashMap<u64, Value>),
+    /// `[[Cells]]`, and held values of collected targets waiting for the
+    /// host to run the cleanup callback.
+    Registry {
+        cells: Vec<RegistryCell>,
+        pending: Vec<Value>,
+    },
 }
 
 /// The `length` of an Array is writable (cleared by freezing).
@@ -290,6 +333,14 @@ impl Object {
 
     pub(crate) fn native(&self) -> Option<NativeFn> {
         self.extra.as_ref()?.native
+    }
+
+    pub(crate) fn internal(&self) -> Option<&Internal> {
+        self.extra.as_ref()?.internal.as_ref()
+    }
+
+    pub(crate) fn internal_mut(&mut self) -> Option<&mut Internal> {
+        self.extra.as_mut()?.internal.as_mut()
     }
 }
 

@@ -97,11 +97,18 @@ impl<T> Arena<T> {
     /// Free every cell not in `marks`, drop the free tail and give its
     /// memory back. Returns the number of cells freed.
     pub(crate) fn sweep(&mut self, marks: &BitSet) -> usize {
+        self.sweep_with(marks, |_| {})
+    }
+
+    /// [`Arena::sweep`], showing each cell to `on_free` before it goes.
+    pub(crate) fn sweep_with(&mut self, marks: &BitSet, mut on_free: impl FnMut(&T)) -> usize {
         let mut freed = 0;
         for (i, cell) in self.cells.iter_mut().enumerate() {
-            if cell.is_some() && !marks.get(i as u32) {
-                *cell = None;
-                freed += 1;
+            if !marks.get(i as u32) {
+                if let Some(value) = cell.take() {
+                    on_free(&value);
+                    freed += 1;
+                }
             }
         }
         self.live -= freed;
@@ -144,6 +151,8 @@ pub struct Heap {
     /// Collect once `bytes_used` reaches this (see `gc.rs`).
     pub(crate) gc_threshold: usize,
     pub(crate) collections: u64,
+    /// Ask for a collection at every safe point (GC stress testing).
+    pub(crate) gc_stress: bool,
 }
 
 impl Heap {
@@ -163,6 +172,7 @@ impl Heap {
             budget: Budget::new(limit),
             gc_threshold: super::gc::initial_threshold(limit),
             collections: 0,
+            gc_stress: false,
         }
     }
 
@@ -320,6 +330,14 @@ impl Heap {
     /// Live shapes, the root included.
     pub fn shape_count(&self) -> usize {
         self.shapes.len()
+    }
+
+    /// Stress mode: [`Agent::should_collect`](super::Agent::should_collect)
+    /// answers yes at every safe point, so a collection runs as often as the
+    /// embedder can run one. Tests use it to find handles that are not
+    /// rooted.
+    pub fn set_gc_stress(&mut self, on: bool) {
+        self.gc_stress = on;
     }
 
     /// Completed collections.

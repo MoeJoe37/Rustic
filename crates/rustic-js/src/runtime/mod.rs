@@ -17,6 +17,7 @@ mod object;
 mod shape;
 mod string;
 mod value;
+mod weak;
 
 pub use agent::{
     Abrupt, Agent, ErrorKind, Intrinsics, JsResult, Names, NativeFn, WellKnownSymbols,
@@ -25,7 +26,7 @@ pub use bigint::BigInt;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
 pub use env::{EnvId, Environment, Reference, ReferenceBase, ThisStatus};
-pub use gc::{GcStats, HostRoot, MIN_GC_THRESHOLD, Roots};
+pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};
 pub use heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory, Symbol};
 pub use internal::IntegrityLevel;
 pub use number::{

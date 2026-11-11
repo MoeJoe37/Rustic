@@ -123,27 +123,31 @@ tracing collector keeps host and shadow tree alive together, and
 shadow roots and the custom element registry are not implemented. The custom
 element name check approximates HTML's `PCENChar` ranges (TD-24).
 
-## Tracing prototype (DOC-09)
+## Garbage collection (DOC-09, JS-03)
 
-`HostHeap` models the host side of the DOM/JS tracing contract before a
-JavaScript runtime exists; [ADR 0012](adr/0012-dom-tracing-prototype.md) records
-the decision and its hand-off to JS-03. It is bound to one document.
+Nodes are collected together with the JavaScript heap
+([ADR 0012](adr/0012-dom-tracing-prototype.md),
+[ADR 0016](adr/0016-js-garbage-collection.md)). The DOM owns the tree half:
 
 | Operation | Behavior |
 | --- | --- |
-| `allocate()` | New unrooted object with a generation-checked `HostObjectId` |
-| `add_edge(doc, from, to)` / `remove_edge` | Register node → object, object → node or object → object edges; node → node is rejected because the tree owns it |
-| `root(doc, target)` / `unroot` | Counted roots for nodes or objects (host handles) |
-| `collect(&mut doc)` | Stop-the-world mark/sweep; returns `CollectionStats` |
+| `Document::tree_marks()` | Mark table for one collection, reserved up front |
+| `mark_tree(&mut marks, node, visit)` | Marks the whole tree holding `node`, the trees its elements own (template contents, shadow roots) and the element owning it; calls `visit` once per newly marked node |
+| `mark_document_tree(&mut marks, visit)` | Marks the document's own tree, which is always live |
+| `sweep_unmarked_trees(&marks)` | Destroys every unmarked parentless tree through `destroy_subtree`; returns the nodes destroyed |
 
 Reachability is per tree: holding any node keeps its whole tree, a template and
-its contents keep each other, and the document's own tree is always live.
-Collection destroys unreachable parentless trees through `destroy_subtree`, so
-their IDs become stale, frees unreachable objects, and prunes roots and edges that
-name nodes the engine destroyed explicitly. Every temporary buffer is reserved
-before the first change, so an error leaves the heap and document untouched.
-Marking and destruction are iterative. `HostHeapLimits` bounds live objects and
-edges plus distinct rooted nodes.
+its contents keep each other, and so do a host and its shadow root. Marking and
+destruction are iterative.
+
+`rustic-bindings` joins this to the JS collector. `DomHeap` gives each node one
+wrapper (a JS host object, the same object on every request), records the
+values a node keeps alive (event listeners), and runs one collection over both
+sides: a reachable wrapper marks its node's tree, a marked tree reports its
+nodes' wrappers and node-held values, unreachable trees are destroyed and
+their wrappers freed. A wrapper whose node the engine destroyed stays a plain
+object that names no node. The heap is bound to one document (TD-17).
+The DOC-09 prototype `HostHeap` that stood in for the JS heap is gone.
 
 ## Structural invariants and the conformance gate
 

@@ -120,6 +120,15 @@ name = "rustic-base"
 version = "0.1.0"
 
 [[package]]
+name = "rustic-bindings"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-dom",
+ "rustic-js",
+]
+
+[[package]]
 name = "rustic-cli"
 version = "0.1.0"
 dependencies = [

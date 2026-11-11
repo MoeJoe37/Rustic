@@ -122,9 +122,12 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Open, JS-08 |
 | TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, M4 |
 | TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
-| TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Open, JS-03 |
+| TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
 | TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and other numeric conversions are missing | Open, JS-05/JS-08 |
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Open, JS-04 |
+| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
+| TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
+| TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Open, JS-03 part 2 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1290,18 +1293,17 @@ Watch for: frame-size growth that lowers the limit below realistic nesting
 mixed levels with default limits). Pay by moving deep expression chains to
 an explicit stack if real content needs more.
 
-### TD-91 — The JS heap never frees
+### TD-91 — The JS heap never frees (Paid)
 
-JS-02 allocates objects, strings, symbols, BigInts and environments into
-`u32`-indexed arenas and charges each to the heap's byte budget
-(`DEFAULT_HEAP_BYTES`, 256 MiB), but nothing is collected: garbage stays
-until the agent is dropped, and a long computation fails with
-`Abrupt::OutOfMemory` once the budget is spent. Nothing executes script yet,
-so no page can reach this.
+JS-02 allocated objects, strings, symbols, BigInts and environments into
+`u32`-indexed arenas charged to the heap's byte budget, but collected nothing:
+garbage stayed until the agent was dropped.
 
-Pay with JS-03: roots, nonmoving mark/sweep over the same arenas with free
-lists that keep indices stable, budget release on sweep, and tracing of host
-objects (replacing the DOC-09 `HostHeap` stand-in, TD-17).
+Paid by JS-03 (ADR 0016): nonmoving mark/sweep over the same arenas with free
+lists that keep indices stable, collection of unused shapes and atoms, arena
+tails returned to the allocator, and the budget reset to the exact live
+footprint. `tests/gc.rs` and the `js-heap` fuzz target check it. Weak
+references and DOM host-object tracing are TD-96.
 
 ### TD-92 — BigInt and number conversions are partial
 
@@ -1324,3 +1326,34 @@ Watch for: JS-04's bytecode compiler should resolve most bindings to slot
 indices at compile time, leaving name search only for `eval` and `with`.
 Pay there if profiles show scope lookup cost.
 
+### TD-94 — Collection only at caller safe points
+
+A handle in a Rust local is not a root, so allocation never collects on its
+own (ADR 0016). The interpreter will poll `Agent::should_collect` between
+instructions, but one native function that allocates in a long loop (a
+built-in over a huge array) runs to the heap limit without a collection and
+then fails with `OutOfMemory` even though garbage exists.
+
+Pay with JS-05: built-ins that loop root their temporaries and poll at loop
+boundaries, or runtime functions adopt handle scopes so allocation itself can
+collect. Trigger: the first built-in that allocates per iteration.
+
+### TD-95 — Stop-the-world, full-heap collection
+
+Every collection marks the whole live heap and sweeps every arena in one
+pause. Pauses grow with the live heap, and each sweep also walks arena cells
+that are free.
+
+Pay with JS-09's limits and benchmark gate: measure pauses on the benchmark
+corpus, then add incremental marking (worklist budget per step with a write
+barrier) or a nursery if the PERFORMANCE.md budget is missed. Trigger: a
+measured pause over budget.
+
+### TD-96 — No weak references or DOM host tracing yet
+
+The collector has strong edges only. `WeakRef`, `WeakMap`, `WeakSet` and
+`FinalizationRegistry` need weak cells and ephemeron marking, and DOM wrappers
+need a host-object class whose edges the DOM reports during marking, replacing
+the DOC-09 `HostHeap` stand-in (TD-17).
+
+Pay with the second part of JS-03, before WEB-02 generates bindings.

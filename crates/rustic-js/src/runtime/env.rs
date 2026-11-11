@@ -100,6 +100,66 @@ pub enum Environment {
 }
 
 impl Environment {
+    /// Report every heap reference this record holds (JS-03).
+    pub(crate) fn trace(&self, tracer: &mut impl super::gc::Tracer) {
+        let record = match self {
+            Environment::Declarative { outer, record } => {
+                tracer.env_opt(*outer);
+                record
+            }
+            Environment::Function {
+                outer,
+                record,
+                this,
+                function,
+                new_target,
+            } => {
+                tracer.env_opt(*outer);
+                tracer.value(Value::object(*function));
+                tracer.value(*new_target);
+                if let ThisStatus::Initialized(v) = this {
+                    tracer.value(*v);
+                }
+                record
+            }
+            Environment::Object { outer, object, .. } => {
+                tracer.env_opt(*outer);
+                tracer.value(Value::object(*object));
+                return;
+            }
+            Environment::Global {
+                object,
+                record,
+                this,
+                var_names,
+            } => {
+                tracer.value(Value::object(*object));
+                tracer.value(Value::object(*this));
+                for name in var_names {
+                    tracer.string(*name);
+                }
+                record
+            }
+        };
+        for (name, _) in &record.names {
+            tracer.string(*name);
+        }
+        for value in &record.values {
+            tracer.value(*value);
+        }
+    }
+
+    /// Bytes this record is charged for (see `gc::footprint`).
+    pub(crate) fn footprint(&self) -> usize {
+        let bindings = match self {
+            Environment::Declarative { record, .. }
+            | Environment::Function { record, .. }
+            | Environment::Global { record, .. } => record.names.len(),
+            Environment::Object { .. } => 0,
+        };
+        std::mem::size_of::<Environment>() + 16 * bindings
+    }
+
     fn outer(&self) -> Option<EnvId> {
         match self {
             Environment::Declarative { outer, .. }

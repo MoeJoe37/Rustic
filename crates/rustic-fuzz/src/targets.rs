@@ -55,6 +55,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(crate::sfnt::SfntTarget),
         Box::new(crate::shaping::ShapingTarget),
         Box::new(crate::js::JsParseTarget),
+        Box::new(crate::js_heap::JsHeapTarget),
         Box::new(UrlTarget),
     ]
 }

@@ -1,11 +1,12 @@
-# JavaScript engine (JS-01, JS-02)
+# JavaScript engine (JS-01 to JS-03)
 
 `rustic-js` is Rustic's own ECMAScript implementation (M4, ADR 0001: no
 existing JavaScript engine is used or embedded). JS-01 provides the front end:
 UTF-16 source text, the lexical grammar, and a parser from scripts and modules
 to an abstract syntax tree with source spans. JS-02 adds the runtime data
-model (see [Runtime data model](#runtime-data-model-js-02)). Nothing executes
-yet; the heap's collector is JS-03 and the interpreter JS-04.
+model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
+garbage collector (see [Garbage collection](#garbage-collection-js-03)).
+Nothing executes yet; the interpreter is JS-04.
 
 ## API
 
@@ -101,7 +102,8 @@ JS-07. Parse-phase results must not be advertised as ECMAScript support.
 ## Fuzzing
 
 The `js-parse` target of `rustic-fuzz` parses every input as a script, a
-module and a strict script. It checks that nothing panics or overflows the
+module and a strict script (the `js-heap` target is described under
+[Garbage collection](#garbage-collection-js-03)). It checks that nothing panics or overflows the
 stack, that syntax error spans lie inside the source, that a successful parse
 dumps deterministically, and that anything valid in strict mode is valid in
 sloppy mode. Seeds are one snippet per line of
@@ -124,7 +126,7 @@ small heap as [ADR 0015](adr/0015-js-value-and-memory-layout.md) records:
 An `Agent` owns one `Heap` and the realm's intrinsic objects. Every
 allocation is charged to the heap's byte budget; exceeding it returns
 `Abrupt::OutOfMemory`, which script cannot catch, and the heap is never
-over-committed. Nothing is collected until JS-03 (TD-91).
+over-committed. Unreachable values are freed by the collector below.
 
 - **Strings** (`JsStr`) are Latin-1 or UTF-16 with UTF-16 semantics.
   Property names are interned, so key comparison is an id compare, and array
@@ -160,3 +162,34 @@ over-committed. Nothing is collected until JS-03 (TD-91).
 `tests/runtime.rs` checks the spec rules above and pins the memory costs in
 the table.
 
+## Garbage collection (JS-03)
+
+The collector is a nonmoving, stop-the-world mark/sweep over the arenas
+([ADR 0016](adr/0016-js-garbage-collection.md)):
+
+- **Roots** are the agent's interned names, well-known symbols and
+  intrinsics, the `Roots` (values and environments) the caller passes to
+  `Agent::collect_garbage`, and host roots made with `Agent::root`. A
+  `HostRoot` carries a generation, so a released handle reads as `None` even
+  after its slot is reused.
+- **Marking** uses a worklist, never recursion, and keeps mark bits in
+  temporary bit sets, so objects carry no collector header.
+- **Sweeping** frees objects, strings, symbols, BigInts, environments, unused
+  shapes (and their transitions) and unused atoms. Freed indices are reused
+  lowest first, emptied arena tails are returned to the allocator, and the
+  byte budget is reset to the exact footprint of what is live.
+- **Safe points.** A handle in a Rust local is not a root, so allocation never
+  collects by itself. Callers poll `Agent::should_collect` where they can list
+  what they hold; the interpreter will do so between instructions. The trigger
+  starts at 1 MiB and becomes twice the live footprint after each collection,
+  capped at seven eighths of the heap limit (TD-94).
+- **Safety.** Using a handle that was collected panics at once instead of
+  reading another value.
+
+`GcStats` reports bytes before and after and the cells freed per kind.
+`tests/gc.rs` covers each root and reference kind, cycles, 200,000-deep
+chains, shape and atom reclamation, index reuse and exact budget return. The
+`js-heap` fuzz target checks random allocate/mutate/link/root/collect
+sequences against a shadow model. Weak references and DOM host-object tracing
+are the remaining part of JS-03 (TD-96); collection is not incremental
+(TD-95).

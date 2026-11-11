@@ -11,7 +11,7 @@ Tags identify reproducible prototypes; they do not imply general browser safety.
 follow-up is open. M1, M2 and M3 are complete for their declared catalog scope
 (28, 8 and 17 capabilities): local HTML parses, styles, lays out, shapes text,
 paints and rasterizes to PNG on the CPU. M4 is the current milestone: JS-01
-(lexer and parser, [JS.md](JS.md)) and JS-02 (the runtime data model) are done. M5–M10 are
+(lexer and parser, [JS.md](JS.md)) and JS-02 (the runtime data model) are done, and JS-03's collector core has landed. M5–M10 are
 unstarted. Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are
 carried forward (see [§6](#6-m3--static-document-renderer)). The
 [progress summary](progress/summary.md) is the measured status and
@@ -193,7 +193,7 @@ interpreter speed and heap size are the performance of the product everywhere.
 | --- | --- | --- | --- | --- |
 | JS-01 | Lexer/parser, lexical goals, AST, source spans, early errors, strict mode, ASI and UTF-16 string model | `js.parser` | M0 | **Done** ([JS.md](JS.md)); RegExp pattern early errors move to JS-08 (TD-88) |
 | JS-02 | 8-byte values, coercions, references, completion records, strings and atoms, shapes, object internal methods/descriptors and elements | `js.values`, `js.objects` | JS-01 | **Done** for the data model ([JS.md](JS.md#runtime-data-model-js-02), ADR 0015); collection is JS-03, BigInt conversions TD-92 |
-| JS-03 | Heap: typed arenas with `u32` indices charged to a budget, handle scopes/roots, nonmoving mark/sweep, weak references, allocation-triggered collection, host-object tracing that replaces the DOC-09 `HostHeap` stand-in | `js.heap` | JS-02, DOC-09 (done) | Planned |
+| JS-03 | Heap: typed arenas with `u32` indices charged to a budget, handle scopes/roots, nonmoving mark/sweep, weak references, allocation-triggered collection, host-object tracing that replaces the DOC-09 `HostHeap` stand-in | `js.heap` | JS-02, DOC-09 (done) | **In progress**: mark/sweep, roots, free lists, shape/atom collection and policy done ([ADR 0016](adr/0016-js-garbage-collection.md)); weak references and DOM host tracing remain |
 | JS-04 | Bytecode compiler and interpreter: AST to register bytecode, control flow, functions, closures, calls/new, exceptions, property inline caches | `js.interpreter`, `js.functions` | JS-02, JS-03 | Planned |
 | JS-05 | Core built-ins, arrays, strings, numbers, symbols, iterators, JSON, collections | `js.builtins` | JS-04 | Planned |
 | JS-06 | Promise jobs, realms, module records/loading hooks and dynamic imports without ambient I/O | `js.jobs`, `js.modules` | JS-04 | Planned |
@@ -427,7 +427,7 @@ contract. The original twelve-item M1 queue (DOC-01a to DOC-09) is complete.
 | Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
 | 1 | JS-02: values, coercions, strings/atoms, shapes and objects | Abstract-operation unit tests against the specification; 8-byte `Value` size asserted on every CI target | In progress |
-| 2 | JS-03: arena heap, roots and mark/sweep with host tracing | DOC-09's detached-tree and listener-cycle tests pass against the real heap; GC-at-every-allocation stress mode; budget exhaustion is atomic | Next |
+| 2 | JS-03: arena heap, roots and mark/sweep with host tracing | DOC-09's detached-tree and listener-cycle tests pass against the real heap; GC-at-every-allocation stress mode; budget exhaustion is atomic | In progress: collector core done |
 | 3 | JS-04: register bytecode, interpreter, functions and inline caches | Closures, exceptions and calls run; deep recursion fails with `RangeError` without Rust stack growth; cancellation stops `for(;;){}` | Planned |
 | 4 | JS-07: standalone runner and Test262 harness | Published counts at a pinned revision with exact expected failures | Planned (starts as soon as JS-04 runs code) |
 | 5 | JS-09: benchmark corpus and heap report | Recorded time and bytes per workload on x64 and ARM64; regressions over 10% need an explanation | Planned (corpus grows with each task) |

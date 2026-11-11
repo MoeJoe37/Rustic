@@ -18,6 +18,7 @@ mod formatting;
 mod harness;
 mod images;
 mod js;
+mod js_heap;
 mod mutate;
 mod paint;
 mod png;

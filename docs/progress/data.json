@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "69740a033c9383e7a8dea27a2f275e4a23dd1cce2f2fe17f84676ec40c46841c",
-  "percent": "34.14",
+  "source_fingerprint": "b7ffcfde6d83805604e2f0668ccedf93ea8eab0f98dc1468dee5f5715c926d5d",
+  "percent": "34.93",
   "verified_percent": "32.50",
-  "partial_percent": "1.64",
+  "partial_percent": "2.43",
   "completed": 53,
-  "in_progress": 4,
+  "in_progress": 5,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "10.68",
       "completed": 0,
       "total": 13,
-      "percent": "13.33",
+      "percent": "20.71",
       "verified_percent": "0.00",
-      "partial_percent": "13.33"
+      "partial_percent": "20.71"
     },
     {
       "id": "M5",
@@ -3055,9 +3055,69 @@
           "label": "Rooted traced heap and host-object cycle collection",
           "size": 8,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Free-list arenas and iterative nonmoving mark/sweep from explicit roots",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/gc.rs",
+                  "marker": "pub fn collect_garbage"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn deep_chains_mark_without_recursion"
+                }
+              ]
+            },
+            {
+              "label": "Shape and atom collection, arena tail return and exact budget reset",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/shape.rs",
+                  "marker": "pub(crate) fn sweep"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn unreachable_objects_are_freed_and_the_budget_returns_to_baseline"
+                }
+              ]
+            },
+            {
+              "label": "Generation-checked host roots, collection policy and the js-heap shadow-model fuzz target",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/js_heap.rs",
+                  "marker": "impl Target for JsHeapTarget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn host_roots_keep_values_alive_until_released"
+                }
+              ]
+            },
+            {
+              "label": "Weak references and ephemeron marking (TD-96)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "DOM host-object tracing replacing the DOC-09 HostHeap (TD-17, TD-96)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "60.00",
           "engine_share": "1.31"
         },
         {
@@ -3173,12 +3233,12 @@
       ],
       "points": 73,
       "completed": 0,
-      "in_progress": 3,
+      "in_progress": 4,
       "total": 15,
-      "contribution": "1.42",
-      "percent": "11.87",
+      "contribution": "2.21",
+      "percent": "18.44",
       "verified_percent": "0.00",
-      "partial_percent": "11.87"
+      "partial_percent": "18.44"
     },
     {
       "id": "wasm",

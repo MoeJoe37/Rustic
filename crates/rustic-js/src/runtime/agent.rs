@@ -60,6 +60,11 @@ macro_rules! names {
             fn new(heap: &mut Heap) -> Result<Self, OutOfMemory> {
                 Ok(Self { $($field: heap.intern_str($text)?,)* })
             }
+
+            /// Every name, for the collector's roots.
+            pub(crate) fn all(&self) -> impl Iterator<Item = StringId> {
+                [$(self.$field,)*].into_iter()
+            }
         }
     };
 }
@@ -96,6 +101,11 @@ macro_rules! symbols {
                     let description = heap.alloc_str($text)?;
                     heap.alloc_symbol(Some(description))?
                 },)* })
+            }
+
+            /// Every symbol, for the collector's roots.
+            pub(crate) fn all(&self) -> impl Iterator<Item = SymbolId> {
+                [$(self.$field,)*].into_iter()
             }
         }
     };
@@ -148,6 +158,28 @@ pub struct Intrinsics {
     pub bigint_prototype: ObjectId,
     /// The global object.
     pub global: ObjectId,
+}
+
+impl Intrinsics {
+    /// Every intrinsic, for the collector's roots.
+    pub(crate) fn all(&self) -> [ObjectId; 14] {
+        [
+            self.object_prototype,
+            self.function_prototype,
+            self.array_prototype,
+            self.error_prototype,
+            self.type_error_prototype,
+            self.range_error_prototype,
+            self.reference_error_prototype,
+            self.syntax_error_prototype,
+            self.boolean_prototype,
+            self.number_prototype,
+            self.string_prototype,
+            self.symbol_prototype,
+            self.bigint_prototype,
+            self.global,
+        ]
+    }
 }
 
 /// One agent with one realm.

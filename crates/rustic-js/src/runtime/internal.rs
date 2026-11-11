@@ -9,7 +9,7 @@ use super::number::to_uint32;
 use super::object::{
     Class, Dictionary, FLAG_ARRAY_LENGTH_WRITABLE, FLAG_EXTENSIBLE, PropertyDescriptor, Stored,
 };
-use super::shape::{Attributes, PropertyKey};
+use super::shape::{Attributes, PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
 use super::value::{Kind, ObjectId, Value};
 
@@ -137,6 +137,9 @@ impl Agent {
             );
         }
         object.slots = Vec::new();
+        // The shape is unused from now on; dropping it lets the collector
+        // free shapes only dictionaries remember.
+        object.shape = ROOT_SHAPE;
         object.extra_mut().dictionary = Some(dictionary);
     }
 

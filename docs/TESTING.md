@@ -97,10 +97,10 @@ serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
 `rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing with 18 targets (`rustic-fuzz list`): HTML tokenizer, document and
+fuzzing with 19 targets (`rustic-fuzz list`): HTML tokenizer, document and
 fragment parsers; CSS syntax, selectors, cascade, media queries and incremental
 restyling; anonymous flow normalization; paint/raster; PNG, JPEG, GIF and WebP
-decoding; font parsing and shaping; the JavaScript parser; and URLs, with seed replay,
+decoding; font parsing and shaping; the JavaScript parser and heap; and URLs, with seed replay,
 minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
 campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
 cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a
@@ -143,3 +143,9 @@ The 18th target, `js-parse`, parses each input as a script, a module and a
 strict script, checking error spans, deterministic dumps and that strict-valid
 source is sloppy-valid; deep nesting must fail with `TooDeep`, never overflow.
 The JavaScript parser's Test262 parse-phase gate is described in [JS.md](JS.md).
+
+The 19th target, `js-heap`, turns each input into allocations, property
+writes and deletes, links, host roots and collections on a small agent, and
+compares every surviving object with a shadow model; the live object count
+must match the model and the byte budget must return to the bare-agent
+baseline.

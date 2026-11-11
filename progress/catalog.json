@@ -2775,8 +2775,68 @@
           "label": "Rooted traced heap and host-object cycle collection",
           "size": 8,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Free-list arenas and iterative nonmoving mark/sweep from explicit roots",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/gc.rs",
+                  "marker": "pub fn collect_garbage"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn deep_chains_mark_without_recursion"
+                }
+              ]
+            },
+            {
+              "label": "Shape and atom collection, arena tail return and exact budget reset",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/shape.rs",
+                  "marker": "pub(crate) fn sweep"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn unreachable_objects_are_freed_and_the_budget_returns_to_baseline"
+                }
+              ]
+            },
+            {
+              "label": "Generation-checked host roots, collection policy and the js-heap shadow-model fuzz target",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/js_heap.rs",
+                  "marker": "impl Target for JsHeapTarget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn host_roots_keep_values_alive_until_released"
+                }
+              ]
+            },
+            {
+              "label": "Weak references and ephemeron marking (TD-96)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "DOM host-object tracing replacing the DOC-09 HostHeap (TD-17, TD-96)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.interpreter",

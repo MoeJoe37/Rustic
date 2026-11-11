@@ -1,5 +1,6 @@
 //! The runtime data model (JS-02): values, strings, numbers, objects,
-//! environments and references, laid out for a small heap (ADR 0015).
+//! environments and references, laid out for a small heap (ADR 0015),
+//! and its garbage collector (JS-03, ADR 0016).
 //! Nothing here evaluates syntax; the interpreter is JS-04.
 
 mod agent;
@@ -8,6 +9,7 @@ mod builtins;
 mod completion;
 mod convert;
 mod env;
+mod gc;
 mod heap;
 mod internal;
 mod number;
@@ -23,6 +25,7 @@ pub use bigint::BigInt;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
 pub use env::{EnvId, Environment, Reference, ReferenceBase, ThisStatus};
+pub use gc::{GcStats, HostRoot, MIN_GC_THRESHOLD, Roots};
 pub use heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory, Symbol};
 pub use internal::IntegrityLevel;
 pub use number::{

@@ -1,6 +1,7 @@
 //! The heap: typed arenas indexed by `u32`, with every allocation charged
-//! to a byte budget (ADR 0015). Nothing is collected yet; mark/sweep over
-//! these arenas arrives with JS-03 (TD-91).
+//! to a byte budget (ADR 0015). The mark/sweep collector over these arenas
+//! is in `gc.rs` (JS-03); freed cells go on a free list so live indices
+//! never move.
 
 use std::collections::HashMap;
 use std::hash::{BuildHasher, RandomState};
@@ -9,6 +10,7 @@ use rustic_base::Budget;
 
 use super::bigint::BigInt;
 use super::env::{EnvId, Environment};
+use super::gc::{BitSet, HostRoots};
 use super::object::Object;
 use super::shape::{PropertyKey, ShapeTable};
 use super::string::JsStr;
@@ -28,37 +30,139 @@ pub struct Symbol {
     pub description: Option<StringId>,
 }
 
+/// Cells of one type, indexed by `u32`. A freed cell is `None` and its
+/// index waits on the free list; the lowest free index is reused first so
+/// the arena stays compact and its tail can be returned.
+#[derive(Debug)]
+pub(crate) struct Arena<T> {
+    cells: Vec<Option<T>>,
+    /// Free indices, highest first, so `pop` reuses the lowest.
+    free: Vec<u32>,
+    live: usize,
+}
+
+impl<T> Default for Arena<T> {
+    fn default() -> Self {
+        Self {
+            cells: Vec::new(),
+            free: Vec::new(),
+            live: 0,
+        }
+    }
+}
+
+impl<T> Arena<T> {
+    pub(crate) fn alloc(&mut self, value: T) -> Result<u32, OutOfMemory> {
+        if let Some(index) = self.free.pop() {
+            self.cells[index as usize] = Some(value);
+            self.live += 1;
+            return Ok(index);
+        }
+        let index = u32::try_from(self.cells.len()).map_err(|_| OutOfMemory)?;
+        self.cells.push(Some(value));
+        self.live += 1;
+        Ok(index)
+    }
+
+    /// The live cell at `index`. Using a freed index is a bug in the
+    /// caller's rooting and panics rather than aliasing another value.
+    pub(crate) fn get(&self, index: u32) -> &T {
+        self.cells[index as usize]
+            .as_ref()
+            .expect("use of a collected heap cell")
+    }
+
+    pub(crate) fn get_mut(&mut self, index: u32) -> &mut T {
+        self.cells[index as usize]
+            .as_mut()
+            .expect("use of a collected heap cell")
+    }
+
+    pub(crate) fn live(&self) -> usize {
+        self.live
+    }
+
+    /// Indices ever allocated (live or free).
+    pub(crate) fn extent(&self) -> usize {
+        self.cells.len()
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (u32, &T)> {
+        self.cells
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| c.as_ref().map(|c| (i as u32, c)))
+    }
+
+    /// Free every cell not in `marks`, drop the free tail and give its
+    /// memory back. Returns the number of cells freed.
+    pub(crate) fn sweep(&mut self, marks: &BitSet) -> usize {
+        let mut freed = 0;
+        for (i, cell) in self.cells.iter_mut().enumerate() {
+            if cell.is_some() && !marks.get(i as u32) {
+                *cell = None;
+                freed += 1;
+            }
+        }
+        self.live -= freed;
+        while matches!(self.cells.last(), Some(None)) {
+            self.cells.pop();
+        }
+        if self.cells.capacity() > 2 * self.cells.len() + 64 {
+            self.cells.shrink_to_fit();
+        }
+        self.free.clear();
+        self.free.extend(
+            self.cells
+                .iter()
+                .enumerate()
+                .rev()
+                .filter(|(_, c)| c.is_none())
+                .map(|(i, _)| i as u32),
+        );
+        self.free.shrink_to_fit();
+        freed
+    }
+}
+
 /// One agent's heap.
 #[derive(Debug)]
 pub struct Heap {
-    strings: Vec<JsStr>,
+    pub(crate) strings: Arena<JsStr>,
     /// Interned strings by content hash; collisions chain through
     /// `atom_next`.
-    atoms: HashMap<u64, StringId>,
-    atom_next: HashMap<StringId, StringId>,
+    pub(crate) atoms: HashMap<u64, StringId>,
+    pub(crate) atom_next: HashMap<StringId, StringId>,
     hasher: RandomState,
-    symbols: Vec<Symbol>,
-    bigints: Vec<BigInt>,
-    pub(crate) objects: Vec<Object>,
+    pub(crate) symbols: Arena<Symbol>,
+    pub(crate) bigints: Arena<BigInt>,
+    pub(crate) objects: Arena<Object>,
     pub(crate) shapes: ShapeTable,
-    envs: Vec<Environment>,
-    budget: Budget,
+    pub(crate) envs: Arena<Environment>,
+    pub(crate) roots: HostRoots,
+    pub(crate) budget: Budget,
+    /// Collect once `bytes_used` reaches this (see `gc.rs`).
+    pub(crate) gc_threshold: usize,
+    pub(crate) collections: u64,
 }
 
 impl Heap {
     /// A heap that may hold `limit` bytes.
     pub fn new(limit: usize) -> Self {
         Self {
-            strings: Vec::new(),
+            strings: Arena::default(),
             atoms: HashMap::new(),
             atom_next: HashMap::new(),
             hasher: RandomState::new(),
-            symbols: Vec::new(),
-            bigints: Vec::new(),
-            objects: Vec::new(),
+            symbols: Arena::default(),
+            bigints: Arena::default(),
+            objects: Arena::default(),
             shapes: ShapeTable::default(),
-            envs: Vec::new(),
+            envs: Arena::default(),
+            roots: HostRoots::default(),
             budget: Budget::new(limit),
+            gc_threshold: super::gc::initial_threshold(limit),
+            collections: 0,
         }
     }
 
@@ -77,18 +181,12 @@ impl Heap {
         self.budget.charge(bytes).map_err(|_| OutOfMemory)
     }
 
-    fn next_index(len: usize) -> Result<u32, OutOfMemory> {
-        u32::try_from(len).map_err(|_| OutOfMemory)
-    }
-
     // ---- strings ----------------------------------------------------
 
     /// Store a new string.
     pub fn alloc_string(&mut self, s: JsStr) -> Result<StringId, OutOfMemory> {
-        let id = StringId(Self::next_index(self.strings.len())?);
         self.charge(std::mem::size_of::<JsStr>() + s.storage_bytes())?;
-        self.strings.push(s);
-        Ok(id)
+        Ok(StringId(self.strings.alloc(s)?))
     }
 
     /// Store a string from Rust text.
@@ -98,10 +196,10 @@ impl Heap {
 
     /// The contents of a string.
     pub fn string(&self, id: StringId) -> &JsStr {
-        &self.strings[id.0 as usize]
+        self.strings.get(id.0)
     }
 
-    fn content_hash(&self, s: &JsStr) -> u64 {
+    pub(crate) fn content_hash(&self, s: &JsStr) -> u64 {
         self.hasher.hash_one(s)
     }
 
@@ -119,7 +217,7 @@ impl Heap {
             last = Some(id);
             current = self.atom_next.get(&id).copied();
         }
-        self.charge(24)?;
+        self.charge(ATOM_BYTES)?;
         let id = self.alloc_string(s.clone())?;
         match last {
             None => self.atoms.insert(hash, id),
@@ -150,78 +248,88 @@ impl Heap {
 
     /// A new unique symbol.
     pub fn alloc_symbol(&mut self, description: Option<StringId>) -> Result<SymbolId, OutOfMemory> {
-        let id = SymbolId(Self::next_index(self.symbols.len())?);
         self.charge(std::mem::size_of::<Symbol>())?;
-        self.symbols.push(Symbol { description });
-        Ok(id)
+        Ok(SymbolId(self.symbols.alloc(Symbol { description })?))
     }
 
     /// A symbol's record.
     pub fn symbol(&self, id: SymbolId) -> &Symbol {
-        &self.symbols[id.0 as usize]
+        self.symbols.get(id.0)
     }
 
     /// Store a BigInt.
     pub fn alloc_bigint(&mut self, b: BigInt) -> Result<BigIntId, OutOfMemory> {
-        let id = BigIntId(Self::next_index(self.bigints.len())?);
         self.charge(std::mem::size_of::<BigInt>() + b.storage_bytes())?;
-        self.bigints.push(b);
-        Ok(id)
+        Ok(BigIntId(self.bigints.alloc(b)?))
     }
 
     /// A BigInt's value.
     pub fn bigint(&self, id: BigIntId) -> &BigInt {
-        &self.bigints[id.0 as usize]
+        self.bigints.get(id.0)
     }
 
     // ---- objects ----------------------------------------------------
 
     /// Store a new object.
     pub(crate) fn alloc_object(&mut self, object: Object) -> Result<ObjectId, OutOfMemory> {
-        let id = ObjectId(Self::next_index(self.objects.len())?);
         self.charge(std::mem::size_of::<Object>())?;
-        self.objects.push(object);
-        Ok(id)
+        Ok(ObjectId(self.objects.alloc(object)?))
     }
 
     /// An object.
     pub(crate) fn object(&self, id: ObjectId) -> &Object {
-        &self.objects[id.0 as usize]
+        self.objects.get(id.0)
     }
 
     /// An object, mutably.
     pub(crate) fn object_mut(&mut self, id: ObjectId) -> &mut Object {
-        &mut self.objects[id.0 as usize]
+        self.objects.get_mut(id.0)
     }
 
-    /// Objects allocated so far.
+    /// Live objects.
     pub fn object_count(&self) -> usize {
-        self.objects.len()
+        self.objects.live()
+    }
+
+    /// Live strings, atoms included.
+    pub fn string_count(&self) -> usize {
+        self.strings.live()
+    }
+
+    /// Live environment records.
+    pub fn env_count(&self) -> usize {
+        self.envs.live()
     }
 
     /// Store an environment record.
     pub(crate) fn alloc_env(&mut self, env: Environment) -> Result<EnvId, OutOfMemory> {
-        let id = EnvId(Self::next_index(self.envs.len())?);
         self.charge(std::mem::size_of::<Environment>())?;
-        self.envs.push(env);
-        Ok(id)
+        Ok(EnvId(self.envs.alloc(env)?))
     }
 
     /// An environment record.
     pub(crate) fn env(&self, id: EnvId) -> &Environment {
-        &self.envs[id.0 as usize]
+        self.envs.get(id.0)
     }
 
     /// An environment record, mutably.
     pub(crate) fn env_mut(&mut self, id: EnvId) -> &mut Environment {
-        &mut self.envs[id.0 as usize]
+        self.envs.get_mut(id.0)
     }
 
-    /// Shapes created so far.
+    /// Live shapes, the root included.
     pub fn shape_count(&self) -> usize {
         self.shapes.len()
     }
+
+    /// Completed collections.
+    pub fn collections(&self) -> u64 {
+        self.collections
+    }
 }
+
+/// Budget charge for an atom's table entries, on top of its string.
+pub(crate) const ATOM_BYTES: usize = 24;
 
 #[cfg(test)]
 mod tests {

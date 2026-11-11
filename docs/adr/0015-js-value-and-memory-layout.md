@@ -1,6 +1,6 @@
 # ADR 0015: JavaScript value and memory layout
 
-Date: 2026-11-11. Status: accepted for JS-02; collection arrives with JS-03.
+Date: 2026-11-11. Status: accepted for JS-02; collection is ADR 0016 (JS-03).
 
 ## Context
 

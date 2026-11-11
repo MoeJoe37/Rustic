@@ -3,6 +3,7 @@
 //! (ADR 0015). Objects built the same way share one chain, so each object
 //! stores only its slot values.
 
+use super::gc::BitSet;
 use super::value::{StringId, SymbolId};
 
 /// A property key (§6.1.7): an interned string, a symbol, or an array
@@ -97,16 +98,20 @@ pub struct Slot {
     pub attributes: Attributes,
 }
 
-/// Every shape of one heap.
+/// Every shape of one heap. Shapes no live object uses are freed by the
+/// collector, and their indices reused.
 #[derive(Debug)]
 pub struct ShapeTable {
-    shapes: Vec<Shape>,
+    shapes: Vec<Option<Shape>>,
+    /// Free indices, highest first.
+    free: Vec<u32>,
+    live: usize,
 }
 
 impl Default for ShapeTable {
     fn default() -> Self {
         Self {
-            shapes: vec![Shape {
+            shapes: vec![Some(Shape {
                 parent: None,
                 key: PropertyKey::Index(0),
                 attributes: Attributes::default(),
@@ -114,19 +119,23 @@ impl Default for ShapeTable {
                 slot_count: 0,
                 property_count: 0,
                 transitions: Vec::new(),
-            }],
+            })],
+            free: Vec::new(),
+            live: 1,
         }
     }
 }
 
 impl ShapeTable {
-    /// Shapes created so far.
+    /// Live shapes, the root included.
     pub fn len(&self) -> usize {
-        self.shapes.len()
+        self.live
     }
 
     fn get(&self, id: ShapeId) -> &Shape {
-        &self.shapes[id.0 as usize]
+        self.shapes[id.0 as usize]
+            .as_ref()
+            .expect("use of a collected shape")
     }
 
     /// Find `key` in the chain ending at `id`.
@@ -166,7 +175,6 @@ impl ShapeTable {
         {
             return Some(next);
         }
-        let next = ShapeId(u32::try_from(self.shapes.len()).ok()?);
         let slot = shape.slot_count;
         let new = Shape {
             parent: Some(id),
@@ -177,10 +185,23 @@ impl ShapeTable {
             property_count: shape.property_count + 1,
             transitions: Vec::new(),
         };
+        let next = match self.free.pop() {
+            Some(index) => {
+                self.shapes[index as usize] = Some(new);
+                ShapeId(index)
+            }
+            None => {
+                let next = ShapeId(u32::try_from(self.shapes.len()).ok()?);
+                self.shapes.push(Some(new));
+                next
+            }
+        };
+        self.live += 1;
         self.shapes[id.0 as usize]
+            .as_mut()
+            .expect("parent shape is live")
             .transitions
             .push((key, attributes, next));
-        self.shapes.push(new);
         Some(next)
     }
 
@@ -213,6 +234,68 @@ impl ShapeTable {
         }
         out.reverse();
         out
+    }
+
+    /// Indices ever allocated.
+    pub(crate) fn extent(&self) -> usize {
+        self.shapes.len()
+    }
+
+    /// Mark `id` and its ancestors, reporting each newly marked shape's
+    /// key. Stops at the first shape already marked, so a whole collection
+    /// visits each shape once.
+    pub(crate) fn mark_chain(
+        &self,
+        id: ShapeId,
+        marks: &mut BitSet,
+        mut key: impl FnMut(PropertyKey),
+    ) {
+        let mut current = Some(id);
+        while let Some(shape_id) = current {
+            if !marks.insert(shape_id.0) {
+                return;
+            }
+            let shape = self.get(shape_id);
+            if shape.parent.is_some() {
+                key(shape.key);
+            }
+            current = shape.parent;
+        }
+    }
+
+    /// Free every shape outside `marks` (the root always stays) and drop
+    /// transitions to freed shapes. Returns the number freed.
+    pub(crate) fn sweep(&mut self, marks: &BitSet) -> usize {
+        let mut freed = 0;
+        for (i, cell) in self.shapes.iter_mut().enumerate().skip(1) {
+            if cell.is_some() && !marks.get(i as u32) {
+                *cell = None;
+                freed += 1;
+            }
+        }
+        self.live -= freed;
+        if freed > 0 {
+            for shape in self.shapes.iter_mut().flatten() {
+                shape.transitions.retain(|(_, _, next)| marks.get(next.0));
+            }
+        }
+        while matches!(self.shapes.last(), Some(None)) {
+            self.shapes.pop();
+        }
+        if self.shapes.capacity() > 2 * self.shapes.len() + 64 {
+            self.shapes.shrink_to_fit();
+        }
+        self.free.clear();
+        self.free.extend(
+            self.shapes
+                .iter()
+                .enumerate()
+                .rev()
+                .filter(|(_, c)| c.is_none())
+                .map(|(i, _)| i as u32),
+        );
+        self.free.shrink_to_fit();
+        freed
     }
 }
 

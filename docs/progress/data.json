@@ -1,20 +1,20 @@
 {
   "schema_version": 2,
-  "catalog_version": "engine-v3",
-  "source_fingerprint": "f7c4054c94f134a8257d7a0f80b3b82f69496595981e0ca785c3ae8f3117d246",
-  "percent": "36.99",
-  "verified_percent": "33.81",
-  "partial_percent": "3.18",
+  "catalog_version": "engine-v4",
+  "source_fingerprint": "5b7db3550bd390498a40600973c0d1da885e0dd37127946a193c2eb89edb7b1a",
+  "percent": "23.51",
+  "verified_percent": "20.90",
+  "partial_percent": "2.61",
   "completed": 54,
   "in_progress": 6,
-  "total": 172,
+  "total": 221,
   "fully_complete": false,
-  "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
+  "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
   "milestones": [
     {
       "id": "M1",
       "label": "Document core",
-      "share": "11.27",
+      "share": "7.28",
       "completed": 28,
       "total": 28,
       "percent": "100.00",
@@ -24,7 +24,7 @@
     {
       "id": "M2",
       "label": "CSS & computed style",
-      "share": "9.00",
+      "share": "4.77",
       "completed": 8,
       "total": 8,
       "percent": "100.00",
@@ -34,7 +34,7 @@
     {
       "id": "M3",
       "label": "Static renderer",
-      "share": "12.22",
+      "share": "7.74",
       "completed": 17,
       "total": 17,
       "percent": "100.00",
@@ -44,7 +44,7 @@
     {
       "id": "M4",
       "label": "ECMAScript runtime",
-      "share": "10.68",
+      "share": "8.90",
       "completed": 1,
       "total": 13,
       "percent": "40.00",
@@ -54,9 +54,9 @@
     {
       "id": "M5",
       "label": "Scripted documents",
-      "share": "7.46",
+      "share": "5.29",
       "completed": 0,
-      "total": 11,
+      "total": 12,
       "percent": "0.00",
       "verified_percent": "0.00",
       "partial_percent": "0.00"
@@ -64,7 +64,7 @@
     {
       "id": "M6",
       "label": "Networking & services",
-      "share": "5.12",
+      "share": "4.38",
       "completed": 0,
       "total": 12,
       "percent": "0.00",
@@ -74,7 +74,7 @@
     {
       "id": "M7",
       "label": "Isolation & security",
-      "share": "4.46",
+      "share": "3.72",
       "completed": 0,
       "total": 8,
       "percent": "0.00",
@@ -84,7 +84,7 @@
     {
       "id": "M8",
       "label": "Desktop & mobile alpha",
-      "share": "10.83",
+      "share": "9.83",
       "completed": 0,
       "total": 20,
       "percent": "0.00",
@@ -94,19 +94,49 @@
     {
       "id": "M9",
       "label": "Compatibility expansion",
-      "share": "25.38",
+      "share": "22.10",
       "completed": 0,
-      "total": 46,
-      "percent": "0.86",
+      "total": 52,
+      "percent": "0.66",
       "verified_percent": "0.00",
-      "partial_percent": "0.86"
+      "partial_percent": "0.66"
     },
     {
       "id": "M10",
-      "label": "Embedding & release",
-      "share": "3.53",
+      "label": "Embedding & beta release",
+      "share": "2.67",
       "completed": 0,
-      "total": 9,
+      "total": 7,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M11",
+      "label": "Web platform parity",
+      "share": "14.85",
+      "completed": 0,
+      "total": 30,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M12",
+      "label": "Performance leadership",
+      "share": "7.91",
+      "completed": 0,
+      "total": 13,
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "M13",
+      "label": "Full engine 1.0",
+      "share": "0.50",
+      "completed": 0,
+      "total": 1,
       "percent": "0.00",
       "verified_percent": "0.00",
       "partial_percent": "0.00"
@@ -116,7 +146,7 @@
     {
       "id": "base",
       "label": "Foundation",
-      "weight": 2,
+      "weight": 1,
       "features": [
         {
           "id": "base.identity",
@@ -137,7 +167,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.25"
+          "engine_share": "0.12"
         },
         {
           "id": "base.budgets",
@@ -158,7 +188,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.25"
+          "engine_share": "0.12"
         },
         {
           "id": "base.cancellation",
@@ -179,7 +209,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.25"
+          "engine_share": "0.12"
         },
         {
           "id": "base.spans",
@@ -200,7 +230,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.12"
+          "engine_share": "0.06"
         },
         {
           "id": "base.clocks",
@@ -221,7 +251,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.12"
+          "engine_share": "0.06"
         },
         {
           "id": "base.geometry",
@@ -257,7 +287,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.37"
+          "engine_share": "0.18"
         },
         {
           "id": "base.diagnostics",
@@ -288,7 +318,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.25"
+          "engine_share": "0.12"
         },
         {
           "id": "base.lifecycle",
@@ -298,14 +328,14 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.18"
         }
       ],
       "points": 16,
       "completed": 7,
       "in_progress": 0,
       "total": 8,
-      "contribution": "1.62",
+      "contribution": "0.81",
       "percent": "81.25",
       "verified_percent": "81.25",
       "partial_percent": "0.00"
@@ -313,7 +343,7 @@
     {
       "id": "url",
       "label": "URLs & encoding",
-      "weight": 3,
+      "weight": 2,
       "features": [
         {
           "id": "url.records",
@@ -334,7 +364,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.30"
+          "engine_share": "0.20"
         },
         {
           "id": "url.addresses",
@@ -355,7 +385,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.20"
+          "engine_share": "0.13"
         },
         {
           "id": "url.origins",
@@ -376,7 +406,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.20"
+          "engine_share": "0.13"
         },
         {
           "id": "url.idna",
@@ -407,7 +437,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.30"
+          "engine_share": "0.20"
         },
         {
           "id": "url.file",
@@ -428,7 +458,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.20"
+          "engine_share": "0.13"
         },
         {
           "id": "url.blob",
@@ -438,7 +468,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.20"
+          "engine_share": "0.13"
         },
         {
           "id": "url.setters",
@@ -448,7 +478,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.20"
+          "engine_share": "0.13"
         },
         {
           "id": "url.encoding",
@@ -458,7 +488,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.50"
+          "engine_share": "0.33"
         },
         {
           "id": "url.restart",
@@ -468,7 +498,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.20"
+          "engine_share": "0.13"
         },
         {
           "id": "url.diagnostics",
@@ -489,7 +519,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.10"
+          "engine_share": "0.06"
         },
         {
           "id": "url.policy",
@@ -499,7 +529,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.20"
         },
         {
           "id": "url.conformance",
@@ -509,14 +539,14 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.20"
         }
       ],
       "points": 30,
       "completed": 6,
       "in_progress": 0,
       "total": 12,
-      "contribution": "1.30",
+      "contribution": "0.86",
       "percent": "43.33",
       "verified_percent": "43.33",
       "partial_percent": "0.00"
@@ -524,7 +554,7 @@
     {
       "id": "dom",
       "label": "DOM",
-      "weight": 6,
+      "weight": 4,
       "features": [
         {
           "id": "dom.storage",
@@ -545,7 +575,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.52"
+          "engine_share": "0.35"
         },
         {
           "id": "dom.mutation",
@@ -566,7 +596,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.52"
+          "engine_share": "0.35"
         },
         {
           "id": "dom.values",
@@ -587,7 +617,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.35"
+          "engine_share": "0.23"
         },
         {
           "id": "dom.nodekinds",
@@ -618,7 +648,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.35"
+          "engine_share": "0.23"
         },
         {
           "id": "dom.adoption",
@@ -654,7 +684,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.52"
+          "engine_share": "0.35"
         },
         {
           "id": "dom.events",
@@ -664,7 +694,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.88"
+          "engine_share": "0.58"
         },
         {
           "id": "dom.observers",
@@ -674,7 +704,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.52"
+          "engine_share": "0.35"
         },
         {
           "id": "dom.ranges",
@@ -684,7 +714,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.52"
+          "engine_share": "0.35"
         },
         {
           "id": "dom.shadow",
@@ -727,7 +757,7 @@
             }
           ],
           "credit": "25.00",
-          "engine_share": "0.88"
+          "engine_share": "0.58"
         },
         {
           "id": "dom.tracing",
@@ -763,14 +793,14 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.88"
+          "engine_share": "0.58"
         }
       ],
       "points": 34,
       "completed": 6,
       "in_progress": 1,
       "total": 10,
-      "contribution": "3.39",
+      "contribution": "2.26",
       "percent": "56.61",
       "verified_percent": "52.94",
       "partial_percent": "3.67"
@@ -778,7 +808,7 @@
     {
       "id": "html",
       "label": "HTML",
-      "weight": 6,
+      "weight": 5,
       "features": [
         {
           "id": "html.input",
@@ -804,7 +834,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.41"
+          "engine_share": "0.27"
         },
         {
           "id": "html.tags",
@@ -835,7 +865,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.62"
+          "engine_share": "0.40"
         },
         {
           "id": "html.references",
@@ -866,7 +896,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.41"
+          "engine_share": "0.27"
         },
         {
           "id": "html.declarations",
@@ -902,7 +932,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.41"
+          "engine_share": "0.27"
         },
         {
           "id": "html.textmodes",
@@ -938,7 +968,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.41"
+          "engine_share": "0.27"
         },
         {
           "id": "html.tree",
@@ -964,7 +994,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.03"
+          "engine_share": "0.67"
         },
         {
           "id": "html.tables",
@@ -1000,7 +1030,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.03"
+          "engine_share": "0.67"
         },
         {
           "id": "html.scripts",
@@ -1010,7 +1040,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.62"
+          "engine_share": "0.40"
         },
         {
           "id": "html.loader",
@@ -1031,7 +1061,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.41"
+          "engine_share": "0.27"
         },
         {
           "id": "html.conformance",
@@ -1077,22 +1107,32 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.62"
+          "engine_share": "0.40"
+        },
+        {
+          "id": "html.elements",
+          "label": "Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading",
+          "size": 8,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.08"
         }
       ],
-      "points": 29,
+      "points": 37,
       "completed": 9,
       "in_progress": 0,
-      "total": 10,
-      "contribution": "5.37",
-      "percent": "89.65",
-      "verified_percent": "89.65",
+      "total": 11,
+      "contribution": "3.51",
+      "percent": "70.27",
+      "verified_percent": "70.27",
       "partial_percent": "0.00"
     },
     {
       "id": "css",
       "label": "CSS & style",
-      "weight": 9,
+      "weight": 6,
       "features": [
         {
           "id": "css.syntax",
@@ -1128,7 +1168,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.69"
+          "engine_share": "0.36"
         },
         {
           "id": "css.selectors",
@@ -1199,7 +1239,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.15"
+          "engine_share": "0.61"
         },
         {
           "id": "css.properties",
@@ -1260,7 +1300,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.84"
+          "engine_share": "0.97"
         },
         {
           "id": "css.cascade",
@@ -1331,7 +1371,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.15"
+          "engine_share": "0.61"
         },
         {
           "id": "css.values",
@@ -1392,7 +1432,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.15"
+          "engine_share": "0.61"
         },
         {
           "id": "css.queries",
@@ -1468,7 +1508,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.69"
+          "engine_share": "0.36"
         },
         {
           "id": "css.invalidation",
@@ -1534,7 +1574,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.15"
+          "engine_share": "0.61"
         },
         {
           "id": "css.conformance",
@@ -1570,22 +1610,42 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.15"
+          "engine_share": "0.61"
+        },
+        {
+          "id": "css.animations",
+          "label": "Transitions, CSS animations and Web Animations",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.61"
+        },
+        {
+          "id": "css.modern",
+          "label": "Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.61"
         }
       ],
-      "points": 39,
+      "points": 49,
       "completed": 8,
       "in_progress": 0,
-      "total": 8,
-      "contribution": "9.00",
-      "percent": "100.00",
-      "verified_percent": "100.00",
+      "total": 10,
+      "contribution": "4.77",
+      "percent": "79.59",
+      "verified_percent": "79.59",
       "partial_percent": "0.00"
     },
     {
       "id": "text",
       "label": "Text & fonts",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "text.fonts",
@@ -1671,7 +1731,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.54"
+          "engine_share": "0.36"
         },
         {
           "id": "text.shaping",
@@ -1727,7 +1787,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.90"
+          "engine_share": "0.60"
         },
         {
           "id": "text.bidi",
@@ -1783,7 +1843,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.54"
+          "engine_share": "0.36"
         },
         {
           "id": "text.breaking",
@@ -1854,7 +1914,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.54"
+          "engine_share": "0.36"
         },
         {
           "id": "text.writing",
@@ -1864,7 +1924,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.90"
+          "engine_share": "0.60"
         },
         {
           "id": "text.conformance",
@@ -1874,22 +1934,32 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.54"
+          "engine_share": "0.36"
+        },
+        {
+          "id": "text.color",
+          "label": "Variable and color fonts (COLRv1, SVG-in-OpenType), palettes and the Font Loading API",
+          "size": 3,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.36"
         }
       ],
-      "points": 22,
+      "points": 25,
       "completed": 4,
       "in_progress": 0,
-      "total": 6,
-      "contribution": "2.54",
-      "percent": "63.63",
-      "verified_percent": "63.63",
+      "total": 7,
+      "contribution": "1.68",
+      "percent": "56.00",
+      "verified_percent": "56.00",
       "partial_percent": "0.00"
     },
     {
       "id": "layout",
       "label": "Layout",
-      "weight": 9,
+      "weight": 6,
       "features": [
         {
           "id": "layout.boxes",
@@ -1945,7 +2015,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.58"
+          "engine_share": "0.35"
         },
         {
           "id": "layout.block",
@@ -2011,7 +2081,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.inline",
@@ -2082,7 +2152,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.sizing",
@@ -2138,7 +2208,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.58"
+          "engine_share": "0.35"
         },
         {
           "id": "layout.position",
@@ -2204,7 +2274,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.flex",
@@ -2275,7 +2345,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.grid",
@@ -2285,7 +2355,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.tables",
@@ -2295,7 +2365,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.fragmentation",
@@ -2305,7 +2375,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
         },
         {
           "id": "layout.incremental",
@@ -2315,22 +2385,32 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.97"
+          "engine_share": "0.58"
+        },
+        {
+          "id": "layout.formats",
+          "label": "SVG, MathML, ruby and multi-column layout",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.58"
         }
       ],
-      "points": 46,
+      "points": 51,
       "completed": 6,
       "in_progress": 0,
-      "total": 10,
-      "contribution": "5.08",
-      "percent": "56.52",
-      "verified_percent": "56.52",
+      "total": 11,
+      "contribution": "3.05",
+      "percent": "50.98",
+      "verified_percent": "50.98",
       "partial_percent": "0.00"
     },
     {
       "id": "paint",
       "label": "Paint & raster",
-      "weight": 6,
+      "weight": 4,
       "features": [
         {
           "id": "paint.display",
@@ -2406,7 +2486,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.66"
+          "engine_share": "0.44"
         },
         {
           "id": "paint.stacking",
@@ -2462,7 +2542,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.66"
+          "engine_share": "0.44"
         },
         {
           "id": "paint.raster",
@@ -2583,7 +2663,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.11"
+          "engine_share": "0.74"
         },
         {
           "id": "paint.images",
@@ -2689,7 +2769,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.66"
+          "engine_share": "0.44"
         },
         {
           "id": "paint.hit",
@@ -2735,17 +2815,17 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.44"
+          "engine_share": "0.29"
         },
         {
           "id": "paint.formats",
-          "label": "SVG/MathML painting integration and Canvas 2D",
+          "label": "SVG and MathML painting integration",
           "size": 8,
           "milestone": "M9",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.77"
+          "engine_share": "1.18"
         },
         {
           "id": "paint.conformance",
@@ -2806,14 +2886,14 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.66"
+          "engine_share": "0.44"
         }
       ],
       "points": 27,
       "completed": 6,
       "in_progress": 0,
       "total": 7,
-      "contribution": "4.22",
+      "contribution": "2.81",
       "percent": "70.37",
       "verified_percent": "70.37",
       "partial_percent": "0.00"
@@ -2821,7 +2901,7 @@
     {
       "id": "js",
       "label": "JavaScript & GC",
-      "weight": 12,
+      "weight": 10,
       "features": [
         {
           "id": "js.parser",
@@ -2918,7 +2998,7 @@
             }
           ],
           "credit": "83.33",
-          "engine_share": "0.82"
+          "engine_share": "0.68"
         },
         {
           "id": "js.values",
@@ -2983,7 +3063,7 @@
             }
           ],
           "credit": "75.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.objects",
@@ -3048,7 +3128,7 @@
             }
           ],
           "credit": "75.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.heap",
@@ -3109,7 +3189,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "1.31"
+          "engine_share": "1.09"
         },
         {
           "id": "js.interpreter",
@@ -3227,7 +3307,7 @@
             }
           ],
           "credit": "75.00",
-          "engine_share": "1.31"
+          "engine_share": "1.09"
         },
         {
           "id": "js.functions",
@@ -3313,7 +3393,7 @@
             }
           ],
           "credit": "66.66",
-          "engine_share": "0.82"
+          "engine_share": "0.68"
         },
         {
           "id": "js.builtins",
@@ -3323,7 +3403,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.31"
+          "engine_share": "1.09"
         },
         {
           "id": "js.jobs",
@@ -3333,7 +3413,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.modules",
@@ -3343,7 +3423,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.advanced",
@@ -3353,7 +3433,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.31"
+          "engine_share": "1.09"
         },
         {
           "id": "js.buffers",
@@ -3363,7 +3443,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.intl",
@@ -3373,7 +3453,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.82"
+          "engine_share": "0.68"
         },
         {
           "id": "js.wasm",
@@ -3383,7 +3463,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.limits",
@@ -3393,7 +3473,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.49"
+          "engine_share": "0.41"
         },
         {
           "id": "js.conformance",
@@ -3403,14 +3483,14 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.82"
+          "engine_share": "0.68"
         }
       ],
       "points": 73,
       "completed": 1,
       "in_progress": 5,
       "total": 15,
-      "contribution": "4.27",
+      "contribution": "3.56",
       "percent": "35.61",
       "verified_percent": "10.95",
       "partial_percent": "24.66"
@@ -3418,7 +3498,7 @@
     {
       "id": "wasm",
       "label": "WebAssembly",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "wasm.decode",
@@ -3428,7 +3508,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.23"
+          "engine_share": "0.17"
         },
         {
           "id": "wasm.validate",
@@ -3438,7 +3518,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.35"
+          "engine_share": "0.26"
         },
         {
           "id": "wasm.execute",
@@ -3448,7 +3528,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.58"
+          "engine_share": "0.44"
         },
         {
           "id": "wasm.instances",
@@ -3458,7 +3538,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.35"
+          "engine_share": "0.26"
         },
         {
           "id": "wasm.web",
@@ -3468,7 +3548,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.35"
+          "engine_share": "0.26"
         },
         {
           "id": "wasm.features",
@@ -3478,7 +3558,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.94"
+          "engine_share": "0.70"
         },
         {
           "id": "wasm.accelerate",
@@ -3488,7 +3568,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.58"
+          "engine_share": "0.44"
         },
         {
           "id": "wasm.conformance",
@@ -3498,7 +3578,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.58"
+          "engine_share": "0.44"
         }
       ],
       "points": 34,
@@ -3513,7 +3593,7 @@
     {
       "id": "web",
       "label": "Bindings & web APIs",
-      "weight": 6,
+      "weight": 5,
       "features": [
         {
           "id": "web.idl",
@@ -3523,7 +3603,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.93"
+          "engine_share": "0.62"
         },
         {
           "id": "web.window",
@@ -3533,7 +3613,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.93"
+          "engine_share": "0.62"
         },
         {
           "id": "web.scheduler",
@@ -3543,7 +3623,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.56"
+          "engine_share": "0.37"
         },
         {
           "id": "web.scripts",
@@ -3553,7 +3633,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.56"
+          "engine_share": "0.37"
         },
         {
           "id": "web.input",
@@ -3563,7 +3643,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.93"
+          "engine_share": "0.62"
         },
         {
           "id": "web.observers",
@@ -3573,7 +3653,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.56"
+          "engine_share": "0.37"
         },
         {
           "id": "web.streams",
@@ -3583,7 +3663,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.93"
+          "engine_share": "0.62"
         },
         {
           "id": "web.conformance",
@@ -3593,13 +3673,328 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.56"
+          "engine_share": "0.37"
+        },
+        {
+          "id": "web.platform",
+          "label": "Remaining HTML/DOM APIs: Navigation API, drag and drop, selection, pointer events, fullscreen and file APIs",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.62"
+        },
+        {
+          "id": "web.performance",
+          "label": "Performance timeline, Navigation/Resource Timing and Reporting APIs",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         }
       ],
-      "points": 32,
+      "points": 40,
       "completed": 0,
       "in_progress": 0,
-      "total": 8,
+      "total": 10,
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "media",
+      "label": "Media & real-time",
+      "weight": 5,
+      "features": [
+        {
+          "id": "media.pipeline",
+          "label": "Audio/video elements, demuxers, buffering and A/V sync",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.65"
+        },
+        {
+          "id": "media.codecs",
+          "label": "Reviewed codecs (AV1, VP8/VP9, Opus, FLAC; H.264/HEVC/AAC via licensed platform decoders) and hardware decode",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.65"
+        },
+        {
+          "id": "media.mse",
+          "label": "Media Source Extensions and adaptive streaming",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.39"
+        },
+        {
+          "id": "media.eme",
+          "label": "Encrypted Media Extensions with Clear Key and a documented CDM decision",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.39"
+        },
+        {
+          "id": "media.webaudio",
+          "label": "Web Audio graph, AudioWorklet and low-latency output",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.65"
+        },
+        {
+          "id": "media.webcodecs",
+          "label": "WebCodecs and Media Capabilities",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.39"
+        },
+        {
+          "id": "media.capture",
+          "label": "Camera, microphone and screen capture with trusted permission prompts",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.39"
+        },
+        {
+          "id": "media.webrtc",
+          "label": "WebRTC peer connections, ICE/DTLS/SRTP and data channels",
+          "size": 8,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.05"
+        },
+        {
+          "id": "media.conformance",
+          "label": "Media/WebRTC WPT, codec corpus and five-platform playback acceptance",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.39"
+        }
+      ],
+      "points": 38,
+      "completed": 0,
+      "in_progress": 0,
+      "total": 9,
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "graphics",
+      "label": "Graphics web APIs",
+      "weight": 4,
+      "features": [
+        {
+          "id": "graphics.canvas",
+          "label": "Canvas 2D, OffscreenCanvas and ImageBitmap",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.66"
+        },
+        {
+          "id": "graphics.webgl",
+          "label": "WebGL 1 and 2 with shader translation and validation",
+          "size": 8,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.06"
+        },
+        {
+          "id": "graphics.webgpu",
+          "label": "WebGPU and WGSL with validation in a sandboxed GPU process",
+          "size": 8,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.06"
+        },
+        {
+          "id": "graphics.color",
+          "label": "Color management, wide gamut and HDR output",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "graphics.images",
+          "label": "Further image formats: AVIF, APNG and reviewed HEIF/JPEG XL decisions",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "graphics.conformance",
+          "label": "Khronos WebGL CTS, WebGPU CTS and canvas WPT gate",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        }
+      ],
+      "points": 30,
+      "completed": 0,
+      "in_progress": 0,
+      "total": 6,
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
+      "id": "devices",
+      "label": "Devices & OS integration",
+      "weight": 4,
+      "features": [
+        {
+          "id": "devices.credentials",
+          "label": "WebAuthn/passkeys and Credential Management",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.66"
+        },
+        {
+          "id": "devices.payments",
+          "label": "Payment Request and platform payment handlers",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "devices.notifications",
+          "label": "Notifications, Push API and Badging",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "devices.sensors",
+          "label": "Geolocation, device orientation/motion and sensor APIs",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "devices.input",
+          "label": "Gamepad, Pointer Lock, Keyboard Lock and Screen Wake Lock",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "devices.share",
+          "label": "Async Clipboard, Web Share and file handling",
+          "size": 2,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.26"
+        },
+        {
+          "id": "devices.hardware",
+          "label": "WebUSB/Bluetooth/HID/Serial/NFC with per-API privacy decisions",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "devices.speech",
+          "label": "Web Speech synthesis and recognition",
+          "size": 2,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.26"
+        },
+        {
+          "id": "devices.apps",
+          "label": "Installable web apps: manifest, install and window controls",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        },
+        {
+          "id": "devices.conformance",
+          "label": "Device API WPT, permission/privacy review and five-platform acceptance",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.40"
+        }
+      ],
+      "points": 30,
+      "completed": 0,
+      "in_progress": 0,
+      "total": 10,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",
@@ -3618,7 +4013,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.68"
+          "engine_share": "0.62"
         },
         {
           "id": "network.navigation",
@@ -3628,7 +4023,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.68"
+          "engine_share": "0.62"
         },
         {
           "id": "network.fetch",
@@ -3638,7 +4033,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.68"
+          "engine_share": "0.62"
         },
         {
           "id": "network.cookies",
@@ -3648,7 +4043,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.37"
         },
         {
           "id": "network.policy",
@@ -3658,7 +4053,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.37"
         },
         {
           "id": "network.protocols",
@@ -3668,7 +4063,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.68"
+          "engine_share": "0.62"
         },
         {
           "id": "network.conformance",
@@ -3678,13 +4073,23 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.37"
+        },
+        {
+          "id": "network.webtransport",
+          "label": "WebTransport, fetch priorities and Early Hints",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.37"
         }
       ],
-      "points": 29,
+      "points": 32,
       "completed": 0,
       "in_progress": 0,
-      "total": 7,
+      "total": 8,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",
@@ -3703,7 +4108,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.27"
+          "engine_share": "0.24"
         },
         {
           "id": "storage.partition",
@@ -3713,7 +4118,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.40"
+          "engine_share": "0.36"
         },
         {
           "id": "storage.webstorage",
@@ -3723,7 +4128,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.13"
+          "engine_share": "0.12"
         },
         {
           "id": "storage.indexeddb",
@@ -3733,7 +4138,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.68"
+          "engine_share": "0.60"
         },
         {
           "id": "storage.workers",
@@ -3743,7 +4148,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.40"
+          "engine_share": "0.36"
         },
         {
           "id": "storage.offline",
@@ -3753,7 +4158,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.68"
+          "engine_share": "0.60"
         },
         {
           "id": "storage.conformance",
@@ -3763,13 +4168,23 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.40"
+          "engine_share": "0.36"
+        },
+        {
+          "id": "storage.filesystem",
+          "label": "Origin-private file system, File System Access and storage buckets",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.36"
         }
       ],
-      "points": 22,
+      "points": 25,
       "completed": 0,
       "in_progress": 0,
-      "total": 7,
+      "total": 8,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",
@@ -3778,7 +4193,7 @@
     {
       "id": "security",
       "label": "Security & IPC",
-      "weight": 6,
+      "weight": 5,
       "features": [
         {
           "id": "security.ipc",
@@ -3788,7 +4203,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.34"
         },
         {
           "id": "security.authority",
@@ -3798,7 +4213,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.34"
         },
         {
           "id": "security.isolation",
@@ -3808,7 +4223,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.69"
+          "engine_share": "0.58"
         },
         {
           "id": "security.desktop",
@@ -3818,7 +4233,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.69"
+          "engine_share": "0.58"
         },
         {
           "id": "security.mobile",
@@ -3828,7 +4243,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.69"
+          "engine_share": "0.58"
         },
         {
           "id": "security.permissions",
@@ -3838,7 +4253,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.34"
         },
         {
           "id": "security.recovery",
@@ -3848,7 +4263,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.34"
         },
         {
           "id": "security.brave",
@@ -3858,7 +4273,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.34"
         },
         {
           "id": "security.privacy",
@@ -3868,7 +4283,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.69"
+          "engine_share": "0.58"
         },
         {
           "id": "security.updates",
@@ -3878,7 +4293,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.41"
+          "engine_share": "0.34"
         },
         {
           "id": "security.audit",
@@ -3888,7 +4303,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.69"
+          "engine_share": "0.58"
         }
       ],
       "points": 43,
@@ -3903,7 +4318,7 @@
     {
       "id": "compositor",
       "label": "Compositor & GPU",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "compositor.scene",
@@ -3913,7 +4328,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.92"
+          "engine_share": "0.69"
         },
         {
           "id": "compositor.backend",
@@ -3923,7 +4338,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.53"
+          "engine_share": "1.15"
         },
         {
           "id": "compositor.recovery",
@@ -3933,7 +4348,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.61"
+          "engine_share": "0.46"
         },
         {
           "id": "compositor.parity",
@@ -3943,7 +4358,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.92"
+          "engine_share": "0.69"
         }
       ],
       "points": 13,
@@ -4184,7 +4599,7 @@
     {
       "id": "extensions",
       "label": "Extensions (MV2)",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "extensions.manifest",
@@ -4194,7 +4609,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.25"
+          "engine_share": "0.18"
         },
         {
           "id": "extensions.packages",
@@ -4204,7 +4619,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.28"
         },
         {
           "id": "extensions.worlds",
@@ -4214,7 +4629,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.62"
+          "engine_share": "0.46"
         },
         {
           "id": "extensions.background",
@@ -4224,7 +4639,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.28"
         },
         {
           "id": "extensions.messaging",
@@ -4234,7 +4649,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.28"
         },
         {
           "id": "extensions.ui",
@@ -4244,7 +4659,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.28"
         },
         {
           "id": "extensions.requests",
@@ -4254,7 +4669,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.62"
+          "engine_share": "0.46"
         },
         {
           "id": "extensions.updates",
@@ -4264,7 +4679,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.25"
+          "engine_share": "0.18"
         },
         {
           "id": "extensions.platforms",
@@ -4274,7 +4689,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.28"
         },
         {
           "id": "extensions.conformance",
@@ -4284,7 +4699,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.28"
         }
       ],
       "points": 32,
@@ -4299,7 +4714,7 @@
     {
       "id": "filtering",
       "label": "uBO port & filtering",
-      "weight": 3,
+      "weight": 2,
       "features": [
         {
           "id": "filtering.inventory",
@@ -4309,7 +4724,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.11"
+          "engine_share": "0.07"
         },
         {
           "id": "filtering.network",
@@ -4319,7 +4734,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.55"
+          "engine_share": "0.37"
         },
         {
           "id": "filtering.cosmetic",
@@ -4329,7 +4744,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.55"
+          "engine_share": "0.37"
         },
         {
           "id": "filtering.broker",
@@ -4339,7 +4754,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.33"
+          "engine_share": "0.22"
         },
         {
           "id": "filtering.port",
@@ -4349,7 +4764,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.55"
+          "engine_share": "0.37"
         },
         {
           "id": "filtering.lists",
@@ -4359,7 +4774,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.22"
+          "engine_share": "0.14"
         },
         {
           "id": "filtering.optimize",
@@ -4369,7 +4784,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.33"
+          "engine_share": "0.22"
         },
         {
           "id": "filtering.acceptance",
@@ -4379,7 +4794,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.33"
+          "engine_share": "0.22"
         }
       ],
       "points": 27,
@@ -4392,9 +4807,154 @@
       "partial_percent": "0.00"
     },
     {
+      "id": "perf",
+      "label": "Performance leadership",
+      "weight": 8,
+      "features": [
+        {
+          "id": "perf.harness",
+          "label": "Cross-engine benchmark harness, reference devices and published reports",
+          "size": 3,
+          "milestone": "M5",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.38"
+        },
+        {
+          "id": "perf.interpreter",
+          "label": "Interpreter fast paths: quickening, superinstructions and call inline caches",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        },
+        {
+          "id": "perf.baseline_jit",
+          "label": "Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback",
+          "size": 8,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.03"
+        },
+        {
+          "id": "perf.optimizing_jit",
+          "label": "Optimizing JIT with speculation, deoptimization and on-stack replacement",
+          "size": 8,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "1.03"
+        },
+        {
+          "id": "perf.gc",
+          "label": "Generational, incremental and concurrent garbage collection",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        },
+        {
+          "id": "perf.style",
+          "label": "Parallel style resolution and selector-matching caches",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        },
+        {
+          "id": "perf.layout",
+          "label": "Incremental and parallel layout with layout caches",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        },
+        {
+          "id": "perf.raster",
+          "label": "GPU raster, off-main-thread compositing and threaded scrolling",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        },
+        {
+          "id": "perf.loading",
+          "label": "Loading pipeline: preload scanner, streaming parse, priorities, prerender and back/forward cache",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        },
+        {
+          "id": "perf.memory",
+          "label": "Memory leadership: compact DOM/style data, tab discarding and memory-pressure handling",
+          "size": 3,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.38"
+        },
+        {
+          "id": "perf.energy",
+          "label": "Energy: timer coalescing, background throttling and idle power",
+          "size": 3,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.38"
+        },
+        {
+          "id": "perf.startup",
+          "label": "Startup and new-tab time with snapshots and code caching",
+          "size": 2,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.25"
+        },
+        {
+          "id": "perf.gate",
+          "label": "Benchmark leadership gate against Blink, Gecko and WebKit on every reference device",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.64"
+        }
+      ],
+      "points": 62,
+      "completed": 0,
+      "in_progress": 0,
+      "total": 13,
+      "contribution": "0.00",
+      "percent": "0.00",
+      "verified_percent": "0.00",
+      "partial_percent": "0.00"
+    },
+    {
       "id": "release",
       "label": "Embedding & release",
-      "weight": 2,
+      "weight": 3,
       "features": [
         {
           "id": "release.embedding",
@@ -4404,7 +4964,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.27"
+          "engine_share": "0.30"
         },
         {
           "id": "release.compatibility",
@@ -4414,17 +4974,17 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.45"
+          "engine_share": "0.50"
         },
         {
           "id": "release.performance",
-          "label": "Measured time, memory, reliability and energy budgets",
+          "label": "Measured time, memory, reliability and energy budgets for the beta",
           "size": 3,
           "milestone": "M10",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.27"
+          "engine_share": "0.30"
         },
         {
           "id": "release.artifacts",
@@ -4434,33 +4994,53 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.27"
+          "engine_share": "0.30"
         },
         {
           "id": "release.comparison",
-          "label": "Controlled Chrome/Firefox speed, memory and energy comparison gates",
+          "label": "Published controlled Blink/Gecko/WebKit speed, memory and energy comparison reports",
           "size": 3,
-          "milestone": "M10",
+          "milestone": "M12",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.27"
+          "engine_share": "0.30"
         },
         {
           "id": "release.complete",
-          "label": "Final full-engine acceptance across all five target platforms",
+          "label": "Final full-engine 1.0 acceptance across all five target platforms",
           "size": 5,
-          "milestone": "M10",
+          "milestone": "M13",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.45"
+          "engine_share": "0.50"
+        },
+        {
+          "id": "release.inventory",
+          "label": "Feature parity inventory against Blink, Gecko and WebKit from pinned browser-compat-data",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.30"
+        },
+        {
+          "id": "release.interop",
+          "label": "WPT parity gate: at least the best engine's pass rate on every required directory",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.50"
         }
       ],
-      "points": 22,
+      "points": 30,
       "completed": 0,
       "in_progress": 0,
-      "total": 6,
+      "total": 8,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",

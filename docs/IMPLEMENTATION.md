@@ -1194,7 +1194,7 @@ OpenType/format/tailoring gaps are paid by this completion. Broad text standards
 acceptance and native platform runtime gates remain separate M9/M8 work.
 
 The table below is the status of the original M1–M2 queue items and is kept as
-history; the [roadmap's current queue](ROADMAP.md#14-current-implementation-queue)
+history; the [roadmap's current queue](ROADMAP.md#17-current-implementation-queue)
 lists the next tasks.
 
 | First implementation queue item | Status |

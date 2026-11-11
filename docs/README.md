@@ -15,7 +15,8 @@ record when a boundary changes) in the same change as the code.
 | M2 Styles | Done (8/8): CSS syntax, selectors, values, cascade with layers, media/container queries, invalidation | [CSS.md](CSS.md) |
 | M3 Static rendering | Done (17/17): block/inline/flex layout, OpenType text, images, CPU raster, `render`, reftests, hit testing | [LAYOUT.md](LAYOUT.md), [TEXT.md](TEXT.md), [PAINT.md](PAINT.md) |
 | M4 JavaScript | Current: parser done, values/objects in progress, nothing executes yet | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
-| M5–M10 | Not started | [ROADMAP.md](ROADMAP.md) |
+| M5–M10 | Not started: scripted pages, networking, isolation, desktop/mobile alpha, compatibility, beta | [ROADMAP.md](ROADMAP.md) |
+| M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, full engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
 
 The [progress summary](progress/summary.md) is regenerated from
 `progress/catalog.json` and is the measured status. Done means done for the
@@ -39,9 +40,9 @@ New to the project? Read these in order:
 
 | Document | Purpose |
 | --- | --- |
-| [PRODUCT.md](PRODUCT.md) | Full-product requirements: Brave-level privacy, Chrome/Firefox comparisons, GPU, Wasm |
+| [PRODUCT.md](PRODUCT.md) | Full-product requirements: Brave-level privacy, parity with and performance leadership over Blink/Gecko/WebKit, GPU, Wasm |
 | [EXTENSIONS.md](EXTENSIONS.md) | Rustic-only Manifest V2 extensions and the uBlock Origin port |
-| [ROADMAP.md](ROADMAP.md) | Milestones M0–M10, tasks, gates, current queue and risk register |
+| [ROADMAP.md](ROADMAP.md) | Milestones M0–M13, tasks, gates, current queue and risk register |
 | [PROGRESS.md](PROGRESS.md) | How the README progress map is scored and updated |
 | [STANDARDS.md](STANDARDS.md) | Which standards are targeted and how conformance is reported |
 
@@ -102,8 +103,9 @@ results.
 ## Document conventions
 
 “Must” states a design invariant or milestone gate. “Candidate” means a choice
-still needs a focused evaluation. M0–M10 are defined in the roadmap. Task IDs
-(DOC-, CSS-, REN-, JS-, WEB-, NET-, ISO-, UI-, MOB-, WASM-, EXT-, BLK-) are
+still needs a focused evaluation. M0–M13 are defined in the roadmap. Task IDs
+(DOC-, CSS-, REN-, JS-, WEB-, NET-, ISO-, UI-, MOB-, WASM-, EXT-, BLK-, PAR-,
+MED-, GFX-, DEV-, PERF-) are
 stable; new work gets a new ID rather than reusing one. Future file paths in
 prose are proposed; linked paths exist now.
 

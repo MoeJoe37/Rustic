@@ -17,10 +17,11 @@ START = "<!-- rustic-progress:start -->"
 END = "<!-- rustic-progress:end -->"
 OUTPUTS = ("docs/progress/engine.svg", "docs/progress/data.json", "docs/progress/summary.md")
 IGNORED = {".git", "target", "artifacts", "__pycache__", "checkouts", ".idea", ".vscode"}
-GROUPS = {"base", "url", "dom", "html", "css", "text", "layout", "paint", "js", "wasm", "web", "network", "storage", "security", "compositor", "platform", "a11y", "devtools", "extensions", "filtering", "release"}
+GROUPS = {"base", "url", "dom", "html", "css", "text", "layout", "paint", "js", "wasm", "web", "media", "graphics", "devices", "network", "storage", "security", "compositor", "platform", "a11y", "devtools", "extensions", "filtering", "perf", "release"}
 SIZES = {1, 2, 3, 5, 8}
-SHORT = {"base": "Base", "url": "URL", "dom": "DOM", "html": "HTML", "css": "CSS", "text": "Text", "layout": "Layout", "paint": "Paint", "js": "JS", "wasm": "Wasm", "web": "Web", "network": "Net", "storage": "Store", "security": "Sec", "compositor": "GPU", "platform": "Host", "a11y": "A11y", "devtools": "Dev", "extensions": "Ext", "filtering": "uBO", "release": "Rel"}
-REQUIRED = {"release.complete", "platform.android", "platform.ios", "platform.linux", "platform.windows", "platform.macos", "js.conformance", "js.wasm", "security.audit", "html.conformance", "css.conformance", "layout.incremental", "compositor.parity", "wasm.conformance", "extensions.conformance", "filtering.acceptance", "security.brave", "security.privacy", "security.updates", "release.comparison"}
+SHORT = {"base": "Base", "url": "URL", "dom": "DOM", "html": "HTML", "css": "CSS", "text": "Text", "layout": "Layout", "paint": "Paint", "js": "JS", "wasm": "Wasm", "web": "Web", "media": "Media", "graphics": "Gfx", "devices": "Device", "network": "Net", "storage": "Store", "security": "Sec", "compositor": "GPU", "platform": "Host", "a11y": "A11y", "devtools": "Dev", "extensions": "Ext", "filtering": "uBO", "perf": "Perf", "release": "Rel"}
+REQUIRED = {"release.complete", "platform.android", "platform.ios", "platform.linux", "platform.windows", "platform.macos", "js.conformance", "js.wasm", "security.audit", "html.conformance", "css.conformance", "layout.incremental", "compositor.parity", "wasm.conformance", "extensions.conformance", "filtering.acceptance", "security.brave", "security.privacy", "security.updates", "release.comparison",
+            "media.conformance", "graphics.conformance", "devices.conformance", "perf.gate", "release.inventory", "release.interop"}
 
 
 def percent(value: Fraction) -> str:

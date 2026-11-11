@@ -25,6 +25,7 @@ instead of rewriting the history of a decision.
 | [0015](0015-js-value-and-memory-layout.md) | 8-byte NaN-boxed JS values, `u32`-indexed budgeted arenas, Latin-1 strings, shapes | Accepted for JS-02; collection with JS-03 |
 | [0016](0016-js-garbage-collection.md) | Nonmoving mark/sweep at safe points, side mark bits, free lists, collected shapes and atoms, ephemerons, host-object tracing shared with the DOM | Accepted for JS-03 |
 | [0017](0017-js-bytecode-interpreter.md) | Register bytecode compiled per function, frames on agent stacks instead of Rust recursion, safe points, shape-and-epoch inline caches | Accepted for JS-04 |
+| [0018](0018-parity-and-performance-leadership.md) | Feature parity with Blink/Gecko/WebKit through a pinned inventory, performance leadership gates against all three, milestones M11–M13, `engine-v4` catalog | Accepted scope update; implementation pending |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

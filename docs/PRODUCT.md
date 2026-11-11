@@ -7,9 +7,10 @@ and iOS/iPadOS. They are not claims about the current M1 implementation.
 
 | Requirement | Planned delivery | Acceptance evidence |
 | --- | --- | --- |
+| Functionality of Blink, Gecko and WebKit | M1–M9 standards pipeline, M11 parity program | Pinned parity inventory with every shipped feature mapped; WPT, Test262, Wasm and graphics conformance at least the best engine's; site-corpus workflows (see [ROADMAP §14](ROADMAP.md#14-m11--web-platform-parity)) |
 | Security and privacy at least as strong as Brave | M6/M7 policy, isolation and privacy; M10 review | Versioned Brave comparison matrix, adversarial tests, per-platform sandbox verification, independent review and update exercises |
 | Broad website support, complete CSS and JavaScript targets | M1–M9 standards pipeline and web APIs | Pinned WPT/Test262 baselines, complete feature inventory, representative site workflows and published unsupported cases |
-| Better results than Chrome and Firefox | M3–M10 measurement and optimization | Reproducible comparisons against both browsers for responsiveness, loading, memory and energy; compatibility/security gates first |
+| Better performance than Blink, Gecko and WebKit | Measurement from M5, ratchets at M8/M10, M12 leadership gate | Reproducible comparisons against Chrome, Firefox and Safari for responsiveness, loading, memory and energy; compatibility/security gates first |
 | GPU acceleration | M3 CPU reference, M8 GPU integration, M9 parity | Hardware-accelerated composition/raster paths on all five platform families, device-loss recovery and CPU-reference parity |
 | WebAssembly support | Original runtime track after M4 foundations; M5/M9 integration | Core, JS and Web API suites, proposal inventory, traps/limits, interpreter fallback and mobile execution |
 | Rustic-only extensions using Manifest V2 | M5/M6 API prototypes, M7 isolation, M8/M9 delivery | Native Rustic package/identity, MV2 background pages/content scripts/blocking requests, permission and malicious-package tests |
@@ -68,21 +69,25 @@ before a Brave-parity claim. Background network connections and telemetry must b
 documented; collection is minimized and optional diagnostics require user consent.
 See [security gates](SECURITY.md) and [extension/filtering design](EXTENSIONS.md).
 
-## Better-than-Chrome/Firefox target
+## Better-than-every-engine target
 
-Measure against both current stable browsers on the same named hardware/OS,
-versions, pages, profiles and feature settings. Publish two configurations:
+Measure against the current stable Chrome (Blink), Firefox (Gecko) and Safari
+(WebKit, or WebKitGTK/WPE where Safari does not run) on the same named
+hardware/OS, versions, pages, profiles and feature settings. Publish two configurations:
 normal product defaults, and equivalent content-blocking/protection settings.
 Separate saved network work from engine execution speed. Do not compare a blocked
 page with an unblocked page and attribute the difference to the rendering engine.
 
-Initial competitive targets, to calibrate using M3/M5 measurements:
+Final competitive targets (the M12 gate), compared with the **best** of the
+three engines on each metric; the intermediate M8/M10 ratchet is in
+[PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates):
 
-| Metric | Target against each comparison browser |
+| Metric | Target against the best comparison engine |
 | --- | --- |
+| Speedometer, JetStream and MotionMark scores | At least 10% higher |
 | Navigation/render and interaction workload aggregates | At least 10% lower geometric-mean time |
 | Fixed multi-tab peak/resident memory | At least 10% less memory with equivalent retained state |
-| Mobile sustained-workload energy | At least 10% less energy on comparable supported devices |
+| Laptop and mobile sustained-workload energy | At least 10% less energy on comparable supported devices |
 | Critical p95 responsiveness and correctness | No unexplained regression over 5%; no compatibility/security tradeoff hidden by the aggregate |
 
 Use repeated trials, cold/warm runs, confidence intervals, thermal/power controls
@@ -124,7 +129,8 @@ before untrusted remote execution. See [Core](https://webassembly.github.io/spec
 
 Extension and filtering contracts start with M5/M6 services, not by delaying the
 first static renderer. Their required product gates land in M8/M9 after isolation.
-M10 full-engine acceptance includes all goals above on each target platform,
+M11 closes the feature gap with the other engines, M12 proves performance
+leadership, and M13 full-engine acceptance includes all goals above on each target platform,
 complete declared standards/site evidence, GPU and Wasm operation, Rustic MV2
 extensions and the uBO port, security review and competitive measurements.
 
@@ -133,7 +139,9 @@ filtering subsystems plus security/privacy/comparison gates. Planning adds no
 completion credit. Previous completed capabilities remain complete, while the
 larger scope can lower the overall score. [PROGRESS.md](PROGRESS.md) records the
 weight and denominator changes. [ADR 0007](adr/0007-product-scope.md) records this
-scope decision.
+scope decision. `engine-v4` adds the parity and performance-leadership scope
+(media, graphics web APIs, device APIs and a performance subsystem, milestones
+M11–M13) under [ADR 0018](adr/0018-parity-and-performance-leadership.md).
 
 Reference review: 2026-11-07. Brave's [privacy inventory](https://brave.com/privacy-features/)
 and [fingerprinting design](https://github.com/brave/brave-browser/wiki/Fingerprinting-Protections)

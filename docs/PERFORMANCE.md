@@ -7,12 +7,15 @@ sanity check, not a controlled benchmark. Budgets below are initial engineering
 targets to calibrate; they are not user-facing promises or measurements.
 Correctness and security gates remain prerequisites to optimization.
 
-Beating Chrome and Firefox in measured speed, memory and energy is a required
-product target. [PRODUCT.md](PRODUCT.md) defines initial 10% aggregate improvement
-targets and p95/correctness guardrails. Record exact browser versions, native
-engines, feature parity and both default/equivalent-blocking configurations.
-Results must include uncertainty and regressions; no present performance or
-universal superiority claim is implied by the target.
+Beating all three established engines (Blink in Chrome, Gecko in Firefox and
+WebKit in Safari) in measured speed, memory and energy is a required product
+target and the M12 gate. [PRODUCT.md](PRODUCT.md) defines the 10% targets and
+guardrails; [cross-engine gates](#cross-engine-gates) below defines the
+benchmarks, devices and the ratchet that tracks the gap from M5 to M12. Record
+exact browser versions, native engines, feature parity and both
+default/equivalent-blocking configurations. Results must include uncertainty
+and regressions; no present performance or universal superiority claim is
+implied by the target.
 
 ## Measurements and corpus
 
@@ -73,8 +76,8 @@ measurements that keep them honest:
   object-allocation churn (GC pressure), JSON-like tree building and a
   DOM-free "framework diff" loop. Each reports median and p95 time, peak heap
   and GC count and total pause.
-- **Comparison.** For the PRODUCT.md targets, the same corpus runs on V8 and
-  SpiderMonkey in their interpreter-only modes and with JIT, with exact
+- **Comparison.** For the PRODUCT.md targets, the same corpus runs on V8,
+  SpiderMonkey and JavaScriptCore in their interpreter-only modes and with JIT, with exact
   versions recorded. Those engines are measured from outside the repository
   only; they are never linked or embedded (ADR 0001).
 - **Initial targets** (to calibrate once JS-04 runs code): no workload is
@@ -86,6 +89,69 @@ measurements that keep them honest:
 Measure on native x64 and ARM64; the emulated 32-bit and big-endian tiers check
 correctness only, never timing.
 
+## Cross-engine gates
+
+These are the measurements behind the M12 [performance-leadership gate](ROADMAP.md#15-m12--performance-leadership).
+The harness (PERF-01, catalog `perf.harness`) starts with M5 and grows as
+features land; a benchmark Rustic cannot run yet is reported as "not runnable",
+never as zero or skipped silently.
+
+### Benchmarks
+
+| Area | Benchmark (pinned revision) | Metric |
+| --- | --- | --- |
+| Web app responsiveness | [Speedometer 3](https://browserbench.org/Speedometer3.0/) | Score (geometric mean of subtests) |
+| JavaScript and Wasm | [JetStream 2](https://browserbench.org/JetStream/) | Score; also Rustic's JS-09 corpus |
+| Graphics | [MotionMark 1.3](https://browserbench.org/MotionMark1.3/) | Score |
+| Page load | Recorded site corpus served by a local replay server, cold and warm | First contentful paint, largest contentful paint, load complete |
+| Interaction | Scripted clicks, typing and navigation on the site corpus | p50/p95 input-to-next-paint latency |
+| Scrolling | Long pages, sticky/fixed content, image-heavy feeds | Dropped and late frames |
+| Memory | Fixed set of 10 tabs with equivalent retained state | Peak and steady resident/private memory |
+| Energy | 30-minute scripted browsing loop on battery | Energy (mWh) from platform counters or external meters |
+| Startup | Cold and warm launch; new tab | Time to first paint |
+
+Rustic's own fixtures are original or licensed for redistribution. Recorded
+sites use local replay; no live site or personal account is measured.
+
+### Reference devices
+
+Exact models are chosen and recorded when PERF-01 lands; each class must exist:
+
+| Platform family | Reference classes |
+| --- | --- |
+| Windows | x64 desktop; ARM64 laptop |
+| macOS | ARM64 (Apple silicon) laptop; x64 (Intel) machine while supported |
+| Linux | x64 desktop; aarch64 board or server |
+| Android | ARM64 mid-range phone; ARM64 low-end phone; 32-bit ARM device for correctness and memory only |
+| iOS/iPadOS | Current iPhone; older supported iPhone or iPad |
+
+Comparison engines: current stable Chrome (Blink/V8), Firefox
+(Gecko/SpiderMonkey) and Safari (WebKit/JavaScriptCore). Where Safari does not
+run (Windows, Linux, Android), WebKit is measured through the WebKitGTK/WPE
+reference browser where one exists and recorded as "not compared" otherwise. On
+iOS outside regions that allow other engines every competitor uses WebKit; the
+report says so. Emulated 32-bit and big-endian tiers check correctness only.
+
+### Ratchet
+
+Each stage compares Rustic with the **best** of the three engines on each
+metric, on every reference device where Rustic runs at that stage. Ratios are
+Rustic ÷ best engine for times and memory, and best ÷ Rustic for scores, so
+lower is better and 1.0 is parity.
+
+| Stage | Speed (benchmarks, load, interaction) | Memory | Energy |
+| --- | --- | --- | --- |
+| M5 scripted documents | Harness runs; ratios recorded, no target | Recorded | Not yet measured |
+| M8 alpha | At most 2.0 | At most 1.5 | Recorded |
+| M10 beta | At most 1.25 on every benchmark | No worse than the median engine | No worse than the median engine |
+| M12 leadership | At most 0.90 (10% better than the best) | At most 0.90 of the lowest | At most 0.90 of the lowest |
+
+Additional M12 rules: 95% confidence intervals must not overlap the best
+engine's; no subtest may be worse than the best engine by more than 5% without
+a reviewed, published exception; p95 interaction latency is never worse than the
+best engine. A stage gate missed on one device class blocks the stage. Results
+are published per device and engine; an aggregate never hides a lost metric.
+
 ## Optimization order
 
 1. Build a correct, observable full-recompute/CPU reference path.
@@ -95,6 +161,8 @@ correctness only, never timing.
 5. Add partial layout/painting and compositor scrolling where semantics permit.
 6. Parallelize immutable independent work after profiling demonstrates benefit.
 7. Evaluate GPU and language optimizations; JIT needs a separate security ADR.
+8. Add JIT tiers, concurrent GC and parallel style/layout (M12) only behind the
+   reference path, with differential tests against it.
 
 Do not parallelize live DOM mutation or page JS by moving shared graphs behind
 locks. Document agents serialize observable mutation; workers have defined agents

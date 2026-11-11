@@ -12,8 +12,8 @@ substitute Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink, WebKit or
 existing JS runtime, including in mobile hosts.
 
 Read `docs/PRODUCT.md` and `docs/EXTENSIONS.md` for required full-product scope:
-Brave-comparable security/privacy, broad standards compatibility, measured
-Chrome/Firefox comparisons, GPU/Wasm, Rustic-only MV2 extensions and the uBO port.
+Brave-comparable security/privacy, broad standards compatibility, feature
+parity with Blink/Gecko/WebKit and measured performance leadership over all three, GPU/Wasm, Rustic-only MV2 extensions and the uBO port.
 Keep those as unimplemented targets until evidence exists. A licensed uBO port is
 an extension application layer, not permission to replace the original engine.
 

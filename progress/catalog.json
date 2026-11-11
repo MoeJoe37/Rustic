@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "catalog_version": "engine-v3",
-  "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
+  "catalog_version": "engine-v4",
+  "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
   "milestones": [
     {
       "id": "M1",
@@ -41,14 +41,26 @@
     },
     {
       "id": "M10",
-      "label": "Embedding & release"
+      "label": "Embedding & beta release"
+    },
+    {
+      "id": "M11",
+      "label": "Web platform parity"
+    },
+    {
+      "id": "M12",
+      "label": "Performance leadership"
+    },
+    {
+      "id": "M13",
+      "label": "Full engine 1.0"
     }
   ],
   "groups": [
     {
       "id": "base",
       "label": "Foundation",
-      "weight": 2,
+      "weight": 1,
       "features": [
         {
           "id": "base.identity",
@@ -221,7 +233,7 @@
     {
       "id": "url",
       "label": "URLs & encoding",
-      "weight": 3,
+      "weight": 2,
       "features": [
         {
           "id": "url.records",
@@ -400,7 +412,7 @@
     {
       "id": "dom",
       "label": "DOM",
-      "weight": 6,
+      "weight": 4,
       "features": [
         {
           "id": "dom.storage",
@@ -626,7 +638,7 @@
     {
       "id": "html",
       "label": "HTML",
-      "weight": 6,
+      "weight": 5,
       "features": [
         {
           "id": "html.input",
@@ -906,13 +918,21 @@
               "marker": "fn every_target_replays_its_seed_corpus_cleanly"
             }
           ]
+        },
+        {
+          "id": "html.elements",
+          "label": "Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading",
+          "size": 8,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": []
         }
       ]
     },
     {
       "id": "css",
       "label": "CSS & style",
-      "weight": 9,
+      "weight": 6,
       "features": [
         {
           "id": "css.syntax",
@@ -1375,13 +1395,29 @@
               "marker": "fn every_target_replays_its_seed_corpus_cleanly"
             }
           ]
+        },
+        {
+          "id": "css.animations",
+          "label": "Transitions, CSS animations and Web Animations",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "css.modern",
+          "label": "Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
         }
       ]
     },
     {
       "id": "text",
       "label": "Text & fonts",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "text.fonts",
@@ -1659,13 +1695,21 @@
           "milestone": "M9",
           "status": "planned",
           "evidence": []
+        },
+        {
+          "id": "text.color",
+          "label": "Variable and color fonts (COLRv1, SVG-in-OpenType), palettes and the Font Loading API",
+          "size": 3,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": []
         }
       ]
     },
     {
       "id": "layout",
       "label": "Layout",
-      "weight": 9,
+      "weight": 6,
       "features": [
         {
           "id": "layout.boxes",
@@ -2072,13 +2116,21 @@
           "milestone": "M9",
           "status": "planned",
           "evidence": []
+        },
+        {
+          "id": "layout.formats",
+          "label": "SVG, MathML, ruby and multi-column layout",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": []
         }
       ]
     },
     {
       "id": "paint",
       "label": "Paint & raster",
-      "weight": 6,
+      "weight": 4,
       "features": [
         {
           "id": "paint.display",
@@ -2477,7 +2529,7 @@
         },
         {
           "id": "paint.formats",
-          "label": "SVG/MathML painting integration and Canvas 2D",
+          "label": "SVG and MathML painting integration",
           "size": 8,
           "milestone": "M9",
           "status": "planned",
@@ -2547,7 +2599,7 @@
     {
       "id": "js",
       "label": "JavaScript & GC",
-      "weight": 12,
+      "weight": 10,
       "features": [
         {
           "id": "js.parser",
@@ -3106,7 +3158,7 @@
     {
       "id": "wasm",
       "label": "WebAssembly",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "wasm.decode",
@@ -3177,7 +3229,7 @@
     {
       "id": "web",
       "label": "Bindings & web APIs",
-      "weight": 6,
+      "weight": 5,
       "features": [
         {
           "id": "web.idl",
@@ -3240,6 +3292,243 @@
           "label": "Exposed web API conformance and reentry gate",
           "size": 3,
           "milestone": "M5",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.platform",
+          "label": "Remaining HTML/DOM APIs: Navigation API, drag and drop, selection, pointer events, fullscreen and file APIs",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "web.performance",
+          "label": "Performance timeline, Navigation/Resource Timing and Reporting APIs",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "label": "Media & real-time",
+      "weight": 5,
+      "features": [
+        {
+          "id": "media.pipeline",
+          "label": "Audio/video elements, demuxers, buffering and A/V sync",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.codecs",
+          "label": "Reviewed codecs (AV1, VP8/VP9, Opus, FLAC; H.264/HEVC/AAC via licensed platform decoders) and hardware decode",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.mse",
+          "label": "Media Source Extensions and adaptive streaming",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.eme",
+          "label": "Encrypted Media Extensions with Clear Key and a documented CDM decision",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.webaudio",
+          "label": "Web Audio graph, AudioWorklet and low-latency output",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.webcodecs",
+          "label": "WebCodecs and Media Capabilities",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.capture",
+          "label": "Camera, microphone and screen capture with trusted permission prompts",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.webrtc",
+          "label": "WebRTC peer connections, ICE/DTLS/SRTP and data channels",
+          "size": 8,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "media.conformance",
+          "label": "Media/WebRTC WPT, codec corpus and five-platform playback acceptance",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "id": "graphics",
+      "label": "Graphics web APIs",
+      "weight": 4,
+      "features": [
+        {
+          "id": "graphics.canvas",
+          "label": "Canvas 2D, OffscreenCanvas and ImageBitmap",
+          "size": 5,
+          "milestone": "M9",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "graphics.webgl",
+          "label": "WebGL 1 and 2 with shader translation and validation",
+          "size": 8,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "graphics.webgpu",
+          "label": "WebGPU and WGSL with validation in a sandboxed GPU process",
+          "size": 8,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "graphics.color",
+          "label": "Color management, wide gamut and HDR output",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "graphics.images",
+          "label": "Further image formats: AVIF, APNG and reviewed HEIF/JPEG XL decisions",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "graphics.conformance",
+          "label": "Khronos WebGL CTS, WebGPU CTS and canvas WPT gate",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "id": "devices",
+      "label": "Devices & OS integration",
+      "weight": 4,
+      "features": [
+        {
+          "id": "devices.credentials",
+          "label": "WebAuthn/passkeys and Credential Management",
+          "size": 5,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.payments",
+          "label": "Payment Request and platform payment handlers",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.notifications",
+          "label": "Notifications, Push API and Badging",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.sensors",
+          "label": "Geolocation, device orientation/motion and sensor APIs",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.input",
+          "label": "Gamepad, Pointer Lock, Keyboard Lock and Screen Wake Lock",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.share",
+          "label": "Async Clipboard, Web Share and file handling",
+          "size": 2,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.hardware",
+          "label": "WebUSB/Bluetooth/HID/Serial/NFC with per-API privacy decisions",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.speech",
+          "label": "Web Speech synthesis and recognition",
+          "size": 2,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.apps",
+          "label": "Installable web apps: manifest, install and window controls",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "devices.conformance",
+          "label": "Device API WPT, permission/privacy review and five-platform acceptance",
+          "size": 3,
+          "milestone": "M11",
           "status": "planned",
           "evidence": []
         }
@@ -3305,6 +3594,14 @@
           "milestone": "M6",
           "status": "planned",
           "evidence": []
+        },
+        {
+          "id": "network.webtransport",
+          "label": "WebTransport, fetch priorities and Early Hints",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
         }
       ]
     },
@@ -3368,13 +3665,21 @@
           "milestone": "M9",
           "status": "planned",
           "evidence": []
+        },
+        {
+          "id": "storage.filesystem",
+          "label": "Origin-private file system, File System Access and storage buckets",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
         }
       ]
     },
     {
       "id": "security",
       "label": "Security & IPC",
-      "weight": 6,
+      "weight": 5,
       "features": [
         {
           "id": "security.ipc",
@@ -3469,7 +3774,7 @@
     {
       "id": "compositor",
       "label": "Compositor & GPU",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "compositor.scene",
@@ -3676,7 +3981,7 @@
     {
       "id": "extensions",
       "label": "Extensions (MV2)",
-      "weight": 4,
+      "weight": 3,
       "features": [
         {
           "id": "extensions.manifest",
@@ -3763,7 +4068,7 @@
     {
       "id": "filtering",
       "label": "uBO port & filtering",
-      "weight": 3,
+      "weight": 2,
       "features": [
         {
           "id": "filtering.inventory",
@@ -3832,9 +4137,120 @@
       ]
     },
     {
+      "id": "perf",
+      "label": "Performance leadership",
+      "weight": 8,
+      "features": [
+        {
+          "id": "perf.harness",
+          "label": "Cross-engine benchmark harness, reference devices and published reports",
+          "size": 3,
+          "milestone": "M5",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.interpreter",
+          "label": "Interpreter fast paths: quickening, superinstructions and call inline caches",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.baseline_jit",
+          "label": "Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback",
+          "size": 8,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.optimizing_jit",
+          "label": "Optimizing JIT with speculation, deoptimization and on-stack replacement",
+          "size": 8,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.gc",
+          "label": "Generational, incremental and concurrent garbage collection",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.style",
+          "label": "Parallel style resolution and selector-matching caches",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.layout",
+          "label": "Incremental and parallel layout with layout caches",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.raster",
+          "label": "GPU raster, off-main-thread compositing and threaded scrolling",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.loading",
+          "label": "Loading pipeline: preload scanner, streaming parse, priorities, prerender and back/forward cache",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.memory",
+          "label": "Memory leadership: compact DOM/style data, tab discarding and memory-pressure handling",
+          "size": 3,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.energy",
+          "label": "Energy: timer coalescing, background throttling and idle power",
+          "size": 3,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.startup",
+          "label": "Startup and new-tab time with snapshots and code caching",
+          "size": 2,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "perf.gate",
+          "label": "Benchmark leadership gate against Blink, Gecko and WebKit on every reference device",
+          "size": 5,
+          "milestone": "M12",
+          "status": "planned",
+          "evidence": []
+        }
+      ]
+    },
+    {
       "id": "release",
       "label": "Embedding & release",
-      "weight": 2,
+      "weight": 3,
       "features": [
         {
           "id": "release.embedding",
@@ -3854,7 +4270,7 @@
         },
         {
           "id": "release.performance",
-          "label": "Measured time, memory, reliability and energy budgets",
+          "label": "Measured time, memory, reliability and energy budgets for the beta",
           "size": 3,
           "milestone": "M10",
           "status": "planned",
@@ -3870,17 +4286,33 @@
         },
         {
           "id": "release.comparison",
-          "label": "Controlled Chrome/Firefox speed, memory and energy comparison gates",
+          "label": "Published controlled Blink/Gecko/WebKit speed, memory and energy comparison reports",
           "size": 3,
-          "milestone": "M10",
+          "milestone": "M12",
           "status": "planned",
           "evidence": []
         },
         {
           "id": "release.complete",
-          "label": "Final full-engine acceptance across all five target platforms",
+          "label": "Final full-engine 1.0 acceptance across all five target platforms",
           "size": 5,
-          "milestone": "M10",
+          "milestone": "M13",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.inventory",
+          "label": "Feature parity inventory against Blink, Gecko and WebKit from pinned browser-compat-data",
+          "size": 3,
+          "milestone": "M11",
+          "status": "planned",
+          "evidence": []
+        },
+        {
+          "id": "release.interop",
+          "label": "WPT parity gate: at least the best engine's pass rate on every required directory",
+          "size": 5,
+          "milestone": "M11",
           "status": "planned",
           "evidence": []
         }

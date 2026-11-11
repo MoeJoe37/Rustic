@@ -8,12 +8,14 @@ external badge service to display it.
 
 ## What the number means
 
-[progress/catalog.json](../progress/catalog.json) defines `engine-v3`: 21 weighted
-subsystems and 172 concrete capabilities covering the whole engine plan. Subsystem
+[progress/catalog.json](../progress/catalog.json) defines `engine-v4`: 25 weighted
+subsystems and 221 concrete capabilities covering the whole engine plan, up to
+feature parity with Blink, Gecko and WebKit and measured performance leadership
+over all three. Subsystem
 weights sum to 100. Inside a subsystem each capability has a **size** of 1, 2, 3,
 5 or 8 points describing its relative scope, so finishing the CSS property
 catalog (8) moves the bar more than finishing the CSS tokenizer (3). Each
-capability also names the [roadmap](ROADMAP.md) **milestone** (M1–M10) that
+capability also names the [roadmap](ROADMAP.md) **milestone** (M1–M13) that
 delivers it.
 
 A capability earns **credit** of 1 when complete, a verified step fraction when
@@ -32,8 +34,9 @@ including unfinished libraries which have no crate yet.
 **100% means all catalog capabilities and final full-engine acceptance are
 complete**, including JavaScript/GC, rendering/layout, standards and site gates,
 network/storage/security, accessibility, performance/reliability, embedding,
-GPU/Wasm, Rustic MV2 extensions, the uBlock Origin port, comparative
-security/performance evidence, signed artifacts and runtime acceptance on Windows, macOS, Linux, Android and
+GPU/Wasm, Rustic MV2 extensions, the uBlock Origin port, media/graphics/device
+APIs, the parity inventory and WPT parity gate, the performance-leadership gate
+against Blink, Gecko and WebKit, comparative security evidence, signed artifacts and runtime acceptance on Windows, macOS, Linux, Android and
 iOS/iPadOS. It cannot be reached by completing just the currently existing crates
 or the first milestone. The final acceptance gate remains open until the actual
 engine and required platform evidence are ready.
@@ -59,6 +62,72 @@ implementations to raise the number.
   width is its size, and engine points (weight × progress; all points add up to
   the overall percentage). An outlined cell is in progress; its blue fill is its
   verified step fraction.
+
+## engine-v4 scope change (2026-11-11)
+
+[ADR 0018](adr/0018-parity-and-performance-leadership.md) extends the plan to a
+full engine with the functionality of Blink, Gecko and WebKit and performance
+better than all three. Every engine-v3 capability ID, size, status, step and
+evidence entry is kept. The change adds:
+
+- milestones **M11 Web platform parity**, **M12 Performance leadership** and
+  **M13 Full engine 1.0**; M10 is renamed "Embedding & beta release";
+- four subsystems: **Media & real-time** (9 capabilities: media pipeline,
+  codecs, MSE, EME, Web Audio, WebCodecs, capture, WebRTC, conformance),
+  **Graphics web APIs** (6: Canvas 2D, WebGL, WebGPU, color/HDR, image formats,
+  CTS gate), **Devices & OS integration** (10: WebAuthn, payments,
+  notifications/push, sensors, input devices, clipboard/share, hardware APIs,
+  speech, installable apps, conformance) and **Performance leadership** (13:
+  benchmark harness, interpreter fast paths, baseline and optimizing JIT,
+  concurrent GC, parallel style and layout, GPU raster, loading, memory, energy,
+  startup, leadership gate);
+- eleven capabilities in existing subsystems: `html.elements`,
+  `css.animations`, `css.modern`, `text.color`, `layout.formats`,
+  `web.platform`, `web.performance`, `network.webtransport`,
+  `storage.filesystem`, `release.inventory` and `release.interop`;
+- moved milestones: `release.comparison` to M12 and `release.complete` to M13.
+  `paint.formats` now covers SVG/MathML painting only, since Canvas 2D moved to
+  `graphics.canvas`.
+
+`perf.gate`, `release.inventory`, `release.interop` and the media, graphics and
+device conformance gates join the mandatory gates the generator requires.
+
+Weights are re-allocated so the new subsystems get 21% of the engine:
+
+| Subsystem | engine-v3 | engine-v4 |
+| --- | --- | --- |
+| Foundation | 2% | 1% |
+| URLs & encoding | 3% | 2% |
+| DOM | 6% | 4% |
+| HTML | 6% | 5% |
+| CSS & style | 9% | 6% |
+| Text & fonts | 4% | 3% |
+| Layout | 9% | 6% |
+| Paint & raster | 6% | 4% |
+| JavaScript & GC | 12% | 10% |
+| WebAssembly | 4% | 3% |
+| Bindings & web APIs | 6% | 5% |
+| Media & real-time | — | 5% |
+| Graphics web APIs | — | 4% |
+| Devices & OS integration | — | 4% |
+| Network & navigation | 4% | 4% |
+| Storage & workers | 3% | 3% |
+| Security & IPC | 6% | 5% |
+| Compositor & GPU | 4% | 3% |
+| Platform hosts | 4% | 4% |
+| Accessibility | 2% | 2% |
+| DevTools | 1% | 1% |
+| Extensions (MV2) | 4% | 3% |
+| uBO port & filtering | 3% | 2% |
+| Performance leadership | — | 8% |
+| Embedding & release | 2% | 3% |
+
+With the same 54 completed and 6 in-progress capabilities, engine-v3 measured
+**36.99%** and engine-v4 measures **23.51%** (20.90% verified + 2.61% partial).
+The drop is the larger target, not lost work: M1–M3 stay 100%, and the share of
+the engine those milestones cover falls from 32.49% to 19.79% because parity
+and leadership add work the earlier plan did not count. Do not compare
+percentages across catalog versions without their weights and scope.
 
 ## engine-v3 measurement change (2026-11-08)
 
@@ -148,7 +217,7 @@ do not compare percentages across catalog versions without their weights/scope.
   all complete must be marked complete instead.
 - **Gray / planned:** the capability is unfinished and contributes no credit.
 
-The generator validates schema, all 21 subsystem identities, positive weights,
+The generator validates schema, all 25 subsystem identities, positive weights,
 capability sizes and milestones, step rules, unique capability IDs, mandatory final/platform/conformance gates, and complete
 items' evidence paths/markers. It does not prove semantics by reading source.
 Maintainers must review the exact claim and tests; an empty function or placeholder

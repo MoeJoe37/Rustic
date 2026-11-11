@@ -1,932 +1,1150 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1202" viewBox="0 0 1000 1202" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 36.99%</title>
-<desc id="desc">Weighted engine completion is 36.99%: 33.81% from capabilities verified complete and 3.18% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
-<rect width="1000" height="1202" rx="12" fill="#0d1117"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1382" viewBox="0 0 1000 1382" role="img" aria-labelledby="title desc">
+<title id="title">Rustic engine completion: 23.51%</title>
+<desc id="desc">Weighted engine completion is 23.51%: 20.90% from capabilities verified complete and 2.61% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
+<rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
-<text x="24.00" y="60" fill="#8b949e" font-size="12">54/172 capabilities complete · 6 in progress · 21 subsystems · engine-v3</text>
-<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">36.99%</text>
+<text x="24.00" y="60" fill="#8b949e" font-size="12">54/221 capabilities complete · 6 in progress · 25 subsystems · engine-v4</text>
+<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">23.51%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
-<rect x="24.00" y="76" width="352.14" height="14" rx="4" fill="#388bfd"/>
-<rect x="24.00" y="76" width="321.87" height="14" rx="4" fill="#2ea043"/>
+<rect x="24.00" y="76" width="223.82" height="14" rx="4" fill="#388bfd"/>
+<rect x="24.00" y="76" width="198.97" height="14" rx="4" fill="#2ea043"/>
 <rect x="24" y="104" width="10" height="10" rx="2" fill="#2ea043"/>
-<text x="40.00" y="113" fill="#c9d1d9" font-size="12">33.81% verified complete</text>
+<text x="40.00" y="113" fill="#c9d1d9" font-size="12">20.90% verified complete</text>
 <rect x="224" y="104" width="10" height="10" rx="2" fill="#388bfd"/>
-<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+3.18% partial credit (verified steps)</text>
+<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+2.61% partial credit (verified steps)</text>
 <rect x="524" y="104" width="10" height="10" rx="2" fill="#30363d"/>
-<text x="540.00" y="113" fill="#c9d1d9" font-size="12">63.01% remaining</text>
+<text x="540.00" y="113" fill="#c9d1d9" font-size="12">76.49% remaining</text>
 <text x="24.00" y="142" fill="#f0f6fc" font-size="14" font-weight="600">Scope map</text>
 <text x="976.00" y="142" fill="#8b949e" font-size="11" text-anchor="end">block width = share of engine · fill = subsystem progress</text>
-<g><title>Foundation: 81.25% of 2% engine weight (1.62 engine points)</title>
-<rect x="25.00" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
-<rect x="25.00" y="150" width="13.84" height="32" rx="3" fill="#2ea043"/>
-<rect x="33.02" y="184" width="1" height="4" fill="#30363d"/>
-<text x="33.52" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Base</text>
+<g><title>Foundation: 81.25% of 1% engine weight (0.81 engine points)</title>
+<rect x="25.00" y="150" width="7.52" height="32" rx="3" fill="#21262d"/>
+<rect x="25.00" y="150" width="6.11" height="32" rx="3" fill="#2ea043"/>
+<rect x="28.26" y="184" width="1" height="4" fill="#30363d"/>
+<text x="28.76" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Base</text>
 </g>
-<g><title>URLs &amp; encoding: 43.33% of 3% engine weight (1.30 engine points)</title>
-<rect x="44.04" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
-<rect x="44.04" y="150" width="11.51" height="32" rx="3" fill="#2ea043"/>
-<rect x="56.82" y="184" width="1" height="16" fill="#30363d"/>
-<text x="57.32" y="210" fill="#8b949e" font-size="10" text-anchor="middle">URL</text>
+<g><title>URLs &amp; encoding: 43.33% of 2% engine weight (0.86 engine points)</title>
+<rect x="34.52" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
+<rect x="34.52" y="150" width="7.38" height="32" rx="3" fill="#2ea043"/>
+<rect x="42.54" y="184" width="1" height="16" fill="#30363d"/>
+<text x="43.04" y="210" fill="#8b949e" font-size="10" text-anchor="middle">URL</text>
 </g>
-<g><title>DOM: 56.61% of 6% engine weight (3.39 engine points)</title>
-<rect x="72.60" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
-<rect x="72.60" y="150" width="31.20" height="32" rx="3" fill="#388bfd"/>
-<rect x="72.60" y="150" width="29.18" height="32" rx="3" fill="#2ea043"/>
-<rect x="99.66" y="184" width="1" height="4" fill="#30363d"/>
-<text x="100.16" y="198" fill="#8b949e" font-size="10" text-anchor="middle">DOM</text>
+<g><title>DOM: 56.61% of 4% engine weight (2.26 engine points)</title>
+<rect x="53.56" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
+<rect x="53.56" y="150" width="20.42" height="32" rx="3" fill="#388bfd"/>
+<rect x="53.56" y="150" width="19.10" height="32" rx="3" fill="#2ea043"/>
+<rect x="71.10" y="184" width="1" height="4" fill="#30363d"/>
+<text x="71.60" y="198" fill="#8b949e" font-size="10" text-anchor="middle">DOM</text>
 </g>
-<g><title>HTML: 89.65% of 6% engine weight (5.37 engine points)</title>
-<rect x="129.72" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
-<rect x="129.72" y="150" width="49.42" height="32" rx="3" fill="#2ea043"/>
-<rect x="156.78" y="184" width="1" height="16" fill="#30363d"/>
-<text x="157.28" y="210" fill="#8b949e" font-size="10" text-anchor="middle">HTML</text>
+<g><title>HTML: 70.27% of 5% engine weight (3.51 engine points)</title>
+<rect x="91.64" y="150" width="45.60" height="32" rx="3" fill="#21262d"/>
+<rect x="91.64" y="150" width="32.04" height="32" rx="3" fill="#2ea043"/>
+<rect x="113.94" y="184" width="1" height="16" fill="#30363d"/>
+<text x="114.44" y="210" fill="#8b949e" font-size="10" text-anchor="middle">HTML</text>
 </g>
-<g><title>CSS &amp; style: 100.00% of 9% engine weight (9.00 engine points)</title>
-<rect x="186.84" y="150" width="83.68" height="32" rx="3" fill="#21262d"/>
-<rect x="186.84" y="150" width="83.68" height="32" rx="3" fill="#2ea043"/>
-<rect x="228.18" y="184" width="1" height="4" fill="#30363d"/>
-<text x="228.68" y="198" fill="#8b949e" font-size="10" text-anchor="middle">CSS</text>
+<g><title>CSS &amp; style: 79.59% of 6% engine weight (4.77 engine points)</title>
+<rect x="139.24" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
+<rect x="139.24" y="150" width="43.87" height="32" rx="3" fill="#2ea043"/>
+<rect x="166.30" y="184" width="1" height="4" fill="#30363d"/>
+<text x="166.80" y="198" fill="#8b949e" font-size="10" text-anchor="middle">CSS</text>
 </g>
-<g><title>Text &amp; fonts: 63.63% of 4% engine weight (2.54 engine points)</title>
-<rect x="272.52" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
-<rect x="272.52" y="150" width="22.96" height="32" rx="3" fill="#2ea043"/>
-<rect x="290.06" y="184" width="1" height="16" fill="#30363d"/>
-<text x="290.56" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Text</text>
+<g><title>Text &amp; fonts: 56.00% of 3% engine weight (1.68 engine points)</title>
+<rect x="196.36" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
+<rect x="196.36" y="150" width="14.87" height="32" rx="3" fill="#2ea043"/>
+<rect x="209.14" y="184" width="1" height="16" fill="#30363d"/>
+<text x="209.64" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Text</text>
 </g>
-<g><title>Layout: 56.52% of 9% engine weight (5.08 engine points)</title>
-<rect x="310.60" y="150" width="83.68" height="32" rx="3" fill="#21262d"/>
-<rect x="310.60" y="150" width="47.30" height="32" rx="3" fill="#2ea043"/>
-<rect x="351.94" y="184" width="1" height="4" fill="#30363d"/>
-<text x="352.44" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Layout</text>
+<g><title>Layout: 50.98% of 6% engine weight (3.05 engine points)</title>
+<rect x="224.92" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
+<rect x="224.92" y="150" width="28.10" height="32" rx="3" fill="#2ea043"/>
+<rect x="251.98" y="184" width="1" height="4" fill="#30363d"/>
+<text x="252.48" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Layout</text>
 </g>
-<g><title>Paint &amp; raster: 70.37% of 6% engine weight (4.22 engine points)</title>
-<rect x="396.28" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
-<rect x="396.28" y="150" width="38.79" height="32" rx="3" fill="#2ea043"/>
-<rect x="423.34" y="184" width="1" height="16" fill="#30363d"/>
-<text x="423.84" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Paint</text>
+<g><title>Paint &amp; raster: 70.37% of 4% engine weight (2.81 engine points)</title>
+<rect x="282.04" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
+<rect x="282.04" y="150" width="25.39" height="32" rx="3" fill="#2ea043"/>
+<rect x="299.58" y="184" width="1" height="16" fill="#30363d"/>
+<text x="300.08" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Paint</text>
 </g>
-<g><title>JavaScript &amp; GC: 35.61% of 12% engine weight (4.27 engine points)</title>
-<rect x="453.40" y="150" width="112.24" height="32" rx="3" fill="#21262d"/>
-<rect x="453.40" y="150" width="39.97" height="32" rx="3" fill="#388bfd"/>
-<rect x="453.40" y="150" width="12.29" height="32" rx="3" fill="#2ea043"/>
-<rect x="509.02" y="184" width="1" height="4" fill="#30363d"/>
-<text x="509.52" y="198" fill="#8b949e" font-size="10" text-anchor="middle">JS</text>
+<g><title>JavaScript &amp; GC: 35.61% of 10% engine weight (3.56 engine points)</title>
+<rect x="320.12" y="150" width="93.20" height="32" rx="3" fill="#21262d"/>
+<rect x="320.12" y="150" width="33.19" height="32" rx="3" fill="#388bfd"/>
+<rect x="320.12" y="150" width="10.21" height="32" rx="3" fill="#2ea043"/>
+<rect x="366.22" y="184" width="1" height="4" fill="#30363d"/>
+<text x="366.72" y="198" fill="#8b949e" font-size="10" text-anchor="middle">JS</text>
 </g>
-<g><title>WebAssembly: 0.00% of 4% engine weight (0.00 engine points)</title>
-<rect x="567.64" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
-<rect x="585.18" y="184" width="1" height="16" fill="#30363d"/>
-<text x="585.68" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Wasm</text>
+<g><title>WebAssembly: 0.00% of 3% engine weight (0.00 engine points)</title>
+<rect x="415.32" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
+<rect x="428.10" y="184" width="1" height="16" fill="#30363d"/>
+<text x="428.60" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Wasm</text>
 </g>
-<g><title>Bindings &amp; web APIs: 0.00% of 6% engine weight (0.00 engine points)</title>
-<rect x="605.72" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
-<rect x="632.78" y="184" width="1" height="4" fill="#30363d"/>
-<text x="633.28" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Web</text>
+<g><title>Bindings &amp; web APIs: 0.00% of 5% engine weight (0.00 engine points)</title>
+<rect x="443.88" y="150" width="45.60" height="32" rx="3" fill="#21262d"/>
+<rect x="466.18" y="184" width="1" height="4" fill="#30363d"/>
+<text x="466.68" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Web</text>
+</g>
+<g><title>Media &amp; real-time: 0.00% of 5% engine weight (0.00 engine points)</title>
+<rect x="491.48" y="150" width="45.60" height="32" rx="3" fill="#21262d"/>
+<rect x="513.78" y="184" width="1" height="16" fill="#30363d"/>
+<text x="514.28" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Media</text>
+</g>
+<g><title>Graphics web APIs: 0.00% of 4% engine weight (0.00 engine points)</title>
+<rect x="539.08" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
+<rect x="556.62" y="184" width="1" height="4" fill="#30363d"/>
+<text x="557.12" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Gfx</text>
+</g>
+<g><title>Devices &amp; OS integration: 0.00% of 4% engine weight (0.00 engine points)</title>
+<rect x="577.16" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
+<rect x="594.70" y="184" width="1" height="16" fill="#30363d"/>
+<text x="595.20" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Device</text>
 </g>
 <g><title>Network &amp; navigation: 0.00% of 4% engine weight (0.00 engine points)</title>
-<rect x="662.84" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
-<rect x="680.38" y="184" width="1" height="16" fill="#30363d"/>
-<text x="680.88" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Net</text>
+<rect x="615.24" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
+<rect x="632.78" y="184" width="1" height="4" fill="#30363d"/>
+<text x="633.28" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Net</text>
 </g>
 <g><title>Storage &amp; workers: 0.00% of 3% engine weight (0.00 engine points)</title>
-<rect x="700.92" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
-<rect x="713.70" y="184" width="1" height="4" fill="#30363d"/>
-<text x="714.20" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Store</text>
+<rect x="653.32" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
+<rect x="666.10" y="184" width="1" height="16" fill="#30363d"/>
+<text x="666.60" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Store</text>
 </g>
-<g><title>Security &amp; IPC: 0.00% of 6% engine weight (0.00 engine points)</title>
-<rect x="729.48" y="150" width="55.12" height="32" rx="3" fill="#21262d"/>
-<rect x="756.54" y="184" width="1" height="16" fill="#30363d"/>
-<text x="757.04" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Sec</text>
+<g><title>Security &amp; IPC: 0.00% of 5% engine weight (0.00 engine points)</title>
+<rect x="681.88" y="150" width="45.60" height="32" rx="3" fill="#21262d"/>
+<rect x="704.18" y="184" width="1" height="4" fill="#30363d"/>
+<text x="704.68" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Sec</text>
 </g>
-<g><title>Compositor &amp; GPU: 0.00% of 4% engine weight (0.00 engine points)</title>
-<rect x="786.60" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
-<rect x="804.14" y="184" width="1" height="4" fill="#30363d"/>
-<text x="804.64" y="198" fill="#8b949e" font-size="10" text-anchor="middle">GPU</text>
+<g><title>Compositor &amp; GPU: 0.00% of 3% engine weight (0.00 engine points)</title>
+<rect x="729.48" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
+<rect x="742.26" y="184" width="1" height="16" fill="#30363d"/>
+<text x="742.76" y="210" fill="#8b949e" font-size="10" text-anchor="middle">GPU</text>
 </g>
 <g><title>Platform hosts: 4.16% of 4% engine weight (0.16 engine points)</title>
-<rect x="824.68" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
-<rect x="824.68" y="150" width="2.00" height="32" rx="3" fill="#2ea043"/>
-<rect x="842.22" y="184" width="1" height="16" fill="#30363d"/>
-<text x="842.72" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Host</text>
+<rect x="758.04" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
+<rect x="758.04" y="150" width="2.00" height="32" rx="3" fill="#2ea043"/>
+<rect x="775.58" y="184" width="1" height="4" fill="#30363d"/>
+<text x="776.08" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Host</text>
 </g>
 <g><title>Accessibility: 0.00% of 2% engine weight (0.00 engine points)</title>
-<rect x="862.76" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
-<rect x="870.78" y="184" width="1" height="4" fill="#30363d"/>
-<text x="871.28" y="198" fill="#8b949e" font-size="10" text-anchor="middle">A11y</text>
+<rect x="796.12" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
+<rect x="804.14" y="184" width="1" height="16" fill="#30363d"/>
+<text x="804.64" y="210" fill="#8b949e" font-size="10" text-anchor="middle">A11y</text>
 </g>
 <g><title>DevTools: 0.00% of 1% engine weight (0.00 engine points)</title>
-<rect x="881.80" y="150" width="7.52" height="32" rx="3" fill="#21262d"/>
-<rect x="885.06" y="184" width="1" height="16" fill="#30363d"/>
-<text x="885.56" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Dev</text>
+<rect x="815.16" y="150" width="7.52" height="32" rx="3" fill="#21262d"/>
+<rect x="818.42" y="184" width="1" height="4" fill="#30363d"/>
+<text x="818.92" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Dev</text>
 </g>
-<g><title>Extensions (MV2): 0.00% of 4% engine weight (0.00 engine points)</title>
-<rect x="891.32" y="150" width="36.08" height="32" rx="3" fill="#21262d"/>
-<rect x="908.86" y="184" width="1" height="4" fill="#30363d"/>
-<text x="909.36" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Ext</text>
+<g><title>Extensions (MV2): 0.00% of 3% engine weight (0.00 engine points)</title>
+<rect x="824.68" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
+<rect x="837.46" y="184" width="1" height="16" fill="#30363d"/>
+<text x="837.96" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Ext</text>
 </g>
-<g><title>uBO port &amp; filtering: 0.00% of 3% engine weight (0.00 engine points)</title>
-<rect x="929.40" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
-<rect x="942.18" y="184" width="1" height="16" fill="#30363d"/>
-<text x="942.68" y="210" fill="#8b949e" font-size="10" text-anchor="middle">uBO</text>
+<g><title>uBO port &amp; filtering: 0.00% of 2% engine weight (0.00 engine points)</title>
+<rect x="853.24" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
+<rect x="861.26" y="184" width="1" height="4" fill="#30363d"/>
+<text x="861.76" y="198" fill="#8b949e" font-size="10" text-anchor="middle">uBO</text>
 </g>
-<g><title>Embedding &amp; release: 0.00% of 2% engine weight (0.00 engine points)</title>
-<rect x="957.96" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
-<rect x="965.98" y="184" width="1" height="4" fill="#30363d"/>
-<text x="966.48" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Rel</text>
+<g><title>Performance leadership: 0.00% of 8% engine weight (0.00 engine points)</title>
+<rect x="872.28" y="150" width="74.16" height="32" rx="3" fill="#21262d"/>
+<rect x="908.86" y="184" width="1" height="16" fill="#30363d"/>
+<text x="909.36" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Perf</text>
+</g>
+<g><title>Embedding &amp; release: 0.00% of 3% engine weight (0.00 engine points)</title>
+<rect x="948.44" y="150" width="26.56" height="32" rx="3" fill="#21262d"/>
+<rect x="961.22" y="184" width="1" height="4" fill="#30363d"/>
+<text x="961.72" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Rel</text>
 </g>
 <text x="24.00" y="246" fill="#f0f6fc" font-size="14" font-weight="600">Roadmap milestones</text>
 <text x="976.00" y="246" fill="#8b949e" font-size="11" text-anchor="end">share = portion of the whole engine scheduled in that milestone</text>
-<g><title>M1 Document core: 100.00% (28/28 capabilities, 11.27% of engine)</title>
+<g><title>M1 Document core: 100.00% (28/28 capabilities, 7.28% of engine)</title>
 <text x="24.00" y="278" fill="#8b949e" font-size="12" font-weight="600">M1</text>
 <text x="60.00" y="278" fill="#c9d1d9" font-size="12">Document core</text>
 <rect x="224.00" y="269" width="150.00" height="10" rx="3" fill="#21262d"/>
 <rect x="224.00" y="269" width="150.00" height="10" rx="3" fill="#2ea043"/>
 <text x="434.00" y="278" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
-<text x="488.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">11.27%</text>
+<text x="488.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">7.28%</text>
 </g>
-<g><title>M2 CSS &amp; computed style: 100.00% (8/8 capabilities, 9.00% of engine)</title>
+<g><title>M2 CSS &amp; computed style: 100.00% (8/8 capabilities, 4.77% of engine)</title>
 <text x="24.00" y="308" fill="#8b949e" font-size="12" font-weight="600">M2</text>
 <text x="60.00" y="308" fill="#c9d1d9" font-size="12">CSS &amp; computed style</text>
 <rect x="224.00" y="299" width="150.00" height="10" rx="3" fill="#21262d"/>
 <rect x="224.00" y="299" width="150.00" height="10" rx="3" fill="#2ea043"/>
 <text x="434.00" y="308" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
-<text x="488.00" y="308" fill="#8b949e" font-size="11" text-anchor="end">9.00%</text>
+<text x="488.00" y="308" fill="#8b949e" font-size="11" text-anchor="end">4.77%</text>
 </g>
-<g><title>M3 Static renderer: 100.00% (17/17 capabilities, 12.22% of engine)</title>
+<g><title>M3 Static renderer: 100.00% (17/17 capabilities, 7.74% of engine)</title>
 <text x="24.00" y="338" fill="#8b949e" font-size="12" font-weight="600">M3</text>
 <text x="60.00" y="338" fill="#c9d1d9" font-size="12">Static renderer</text>
 <rect x="224.00" y="329" width="150.00" height="10" rx="3" fill="#21262d"/>
 <rect x="224.00" y="329" width="150.00" height="10" rx="3" fill="#2ea043"/>
 <text x="434.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
-<text x="488.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">12.22%</text>
+<text x="488.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">7.74%</text>
 </g>
-<g><title>M4 ECMAScript runtime: 40.00% (1/13 capabilities, 10.68% of engine)</title>
+<g><title>M4 ECMAScript runtime: 40.00% (1/13 capabilities, 8.90% of engine)</title>
 <text x="24.00" y="368" fill="#8b949e" font-size="12" font-weight="600">M4</text>
 <text x="60.00" y="368" fill="#c9d1d9" font-size="12">ECMAScript runtime</text>
 <rect x="224.00" y="359" width="150.00" height="10" rx="3" fill="#21262d"/>
 <rect x="224.00" y="359" width="60.00" height="10" rx="3" fill="#388bfd"/>
 <rect x="224.00" y="359" width="18.45" height="10" rx="3" fill="#2ea043"/>
 <text x="434.00" y="368" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">40.00%</text>
-<text x="488.00" y="368" fill="#8b949e" font-size="11" text-anchor="end">10.68%</text>
+<text x="488.00" y="368" fill="#8b949e" font-size="11" text-anchor="end">8.90%</text>
 </g>
-<g><title>M5 Scripted documents: 0.00% (0/11 capabilities, 7.46% of engine)</title>
+<g><title>M5 Scripted documents: 0.00% (0/12 capabilities, 5.29% of engine)</title>
 <text x="24.00" y="398" fill="#8b949e" font-size="12" font-weight="600">M5</text>
 <text x="60.00" y="398" fill="#c9d1d9" font-size="12">Scripted documents</text>
 <rect x="224.00" y="389" width="150.00" height="10" rx="3" fill="#21262d"/>
 <text x="434.00" y="398" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<text x="488.00" y="398" fill="#8b949e" font-size="11" text-anchor="end">7.46%</text>
+<text x="488.00" y="398" fill="#8b949e" font-size="11" text-anchor="end">5.29%</text>
 </g>
-<g><title>M6 Networking &amp; services: 0.00% (0/12 capabilities, 5.12% of engine)</title>
-<text x="512.00" y="278" fill="#8b949e" font-size="12" font-weight="600">M6</text>
-<text x="548.00" y="278" fill="#c9d1d9" font-size="12">Networking &amp; services</text>
+<g><title>M6 Networking &amp; services: 0.00% (0/12 capabilities, 4.38% of engine)</title>
+<text x="24.00" y="428" fill="#8b949e" font-size="12" font-weight="600">M6</text>
+<text x="60.00" y="428" fill="#c9d1d9" font-size="12">Networking &amp; services</text>
+<rect x="224.00" y="419" width="150.00" height="10" rx="3" fill="#21262d"/>
+<text x="434.00" y="428" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<text x="488.00" y="428" fill="#8b949e" font-size="11" text-anchor="end">4.38%</text>
+</g>
+<g><title>M7 Isolation &amp; security: 0.00% (0/8 capabilities, 3.72% of engine)</title>
+<text x="24.00" y="458" fill="#8b949e" font-size="12" font-weight="600">M7</text>
+<text x="60.00" y="458" fill="#c9d1d9" font-size="12">Isolation &amp; security</text>
+<rect x="224.00" y="449" width="150.00" height="10" rx="3" fill="#21262d"/>
+<text x="434.00" y="458" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<text x="488.00" y="458" fill="#8b949e" font-size="11" text-anchor="end">3.72%</text>
+</g>
+<g><title>M8 Desktop &amp; mobile alpha: 0.00% (0/20 capabilities, 9.83% of engine)</title>
+<text x="512.00" y="278" fill="#8b949e" font-size="12" font-weight="600">M8</text>
+<text x="548.00" y="278" fill="#c9d1d9" font-size="12">Desktop &amp; mobile alpha</text>
 <rect x="712.00" y="269" width="150.00" height="10" rx="3" fill="#21262d"/>
 <text x="922.00" y="278" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<text x="976.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">5.12%</text>
+<text x="976.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">9.83%</text>
 </g>
-<g><title>M7 Isolation &amp; security: 0.00% (0/8 capabilities, 4.46% of engine)</title>
-<text x="512.00" y="308" fill="#8b949e" font-size="12" font-weight="600">M7</text>
-<text x="548.00" y="308" fill="#c9d1d9" font-size="12">Isolation &amp; security</text>
+<g><title>M9 Compatibility expansion: 0.66% (0/52 capabilities, 22.10% of engine)</title>
+<text x="512.00" y="308" fill="#8b949e" font-size="12" font-weight="600">M9</text>
+<text x="548.00" y="308" fill="#c9d1d9" font-size="12">Compatibility expansion</text>
 <rect x="712.00" y="299" width="150.00" height="10" rx="3" fill="#21262d"/>
-<text x="922.00" y="308" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<text x="976.00" y="308" fill="#8b949e" font-size="11" text-anchor="end">4.46%</text>
+<rect x="712.00" y="299" width="2.00" height="10" rx="3" fill="#388bfd"/>
+<text x="922.00" y="308" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.66%</text>
+<text x="976.00" y="308" fill="#8b949e" font-size="11" text-anchor="end">22.10%</text>
 </g>
-<g><title>M8 Desktop &amp; mobile alpha: 0.00% (0/20 capabilities, 10.83% of engine)</title>
-<text x="512.00" y="338" fill="#8b949e" font-size="12" font-weight="600">M8</text>
-<text x="548.00" y="338" fill="#c9d1d9" font-size="12">Desktop &amp; mobile alpha</text>
+<g><title>M10 Embedding &amp; beta release: 0.00% (0/7 capabilities, 2.67% of engine)</title>
+<text x="512.00" y="338" fill="#8b949e" font-size="12" font-weight="600">M10</text>
+<text x="548.00" y="338" fill="#c9d1d9" font-size="12">Embedding &amp; beta release</text>
 <rect x="712.00" y="329" width="150.00" height="10" rx="3" fill="#21262d"/>
 <text x="922.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<text x="976.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">10.83%</text>
+<text x="976.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">2.67%</text>
 </g>
-<g><title>M9 Compatibility expansion: 0.86% (0/46 capabilities, 25.38% of engine)</title>
-<text x="512.00" y="368" fill="#8b949e" font-size="12" font-weight="600">M9</text>
-<text x="548.00" y="368" fill="#c9d1d9" font-size="12">Compatibility expansion</text>
+<g><title>M11 Web platform parity: 0.00% (0/30 capabilities, 14.85% of engine)</title>
+<text x="512.00" y="368" fill="#8b949e" font-size="12" font-weight="600">M11</text>
+<text x="548.00" y="368" fill="#c9d1d9" font-size="12">Web platform parity</text>
 <rect x="712.00" y="359" width="150.00" height="10" rx="3" fill="#21262d"/>
-<rect x="712.00" y="359" width="2.00" height="10" rx="3" fill="#388bfd"/>
-<text x="922.00" y="368" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.86%</text>
-<text x="976.00" y="368" fill="#8b949e" font-size="11" text-anchor="end">25.38%</text>
+<text x="922.00" y="368" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<text x="976.00" y="368" fill="#8b949e" font-size="11" text-anchor="end">14.85%</text>
 </g>
-<g><title>M10 Embedding &amp; release: 0.00% (0/9 capabilities, 3.53% of engine)</title>
-<text x="512.00" y="398" fill="#8b949e" font-size="12" font-weight="600">M10</text>
-<text x="548.00" y="398" fill="#c9d1d9" font-size="12">Embedding &amp; release</text>
+<g><title>M12 Performance leadership: 0.00% (0/13 capabilities, 7.91% of engine)</title>
+<text x="512.00" y="398" fill="#8b949e" font-size="12" font-weight="600">M12</text>
+<text x="548.00" y="398" fill="#c9d1d9" font-size="12">Performance leadership</text>
 <rect x="712.00" y="389" width="150.00" height="10" rx="3" fill="#21262d"/>
 <text x="922.00" y="398" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<text x="976.00" y="398" fill="#8b949e" font-size="11" text-anchor="end">3.53%</text>
+<text x="976.00" y="398" fill="#8b949e" font-size="11" text-anchor="end">7.91%</text>
 </g>
-<text x="24.00" y="444" fill="#f0f6fc" font-size="14" font-weight="600">Subsystems</text>
-<text x="24.00" y="466" fill="#8b949e" font-size="11">Subsystem</text>
-<text x="236.00" y="466" fill="#8b949e" font-size="11" text-anchor="end">Weight</text>
-<text x="252.00" y="466" fill="#8b949e" font-size="11">Progress</text>
-<text x="504.00" y="466" fill="#8b949e" font-size="11" text-anchor="end">Done</text>
-<text x="520.00" y="466" fill="#8b949e" font-size="11">Capabilities (width = relative scope)</text>
-<text x="976.00" y="466" fill="#8b949e" font-size="11" text-anchor="end">Points</text>
-<rect x="24" y="473" width="952" height="1" fill="#30363d"/>
-<g><title>Foundation: 7/8 capabilities complete, 81.25% done, 1.62 of 2 engine points</title>
-<text x="32.00" y="497" fill="#f0f6fc" font-size="12">Foundation</text>
-<text x="236.00" y="497" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
-<rect x="252.00" y="488" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="488" width="162.50" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="497" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">81.25%</text>
+<g><title>M13 Full engine 1.0: 0.00% (0/1 capabilities, 0.50% of engine)</title>
+<text x="512.00" y="428" fill="#8b949e" font-size="12" font-weight="600">M13</text>
+<text x="548.00" y="428" fill="#c9d1d9" font-size="12">Full engine 1.0</text>
+<rect x="712.00" y="419" width="150.00" height="10" rx="3" fill="#21262d"/>
+<text x="922.00" y="428" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<text x="976.00" y="428" fill="#8b949e" font-size="11" text-anchor="end">0.50%</text>
+</g>
+<text x="24.00" y="504" fill="#f0f6fc" font-size="14" font-weight="600">Subsystems</text>
+<text x="24.00" y="526" fill="#8b949e" font-size="11">Subsystem</text>
+<text x="236.00" y="526" fill="#8b949e" font-size="11" text-anchor="end">Weight</text>
+<text x="252.00" y="526" fill="#8b949e" font-size="11">Progress</text>
+<text x="504.00" y="526" fill="#8b949e" font-size="11" text-anchor="end">Done</text>
+<text x="520.00" y="526" fill="#8b949e" font-size="11">Capabilities (width = relative scope)</text>
+<text x="976.00" y="526" fill="#8b949e" font-size="11" text-anchor="end">Points</text>
+<rect x="24" y="533" width="952" height="1" fill="#30363d"/>
+<g><title>Foundation: 7/8 capabilities complete, 81.25% done, 0.81 of 1 engine points</title>
+<text x="32.00" y="557" fill="#f0f6fc" font-size="12">Foundation</text>
+<text x="236.00" y="557" fill="#8b949e" font-size="12" text-anchor="end">1%</text>
+<rect x="252.00" y="548" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="548" width="162.50" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="557" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">81.25%</text>
 <g><title>Document/node identity and stale-handle contracts: complete, size 2, M1</title>
-<rect x="520.00" y="486" width="45.50" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="546" width="45.50" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Checked resource accounting: complete, size 2, M1</title>
-<rect x="567.50" y="486" width="45.50" height="14" rx="2" fill="#2ea043"/>
+<rect x="567.50" y="546" width="45.50" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Cooperative cancellation: complete, size 2, M1</title>
-<rect x="615.00" y="486" width="45.50" height="14" rx="2" fill="#2ea043"/>
+<rect x="615.00" y="546" width="45.50" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Checked source byte spans: complete, size 1, M1</title>
-<rect x="662.50" y="486" width="21.75" height="14" rx="2" fill="#2ea043"/>
+<rect x="662.50" y="546" width="21.75" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Injectable monotonic clocks: complete, size 1, M1</title>
-<rect x="686.25" y="486" width="21.75" height="14" rx="2" fill="#2ea043"/>
+<rect x="686.25" y="546" width="21.75" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Typed CSS/device geometry and checked surface allocation: complete, size 3, M3</title>
-<rect x="710.00" y="486" width="69.25" height="14" rx="2" fill="#2ea043"/>
+<rect x="710.00" y="546" width="69.25" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Structured source/revision diagnostics and redaction: complete, size 2, M1</title>
-<rect x="781.25" y="486" width="45.50" height="14" rx="2" fill="#2ea043"/>
+<rect x="781.25" y="546" width="45.50" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Coordinated lifecycle, shutdown and resource ownership: planned, size 3, M5</title>
-<rect x="828.75" y="486" width="69.25" height="14" rx="2" fill="#30363d"/>
+<rect x="828.75" y="546" width="69.25" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="497" fill="#c9d1d9" font-size="12" text-anchor="end">1.62</text>
+<text x="976.00" y="557" fill="#c9d1d9" font-size="12" text-anchor="end">0.81</text>
 </g>
-<g><title>URLs &amp; encoding: 6/12 capabilities complete, 43.33% done, 1.30 of 3 engine points</title>
-<rect x="24" y="508" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="527" fill="#f0f6fc" font-size="12">URLs &amp; encoding</text>
-<text x="236.00" y="527" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
-<rect x="252.00" y="518" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="518" width="86.66" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="527" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">43.33%</text>
+<g><title>URLs &amp; encoding: 6/12 capabilities complete, 43.33% done, 0.86 of 2 engine points</title>
+<rect x="24" y="568" width="952" height="30" fill="#161b22"/>
+<text x="32.00" y="587" fill="#f0f6fc" font-size="12">URLs &amp; encoding</text>
+<text x="236.00" y="587" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
+<rect x="252.00" y="578" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="578" width="86.66" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="587" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">43.33%</text>
 <g><title>Declared ASCII URL/reference parsing subset: complete, size 3, M1</title>
-<rect x="520.00" y="516" width="36.00" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="576" width="36.00" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>IPv4/IPv6 host parsing and canonicalization: complete, size 2, M1</title>
-<rect x="558.00" y="516" width="23.33" height="14" rx="2" fill="#2ea043"/>
+<rect x="558.00" y="576" width="23.33" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Tuple and process-local opaque origin identity: complete, size 2, M1</title>
-<rect x="583.33" y="516" width="23.33" height="14" rx="2" fill="#2ea043"/>
+<rect x="583.33" y="576" width="23.33" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Unicode IDNA and data adapter: complete, size 3, M1</title>
-<rect x="608.67" y="516" width="36.00" height="14" rx="2" fill="#2ea043"/>
+<rect x="608.67" y="576" width="36.00" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>File URL and platform rules: complete, size 2, M1</title>
-<rect x="646.67" y="516" width="23.33" height="14" rx="2" fill="#2ea043"/>
+<rect x="646.67" y="576" width="23.33" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Blob registry and origin rules: planned, size 2, M9</title>
-<rect x="672.00" y="516" width="23.33" height="14" rx="2" fill="#30363d"/>
+<rect x="672.00" y="576" width="23.33" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>URL setters and URLSearchParams: planned, size 2, M9</title>
-<rect x="697.33" y="516" width="23.33" height="14" rx="2" fill="#30363d"/>
+<rect x="697.33" y="576" width="23.33" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Required legacy decoders and charset selection: planned, size 5, M6</title>
-<rect x="722.67" y="516" width="61.33" height="14" rx="2" fill="#30363d"/>
+<rect x="722.67" y="576" width="61.33" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Encoding sniff/restart integration: planned, size 2, M6</title>
-<rect x="786.00" y="516" width="23.33" height="14" rx="2" fill="#30363d"/>
+<rect x="786.00" y="576" width="23.33" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Validation-error diagnostics and source locations: complete, size 1, M1</title>
-<rect x="811.33" y="516" width="10.67" height="14" rx="2" fill="#2ea043"/>
+<rect x="811.33" y="576" width="10.67" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Navigation origin inheritance and policy integration: planned, size 3, M6</title>
-<rect x="824.00" y="516" width="36.00" height="14" rx="2" fill="#30363d"/>
+<rect x="824.00" y="576" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Complete declared URL/encoding conformance gate: planned, size 3, M9</title>
-<rect x="862.00" y="516" width="36.00" height="14" rx="2" fill="#30363d"/>
+<rect x="862.00" y="576" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="527" fill="#c9d1d9" font-size="12" text-anchor="end">1.30</text>
+<text x="976.00" y="587" fill="#c9d1d9" font-size="12" text-anchor="end">0.86</text>
 </g>
-<g><title>DOM: 6/10 capabilities complete, 56.61% done, 3.39 of 6 engine points</title>
-<text x="32.00" y="557" fill="#f0f6fc" font-size="12">DOM</text>
-<text x="236.00" y="557" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
-<rect x="252.00" y="548" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="548" width="113.22" height="10" rx="3" fill="#388bfd"/>
-<rect x="252.00" y="548" width="105.88" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="557" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">56.61%</text>
+<g><title>DOM: 6/10 capabilities complete, 56.61% done, 2.26 of 4 engine points</title>
+<text x="32.00" y="617" fill="#f0f6fc" font-size="12">DOM</text>
+<text x="236.00" y="617" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
+<rect x="252.00" y="608" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="608" width="113.22" height="10" rx="3" fill="#388bfd"/>
+<rect x="252.00" y="608" width="105.88" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="617" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">56.61%</text>
 <g><title>Bounded document-owned node storage: complete, size 3, M1</title>
-<rect x="520.00" y="546" width="31.53" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="606" width="31.53" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Checked same-document mutation and traversal: complete, size 3, M1</title>
-<rect x="553.53" y="546" width="31.53" height="14" rx="2" fill="#2ea043"/>
+<rect x="553.53" y="606" width="31.53" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Namespace/attribute identity and UTF-16 values: complete, size 2, M1</title>
-<rect x="587.06" y="546" width="20.35" height="14" rx="2" fill="#2ea043"/>
+<rect x="587.06" y="606" width="20.35" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Fragments, processing instructions and full node kinds: complete, size 2, M1</title>
-<rect x="609.41" y="546" width="20.35" height="14" rx="2" fill="#2ea043"/>
+<rect x="609.41" y="606" width="20.35" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Adoption, cloning and document lifecycle: complete, size 3, M1</title>
-<rect x="631.76" y="546" width="31.53" height="14" rx="2" fill="#2ea043"/>
+<rect x="631.76" y="606" width="31.53" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>DOM event propagation and default actions: planned, size 5, M5</title>
-<rect x="665.29" y="546" width="53.88" height="14" rx="2" fill="#30363d"/>
+<rect x="665.29" y="606" width="53.88" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Mutation records and observers: planned, size 3, M5</title>
-<rect x="721.18" y="546" width="31.53" height="14" rx="2" fill="#30363d"/>
+<rect x="721.18" y="606" width="31.53" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Ranges, live collections and traversal APIs: planned, size 3, M9</title>
-<rect x="754.71" y="546" width="31.53" height="14" rx="2" fill="#30363d"/>
+<rect x="754.71" y="606" width="31.53" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Shadow DOM and custom element lifecycle: in progress, size 5, M9, 25.00% verified</title>
-<rect x="788.24" y="546" width="53.88" height="14" rx="2" fill="#30363d"/>
-<rect x="788.24" y="546" width="13.47" height="14" rx="2" fill="#388bfd"/>
-<rect x="788.74" y="546.5" width="52.88" height="13" rx="2" fill="none" stroke="#388bfd"/>
+<rect x="788.24" y="606" width="53.88" height="14" rx="2" fill="#30363d"/>
+<rect x="788.24" y="606" width="13.47" height="14" rx="2" fill="#388bfd"/>
+<rect x="788.74" y="606.5" width="52.88" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <g><title>Tracing integration and DOM conformance gate: complete, size 5, M1</title>
-<rect x="844.12" y="546" width="53.88" height="14" rx="2" fill="#2ea043"/>
+<rect x="844.12" y="606" width="53.88" height="14" rx="2" fill="#2ea043"/>
 </g>
-<text x="976.00" y="557" fill="#c9d1d9" font-size="12" text-anchor="end">3.39</text>
+<text x="976.00" y="617" fill="#c9d1d9" font-size="12" text-anchor="end">2.26</text>
 </g>
-<g><title>HTML: 9/10 capabilities complete, 89.65% done, 5.37 of 6 engine points</title>
-<rect x="24" y="568" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="587" fill="#f0f6fc" font-size="12">HTML</text>
-<text x="236.00" y="587" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
-<rect x="252.00" y="578" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="578" width="179.30" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="587" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">89.65%</text>
+<g><title>HTML: 9/11 capabilities complete, 70.27% done, 3.51 of 5 engine points</title>
+<rect x="24" y="628" width="952" height="30" fill="#161b22"/>
+<text x="32.00" y="647" fill="#f0f6fc" font-size="12">HTML</text>
+<text x="236.00" y="647" fill="#8b949e" font-size="12" text-anchor="end">5%</text>
+<rect x="252.00" y="638" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="638" width="140.54" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="647" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">70.27%</text>
 <g><title>Bounded incremental UTF-8 decoding and input preprocessing: complete, size 2, M1</title>
-<rect x="520.00" y="576" width="24.21" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="636" width="18.54" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Declared data/tag/attribute tokenizer subset: complete, size 3, M1</title>
-<rect x="546.21" y="576" width="37.31" height="14" rx="2" fill="#2ea043"/>
+<rect x="540.54" y="636" width="28.81" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Full named/numeric character references: complete, size 2, M1</title>
-<rect x="585.52" y="576" width="24.21" height="14" rx="2" fill="#2ea043"/>
+<rect x="571.35" y="636" width="18.54" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Comments, doctypes and declaration recovery: complete, size 2, M1</title>
-<rect x="611.72" y="576" width="24.21" height="14" rx="2" fill="#2ea043"/>
+<rect x="591.89" y="636" width="18.54" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>RCDATA, RAWTEXT, script and plaintext modes: complete, size 2, M1</title>
-<rect x="637.93" y="576" width="24.21" height="14" rx="2" fill="#2ea043"/>
+<rect x="612.43" y="636" width="18.54" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Core insertion modes and malformed-tree recovery: complete, size 5, M1</title>
-<rect x="664.14" y="576" width="63.52" height="14" rx="2" fill="#2ea043"/>
+<rect x="632.97" y="636" width="49.35" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Table, formatting, template and foreign content rules: complete, size 5, M1</title>
-<rect x="729.66" y="576" width="63.52" height="14" rx="2" fill="#2ea043"/>
+<rect x="684.32" y="636" width="49.35" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Parser/script reentry and encoding restart: planned, size 3, M5</title>
-<rect x="795.17" y="576" width="37.31" height="14" rx="2" fill="#30363d"/>
+<rect x="735.68" y="636" width="28.81" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Bounded local loader and dump-dom command: complete, size 2, M1</title>
-<rect x="834.48" y="576" width="24.21" height="14" rx="2" fill="#2ea043"/>
+<rect x="766.49" y="636" width="18.54" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Parser corpora, chunk invariance and fuzz gate: complete, size 3, M1</title>
-<rect x="860.69" y="576" width="37.31" height="14" rx="2" fill="#2ea043"/>
+<rect x="787.03" y="636" width="28.81" height="14" rx="2" fill="#2ea043"/>
 </g>
-<text x="976.00" y="587" fill="#c9d1d9" font-size="12" text-anchor="end">5.37</text>
+<g><title>Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading: planned, size 8, M9</title>
+<rect x="817.84" y="636" width="80.16" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>CSS &amp; style: 8/8 capabilities complete, 100.00% done, 9.00 of 9 engine points</title>
-<text x="32.00" y="617" fill="#f0f6fc" font-size="12">CSS &amp; style</text>
-<text x="236.00" y="617" fill="#8b949e" font-size="12" text-anchor="end">9%</text>
-<rect x="252.00" y="608" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="608" width="200.00" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="617" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
+<text x="976.00" y="647" fill="#c9d1d9" font-size="12" text-anchor="end">3.51</text>
+</g>
+<g><title>CSS &amp; style: 8/10 capabilities complete, 79.59% done, 4.77 of 6 engine points</title>
+<text x="32.00" y="677" fill="#f0f6fc" font-size="12">CSS &amp; style</text>
+<text x="236.00" y="677" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
+<rect x="252.00" y="668" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="668" width="159.18" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="677" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">79.59%</text>
 <g><title>CSS tokenizer/parser and recovery: complete, size 3, M2</title>
-<rect x="520.00" y="606" width="27.23" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="666" width="21.27" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Required selectors and specificity: complete, size 5, M2</title>
-<rect x="549.23" y="606" width="46.72" height="14" rx="2" fill="#2ea043"/>
+<rect x="543.27" y="666" width="36.78" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Typed property grammar and supported property catalog: complete, size 8, M2</title>
-<rect x="597.95" y="606" width="75.95" height="14" rx="2" fill="#2ea043"/>
+<rect x="582.04" y="666" width="60.04" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Complete cascade/origins/layers and inheritance: complete, size 5, M2</title>
-<rect x="675.90" y="606" width="46.72" height="14" rx="2" fill="#2ea043"/>
+<rect x="644.08" y="666" width="36.78" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Computed values, variables, registered properties and cycle handling: complete, size 5, M2</title>
-<rect x="724.62" y="606" width="46.72" height="14" rx="2" fill="#2ea043"/>
+<rect x="682.86" y="666" width="36.78" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Media/container queries and style attachment: complete, size 3, M2</title>
-<rect x="773.33" y="606" width="27.23" height="14" rx="2" fill="#2ea043"/>
+<rect x="721.63" y="666" width="21.27" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Correct incremental invalidation against reference path: complete, size 5, M2</title>
-<rect x="802.56" y="606" width="46.72" height="14" rx="2" fill="#2ea043"/>
+<rect x="744.90" y="666" width="36.78" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Declared CSS conformance and regression gate: complete, size 5, M2</title>
-<rect x="851.28" y="606" width="46.72" height="14" rx="2" fill="#2ea043"/>
+<rect x="783.67" y="666" width="36.78" height="14" rx="2" fill="#2ea043"/>
 </g>
-<text x="976.00" y="617" fill="#c9d1d9" font-size="12" text-anchor="end">9.00</text>
+<g><title>Transitions, CSS animations and Web Animations: planned, size 5, M9</title>
+<rect x="822.45" y="666" width="36.78" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Text &amp; fonts: 4/6 capabilities complete, 63.63% done, 2.54 of 4 engine points</title>
-<rect x="24" y="628" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="647" fill="#f0f6fc" font-size="12">Text &amp; fonts</text>
-<text x="236.00" y="647" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
-<rect x="252.00" y="638" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="638" width="127.26" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="647" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">63.63%</text>
+<g><title>Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope: planned, size 5, M11</title>
+<rect x="861.22" y="666" width="36.78" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="677" fill="#c9d1d9" font-size="12" text-anchor="end">4.77</text>
+</g>
+<g><title>Text &amp; fonts: 4/7 capabilities complete, 56.00% done, 1.68 of 3 engine points</title>
+<rect x="24" y="688" width="952" height="30" fill="#161b22"/>
+<text x="32.00" y="707" fill="#f0f6fc" font-size="12">Text &amp; fonts</text>
+<text x="236.00" y="707" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
+<rect x="252.00" y="698" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="698" width="112.00" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="707" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">56.00%</text>
 <g><title>Font selection/discovery and metrics, including computed ex/ch/cap/ic values from loaded fonts: complete, size 3, M3</title>
-<rect x="520.00" y="636" width="49.82" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="696" width="43.60" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Shaping, fallback and glyph clusters: complete, size 5, M3</title>
-<rect x="571.82" y="636" width="84.36" height="14" rx="2" fill="#2ea043"/>
+<rect x="565.60" y="696" width="74.00" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Bidi and mixed-direction text: complete, size 3, M3</title>
-<rect x="658.18" y="636" width="49.82" height="14" rx="2" fill="#2ea043"/>
+<rect x="641.60" y="696" width="43.60" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Line breaking and grapheme navigation: complete, size 3, M3</title>
-<rect x="710.00" y="636" width="49.82" height="14" rx="2" fill="#2ea043"/>
+<rect x="687.20" y="696" width="43.60" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Writing modes, vertical text and font loading: planned, size 5, M9</title>
-<rect x="761.82" y="636" width="84.36" height="14" rx="2" fill="#30363d"/>
+<rect x="732.80" y="696" width="74.00" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Text/font conformance and platform parity: planned, size 3, M9</title>
-<rect x="848.18" y="636" width="49.82" height="14" rx="2" fill="#30363d"/>
+<rect x="808.80" y="696" width="43.60" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="647" fill="#c9d1d9" font-size="12" text-anchor="end">2.54</text>
+<g><title>Variable and color fonts (COLRv1, SVG-in-OpenType), palettes and the Font Loading API: planned, size 3, M9</title>
+<rect x="854.40" y="696" width="43.60" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Layout: 6/10 capabilities complete, 56.52% done, 5.08 of 9 engine points</title>
-<text x="32.00" y="677" fill="#f0f6fc" font-size="12">Layout</text>
-<text x="236.00" y="677" fill="#8b949e" font-size="12" text-anchor="end">9%</text>
-<rect x="252.00" y="668" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="668" width="113.04" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="677" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">56.52%</text>
+<text x="976.00" y="707" fill="#c9d1d9" font-size="12" text-anchor="end">1.68</text>
+</g>
+<g><title>Layout: 6/11 capabilities complete, 50.98% done, 3.05 of 6 engine points</title>
+<text x="32.00" y="737" fill="#f0f6fc" font-size="12">Layout</text>
+<text x="236.00" y="737" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
+<rect x="252.00" y="728" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="728" width="101.96" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="737" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">50.98%</text>
 <g><title>Box/fragment trees and checked geometry: complete, size 3, M3</title>
-<rect x="520.00" y="666" width="22.78" height="14" rx="2" fill="#2ea043"/>
+<rect x="520.00" y="726" width="20.35" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Block flow, margins and anonymous boxes: complete, size 5, M3</title>
-<rect x="544.78" y="666" width="39.30" height="14" rx="2" fill="#2ea043"/>
+<rect x="542.35" y="726" width="35.25" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Inline formatting, line boxes and baselines: complete, size 5, M3</title>
-<rect x="586.09" y="666" width="39.30" height="14" rx="2" fill="#2ea043"/>
+<rect x="579.61" y="726" width="35.25" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Intrinsic and replaced-element sizing: complete, size 3, M3</title>
-<rect x="627.39" y="666" width="22.78" height="14" rx="2" fill="#2ea043"/>
+<rect x="616.86" y="726" width="20.35" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Floats, positioning and overflow: complete, size 5, M3</title>
-<rect x="652.17" y="666" width="39.30" height="14" rx="2" fill="#2ea043"/>
+<rect x="639.22" y="726" width="35.25" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Flexbox: complete, size 5, M3</title>
-<rect x="693.48" y="666" width="39.30" height="14" rx="2" fill="#2ea043"/>
+<rect x="676.47" y="726" width="35.25" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Grid: planned, size 5, M9</title>
-<rect x="734.78" y="666" width="39.30" height="14" rx="2" fill="#30363d"/>
+<rect x="713.73" y="726" width="35.25" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Tables: planned, size 5, M9</title>
-<rect x="776.09" y="666" width="39.30" height="14" rx="2" fill="#30363d"/>
+<rect x="750.98" y="726" width="35.25" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Fragmentation, printing and advanced formatting: planned, size 5, M9</title>
-<rect x="817.39" y="666" width="39.30" height="14" rx="2" fill="#30363d"/>
+<rect x="788.24" y="726" width="35.25" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Incremental/full-layout parity and conformance: planned, size 5, M9</title>
-<rect x="858.70" y="666" width="39.30" height="14" rx="2" fill="#30363d"/>
+<rect x="825.49" y="726" width="35.25" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="677" fill="#c9d1d9" font-size="12" text-anchor="end">5.08</text>
+<g><title>SVG, MathML, ruby and multi-column layout: planned, size 5, M9</title>
+<rect x="862.75" y="726" width="35.25" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Paint &amp; raster: 6/7 capabilities complete, 70.37% done, 4.22 of 6 engine points</title>
-<rect x="24" y="688" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="707" fill="#f0f6fc" font-size="12">Paint &amp; raster</text>
-<text x="236.00" y="707" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
-<rect x="252.00" y="698" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="698" width="140.74" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="707" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">70.37%</text>
-<g><title>Immutable display lists and paint order: complete, size 3, M3</title>
-<rect x="520.00" y="696" width="40.22" height="14" rx="2" fill="#2ea043"/>
+<text x="976.00" y="737" fill="#c9d1d9" font-size="12" text-anchor="end">3.05</text>
 </g>
-<g><title>Stacking, clips and transforms: complete, size 3, M3</title>
-<rect x="562.22" y="696" width="40.22" height="14" rx="2" fill="#2ea043"/>
-</g>
-<g><title>Deterministic CPU reference rasterizer: complete, size 5, M3</title>
-<rect x="604.44" y="696" width="68.37" height="14" rx="2" fill="#2ea043"/>
-</g>
-<g><title>Bounded images, color/alpha and resource lifecycle: complete, size 3, M3</title>
-<rect x="674.81" y="696" width="40.22" height="14" rx="2" fill="#2ea043"/>
-</g>
-<g><title>Hit testing and resize/zoom geometry: complete, size 2, M3</title>
-<rect x="717.04" y="696" width="26.15" height="14" rx="2" fill="#2ea043"/>
-</g>
-<g><title>SVG/MathML painting integration and Canvas 2D: planned, size 8, M9</title>
-<rect x="745.19" y="696" width="110.59" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Reftest output, damage and paint conformance: complete, size 3, M3</title>
-<rect x="857.78" y="696" width="40.22" height="14" rx="2" fill="#2ea043"/>
-</g>
-<text x="976.00" y="707" fill="#c9d1d9" font-size="12" text-anchor="end">4.22</text>
-</g>
-<g><title>JavaScript &amp; GC: 1/15 capabilities complete, 35.61% done, 4.27 of 12 engine points</title>
-<text x="32.00" y="737" fill="#f0f6fc" font-size="12">JavaScript &amp; GC</text>
-<text x="236.00" y="737" fill="#8b949e" font-size="12" text-anchor="end">12%</text>
-<rect x="252.00" y="728" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="728" width="71.22" height="10" rx="3" fill="#388bfd"/>
-<rect x="252.00" y="728" width="21.90" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="737" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">35.61%</text>
-<g><title>Lexer/parser, ASI, early errors and UTF-16: in progress, size 5, M4, 83.33% verified</title>
-<rect x="520.00" y="726" width="24.03" height="14" rx="2" fill="#30363d"/>
-<rect x="520.00" y="726" width="20.02" height="14" rx="2" fill="#388bfd"/>
-<rect x="520.50" y="726.5" width="23.03" height="13" rx="2" fill="none" stroke="#388bfd"/>
-</g>
-<g><title>Values, coercions, references and completions: in progress, size 3, M4, 75.00% verified</title>
-<rect x="546.03" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-<rect x="546.03" y="726" width="10.21" height="14" rx="2" fill="#388bfd"/>
-<rect x="546.53" y="726.5" width="12.62" height="13" rx="2" fill="none" stroke="#388bfd"/>
-</g>
-<g><title>Object methods, descriptors and prototypes: in progress, size 3, M4, 75.00% verified</title>
-<rect x="561.64" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-<rect x="561.64" y="726" width="10.21" height="14" rx="2" fill="#388bfd"/>
-<rect x="562.14" y="726.5" width="12.62" height="13" rx="2" fill="none" stroke="#388bfd"/>
-</g>
-<g><title>Rooted traced heap and host-object cycle collection: complete, size 8, M4</title>
-<rect x="577.26" y="726" width="39.64" height="14" rx="2" fill="#2ea043"/>
-</g>
-<g><title>Original interpreter/bytecode and control flow: in progress, size 8, M4, 75.00% verified</title>
-<rect x="618.90" y="726" width="39.64" height="14" rx="2" fill="#30363d"/>
-<rect x="618.90" y="726" width="29.73" height="14" rx="2" fill="#388bfd"/>
-<rect x="619.40" y="726.5" width="38.64" height="13" rx="2" fill="none" stroke="#388bfd"/>
-</g>
-<g><title>Functions, closures, call/construct and exceptions: in progress, size 5, M4, 66.66% verified</title>
-<rect x="660.55" y="726" width="24.03" height="14" rx="2" fill="#30363d"/>
-<rect x="660.55" y="726" width="16.02" height="14" rx="2" fill="#388bfd"/>
-<rect x="661.05" y="726.5" width="23.03" height="13" rx="2" fill="none" stroke="#388bfd"/>
-</g>
-<g><title>Core built-ins and collections: planned, size 8, M4</title>
-<rect x="686.58" y="726" width="39.64" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Promises, jobs and realms: planned, size 3, M4</title>
-<rect x="728.22" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Modules and host loading hooks: planned, size 3, M4</title>
-<rect x="743.84" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>BigInt, RegExp, proxies, generators and async: planned, size 8, M4</title>
-<rect x="759.45" y="726" width="39.64" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Buffers, typed arrays and memory semantics: planned, size 3, M4</title>
-<rect x="801.10" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Intl and required Unicode semantics: planned, size 5, M4</title>
-<rect x="816.71" y="726" width="24.03" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>JavaScript/WebAssembly identity, conversions and tracing integration: planned, size 3, M9</title>
-<rect x="842.74" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Cancellation, stack/heap limits and GC stress: planned, size 3, M4</title>
-<rect x="858.36" y="726" width="13.62" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Declared full Test262 and runtime correctness gate: planned, size 5, M9</title>
-<rect x="873.97" y="726" width="24.03" height="14" rx="2" fill="#30363d"/>
-</g>
-<text x="976.00" y="737" fill="#c9d1d9" font-size="12" text-anchor="end">4.27</text>
-</g>
-<g><title>WebAssembly: 0/8 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
+<g><title>Paint &amp; raster: 6/7 capabilities complete, 70.37% done, 2.81 of 4 engine points</title>
 <rect x="24" y="748" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="767" fill="#f0f6fc" font-size="12">WebAssembly</text>
+<text x="32.00" y="767" fill="#f0f6fc" font-size="12">Paint &amp; raster</text>
 <text x="236.00" y="767" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
 <rect x="252.00" y="758" width="200.00" height="10" rx="3" fill="#21262d"/>
-<text x="504.00" y="767" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Bounded binary decoder and malformed-module handling: planned, size 2, M9</title>
-<rect x="520.00" y="756" width="20.35" height="14" rx="2" fill="#30363d"/>
+<rect x="252.00" y="758" width="140.74" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="767" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">70.37%</text>
+<g><title>Immutable display lists and paint order: complete, size 3, M3</title>
+<rect x="520.00" y="756" width="40.22" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Complete selected type/instruction/module validation: planned, size 3, M9</title>
-<rect x="542.35" y="756" width="31.53" height="14" rx="2" fill="#30363d"/>
+<g><title>Stacking, clips and transforms: complete, size 3, M3</title>
+<rect x="562.22" y="756" width="40.22" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Original interpreter, numerics, control flow and traps: planned, size 5, M9</title>
-<rect x="575.88" y="756" width="53.88" height="14" rx="2" fill="#30363d"/>
+<g><title>Deterministic CPU reference rasterizer: complete, size 5, M3</title>
+<rect x="604.44" y="756" width="68.37" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Memories, tables, globals, instances and resource limits: planned, size 3, M9</title>
-<rect x="631.76" y="756" width="31.53" height="14" rx="2" fill="#30363d"/>
+<g><title>Bounded images, color/alpha and resource lifecycle: complete, size 3, M3</title>
+<rect x="674.81" y="756" width="40.22" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Streaming Web API, MIME/CSP and capability-safe imports: planned, size 3, M9</title>
-<rect x="665.29" y="756" width="31.53" height="14" rx="2" fill="#30363d"/>
+<g><title>Hit testing and resize/zoom geometry: complete, size 2, M3</title>
+<rect x="717.04" y="756" width="26.15" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Required reference/GC, exception, SIMD, shared-memory and baseline features: planned, size 8, M9</title>
-<rect x="698.82" y="756" width="87.41" height="14" rx="2" fill="#30363d"/>
+<g><title>SVG and MathML painting integration: planned, size 8, M9</title>
+<rect x="745.19" y="756" width="110.59" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Reviewed acceleration with interpreter fallback on mobile/desktop: planned, size 5, M9</title>
-<rect x="788.24" y="756" width="53.88" height="14" rx="2" fill="#30363d"/>
+<g><title>Reftest output, damage and paint conformance: complete, size 3, M3</title>
+<rect x="857.78" y="756" width="40.22" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Core/JS/Web suites, fuzzing and five-platform acceptance: planned, size 5, M9</title>
-<rect x="844.12" y="756" width="53.88" height="14" rx="2" fill="#30363d"/>
+<text x="976.00" y="767" fill="#c9d1d9" font-size="12" text-anchor="end">2.81</text>
 </g>
-<text x="976.00" y="767" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
-</g>
-<g><title>Bindings &amp; web APIs: 0/8 capabilities complete, 0.00% done, 0.00 of 6 engine points</title>
-<text x="32.00" y="797" fill="#f0f6fc" font-size="12">Bindings &amp; web APIs</text>
-<text x="236.00" y="797" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
+<g><title>JavaScript &amp; GC: 1/15 capabilities complete, 35.61% done, 3.56 of 10 engine points</title>
+<text x="32.00" y="797" fill="#f0f6fc" font-size="12">JavaScript &amp; GC</text>
+<text x="236.00" y="797" fill="#8b949e" font-size="12" text-anchor="end">10%</text>
 <rect x="252.00" y="788" width="200.00" height="10" rx="3" fill="#21262d"/>
-<text x="504.00" y="797" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Web IDL tooling, conversions and rooted wrappers: planned, size 5, M5</title>
-<rect x="520.00" y="786" width="57.38" height="14" rx="2" fill="#30363d"/>
+<rect x="252.00" y="788" width="71.22" height="10" rx="3" fill="#388bfd"/>
+<rect x="252.00" y="788" width="21.90" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="797" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">35.61%</text>
+<g><title>Lexer/parser, ASI, early errors and UTF-16: in progress, size 5, M4, 83.33% verified</title>
+<rect x="520.00" y="786" width="24.03" height="14" rx="2" fill="#30363d"/>
+<rect x="520.00" y="786" width="20.02" height="14" rx="2" fill="#388bfd"/>
+<rect x="520.50" y="786.5" width="23.03" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Window/Document/Element bindings and identity: planned, size 5, M5</title>
-<rect x="579.38" y="786" width="57.38" height="14" rx="2" fill="#30363d"/>
+<g><title>Values, coercions, references and completions: in progress, size 3, M4, 75.00% verified</title>
+<rect x="546.03" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
+<rect x="546.03" y="786" width="10.21" height="14" rx="2" fill="#388bfd"/>
+<rect x="546.53" y="786.5" width="12.62" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Tasks, microtasks and rendering opportunities: planned, size 3, M5</title>
-<rect x="638.75" y="786" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Object methods, descriptors and prototypes: in progress, size 3, M4, 75.00% verified</title>
+<rect x="561.64" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
+<rect x="561.64" y="786" width="10.21" height="14" rx="2" fill="#388bfd"/>
+<rect x="562.14" y="786.5" width="12.62" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Classic/module script lifecycle and readiness: planned, size 3, M5</title>
-<rect x="674.38" y="786" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Rooted traced heap and host-object cycle collection: complete, size 8, M4</title>
+<rect x="577.26" y="786" width="39.64" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Forms, focus, editing and user input: planned, size 5, M5</title>
-<rect x="710.00" y="786" width="57.38" height="14" rx="2" fill="#30363d"/>
+<g><title>Original interpreter/bytecode and control flow: in progress, size 8, M4, 75.00% verified</title>
+<rect x="618.90" y="786" width="39.64" height="14" rx="2" fill="#30363d"/>
+<rect x="618.90" y="786" width="29.73" height="14" rx="2" fill="#388bfd"/>
+<rect x="619.40" y="786.5" width="38.64" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Timers, animation frames and observer APIs: planned, size 3, M5</title>
-<rect x="769.38" y="786" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Functions, closures, call/construct and exceptions: in progress, size 5, M4, 66.66% verified</title>
+<rect x="660.55" y="786" width="24.03" height="14" rx="2" fill="#30363d"/>
+<rect x="660.55" y="786" width="16.02" height="14" rx="2" fill="#388bfd"/>
+<rect x="661.05" y="786.5" width="23.03" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Streams, messaging and structured clone: planned, size 5, M9</title>
-<rect x="805.00" y="786" width="57.38" height="14" rx="2" fill="#30363d"/>
+<g><title>Core built-ins and collections: planned, size 8, M4</title>
+<rect x="686.58" y="786" width="39.64" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Exposed web API conformance and reentry gate: planned, size 3, M5</title>
-<rect x="864.38" y="786" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Promises, jobs and realms: planned, size 3, M4</title>
+<rect x="728.22" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="797" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+<g><title>Modules and host loading hooks: planned, size 3, M4</title>
+<rect x="743.84" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Network &amp; navigation: 0/7 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
+<g><title>BigInt, RegExp, proxies, generators and async: planned, size 8, M4</title>
+<rect x="759.45" y="786" width="39.64" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Buffers, typed arrays and memory semantics: planned, size 3, M4</title>
+<rect x="801.10" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Intl and required Unicode semantics: planned, size 5, M4</title>
+<rect x="816.71" y="786" width="24.03" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>JavaScript/WebAssembly identity, conversions and tracing integration: planned, size 3, M9</title>
+<rect x="842.74" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Cancellation, stack/heap limits and GC stress: planned, size 3, M4</title>
+<rect x="858.36" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Declared full Test262 and runtime correctness gate: planned, size 5, M9</title>
+<rect x="873.97" y="786" width="24.03" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="797" fill="#c9d1d9" font-size="12" text-anchor="end">3.56</text>
+</g>
+<g><title>WebAssembly: 0/8 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
 <rect x="24" y="808" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="827" fill="#f0f6fc" font-size="12">Network &amp; navigation</text>
-<text x="236.00" y="827" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
+<text x="32.00" y="827" fill="#f0f6fc" font-size="12">WebAssembly</text>
+<text x="236.00" y="827" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
 <rect x="252.00" y="818" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="827" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Reviewed TLS/HTTP transport with cancellation: planned, size 5, M6</title>
-<rect x="520.00" y="816" width="63.52" height="14" rx="2" fill="#30363d"/>
+<g><title>Bounded binary decoder and malformed-module handling: planned, size 2, M9</title>
+<rect x="520.00" y="816" width="20.35" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Navigation/history state machine and redirects: planned, size 5, M6</title>
-<rect x="585.52" y="816" width="63.52" height="14" rx="2" fill="#30363d"/>
+<g><title>Complete selected type/instruction/module validation: planned, size 3, M9</title>
+<rect x="542.35" y="816" width="31.53" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Fetch, CORS and response filtering: planned, size 5, M6</title>
-<rect x="651.03" y="816" width="63.52" height="14" rx="2" fill="#30363d"/>
+<g><title>Original interpreter, numerics, control flow and traps: planned, size 5, M9</title>
+<rect x="575.88" y="816" width="53.88" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Cookies and partitioned HTTP cache: planned, size 3, M6</title>
-<rect x="716.55" y="816" width="37.31" height="14" rx="2" fill="#30363d"/>
+<g><title>Memories, tables, globals, instances and resource limits: planned, size 3, M9</title>
+<rect x="631.76" y="816" width="31.53" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>CSP, MIME, secure contexts and mixed-content policy: planned, size 3, M6</title>
-<rect x="755.86" y="816" width="37.31" height="14" rx="2" fill="#30363d"/>
+<g><title>Streaming Web API, MIME/CSP and capability-safe imports: planned, size 3, M9</title>
+<rect x="665.29" y="816" width="31.53" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Required HTTP versions, WebSockets and referrer rules: planned, size 5, M9</title>
-<rect x="795.17" y="816" width="63.52" height="14" rx="2" fill="#30363d"/>
+<g><title>Required reference/GC, exception, SIMD, shared-memory and baseline features: planned, size 8, M9</title>
+<rect x="698.82" y="816" width="87.41" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Network policy and navigation conformance gate: planned, size 3, M6</title>
-<rect x="860.69" y="816" width="37.31" height="14" rx="2" fill="#30363d"/>
+<g><title>Reviewed acceleration with interpreter fallback on mobile/desktop: planned, size 5, M9</title>
+<rect x="788.24" y="816" width="53.88" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Core/JS/Web suites, fuzzing and five-platform acceptance: planned, size 5, M9</title>
+<rect x="844.12" y="816" width="53.88" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="827" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Storage &amp; workers: 0/7 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
-<text x="32.00" y="857" fill="#f0f6fc" font-size="12">Storage &amp; workers</text>
-<text x="236.00" y="857" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
+<g><title>Bindings &amp; web APIs: 0/10 capabilities complete, 0.00% done, 0.00 of 5 engine points</title>
+<text x="32.00" y="857" fill="#f0f6fc" font-size="12">Bindings &amp; web APIs</text>
+<text x="236.00" y="857" fill="#8b949e" font-size="12" text-anchor="end">5%</text>
 <rect x="252.00" y="848" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="857" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Ephemeral/persistent profiles and private mode: planned, size 2, M6</title>
-<rect x="520.00" y="846" width="32.55" height="14" rx="2" fill="#30363d"/>
+<g><title>Web IDL tooling, conversions and rooted wrappers: planned, size 5, M5</title>
+<rect x="520.00" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Storage keys, quotas and schema recovery: planned, size 3, M6</title>
-<rect x="554.55" y="846" width="49.82" height="14" rx="2" fill="#30363d"/>
+<g><title>Window/Document/Element bindings and identity: planned, size 5, M5</title>
+<rect x="567.50" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Local/session storage: planned, size 1, M6</title>
-<rect x="606.36" y="846" width="15.27" height="14" rx="2" fill="#30363d"/>
+<g><title>Tasks, microtasks and rendering opportunities: planned, size 3, M5</title>
+<rect x="615.00" y="846" width="26.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>IndexedDB transactions and crash recovery: planned, size 5, M9</title>
-<rect x="623.64" y="846" width="84.36" height="14" rx="2" fill="#30363d"/>
+<g><title>Classic/module script lifecycle and readiness: planned, size 3, M5</title>
+<rect x="643.50" y="846" width="26.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Worker agents, lifetimes and messaging: planned, size 3, M9</title>
-<rect x="710.00" y="846" width="49.82" height="14" rx="2" fill="#30363d"/>
+<g><title>Forms, focus, editing and user input: planned, size 5, M5</title>
+<rect x="672.00" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Service workers and Cache API: planned, size 5, M9</title>
-<rect x="761.82" y="846" width="84.36" height="14" rx="2" fill="#30363d"/>
+<g><title>Timers, animation frames and observer APIs: planned, size 3, M5</title>
+<rect x="719.50" y="846" width="26.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Persistence/offline/worker isolation and conformance: planned, size 3, M9</title>
-<rect x="848.18" y="846" width="49.82" height="14" rx="2" fill="#30363d"/>
+<g><title>Streams, messaging and structured clone: planned, size 5, M9</title>
+<rect x="748.00" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Exposed web API conformance and reentry gate: planned, size 3, M5</title>
+<rect x="795.50" y="846" width="26.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Remaining HTML/DOM APIs: Navigation API, drag and drop, selection, pointer events, fullscreen and file APIs: planned, size 5, M9</title>
+<rect x="824.00" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Performance timeline, Navigation/Resource Timing and Reporting APIs: planned, size 3, M11</title>
+<rect x="871.50" y="846" width="26.50" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="857" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Security &amp; IPC: 0/11 capabilities complete, 0.00% done, 0.00 of 6 engine points</title>
+<g><title>Media &amp; real-time: 0/9 capabilities complete, 0.00% done, 0.00 of 5 engine points</title>
 <rect x="24" y="868" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="887" fill="#f0f6fc" font-size="12">Security &amp; IPC</text>
-<text x="236.00" y="887" fill="#8b949e" font-size="12" text-anchor="end">6%</text>
+<text x="32.00" y="887" fill="#f0f6fc" font-size="12">Media &amp; real-time</text>
+<text x="236.00" y="887" fill="#8b949e" font-size="12" text-anchor="end">5%</text>
 <rect x="252.00" y="878" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="887" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Bounded versioned hostile-peer-safe IPC: planned, size 3, M7</title>
-<rect x="520.00" y="876" width="24.51" height="14" rx="2" fill="#30363d"/>
+<g><title>Audio/video elements, demuxers, buffering and A/V sync: planned, size 5, M11</title>
+<rect x="520.00" y="876" width="48.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Browser-assigned authority and capability brokering: planned, size 3, M7</title>
-<rect x="546.51" y="876" width="24.51" height="14" rx="2" fill="#30363d"/>
+<g><title>Reviewed codecs (AV1, VP8/VP9, Opus, FLAC; H.264/HEVC/AAC via licensed platform decoders) and hardware decode: planned, size 5, M11</title>
+<rect x="570.00" y="876" width="48.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Site/agent/process assignment and origin separation: planned, size 5, M7</title>
-<rect x="573.02" y="876" width="42.19" height="14" rx="2" fill="#30363d"/>
+<g><title>Media Source Extensions and adaptive streaming: planned, size 3, M11</title>
+<rect x="620.00" y="876" width="28.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Verified Windows/macOS/Linux sandboxing: planned, size 5, M7</title>
-<rect x="617.21" y="876" width="42.19" height="14" rx="2" fill="#30363d"/>
+<g><title>Encrypted Media Extensions with Clear Key and a documented CDM decision: planned, size 3, M11</title>
+<rect x="650.00" y="876" width="28.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Verified Android/iOS process and broker restrictions: planned, size 5, M7</title>
-<rect x="661.40" y="876" width="42.19" height="14" rx="2" fill="#30363d"/>
+<g><title>Web Audio graph, AudioWorklet and low-latency output: planned, size 5, M11</title>
+<rect x="680.00" y="876" width="48.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Trusted permissions, activation, files and downloads: planned, size 3, M7</title>
-<rect x="705.58" y="876" width="24.51" height="14" rx="2" fill="#30363d"/>
+<g><title>WebCodecs and Media Capabilities: planned, size 3, M11</title>
+<rect x="730.00" y="876" width="28.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Renderer/service crash recovery without stale authority: planned, size 3, M7</title>
-<rect x="732.09" y="876" width="24.51" height="14" rx="2" fill="#30363d"/>
+<g><title>Camera, microphone and screen capture with trusted permission prompts: planned, size 3, M11</title>
+<rect x="760.00" y="876" width="28.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Versioned Brave security comparison and independent review: planned, size 3, M10</title>
-<rect x="758.60" y="876" width="24.51" height="14" rx="2" fill="#30363d"/>
+<g><title>WebRTC peer connections, ICE/DTLS/SRTP and data channels: planned, size 8, M11</title>
+<rect x="790.00" y="876" width="78.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Default tracking/bounce/fingerprinting defenses and privacy matrix: planned, size 5, M10</title>
-<rect x="785.12" y="876" width="42.19" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Authenticated updates, incident response and vulnerability triage: planned, size 3, M10</title>
-<rect x="829.30" y="876" width="24.51" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Fuzz/native-memory review and security release gate: planned, size 5, M7</title>
-<rect x="855.81" y="876" width="42.19" height="14" rx="2" fill="#30363d"/>
+<g><title>Media/WebRTC WPT, codec corpus and five-platform playback acceptance: planned, size 3, M11</title>
+<rect x="870.00" y="876" width="28.00" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="887" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Compositor &amp; GPU: 0/4 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
-<text x="32.00" y="917" fill="#f0f6fc" font-size="12">Compositor &amp; GPU</text>
+<g><title>Graphics web APIs: 0/6 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
+<text x="32.00" y="917" fill="#f0f6fc" font-size="12">Graphics web APIs</text>
 <text x="236.00" y="917" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
 <rect x="252.00" y="908" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="917" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Incremental scene submission and scrolling: planned, size 3, M8</title>
-<rect x="520.00" y="906" width="85.69" height="14" rx="2" fill="#30363d"/>
+<g><title>Canvas 2D, OffscreenCanvas and ImageBitmap: planned, size 5, M9</title>
+<rect x="520.00" y="906" width="61.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Mobile/desktop GPU adapters and CPU fallback: planned, size 5, M8</title>
-<rect x="607.69" y="906" width="144.15" height="14" rx="2" fill="#30363d"/>
+<g><title>WebGL 1 and 2 with shader translation and validation: planned, size 8, M11</title>
+<rect x="583.33" y="906" width="99.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Surface/device loss and resource recovery: planned, size 2, M8</title>
-<rect x="753.85" y="906" width="56.46" height="14" rx="2" fill="#30363d"/>
+<g><title>WebGPU and WGSL with validation in a sandboxed GPU process: planned, size 8, M11</title>
+<rect x="684.67" y="906" width="99.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>GPU/reference parity, performance and energy gates: planned, size 3, M8</title>
-<rect x="812.31" y="906" width="85.69" height="14" rx="2" fill="#30363d"/>
+<g><title>Color management, wide gamut and HDR output: planned, size 3, M11</title>
+<rect x="786.00" y="906" width="36.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Further image formats: AVIF, APNG and reviewed HEIF/JPEG XL decisions: planned, size 3, M11</title>
+<rect x="824.00" y="906" width="36.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Khronos WebGL CTS, WebGPU CTS and canvas WPT gate: planned, size 3, M11</title>
+<rect x="862.00" y="906" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="917" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Platform hosts: 1/9 capabilities complete, 4.16% done, 0.16 of 4 engine points</title>
+<g><title>Devices &amp; OS integration: 0/10 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
 <rect x="24" y="928" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="947" fill="#f0f6fc" font-size="12">Platform hosts</text>
+<text x="32.00" y="947" fill="#f0f6fc" font-size="12">Devices &amp; OS integration</text>
 <text x="236.00" y="947" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
 <rect x="252.00" y="938" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="938" width="8.32" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="947" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">4.16%</text>
-<g><title>Android/iOS shared-core cross-compilation: complete, size 1, M1</title>
-<rect x="520.00" y="936" width="13.83" height="14" rx="2" fill="#2ea043"/>
+<text x="504.00" y="947" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<g><title>WebAuthn/passkeys and Credential Management: planned, size 5, M11</title>
+<rect x="520.00" y="936" width="61.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Linux runtime and native host acceptance: planned, size 3, M8</title>
-<rect x="535.83" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>Payment Request and platform payment handlers: planned, size 3, M11</title>
+<rect x="583.33" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Windows runtime and native host acceptance: planned, size 3, M8</title>
-<rect x="583.33" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>Notifications, Push API and Badging: planned, size 3, M11</title>
+<rect x="621.33" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>macOS runtime and native host acceptance: planned, size 3, M8</title>
-<rect x="630.83" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>Geolocation, device orientation/motion and sensor APIs: planned, size 3, M11</title>
+<rect x="659.33" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Android runtime and native host acceptance: planned, size 3, M8</title>
-<rect x="678.33" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>Gamepad, Pointer Lock, Keyboard Lock and Screen Wake Lock: planned, size 3, M11</title>
+<rect x="697.33" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>iOS/iPadOS runtime and native host acceptance: planned, size 3, M8</title>
-<rect x="725.83" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>Async Clipboard, Web Share and file handling: planned, size 2, M11</title>
+<rect x="735.33" y="936" width="23.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Surface, touch/IME and background lifecycle parity: planned, size 3, M8</title>
-<rect x="773.33" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>WebUSB/Bluetooth/HID/Serial/NFC with per-API privacy decisions: planned, size 3, M11</title>
+<rect x="760.67" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Native font/codec/OS service adapters: planned, size 3, M8</title>
-<rect x="820.83" y="936" width="45.50" height="14" rx="2" fill="#30363d"/>
+<g><title>Web Speech synthesis and recognition: planned, size 2, M11</title>
+<rect x="798.67" y="936" width="23.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Linked artifacts, device/simulator suites and OS policy: planned, size 2, M8</title>
-<rect x="868.33" y="936" width="29.67" height="14" rx="2" fill="#30363d"/>
+<g><title>Installable web apps: manifest, install and window controls: planned, size 3, M11</title>
+<rect x="824.00" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="947" fill="#c9d1d9" font-size="12" text-anchor="end">0.16</text>
+<g><title>Device API WPT, permission/privacy review and five-platform acceptance: planned, size 3, M11</title>
+<rect x="862.00" y="936" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Accessibility: 0/4 capabilities complete, 0.00% done, 0.00 of 2 engine points</title>
-<text x="32.00" y="977" fill="#f0f6fc" font-size="12">Accessibility</text>
-<text x="236.00" y="977" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
+<text x="976.00" y="947" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<g><title>Network &amp; navigation: 0/8 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
+<text x="32.00" y="977" fill="#f0f6fc" font-size="12">Network &amp; navigation</text>
+<text x="236.00" y="977" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
 <rect x="252.00" y="968" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="977" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Semantic roles, names and state tree: planned, size 3, M8</title>
-<rect x="520.00" y="966" width="79.43" height="14" rx="2" fill="#30363d"/>
+<g><title>Reviewed TLS/HTTP transport with cancellation: planned, size 5, M6</title>
+<rect x="520.00" y="966" width="57.38" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Desktop and mobile accessibility bridges: planned, size 5, M8</title>
-<rect x="601.43" y="966" width="133.71" height="14" rx="2" fill="#30363d"/>
+<g><title>Navigation/history state machine and redirects: planned, size 5, M6</title>
+<rect x="579.38" y="966" width="57.38" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Keyboard/IME, focus and assistive editing flows: planned, size 3, M8</title>
-<rect x="737.14" y="966" width="79.43" height="14" rx="2" fill="#30363d"/>
+<g><title>Fetch, CORS and response filtering: planned, size 5, M6</title>
+<rect x="638.75" y="966" width="57.38" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Assistive-technology and accessibility acceptance: planned, size 3, M8</title>
-<rect x="818.57" y="966" width="79.43" height="14" rx="2" fill="#30363d"/>
+<g><title>Cookies and partitioned HTTP cache: planned, size 3, M6</title>
+<rect x="698.12" y="966" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>CSP, MIME, secure contexts and mixed-content policy: planned, size 3, M6</title>
+<rect x="733.75" y="966" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Required HTTP versions, WebSockets and referrer rules: planned, size 5, M9</title>
+<rect x="769.38" y="966" width="57.38" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Network policy and navigation conformance gate: planned, size 3, M6</title>
+<rect x="828.75" y="966" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>WebTransport, fetch priorities and Early Hints: planned, size 3, M11</title>
+<rect x="864.38" y="966" width="33.62" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="977" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>DevTools: 0/4 capabilities complete, 0.00% done, 0.00 of 1 engine points</title>
+<g><title>Storage &amp; workers: 0/8 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
 <rect x="24" y="988" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="1007" fill="#f0f6fc" font-size="12">DevTools</text>
-<text x="236.00" y="1007" fill="#8b949e" font-size="12" text-anchor="end">1%</text>
+<text x="32.00" y="1007" fill="#f0f6fc" font-size="12">Storage &amp; workers</text>
+<text x="236.00" y="1007" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
 <rect x="252.00" y="998" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="1007" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>DOM/style/layout inspection and console: planned, size 3, M8</title>
-<rect x="520.00" y="996" width="112.00" height="14" rx="2" fill="#30363d"/>
+<g><title>Ephemeral/persistent profiles and private mode: planned, size 2, M6</title>
+<rect x="520.00" y="996" width="28.40" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Source debugging, breakpoints and network diagnostics: planned, size 3, M8</title>
-<rect x="634.00" y="996" width="112.00" height="14" rx="2" fill="#30363d"/>
+<g><title>Storage keys, quotas and schema recovery: planned, size 3, M6</title>
+<rect x="550.40" y="996" width="43.60" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Secure headless automation and profiling protocol: planned, size 3, M8</title>
-<rect x="748.00" y="996" width="112.00" height="14" rx="2" fill="#30363d"/>
+<g><title>Local/session storage: planned, size 1, M6</title>
+<rect x="596.00" y="996" width="13.20" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Debugger privacy, authority and diagnostic acceptance: planned, size 1, M8</title>
-<rect x="862.00" y="996" width="36.00" height="14" rx="2" fill="#30363d"/>
+<g><title>IndexedDB transactions and crash recovery: planned, size 5, M9</title>
+<rect x="611.20" y="996" width="74.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Worker agents, lifetimes and messaging: planned, size 3, M9</title>
+<rect x="687.20" y="996" width="43.60" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Service workers and Cache API: planned, size 5, M9</title>
+<rect x="732.80" y="996" width="74.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Persistence/offline/worker isolation and conformance: planned, size 3, M9</title>
+<rect x="808.80" y="996" width="43.60" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Origin-private file system, File System Access and storage buckets: planned, size 3, M11</title>
+<rect x="854.40" y="996" width="43.60" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="1007" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Extensions (MV2): 0/10 capabilities complete, 0.00% done, 0.00 of 4 engine points</title>
-<text x="32.00" y="1037" fill="#f0f6fc" font-size="12">Extensions (MV2)</text>
-<text x="236.00" y="1037" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
+<g><title>Security &amp; IPC: 0/11 capabilities complete, 0.00% done, 0.00 of 5 engine points</title>
+<text x="32.00" y="1037" fill="#f0f6fc" font-size="12">Security &amp; IPC</text>
+<text x="236.00" y="1037" fill="#8b949e" font-size="12" text-anchor="end">5%</text>
 <rect x="252.00" y="1028" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="1037" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Rustic-native Manifest V2 schema and API version contract: planned, size 2, M9</title>
-<rect x="520.00" y="1026" width="21.75" height="14" rx="2" fill="#30363d"/>
+<g><title>Bounded versioned hostile-peer-safe IPC: planned, size 3, M7</title>
+<rect x="520.00" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Package identity, signatures and hostile archive validation: planned, size 3, M9</title>
-<rect x="543.75" y="1026" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Browser-assigned authority and capability brokering: planned, size 3, M7</title>
+<rect x="546.51" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Isolated content-script worlds and extension principals: planned, size 5, M9</title>
-<rect x="579.38" y="1026" width="57.38" height="14" rx="2" fill="#30363d"/>
+<g><title>Site/agent/process assignment and origin separation: planned, size 5, M7</title>
+<rect x="573.02" y="1026" width="42.19" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>MV2 background pages and mobile lifecycle: planned, size 3, M9</title>
-<rect x="638.75" y="1026" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Verified Windows/macOS/Linux sandboxing: planned, size 5, M7</title>
+<rect x="617.21" y="1026" width="42.19" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Attributed bounded messaging and storage APIs: planned, size 3, M9</title>
-<rect x="674.38" y="1026" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Verified Android/iOS process and broker restrictions: planned, size 5, M7</title>
+<rect x="661.40" y="1026" width="42.19" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Actions, options, permissions and developer diagnostics: planned, size 3, M9</title>
-<rect x="710.00" y="1026" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Trusted permissions, activation, files and downloads: planned, size 3, M7</title>
+<rect x="705.58" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Blocking webRequest and reviewed response filtering: planned, size 5, M9</title>
-<rect x="745.62" y="1026" width="57.38" height="14" rx="2" fill="#30363d"/>
+<g><title>Renderer/service crash recovery without stale authority: planned, size 3, M7</title>
+<rect x="732.09" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Signed updates, revocation and rollback protection: planned, size 2, M9</title>
-<rect x="805.00" y="1026" width="21.75" height="14" rx="2" fill="#30363d"/>
+<g><title>Versioned Brave security comparison and independent review: planned, size 3, M10</title>
+<rect x="758.60" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Native desktop/Android/iOS extension acceptance: planned, size 3, M9</title>
-<rect x="828.75" y="1026" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Default tracking/bounce/fingerprinting defenses and privacy matrix: planned, size 5, M10</title>
+<rect x="785.12" y="1026" width="42.19" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Supported-API parity and hostile-extension security gate: planned, size 3, M9</title>
-<rect x="864.38" y="1026" width="33.62" height="14" rx="2" fill="#30363d"/>
+<g><title>Authenticated updates, incident response and vulnerability triage: planned, size 3, M10</title>
+<rect x="829.30" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Fuzz/native-memory review and security release gate: planned, size 5, M7</title>
+<rect x="855.81" y="1026" width="42.19" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="1037" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>uBO port &amp; filtering: 0/8 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
+<g><title>Compositor &amp; GPU: 0/4 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
 <rect x="24" y="1048" width="952" height="30" fill="#161b22"/>
-<text x="32.00" y="1067" fill="#f0f6fc" font-size="12">uBO port &amp; filtering</text>
+<text x="32.00" y="1067" fill="#f0f6fc" font-size="12">Compositor &amp; GPU</text>
 <text x="236.00" y="1067" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
 <rect x="252.00" y="1058" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="1067" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Pinned uBlock Origin port feature/license inventory: planned, size 1, M9</title>
-<rect x="520.00" y="1056" width="12.07" height="14" rx="2" fill="#30363d"/>
+<g><title>Incremental scene submission and scrolling: planned, size 3, M8</title>
+<rect x="520.00" y="1056" width="85.69" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Reference static/dynamic network rules and exceptions: planned, size 5, M9</title>
-<rect x="534.07" y="1056" width="68.37" height="14" rx="2" fill="#30363d"/>
+<g><title>Mobile/desktop GPU adapters and CPU fallback: planned, size 5, M8</title>
+<rect x="607.69" y="1056" width="144.15" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Cosmetic/procedural filters, packaged scriptlets and resources: planned, size 5, M9</title>
-<rect x="604.44" y="1056" width="68.37" height="14" rx="2" fill="#30363d"/>
+<g><title>Surface/device loss and resource recovery: planned, size 2, M8</title>
+<rect x="753.85" y="1056" width="56.46" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Redirect/cache/worker/WebSocket and request-policy integration: planned, size 3, M9</title>
-<rect x="674.81" y="1056" width="40.22" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Rustic uBO port dashboard, logger, picker and advanced controls: planned, size 5, M9</title>
-<rect x="717.04" y="1056" width="68.37" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Bounded transactional filter-list updates and rollback: planned, size 2, M9</title>
-<rect x="787.41" y="1056" width="26.15" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Rust acceleration/reference parity and measured budgets: planned, size 3, M9</title>
-<rect x="815.56" y="1056" width="40.22" height="14" rx="2" fill="#30363d"/>
-</g>
-<g><title>Full declared uBO feature, mobile and security acceptance: planned, size 3, M9</title>
-<rect x="857.78" y="1056" width="40.22" height="14" rx="2" fill="#30363d"/>
+<g><title>GPU/reference parity, performance and energy gates: planned, size 3, M8</title>
+<rect x="812.31" y="1056" width="85.69" height="14" rx="2" fill="#30363d"/>
 </g>
 <text x="976.00" y="1067" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Embedding &amp; release: 0/6 capabilities complete, 0.00% done, 0.00 of 2 engine points</title>
-<text x="32.00" y="1097" fill="#f0f6fc" font-size="12">Embedding &amp; release</text>
-<text x="236.00" y="1097" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
+<g><title>Platform hosts: 1/9 capabilities complete, 4.16% done, 0.16 of 4 engine points</title>
+<text x="32.00" y="1097" fill="#f0f6fc" font-size="12">Platform hosts</text>
+<text x="236.00" y="1097" fill="#8b949e" font-size="12" text-anchor="end">4%</text>
 <rect x="252.00" y="1088" width="200.00" height="10" rx="3" fill="#21262d"/>
-<text x="504.00" y="1097" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<rect x="252.00" y="1088" width="8.32" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="1097" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">4.16%</text>
+<g><title>Android/iOS shared-core cross-compilation: complete, size 1, M1</title>
+<rect x="520.00" y="1086" width="13.83" height="14" rx="2" fill="#2ea043"/>
+</g>
+<g><title>Linux runtime and native host acceptance: planned, size 3, M8</title>
+<rect x="535.83" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Windows runtime and native host acceptance: planned, size 3, M8</title>
+<rect x="583.33" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>macOS runtime and native host acceptance: planned, size 3, M8</title>
+<rect x="630.83" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Android runtime and native host acceptance: planned, size 3, M8</title>
+<rect x="678.33" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>iOS/iPadOS runtime and native host acceptance: planned, size 3, M8</title>
+<rect x="725.83" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Surface, touch/IME and background lifecycle parity: planned, size 3, M8</title>
+<rect x="773.33" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Native font/codec/OS service adapters: planned, size 3, M8</title>
+<rect x="820.83" y="1086" width="45.50" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Linked artifacts, device/simulator suites and OS policy: planned, size 2, M8</title>
+<rect x="868.33" y="1086" width="29.67" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1097" fill="#c9d1d9" font-size="12" text-anchor="end">0.16</text>
+</g>
+<g><title>Accessibility: 0/4 capabilities complete, 0.00% done, 0.00 of 2 engine points</title>
+<rect x="24" y="1108" width="952" height="30" fill="#161b22"/>
+<text x="32.00" y="1127" fill="#f0f6fc" font-size="12">Accessibility</text>
+<text x="236.00" y="1127" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
+<rect x="252.00" y="1118" width="200.00" height="10" rx="3" fill="#21262d"/>
+<text x="504.00" y="1127" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<g><title>Semantic roles, names and state tree: planned, size 3, M8</title>
+<rect x="520.00" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Desktop and mobile accessibility bridges: planned, size 5, M8</title>
+<rect x="601.43" y="1116" width="133.71" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Keyboard/IME, focus and assistive editing flows: planned, size 3, M8</title>
+<rect x="737.14" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Assistive-technology and accessibility acceptance: planned, size 3, M8</title>
+<rect x="818.57" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1127" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<g><title>DevTools: 0/4 capabilities complete, 0.00% done, 0.00 of 1 engine points</title>
+<text x="32.00" y="1157" fill="#f0f6fc" font-size="12">DevTools</text>
+<text x="236.00" y="1157" fill="#8b949e" font-size="12" text-anchor="end">1%</text>
+<rect x="252.00" y="1148" width="200.00" height="10" rx="3" fill="#21262d"/>
+<text x="504.00" y="1157" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<g><title>DOM/style/layout inspection and console: planned, size 3, M8</title>
+<rect x="520.00" y="1146" width="112.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Source debugging, breakpoints and network diagnostics: planned, size 3, M8</title>
+<rect x="634.00" y="1146" width="112.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Secure headless automation and profiling protocol: planned, size 3, M8</title>
+<rect x="748.00" y="1146" width="112.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Debugger privacy, authority and diagnostic acceptance: planned, size 1, M8</title>
+<rect x="862.00" y="1146" width="36.00" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1157" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<g><title>Extensions (MV2): 0/10 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
+<rect x="24" y="1168" width="952" height="30" fill="#161b22"/>
+<text x="32.00" y="1187" fill="#f0f6fc" font-size="12">Extensions (MV2)</text>
+<text x="236.00" y="1187" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
+<rect x="252.00" y="1178" width="200.00" height="10" rx="3" fill="#21262d"/>
+<text x="504.00" y="1187" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<g><title>Rustic-native Manifest V2 schema and API version contract: planned, size 2, M9</title>
+<rect x="520.00" y="1176" width="21.75" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Package identity, signatures and hostile archive validation: planned, size 3, M9</title>
+<rect x="543.75" y="1176" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Isolated content-script worlds and extension principals: planned, size 5, M9</title>
+<rect x="579.38" y="1176" width="57.38" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>MV2 background pages and mobile lifecycle: planned, size 3, M9</title>
+<rect x="638.75" y="1176" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Attributed bounded messaging and storage APIs: planned, size 3, M9</title>
+<rect x="674.38" y="1176" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Actions, options, permissions and developer diagnostics: planned, size 3, M9</title>
+<rect x="710.00" y="1176" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Blocking webRequest and reviewed response filtering: planned, size 5, M9</title>
+<rect x="745.62" y="1176" width="57.38" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Signed updates, revocation and rollback protection: planned, size 2, M9</title>
+<rect x="805.00" y="1176" width="21.75" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Native desktop/Android/iOS extension acceptance: planned, size 3, M9</title>
+<rect x="828.75" y="1176" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Supported-API parity and hostile-extension security gate: planned, size 3, M9</title>
+<rect x="864.38" y="1176" width="33.62" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1187" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<g><title>uBO port &amp; filtering: 0/8 capabilities complete, 0.00% done, 0.00 of 2 engine points</title>
+<text x="32.00" y="1217" fill="#f0f6fc" font-size="12">uBO port &amp; filtering</text>
+<text x="236.00" y="1217" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
+<rect x="252.00" y="1208" width="200.00" height="10" rx="3" fill="#21262d"/>
+<text x="504.00" y="1217" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<g><title>Pinned uBlock Origin port feature/license inventory: planned, size 1, M9</title>
+<rect x="520.00" y="1206" width="12.07" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Reference static/dynamic network rules and exceptions: planned, size 5, M9</title>
+<rect x="534.07" y="1206" width="68.37" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Cosmetic/procedural filters, packaged scriptlets and resources: planned, size 5, M9</title>
+<rect x="604.44" y="1206" width="68.37" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Redirect/cache/worker/WebSocket and request-policy integration: planned, size 3, M9</title>
+<rect x="674.81" y="1206" width="40.22" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Rustic uBO port dashboard, logger, picker and advanced controls: planned, size 5, M9</title>
+<rect x="717.04" y="1206" width="68.37" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Bounded transactional filter-list updates and rollback: planned, size 2, M9</title>
+<rect x="787.41" y="1206" width="26.15" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Rust acceleration/reference parity and measured budgets: planned, size 3, M9</title>
+<rect x="815.56" y="1206" width="40.22" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Full declared uBO feature, mobile and security acceptance: planned, size 3, M9</title>
+<rect x="857.78" y="1206" width="40.22" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1217" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<g><title>Performance leadership: 0/13 capabilities complete, 0.00% done, 0.00 of 8 engine points</title>
+<rect x="24" y="1228" width="952" height="30" fill="#161b22"/>
+<text x="32.00" y="1247" fill="#f0f6fc" font-size="12">Performance leadership</text>
+<text x="236.00" y="1247" fill="#8b949e" font-size="12" text-anchor="end">8%</text>
+<rect x="252.00" y="1238" width="200.00" height="10" rx="3" fill="#21262d"/>
+<text x="504.00" y="1247" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
+<g><title>Cross-engine benchmark harness, reference devices and published reports: planned, size 3, M5</title>
+<rect x="520.00" y="1236" width="16.39" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Interpreter fast paths: quickening, superinstructions and call inline caches: planned, size 5, M12</title>
+<rect x="538.39" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback: planned, size 8, M12</title>
+<rect x="569.03" y="1236" width="47.03" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Optimizing JIT with speculation, deoptimization and on-stack replacement: planned, size 8, M12</title>
+<rect x="618.06" y="1236" width="47.03" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Generational, incremental and concurrent garbage collection: planned, size 5, M12</title>
+<rect x="667.10" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Parallel style resolution and selector-matching caches: planned, size 5, M12</title>
+<rect x="697.74" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Incremental and parallel layout with layout caches: planned, size 5, M12</title>
+<rect x="728.39" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>GPU raster, off-main-thread compositing and threaded scrolling: planned, size 5, M12</title>
+<rect x="759.03" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Loading pipeline: preload scanner, streaming parse, priorities, prerender and back/forward cache: planned, size 5, M12</title>
+<rect x="789.68" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Memory leadership: compact DOM/style data, tab discarding and memory-pressure handling: planned, size 3, M12</title>
+<rect x="820.32" y="1236" width="16.39" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Energy: timer coalescing, background throttling and idle power: planned, size 3, M12</title>
+<rect x="838.71" y="1236" width="16.39" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Startup and new-tab time with snapshots and code caching: planned, size 2, M12</title>
+<rect x="857.10" y="1236" width="10.26" height="14" rx="2" fill="#30363d"/>
+</g>
+<g><title>Benchmark leadership gate against Blink, Gecko and WebKit on every reference device: planned, size 5, M12</title>
+<rect x="869.35" y="1236" width="28.65" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1247" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<g><title>Embedding &amp; release: 0/8 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
+<text x="32.00" y="1277" fill="#f0f6fc" font-size="12">Embedding &amp; release</text>
+<text x="236.00" y="1277" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
+<rect x="252.00" y="1268" width="200.00" height="10" rx="3" fill="#21262d"/>
+<text x="504.00" y="1277" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
 <g><title>Versioned ownership/thread/cancellation embedding contract: planned, size 3, M10</title>
-<rect x="520.00" y="1086" width="49.82" height="14" rx="2" fill="#30363d"/>
+<rect x="520.00" y="1266" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Representative sites and complete declared conformance gates: planned, size 5, M10</title>
-<rect x="571.82" y="1086" width="84.36" height="14" rx="2" fill="#30363d"/>
+<rect x="558.00" y="1266" width="61.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Measured time, memory, reliability and energy budgets: planned, size 3, M10</title>
-<rect x="658.18" y="1086" width="49.82" height="14" rx="2" fill="#30363d"/>
+<g><title>Measured time, memory, reliability and energy budgets for the beta: planned, size 3, M10</title>
+<rect x="621.33" y="1266" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
 <g><title>Reproducible signed desktop/mobile artifacts and updates: planned, size 3, M10</title>
-<rect x="710.00" y="1086" width="49.82" height="14" rx="2" fill="#30363d"/>
+<rect x="659.33" y="1266" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Controlled Chrome/Firefox speed, memory and energy comparison gates: planned, size 3, M10</title>
-<rect x="761.82" y="1086" width="49.82" height="14" rx="2" fill="#30363d"/>
+<g><title>Published controlled Blink/Gecko/WebKit speed, memory and energy comparison reports: planned, size 3, M12</title>
+<rect x="697.33" y="1266" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Final full-engine acceptance across all five target platforms: planned, size 5, M10</title>
-<rect x="813.64" y="1086" width="84.36" height="14" rx="2" fill="#30363d"/>
+<g><title>Final full-engine 1.0 acceptance across all five target platforms: planned, size 5, M13</title>
+<rect x="735.33" y="1266" width="61.33" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="1097" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+<g><title>Feature parity inventory against Blink, Gecko and WebKit from pinned browser-compat-data: planned, size 3, M11</title>
+<rect x="798.67" y="1266" width="36.00" height="14" rx="2" fill="#30363d"/>
 </g>
-<rect x="24" y="1126" width="12" height="12" rx="2" fill="#2ea043"/>
-<text x="44.00" y="1137" fill="#c9d1d9" font-size="12">Verified complete</text>
-<rect x="190" y="1126" width="12" height="12" rx="2" fill="#388bfd"/>
-<text x="210.00" y="1137" fill="#c9d1d9" font-size="12">Partial credit from verified steps</text>
-<rect x="450" y="1126" width="12" height="12" rx="2" fill="#30363d" stroke="#388bfd"/>
-<text x="470.00" y="1137" fill="#c9d1d9" font-size="12">In progress (outlined)</text>
-<rect x="640" y="1126" width="12" height="12" rx="2" fill="#30363d"/>
-<text x="660.00" y="1137" fill="#c9d1d9" font-size="12">Planned / remaining</text>
-<text x="24.00" y="1164" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1184" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot f7c4054c94f1</text>
+<g><title>WPT parity gate: at least the best engine&#x27;s pass rate on every required directory: planned, size 5, M11</title>
+<rect x="836.67" y="1266" width="61.33" height="14" rx="2" fill="#30363d"/>
+</g>
+<text x="976.00" y="1277" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+</g>
+<rect x="24" y="1306" width="12" height="12" rx="2" fill="#2ea043"/>
+<text x="44.00" y="1317" fill="#c9d1d9" font-size="12">Verified complete</text>
+<rect x="190" y="1306" width="12" height="12" rx="2" fill="#388bfd"/>
+<text x="210.00" y="1317" fill="#c9d1d9" font-size="12">Partial credit from verified steps</text>
+<rect x="450" y="1306" width="12" height="12" rx="2" fill="#30363d" stroke="#388bfd"/>
+<text x="470.00" y="1317" fill="#c9d1d9" font-size="12">In progress (outlined)</text>
+<rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
+<text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
+<text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 5b7db3550bd3</text>
 </g>
 </svg>

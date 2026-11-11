@@ -32,7 +32,7 @@ tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 36.99%** (33.81% verified complete + 3.18% partial credit) — 54/172 capabilities complete and 6 in progress across 21 subsystems. Current milestone: **M4 ECMAScript runtime**, 40.00% done.
+**Overall engine completion: 23.51%** (20.90% verified complete + 2.61% partial credit) — 54/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 40.00% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -131,8 +131,9 @@ their milestone needs them. All packages are unpublished.
 ## Development direction
 
 The complete product targets security/privacy at least as strong as Brave, broad
-standards-complete website/CSS/JavaScript support, and measured improvements over
-Chrome and Firefox. GPU acceleration, WebAssembly, **Rustic-only Manifest V2
+standards-complete website/CSS/JavaScript support with the functionality of the
+other engines (Blink, Gecko and WebKit), and measured performance better than all
+three. GPU acceleration, WebAssembly, **Rustic-only Manifest V2
 extensions**, and a rebuilt/ported **uBlock Origin for Rustic** are required parts
 of the plan. These are future acceptance targets, not current support or measured
 superiority. See [product requirements](docs/PRODUCT.md) for exact gates and scope.
@@ -143,6 +144,9 @@ superiority. See [product requirements](docs/PRODUCT.md) for exact gates and sco
 4. Add controlled networking, browser policy, storage, and platform integration.
 5. Establish process isolation and security gates before general web browsing.
 6. Expand modern platform compatibility, accessibility, performance, and embedding.
+7. Close the remaining feature gap with Blink, Gecko and WebKit (M11).
+8. Beat all three on pinned benchmarks, memory and energy on every reference device (M12).
+9. Ship the full engine 1.0 once every gate passes on all five platform families (M13).
 
 Rustic is not based on **Mozilla, Firefox, Gecko, or SpiderMonkey**. No Chromium,
 Blink, WebKit, Servo, or existing JavaScript engine is embedded as its implementation.

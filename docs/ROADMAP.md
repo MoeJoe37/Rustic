@@ -11,7 +11,7 @@ Tags identify reproducible prototypes; they do not imply general browser safety.
 follow-up is open. M1, M2 and M3 are complete for their declared catalog scope
 (28, 8 and 17 capabilities): local HTML parses, styles, lays out, shapes text,
 paints and rasterizes to PNG on the CPU. M4 is the current milestone: JS-01
-(lexer and parser, [JS.md](JS.md)) and JS-02 (the runtime data model) and JS-03 (the garbage collector, shared with the DOM) are done, and the first part of JS-04 runs scripts (bytecode interpreter; classes and generators remain). M5–M10 are
+(lexer and parser, [JS.md](JS.md)) and JS-02 (the runtime data model) and JS-03 (the garbage collector, shared with the DOM) are done, and the first part of JS-04 runs scripts (bytecode interpreter; classes and generators remain). M5–M13 are
 unstarted. Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are
 carried forward (see [§6](#6-m3--static-document-renderer)). The
 [progress summary](progress/summary.md) is the measured status and
@@ -19,10 +19,19 @@ carried forward (see [§6](#6-m3--static-document-renderer)). The
 neither implies more than its declared scope.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
-coverage, measured Chrome/Firefox improvements, GPU acceleration, WebAssembly,
-Rustic-only Manifest V2 extensions and the Rustic uBO port mandatory full-product
-targets. [ADR 0007](adr/0007-product-scope.md) supersedes the earlier optional
-Wasm/extension scope. No planning checkbox grants implementation credit.
+coverage, GPU acceleration, WebAssembly, Rustic-only Manifest V2 extensions and
+the Rustic uBO port mandatory full-product targets. [ADR 0007](adr/0007-product-scope.md)
+supersedes the earlier optional Wasm/extension scope.
+
+**End goal.** The roadmap ends in a fully working engine that has the
+functionality of the other browser engines (Blink, Gecko and WebKit) and is
+faster and leaner than all three. M1–M10 build the engine and a beta;
+[M11](#14-m11--web-platform-parity) closes the remaining feature gap against a
+pinned inventory of everything those engines ship;
+[M12](#15-m12--performance-leadership) turns the measured performance targets
+into gates against all three engines; [M13](#16-m13--full-engine-10) is the
+final acceptance on every platform. [ADR 0018](adr/0018-parity-and-performance-leadership.md)
+records this scope. No planning checkbox grants implementation credit.
 
 Assume one primary maintainer with occasional contributions. A small team can
 work on the independent tracks below after agreeing on interfaces. Full modern
@@ -44,7 +53,10 @@ reveals complexity. Later milestones deliberately have no fabricated estimates.
 | M7 Isolated browsing | Enforced broker/renderer isolation on supported platforms | M6, IPC prototypes | Dedicated security program |
 | M8 Desktop/mobile alpha | Native hosts, accessibility/inspection, required GPU backend and extension/uBO integration | M7 per platform; local surface prototypes start in M3 | Re-estimate by platform |
 | M9 Compatibility expansion | Broad modern site/API coverage, published test results | M8 | Open-ended feature program |
-| M10 Embedding and stabilization | Versioned API and maintained beta/release process | Evidence from M8/M9 | Evidence-based release decision |
+| M10 Embedding and beta | Versioned API and maintained beta/release process | Evidence from M8/M9 | Evidence-based release decision |
+| M11 Web platform parity | Every feature Blink, Gecko or WebKit ships is implemented or has a reviewed decision; WPT/Test262 pass rates at least the best engine's | M9; media/graphics/device tracks can start after M8 | Multi-year feature program |
+| M12 Performance leadership | Faster, leaner and more energy-efficient than all three engines on pinned benchmarks and reference devices | M8 harness and alpha; JIT after M7 isolation | Multi-year optimization program |
+| M13 Full engine 1.0 | All product, parity, performance and security gates pass on all five platform families | M10, M11, M12 | Evidence-based release decision |
 
 ## 2. Dependency and parallel work strategy
 
@@ -60,7 +72,12 @@ flowchart TD
     M6 --> M7["M7 Isolation gate"]
     M7 --> M8["M8 Desktop and mobile alpha"]
     M8 --> M9["M9 Compatibility"]
-    M9 --> M10["M10 Stable embedding"]
+    M9 --> M10["M10 Embedding and beta"]
+    M9 --> M11["M11 Web platform parity"]
+    M8 --> M12["M12 Performance leadership"]
+    M10 --> M13["M13 Full engine 1.0"]
+    M11 --> M13
+    M12 --> M13
 ```
 
 The main integration path is M1 → M2 → M3 → M5 → M6 → M7. The JS track can
@@ -68,7 +85,11 @@ proceed independently, but shared tracing and reentry contracts must be decided
 before M5, not discovered during binding generation. Parser corpora, Unicode
 data, deterministic fixtures, and test runners are good independent work once
 their formats are settled. Networking may be prototyped against a fake document
-host, but real remote navigation stays behind the M6/M7 gates.
+host, but real remote navigation stays behind the M6/M7 gates. M11 and M12 run
+in parallel after the alpha: parity work adds features, leadership work makes
+the existing ones faster, and each keeps the other's gates green. Performance
+is measured from M5 onward (PERF-01), so M12 starts from years of numbers, not
+from a late optimization push.
 
 For a small team, name owners for document/rendering, language/bindings,
 services/security, and tooling/platforms. A solo maintainer alternates those
@@ -375,7 +396,7 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 | Language | Remaining ECMAScript semantics and built-ins, RegExp/Intl; optimization after correctness | Test262 full-selection reporting; GC/stack stress |
 | Platform APIs | Streams, workers, structured clone, messaging, URL APIs, encoding, observers | Agent/task/cross-origin tests |
 | Offline/data | IndexedDB, Cache API, service workers and update/lifetime rules | Transaction/crash-recovery and partition tests |
-| Graphics/media | Canvas 2D; audio/video with reviewed codecs; then evaluate WebGL/WebGPU | Rendering/codec corpora, permissions and sandbox review |
+| Graphics/media | Canvas 2D and OffscreenCanvas; audio/video, WebGL, WebGPU and WebRTC are M11 parity work | Rendering corpora, canvas WPT and sandbox review |
 | Network | HTTP/2 and HTTP/3 via reviewed transports, WebSockets, cache/cookie compatibility | Protocol fixtures, cancellation and cross-origin tests |
 | Modern execution | Required original Wasm runtime and JS/Web integration; WASM-01–08 | Core/JS/Web suites, bounded execution, reviewed acceleration and interpreter fallback |
 | Native extensions | Rustic-only MV2 platform, background/content worlds, blocking requests and mobile lifecycle; EXT-01–10 | Signed-package, permission/revocation, API and hostile-extension corpus |
@@ -412,13 +433,143 @@ no unexplained regressions; supported-platform security gates and accessibility
 flows pass; reproducible builds and incident handling are exercised. Full web
 compatibility is not inferred from a version number.
 
-**Full-product gate:** all [PRODUCT.md](PRODUCT.md) acceptance criteria pass,
-including the dated Brave security/privacy comparison, required standards/site
-coverage, five-platform GPU/Wasm and MV2/uBO operation, and controlled competitive
-measurements. Targets and measured results are reported separately. Final 100%
-progress cannot bypass these gates.
+**Performance at beta:** the M10 ratchet in
+[PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) (within 1.25× of the best
+engine on every pinned benchmark, memory no worse than the median engine) passes
+on every reference device. The full-product gate moves to
+[M13](#16-m13--full-engine-10).
 
-## 14. Current implementation queue
+## 14. M11 — Web platform parity
+
+M11 closes the gap between "broad compatibility" (M9) and "everything the other
+engines can do". Parity is measured, not asserted: the reference is the set of
+features shipped by default in the current stable releases of Chrome (Blink),
+Firefox (Gecko) and Safari (WebKit) on any of their desktop or mobile platforms.
+
+| Task | Work and deliverable | Catalog | Prerequisite |
+| --- | --- | --- | --- |
+| PAR-01 | Parity inventory: a tool that reads a pinned [browser-compat-data](https://github.com/mdn/browser-compat-data) release and lists every feature shipped by any of the three engines, mapped to a catalog capability with status implemented / planned (with milestone) / declined (with reviewed reason) | `release.inventory` | M9 workstreams defined |
+| PAR-02 | WPT at scale: the UI-06 runner covers the full pinned WPT checkout on every platform family and compares each directory with the three engines' results for the same WPT revision on [wpt.fyi](https://wpt.fyi) | `release.interop` | UI-06 |
+| HTML-10 | Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes, lazy loading | `html.elements` | M9 |
+| CSS-09 | Transitions, animations and Web Animations (M9), then anchor positioning, view transitions, scroll-driven animations and `@scope` | `css.animations`, `css.modern` | M9 CSS/layout |
+| TXT-05 / LAY-09 | Variable/color fonts and the Font Loading API; SVG, MathML, ruby and multi-column layout | `text.color`, `layout.formats` | M9 |
+| WEB-08 | Navigation API, drag and drop, selection, pointer events, fullscreen, file APIs; performance timeline and Reporting APIs | `web.platform`, `web.performance` | M9 |
+| NET-08 / STO-08 | WebTransport, fetch priorities, Early Hints; origin-private file system, File System Access, storage buckets | `network.webtransport`, `storage.filesystem` | M6, M9 |
+| MED-01–05 | Media pipeline and reviewed codecs; MSE and EME (Clear Key, documented CDM decision); Web Audio with AudioWorklet; WebCodecs; camera/microphone/screen capture; WebRTC | `media.*` | M8 hosts, M7 isolation |
+| GFX-01–04 | Canvas 2D/OffscreenCanvas (M9); WebGL 1/2 with shader translation; WebGPU/WGSL in a sandboxed GPU process; color management/HDR; AVIF and further image formats | `graphics.*` | UI-05 GPU backend |
+| DEV-01–06 | WebAuthn/passkeys, Payment Request, notifications/Push, sensors and geolocation, gamepad/pointer/keyboard lock, clipboard/Web Share, hardware APIs (USB/Bluetooth/HID/Serial/NFC), Web Speech, installable web apps | `devices.*` | ISO-05 permissions |
+
+**Platform plan.** Every M11 API names its backend on each platform family, and
+a missing backend is a recorded gap, not a silent omission:
+
+| Area | Windows x64/ARM64 | macOS x64/ARM64 | Linux x64/aarch64 | Android | iOS/iPadOS |
+| --- | --- | --- | --- | --- | --- |
+| GPU for WebGL/WebGPU | Direct3D 12 | Metal | Vulkan (GL ES fallback) | Vulkan (GL ES fallback) | Metal |
+| Hardware video decode | Media Foundation | VideoToolbox | VA-API / V4L2 | MediaCodec | VideoToolbox |
+| Audio output/capture | WASAPI | Core Audio | PipeWire / PulseAudio / ALSA | AAudio | AVAudioSession |
+| Passkeys/WebAuthn | Windows Hello + roaming keys | AuthenticationServices | Roaming keys + hybrid (phone) | Credential Manager | AuthenticationServices |
+| Notifications/Push | Windows notifications | UserNotifications | Freedesktop notifications | Android notifications | UserNotifications (with app policy) |
+
+Licensed codecs (H.264, HEVC, AAC) use the platform decoder where one exists and
+are recorded as a gap where none does; DRM CDMs depend on vendor eligibility and
+are tracked as a decision, never assumed.
+
+**Gate.** All of these hold at one pinned date, on all five platform families:
+
+- The parity inventory has no unmapped feature. A feature shipped by all three
+  engines may be declined only for a security or privacy reason recorded in an
+  ADR; a feature shipped by one or two engines needs a reviewed decision.
+- For every required WPT directory, Rustic's pass rate is at least the best of
+  Blink, Gecko and WebKit at the same WPT revision, and the current Interop
+  focus-area score is at least the best engine's.
+- Test262 pass rate is at least the best of V8, SpiderMonkey and JavaScriptCore
+  at the same revision (as reported by [test262.fyi](https://test262.fyi)); the
+  Wasm core/JS/Web suites, Khronos WebGL CTS and WebGPU CTS meet the same rule.
+- The recorded site corpus (at least 1,000 representative sites with scripted
+  workflows: login, editing, media, maps, office suites, video calls, games)
+  completes at least as many workflows as the best engine, with visual
+  differences reviewed.
+
+Privacy defaults (blocking, fingerprinting defenses) stay on; a site broken by a
+privacy feature is reported separately from an engine defect, as in
+[PRODUCT.md](PRODUCT.md#compatibility-target).
+
+## 15. M12 — Performance leadership
+
+M12 makes Rustic faster, smaller and more energy-efficient than Blink, Gecko and
+WebKit, measured with the method in
+[PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates). The harness (PERF-01) lands
+with M5 so every later milestone has numbers; the optimizations below start once
+the matching reference path is correct.
+
+| Task | Work and deliverable | Catalog | Prerequisite |
+| --- | --- | --- | --- |
+| PERF-01 | Cross-engine harness: pinned Speedometer 3, JetStream 2, MotionMark 1.3 and Rustic's load/interaction/scroll/memory/energy/startup corpus, run on named reference devices against the three engines, with published reports | `perf.harness` | M5 (first numbers), M8 (full device set) |
+| PERF-02 | Interpreter fast paths: quickening, superinstructions, call inline caches; the speed that platforms without a JIT get | `perf.interpreter` | JS-09 |
+| PERF-03 | Baseline JIT for x64 and ARM64: W^X, interpreter fallback, differential fuzzing against the interpreter | `perf.baseline_jit` | ADR for a confined `unsafe` code-memory boundary, M7 isolation |
+| PERF-04 | Optimizing JIT: type feedback, speculation, deoptimization, on-stack replacement, inlining | `perf.optimizing_jit` | PERF-03 |
+| PERF-05 | Generational, incremental and concurrent GC with write barriers; pause and heap evidence first | `perf.gc` | JS-09, ADR 0016 revisit |
+| PERF-06 | Parallel style resolution and shared matching caches | `perf.style` | css.invalidation parity |
+| PERF-07 | Incremental and parallel layout with layout caches, checked against full layout | `perf.layout` | layout.incremental |
+| PERF-08 | GPU raster, off-main-thread compositing and threaded scrolling | `perf.raster` | UI-05, compositor.parity |
+| PERF-09 | Loading pipeline: preload scanner, streaming parse, request priorities, prerender, back/forward cache | `perf.loading` | M6 |
+| PERF-10 | Memory: compact DOM/style data, tab discarding, memory-pressure handling on every platform | `perf.memory` | M8 |
+| PERF-11 | Energy: timer coalescing, background throttling, idle power, GPU power states | `perf.energy` | M8 |
+| PERF-12 | Startup and new-tab time: snapshots and bytecode caching | `perf.startup` | M8 |
+| PERF-13 | Leadership gate: the final targets below pass on every reference device | `perf.gate` | PERF-01–12, M11 parity kept |
+
+**JIT and platforms.** Rustic forbids `unsafe` in project code today, and a JIT
+needs executable memory. PERF-03 therefore starts with an ADR that confines the
+code-memory boundary to one small audited crate, with W^X, ARM64 pointer
+authentication/BTI where available, and fuzzing. Back ends: x64 (Windows, macOS,
+Linux) and ARM64 (Windows ARM64, macOS, Linux aarch64, Android, and iOS/iPadOS
+where Apple's alternative-engine entitlements allow JIT). Where JIT is not
+allowed or not yet built (32-bit ARM/x86, RISC-V, locked-down devices), the
+interpreter fast paths are the product and have their own targets. Wasm gets
+the same tiers through `wasm.accelerate`.
+
+**Gate.** On each reference device in [PERFORMANCE.md](PERFORMANCE.md#reference-devices),
+against the current stable Chrome, Firefox and Safari (or WebKitGTK/WPE where
+Safari does not run), with 95% confidence intervals that do not overlap:
+
+- Speedometer, JetStream and MotionMark scores, and the page-load corpus time,
+  are each at least 10% better than the best of the three engines.
+- Interaction latency p95 and dropped scroll frames are no worse than the best
+  engine, and at least 10% better on the aggregate.
+- Peak and resident memory on the fixed multi-tab workload is at least 10% lower
+  than the lowest of the three.
+- Sustained-browsing energy on laptops and phones is at least 10% lower than the
+  lowest of the three.
+- No subtest is more than 5% worse than the best engine without a reviewed,
+  published exception, and no compatibility, privacy or security setting is
+  weakened to win a number.
+
+Intermediate ratchets (M5 baseline, M8 alpha, M10 beta) are defined in
+[PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) so the gap is tracked the
+whole way, not discovered at the end.
+
+## 16. M13 — Full engine 1.0
+
+**Gate:** all [PRODUCT.md](PRODUCT.md) acceptance criteria pass, including the
+dated Brave security/privacy comparison, the M11 parity gate, the M12
+performance-leadership gate, five-platform GPU/Wasm and MV2/uBO operation, and
+signed reproducible artifacts. Each result is re-measured against the then-current
+stable Blink, Gecko and WebKit releases within 30 days of the release; targets
+and measured results are reported separately. Final 100% progress cannot bypass
+these gates.
+
+Platforms: Windows x64 and ARM64; macOS x64 and ARM64; Linux x64 and aarch64;
+Android ARM64, 32-bit ARM and x86-64; iOS/iPadOS ARM64. The 32-bit x86, RISC-V
+and big-endian tiers keep passing the full test suite (see
+[PLATFORMS.md](PLATFORMS.md)).
+
+**After 1.0.** Parity and leadership are kept, not reached once. Every Rustic
+release refreshes the pinned compat data, WPT and benchmark revisions; a feature
+newly shipped by one of the three engines enters the inventory within one
+release cycle, and a lost lead on any gated benchmark blocks the release until
+it is fixed or a reviewed exception is published.
+
+## 17. Current implementation queue
 
 Work in order unless a row says it runs in parallel. Status is as of
 2026-11-11; [implementation progress](IMPLEMENTATION.md) records each finished
@@ -433,6 +584,7 @@ contract. The original twelve-item M1 queue (DOC-01a to DOC-09) is complete.
 | 5 | JS-09: benchmark corpus and heap report | Recorded time and bytes per workload on x64 and ARM64; regressions over 10% need an explanation | Planned (corpus grows with each task) |
 | 6 | JS-05, JS-06, JS-08 | Their Test262 selections, each with an exact expected list | Planned |
 | — | MOB-03/04: Android/iOS CPU surfaces (parallel platform track) | Headless pixels match on device/emulator/simulator | Carried over from M3 |
+| — | PERF-01: cross-engine benchmark harness (Speedometer, JetStream, MotionMark and Rustic's corpus against Blink, Gecko and WebKit) | First recorded report on x64 and ARM64 with exact browser versions | Starts with M5; JS-09 feeds it |
 | — | M0 follow-up: require the `CI` check on `main` | Repository ruleset active | Waiting for GitHub Actions billing to be restored |
 
 For every task record its ID, dependencies, specification section/revision,
@@ -440,7 +592,7 @@ in/out scope, input/output contract, acceptance fixtures, budget behavior, and
 documentation to update. A task should fit a reviewable change; split further
 before coding when it spans multiple unrelated contracts.
 
-## 15. Definition of done and risk register
+## 18. Definition of done and risk register
 
 A change is done when the implementation, focused negative/regression tests,
 relevant conformance selection, diagnostics, budget/cancellation behavior, docs,
@@ -463,3 +615,6 @@ review and a threat-model update; dependency additions get a boundary review.
 | Flaky or expensive CI | Random image diffs; excessive runner minutes | Stable fixtures, bounded required checks, scheduled heavy suites |
 | Performance optimized prematurely | Complex caches before correct output | Keep reference path; require profiles and parity evidence |
 | Upstream standards/tests change | Baseline shifts without code changes | Pin revisions; update in reviewed changes with before/after counts |
+| Parity target keeps moving | Other engines ship features faster than Rustic adds them | Inventory refresh every release; prioritize features shipped by all three and by measured site breakage |
+| Leadership gap stays wide | Ratchet misses at M8/M10 | Profile the biggest gap first; fix representation before adding tiers; no gate is lowered without a reviewed plan update |
+| JIT weakens memory safety | Fuzzing finds miscompiles or code-memory misuse | Interpreter fallback, W^X, confined `unsafe` crate, differential fuzzing; JIT off by policy where it cannot be verified |

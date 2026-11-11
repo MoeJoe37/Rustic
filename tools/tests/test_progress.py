@@ -40,8 +40,8 @@ class ProgressTests(unittest.TestCase):
         self.complete(self.catalog["groups"][0]["features"][0])
         progress.validate(self.catalog, self.root)
         data = progress.measure(self.catalog, "0" * 64)
-        self.assertEqual(data["percent"], "0.25")  # Size 2 of 16 foundation points, weighted at 2%.
-        self.assertEqual(data["verified_percent"], "0.25")
+        self.assertEqual(data["percent"], "0.12")  # Size 2 of 16 foundation points, weighted at 1%, truncated.
+        self.assertEqual(data["verified_percent"], "0.12")
         self.assertEqual(data["partial_percent"], "0.00")
         self.assertFalse(data["fully_complete"])
         self.assertEqual(progress.percent(Fraction(999999, 10000)), "99.99")
@@ -76,6 +76,8 @@ class ProgressTests(unittest.TestCase):
             lambda catalog: catalog["groups"].remove(next(group for group in catalog["groups"] if group["id"] == "extensions")),
             lambda catalog: next(group for group in catalog["groups"] if group["id"] == "wasm")["features"].pop(),
             lambda catalog: next(group for group in catalog["groups"] if group["id"] == "filtering")["features"].pop(),
+            lambda catalog: next(group for group in catalog["groups"] if group["id"] == "perf")["features"].pop(),
+            lambda catalog: catalog["groups"].remove(next(group for group in catalog["groups"] if group["id"] == "media")),
         ]:
             catalog = copy.deepcopy(self.catalog)
             edit(catalog)
@@ -90,7 +92,7 @@ class ProgressTests(unittest.TestCase):
         self.assertNotIn("<script>", svg)
         self.assertIn("&lt;script&gt;", svg)
         self.assertIn("aria-labelledby", svg)
-        self.assertIn("21 subsystems", svg)
+        self.assertIn("25 subsystems", svg)
         height = float(tree.attrib["height"])
         ns = {"svg": "http://www.w3.org/2000/svg"}
         self.assertTrue(all(float(node.attrib["y"]) < height for node in tree.findall(".//svg:text", ns)))
@@ -117,8 +119,8 @@ class ProgressTests(unittest.TestCase):
         properties["status"], properties["evidence"] = "planned", []
         self.complete(syntax)
         small = progress.measure(self.catalog, "0" * 64)
-        self.assertEqual(large["percent"], "1.84")  # 8 of 39 points of a 9% subsystem.
-        self.assertEqual(small["percent"], "0.69")  # 3 of 39 points.
+        self.assertEqual(large["percent"], "0.97")  # 8 of 49 points of a 6% subsystem, truncated.
+        self.assertEqual(small["percent"], "0.36")  # 3 of 49 points.
 
     def in_progress(self, feature, done, total):
         feature["status"] = "in_progress"
@@ -131,9 +133,9 @@ class ProgressTests(unittest.TestCase):
         self.in_progress(feature, 1, 4)
         progress.validate(self.catalog, self.root)
         data = progress.measure(self.catalog, "0" * 64)
-        self.assertEqual(data["percent"], "0.06")  # 2% × 2/16 × 1/4, truncated.
+        self.assertEqual(data["percent"], "0.03")  # 1% × 2/16 × 1/4, truncated.
         self.assertEqual(data["verified_percent"], "0.00")
-        self.assertEqual(data["partial_percent"], "0.06")
+        self.assertEqual(data["partial_percent"], "0.03")
         self.assertEqual(data["in_progress"], 1)
         self.assertEqual(data["groups"][0]["features"][0]["credit"], "25.00")
         feature["status"] = "in_progress"

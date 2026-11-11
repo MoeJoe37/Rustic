@@ -1099,6 +1099,23 @@ first 32-bit run found a DOM test that built a multi-gigabyte dump, impossible i
 a 32-bit address space; TD-18's linear dump format removes it. Every later task
 must keep all tiers green.
 
+## JS-01 — ECMAScript lexer and parser
+
+`rustic-js` parses scripts and modules from UTF-16 source into an AST with
+source spans, reporting early errors, strict-mode rules and automatic
+semicolon insertion during the parse; Annex B syntax is accepted in scripts
+only. Cover grammars convert expressions to arrow parameters and patterns
+without backtracking. Depth, measured stack use and cancellation bound every
+parse, and left-nested chains build and drop iteratively.
+
+Evidence: lexer and parser integration tests; a Test262 parse-phase gate
+(22,956 of 23,123 `test/language` files at revision `48221d7c`, with the 167
+RegExp-pattern failures committed as an exact expected list); and the 18th
+fuzz target, `js-parse`, with a strict/sloppy differential. Identifier data is
+generated from pinned Unicode 17 files. Nothing executes yet: values, heap and
+interpreter are JS-02 to JS-04, and the Test262 runner with published results
+is JS-07. See [JS.md](JS.md) and TD-88/89/90.
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,
@@ -1154,6 +1171,7 @@ acceptance and native platform runtime gates remain separate M9/M8 work.
 | CSS-07a: remaining required selectors | Complete: `:has()` (linear for single-compound arguments, TD-30), HTML form states, `:lang()`, `:dir()` (Bidi_Class via TD-29), `&` with nested style rules expanded by `StyleSheet::parse`, more pseudo-elements and user-action states after them; `css.selectors` is complete. Constraint-validation states and form owners set by the parser (TD-31) remain |
 | CSS-08: declared CSS conformance gate | Complete: pinned WPT parsing cases for selectors and supported properties, 1,115/1,455 in scope pass, the rest listed with reasons in a ratchet; shorthand serialization, named-color keywords and `calc()` wrappers in specified values remain |
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
+| JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 
 M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
 adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
@@ -1163,5 +1181,7 @@ complete (media queries, invalidation, custom properties and container
 queries), and CSS-08 closed the declared conformance gate with known failures
 recorded rather than hidden. The M2 catalog scope is complete, including its
 math-function and invalidation steps; broader CSS compatibility remains open.
-M3 has started with REN-01a, while full static rendering remains unimplemented. All project crates remain safe
-Rust, unpublished, and free of third-party Rust dependencies.
+M3's declared rendering scope is complete (REN sections above, with open debt in
+the ledger). M4 has started with JS-01, the ECMAScript lexer and parser. All
+project crates remain safe Rust and unpublished; the only third-party Rust
+crates are the reviewed font adapters of ADR 0014.

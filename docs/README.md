@@ -57,7 +57,8 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Checked CSS/device geometry, principal boxes and block widths | Initial M3 slice (REN-01a) | `rustic-layout`, `dump-boxes`; [contracts and tests](LAYOUT.md) |
 | Block used rectangles, adjoining margin collapse and `dump-layout` | REN-01b/REN-02a static block subset; inline/special/positioned content remains unsupported | [Layout reference and flow tests](LAYOUT.md) |
 | Display list, CPU rasterizer, PNG output, `dump-paint` and `rustic render` | REN-04a/REN-05a: block backgrounds and solid borders; text/images/opacity unsupported | `rustic-paint`, `rustic-raster`; [paint reference and tests](PAINT.md) |
-| Remaining HTML tokenizer/tree rules, browser DOM bindings, CSS, layout, painting, JavaScript | Planned | M1–M5 |
+| ECMAScript lexer, parser, early errors, strict mode and ASI | Implemented (JS-01); nothing executes yet | `rustic-js`; [Test262 parse gate (22,956 of 23,123 files) and fuzz target](JS.md) |
+| Remaining HTML tokenizer/tree rules, browser DOM bindings, CSS, layout, painting, JavaScript execution | Planned | M1–M5 |
 | Network, storage, browser UI, accessibility, sandbox | Planned | M6–M8 |
 | Pinned WPT URL data subset | Implemented offline runner | 887 selected URL records, including file and non-ASCII URLs; no full browser harness |
 | Pinned html5lib declaration tokenizer subset | Implemented offline runner | 1,079 selected cases; token fields/error codes and all fixture splits |
@@ -68,7 +69,8 @@ capability catalog, with source/test evidence and automatic default-branch updat
 | Browser WPT harness, Test262, fuzzing, benchmarks, releases | Planned | Milestone-specific gates; no broad results claimed |
 
 There are no external Rust dependencies yet. URL subset evidence is recorded in
-[URL.md](URL.md); there are no whole-WPT/Test262 pass percentages, sandbox
+[URL.md](URL.md) and Test262 parse-phase evidence in [JS.md](JS.md); there are no
+whole-WPT or full Test262 pass percentages, sandbox
 guarantees, performance measurements, or releases yet.
 Configuration present in the repository is distinct from a successful Actions
 run; inspect the [Actions page](https://github.com/MoeJoe37/Rustic/actions) for run results.

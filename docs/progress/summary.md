@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 32.72%** = 32.50% verified complete + 0.22% partial credit. 53/172 capabilities complete, 1 in progress.
+**Overall completion: 33.40%** = 32.50% verified complete + 0.90% partial credit. 53/172 capabilities complete, 2 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `d8a870fb760240d94cb0853f03cea95c514eadfb9b6ad1f8fb5fad77fdd2174b`.
+Catalog: `engine-v3`. Source fingerprint: `4ea43e6d4124e9de5e9c3fd1d22dec18ad857f85d3183ad7fa53baa83ab2b0b1`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v3`. Source fingerprint: `d8a870fb760240d94cb0853f03cea95c514ea
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 12.22% |
-| M4 ECMAScript runtime | 0/13 | 0.00% | 0.00% | 10.68% |
+| M4 ECMAScript runtime | 0/13 | 6.41% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 4.46% |
@@ -33,7 +33,7 @@ Catalog: `engine-v3`. Source fingerprint: `d8a870fb760240d94cb0853f03cea95c514ea
 | Text & fonts | 4/6 | 0 | 63.63% | 63.63% | 4% | 2.54 |
 | Layout | 6/10 | 0 | 56.52% | 56.52% | 9% | 5.08 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 6% | 4.22 |
-| JavaScript & GC | 0/15 | 0 | 0.00% | 0.00% | 12% | 0.00 |
+| JavaScript & GC | 0/15 | 1 | 5.70% | 0.00% | 12% | 0.68 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
 | Network & navigation | 0/7 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -152,7 +152,13 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### JavaScript & GC
 
-- **planned** `js.parser` — Lexer/parser, ASI, early errors and UTF-16 · size 5 · M4 · 0.82% of engine
+- **in progress 83.33%** `js.parser` — Lexer/parser, ASI, early errors and UTF-16 · size 5 · M4 · 0.82% of engine
+  - [x] UTF-16 source, lexical grammar and pinned Unicode identifier data ([source](../../crates/rustic-js/src/lexer.rs), [test](../../crates/rustic-js/tests/lexer.rs))
+  - [x] Scripts and modules to a spanned AST with cover grammars, ASI and strict mode ([source](../../crates/rustic-js/src/parser/mod.rs), [test](../../crates/rustic-js/tests/parse.rs))
+  - [x] Early errors for scopes, labels, classes, modules and contextual keywords ([source](../../crates/rustic-js/src/parser/scope.rs), [test](../../crates/rustic-js/tests/parse.rs))
+  - [x] Bounded parsing: depth, stack guard, cancellation and the js-parse fuzz target ([source](../../crates/rustic-fuzz/src/js.rs), [test](../../crates/rustic-js/tests/parse.rs))
+  - [x] Pinned Test262 parse-phase gate with exact expected failures ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs))
+  - [ ] RegExp pattern early errors (TD-88)
 - **planned** `js.values` — Values, coercions, references and completions · size 3 · M4 · 0.49% of engine
 - **planned** `js.objects` — Object methods, descriptors and prototypes · size 3 · M4 · 0.49% of engine
 - **planned** `js.heap` — Rooted traced heap and host-object cycle collection · size 8 · M4 · 1.31% of engine

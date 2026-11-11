@@ -119,6 +119,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-85 | Deliberate | Fonts | Backend caches, temporary memory and native/advanced font services | Open, M8/M9 |
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
 | TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
+| TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Open, JS-08 |
+| TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, M4 |
+| TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1244,3 +1247,43 @@ opportunities without language dictionaries. No full CSS Text WPT pass is claime
 Pay with reviewed locale resources, SA/phrase segmenters, language-specific
 hyphen replacement models and the M9 text conformance suites. Keep licenses,
 source revisions and bounded work/output accounting for each added resource.
+
+### TD-88 — RegExp patterns are not validated at parse time
+
+The lexer finds the end of a regular expression literal and checks its flags
+(unknown or repeated flags, `u` with `v`), but the pattern itself is kept as
+source code units and not parsed. ECMA-262 makes an invalid pattern an early
+error, so `/(?<a>.)(?<a>.)/` or `/a{2,1}/` parse today instead of failing.
+All 167 expected failures of the pinned Test262 parse gate are these files
+(`test/language/literals/regexp`), listed in
+`crates/rustic-js/tests/fixtures/test262_expected_failures.txt`. Nothing
+executes yet, so no invalid pattern can run.
+
+Pay with the RegExp pattern parser of JS-08, used both for early errors and
+for compiling patterns; the gate then fails until the list is emptied.
+
+### TD-89 — Proposal syntax is unsupported
+
+Decorators, explicit resource management (`using`), `import defer` and
+source-phase imports are rejected as syntax errors. The Test262 gate skips the
+709 files that declare these features (`test262::UNSUPPORTED_FEATURES`) and
+reports the count; it never counts them as passes.
+
+Pay when each proposal is part of the ECMAScript edition Rustic targets, by
+removing it from the list so its files join the gate.
+
+### TD-90 — Nesting limits depend on stack frame sizes
+
+`ParseLimits::max_stack_bytes` (1 MiB by default) stops recursion by measured
+stack use, in addition to the fixed `max_depth` of 256. Frames differ between
+optimized and test builds and between targets, so the deepest source that
+parses can differ slightly by build (about 225 nested parentheses in release
+builds on x86-64). This is a resource limit that fails visibly with
+`ParseError::TooDeep`, never a silent truncation. `rustic-js` builds at
+`opt-level = 1` in the dev profile so test builds stay close to release.
+
+Watch for: frame-size growth that lowers the limit below realistic nesting
+(the `nesting_beyond_the_limit_fails_without_overflowing` test parses 128
+mixed levels with default limits). Pay by moving deep expression chains to
+an explicit stack if real content needs more.
+

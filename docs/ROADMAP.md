@@ -10,7 +10,8 @@ M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-0
 and DOC-08 are complete for their declared scope, including fragment parsing;
 M2 has completed its declared CSS subset and conformance gate; M3 has started
 with REN-01a (checked geometry, principal snapshots and horizontal block sizing).
-M4–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
+M4 has started with JS-01 (the ECMAScript lexer and parser, see [JS.md](JS.md));
+M5–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
 current completed scope without implying completion of the entire milestone.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS

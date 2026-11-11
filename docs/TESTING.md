@@ -137,3 +137,8 @@ partitions, valid face/glyph IDs and finite positions. `text-sfnt` also mutates
 CFF/web wrappers and invokes shaping on accepted mutated layout tables. Required
 local checks include `cargo deny --locked check advisories licenses bans sources`.
 Native platform runtime acceptance and complete CSS Text WPT remain open gates.
+
+The 18th target, `js-parse`, parses each input as a script, a module and a
+strict script, checking error spans, deterministic dumps and that strict-valid
+source is sloppy-valid; deep nesting must fail with `TooDeep`, never overflow.
+The JavaScript parser's Test262 parse-phase gate is described in [JS.md](JS.md).

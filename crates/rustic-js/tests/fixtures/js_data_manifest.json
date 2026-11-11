@@ -1,0 +1,17 @@
+{
+  "license": "Unicode License v3 (crates/rustic-js/UNICODE-LICENSE.md)",
+  "outputs": {
+    "crates/rustic-js/src/unicode/tables.rs": "f9b4bd95b16e21d845d388988537493f3e93712b36c48adc61c16f35fc34cc82"
+  },
+  "sources": {
+    "DerivedCoreProperties.txt": {
+      "sha256": "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/DerivedCoreProperties.txt"
+    },
+    "DerivedGeneralCategory.txt": {
+      "sha256": "d62e5bab70ca74f099343f71224fa051cb1fdd61a1ab45c0488c44cfc0b6102e",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/extracted/DerivedGeneralCategory.txt"
+    }
+  },
+  "unicodetools_revision": "63aff0ca8dea894a057d04e7aef7ae1241757680"
+}

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rustic-base", "crates/rustic-dom", "crates/rustic-url", "crates/rustic-html", "crates/rustic-engine", "crates/rustic-cli", "crates/rustic-css", "crates/rustic-fuzz", "crates/rustic-style", "crates/rustic-layout", "crates/rustic-paint", "crates/rustic-raster", "crates/rustic-text", "crates/rustic-codecs"]
+members = ["crates/rustic-base", "crates/rustic-dom", "crates/rustic-url", "crates/rustic-html", "crates/rustic-engine", "crates/rustic-cli", "crates/rustic-css", "crates/rustic-fuzz", "crates/rustic-style", "crates/rustic-layout", "crates/rustic-paint", "crates/rustic-raster", "crates/rustic-text", "crates/rustic-codecs", "crates/rustic-js"]
 resolver = "3"
 
 [workspace.package]
@@ -26,3 +26,9 @@ unimplemented = "warn"
 lto = "thin"
 codegen-units = 1
 overflow-checks = true
+
+# The JavaScript parser recurses once per nesting level; unoptimized frames
+# are several times larger, which would make its stack guard stop at a few
+# dozen levels in test builds.
+[profile.dev.package.rustic-js]
+opt-level = 1

@@ -18,6 +18,7 @@ rustic-codecs = { path = "../rustic-codecs" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-html = { path = "../rustic-html" }
+rustic-js = { path = "../rustic-js" }
 rustic-layout = { path = "../rustic-layout" }
 rustic-paint = { path = "../rustic-paint" }
 rustic-raster = { path = "../rustic-raster" }

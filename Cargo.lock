@@ -171,6 +171,7 @@ dependencies = [
  "rustic-css",
  "rustic-dom",
  "rustic-html",
+ "rustic-js",
  "rustic-layout",
  "rustic-paint",
  "rustic-raster",
@@ -185,6 +186,13 @@ version = "0.1.0"
 dependencies = [
  "rustic-base",
  "rustic-dom",
+]
+
+[[package]]
+name = "rustic-js"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
 ]
 
 [[package]]

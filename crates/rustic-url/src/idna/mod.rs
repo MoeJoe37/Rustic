@@ -38,9 +38,9 @@ pub enum StrongDirection {
 /// The strong bidirectional type of `value` from the pinned Bidi_Class data,
 /// or `None` for weak and neutral characters.
 ///
-/// The table is generated for IDNA's Bidi Rule; HTML directionality
-/// (`dir=auto`, `:dir()`) shares it until a shared Unicode data crate exists
-/// (TD-29).
+/// The table is generated for IDNA's Bidi Rule. HTML directionality reads
+/// `rustic_text::unicode::strong_direction` instead; a `rustic-style` test
+/// checks that both tables agree for every scalar value.
 ///
 /// ```
 /// use rustic_url::idna::{StrongDirection, strong_direction};

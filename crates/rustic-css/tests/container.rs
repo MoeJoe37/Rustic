@@ -1,8 +1,8 @@
 //! `@container` preludes, container properties and query evaluation (CSS-06).
 
 use rustic_css::{
-    ContainerFacts, CssParser, CustomValue, MediaCondition, parse_container_query_list,
-    parse_declaration, parse_media_query_list,
+    ContainerFacts, CssParser, CustomValue, FontUnitRatios, MediaCondition,
+    parse_container_query_list, parse_declaration, parse_media_query_list,
 };
 
 fn values(source: &str) -> Vec<rustic_css::Value> {
@@ -94,6 +94,8 @@ fn evaluate(source: &str, width: Option<f64>, height: Option<f64>) -> Option<boo
         height,
         font_size_px: 20.0,
         root_font_size_px: 10.0,
+        font_ratios: FontUnitRatios::FALLBACK,
+        root_font_ratios: FontUnitRatios::FALLBACK,
         viewport_width: 1000.0,
         viewport_height: 500.0,
     };
@@ -202,5 +204,41 @@ fn container_properties() {
         "container-name: default",
     ] {
         assert!(declaration(invalid).is_err(), "{invalid}");
+    }
+}
+
+#[test]
+fn font_relative_units_use_the_container_and_root_font_ratios() {
+    let ratios = |ex, ch, cap, ic| FontUnitRatios { ex, ch, cap, ic };
+    let facts = ContainerFacts {
+        width: Some(400.0),
+        height: Some(300.0),
+        font_size_px: 20.0,
+        root_font_size_px: 10.0,
+        font_ratios: ratios(0.2, 0.4, 0.8, 1.6),
+        root_font_ratios: ratios(0.5, 0.25, 0.5, 2.0),
+        viewport_width: 1000.0,
+        viewport_height: 500.0,
+    };
+    let style = |_: &str, _: Option<&CustomValue>| None;
+    for (source, want) in [
+        ("(width = 100ex)", true),
+        ("(width = 50ch)", true),
+        ("(width = 25cap)", true),
+        ("(width = 12.5ic)", true),
+        ("(width = 80rex)", true),
+        ("(width = 160rch)", true),
+        ("(width = 80rcap)", true),
+        ("(width = 20ric)", true),
+        ("(width = 20em)", true),
+        ("(width = 40ex)", false),
+    ] {
+        let list = parse_container_query_list(&values(source)).unwrap();
+        let got = list.conditions[0]
+            .query
+            .as_ref()
+            .unwrap()
+            .evaluate_container(&facts, &style);
+        assert_eq!(got, Some(want), "{source}");
     }
 }

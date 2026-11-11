@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 use rustic_css::FormState;
 use rustic_dom::HTML_NAMESPACE;
-use rustic_url::idna::{StrongDirection, strong_direction};
+use rustic_text::unicode::{StrongDirection, strong_direction};
 
 use crate::matching::MatchCache;
 use crate::{ChildRef, ElementView};

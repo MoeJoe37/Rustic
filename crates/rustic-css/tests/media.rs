@@ -1,8 +1,8 @@
 //! Media query parsing, serialization and evaluation (CSS-06).
 
 use rustic_css::{
-    ColorScheme, CssParser, MAX_MEDIA_NESTING, MediaEnvironment, MediaQueryList, MediaType,
-    PointerAccuracy,
+    ColorScheme, CssParser, FontUnitRatios, MAX_MEDIA_NESTING, MediaEnvironment, MediaQueryList,
+    MediaType, PointerAccuracy,
 };
 
 fn parse(source: &str) -> MediaQueryList {
@@ -165,5 +165,32 @@ fn evaluation_follows_the_environment() {
         assert_eq!(list.matches(&desktop), on_desktop, "{source:?} on desktop");
         assert_eq!(list.matches(&phone), on_phone, "{source:?} on phone");
         assert_eq!(list.matches(&print), on_print, "{source:?} in print");
+    }
+}
+
+#[test]
+fn font_relative_units_use_the_initial_font_ratios() {
+    // Fallbacks: 1ex = 8px, 1cap = 11.2px, 1ic = 16px at the 16px initial font.
+    let mut env = MediaEnvironment::screen(400.0, 300.0);
+    assert!(parse("(width = 50ex)").matches(&env));
+    assert!(parse("(width = 25ic)").matches(&env));
+    // A loaded initial font with a 0.25em x-height, 0.625em `0` advance,
+    // 0.5em cap height and 1.25em ideographic advance.
+    env.initial_font = FontUnitRatios {
+        ex: 0.25,
+        ch: 0.625,
+        cap: 0.5,
+        ic: 1.25,
+    };
+    for (source, want) in [
+        ("(width = 100ex)", true),
+        ("(width = 50ex)", false),
+        ("(width = 40ch)", true),
+        ("(width = 40rch)", true),
+        ("(width = 50cap)", true),
+        ("(width = 20ic)", true),
+        ("(width = 25em)", true),
+    ] {
+        assert_eq!(parse(source).matches(&env), want, "{source}");
     }
 }

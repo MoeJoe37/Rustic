@@ -1,4 +1,9 @@
 //! Host-granted local font files for development rendering.
+//!
+//! `--font FILE` options are removed from the arguments before the command
+//! runs. The first granted face's family serves every generic family and the
+//! fallback; the other granted faces join per-cluster fallback.
+
 use rustic_text::{FontDatabase, FontLimits};
 use std::{
     ffi::OsString,
@@ -7,7 +12,14 @@ use std::{
     path::PathBuf,
     sync::{Arc, OnceLock},
 };
+
+/// Total bytes read from, and decoded for, all granted font files.
+const MAX_TOTAL_FONT_BYTES: usize = 128 * 1024 * 1024;
+/// Most `--font` grants per run.
+const MAX_FONT_GRANTS: usize = 64;
+
 static CONFIG: OnceLock<Arc<FontDatabase>> = OnceLock::new();
+
 /// Extract and validate explicit font grants before publishing configuration.
 pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     let mut output = Vec::new();
@@ -24,7 +36,7 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
                 .next()
                 .filter(|a| !a.to_string_lossy().starts_with("--"))
                 .ok_or("--font requires a local font file")?;
-            if paths.len() >= 64 {
+            if paths.len() >= MAX_FONT_GRANTS {
                 return Err("at most 64 explicit font files are accepted".into());
             }
             paths.push(PathBuf::from(value));
@@ -42,7 +54,7 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     for path in paths {
         let mut bytes = Vec::new();
         let file = File::open(&path).map_err(|e| format!("font file: {e}"))?;
-        let remaining = (128 * 1024 * 1024usize)
+        let remaining = MAX_TOTAL_FONT_BYTES
             .saturating_sub(input)
             .min(limits.max_font_bytes);
         if file.metadata().map_err(|e| e.to_string())?.len() > remaining as u64 {
@@ -58,7 +70,7 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
         let index = db.load(bytes, &limits).map_err(|e| e.to_string())?;
         decoded = decoded
             .checked_add(db.faces()[index].byte_len())
-            .filter(|&n| n <= 128 * 1024 * 1024)
+            .filter(|&n| n <= MAX_TOTAL_FONT_BYTES)
             .ok_or("decoded font byte limit exceeded")?;
     }
     let family = db.faces()[0].family().to_owned();
@@ -88,6 +100,8 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
 pub fn explicit() -> Option<Arc<FontDatabase>> {
     CONFIG.get().cloned()
 }
+
+/// The granted fonts, or the bundled test fonts without grants.
 pub fn database() -> &'static FontDatabase {
     static DEFAULT: OnceLock<FontDatabase> = OnceLock::new();
     CONFIG.get().map_or_else(

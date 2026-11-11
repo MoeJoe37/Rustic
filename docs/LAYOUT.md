@@ -338,7 +338,7 @@ Specification basis, reviewed 2026-11-09: OpenType 1.9
 CSS Fonts 4 [§5.2 font matching](https://www.w3.org/TR/css-fonts-4/#font-matching-algorithm)
 and CSS Values 4 [§6.1.1 font-relative lengths](https://www.w3.org/TR/css-values-4/#font-relative-lengths).
 These are focused fixtures, not a font-conformance or WPT result. Remaining
-work is tracked in TD-42 and TD-43.
+work is tracked in TD-42 and TD-85 (TD-43 is paid).
 
 ## Floats, positioning and overflow (REN-02b)
 

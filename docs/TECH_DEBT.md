@@ -76,7 +76,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Open |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
 | TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Open, pay with the encoding layer |
-| TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Open, pay with text shaping (M3) |
+| TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Paid |
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
@@ -90,7 +90,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
 | TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
 | TD-42 | Deliberate | Text | CFF/WOFF and discovery paid; advanced fonts/native services remain (TD-85) | Partly paid, REN-03 |
-| TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Open, REN-03 |
+| TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Paid |
 | TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
 | TD-46 | Deliberate | Paint | Opacity groups allocate a full surface each instead of their bounds | Open |
@@ -99,8 +99,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
 | TD-50 | Deliberate | Layout | OpenType/complex scripts paid; cross-source ligatures/break reshaping remain (TD-86) | Partly paid |
 | TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
-| TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting, system fonts or exact nonzero fill | Open, REN-04c |
-| TD-53 | Deliberate | Paint | First image painting: block-level PNG only, fill-only fit, bilinear only, no alt text | Open, REN-05c |
+| TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting or exact nonzero fill (`--font` paid) | Partly paid |
+| TD-53 | Deliberate | Paint | First image painting: fill-only fit, bilinear only, no alt text (inline images and formats paid) | Partly paid |
 | TD-54 | Deliberate | Paint | First outline painting: solid/double only, `auto` as solid, per-fragment inline outlines | Open, REN-04e |
 | TD-55 | Deliberate | Paint | First `border-radius`: single-axis overflow ignores radii, per-fragment inline curves, unsnapped side joins | Open, REN-04f |
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
@@ -477,7 +477,15 @@ nothing is truncated, and the replaced text is still bounded by the byte
 budget. **Pay:** route fetched bytes through the encoding layer that DOC-06's
 encoding sniffing will provide, with the CSS fallback chain. **Trigger:** the
 encoding layer landing, or a real page fixture that needs a non-UTF-8 sheet.
-### TD-29 — `:dir()` reads Bidi_Class from the IDNA tables
+### TD-29 — `:dir()` reads Bidi_Class from the IDNA tables (Paid)
+
+**Paid 2026-11-11:** `rustic-style` now reads
+`rustic_text::unicode::strong_direction`, generated with the rest of
+`rustic-text`'s Unicode 17 tables, and no longer uses `rustic-url` for
+directionality. IDNA keeps its own generated copy for the Bidi Rule because
+`rustic-url` must not depend on the text stack;
+`crates/rustic-style/tests/unicode_data.rs` checks that both tables give the
+same strong direction for every scalar value. The original entry is kept below.
 
 HTML directionality (`dir=auto`, `bdi`, `:dir()`) needs each character's strong
 bidirectional type. The only pinned Bidi_Class data is the table
@@ -730,7 +738,15 @@ WOFF2 decoding behind the same limits, platform discovery in
 real pages' web fonts, shaping text, or desktop/mobile hosts needing system
 fonts.
 
-### TD-43 — Query font units ignore loaded fonts
+### TD-43 — Query font units ignore loaded fonts (Paid)
+
+**Paid 2026-11-11:** `rustic_css::FontUnitRatios` carries `ex`/`ch`/`cap`/`ic`
+ratios. `MediaEnvironment::initial_font` holds the initial font's ratios
+(embedders fill it from `ComputeContext::initial_font_ratios`, as the CLI
+does), and `ContainerFacts` carries the container's and root's first available
+font ratios, filled by `rustic-style`. Tests: `font_relative_units_*` in
+`rustic-css`'s media and container tests and `queries_use_loaded_font_ratios`
+in `rustic-style`'s font tests. The original entry is kept below.
 
 Computed styles use the first available font's `ex`, `ch`, `cap` and `ic`, but
 media queries still evaluate those units with fixed ratios of a 16px initial
@@ -890,6 +906,10 @@ tagged images, or decode time showing in render profiles.
 
 ### TD-52 — First text painting slice
 
+**2026-11-11 update:** `--font FILE` grants local fonts to every CLI command
+(M3 text completion), so the "no way to name a local font file" part is paid;
+automatic platform discovery stays a host decision (TD-85). The rest stands.
+
 REN-04c paints glyph outlines but no emphasis marks, `text-shadow` or
 selection. REN-04d text decorations use fixed em fractions for thickness and
 position rather than the font's `post`/`OS/2` underline and strikeout metrics,
@@ -910,6 +930,10 @@ discovery per platform behind the same `FontDatabase`; text-node hit regions.
 **Trigger:** the first real-page renders or text WPT reftests.
 
 ### TD-53 — First image painting slice
+
+**2026-11-11 update:** inline-level images paint as atomic inlines (TD-70) and
+JPEG, GIF and WebP decode through the image store (REN-05d), so those parts
+are paid. Fit, sampling, density, alt text and cross-document caching stand.
 
 REN-05c paints decoded PNGs for block-level replaced `img` boxes only:
 inline-level images wait for atomic inlines (TD-50). The content is always

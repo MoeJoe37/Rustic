@@ -219,6 +219,33 @@ pub fn bidi_class(c: char) -> BidiClass {
     lookup(&tables::BIDI_CLASS, c).unwrap_or(BidiClass::L)
 }
 
+/// A character's strong bidirectional direction (HTML `dir=auto`, `:dir()`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum StrongDirection {
+    /// `Bidi_Class` L.
+    Ltr,
+    /// `Bidi_Class` R or AL.
+    Rtl,
+}
+
+/// The strong direction of `c`, or `None` for weak, neutral and explicit
+/// formatting characters.
+///
+/// ```
+/// use rustic_text::unicode::{StrongDirection, strong_direction};
+/// assert_eq!(strong_direction('a'), Some(StrongDirection::Ltr));
+/// assert_eq!(strong_direction('\u{5D0}'), Some(StrongDirection::Rtl));
+/// assert_eq!(strong_direction('\u{627}'), Some(StrongDirection::Rtl));
+/// assert_eq!(strong_direction('1'), None);
+/// ```
+pub fn strong_direction(c: char) -> Option<StrongDirection> {
+    match bidi_class(c) {
+        BidiClass::L => Some(StrongDirection::Ltr),
+        BidiClass::R | BidiClass::Al => Some(StrongDirection::Rtl),
+        _ => None,
+    }
+}
+
 /// `Bidi_Paired_Bracket` and whether `c` is an opening bracket.
 pub(crate) fn paired_bracket(c: char) -> Option<(char, bool)> {
     let i = tables::BIDI_BRACKETS.partition_point(|&(cp, _, _)| cp < u32::from(c));

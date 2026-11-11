@@ -15,10 +15,11 @@
 
 use rustic_css::{
     ContainerCondition, ContainerFacts, ContainerQueryList, ContainerType, CustomValue,
-    MAX_SUBSTITUTED_VALUES, MediaEnvironment, PropertyId, PropertyValue,
+    FontUnitRatios, MAX_SUBSTITUTED_VALUES, MediaEnvironment, PropertyId, PropertyValue,
 };
 
 use crate::ComputedStyle;
+use crate::fonts::unit_ratios;
 
 /// A query container's content-box size in CSS pixels, from layout.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -98,9 +99,15 @@ fn condition_matches<E>(
         return true;
     };
     let kind = container_type(container.style);
-    let root_font = containers
-        .first()
-        .map_or(16.0, |root| root.style.font_size_px());
+    let (root_font, root_ratios) =
+        containers
+            .first()
+            .map_or((16.0, FontUnitRatios::FALLBACK), |root| {
+                (
+                    root.style.font_size_px(),
+                    unit_ratios(root.style.font_metrics()),
+                )
+            });
     let facts = ContainerFacts {
         width: container
             .size
@@ -112,6 +119,8 @@ fn condition_matches<E>(
             .map(|s| s.height),
         font_size_px: container.style.font_size_px(),
         root_font_size_px: root_font,
+        font_ratios: unit_ratios(container.style.font_metrics()),
+        root_font_ratios: root_ratios,
         viewport_width: environment.width,
         viewport_height: environment.height,
     };

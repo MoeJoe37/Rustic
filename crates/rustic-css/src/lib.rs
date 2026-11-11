@@ -66,9 +66,10 @@ pub use flex::{
 };
 pub use length::{Length, LengthPercentage, LengthUnit};
 pub use media::{
-    ColorScheme, MAX_MEDIA_NESTING, MediaComparison, MediaCondition, MediaEnvironment,
-    MediaFeature, MediaFeatureName, MediaFeatureValue, MediaPrefix, MediaQualifier, MediaQuery,
-    MediaQueryList, MediaType, PointerAccuracy, ResolutionUnit, parse_media_query_list,
+    ColorScheme, FontUnitRatios, MAX_MEDIA_NESTING, MediaComparison, MediaCondition,
+    MediaEnvironment, MediaFeature, MediaFeatureName, MediaFeatureValue, MediaPrefix,
+    MediaQualifier, MediaQuery, MediaQueryList, MediaType, PointerAccuracy, ResolutionUnit,
+    parse_media_query_list,
 };
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{

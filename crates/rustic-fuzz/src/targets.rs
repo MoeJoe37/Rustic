@@ -992,6 +992,8 @@ fn check_container_prelude(parser: &CssParser, text: &str) -> Result<(), String>
             height,
             font_size_px: 16.0,
             root_font_size_px: 16.0,
+            font_ratios: rustic_css::FontUnitRatios::FALLBACK,
+            root_font_ratios: rustic_css::FontUnitRatios::FALLBACK,
             viewport_width: 1280.0,
             viewport_height: 720.0,
         };

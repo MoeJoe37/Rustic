@@ -19,14 +19,14 @@ use std::fmt;
 use std::sync::Arc;
 
 use rustic_css::{
-    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, FamilyName, FlexBasis,
-    Float, FontSize, FontSizeKeyword, FontStretch, FontStyle, FontWeight, Gap, GenericFamily,
-    Length, LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, Overflow,
-    Position, PositionComponent, PositionValue, PropertyId, PropertyValue, Size, Spacing,
-    TextAlign, VerticalAlign,
+    BackgroundSize, BorderStyle, BorderWidth, Color, Direction, Display, FlexBasis, Float,
+    FontSize, FontSizeKeyword, FontStretch, FontStyle, FontUnitRatios, FontWeight, Gap, Length,
+    LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, Overflow, Position,
+    PositionComponent, PositionValue, PropertyId, PropertyValue, Size, Spacing, TextAlign,
+    VerticalAlign,
 };
 
-use crate::fonts::{FontMetricsSource, FontQuery};
+use crate::fonts::{FontMetricsSource, FontQuery, INITIAL_FONT, unit_ratios};
 use crate::{CustomProperties, EmRatios, SpecifiedStyle};
 
 /// The environment computed values depend on.
@@ -82,6 +82,15 @@ impl ComputeContext {
             fonts: Some(fonts),
             ..Self::default()
         }
+    }
+
+    /// The initial font's unit ratios, for [`MediaEnvironment::initial_font`]
+    /// so media queries resolve `ex`, `ch`, `cap` and `ic` against the same
+    /// fonts as computed styles.
+    ///
+    /// [`MediaEnvironment::initial_font`]: rustic_css::MediaEnvironment::initial_font
+    pub fn initial_font_ratios(&self) -> FontUnitRatios {
+        unit_ratios(self.em_ratios(&INITIAL_FONT))
     }
 
     fn em_ratios(&self, font: &FontQuery<'_>) -> EmRatios {
@@ -426,12 +435,7 @@ fn compute_values(
     // font: the initial `serif` family at weight 400, normal style/stretch.
     let parent_ratios = match parent {
         Some(p) => p.font_ratios,
-        None => cx.em_ratios(&FontQuery {
-            families: &[FamilyName::Generic(GenericFamily::Serif)],
-            weight: 400.0,
-            style: FontStyle::Normal,
-            stretch: 100.0,
-        }),
+        None => cx.em_ratios(&INITIAL_FONT),
     };
     let font = font_query(specified, parent_weight);
     let font_ratios = match parent {

@@ -169,8 +169,8 @@ reviewed 2026-11-08):
 
 Radio groups use the form owner from the `form` attribute or the nearest form
 ancestor; parser association of non-descendant controls is not recorded yet
-(TD-31). Strong characters come from the pinned Unicode 17.0.0 Bidi_Class
-table shared with IDNA (TD-29). Whole-tree facts (IDs, radio groups, default
+(TD-31). Strong characters come from `rustic-text`'s pinned Unicode 17.0.0
+Bidi_Class table (TD-29, paid). Whole-tree facts (IDs, radio groups, default
 buttons, the pragma-set language) are built once per match or restyle on first
 use, and directionality is memoized per element.
 
@@ -509,7 +509,10 @@ x-height, the advance of `0`, cap height and the advance of 水. Units inside
 parent is the initial `serif` font at weight 400. Without a source or a
 matching font they keep the specification's 0.5em fallback for `ex` and `ch`,
 0.7em for `cap` and 1em for `ic`. `normal` line height counts as 1.2 for `lh`.
-Media and container queries still use the fallback ratios (TD-43). `style_tree` returns both the specified and computed style of each
+Media queries resolve these units against the initial font's ratios in
+`MediaEnvironment::initial_font` (`ComputeContext::initial_font_ratios`), and
+container queries against the container's and root's first available fonts
+(TD-43, paid). `style_tree` returns both the specified and computed style of each
 element and inherits computed values.
 
 ### User-agent stylesheet and `<style>` elements

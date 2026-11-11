@@ -798,6 +798,40 @@ pub enum ColorScheme {
     Dark,
 }
 
+/// Sizes of the font-relative units `ex`, `ch`, `cap` and `ic` as multiples
+/// of the font size, taken from a font's metrics.
+///
+/// Media and container queries cannot see fonts, so the embedder (or the
+/// style system, for containers) passes the ratios of the relevant font.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontUnitRatios {
+    /// `ex`: the x-height.
+    pub ex: f64,
+    /// `ch`: the advance of `0`.
+    pub ch: f64,
+    /// `cap`: the cap height.
+    pub cap: f64,
+    /// `ic`: the advance of 水.
+    pub ic: f64,
+}
+
+impl FontUnitRatios {
+    /// The ratios without a font: CSS Values 4 fallbacks of 0.5em for `ex`
+    /// and `ch`, 1em for `ic`, and 0.7em for `cap`.
+    pub const FALLBACK: Self = Self {
+        ex: 0.5,
+        ch: 0.5,
+        cap: 0.7,
+        ic: 1.0,
+    };
+}
+
+impl Default for FontUnitRatios {
+    fn default() -> Self {
+        Self::FALLBACK
+    }
+}
+
 /// Everything media queries can test, for one rendering surface.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MediaEnvironment {
@@ -849,6 +883,9 @@ pub struct MediaEnvironment {
     pub color_gamut: &'static str,
     /// `dynamic-range: high`.
     pub high_dynamic_range: bool,
+    /// The initial font's unit ratios, for `ex`, `ch`, `cap` and `ic` in
+    /// queries ([`FontUnitRatios::FALLBACK`] until fonts are known).
+    pub initial_font: FontUnitRatios,
 }
 
 impl Default for MediaEnvironment {
@@ -886,6 +923,7 @@ impl MediaEnvironment {
             display_mode: "browser",
             color_gamut: "srgb",
             high_dynamic_range: false,
+            initial_font: FontUnitRatios::FALLBACK,
         }
     }
 
@@ -899,13 +937,17 @@ impl MediaEnvironment {
         }
         // Relative units use the initial font (16px, `normal` line height
         // 1.2) and the viewport, as Media Queries 4 §1.3 requires.
+        const INITIAL_FONT_PX: f64 = 16.0;
         let v = length.value;
         let (w, h) = (self.width, self.height);
+        let font = self.initial_font;
         match length.unit {
-            LengthUnit::Em | LengthUnit::Rem | LengthUnit::Ic | LengthUnit::Ric => v * 16.0,
-            LengthUnit::Ex | LengthUnit::Rex | LengthUnit::Ch | LengthUnit::Rch => v * 8.0,
-            LengthUnit::Cap | LengthUnit::Rcap => v * 11.2,
-            LengthUnit::Lh | LengthUnit::Rlh => v * 19.2,
+            LengthUnit::Em | LengthUnit::Rem => v * INITIAL_FONT_PX,
+            LengthUnit::Ex | LengthUnit::Rex => v * INITIAL_FONT_PX * font.ex,
+            LengthUnit::Ch | LengthUnit::Rch => v * INITIAL_FONT_PX * font.ch,
+            LengthUnit::Cap | LengthUnit::Rcap => v * INITIAL_FONT_PX * font.cap,
+            LengthUnit::Ic | LengthUnit::Ric => v * INITIAL_FONT_PX * font.ic,
+            LengthUnit::Lh | LengthUnit::Rlh => v * INITIAL_FONT_PX * 1.2,
             LengthUnit::Vw
             | LengthUnit::Vi
             | LengthUnit::Svw

@@ -7,8 +7,8 @@ use rustic_css::{CssParser, FamilyName, FontStyle, GenericFamily, PropertyId};
 use rustic_dom::{Document, NodeId, NodeKind, QualifiedName};
 use rustic_html::HtmlDocumentParser;
 use rustic_style::{
-    Cascade, ComputeContext, ComputedStyle, EmRatios, FontMetricsSource, FontQuery, MatchContext,
-    Mutation, Origin, StyleSheet, StyledDocument, style_tree,
+    Cascade, ComputeContext, ComputedStyle, ContainerSize, EmRatios, FontMetricsSource, FontQuery,
+    MatchContext, Mutation, Origin, StyleSheet, StyledDocument, style_tree, style_tree_with_sizes,
 };
 use rustic_text::bundled::{TEST_FONTS, test_database};
 use rustic_text::{FontDatabase, FontLimits};
@@ -295,4 +295,67 @@ fn incremental_restyle_matches_a_full_restyle_with_fonts() {
         .unwrap();
     // Bold `0` advance: 3 × 0.6 × 16.
     assert_eq!(b.computed.get(PropertyId::Width).to_string(), "28.8px");
+}
+
+/// Media and container queries resolve `ex`/`ch`/`cap`/`ic` with the same
+/// fonts as computed styles (TD-43): the initial font for media queries, the
+/// container's and root's first available fonts for container queries.
+#[test]
+fn queries_use_loaded_font_ratios() {
+    use rustic_css::MediaEnvironment;
+
+    let compute = ComputeContext::with_fonts(Arc::new(Recorder::default()));
+    // The recorder's x-height is 0.25em and `0` advance 0.125em.
+    assert_eq!(compute.initial_font_ratios().ex, 0.25);
+    let parser = CssParser::default();
+    let mut html_parser = HtmlDocumentParser::default();
+    html_parser.feed(b"<div id=c><p id=p></p></div>").unwrap();
+    let page = html_parser.finish().unwrap();
+    let doc = page.document();
+    let author = "html { font-size: 16px } \
+                  #c { container-type: inline-size; font-size: 20px } \
+                  @media (width = 100ex) { #p { width: 1px } } \
+                  @media (width = 50ex) { #p { width: 2px } } \
+                  @container (width = 80ex) { #p { height: 3px } } \
+                  @container (width = 40ex) { #p { height: 4px } } \
+                  @container (width = 200rch) { #p { min-width: 5px } }";
+    let mut environment = MediaEnvironment::screen(400.0, 300.0);
+    environment.initial_font = compute.initial_font_ratios();
+    let mut cascade = Cascade::with_environment(environment);
+    let (sheet, diagnostics) = StyleSheet::parse(&parser, author, Origin::Author).unwrap();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    cascade.push(sheet);
+    let container = doc
+        .walk(doc.root())
+        .unwrap()
+        .map(|(node, _)| node)
+        .find(|&node| id_of(doc, node).as_deref() == Some("c"))
+        .unwrap();
+    let sizes = std::iter::once((
+        container,
+        ContainerSize {
+            width: 400.0,
+            height: 100.0,
+        },
+    ))
+    .collect();
+    let styles: Vec<(String, ComputedStyle)> = style_tree_with_sizes(
+        doc,
+        doc.root(),
+        &cascade,
+        &parser,
+        &MatchContext::html(),
+        &compute,
+        &sizes,
+    )
+    .unwrap()
+    .into_iter()
+    .filter_map(|s| Some((id_of(doc, s.node)?, s.computed)))
+    .collect();
+    // Media: 100ex = 100 × 0.25 × 16px = 400px (the fallback would give 800px).
+    assert_eq!(px(&styles, "p", "width"), "1px");
+    // Container: 80ex = 80 × 0.25 × 20px = 400px.
+    assert_eq!(px(&styles, "p", "height"), "3px");
+    // Root font: 200rch = 200 × 0.125 × 16px = 400px.
+    assert_eq!(px(&styles, "p", "min-width"), "5px");
 }

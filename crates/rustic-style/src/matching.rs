@@ -6,7 +6,7 @@ use rustic_css::{
     RelativeSelectorList, SelectorList, SimpleSelector,
 };
 use rustic_dom::HTML_NAMESPACE;
-use rustic_url::idna::StrongDirection;
+use rustic_text::unicode::StrongDirection;
 
 use crate::variables::SubstitutionCache;
 use std::cell::RefCell;

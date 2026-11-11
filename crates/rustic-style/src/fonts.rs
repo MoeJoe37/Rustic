@@ -9,7 +9,7 @@
 
 use std::fmt::Debug;
 
-use rustic_css::{FamilyName, FontStyle};
+use rustic_css::{FamilyName, FontStyle, FontUnitRatios, GenericFamily};
 use rustic_text::{EmRatios, FaceQuery, FaceStyle, FamilyRef, FontDatabase};
 
 /// The computed font properties a first available font is chosen from.
@@ -50,5 +50,25 @@ impl FontMetricsSource for FontDatabase {
         };
         self.select(families, &query)
             .map(|face| face.metrics().em_ratios())
+    }
+}
+
+/// The initial font: the initial `serif` family at weight 400 with normal
+/// style and stretch. It is the root element's parent font and the font
+/// media queries resolve `ex`, `ch`, `cap` and `ic` against.
+pub(crate) const INITIAL_FONT: FontQuery<'static> = FontQuery {
+    families: &[FamilyName::Generic(GenericFamily::Serif)],
+    weight: 400.0,
+    style: FontStyle::Normal,
+    stretch: 100.0,
+};
+
+/// `ratios` in the form media and container queries take.
+pub(crate) fn unit_ratios(ratios: EmRatios) -> FontUnitRatios {
+    FontUnitRatios {
+        ex: ratios.x_height,
+        ch: ratios.zero_advance,
+        cap: ratios.cap_height,
+        ic: ratios.ideograph_advance,
     }
 }

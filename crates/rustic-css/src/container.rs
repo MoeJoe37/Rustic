@@ -16,9 +16,9 @@ use crate::media::{
 };
 use crate::serialize::write_values;
 use crate::{
-    CssWideKeyword, CustomValue, Length, LengthUnit, MAX_MEDIA_NESTING, MediaComparison,
-    MediaCondition, MediaFeature, MediaFeatureName, MediaFeatureValue, MediaPrefix, Token, Value,
-    serialize_identifier,
+    CssWideKeyword, CustomValue, FontUnitRatios, Length, LengthUnit, MAX_MEDIA_NESTING,
+    MediaComparison, MediaCondition, MediaFeature, MediaFeatureName, MediaFeatureValue,
+    MediaPrefix, Token, Value, serialize_identifier,
 };
 
 /// A `style()` query.
@@ -82,6 +82,10 @@ pub struct ContainerFacts {
     pub font_size_px: f64,
     /// The root's computed font size, for `rem` and friends.
     pub root_font_size_px: f64,
+    /// The container's first available font's unit ratios.
+    pub font_ratios: FontUnitRatios,
+    /// The root's first available font's unit ratios.
+    pub root_font_ratios: FontUnitRatios,
     /// Viewport width in CSS pixels.
     pub viewport_width: f64,
     /// Viewport height in CSS pixels.
@@ -280,14 +284,19 @@ impl ContainerFacts {
         }
         let v = length.value;
         let (font, root) = (self.font_size_px, self.root_font_size_px);
+        let (fr, rr) = (self.font_ratios, self.root_font_ratios);
         let (w, h) = (self.viewport_width, self.viewport_height);
         match length.unit {
-            LengthUnit::Em | LengthUnit::Ic => v * font,
-            LengthUnit::Rem | LengthUnit::Ric => v * root,
-            LengthUnit::Ex | LengthUnit::Ch => v * font / 2.0,
-            LengthUnit::Rex | LengthUnit::Rch => v * root / 2.0,
-            LengthUnit::Cap => v * font * 0.7,
-            LengthUnit::Rcap => v * root * 0.7,
+            LengthUnit::Em => v * font,
+            LengthUnit::Rem => v * root,
+            LengthUnit::Ex => v * font * fr.ex,
+            LengthUnit::Rex => v * root * rr.ex,
+            LengthUnit::Ch => v * font * fr.ch,
+            LengthUnit::Rch => v * root * rr.ch,
+            LengthUnit::Cap => v * font * fr.cap,
+            LengthUnit::Rcap => v * root * rr.cap,
+            LengthUnit::Ic => v * font * fr.ic,
+            LengthUnit::Ric => v * root * rr.ic,
             LengthUnit::Lh => v * font * 1.2,
             LengthUnit::Rlh => v * root * 1.2,
             LengthUnit::Vw

@@ -363,9 +363,6 @@ fn compute_styles(
     // Media queries and viewport units see the view's layout viewport.
     let viewport = view.viewport();
     let (width, height) = (viewport.width().get(), viewport.height().get());
-    let mut environment = MediaEnvironment::screen(width, height);
-    environment.resolution = view.scale().get();
-    cascade.set_environment(environment);
     let compute = ComputeContext {
         viewport_width: width,
         viewport_height: height,
@@ -373,6 +370,11 @@ fn compute_styles(
             ComputeContext::with_fonts(fonts)
         })
     };
+    let mut environment = MediaEnvironment::screen(width, height);
+    environment.resolution = view.scale().get();
+    // Font-relative units in media queries use the same granted fonts.
+    environment.initial_font = compute.initial_font_ratios();
+    cascade.set_environment(environment);
     let mut cx = MatchContext::html();
     cx.quirks = parsed.mode() == DocumentMode::Quirks;
     let styles = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)

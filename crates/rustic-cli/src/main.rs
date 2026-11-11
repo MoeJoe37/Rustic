@@ -46,12 +46,13 @@ split inline continuations, preserving unshaped text. Other formatting types,
 positioning/floats and special/replaced elements fail explicitly.
 dump-layout prints used content/padding/border rectangles for blocks with
 collapsed vertical margins, plus line boxes, text fragments and inline boxes
-laid out with the bundled test fonts. Unsupported formatting fails explicitly.
+laid out with the same fonts as dump-paint. Unsupported formatting fails explicitly.
 dump-paint prints the display list for that layout: the canvas color (with
 root/body background propagation), block and inline background colors, solid
 borders and text glyph paths in stacking-context paint order, with overflow
-clips and opacity groups, and block-level <img> content. Layout and paint use
-explicit --font files when supplied, otherwise the bundled test fonts; <img src> loads local PNG files from the
+clips and opacity groups, and <img> content. Layout and paint use explicit
+--font files when supplied, otherwise the bundled test fonts (which map only a
+few characters); <img src> loads local PNG, JPEG, GIF and WebP files from the
 document's directory or below it, like stylesheets.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). VIEW options set the window: --viewport WxH is its

@@ -2,12 +2,14 @@
 //! intrinsic objects of its realm (§9.3, §9.7). Built-in library objects
 //! beyond what JS-02's conversions need arrive with JS-05.
 
+use super::env::EnvId;
 use super::heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory};
 use super::number::number_to_string;
 use super::object::{Class, Object, PropertyDescriptor};
 use super::shape::PropertyKey;
 use super::string::JsStr;
 use super::value::{Kind, ObjectId, StringId, SymbolId, Value};
+use crate::vm::interp::VmState;
 
 /// Why an operation did not complete normally.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,6 +18,8 @@ pub enum Abrupt {
     Throw(Value),
     /// The heap budget ran out. Not catchable by script.
     OutOfMemory,
+    /// The host cancelled execution. Not catchable by script.
+    Cancelled,
 }
 
 impl From<OutOfMemory> for Abrupt {
@@ -82,6 +86,10 @@ names! {
     infinity = "Infinity",
     undefined = "undefined",
     empty = "",
+    next = "next",
+    done = "done",
+    value = "value",
+    return_ = "return",
 }
 
 macro_rules! symbols {
@@ -158,11 +166,17 @@ pub struct Intrinsics {
     pub bigint_prototype: ObjectId,
     /// The global object.
     pub global: ObjectId,
+    /// `%ArrayIteratorPrototype%`.
+    pub array_iterator_prototype: ObjectId,
+    /// `%Array.prototype.values%`, also `Array.prototype[Symbol.iterator]`.
+    pub array_values: ObjectId,
+    /// `%ArrayIteratorPrototype%.next`.
+    pub array_iterator_next: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 14] {
+    pub(crate) fn all(&self) -> [ObjectId; 17] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -178,6 +192,9 @@ impl Intrinsics {
             self.symbol_prototype,
             self.bigint_prototype,
             self.global,
+            self.array_iterator_prototype,
+            self.array_values,
+            self.array_iterator_next,
         ]
     }
 }
@@ -193,6 +210,10 @@ pub struct Agent {
     pub symbols: WellKnownSymbols,
     /// Intrinsic objects.
     pub intrinsics: Intrinsics,
+    /// The realm's global environment.
+    pub(crate) global_env: EnvId,
+    /// The interpreter's stack and frames.
+    pub(crate) vm: VmState,
 }
 
 impl Agent {
@@ -226,9 +247,18 @@ impl Agent {
                 symbol_prototype: placeholder,
                 bigint_prototype: placeholder,
                 global: placeholder,
+                array_iterator_prototype: placeholder,
+                array_values: placeholder,
+                array_iterator_next: placeholder,
             },
+            global_env: EnvId(0),
+            vm: VmState::default(),
         };
         agent.create_intrinsics().map_err(|_| OutOfMemory)?;
+        let global = agent.intrinsics.global;
+        agent.global_env = agent
+            .new_global_environment(global, global)
+            .map_err(|_| OutOfMemory)?;
         Ok(agent)
     }
 
@@ -275,6 +305,9 @@ impl Agent {
             symbol_prototype,
             bigint_prototype,
             global,
+            array_iterator_prototype: object_prototype,
+            array_values: object_prototype,
+            array_iterator_next: object_prototype,
         };
         super::builtins::install(self)
     }
@@ -401,11 +434,16 @@ impl Agent {
 
     /// `Call(f, this, args)`.
     pub fn call(&mut self, f: Value, this: Value, args: &[Value]) -> JsResult<Value> {
-        let native = f.as_object().and_then(|o| self.heap.object(o).native());
-        match native {
-            Some(behavior) => behavior(self, this, args),
-            None => self.type_error("value is not a function"),
+        let Some(o) = f.as_object() else {
+            return self.type_error("value is not a function");
+        };
+        if let Some(behavior) = self.heap.object(o).native() {
+            return self.call_native(behavior, this, args);
         }
+        if self.heap.object(o).closure_index().is_some() {
+            return self.call_closure(o, this, args);
+        }
+        self.type_error("value is not a function")
     }
 
     // ---- inspection -------------------------------------------------

@@ -243,6 +243,7 @@ impl Run {
         self.agent.collect_garbage(Roots {
             values: &held,
             envs: &[],
+            codes: &[],
         });
         let live = self.reachable();
         self.objects.retain(|o, _| live.contains(o));

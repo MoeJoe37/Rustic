@@ -25,7 +25,9 @@ pub use agent::{
 pub use bigint::BigInt;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
+pub(crate) use env::{BINDING_MUTABLE, BINDING_STRICT};
 pub use env::{EnvId, Environment, Reference, ReferenceBase, ThisStatus};
+pub(crate) use gc::Tracer;
 pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};
 pub use heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory, Symbol};
 pub use internal::IntegrityLevel;
@@ -34,6 +36,8 @@ pub use number::{
     to_uint32,
 };
 pub use object::{Class, PropertyDescriptor};
+pub(crate) use object::{Closure, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Object};
+pub(crate) use shape::ShapeId;
 pub use shape::{Attributes, MAX_SHAPE_PROPERTIES, PropertyKey};
 pub use string::JsStr;
 pub use value::{BigIntId, Kind, ObjectId, StringId, SymbolId, Type, Value};

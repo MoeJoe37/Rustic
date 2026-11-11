@@ -1,0 +1,473 @@
+//! Register bytecode (JS-04).
+//!
+//! A function compiles to a [`FunctionCode`]: a flat vector of [`Op`]s over
+//! a frame of registers, a constant pool, the templates of nested
+//! functions and a table of exception handlers. Registers hold [`Value`]s;
+//! the frame lives on the agent's value stack, not the Rust stack.
+//! Operands are `u16` register numbers and `u32` pool or code indices, so
+//! an op is 12 bytes on every target.
+
+use std::cell::Cell;
+
+use crate::runtime::{StringId, Value};
+
+/// A compiled function in a heap. Code is collected like any other heap
+/// record: a closure or a running frame keeps its code alive, and code
+/// keeps its constants and nested functions alive.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CodeId(pub(crate) u32);
+
+/// A register in the current frame.
+pub type Reg = u16;
+
+/// Operators that take two values and produce one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BinOp {
+    /// `+`
+    Add,
+    /// `-`
+    Sub,
+    /// `*`
+    Mul,
+    /// `/`
+    Div,
+    /// `%`
+    Rem,
+    /// `**`
+    Exp,
+    /// `<<`
+    Shl,
+    /// `>>`
+    Sar,
+    /// `>>>`
+    Shr,
+    /// `&`
+    BitAnd,
+    /// `|`
+    BitOr,
+    /// `^`
+    BitXor,
+    /// `==`
+    Eq,
+    /// `!=`
+    NotEq,
+    /// `===`
+    StrictEq,
+    /// `!==`
+    StrictNotEq,
+    /// `<`
+    Lt,
+    /// `<=`
+    LtEq,
+    /// `>`
+    Gt,
+    /// `>=`
+    GtEq,
+    /// `in`
+    In,
+    /// `instanceof`
+    Instanceof,
+}
+
+/// Operators that take one value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnOp {
+    /// `-`
+    Neg,
+    /// `+` (ToNumber)
+    Plus,
+    /// `!`
+    Not,
+    /// `~`
+    BitNot,
+    /// `typeof` of a value
+    Typeof,
+    /// ToNumeric, for postfix updates
+    ToNumeric,
+    /// `x + 1` on a numeric
+    Inc,
+    /// `x - 1` on a numeric
+    Dec,
+    /// ToPropertyKey, for computed keys
+    ToPropertyKey,
+    /// ToString, for template substitutions
+    ToString,
+    /// ToObject (throws on null and undefined)
+    ToObject,
+}
+
+/// One instruction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Op {
+    /// `dst = constants[index]`
+    Const { dst: Reg, index: u32 },
+    /// `dst = undefined`
+    Undefined { dst: Reg },
+    /// `dst = <uninitialized>` (start of a TDZ)
+    Uninit { dst: Reg },
+    /// `dst = int` as a Number
+    Int { dst: Reg, value: i32 },
+    /// `dst = src`
+    Move { dst: Reg, src: Reg },
+    /// `dst = this` (throws in a derived constructor before `super()`)
+    This { dst: Reg },
+    /// `dst = new.target`
+    NewTarget { dst: Reg },
+    /// `dst = the running function`
+    Callee { dst: Reg },
+    /// Throw a ReferenceError naming `constants[name]` if `src` is
+    /// uninitialized.
+    CheckTdz { src: Reg, name: u32 },
+    /// Throw a TypeError for assignment to the constant `constants[name]`.
+    ConstAssign { name: u32 },
+
+    /// `dst = scope slot`, `hops` scopes out, with a TDZ check.
+    GetSlot { dst: Reg, hops: u16, slot: u16 },
+    /// Store into a scope slot, checking the TDZ and mutability.
+    SetSlot { src: Reg, hops: u16, slot: u16 },
+    /// Initialize a scope slot (declarations; no checks).
+    InitSlot { src: Reg, hops: u16, slot: u16 },
+    /// Enter a block scope: a new environment with `scopes[scope]`'s
+    /// bindings, all uninitialized.
+    PushScope { scope: u32 },
+    /// Leave the innermost block scope.
+    PopScope,
+    /// Replace the innermost scope with a copy (per-iteration bindings).
+    CopyScope,
+
+    /// `dst = name` resolved through the environment chain (globals,
+    /// `with`); ReferenceError if unresolvable.
+    GetName { dst: Reg, name: u32 },
+    /// `typeof name`: like `GetName` but `undefined` when unresolvable.
+    TypeofName { dst: Reg, name: u32 },
+    /// Assign to `name` through the chain (`PutValue`).
+    SetName { src: Reg, name: u32 },
+    /// `dst = the global binding sites[site].name`: a global lexical
+    /// binding or a property of the global object, cached in the site.
+    /// Emitted for names no enclosing scope declares when no `with` is in
+    /// the way.
+    GetGlobal { dst: Reg, site: u16 },
+    /// Assign to a global binding through `sites[site]`.
+    SetGlobal { src: Reg, site: u16 },
+    /// Initialize a global lexical binding or declare a global var.
+    DeclareGlobal { name: u32, kind: u8 },
+    /// Initialize a global lexical binding (`let`, `const` at the top of a
+    /// script).
+    InitName { src: Reg, name: u32 },
+    /// `dst = delete name`
+    DeleteName { dst: Reg, name: u32 },
+    /// Enter a `with` body: an object environment for `object`.
+    PushWith { object: Reg },
+    /// `dst = this` for a name call through a `with` object, else
+    /// undefined.
+    WithBase { dst: Reg, name: u32 },
+
+    /// `dst = object[key]`
+    GetProp { dst: Reg, object: Reg, key: Reg },
+    /// `dst = object.name` through `sites[site]`, which caches the shape
+    /// and slot of the last own data property found.
+    GetNamed { dst: Reg, object: Reg, site: u16 },
+    /// `object[key] = value`
+    SetProp { object: Reg, key: Reg, value: Reg },
+    /// `object.name = value` through `sites[site]`.
+    SetNamed { object: Reg, site: u16, value: Reg },
+    /// `dst = delete object[key]`
+    DeleteProp { dst: Reg, object: Reg, key: Reg },
+    /// `CreateDataPropertyOrThrow(object, key, value)` (literals).
+    DefineProp { object: Reg, key: Reg, value: Reg },
+    /// Define a getter (`setter == false`) or setter on a literal.
+    DefineAccessor {
+        object: Reg,
+        key: Reg,
+        function: Reg,
+        setter: bool,
+    },
+    /// `dst = {}`
+    NewObject { dst: Reg },
+    /// `dst = []`
+    NewArray { dst: Reg },
+    /// Append `value` (or a hole) to the array in `array`.
+    ArrayPush { array: Reg, value: Reg },
+    /// Append a hole.
+    ArrayHole { array: Reg },
+    /// Copy own enumerable properties of `source` into `target` (object
+    /// spread and rest), skipping the keys in registers
+    /// `excluded .. excluded + count`.
+    CopyProps {
+        target: Reg,
+        source: Reg,
+        excluded: Reg,
+        count: u16,
+    },
+    /// `dst = a new closure` over `functions[index]`.
+    Closure { dst: Reg, index: u32 },
+    /// Set the closure's `[[HomeObject]]` for `super` lookups.
+    SetHome { function: Reg, home: Reg },
+    /// `dst = the arguments object`
+    Arguments { dst: Reg },
+    /// `dst = the rest parameters as an array`
+    Rest { dst: Reg, from: u16 },
+
+    /// `dst = op src`
+    Unary { op: UnOp, dst: Reg, src: Reg },
+    /// `dst = a op b`
+    Binary { op: BinOp, dst: Reg, a: Reg, b: Reg },
+    /// `dst = a op value`, for a small integer literal on the right.
+    BinaryInt {
+        op: BinOp,
+        dst: Reg,
+        a: Reg,
+        value: i32,
+    },
+
+    /// Unconditional jump.
+    Jump { target: u32 },
+    /// Jump if ToBoolean(cond).
+    JumpIfTrue { cond: Reg, target: u32 },
+    /// Jump unless ToBoolean(cond).
+    JumpIfFalse { cond: Reg, target: u32 },
+    /// Jump if `src` is null or undefined.
+    JumpIfNullish { src: Reg, target: u32 },
+    /// Jump unless `src` is undefined.
+    JumpIfNotUndefined { src: Reg, target: u32 },
+    /// Jump unless `a op b` holds; `op` is a comparison. A test and its
+    /// branch in one instruction.
+    JumpUnless {
+        op: BinOp,
+        a: Reg,
+        b: Reg,
+        target: u32,
+    },
+    /// Jump unless `a op value` holds, for a small integer literal.
+    JumpUnlessInt {
+        op: BinOp,
+        a: Reg,
+        value: i32,
+        target: u32,
+    },
+    /// Jump if `a === b` (switch cases).
+    JumpIfStrictEq { a: Reg, b: Reg, target: u32 },
+    /// Jump if `a` holds the Number `value` (finally dispatch).
+    JumpIfInt { a: Reg, value: i32, target: u32 },
+
+    /// `dst = callee(args)` with `this` = `this`; arguments in
+    /// `args .. args + argc`.
+    Call {
+        dst: Reg,
+        callee: Reg,
+        this: Reg,
+        args: Reg,
+        argc: u16,
+    },
+    /// `dst = new callee(args)`
+    New {
+        dst: Reg,
+        callee: Reg,
+        args: Reg,
+        argc: u16,
+    },
+    /// Return `src` from the function.
+    Return { src: Reg },
+    /// Throw `src`.
+    Throw { src: Reg },
+
+    /// Start a for-in over `src`: `state` holds the object (undefined
+    /// for null and undefined), `state + 1` an array of its enumerable
+    /// string keys, own first and then inherited, and `state + 2` the
+    /// position.
+    ForInStart { state: Reg, src: Reg },
+    /// `dst = the next key that is still a property`, or jump to `done`
+    /// when exhausted.
+    ForInNext { dst: Reg, state: Reg, done: u32 },
+    /// `iterator, next = GetIterator(src)` (sync). `next` is always the
+    /// register after `iterator`. For an array whose iteration protocol
+    /// is untouched, `iterator` is the array and `next` the position, and
+    /// stepping allocates nothing.
+    GetIterator { iterator: Reg, next: Reg, src: Reg },
+    /// `dst = IteratorStepValue`, or jump to `done` when finished.
+    IteratorStep {
+        dst: Reg,
+        iterator: Reg,
+        next: Reg,
+        done: u32,
+    },
+    /// `IteratorClose` for an early exit, then forget the iterator so a
+    /// second close does nothing. `silent` is the close after a throw:
+    /// errors from `return` are dropped in favor of the original one.
+    IteratorClose { iterator: Reg, silent: bool },
+    /// `dst = callee(...array)` with `this`.
+    CallSpread {
+        dst: Reg,
+        callee: Reg,
+        this: Reg,
+        array: Reg,
+    },
+    /// `dst = new callee(...array)`
+    NewSpread { dst: Reg, callee: Reg, array: Reg },
+    /// `object.[[Prototype]] = value` if value is an object or null
+    /// (`__proto__: value` in a literal).
+    SetPrototype { object: Reg, value: Reg },
+    /// A loop's back edge: poll for cancellation and collection, then
+    /// jump to `target`.
+    Loop { target: u32 },
+    /// No operation (`debugger`).
+    Nop,
+}
+
+/// The `kind` operand of [`Op::DeclareGlobal`].
+pub mod declare {
+    /// `var` or a function declaration: a global object property.
+    pub const VAR: u8 = 0;
+    /// `let` or `class`: a mutable global lexical binding.
+    pub const LET: u8 = 1;
+    /// `const`: an immutable global lexical binding.
+    pub const CONST: u8 = 2;
+}
+
+/// An exception handler: a throw from `start .. end` jumps to `target`
+/// with the exception in `exception`, after dropping block scopes down to
+/// `scope_depth`.
+#[derive(Clone, Copy, Debug)]
+pub struct Handler {
+    /// First covered op.
+    pub start: u32,
+    /// One past the last covered op.
+    pub end: u32,
+    /// Where to continue.
+    pub target: u32,
+    /// Register receiving the exception.
+    pub exception: Reg,
+    /// Block-scope depth at the `try`.
+    pub scope_depth: u16,
+}
+
+/// What kind of function a template makes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FunctionKind {
+    /// A script's top level.
+    Script,
+    /// `function` declarations and expressions: callable and
+    /// constructible, with their own `this`.
+    Normal,
+    /// Arrow functions: lexical `this`, not constructible.
+    Arrow,
+    /// Object-literal methods, getters and setters: not constructible.
+    Method,
+}
+
+/// A compiled function.
+#[derive(Debug)]
+pub struct FunctionCode {
+    /// Instructions.
+    pub ops: Vec<Op>,
+    /// Constant pool: numbers, strings and atoms (property names and
+    /// binding names, as interned strings).
+    pub constants: Vec<Value>,
+    /// Templates of nested functions.
+    pub functions: Vec<CodeId>,
+    /// Block scopes: the names and flags of their bindings.
+    pub scopes: Vec<Box<[(StringId, u8)]>>,
+    /// Exception handlers, innermost first.
+    pub handlers: Vec<Handler>,
+    /// Registers per frame, parameters first.
+    pub registers: u16,
+    /// Declared parameters before any rest parameter (the `length`
+    /// counts only those before the first default).
+    pub params: u16,
+    /// The function's `length`.
+    pub length: u16,
+    /// The function's `name`, as an atom.
+    pub name: StringId,
+    /// Strict mode code.
+    pub strict: bool,
+    /// What kind of function this is.
+    pub kind: FunctionKind,
+    /// Named property access sites with their inline caches.
+    pub sites: Box<[NamedSite]>,
+}
+
+/// What an access site remembers about its last lookup.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CacheKind {
+    /// Nothing yet.
+    #[default]
+    Empty,
+    /// An own data property: the value is the receiver's `slot`.
+    Own,
+    /// An inherited data property: the value is slot `slot` of the
+    /// object `other`, found through the receiver's prototype `proto`.
+    Inherited,
+    /// A write that adds the property: the receiver moves to shape
+    /// `other` and the value becomes its slot `slot`. Nothing on the
+    /// chain from `proto` intercepts the write.
+    Add,
+    /// A global lexical binding at position `slot`; never stale.
+    GlobalLexical,
+}
+
+/// The one-entry inline cache of a [`NamedSite`].
+///
+/// An entry is trusted only while `epoch` is the agent's current cache
+/// epoch, which moves on every collection (shape and object ids are
+/// reused), on every change to a prototype object and on every new global
+/// lexical binding, and only for a receiver with the same `shape` and,
+/// where the chain matters, the same prototype.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SiteCache {
+    /// What the entry says.
+    pub kind: CacheKind,
+    /// The cache epoch the entry was written in.
+    pub epoch: u32,
+    /// The receiver's shape.
+    pub shape: u32,
+    /// The slot to read or write.
+    pub slot: u32,
+    /// The holder object or the new shape (see [`CacheKind`]).
+    pub other: u32,
+    /// The receiver's prototype, as stored in the object.
+    pub proto: u32,
+}
+
+/// One `object.name` access site and its one-entry inline cache.
+#[derive(Debug)]
+pub struct NamedSite {
+    /// The property name (an atom).
+    pub name: StringId,
+    /// The site's cache.
+    pub cache: Cell<SiteCache>,
+}
+
+impl FunctionCode {
+    /// Bytes this function's code, constants, tables and caches are
+    /// charged for (nested functions are charged on their own).
+    pub fn code_bytes(&self) -> usize {
+        std::mem::size_of::<Self>()
+            + self.ops.len() * std::mem::size_of::<Op>()
+            + self.constants.len() * 8
+            + self.functions.len() * 4
+            + self.scopes.iter().map(|s| 16 + s.len() * 8).sum::<usize>()
+            + self.handlers.len() * std::mem::size_of::<Handler>()
+            + self.sites.len() * std::mem::size_of::<NamedSite>()
+    }
+
+    /// Report every heap reference the code holds. Shapes remembered by
+    /// inline caches are not references: a cache entry is only trusted in
+    /// the collection epoch that wrote it.
+    pub(crate) fn trace(&self, tracer: &mut impl crate::runtime::Tracer) {
+        for &v in &self.constants {
+            tracer.value(v);
+        }
+        for &f in &self.functions {
+            tracer.code(f);
+        }
+        for scope in &self.scopes {
+            for &(name, _) in scope.iter() {
+                tracer.string(name);
+            }
+        }
+        tracer.string(self.name);
+        for site in self.sites.iter() {
+            tracer.string(site.name);
+        }
+    }
+}

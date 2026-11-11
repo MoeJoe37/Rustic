@@ -24,7 +24,11 @@ fn baseline(agent: &mut Agent) -> usize {
 }
 
 fn holding(values: &[Value]) -> Roots<'_> {
-    Roots { values, envs: &[] }
+    Roots {
+        values,
+        envs: &[],
+        codes: &[],
+    }
 }
 
 #[test]
@@ -135,6 +139,7 @@ fn deep_chains_mark_without_recursion() {
     let stats = a.collect_garbage(Roots {
         values: &[Value::object(proto)],
         envs: &[env],
+        codes: &[],
     });
     assert_eq!(stats.objects_freed, 0);
     assert_eq!(stats.envs_freed, 0);
@@ -148,7 +153,8 @@ fn deep_chains_mark_without_recursion() {
     }
     assert_eq!(walk, bottom);
     let stats = a.collect_garbage(Roots::default());
-    assert_eq!(stats.envs_freed, envs);
+    // Everything but the realm's own global environment.
+    assert_eq!(stats.envs_freed, envs - 1);
     assert_eq!(stats.objects_freed, 200_001);
 }
 
@@ -177,6 +183,7 @@ fn environments_keep_their_bindings_outer_scopes_and_objects() {
     let stats = a.collect_garbage(Roots {
         values: &[],
         envs: &[with],
+        codes: &[],
     });
     assert_eq!(stats.envs_freed, 1);
     assert_eq!(a.heap.string_count(), strings - 1);

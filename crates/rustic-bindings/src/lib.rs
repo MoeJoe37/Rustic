@@ -24,7 +24,7 @@
 //!
 //! // Script holds the wrapper, so the detached element survives.
 //! let held = [Value::object(wrapper)];
-//! dom.collect(&mut agent, &mut document, Roots { values: &held, envs: &[] }).unwrap();
+//! dom.collect(&mut agent, &mut document, Roots { values: &held, envs: &[], codes: &[] }).unwrap();
 //! assert!(document.node(div).is_ok());
 //!
 //! // Nothing holds it any more.

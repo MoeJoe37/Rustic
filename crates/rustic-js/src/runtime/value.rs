@@ -123,6 +123,7 @@ impl Value {
     pub const NAN: Value = Value(CANONICAL_NAN);
 
     /// A Number; every NaN becomes the canonical NaN.
+    #[inline]
     pub fn number(n: f64) -> Value {
         if n.is_nan() {
             Value::NAN
@@ -132,6 +133,7 @@ impl Value {
     }
 
     /// A Boolean.
+    #[inline]
     pub fn boolean(b: bool) -> Value {
         if b { Value::TRUE } else { Value::FALSE }
     }
@@ -192,26 +194,36 @@ impl Value {
     }
 
     /// The Number, if this is one.
+    #[inline]
     pub fn as_number(self) -> Option<f64> {
-        match self.kind() {
-            Kind::Number(n) => Some(n),
-            _ => None,
+        // Every tag sorts above every Number's bits (the canonical NaN
+        // included), so one comparison decides.
+        if self.0 < TAG_UNDEFINED << TAG_SHIFT {
+            Some(f64::from_bits(self.0))
+        } else {
+            None
         }
     }
 
     /// The object, if this is one.
+    #[inline]
     pub fn as_object(self) -> Option<ObjectId> {
-        match self.kind() {
-            Kind::Object(o) => Some(o),
-            _ => None,
+        if self.0 >> TAG_SHIFT == TAG_OBJECT {
+            // The payload is the low 32 bits.
+            Some(ObjectId(self.0 as u32))
+        } else {
+            None
         }
     }
 
     /// The string, if this is one.
+    #[inline]
     pub fn as_string(self) -> Option<StringId> {
-        match self.kind() {
-            Kind::String(s) => Some(s),
-            _ => None,
+        if self.0 >> TAG_SHIFT == TAG_STRING {
+            // The payload is the low 32 bits.
+            Some(StringId(self.0 as u32))
+        } else {
+            None
         }
     }
 

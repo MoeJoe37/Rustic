@@ -124,10 +124,18 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
 | TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
 | TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and other numeric conversions are missing | Open, JS-05/JS-08 |
-| TD-93 | Watch | JS | Environment bindings are found by a linear name search | Open, JS-04 |
+| TD-93 | Watch | JS | Environment bindings are found by a linear name search | Paid |
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
+| TD-97 | Deliberate | JS | Classes, `super`, private names, generators, async functions, modules, RegExp literals, tagged templates and optional calls are rejected by the bytecode compiler | Open, JS-04/JS-06/JS-08 |
+| TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Open, JS-04 |
+| TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
+| TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Open, JS-05 |
+| TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Open, JS-09 |
+| TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
+| TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
+| TD-104 | Watch | JS | Shape lookups walk the transition chain, and each environment stores its own name list | Open, JS-09 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1311,17 +1319,20 @@ BigInts and Numbers exactly, which is what equality, `<` and `ToString` need.
 other than 10 are not implemented. Callers get no silent wrong answers:
 the operations simply do not exist yet.
 
+The interpreter (JS-04) throws a `TypeError` for arithmetic on BigInt values
+and rejects BigInt literals at compile time (TD-97).
+
 Pay with the Number built-ins (JS-05) and the BigInt work of JS-08.
 
-### TD-93 — Bindings are found by name search
+### TD-93 — Bindings are found by name search (Paid)
 
-A declarative environment record finds a binding by a linear search over its
-interned names. This is exact and compact (12 bytes per binding), but costs
-time per lookup in large scopes.
+A declarative environment record found a binding by a linear search over its
+interned names.
 
-Watch for: JS-04's bytecode compiler should resolve most bindings to slot
-indices at compile time, leaving name search only for `eval` and `with`.
-Pay there if profiles show scope lookup cost.
+Paid by JS-04: the compiler resolves every binding to a register or an
+environment slot index. Names are searched only for globals (behind a
+per-site cache) and inside `with`. The name lists that remain in each
+environment are TD-104.
 
 ### TD-94 — Collection only at caller safe points
 
@@ -1353,3 +1364,86 @@ references, weak maps and sets with ephemeron marking and finalization
 registries in `runtime/weak.rs`; host objects and `HostTracer`; and
 `rustic-bindings::DomHeap`, which replaced the DOC-09 `HostHeap`. One document
 per heap remains (TD-17).
+
+### TD-97 — Syntax the bytecode compiler rejects
+
+JS-04's first part compiles functions, closures, control flow, destructuring,
+iteration and exceptions. Classes, `super`, private names, generators, async
+functions and `for await`, modules, regular expression literals, tagged
+templates, optional calls (`f?.()`) and BigInt literals return
+`CompileError::Unsupported` with a span before any code runs, so a script
+either runs with correct semantics or not at all. There is no `eval`.
+
+Pay classes, `super`, private names, tagged templates and optional calls in
+the second part of JS-04; modules with JS-06; generators, async functions,
+RegExp and BigInt with JS-08. Trigger: the Test262 runner (JS-07) needs
+classes for much of its harness.
+
+### TD-98 — Eager function prototypes
+
+`new_closure` creates the `prototype` object (80 bytes with its `constructor`
+slot) for every non-arrow, non-method function, although most functions are
+never used as constructors. A closure therefore costs 200 bytes where about
+120 would do.
+
+Pay in JS-04: materialize `prototype` on first access (own-property lookup,
+key enumeration, `new`), with the `js-run` differential guarding the caches.
+Trigger: now; this is the largest known per-value overhead.
+
+### TD-99 — Arguments objects and Annex B functions in blocks
+
+`arguments` is created unmapped in sloppy functions too (writing a parameter
+does not change `arguments[i]`), and it is an ordinary object without the
+arguments class. Function declarations in blocks follow the strict rules
+only; the Annex B hoisting to the function scope is missing.
+
+Pay with the exotic objects of JS-05. Trigger: a Test262 selection or real
+script that depends on either.
+
+### TD-100 — Destructuring does not close iterators on error
+
+`for-of` closes its iterator on `break`, `return` and throw. Array
+destructuring (`[a, b] = iterable`) closes it after a normal finish, but not
+when evaluating a target or default throws midway.
+
+Pay with JS-05's iterator helpers. Trigger: generators (JS-08) make the
+missing `return()` call observable in common code.
+
+### TD-101 — Strings concatenate by copying
+
+`a + b` allocates a new flat string. A loop that appends to one string copies
+it every time, which is quadratic in the final length.
+
+Watch for: JS-09's benchmark corpus. Pay with ropes or an append buffer for
+the single-owner case if a workload shows it.
+
+### TD-102 — Interpreter stacks are outside the heap budget
+
+The value stack (at most 2²⁰ values, 8 MiB), the frame stack (at most 10,000
+frames) and the AST of the script being compiled are bounded by their own
+limits but not charged to the agent's byte budget, so an agent's real
+footprint can exceed its limit by those bounds.
+
+Watch for: JS-09's heap report. Pay by charging stack growth to the budget
+when the report needs one number per agent.
+
+### TD-103 — One cache entry per site, one epoch for all
+
+A property site remembers a single shape, so a site that sees two shapes in
+turn misses every time. All entries share one epoch: any write to an object
+used as a prototype, any collection and any new global lexical binding
+invalidate every cache in the agent.
+
+Watch for: JS-09 profiles showing miss or flush cost. Pay with a second entry
+per site or per-shape validity cells.
+
+### TD-104 — Shape lookup and environment names are linear
+
+Finding a property in a shape walks its transition chain (at most 32 steps
+before dictionary mode), and each environment record carries its own list of
+names although the compiler addresses slots by index. Inline caches hide the
+first cost on hot paths; the second is memory per closure environment.
+
+Watch for: JS-09's heap report and miss-path profiles. Pay with a per-shape
+lookup table and by dropping names from compiled scopes that `with` and
+debugging do not need.

@@ -6,8 +6,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::agent::NativeFn;
+use super::env::EnvId;
 use super::shape::{Attributes, PropertyKey, ROOT_SHAPE, ShapeId};
 use super::value::{ObjectId, Value};
+use crate::vm::bytecode::CodeId;
 
 /// What kind of object this is, for exotic behavior and brand checks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -236,9 +238,42 @@ pub(crate) struct RegistryCell {
     pub token: Value,
 }
 
+/// A function compiled from source: its code and what it closed over.
+/// Closures live in their own arena, 24 bytes each, and the function
+/// object names its closure through the `length` field; boxing them into
+/// `Extra` would cost every function several times that.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Closure {
+    /// The compiled function.
+    pub code: CodeId,
+    /// `[[Environment]]`: the scope the function was created in.
+    pub env: EnvId,
+    /// An arrow function's `this`, captured where it was created;
+    /// `UNINITIALIZED` for every other function.
+    pub this: Value,
+    /// `[[HomeObject]]`, or undefined.
+    pub home: Value,
+}
+
+/// What a built-in iterator walks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum IteratorKind {
+    /// The elements of an array-like, by index.
+    Array,
+    /// The code points of a string.
+    String,
+}
+
 /// Internal slots the collector treats specially.
 #[derive(Clone, Debug)]
 pub(crate) enum Internal {
+    /// A built-in iterator: what it walks and the next position.
+    /// `target` is undefined once the iterator is exhausted.
+    Iterator {
+        target: Value,
+        index: u32,
+        kind: IteratorKind,
+    },
     /// A host object's embedder data.
     Host(u64),
     /// `[[WeakRefTarget]]`; `UNINITIALIZED` once the target is collected.
@@ -257,6 +292,12 @@ pub(crate) enum Internal {
 /// The `length` of an Array is writable (cleared by freezing).
 pub(crate) const FLAG_EXTENSIBLE: u8 = 1;
 pub(crate) const FLAG_ARRAY_LENGTH_WRITABLE: u8 = 2;
+/// Some object has (or had) this one as its prototype. Changing its named
+/// properties can change what other objects inherit, so it invalidates
+/// the interpreter's inline caches.
+pub(crate) const FLAG_PROTOTYPE: u8 = 8;
+/// A function compiled from source; `length` indexes the closure arena.
+pub(crate) const FLAG_CLOSURE: u8 = 4;
 
 const NO_PROTOTYPE: u32 = u32::MAX;
 
@@ -265,7 +306,8 @@ const NO_PROTOTYPE: u32 = u32::MAX;
 pub struct Object {
     pub(crate) shape: ShapeId,
     proto: u32,
-    /// Array `length` (arrays only).
+    /// Array `length` for arrays; the closure index for functions
+    /// compiled from source (`FLAG_CLOSURE`).
     pub(crate) length: u32,
     pub(crate) class: Class,
     pub(crate) flags: u8,
@@ -294,6 +336,12 @@ impl Object {
     }
 
     /// `[[Prototype]]`.
+    /// `[[Prototype]]` as stored: the object's index, or a marker for
+    /// none. Inline caches compare it without decoding.
+    pub(crate) fn proto_raw(&self) -> u32 {
+        self.proto
+    }
+
     pub(crate) fn proto(&self) -> Option<ObjectId> {
         (self.proto != NO_PROTOTYPE).then_some(ObjectId(self.proto))
     }
@@ -333,6 +381,12 @@ impl Object {
 
     pub(crate) fn native(&self) -> Option<NativeFn> {
         self.extra.as_ref()?.native
+    }
+
+    /// The index of this function's [`Closure`], when it was compiled
+    /// from source.
+    pub(crate) fn closure_index(&self) -> Option<u32> {
+        self.has_flag(FLAG_CLOSURE).then_some(self.length)
     }
 
     pub(crate) fn internal(&self) -> Option<&Internal> {

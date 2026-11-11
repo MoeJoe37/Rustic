@@ -20,11 +20,12 @@
 use super::agent::Agent;
 use super::env::EnvId;
 use super::heap::{ATOM_BYTES, Heap, OutOfMemory, Symbol};
-use super::object::{Internal, Object};
+use super::object::{Closure, Internal, Object};
 use super::shape::{PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
 use super::value::{Kind, StringId, Value};
 use crate::runtime::bigint::BigInt;
+use crate::vm::bytecode::CodeId;
 
 /// One bit per arena index.
 #[derive(Clone, Debug, Default)]
@@ -65,6 +66,7 @@ pub(crate) trait Tracer {
     fn value(&mut self, value: Value);
     fn string(&mut self, id: StringId);
     fn env(&mut self, id: EnvId);
+    fn code(&mut self, id: CodeId);
 
     fn env_opt(&mut self, id: Option<EnvId>) {
         if let Some(id) = id {
@@ -90,6 +92,8 @@ pub struct Roots<'a> {
     /// Environments on the caller's stack (running scopes, the realm's
     /// global environment).
     pub envs: &'a [EnvId],
+    /// Compiled functions the caller holds (code about to run).
+    pub codes: &'a [CodeId],
 }
 
 /// A value the host keeps alive across collections. The generation makes
@@ -136,6 +140,8 @@ pub struct GcStats {
     pub envs_freed: usize,
     /// Shapes freed.
     pub shapes_freed: usize,
+    /// Compiled functions freed.
+    pub codes_freed: usize,
 }
 
 /// The smallest heap growth between collections: below this, collecting
@@ -162,6 +168,8 @@ struct Marks {
     objects: BitSet,
     envs: BitSet,
     shapes: BitSet,
+    codes: BitSet,
+    closures: BitSet,
 }
 
 impl Marks {
@@ -201,6 +209,7 @@ impl HostTracer for NoHost {
 enum Gray {
     Object(u32),
     Env(u32),
+    Code(u32),
 }
 
 struct Marker<'h> {
@@ -258,6 +267,12 @@ impl Tracer for Marker<'_> {
             self.work.push(Gray::Env(id.0));
         }
     }
+
+    fn code(&mut self, id: CodeId) {
+        if self.marks.codes.insert(id.0) {
+            self.work.push(Gray::Code(id.0));
+        }
+    }
 }
 
 impl Marker<'_> {
@@ -272,6 +287,7 @@ impl Marker<'_> {
                 match gray {
                     Gray::Object(index) => self.trace_object(index, heap.objects.get(index)),
                     Gray::Env(index) => heap.envs.get(index).trace(self),
+                    Gray::Code(index) => heap.codes.get(index).trace(self),
                 }
             }
             while let Some(data) = self.hosts.pop() {
@@ -299,6 +315,14 @@ impl Marker<'_> {
     }
 
     fn trace_object(&mut self, index: u32, object: &Object) {
+        if let Some(closure) = object.closure_index() {
+            self.marks.closures.insert(closure);
+            let closure = *self.heap.closures.get(closure);
+            self.code(closure.code);
+            self.env(closure.env);
+            self.value(closure.this);
+            self.value(closure.home);
+        }
         if let Some(proto) = object.proto() {
             self.value(Value::object(proto));
         }
@@ -333,6 +357,7 @@ impl Marker<'_> {
             match &extra.internal {
                 None => {}
                 Some(Internal::Host(data)) => self.hosts.push(*data),
+                Some(Internal::Iterator { target, .. }) => self.value(*target),
                 // The target is weak: cleared after marking if nothing
                 // else reaches it.
                 Some(Internal::WeakRef(_)) => self.weak_refs.push(index),
@@ -395,7 +420,9 @@ fn live_footprint(heap: &Heap) -> usize {
     let envs: usize = heap.envs.iter().map(|(_, e)| e.footprint()).sum();
     let shapes = (heap.shapes.len() - 1) * 64;
     let roots = heap.roots.live * HOST_ROOT_BYTES;
-    strings + atoms + symbols + bigints + objects + envs + shapes + roots
+    let codes: usize = heap.codes.iter().map(|(_, c)| c.code_bytes()).sum();
+    let closures = heap.closures.live() * std::mem::size_of::<Closure>();
+    strings + atoms + symbols + bigints + objects + envs + shapes + roots + codes + closures
 }
 
 /// Rebuild the atom table without freed strings. Chains keep their order,
@@ -403,6 +430,7 @@ fn live_footprint(heap: &Heap) -> usize {
 fn sweep_atoms(heap: &mut Heap, marks: &BitSet) {
     let heads = std::mem::take(&mut heap.atoms);
     let mut next = std::mem::take(&mut heap.atom_next);
+    let mut interned = BitSet::with_capacity(heap.strings.extent());
     for (hash, head) in heads {
         let mut last: Option<StringId> = None;
         let mut current = Some(head);
@@ -411,6 +439,7 @@ fn sweep_atoms(heap: &mut Heap, marks: &BitSet) {
             if !marks.get(id.0) {
                 continue;
             }
+            interned.insert(id.0);
             match last {
                 None => heap.atoms.insert(hash, id),
                 Some(prev) => heap.atom_next.insert(prev, id),
@@ -418,6 +447,7 @@ fn sweep_atoms(heap: &mut Heap, marks: &BitSet) {
             last = Some(id);
         }
     }
+    heap.interned = interned;
     heap.atoms.shrink_to_fit();
     heap.atom_next.shrink_to_fit();
 }
@@ -451,6 +481,8 @@ impl Agent {
                 objects: BitSet::with_capacity(heap.objects.extent()),
                 envs: BitSet::with_capacity(heap.envs.extent()),
                 shapes: BitSet::with_capacity(heap.shapes.extent()),
+                codes: BitSet::with_capacity(heap.codes.extent()),
+                closures: BitSet::with_capacity(heap.closures.extent()),
             },
             work: Vec::new(),
             keys: Vec::new(),
@@ -479,6 +511,11 @@ impl Agent {
         for &env in roots.envs {
             marker.env(env);
         }
+        for &code in roots.codes {
+            marker.code(code);
+        }
+        marker.env(self.global_env);
+        self.vm.trace(&mut marker);
         host.roots(&mut |value| marker.value(value));
         marker.drain(host);
         let Marker {
@@ -539,7 +576,9 @@ impl Agent {
             bigints_freed: heap.bigints.sweep(&marks.bigints),
             envs_freed: heap.envs.sweep(&marks.envs),
             shapes_freed: heap.shapes.sweep(&marks.shapes),
+            codes_freed: heap.codes.sweep(&marks.codes),
         };
+        heap.closures.sweep(&marks.closures);
         sweep_atoms(heap, &marks.strings);
         let live = live_footprint(heap);
         // Charges between collections are estimates of the same costs, so

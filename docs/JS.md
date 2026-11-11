@@ -1,4 +1,4 @@
-# JavaScript engine (JS-01 to JS-03)
+# JavaScript engine (JS-01 to JS-04)
 
 `rustic-js` is Rustic's own ECMAScript implementation (M4, ADR 0001: no
 existing JavaScript engine is used or embedded). JS-01 provides the front end:
@@ -6,7 +6,9 @@ UTF-16 source text, the lexical grammar, and a parser from scripts and modules
 to an abstract syntax tree with source spans. JS-02 adds the runtime data
 model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
 garbage collector (see [Garbage collection](#garbage-collection-js-03)).
-Nothing executes yet; the interpreter is JS-04.
+JS-04 compiles scripts to bytecode and runs them (see
+[Bytecode and interpreter](#bytecode-and-interpreter-js-04)); classes,
+generators, async functions, modules and regular expressions do not run yet.
 
 ## API
 
@@ -103,7 +105,8 @@ JS-07. Parse-phase results must not be advertised as ECMAScript support.
 
 The `js-parse` target of `rustic-fuzz` parses every input as a script, a
 module and a strict script (the `js-heap` target is described under
-[Garbage collection](#garbage-collection-js-03)). It checks that nothing panics or overflows the
+[Garbage collection](#garbage-collection-js-03) and `js-run` under
+[Bytecode and interpreter](#bytecode-and-interpreter-js-04)). It checks that nothing panics or overflows the
 stack, that syntax error spans lie inside the source, that a successful parse
 dumps deterministically, and that anything valid in strict mode is valid in
 sloppy mode. Seeds are one snippet per line of
@@ -209,3 +212,77 @@ references, ephemeron chains, registries and host tracing. The `js-heap` fuzz
 target checks random allocate/mutate/link/root/collect sequences against a
 shadow model. Collection is not incremental (TD-95) and native functions
 cannot collect mid-run (TD-94).
+
+## Bytecode and interpreter (JS-04)
+
+`Agent::evaluate(source)` parses, compiles and runs a script and returns its
+completion value or an `EvalError` (`Parse`, `Compile`, `Throw`,
+`OutOfMemory`, `Cancelled`, `SourceTooLong`). `Agent::compile_script` and
+`Agent::run_script` do the two halves separately, and `Agent::call_from_host`
+calls a function value. The design is recorded in
+[ADR 0017](adr/0017-js-bytecode-interpreter.md).
+
+- **Compiler** (`vm/scope.rs`, `vm/compile.rs`). A scope pass resolves every
+  identifier before code is emitted: a binding that no inner function captures
+  is a register, and a captured one is a numbered slot of a heap environment.
+  Only globals and names inside `with` are looked up by name. Code is
+  register bytecode with 12-byte instructions, stored once per function in a
+  collected arena.
+- **Supported syntax.** `var`/`let`/`const` with temporal dead zones, all
+  operators including `**`, `??`, `?.` on members and logical assignment,
+  destructuring with defaults and rests, template literals, object literals
+  with getters, setters, methods, computed keys, spread and `__proto__`,
+  arrays with holes and spread, functions with defaults and rest parameters,
+  arrow functions, closures, `new` and `new.target`, `this` rules for strict
+  and sloppy code, `arguments`, `if`/`switch`/loops/labels, `for-in`,
+  `for-of` with iterator closing, `try`/`catch`/`finally`, `with`, `delete`,
+  `typeof`, `in` and `instanceof`.
+- **Not yet compiled** (rejected with `CompileError::Unsupported` before
+  anything runs, TD-97): classes, `super`, private names, generators, async
+  functions, modules, regular expression literals, tagged templates, optional
+  calls, and BigInt literals. BigInt arithmetic throws a `TypeError`
+  (TD-92).
+- **Calls** never recurse in Rust between script functions: frames and
+  registers live on vectors in the agent. `VmLimits` bounds frames (10,000),
+  stack values (2²⁰, 8 bytes each) and script nested through native code
+  (96 levels and 1 MiB of Rust stack). Exceeding a limit throws a `RangeError`
+  that script can catch.
+- **Safe points** are loop back edges and calls. They poll the
+  `CancellationToken` set with `Agent::set_cancellation`, count down
+  `Agent::set_step_budget` (a deterministic limit for tests and fuzzing), and
+  collect garbage when the heap asks. Cancellation and out-of-memory cannot
+  be caught by script.
+- **Inline caches.** Each `o.name` and global site remembers one shape: an
+  own slot, a slot on a prototype, or a property add with its shape
+  transition. Any change to an object used as a prototype, any collection and
+  any new global lexical binding start a new epoch that invalidates all
+  entries, so hits need no chain walk. `Agent::set_inline_caches(false)`
+  turns them off for differential tests.
+- **Iteration.** `for-of` over an array, while the array iterator's `next` is
+  untouched, reads elements directly and allocates no result objects. The
+  built-ins installed so far are only the ones the language needs: array and
+  string iterators. Everything else is JS-05.
+
+Memory per value on a 64-bit build: an object with two properties is 88
+bytes; a closure is 200 bytes because every `function` gets its `prototype`
+object eagerly (TD-98); arrow functions and methods have none. Compiled code
+is shared by all closures of a function.
+
+Time on the development machine (x86-64, release build, best of five,
+`cargo run --release -p rustic-js --example js_run -- file.js`). These are
+first measurements, not a gate; JS-09 adds the benchmark corpus.
+
+| Script | Time |
+| --- | --- |
+| `fib(30)` (1.3 million calls) | 175 ms |
+| 10 million iterations of integer arithmetic in a function | 249 ms |
+| The same loop on global variables | 551 ms |
+| 2 million `new P(i, i + 1)` with two property reads each | 335 ms |
+| 5 million array elements summed with `for-of` after 1 million indexed writes | 151 ms |
+| 3 million calls of a counter closure | 240 ms |
+
+The `js-run` fuzz target runs each input three ways (caches on, caches off,
+and collecting at every safe point) with a 2 MiB heap and a step budget, and
+requires the same outcome each time and a usable agent afterwards. Its first
+runs found a loop that could not be cancelled and a function that ran off the
+end of its code; both are fixed and kept as seeds or regressions.

@@ -51,6 +51,7 @@ impl World {
                 Roots {
                     values: &values,
                     envs: &[],
+                    codes: &[],
                 },
             )
             .unwrap();
@@ -228,6 +229,7 @@ fn engine_destroyed_nodes_leave_no_dangling_edges_or_wrappers() {
             Roots {
                 values: &values,
                 envs: &[],
+                codes: &[],
             },
         )
         .unwrap();

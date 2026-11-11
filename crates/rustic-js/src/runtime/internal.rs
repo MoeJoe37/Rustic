@@ -173,6 +173,7 @@ impl Agent {
         if let PropertyKey::Index(i) = key {
             return self.store_element(o, i, stored);
         }
+        self.heap.note_named_change(o);
         if self.heap.object(o).dictionary().is_none() {
             let shape = self.heap.object(o).shape;
             match self.heap.shapes.lookup(shape, key) {
@@ -256,6 +257,7 @@ impl Agent {
             }
             return;
         }
+        self.heap.note_named_change(o);
         if self.heap.object(o).dictionary().is_none() {
             let shape = self.heap.object(o).shape;
             if let Some(parent) = self.heap.shapes.remove_last(shape, key) {
@@ -300,6 +302,14 @@ impl Agent {
                 return false;
             }
             p = self.heap.object(candidate).proto();
+        }
+        // Whatever was cached about this object's chain, or about chains
+        // through it, no longer holds.
+        self.heap.proto_epoch = self.heap.proto_epoch.wrapping_add(1);
+        if let Some(p) = proto {
+            self.heap
+                .object_mut(p)
+                .set_flag(super::object::FLAG_PROTOTYPE, true);
         }
         self.heap.object_mut(o).set_proto(proto);
         true
@@ -554,6 +564,7 @@ impl Agent {
                 Some(Location::Slot(slot, attributes))
                     if attributes.has(Attributes::WRITABLE) && !attributes.is_accessor() =>
                 {
+                    self.heap.note_named_change(o);
                     self.heap.object_mut(o).slots[slot as usize] = value;
                     return Ok(true);
                 }

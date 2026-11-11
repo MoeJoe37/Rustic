@@ -756,3 +756,114 @@ impl Environment {
         }
     }
 }
+
+// ---- slot access for compiled code (JS-04) -----------------------------
+
+/// Binding flags a compiled scope declares.
+pub(crate) const BINDING_MUTABLE: u8 = MUTABLE;
+/// Assignment to this immutable binding throws even in sloppy code.
+pub(crate) const BINDING_STRICT: u8 = STRICT;
+
+impl Agent {
+    /// A declarative environment holding `names` in order, every binding
+    /// starting as `initial` (`UNINITIALIZED` for the temporal dead zone).
+    /// Compiled code then reads and writes them by slot.
+    pub(crate) fn new_scope_environment(
+        &mut self,
+        outer: Option<EnvId>,
+        names: &[(StringId, u8)],
+        initial: Value,
+    ) -> JsResult<EnvId> {
+        self.heap.charge(16 * names.len())?;
+        let record = Declarative {
+            names: names.to_vec(),
+            values: vec![initial; names.len()],
+        };
+        Ok(self
+            .heap
+            .alloc_env(Environment::Declarative { outer, record })?)
+    }
+
+    /// A copy of a scope environment with the same outer environment and
+    /// current values: the per-iteration bindings of a `for (let ...)`
+    /// loop (`CreatePerIterationEnvironment`).
+    pub(crate) fn copy_scope_environment(&mut self, env: EnvId) -> JsResult<EnvId> {
+        let copy = self.heap.env(env).clone();
+        if let Some(record) = copy.declarative() {
+            self.heap.charge(16 * record.names.len())?;
+        }
+        Ok(self.heap.alloc_env(copy)?)
+    }
+
+    /// The environment `hops` steps out from `env`.
+    pub(crate) fn env_outer_n(&self, mut env: EnvId, hops: u16) -> EnvId {
+        for _ in 0..hops {
+            env = self
+                .heap
+                .env(env)
+                .outer()
+                .expect("compiled scope depth matches the environment chain");
+        }
+        env
+    }
+
+    /// The value in a compiled scope's slot (`UNINITIALIZED` in the TDZ).
+    pub(crate) fn env_slot(&self, env: EnvId, slot: u16) -> Value {
+        self.heap
+            .env(env)
+            .declarative()
+            .expect("compiled scopes are declarative")
+            .values[slot as usize]
+    }
+
+    /// The name and flags of a compiled scope's slot.
+    pub(crate) fn env_slot_binding(&self, env: EnvId, slot: u16) -> (StringId, u8) {
+        self.heap
+            .env(env)
+            .declarative()
+            .expect("compiled scopes are declarative")
+            .names[slot as usize]
+    }
+
+    /// The position of `name` in the global environment's lexical record
+    /// (`let`, `const` and `class` at the top of a script). Positions are
+    /// stable: global lexical bindings are never removed.
+    pub(crate) fn global_lexical_slot(&self, name: StringId) -> Option<u32> {
+        match self.heap.env(self.global_env) {
+            Environment::Global { record, .. } => record.find(name).map(|i| i as u32),
+            _ => None,
+        }
+    }
+
+    /// The value and flags of a global lexical binding.
+    pub(crate) fn global_lexical(&self, slot: u32) -> (Value, u8) {
+        match self.heap.env(self.global_env) {
+            Environment::Global { record, .. } => {
+                (record.values[slot as usize], record.names[slot as usize].1)
+            }
+            _ => (Value::UNDEFINED, 0),
+        }
+    }
+
+    /// Store into a global lexical binding without checks.
+    pub(crate) fn set_global_lexical(&mut self, slot: u32, value: Value) {
+        if let Environment::Global { record, .. } = self.heap.env_mut(self.global_env) {
+            record.values[slot as usize] = value;
+        }
+    }
+
+    /// A ReferenceError for reading `name` in its temporal dead zone.
+    pub(crate) fn tdz_error(&mut self, name: StringId) -> super::agent::Abrupt {
+        self.reference_error_for(name, "cannot be accessed before initialization")
+    }
+
+    /// A ReferenceError for a name nothing declares.
+    pub(crate) fn not_defined_error(&mut self, name: StringId) -> super::agent::Abrupt {
+        self.reference_error_for(name, "is not defined")
+    }
+
+    /// Store into a compiled scope's slot without checks.
+    pub(crate) fn set_env_slot(&mut self, env: EnvId, slot: u16, value: Value) {
+        self.declarative_mut(env).values[slot as usize] = value;
+    }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "rustic-js"
-description = "Rustic's original ECMAScript implementation: source text, lexer and parser (M4)"
+description = "Rustic's original ECMAScript implementation: parser, collected heap and bytecode interpreter (M4)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -2834,16 +2834,200 @@
           "label": "Original interpreter/bytecode and control flow",
           "size": 8,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Scope resolution to registers and environment slots, register bytecode in a collected arena",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "pub(crate) fn compile_script"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn variables_and_scopes"
+                }
+              ]
+            },
+            {
+              "label": "Operators, control flow, labels, switch, with, destructuring and template literals",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn dispatch"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn control_flow"
+                }
+              ]
+            },
+            {
+              "label": "for-in and for-of with the iteration protocol and iterator closing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins.rs",
+                  "marker": "fn install_iterators"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn iteration_protocol"
+                }
+              ]
+            },
+            {
+              "label": "Inline caches for own, inherited, added and global properties",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn get_named"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn inline_caches_follow_prototype_changes"
+                }
+              ]
+            },
+            {
+              "label": "Safe points: cancellation, step budget and collection while running",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn safepoint"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn cancellation_stops_an_endless_loop"
+                }
+              ]
+            },
+            {
+              "label": "Cached, uncached and collecting runs agree under fuzzing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/js_run.rs",
+                  "marker": "impl Target for JsRunTarget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "Tagged templates, optional calls and regular expression literals",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Generators, async functions and modules on the bytecode",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.functions",
           "label": "Functions, closures, call/construct and exceptions",
           "size": 5,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Function declarations, expressions, arrows, defaults, rest parameters and arguments",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn new_closure"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn functions_and_closures"
+                }
+              ]
+            },
+            {
+              "label": "Call and construct with prototypes, this binding and new.target",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn construct"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn constructors_and_prototypes"
+                }
+              ]
+            },
+            {
+              "label": "try/catch/finally with uncatchable cancellation and out-of-memory",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn unwind"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn exceptions"
+                }
+              ]
+            },
+            {
+              "label": "Frames on agent stacks: bounded recursion without Rust stack growth, host calls and reentrancy",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "pub struct VmLimits"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn recursion_is_bounded_without_the_rust_stack"
+                }
+              ]
+            },
+            {
+              "label": "Classes, super and private names",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Lazy function prototypes and mapped arguments objects",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.builtins",

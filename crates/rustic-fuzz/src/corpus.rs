@@ -52,6 +52,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         "codec-webp" => seeds.extend(crate::images::WEBP.seeds(root)?),
         "js-parse" => seeds.extend(crate::js::seeds(root)?),
         "js-heap" => seeds.extend(crate::js_heap::seeds()),
+        "js-run" => seeds.extend(crate::js_run::seeds(root)?),
         _ => {}
     }
     Ok(seeds)

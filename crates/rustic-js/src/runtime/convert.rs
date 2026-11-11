@@ -205,13 +205,22 @@ impl Agent {
 
     /// `ToPropertyKey`.
     pub fn to_property_key(&mut self, value: Value) -> JsResult<PropertyKey> {
+        if let Some(n) = value.as_number() {
+            // An array index needs no string.
+            let index = n as u32;
+            if f64::from(index) == n && index != u32::MAX && !(n == 0.0 && n.is_sign_negative()) {
+                return Ok(PropertyKey::Index(index));
+            }
+        }
+        if let Some(s) = value.as_string() {
+            return Ok(self.heap.key_for_string(s)?);
+        }
         let key = self.to_primitive(value, Some(PreferredType::String))?;
         if let Kind::Symbol(s) = key.kind() {
             return Ok(PropertyKey::Symbol(s));
         }
         let s = self.to_string(key)?;
-        let contents = self.heap.string(s).clone();
-        Ok(self.heap.key_for(&contents)?)
+        Ok(self.heap.key_for_string(s)?)
     }
 
     /// The value of a property key (`"0"` for index 0).

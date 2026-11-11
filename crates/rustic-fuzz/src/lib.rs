@@ -19,6 +19,7 @@ mod harness;
 mod images;
 mod js;
 mod js_heap;
+mod js_run;
 mod mutate;
 mod paint;
 mod png;

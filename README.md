@@ -32,7 +32,7 @@ tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 35.46%** (33.81% verified complete + 1.65% partial credit) — 54/172 capabilities complete and 4 in progress across 21 subsystems. Current milestone: **M4 ECMAScript runtime**, 25.64% done.
+**Overall engine completion: 36.99%** (33.81% verified complete + 3.18% partial credit) — 54/172 capabilities complete and 6 in progress across 21 subsystems. Current milestone: **M4 ECMAScript runtime**, 40.00% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -123,7 +123,7 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-bindings` | Node wrappers and the shared DOM/JS garbage collection |
 | `rustic-engine` | Viewport configuration |
 | `rustic-cli` | The `rustic` development tool |
-| `rustic-fuzz` | Deterministic mutation fuzzing (19 targets) |
+| `rustic-fuzz` | Deterministic mutation fuzzing (20 targets) |
 
 Future crates in the [architecture](docs/ARCHITECTURE.md) are created only when
 their milestone needs them. All packages are unpublished.

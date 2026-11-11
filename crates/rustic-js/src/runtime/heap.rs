@@ -5,16 +5,18 @@
 
 use std::collections::HashMap;
 use std::hash::{BuildHasher, RandomState};
+use std::rc::Rc;
 
 use rustic_base::Budget;
 
 use super::bigint::BigInt;
 use super::env::{EnvId, Environment};
 use super::gc::{BitSet, HostRoots};
-use super::object::Object;
+use super::object::{Closure, FLAG_PROTOTYPE, Object};
 use super::shape::{PropertyKey, ShapeTable};
 use super::string::JsStr;
 use super::value::{BigIntId, ObjectId, StringId, SymbolId};
+use crate::vm::bytecode::{CodeId, FunctionCode};
 
 /// The heap ran out of its byte budget or of `u32` indices.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -140,12 +142,20 @@ pub struct Heap {
     /// `atom_next`.
     pub(crate) atoms: HashMap<u64, StringId>,
     pub(crate) atom_next: HashMap<StringId, StringId>,
+    /// Which strings are atoms, so a string value that already is one
+    /// becomes a property key without hashing its contents.
+    pub(crate) interned: BitSet,
     hasher: RandomState,
     pub(crate) symbols: Arena<Symbol>,
     pub(crate) bigints: Arena<BigInt>,
     pub(crate) objects: Arena<Object>,
     pub(crate) shapes: ShapeTable,
     pub(crate) envs: Arena<Environment>,
+    pub(crate) closures: Arena<Closure>,
+    /// Compiled functions. The `Rc` lets a running frame read its code
+    /// while the heap is borrowed mutably; liveness is still decided by
+    /// the collector alone.
+    pub(crate) codes: Arena<Rc<FunctionCode>>,
     pub(crate) roots: HostRoots,
     pub(crate) budget: Budget,
     /// Collect once `bytes_used` reaches this (see `gc.rs`).
@@ -153,6 +163,10 @@ pub struct Heap {
     pub(crate) collections: u64,
     /// Ask for a collection at every safe point (GC stress testing).
     pub(crate) gc_stress: bool,
+    /// Bumped whenever a named property of a prototype object changes or
+    /// an object's prototype is replaced: what an inline cache learned
+    /// by walking a prototype chain holds only within one value of this.
+    pub(crate) proto_epoch: u32,
 }
 
 impl Heap {
@@ -162,17 +176,21 @@ impl Heap {
             strings: Arena::default(),
             atoms: HashMap::new(),
             atom_next: HashMap::new(),
+            interned: BitSet::default(),
             hasher: RandomState::new(),
             symbols: Arena::default(),
             bigints: Arena::default(),
             objects: Arena::default(),
             shapes: ShapeTable::default(),
             envs: Arena::default(),
+            closures: Arena::default(),
+            codes: Arena::default(),
             roots: HostRoots::default(),
             budget: Budget::new(limit),
             gc_threshold: super::gc::initial_threshold(limit),
             collections: 0,
             gc_stress: false,
+            proto_epoch: 0,
         }
     }
 
@@ -229,6 +247,7 @@ impl Heap {
         }
         self.charge(ATOM_BYTES)?;
         let id = self.alloc_string(s.clone())?;
+        self.interned.insert(id.0);
         match last {
             None => self.atoms.insert(hash, id),
             Some(last) => self.atom_next.insert(last, id),
@@ -239,6 +258,19 @@ impl Heap {
     /// Intern Rust text.
     pub fn intern_str(&mut self, text: &str) -> Result<StringId, OutOfMemory> {
         self.intern(&JsStr::from_text(text))
+    }
+
+    /// The property key for a string in the heap: an array index or an
+    /// atom. A string that is already an atom is not hashed again.
+    pub fn key_for_string(&mut self, id: StringId) -> Result<PropertyKey, OutOfMemory> {
+        if self.interned.get(id.0) {
+            return Ok(match self.string(id).array_index() {
+                Some(index) => PropertyKey::Index(index),
+                None => PropertyKey::String(id),
+            });
+        }
+        let contents = self.string(id).clone();
+        self.key_for(&contents)
     }
 
     /// The property key for string contents: an array index or an atom.
@@ -283,6 +315,9 @@ impl Heap {
     /// Store a new object.
     pub(crate) fn alloc_object(&mut self, object: Object) -> Result<ObjectId, OutOfMemory> {
         self.charge(std::mem::size_of::<Object>())?;
+        if let Some(proto) = object.proto() {
+            self.objects.get_mut(proto.0).set_flag(FLAG_PROTOTYPE, true);
+        }
         Ok(ObjectId(self.objects.alloc(object)?))
     }
 
@@ -325,6 +360,46 @@ impl Heap {
     /// An environment record, mutably.
     pub(crate) fn env_mut(&mut self, id: EnvId) -> &mut Environment {
         self.envs.get_mut(id.0)
+    }
+
+    /// Note that a named property of `o` is about to change. If `o` is a
+    /// prototype, inherited lookups other objects cached are stale.
+    #[inline]
+    pub(crate) fn note_named_change(&mut self, o: ObjectId) {
+        if self.objects.get(o.0).has_flag(FLAG_PROTOTYPE) {
+            self.proto_epoch = self.proto_epoch.wrapping_add(1);
+        }
+    }
+
+    // ---- compiled code ------------------------------------------------
+
+    /// Store a compiled function.
+    pub(crate) fn alloc_code(&mut self, code: FunctionCode) -> Result<CodeId, OutOfMemory> {
+        self.charge(code.code_bytes())?;
+        Ok(CodeId(self.codes.alloc(Rc::new(code))?))
+    }
+
+    /// The closure of a function object compiled from source.
+    pub(crate) fn closure(&self, f: ObjectId) -> Option<Closure> {
+        self.object(f)
+            .closure_index()
+            .map(|index| *self.closures.get(index))
+    }
+
+    /// The closure of a function object, mutably.
+    pub(crate) fn closure_mut(&mut self, f: ObjectId) -> Option<&mut Closure> {
+        let index = self.object(f).closure_index()?;
+        Some(self.closures.get_mut(index))
+    }
+
+    /// A compiled function.
+    pub(crate) fn code(&self, id: CodeId) -> &Rc<FunctionCode> {
+        self.codes.get(id.0)
+    }
+
+    /// Live compiled functions.
+    pub fn code_count(&self) -> usize {
+        self.codes.live()
     }
 
     /// Live shapes, the root included.

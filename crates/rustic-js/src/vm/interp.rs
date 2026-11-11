@@ -373,18 +373,13 @@ impl Agent {
             PropertyDescriptor::data_with(Value::string(code.name), false, false, true),
         )?;
         if code.kind == FunctionKind::Normal {
-            let prototype = self.new_object()?;
-            let constructor_key = PropertyKey::String(self.names.constructor);
-            self.define_property_or_throw(
-                prototype,
-                constructor_key,
-                PropertyDescriptor::data_with(Value::object(f), true, false, true),
-            )?;
+            // The object itself is created on first use (see
+            // `realize_function_prototype`); most functions never need it.
             let prototype_key = PropertyKey::String(self.names.prototype);
             self.define_property_or_throw(
                 f,
                 prototype_key,
-                PropertyDescriptor::data_with(Value::object(prototype), true, false, false),
+                PropertyDescriptor::data_with(Value::UNINITIALIZED, true, false, false),
             )?;
         }
         Ok(f)
@@ -1435,7 +1430,9 @@ impl Agent {
                 _ => {}
             }
         }
-        if !self.cacheable(o, site.name) {
+        // A function's `prototype` slot can hold a not-yet-created marker
+        // that only the full lookup understands.
+        if !self.cacheable(o, site.name) || site.name == self.names.prototype {
             return self.get(o, key);
         }
         let (shape, proto) = (receiver.shape.0, receiver.proto_raw());

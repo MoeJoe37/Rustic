@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "5b7db3550bd390498a40600973c0d1da885e0dd37127946a193c2eb89edb7b1a",
-  "percent": "23.51",
+  "source_fingerprint": "deac3f3fb23cc30ae5371b6a6a5b0b5746ad13955e214a4c09c50d92607de709",
+  "percent": "23.54",
   "verified_percent": "20.90",
-  "partial_percent": "2.61",
+  "partial_percent": "2.64",
   "completed": 54,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "40.00",
+      "percent": "40.36",
       "verified_percent": "12.30",
-      "partial_percent": "27.70"
+      "partial_percent": "28.06"
     },
     {
       "id": "M5",
@@ -3387,12 +3387,28 @@
               "evidence": []
             },
             {
-              "label": "Lazy function prototypes and mapped arguments objects",
+              "label": "Lazy function prototypes and shared scope name lists (120-byte closures)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/internal.rs",
+                  "marker": "fn realize_function_prototype"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn closures_and_their_scopes_stay_small"
+                }
+              ]
+            },
+            {
+              "label": "Mapped arguments objects",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "66.66",
+          "credit": "71.42",
           "engine_share": "0.68"
         },
         {
@@ -3490,10 +3506,10 @@
       "completed": 1,
       "in_progress": 5,
       "total": 15,
-      "contribution": "3.56",
-      "percent": "35.61",
+      "contribution": "3.59",
+      "percent": "35.94",
       "verified_percent": "10.95",
-      "partial_percent": "24.66"
+      "partial_percent": "24.99"
     },
     {
       "id": "wasm",

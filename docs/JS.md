@@ -264,9 +264,12 @@ calls a function value. The design is recorded in
   string iterators. Everything else is JS-05.
 
 Memory per value on a 64-bit build: an object with two properties is 88
-bytes; a closure is 200 bytes because every `function` gets its `prototype`
-object eagerly (TD-98); arrow functions and methods have none. Compiled code
-is shared by all closures of a function.
+bytes; a closure is 120 bytes, because a function's `prototype` object is
+created only when something first reads it; and the scope environment of a
+closure that captures one variable is 64 bytes (56 plus 8 per variable),
+since environments share their name lists with the compiled code.
+`closures_and_their_scopes_stay_small` holds these bounds. Compiled code is
+shared by all closures of a function.
 
 Time on the development machine (x86-64, release build, best of five,
 `cargo run --release -p rustic-js --example js_run -- file.js`). These are

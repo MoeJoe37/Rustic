@@ -6,6 +6,8 @@
 //! binding holds [`Value::UNINITIALIZED`], so the temporal dead zone costs
 //! nothing extra (ADR 0015).
 
+use std::rc::Rc;
+
 use super::agent::{Agent, ErrorKind, JsResult};
 use super::object::PropertyDescriptor;
 use super::shape::PropertyKey;
@@ -22,7 +24,11 @@ const DELETABLE: u8 = 4;
 /// Names and values of a declarative record.
 #[derive(Clone, Debug, Default)]
 pub struct Declarative {
-    names: Vec<(StringId, u8)>,
+    /// Names and flags. Scope environments of compiled code share the
+    /// list their function's code owns, so an environment pays only for
+    /// its values; the rare binding created or deleted at run time copies
+    /// the list first.
+    names: Rc<Vec<(StringId, u8)>>,
     values: Vec<Value>,
 }
 
@@ -32,12 +38,12 @@ impl Declarative {
     }
 
     fn create(&mut self, name: StringId, flags: u8) {
-        self.names.push((name, flags));
+        Rc::make_mut(&mut self.names).push((name, flags));
         self.values.push(Value::UNINITIALIZED);
     }
 
     fn remove(&mut self, at: usize) {
-        self.names.remove(at);
+        Rc::make_mut(&mut self.names).remove(at);
         self.values.remove(at);
     }
 }
@@ -51,6 +57,17 @@ pub enum ThisStatus {
     Uninitialized,
     /// Bound to a value.
     Initialized(Value),
+}
+
+/// What a function environment holds beyond its bindings.
+#[derive(Clone, Debug)]
+pub struct FunctionExtra {
+    /// `[[ThisBindingStatus]]` and `[[ThisValue]]`.
+    pub this: ThisStatus,
+    /// `[[FunctionObject]]`.
+    pub function: ObjectId,
+    /// `[[NewTarget]]`.
+    pub new_target: Value,
 }
 
 /// An environment record.
@@ -69,12 +86,9 @@ pub enum Environment {
         outer: Option<EnvId>,
         /// Bindings.
         record: Declarative,
-        /// `[[ThisBindingStatus]]` and `[[ThisValue]]`.
-        this: ThisStatus,
-        /// `[[FunctionObject]]`.
-        function: ObjectId,
-        /// `[[NewTarget]]`.
-        new_target: Value,
+        /// The fields only function environments have, boxed so that
+        /// block scopes (the common record) stay small.
+        extra: Box<FunctionExtra>,
     },
     /// `with` statements and the global object's half of the global
     /// environment.
@@ -95,7 +109,7 @@ pub enum Environment {
         /// `[[GlobalThisValue]]`.
         this: ObjectId,
         /// `[[VarNames]]`.
-        var_names: Vec<StringId>,
+        var_names: Box<Vec<StringId>>,
     },
 }
 
@@ -110,15 +124,13 @@ impl Environment {
             Environment::Function {
                 outer,
                 record,
-                this,
-                function,
-                new_target,
+                extra,
             } => {
                 tracer.env_opt(*outer);
-                tracer.value(Value::object(*function));
-                tracer.value(*new_target);
-                if let ThisStatus::Initialized(v) = this {
-                    tracer.value(*v);
+                tracer.value(Value::object(extra.function));
+                tracer.value(extra.new_target);
+                if let ThisStatus::Initialized(v) = extra.this {
+                    tracer.value(v);
                 }
                 record
             }
@@ -135,13 +147,13 @@ impl Environment {
             } => {
                 tracer.value(Value::object(*object));
                 tracer.value(Value::object(*this));
-                for name in var_names {
+                for name in var_names.iter() {
                     tracer.string(*name);
                 }
                 record
             }
         };
-        for (name, _) in &record.names {
+        for (name, _) in record.names.iter() {
             tracer.string(*name);
         }
         for value in &record.values {
@@ -151,13 +163,27 @@ impl Environment {
 
     /// Bytes this record is charged for (see `gc::footprint`).
     pub(crate) fn footprint(&self) -> usize {
+        // Eight bytes per value, and eight more per name unless the list
+        // belongs to compiled code, which is charged for it there.
         let bindings = match self {
             Environment::Declarative { record, .. }
             | Environment::Function { record, .. }
-            | Environment::Global { record, .. } => record.names.len(),
+            | Environment::Global { record, .. } => {
+                let per_binding = if Rc::strong_count(&record.names) == 1 {
+                    16
+                } else {
+                    8
+                };
+                per_binding * record.names.len()
+            }
             Environment::Object { .. } => 0,
         };
-        std::mem::size_of::<Environment>() + 16 * bindings
+        let boxed = match self {
+            Environment::Function { .. } => std::mem::size_of::<FunctionExtra>(),
+            Environment::Global { .. } => std::mem::size_of::<Vec<StringId>>(),
+            _ => 0,
+        };
+        std::mem::size_of::<Environment>() + boxed + bindings
     }
 
     fn outer(&self) -> Option<EnvId> {
@@ -257,22 +283,26 @@ impl Agent {
         } else {
             ThisStatus::Uninitialized
         };
+        self.heap.charge(std::mem::size_of::<FunctionExtra>())?;
         self.alloc_env(Environment::Function {
             outer,
             record: Declarative::default(),
-            this,
-            function,
-            new_target,
+            extra: Box::new(FunctionExtra {
+                this,
+                function,
+                new_target,
+            }),
         })
     }
 
     /// `NewGlobalEnvironment(G, thisValue)`.
     pub fn new_global_environment(&mut self, global: ObjectId, this: ObjectId) -> JsResult<EnvId> {
+        self.heap.charge(std::mem::size_of::<Vec<StringId>>())?;
         self.alloc_env(Environment::Global {
             object: global,
             record: Declarative::default(),
             this,
-            var_names: Vec::new(),
+            var_names: Box::default(),
         })
     }
 
@@ -513,7 +543,7 @@ impl Agent {
     /// `HasThisBinding()`.
     pub fn has_this_binding(&self, env: EnvId) -> bool {
         match self.env(env) {
-            Environment::Function { this, .. } => *this != ThisStatus::Lexical,
+            Environment::Function { extra, .. } => extra.this != ThisStatus::Lexical,
             Environment::Global { .. } => true,
             _ => false,
         }
@@ -522,34 +552,32 @@ impl Agent {
     /// `BindThisValue(V)` of a function environment.
     pub fn bind_this_value(&mut self, env: EnvId, value: Value) -> JsResult<()> {
         let status = match self.env(env) {
-            Environment::Function { this, .. } => *this,
+            Environment::Function { extra, .. } => extra.this,
             _ => return self.type_error("environment has no this binding"),
         };
         if status != ThisStatus::Uninitialized {
             return Err(self.throw(ErrorKind::ReferenceError, "this is already initialized"));
         }
-        if let Environment::Function { this, .. } = self.heap.env_mut(env) {
-            *this = ThisStatus::Initialized(value);
+        if let Environment::Function { extra, .. } = self.heap.env_mut(env) {
+            extra.this = ThisStatus::Initialized(value);
         }
         Ok(())
     }
 
     /// `GetThisBinding()`.
     pub fn get_this_binding(&mut self, env: EnvId) -> JsResult<Value> {
-        match self.env(env) {
-            Environment::Function {
-                this: ThisStatus::Initialized(v),
-                ..
-            } => Ok(*v),
-            Environment::Global { this, .. } => Ok(Value::object(*this)),
-            Environment::Function {
-                this: ThisStatus::Uninitialized,
-                ..
-            } => Err(self.throw(
+        let status = match self.env(env) {
+            Environment::Function { extra, .. } => extra.this,
+            Environment::Global { this, .. } => return Ok(Value::object(*this)),
+            _ => ThisStatus::Lexical,
+        };
+        match status {
+            ThisStatus::Initialized(v) => Ok(v),
+            ThisStatus::Uninitialized => Err(self.throw(
                 ErrorKind::ReferenceError,
                 "must call super constructor before accessing this",
             )),
-            _ => self.type_error("environment has no this binding"),
+            ThisStatus::Lexical => self.type_error("environment has no this binding"),
         }
     }
 
@@ -771,12 +799,12 @@ impl Agent {
     pub(crate) fn new_scope_environment(
         &mut self,
         outer: Option<EnvId>,
-        names: &[(StringId, u8)],
+        names: &Rc<Vec<(StringId, u8)>>,
         initial: Value,
     ) -> JsResult<EnvId> {
-        self.heap.charge(16 * names.len())?;
+        self.heap.charge(8 * names.len())?;
         let record = Declarative {
-            names: names.to_vec(),
+            names: Rc::clone(names),
             values: vec![initial; names.len()],
         };
         Ok(self
@@ -790,7 +818,7 @@ impl Agent {
     pub(crate) fn copy_scope_environment(&mut self, env: EnvId) -> JsResult<EnvId> {
         let copy = self.heap.env(env).clone();
         if let Some(record) = copy.declarative() {
-            self.heap.charge(16 * record.names.len())?;
+            self.heap.charge(8 * record.names.len())?;
         }
         Ok(self.heap.alloc_env(copy)?)
     }

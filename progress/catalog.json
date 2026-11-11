@@ -3075,7 +3075,23 @@
               "evidence": []
             },
             {
-              "label": "Lazy function prototypes and mapped arguments objects",
+              "label": "Lazy function prototypes and shared scope name lists (120-byte closures)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/internal.rs",
+                  "marker": "fn realize_function_prototype"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn closures_and_their_scopes_stay_small"
+                }
+              ]
+            },
+            {
+              "label": "Mapped arguments objects",
               "status": "planned",
               "evidence": []
             }

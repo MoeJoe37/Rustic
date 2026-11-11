@@ -106,3 +106,7 @@ var o = {a: 1, b: 2}; for (var k in o) { delete o.b } k
 var str = 'abc'; str[1] + str.length + str[5]
 var x = 3; x **= 2; x <<= 1; x >>= 2; x >>>= 0; x %= 3; x
 var t = 0; for (var i = 0; i < 30; i++) { try { if (i % 5 == 0) throw i; t += 1 } catch (e) { t += e } finally { t -= 1 } } t
+function F() {} var p = F.prototype; p === F.prototype && p.constructor === F
+function F() {} F.x = 1; var o = new F(); F.prototype.y = 2; o.y + F.x + (o instanceof F)
+function F() {} function g(f) { return f.prototype } g(F); F.prototype = {z: 3}; g(F).z + new F().z
+var fs = []; for (var i = 0; i < 50; i++) fs[i] = function () {}; var n = 0; for (var f of fs) { if (f.prototype.constructor === f) n++ } n

@@ -129,13 +129,13 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 | TD-97 | Deliberate | JS | Classes, `super`, private names, generators, async functions, modules, RegExp literals, tagged templates and optional calls are rejected by the bytecode compiler | Open, JS-04/JS-06/JS-08 |
-| TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Open, JS-04 |
+| TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Open, JS-05 |
 | TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Open, JS-09 |
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
-| TD-104 | Watch | JS | Shape lookups walk the transition chain, and each environment stores its own name list | Open, JS-09 |
+| TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1379,16 +1379,18 @@ the second part of JS-04; modules with JS-06; generators, async functions,
 RegExp and BigInt with JS-08. Trigger: the Test262 runner (JS-07) needs
 classes for much of its harness.
 
-### TD-98 — Eager function prototypes
+### TD-98 — Eager function prototypes (Paid)
 
-`new_closure` creates the `prototype` object (80 bytes with its `constructor`
+`new_closure` created the `prototype` object (80 bytes with its `constructor`
 slot) for every non-arrow, non-method function, although most functions are
-never used as constructors. A closure therefore costs 200 bytes where about
-120 would do.
+never used as constructors, so a closure cost 200 bytes.
 
-Pay in JS-04: materialize `prototype` on first access (own-property lookup,
-key enumeration, `new`), with the `js-run` differential guarding the caches.
-Trigger: now; this is the largest known per-value overhead.
+Paid in JS-04: the `prototype` property exists from the start with its final
+attributes and position, but holds a marker until something reads it; the
+object is created then (`realize_function_prototype`), and assigning
+`F.prototype = ...` first never creates it. A closure costs 120 bytes.
+`function_prototypes_are_created_on_first_use` and the `js-run` differential
+cover it.
 
 ### TD-99 — Arguments objects and Annex B functions in blocks
 
@@ -1437,13 +1439,15 @@ invalidate every cache in the agent.
 Watch for: JS-09 profiles showing miss or flush cost. Pay with a second entry
 per site or per-shape validity cells.
 
-### TD-104 — Shape lookup and environment names are linear
+### TD-104 — Shape lookup is linear
 
 Finding a property in a shape walks its transition chain (at most 32 steps
-before dictionary mode), and each environment record carries its own list of
-names although the compiler addresses slots by index. Inline caches hide the
-first cost on hot paths; the second is memory per closure environment.
+before dictionary mode). Inline caches hide the cost on hot paths, but every
+miss and every uncached access pays it.
 
-Watch for: JS-09's heap report and miss-path profiles. Pay with a per-shape
-lookup table and by dropping names from compiled scopes that `with` and
-debugging do not need.
+Watch for: JS-09 miss-path profiles. Pay with a per-shape lookup table.
+
+The second half of this entry is paid: scope environments of compiled code
+share the name list their function's code owns and box the fields only
+function and global records need, so the environment of a closure that
+captures one variable costs 64 bytes instead of 112.

@@ -81,7 +81,53 @@ impl Agent {
         }
     }
 
+    /// Create the `prototype` object of a function on first use. Until
+    /// then the property exists with its final attributes and holds
+    /// [`Value::UNINITIALIZED`], which no other object property can, so a
+    /// function that is never constructed or inspected costs one slot
+    /// instead of a second object.
+    fn realize_function_prototype(
+        &mut self,
+        f: ObjectId,
+        attributes: Attributes,
+    ) -> JsResult<Value> {
+        let prototype = self.new_object()?;
+        let constructor = PropertyKey::String(self.names.constructor);
+        self.define_property_or_throw(
+            prototype,
+            constructor,
+            PropertyDescriptor::data_with(Value::object(f), true, false, true),
+        )?;
+        let value = Value::object(prototype);
+        let key = PropertyKey::String(self.names.prototype);
+        self.store(
+            f,
+            key,
+            Stored {
+                first: value,
+                second: Value::UNDEFINED,
+                attributes,
+            },
+        )?;
+        Ok(value)
+    }
+
     fn describe(&mut self, o: ObjectId, location: Location) -> JsResult<PropertyDescriptor> {
+        let lazy = match location {
+            Location::Slot(slot, attributes) => (self.heap.object(o).slots[slot as usize]
+                == Value::UNINITIALIZED)
+                .then_some(attributes),
+            Location::Dictionary(s) => (s.first == Value::UNINITIALIZED).then_some(s.attributes),
+            _ => None,
+        };
+        if let Some(attributes) = lazy {
+            let value = self.realize_function_prototype(o, attributes)?;
+            return Ok(PropertyDescriptor::from_stored(
+                attributes,
+                value,
+                Value::UNDEFINED,
+            ));
+        }
         let object = self.heap.object(o);
         Ok(match location {
             Location::Slot(slot, attributes) => {
@@ -530,7 +576,11 @@ impl Agent {
                 match location {
                     Location::Element(v) => return Ok(v),
                     Location::Slot(slot, attributes) if !attributes.is_accessor() => {
-                        return Ok(self.heap.object(object).slots[slot as usize]);
+                        let value = self.heap.object(object).slots[slot as usize];
+                        if value != Value::UNINITIALIZED {
+                            return Ok(value);
+                        }
+                        // A function's `prototype` not created yet.
                     }
                     _ => {}
                 }

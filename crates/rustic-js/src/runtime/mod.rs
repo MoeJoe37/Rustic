@@ -26,7 +26,7 @@ pub use bigint::BigInt;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
 pub(crate) use env::{BINDING_MUTABLE, BINDING_STRICT};
-pub use env::{EnvId, Environment, Reference, ReferenceBase, ThisStatus};
+pub use env::{EnvId, Environment, FunctionExtra, Reference, ReferenceBase, ThisStatus};
 pub(crate) use gc::Tracer;
 pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};
 pub use heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory, Symbol};

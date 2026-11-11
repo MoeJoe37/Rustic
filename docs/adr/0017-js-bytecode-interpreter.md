@@ -23,7 +23,8 @@ closure of the function; unreachable code is freed with its closures.
 
 **Small closures.** A closure is its function object plus a 24-byte record
 (code, environment, home `this` for arrows) in a typed arena, not a boxed
-structure per function.
+structure per function. Its `prototype` object is created on first read, and
+scope environments share the name list owned by the compiled code.
 
 **No Rust recursion for script calls.** Frames and registers live on two
 vectors in the agent. A script-to-script call pushes a frame and continues the

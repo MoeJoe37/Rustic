@@ -658,6 +658,95 @@ fn inline_caches_follow_prototype_changes() {
 }
 
 #[test]
+fn function_prototypes_are_created_on_first_use() {
+    let _report = Report;
+    // Identity, the constructor link and attributes are as if it always existed.
+    check(
+        "function F() {} F.prototype === F.prototype && F.prototype.constructor === F",
+        "true",
+    );
+    check(
+        "function F() {} var o = new F(); o instanceof F && o.constructor === F",
+        "true",
+    );
+    check(
+        "function F() {} var keys = ''; for (var k in F) keys += k; keys + delete F.prototype",
+        "false",
+    );
+    check(
+        "'use strict'; function F() {} try { delete F.prototype } catch (e) { e.name }",
+        "TypeError",
+    );
+    check(
+        "function F() {} F.prototype = {m() { return 1 }}; new F().m()",
+        "1",
+    );
+    check(
+        "function F() {} F.x = 1; F.prototype.y = 2; new F().y + F.x",
+        "3",
+    );
+    check(
+        "function F() {} function get(f) { return f.prototype } get(F) === get(F) && get(F) === F.prototype",
+        "true",
+    );
+    check(
+        "function F() {} var p = F['proto' + 'type']; p === F.prototype && typeof p",
+        "object",
+    );
+    check(
+        "var a = () => 1, o = {m() {}}; typeof a.prototype + typeof o.m.prototype",
+        "undefinedundefined",
+    );
+    check(
+        "function F() {} var G = F; ({...F}).prototype === undefined && F.prototype !== undefined",
+        "true",
+    );
+    // Forty extra properties push the function into dictionary mode first.
+    check(
+        "function F() {} for (var i = 0; i < 40; i++) F['p' + i] = i; var p = F.prototype; p === F.prototype && p.constructor === F && new F() instanceof F",
+        "true",
+    );
+    // A function that never uses its prototype does not pay for one.
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("var a = []; for (var i = 0; i < 1000; i++) a[i] = function () {}")
+        .expect("runs");
+    let lazy = agent.heap.object_count();
+    agent
+        .evaluate("for (var i = 0; i < 1000; i++) a[i].prototype")
+        .expect("runs");
+    assert_eq!(agent.heap.object_count(), lazy + 1000);
+}
+
+#[test]
+fn closures_and_their_scopes_stay_small() {
+    // The memory gate for functions: a closure with no captured variable,
+    // and one that captures a variable in its own scope environment.
+    // The bounds are the 64-bit sizes; 32-bit targets use less.
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("var a = []; for (var i = 0; i < 2000; i++) a[i] = 0")
+        .expect("runs");
+    let before = agent.heap.bytes_used();
+    agent
+        .evaluate("for (var i = 0; i < 2000; i++) a[i] = function () {}")
+        .expect("runs");
+    let plain = (agent.heap.bytes_used() - before) / 2000;
+    assert!(plain <= 120, "a closure costs {plain} bytes");
+
+    let before = agent.heap.bytes_used();
+    agent
+        .evaluate("function mk(n) { return function () { return n } } for (var i = 0; i < 2000; i++) a[i] = mk(i)")
+        .expect("runs");
+    agent.collect_garbage(rustic_js::runtime::Roots::default());
+    let capturing = agent.heap.bytes_used().saturating_sub(before) / 2000;
+    assert!(
+        capturing <= 80,
+        "a capturing closure costs {capturing} bytes more than a plain one"
+    );
+}
+
+#[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
     for source in [
         "class A {}",

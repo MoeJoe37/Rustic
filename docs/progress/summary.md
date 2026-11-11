@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 23.51%** = 20.90% verified complete + 2.61% partial credit. 54/221 capabilities complete, 6 in progress.
+**Overall completion: 23.54%** = 20.90% verified complete + 2.64% partial credit. 54/221 capabilities complete, 6 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `5b7db3550bd390498a40600973c0d1da885e0dd37127946a193c2eb89edb7b1a`.
+Catalog: `engine-v4`. Source fingerprint: `deac3f3fb23cc30ae5371b6a6a5b0b5746ad13955e214a4c09c50d92607de709`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `5b7db3550bd390498a40600973c0d1da885e0
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 1/13 | 40.00% | 12.30% | 8.90% |
+| M4 ECMAScript runtime | 1/13 | 40.36% | 12.30% | 8.90% |
 | M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `5b7db3550bd390498a40600973c0d1da885e0
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 1/15 | 5 | 35.61% | 10.95% | 10% | 3.56 |
+| JavaScript & GC | 1/15 | 5 | 35.94% | 10.95% | 10% | 3.59 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -191,13 +191,14 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Cached, uncached and collecting runs agree under fuzzing ([source](../../crates/rustic-fuzz/src/js_run.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
   - [ ] Tagged templates, optional calls and regular expression literals
   - [ ] Generators, async functions and modules on the bytecode
-- **in progress 66.66%** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.68% of engine
+- **in progress 71.42%** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.68% of engine
   - [x] Function declarations, expressions, arrows, defaults, rest parameters and arguments ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Call and construct with prototypes, this binding and new.target ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] try/catch/finally with uncatchable cancellation and out-of-memory ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Frames on agent stacks: bounded recursion without Rust stack growth, host calls and reentrancy ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [ ] Classes, super and private names
-  - [ ] Lazy function prototypes and mapped arguments objects
+  - [x] Lazy function prototypes and shared scope name lists (120-byte closures) ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/interp.rs))
+  - [ ] Mapped arguments objects
 - **planned** `js.builtins` — Core built-ins and collections · size 8 · M4 · 1.09% of engine
 - **planned** `js.jobs` — Promises, jobs and realms · size 3 · M4 · 0.41% of engine
 - **planned** `js.modules` — Modules and host loading hooks · size 3 · M4 · 0.41% of engine

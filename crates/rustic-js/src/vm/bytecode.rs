@@ -8,6 +8,7 @@
 //! an op is 12 bytes on every target.
 
 use std::cell::Cell;
+use std::rc::Rc;
 
 use crate::runtime::{StringId, Value};
 
@@ -366,7 +367,7 @@ pub struct FunctionCode {
     /// Templates of nested functions.
     pub functions: Vec<CodeId>,
     /// Block scopes: the names and flags of their bindings.
-    pub scopes: Vec<Box<[(StringId, u8)]>>,
+    pub scopes: Vec<Rc<Vec<(StringId, u8)>>>,
     /// Exception handlers, innermost first.
     pub handlers: Vec<Handler>,
     /// Registers per frame, parameters first.

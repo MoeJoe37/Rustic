@@ -9,6 +9,7 @@
 //! script is compiled, only bytecode remains.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use super::bytecode::{
     BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, UnOp, declare,
@@ -120,7 +121,7 @@ struct Gen<'a, 't> {
     strings: HashMap<Vec<u16>, u32>,
     atoms: HashMap<StringId, u32>,
     functions: Vec<CodeId>,
-    scopes: Vec<Box<[(StringId, u8)]>>,
+    scopes: Vec<Rc<Vec<(StringId, u8)>>>,
     scope_index: HashMap<ScopeId, u32>,
     handlers: Vec<Handler>,
     sites: Vec<NamedSite>,
@@ -423,7 +424,8 @@ impl<'a, 't> Gen<'a, 't> {
         }
         if s.has_env() {
             let index = self.scopes.len() as u32;
-            self.scopes.push(names.into_boxed_slice());
+            names.shrink_to_fit();
+            self.scopes.push(Rc::new(names));
             self.scope_index.insert(scope, index);
         }
         Ok(())

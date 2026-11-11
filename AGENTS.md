@@ -27,6 +27,7 @@ an extension application layer, not permission to replace the original engine.
 - Distinguish detach from destruction. Script-reachable detached nodes will require tracing; explicit engine destruction is not JS-visible DOM removal.
 - Preserve UTF-16 code units for DOM values and future JS strings. Keep byte offsets, UTF-16 offsets and glyph/character indexes distinct.
 - Avoid content-controlled recursion. Use bounded iterative algorithms and checked arithmetic before allocation.
+- Treat memory as a feature. Prefer compact representations (indices over pointers, shared shapes, interned strings) and charge allocations to a budget; the JavaScript engine follows the [M4 memory and performance design](docs/ROADMAP.md#memory-and-performance-design).
 - Maintain safe Rust and the declared minimum compiler. Do not add blanket lint suppressions to hide defects or compiler incompatibility.
 - Add dependencies only for a concrete need after the documented boundary/license/security review. Do not embed an existing browser engine or JavaScript VM.
 
@@ -62,7 +63,13 @@ cargo test --locked --workspace --doc
 RUSTDOCFLAGS=-Dwarnings cargo doc --locked --workspace --no-deps
 python3 tools/check_repository.py
 python3 -m unittest discover -s tools/tests -p 'test_*.py'
+python3 tools/progress.py --write && python3 tools/progress.py --check
+cargo deny --locked check advisories licenses bans sources
 ```
+
+Push to the `feature` branch only and merge into `main` once the checks pass;
+[DEVELOPMENT.md](docs/DEVELOPMENT.md#branches-and-merging) describes the
+sandbox gate used while hosted Actions is unavailable.
 
 Use the platform's Python 3.11+ command if it is named `python`. Run affected
 examples or integration harnesses too. GitHub Actions verifies the declared MSRV,

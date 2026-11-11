@@ -189,25 +189,18 @@ fixture is checked at chunk sizes 1, 7 and 65536 and exact output boundaries;
 an integration case also loads a local linked stylesheet and verifies that
 unshaped text fails with empty stdout. All dump commands remain local-only.
 
-## Next units
+## Status of the M3 layout units
 
-1. Finish REN-01b: normalize principal/anonymous boxes and mixed inline/block
-   content, then expand the initial block geometry reference.
-2. REN-02 is implemented: margin collapse, floats, clearance, relative,
-   absolute, fixed and sticky positioning, overflow clipping, intrinsic
-   sizing keywords, replaced sizing (REN-02c) and text min-/max-content
-   (REN-03b). Flexbox (REN-08) lays out block-level items, text and
-   `inline-flex`; 38 of 91 static css-flexbox WPT pages pass (TD-72).
-3. REN-03/04: line layout, atomic inlines and the general fragment tree
-   exist (`BlockLayout::compute_with_fonts`, below); OpenType shaping, glyph
-   paint and the paint order of atomic inlines (TD-70) remain.
-   The first block display list exists ([PAINT.md](PAINT.md)).
-4. REN-05/06/07: the CPU raster reference and PNG `render` paint blocks,
-   inline boxes and text glyphs; bounded PNG decode, the reftest harness and
-   paint-order hit testing exist, and block-level PNG images paint; resize
-   remains.
-
-No image output or whole REN-01 completion is claimed by this first slice.
+The sections below were written slice by slice (REN-01a onward), so earlier
+ones describe the scope at the time and later sections extend them. As of the
+M3 completion (2026-11-10) every declared layout unit is implemented: block
+flow and margin collapse, anonymous flow normalization, floats, clearance,
+relative/absolute/fixed/sticky positioning, overflow clipping, intrinsic and
+replaced sizing (REN-02c), inline formatting with OpenType shaping and atomic
+inlines (REN-03), and flexbox with text items and `inline-flex` (REN-08; 38 of
+91 static css-flexbox WPT pages pass, TD-72). Grid, tables, multicolumn,
+vertical writing modes and fragmentation are M9 work. Open layout debt is in
+[TECH_DEBT.md](TECH_DEBT.md) (TD-48/49/70–73).
 
 ## Anonymous flow normalization (REN-01c)
 

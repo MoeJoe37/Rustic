@@ -2,20 +2,17 @@
 
 ## Current and planned coverage
 
-The current suite has viewport boundary/error tests, CLI subprocess tests, a
-rustdoc example, shared primitive boundary/concurrency tests, DOM hierarchy and
-payload tests, seeded mutations against an independent ordered-tree model, repository
-consistency checks, and compiler/linter checks.
-URL parsing now adds focused host/origin/limit, file URL and diagnostics tests and an 887-case pinned WPT
-URL-data subset; see [scope and provenance](URL.md). HTML input/tokenization adds
-53 focused tests plus 1,079 selected declaration cases and all 4,626 cases in the
-pinned html5lib reference files, with token fields, diagnostic order and chunk
-invariance checked. See [HTML evidence](HTML.md) for
-the pinned revision, selection policy and untested fields. Text-mode tests add
-109 records expanded into 282 initial contexts and exercise pull feedback,
-queued input, raw-byte boundaries, probe budgets and Unicode fixture adaptation.
-Full browser conformance, rendering, coverage-guided fuzzing, GC stress, integration servers and benchmarks are planned;
-they do not run in the initial CI. Add each harness with the subsystem it tests.
+Today's suite covers M1–M3 and the M4 parser: focused unit and negative tests in
+every crate, seeded mutation tests against independent models (DOM tree,
+margin adjacency, `:has()` and invalidation, tracing), pinned upstream corpora
+(WPT URL and CSS parsing selections, html5lib tokenizer and tree records at
+every chunk split, Unicode IDNA and segmentation data, a css-flexbox WPT
+selection, HarfBuzz shaping references and the Test262 parse phase), CLI
+snapshot and reftests, and 18 deterministic fuzz targets. The
+[evidence table](README.md#evidence-at-a-glance) lists the counts and each
+subsystem document records its revision. Browser-hosted WPT, Test262 runtime
+execution, GC stress, integration servers, sanitizers and benchmark gates are
+planned; add each harness with the subsystem it tests.
 
 | Layer | What it proves | First milestone / execution |
 | --- | --- | --- |
@@ -24,7 +21,8 @@ they do not run in the initial CI. Add each harness with the subsystem it tests.
 | Pinned upstream parser data | Token/tree recovery against known fixtures | M1; selected required corpus |
 | Style/layout structural dumps | Cascade and box/fragment correctness | M2/M3; every relevant PR |
 | CPU image/reftests | Paint order, text, clips, geometry, resize | M3; small required suite plus scheduled broad suite |
-| Test262 | Language semantics and host-independent runtime behavior | M4; selected required suite, broader scheduled runs |
+| Test262 | Language semantics and host-independent runtime behavior | M4; parse-phase gate today (manual, pinned checkout), runtime runner in JS-07 |
+| JS heap and benchmarks | Bytes per value kind, GC pause and throughput regressions | M4 (JS-09); see [PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) |
 | Scripted document fixtures | Bindings, GC edges, tasks/events, reentry and invalidation | M5; every relevant PR |
 | Network/profile integration | Redirects, policy, cancellation, partitioning and persistence | M6; loopback servers in PR jobs |
 | Hostile-peer/isolation tests | Broker and OS restrictions, process recovery | M7; supported-platform required gates |
@@ -99,7 +97,10 @@ serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
 `rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing for the HTML tokenizer, document and fragment parsers, the CSS parser, typed values, selectors, cascade and computed style, media queries, incremental restyling, anonymous flow normalization, and the URL parser, with seed replay,
+fuzzing with 18 targets (`rustic-fuzz list`): HTML tokenizer, document and
+fragment parsers; CSS syntax, selectors, cascade, media queries and incremental
+restyling; anonymous flow normalization; paint/raster; PNG, JPEG, GIF and WebP
+decoding; font parsing and shaping; the JavaScript parser; and URLs, with seed replay,
 minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
 campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
 cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a

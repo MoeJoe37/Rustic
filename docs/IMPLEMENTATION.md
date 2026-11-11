@@ -1138,6 +1138,10 @@ Earlier REN-03a/03b descriptions above are historical slices; their former
 OpenType/format/tailoring gaps are paid by this completion. Broad text standards
 acceptance and native platform runtime gates remain separate M9/M8 work.
 
+The table below is the status of the original M1–M2 queue items and is kept as
+history; the [roadmap's current queue](ROADMAP.md#14-current-implementation-queue)
+lists the next tasks.
+
 | First implementation queue item | Status |
 | --- | --- |
 | DOC-01a: typed document/node IDs and generation validation | Complete through the DOM storage layer |
@@ -1173,8 +1177,9 @@ acceptance and native platform runtime gates remain separate M9/M8 work.
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 
-M1 remains in progress. DOC-04c added node kinds, cloning and cross-document
-adoption; mutation records remain for the broader DOC-04 task. With DOC-06c and DOC-08 done,
+M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and
+cross-document adoption; mutation records and observers are an M5 gate
+(`dom.observers`). With DOC-06c and DOC-08 done,
 `html.conformance` is complete and DOC-06d removed the last known tree
 failures. M2 has CSS-01 through CSS-05 and CSS-07a (selectors) done and CSS-06
 complete (media queries, invalidation, custom properties and container

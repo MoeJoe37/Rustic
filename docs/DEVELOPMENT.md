@@ -9,18 +9,22 @@ is pinned; MSRV and moving stable are additional compatibility checks, not the
 local toolchain definition. All packages are private/unpublished.
 
 ```sh
-cargo run --locked -p rustic-cli -- info
-cargo run --locked -p rustic-dom --example tree
-cargo run --locked -p rustic-url --example resolve
-cargo run --locked -p rustic-html --example tokenize
-cargo run --locked -p rustic-html --example text_modes
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace --all-targets
 cargo test --locked --workspace --doc
-cargo doc --locked --workspace --no-deps
+RUSTDOCFLAGS=-Dwarnings cargo doc --locked --workspace --no-deps
 python3 tools/check_repository.py
+python3 -m unittest discover -s tools/tests -p 'test_*.py'
+python3 tools/progress.py --write && python3 tools/progress.py --check
+cargo run --locked --release -p rustic-fuzz -- run --all --seed 1 --iterations 20000 --timeout-ms 10000
+cargo deny --locked check advisories licenses bans sources
 ```
+
+These are the gates CI runs (the last needs `cargo install cargo-deny --version
+0.20.2 --locked`). Runnable examples: `rustic-dom` `tree`, `rustic-url`
+`resolve`, `rustic-html` `tokenize`/`text_modes`/`document`, `rustic-text`
+`shape_font`, `rustic-raster` `frame_budget` and `rustic-js` `parse`.
 
 Use `python` instead of `python3` if that is the Python 3.11+ command on Windows.
 Set `RUSTDOCFLAGS=-Dwarnings` when reproducing the CI rustdoc warning gate.
@@ -33,28 +37,37 @@ rustup toolchain install stable --profile minimal
 cargo +stable test --locked --workspace --all-targets
 ```
 
-The first `Cargo.lock` is a dependency-free workspace lockfile. Keep it committed
-and use `--locked` so implicit resolution changes fail visibly. Do not publish the
-scaffold or claim rendering support. The CLI accepts only `info`, `--help`,
+Keep `Cargo.lock` committed and use `--locked` so implicit resolution changes
+fail visibly; its only third-party packages are the reviewed font adapters of
+[ADR 0014](adr/0014-reviewed-font-adapters.md). The CLI accepts only `info`, `--help`,
 `--version`, the local-only `dump-dom` command described in
 [HTML_TREE.md](HTML_TREE.md#local-dump-dom-command), and `dump-style`, which
 prints computed styles for the same input ([CSS.md](CSS.md#style-dump)),
 and `dump-boxes`, which prints an initial principal-box snapshot
 ([LAYOUT.md](LAYOUT.md)) without positions or painting. `dump-formatting`
 derives anonymous flow boxes and split inline continuations, with independent
-box/depth/work limits; it preserves unshaped UTF-16 text. `dump-layout` adds used
-rectangles and margin collapse for an explicitly limited static block subset; it rejects
-unsupported inline/text and other formatting rather than emitting partial output.
+box/depth/work limits. `dump-layout` adds used geometry, line boxes and text
+fragments for block, inline and flex layout; unsupported formatting (grid,
+tables) fails explicitly rather than emitting partial output.
 `dump-paint` prints the display list for that layout and `render` writes it as a
 PNG through the CPU rasterizer ([PAINT.md](PAINT.md)). `reftest` renders a test
 page and its `rel=match`/`rel=mismatch` references and compares the pixels within
 the test's fuzzy tolerance; `cargo test -p rustic-cli --test reftests` runs the
 checked suite in `crates/rustic-cli/tests/reftests`. `hit-test --at X,Y` prints
 the topmost box at each point.
-While hosted Actions is unavailable, the maintainer has authorized sandbox-gated
-merges: run the local gates and compatibility/compile checks, record their
-actual scope, push the checked source to `feature`, and then merge that exact
-source into `main`. Hosted runner results remain separate evidence.
+## Branches and merging
+
+The repository keeps two branches: `main` and one working branch, `feature`.
+All work is pushed to `feature`; once its checks pass, the maintainer's standing
+instruction is to merge it into `main` straight away. While hosted Actions is
+unavailable (a billing block since 2026-11-08), the checks run in a sandbox
+instead: the gates above, MSRV 1.85.0, the emulated 32-bit ARM/x86, RISC-V and
+big-endian test runs, and the cross/mobile compile checks of
+[PLATFORMS.md](PLATFORMS.md). Record the scope actually run, push the checked
+source to `feature`, then merge that exact source into `main`. Hosted runner
+results remain separate evidence. Successful default-branch CI also pushes a
+`chore(progress)` commit to `main`, so merge `origin/main` into `feature`
+before pushing rather than force-pushing.
 
 The DOM `tree` example constructs nodes through the storage API, then emits an
 inspection dump. It is a runnable check of document ownership and traversal, not
@@ -104,12 +117,14 @@ from adding a workflow and may require GitHub plan/administration support.
 Dependabot configuration checks Cargo and GitHub Actions weekly, groups related
 update PRs, and caps open requests. Scheduled dependency checks depend on GitHub
 repository settings. Private-repository runner usage is subject to the account's
-Actions allowance. There are no scheduled heavy build/fuzz jobs in the first CI.
+Actions allowance. [fuzz.yml](../.github/workflows/fuzz.yml) runs a nightly
+fresh-seed campaign over every fuzz target and
+[dependencies.yml](../.github/workflows/dependencies.yml) runs `cargo deny`.
 
 ## Failure diagnosis
 
-The [progress reporter](PROGRESS.md) validates catalog/evidence and runs eight
-Python regression tests in the repository job. The chart is regenerated for each
+The [progress reporter](PROGRESS.md) validates catalog/evidence and has Python regression
+tests (`tools/tests`) that run in the repository job. The chart is regenerated for each
 source snapshot; successful default-branch CI publishes changed output. Inspect
 the publishing job as well as the native/check gate when testing automation.
 
@@ -151,11 +166,11 @@ See [MOBILE.md](MOBILE.md) for target triples, native host milestones and runtim
 gates. Mobile metadata checks are included in the aggregate `CI` job, while
 NDK/Xcode linking, packaging and device testing are staged with actual adapters.
 
-Introduce parser corpora with M1, render artifacts with M3, Test262 with M4, and
-integrated WPT with the host adapter. Add bounded fuzz smoke checks first, then
-scheduled long campaigns when targets exist. Add dependency vulnerability/license
-tools when external crates arrive, and sanitizer/native checks when their surface
-exists. Keep action references pinned and permissions narrow in every workflow.
+Parser corpora (M1), pinned CSS/flexbox WPT selections and reftests (M2/M3),
+fuzz smoke and nightly campaigns, and dependency auditing now exist. Next: the
+Test262 runtime runner and the JS benchmark/heap report (M4, JS-07/JS-09),
+integrated WPT with the host adapter (M5/M8), and sanitizer/native checks when
+their surface exists. Keep action references pinned and permissions narrow in every workflow.
 
 Release packaging/signing/publishing requires a separate reviewed workflow once
 there is an actual release contract. Do not grant CI write permission or store

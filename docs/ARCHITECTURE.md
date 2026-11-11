@@ -44,7 +44,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-layout` | Formatting contexts, fragments, intrinsic sizes, hit-test geometry | base, computed styles, text | M3 |
 | `rustic-paint` | Stacking/paint order, immutable display lists, clipping, damage | base, layout fragments | M3 |
 | `rustic-raster` | Deterministic CPU display-list interpreter and surfaces | base, paint commands, codec adapters | M3 |
-| `rustic-codecs` | Bounded from-scratch decoders (inflate, PNG; later JPEG/GIF/WebP) | base | M3 |
+| `rustic-codecs` | Bounded from-scratch decoders: inflate, PNG, JPEG, GIF and WebP | base | M3 |
 | `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
 | `rustic-wasm` | Original bounded Wasm decoder, validator, interpreter and reviewed acceleration | base; JS/Web integration through explicit adapters | M4 foundations, M5/M9 integration |
 | `rustic-bindings` | Web IDL subset tooling, JS/DOM wrappers, exception conversion, tracing edges | JS, DOM; generated from pinned IDL | M5 |
@@ -187,10 +187,16 @@ updates can later avoid full layout when geometry is unchanged.
 
 ## 5. JavaScript and host execution
 
-Build Rustic's own runtime, beginning with an interpreter. Lexer and parser must
-handle lexical goals, automatic semicolon insertion, source spans, early errors,
-strict mode, scopes, and Unicode identifiers. Bytecode compilation follows an
-AST reference evaluator or a deliberately small initial bytecode subset. Preserve
+Build Rustic's own runtime, beginning with an interpreter. The lexer and parser
+(JS-01, [JS.md](JS.md)) handle lexical goals, automatic semicolon insertion,
+source spans, early errors, strict mode, scopes, and Unicode identifiers.
+Execution compiles the AST to compact register bytecode and drops the AST; there
+is no long-lived tree-walking evaluator, because it would double the memory per
+function and run slower. Values are 8 bytes, heap objects live in `u32`-indexed
+typed arenas charged to the agent budget, objects share shapes with inline
+caches, and JS calls do not recurse on the Rust stack. The
+[M4 memory and performance design](ROADMAP.md#memory-and-performance-design)
+lists these commitments and ADR 0015 records the exact layout. Preserve
 completion records, references, environments, property descriptors, prototypes,
 call/construct semantics, exceptions, realms, and abstract operations. Do not
 substitute Rust numeric/string behavior for ECMAScript coercions.

@@ -15,11 +15,16 @@ RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets
 Device shells, rendering, input, and runtime validation are still planned. See
 [platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: M3 static renderer.** The original pipeline covers local HTML,
-computed CSS, block/inline/flex layout, OpenType text, image paint, CPU raster,
-resize/zoom and hit testing. See the [implementation ledger](docs/IMPLEMENTATION.md)
-for precise tested contracts. JavaScript execution, web-page networking and
-native host acceptance remain later milestone work.
+**Current stage: M4 JavaScript runtime.** M1–M3 are complete for their declared
+scope: Rustic's own pipeline turns a local HTML file into a PNG through parsing,
+the CSS cascade, block/inline/flex layout, OpenType text, image decoding and a
+CPU rasterizer, with resize/zoom and hit testing. M4 has a complete ECMAScript
+parser; values, the heap and the bytecode interpreter are being built next, with
+memory use and interpreter speed as design constraints
+([plan](docs/ROADMAP.md#memory-and-performance-design)). Nothing executes
+JavaScript yet, and web-page networking and native app hosts are later
+milestones. See the [implementation ledger](docs/IMPLEMENTATION.md) for precise
+tested contracts.
 
 <!-- rustic-progress:start -->
 
@@ -43,8 +48,12 @@ native host acceptance remain later milestone work.
 | [Implementation progress](docs/IMPLEMENTATION.md) | Completed tasks, tested contracts, and the next implementation work |
 | [Progress graph methodology](docs/PROGRESS.md) | Whole-engine completion criteria, weights, evidence and automatic commit updates |
 | [URLs and origins](docs/URL.md) | Parser scope, identity rules, limits and pinned upstream test evidence |
-| [CSS syntax](docs/CSS.md) | CSS tokenizer/parser scope, recovery, limits and pinned corpus evidence |
-| [HTML input and tokenization](docs/HTML.md) | Streaming UTF-8 and initial tokenizer subset, limits, evidence and remaining states |
+| [HTML](docs/HTML.md) and [tree construction](docs/HTML_TREE.md) | Tokenizer, tree builder, fragments and `dump-dom` |
+| [DOM](docs/DOM.md) | Node storage, mutation, adoption and the tracing prototype |
+| [CSS](docs/CSS.md) | Syntax, selectors, values, cascade, queries, invalidation and computed style |
+| [Layout](docs/LAYOUT.md), [text](docs/TEXT.md) and [paint](docs/PAINT.md) | The M3 static renderer |
+| [JavaScript](docs/JS.md) | The M4 engine, starting with the parser |
+| [Technical debt](docs/TECH_DEBT.md) | Known shortcuts and the rules that keep them safe |
 | [Platform and device support](docs/PLATFORMS.md) | Any device that can run a browser: portability rules and the CI target matrix |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
 | [Architecture](docs/ARCHITECTURE.md) | Components, ownership, execution, IPC, embedding, and data flow |
@@ -57,68 +66,66 @@ native host acceptance remain later milestone work.
 | [Dependencies and platforms](docs/DEPENDENCIES.md) | Meaning of “from scratch,” dependency policy, and platform rollout |
 | [Architecture decisions](docs/adr/README.md) | Decisions, alternatives, and review triggers |
 
-## Run the foundation
+## Try it
 
 Install Rust through [rustup](https://rustup.rs/), then:
 
 ```sh
 git clone https://github.com/MoeJoe37/Rustic.git
 cd Rustic
-cargo run --locked -p rustic-cli -- info
-cargo test --locked --workspace --all-targets
-cargo test --locked --workspace --doc
-cargo run --locked -p rustic-dom --example tree
-cargo run --locked -p rustic-url --example resolve
-cargo run --locked -p rustic-html --example tokenize
-cargo run --locked -p rustic-html --example text_modes
-cargo run --locked -p rustic-html --example document
+cargo run --locked -p rustic-cli -- --help
+cargo run --locked -p rustic-cli -- dump-dom crates/rustic-cli/tests/fixtures/styled.html
 cargo run --locked -p rustic-cli -- dump-style crates/rustic-cli/tests/fixtures/styled.html
-cargo run --locked -p rustic-cli -- dump-boxes crates/rustic-cli/tests/fixtures/boxes.html
-cargo run --locked -p rustic-cli -- dump-formatting crates/rustic-cli/tests/fixtures/formatting.html
 cargo run --locked -p rustic-cli -- dump-layout crates/rustic-cli/tests/fixtures/layout.html
+cargo run --locked -p rustic-cli -- render --output out.png crates/rustic-cli/tests/fixtures/m3/article.html
+cargo run --locked -p rustic-js --example parse -- -e 'let f = (a, b) => a ?? b;'
+cargo test --locked --workspace --all-targets
 ```
 
-The toolchain file pins Rust **1.99.1** for reproducible development. The minimum
-supported Rust version is **1.85.0**, tested separately in CI; the workspace uses
-the 2024 edition. The commands are `rustic info`, `--help`, `--version` and
-`rustic dump-dom <file>`, which loads one local HTML file within byte, token,
-node and output budgets and prints a deterministic DOM dump, and
-`rustic dump-style <file>`, which prints each element's computed style for the
-same file. `rustic dump-boxes <file>` exposes M3's initial principal-box
-snapshot; `rustic dump-formatting <file>` shows anonymous flow boxes and inline
-continuations before shaping. `rustic dump-layout <file>` adds [used block rectangles](docs/LAYOUT.md)
-for a static block subset with adjoining-margin collapse. `rustic dump-paint <file>` prints
-its [display list](docs/PAINT.md) and `rustic render --output out.png <file>` rasterizes
-the full supported display list to a PNG on the CPU; `rustic reftest <test>`
-compares a page's render with its `rel=match` references. Text uses OpenType shaping with Arabic/Indic and CSS wrapping/bidi policies;
-local PNG/JPEG/GIF/WebP images paint. `--font FILE` loads granted local
-TTF/OTF/WOFF/WOFF2 files for font metrics, shaping and paint. Without it, bundled
-test fonts keep results deterministic. [Text contracts and limits](docs/TEXT.md)
-include the remaining native font services and broader conformance work. URLs and other
-arguments return an error instead of implying navigation.
+The toolchain file pins Rust **1.99.1**; the minimum supported Rust version is
+**1.85.0** and the workspace uses the 2024 edition. `rustic` is a development
+tool, not a browser: every command reads one local file (URLs are rejected) and
+prints a deterministic result.
 
-The `tree` example builds nodes directly through the internal DOM API and prints
-a deterministic inspection dump. It does not parse HTML or load a page.
-The `tokenize` example reads a small UTF-8 stream in chunks and emits tokens;
-comments, doctypes, processing instructions and named/numeric character references
-are included. The `text_modes` example uses token-at-a-time feedback for
-RCDATA/raw text/script/plaintext contexts. The `document` example parses a local
-fixture into a DOM tree with implied elements and paragraph recovery. Unsupported
-tree constructs return explicit errors; broad tree-building rules remain pending.
+| Command | Output |
+| --- | --- |
+| `dump-dom` | The parsed DOM tree, within byte, token, node and output budgets |
+| `dump-style` | Each element's computed style, including local `<link>`/`@import` sheets |
+| `dump-boxes`, `dump-formatting` | The box tree before layout, with anonymous boxes |
+| `dump-layout` | Used geometry, line boxes and text fragments |
+| `dump-paint` | The display list in paint order |
+| `render --output out.png` | A CPU-rasterized PNG; `--viewport WxH` and `--zoom` relayout |
+| `reftest` | Compares a page with its `rel=match`/`rel=mismatch` references |
+| `hit-test --at X,Y` | The topmost box at each point |
 
-The current crates are `rustic-base` (identity, budgets, cancellation, source spans,
-clocks and redacted diagnostics), `rustic-dom` (bounded node storage, checked tree mutation and
-[UTF-16 text edits](docs/DOM.md)),
-`rustic-url` (URL records, parsing and origins),
-`rustic-html` (streaming tokens and full WHATWG document tree construction),
-`rustic-css` (CSS syntax, selectors, specificity and typed property values),
-`rustic-style` (selector matching, the cascade and computed style over a read-only DOM view),
-`rustic-layout` (checked geometry, principal boxes and reference block widths),
-`rustic-paint` (display lists), `rustic-raster` (CPU rasterizer and PNG output),
-`rustic-codecs` (bounded inflate and PNG decoding),
-`rustic-engine` (bounded viewport configuration), `rustic-cli`
-(development entry point), and `rustic-fuzz` (deterministic parser fuzzing). Future crates listed in the architecture
-are created only when their milestone needs them. All packages are unpublished.
+Text uses OpenType shaping with bidi and CSS line breaking; `--font FILE` grants
+local TTF/OTF/WOFF/WOFF2 fonts, otherwise bundled test fonts keep output
+reproducible (they cover only a few characters). Local PNG/JPEG/GIF/WebP images
+next to the document paint. See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for every
+check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
+
+### Crates
+
+| Crate | Role |
+| --- | --- |
+| `rustic-base` | IDs, budgets, cancellation, source spans, clocks, geometry, redacted diagnostics |
+| `rustic-url` | URL parsing, origins, IDNA |
+| `rustic-html` | Streaming tokenizer and full WHATWG tree construction |
+| `rustic-dom` | Bounded node storage, checked mutation, UTF-16 text, tracing prototype |
+| `rustic-css` | CSS syntax, selectors and typed property values |
+| `rustic-style` | Selector matching, cascade, computed style and invalidation |
+| `rustic-text` | Fonts, shaping (reviewed adapters), Unicode segmentation and bidi |
+| `rustic-layout` | Box tree, block/inline/flex layout, fragments |
+| `rustic-paint` | Display lists and paint order |
+| `rustic-raster` | CPU rasterizer and PNG output |
+| `rustic-codecs` | Bounded inflate, PNG, JPEG, GIF and WebP decoders |
+| `rustic-js` | ECMAScript lexer and parser (runtime in progress) |
+| `rustic-engine` | Viewport configuration |
+| `rustic-cli` | The `rustic` development tool |
+| `rustic-fuzz` | Deterministic mutation fuzzing (18 targets) |
+
+Future crates in the [architecture](docs/ARCHITECTURE.md) are created only when
+their milestone needs them. All packages are unpublished.
 
 ## Development direction
 

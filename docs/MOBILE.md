@@ -61,8 +61,8 @@ release; missing approvals cannot be represented as successful runtime support.
 | --- | --- | --- |
 | MOB-01 | M1 | Shared library cross-checks for Android ARM64/ARMv7/x86-64/x86 and iOS device plus ARM64/x86-64 simulator, required by CI |
 | MOB-02 | M1–M3 | Audit native dependencies for both mobile systems, licenses, SDK/NDK and thread/resource requirements |
-| MOB-03 | M3 | Android local-fixture CPU surface through an unstable JNI/native bridge; compare pixels with headless output |
-| MOB-04 | M3 | iOS local-fixture CPU surface and C/Swift bridge; link/run in Simulator and on a signed development device where allowed |
+| MOB-03 | M3, carried forward (target: before M5 closes) | Android local-fixture CPU surface through an unstable JNI/native bridge; compare pixels with headless output |
+| MOB-04 | M3, carried forward (target: before M5 closes) | iOS local-fixture CPU surface and C/Swift bridge; link/run in Simulator and on a signed development device where allowed |
 | MOB-05 | M3–M5 | Touch, viewport/scale, keyboard/IME, caret/selection and accessibility fixtures on both mobile systems |
 | MOB-06 | M5–M6 | Background/resume, memory pressure, profile isolation, permission UI and cancellation integration tests |
 | MOB-07 | M7 | OS-supported isolated renderer/service design, adversarial authority tests and iOS entitlement/process feasibility |

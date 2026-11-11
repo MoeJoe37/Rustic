@@ -6,13 +6,17 @@ The outcome is a new engine, not a wrapper around an existing renderer or JS VM.
 Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
-M0 has a verified repository baseline. M1 is well advanced: DOC-01 through DOC-07
-and DOC-08 are complete for their declared scope, including fragment parsing;
-M2 has completed its declared CSS subset and conformance gate; M3 has started
-with REN-01a (checked geometry, principal snapshots and horizontal block sizing).
-M4 has started with JS-01 (the ECMAScript lexer and parser, see [JS.md](JS.md));
-M5–M10 are unstarted. [Implementation progress](IMPLEMENTATION.md) records the
-current completed scope without implying completion of the entire milestone.
+
+**Status (2026-11-11).** M0 has a verified baseline; only the repository-rules
+follow-up is open. M1, M2 and M3 are complete for their declared catalog scope
+(28, 8 and 17 capabilities): local HTML parses, styles, lays out, shapes text,
+paints and rasterizes to PNG on the CPU. M4 is the current milestone: JS-01
+(lexer and parser, [JS.md](JS.md)) is done and JS-02 is in progress. M5–M10 are
+unstarted. Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are
+carried forward (see [§6](#6-m3--static-document-renderer)). The
+[progress summary](progress/summary.md) is the measured status and
+[implementation progress](IMPLEMENTATION.md) records each completed contract;
+neither implies more than its declared scope.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
 coverage, measured Chrome/Firefox improvements, GPU acceleration, WebAssembly,
@@ -115,6 +119,11 @@ inputs terminate within budgets; no network access. HTML fragment parsing,
 foreign SVG/MathML integration, and script reentry each have explicit status.
 Do not label a happy-path tag splitter an HTML implementation.
 
+**Status:** complete. DOC-01 to DOC-09 are done for their declared scope; see
+[implementation progress](IMPLEMENTATION.md). Remaining DOM/HTML work is
+scheduled where it is needed: mutation records/observers, events and parser
+script reentry (`dom.observers`, `dom.events`, `html.scripts`) are M5 gates.
+
 ## 5. M2 — CSS and computed style
 
 | Task | Work and deliverable | Prerequisite |
@@ -127,7 +136,7 @@ Do not label a happy-path tag splitter an HTML implementation.
 | CSS-04 | **Done** ([CSS.md](CSS.md#cascade)): UA/user/author origins, importance, inline styles, source order, inheritance and CSS-wide values | CSS-02, CSS-03 |
 | CSS-05 | **Done** ([CSS.md](CSS.md#computed-style)): computed values, stylesheet attachment, style dump, full-restyle reference implementation | CSS-04, DOC-07 |
 | CSS-06 | **Done** ([CSS.md](CSS.md#media-queries)): media queries, mutation/viewport invalidation, custom properties with `var()` and cycle handling, `@property` registration with font-relative unit cycles, and container queries (sizes supplied by the caller until layout). Font-metric units (`ex`/`ch`/`cap`/`ic`) use spec fallbacks until REN-03 loads fonts | CSS-05 |
-| CSS-07 | Expand selectors and cascade layers with isolated WPT selections and negative grammar tests. **CSS-07a done** ([CSS.md](CSS.md#selectors)): `:has()`, form states, `:lang()`/`:dir()`, nesting `&` and nested rules, pseudo-element states; cascade layers remain | CSS-05 |
+| CSS-07 | **Done**: CSS-07a ([CSS.md](CSS.md#selectors)) adds `:has()`, form states, `:lang()`/`:dir()`, nesting `&` and nested rules, pseudo-element states; CSS-07b adds cascade layers, shadow-tree contexts and animation origins. Slots, `::slotted()`/`::part()` and `@import layer()` remain | CSS-05 |
 | CSS-08 | **Done** ([CSS.md](CSS.md#conformance-gate)): declared conformance gate over pinned WPT parsing cases for selectors and supported properties, with a reviewed ratchet expectation list | CSS-07a |
 
 **Demo:** a local page with conflicting stylesheet/inline/inherited declarations
@@ -138,31 +147,29 @@ at-rules recover according to syntax and never silently become supported values.
 property has initial/inherited/computed behavior tests, and DOM mutations match
 full recomputation. Paint/layout must not invent a second cascade implementation.
 
+**Status:** complete for the declared subset and gate (CSS-08 ratchet). Broader
+CSS compatibility is M9 work.
+
 ## 6. M3 — Static document renderer
 
 | Task | Work and deliverable | Prerequisite |
 | --- | --- | --- |
-| REN-01 | Typed CSS/device geometry, box tree, anonymous boxes, block flow, margins/padding/borders | CSS-05 |
-| REN-02 | Intrinsic sizing, replaced elements, overflow, positioning, floats and margin collapse | REN-01 |
-| REN-02c | **Done** ([LAYOUT.md](LAYOUT.md#intrinsic-and-replaced-sizing-ren-02c)): intrinsic sizing keywords, shrink-to-fit contributions and block-level replaced sizing with embedder natural sizes; text intrinsic sizes wait for REN-03 (TD-49) | REN-02b |
-| REN-03 | Font adapter, bundled test fonts, shaping, bidi, line breaking, inline layout and baselines; computed `ex`/`ch`/`cap`/`ic` from loaded font metrics (moved from M2 css.values) | CSS font values, REN-01 |
-| REN-03a | **Done** ([LAYOUT.md](LAYOUT.md#font-adapter-ren-03a)): `rustic-text` TrueType parser, bundled original test fonts, CSS face matching and computed `ex`/`ch`/`cap`/`ic`; CFF/WOFF, discovery and shaping complete in REN-03 (TD-85/86/87 record remaining scope) | CSS font values |
-| REN-04 | Fragments, stacking contexts, paint order, clips, glyph/image display-list commands | REN-02, REN-03 |
-| REN-05 | CPU raster reference backend and bounded image decode; sRGB/alpha conventions | REN-04 |
-| REN-06 | `render` headless command, PNG output, layout/display-list dumps, resize and hit testing | REN-05 |
-| REN-07 | Reftest harness, checked image fixtures, deterministic clocks/fonts, allocation counters | REN-06 |
-| REN-08 | Implement flexbox as its own tested formatting context; start grid/table plans from failures | REN-07 |
-| REN-08a | **Done** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): flexbox formatting context for block-level items, taken ahead of REN-07; text items and `inline-flex` wait for line layout, layout-WPT comparison for REN-07 (TD-49) | REN-02c |
-| MOB-03/04 | Android/iOS local-fixture CPU surfaces through narrow native bridges | REN-05; mobile core checks |
+| REN-01 | **Done** ([LAYOUT.md](LAYOUT.md)): typed CSS/device geometry, box tree, anonymous boxes, block flow, margins/padding/borders | CSS-05 |
+| REN-02 | **Done** ([LAYOUT.md](LAYOUT.md)): intrinsic sizing, replaced elements, overflow, positioning (including sticky), floats and margin collapse; REN-02c adds intrinsic keywords and replaced sizing | REN-01 |
+| REN-03 | **Done** ([TEXT.md](TEXT.md)): font adapter (TrueType, CFF/CFF2, WOFF1/2 via ADR 0014), bundled test fonts, host-granted discovery, GSUB/GPOS shaping with Arabic/Indic, bidi, line breaking/hyphenation, inline layout and baselines, computed `ex`/`ch`/`cap`/`ic`; TD-85/86/87 record remaining refinements | CSS font values, REN-01 |
+| REN-04 | **Done** ([PAINT.md](PAINT.md)): fragments, stacking contexts, paint order, clips, text/image/decoration/outline commands, rounded corners, clip paths, transforms, shadows, blending and filters | REN-02, REN-03 |
+| REN-05 | **Done** ([PAINT.md](PAINT.md)): CPU raster reference backend, tiling and damage; bounded inflate, PNG, JPEG, GIF and WebP decoding with an image store | REN-04 |
+| REN-06 | **Done**: `render` headless command, PNG output, layout/display-list dumps, resize/zoom and `hit-test` | REN-05 |
+| REN-07 | **Done for the declared gate**: `reftest` harness with fuzzy tolerances, checked fixtures, deterministic fonts; the `frame_budget` example measures repaint time | REN-06 |
+| REN-08 | **Done for the declared scope** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): block, text and `inline-flex` items; 38 of 91 pinned static css-flexbox WPT pages pass (TD-72). Grid and tables are M9 work | REN-07 |
+| MOB-03/04 | **Not done; carried forward.** Android/iOS local-fixture CPU surfaces through narrow native bridges. They need NDK/Xcode link and device runs that the current CI cannot provide. Target: land before M5 closes, as a parallel platform track that does not block M4 | REN-05; mobile core checks |
 
-**Current slice:** the declared static renderer capabilities include block,
-inline and flex layout, positioned/replaced content, glyph/image paint, CPU
-raster, resize/zoom, hit testing and pinned layout/reftest gates. REN-03 completes
-font discovery/formats, GSUB/GPOS with Arabic/Indic, CSS bidi scopes and wrapping/
-hyphenation. See [TEXT.md](TEXT.md) and TD-85/86/87 for precise contracts and
-remaining text refinements. The M3 catalog gate has 17 capabilities; its
-completion does not claim full web compatibility or native Android/iOS surface
-acceptance. Those existing M9/M8 catalog gates remain open.
+**Status:** the M3 catalog gate (17 capabilities) is complete: block, inline and
+flex layout, positioned/replaced content, glyph/image paint, CPU raster,
+resize/zoom, hit testing and pinned layout/reftest gates. It does not claim full
+web compatibility (M9) or native Android/iOS surface acceptance (MOB-03/04
+above, then M8). See [TEXT.md](TEXT.md), [LAYOUT.md](LAYOUT.md),
+[PAINT.md](PAINT.md) and the [M3 completion review](reviews/2026-11-10-m3-completion.md).
 
 **Demo:** local article, styled cards, inline image, nested blocks, Arabic/Latin
 mixed text, resize, and overflow render through Rustic's pipeline. Early debug
@@ -175,16 +182,72 @@ and advanced effects remain separately tracked instead of implied by HTML suppor
 
 ## 7. M4 — Original ECMAScript runtime
 
-| Task | Work and deliverable | Prerequisite |
-| --- | --- | --- |
-| JS-01 | Lexer/parser, lexical goals, AST, source spans, early errors, strict mode, ASI and UTF-16 string model | M0 |
-| JS-02 | Values, coercions, environments, references, completion records, object internal methods/descriptors | JS-01 |
-| JS-03 | Nonmoving traced heap, root scopes, cyclic objects, weak host handles and resource budgets | JS-02, DOC-09 coordination |
-| JS-04 | Interpreter/initial bytecode, expressions, control flow, functions, closures, calls/new, exceptions | JS-02, JS-03 |
-| JS-05 | Core built-ins, arrays, strings, numbers, symbols, iterators and collections | JS-04 |
-| JS-06 | Promise jobs, realms, module records/loading hooks and dynamic imports without ambient I/O | JS-04 |
-| JS-07 | Standalone JS runner and pinned Test262 harness, strict/raw/module/negative/async metadata handling | JS-04 |
-| JS-08 | BigInt, RegExp, typed arrays/buffers, proxies, generators/async, Intl in explicitly measured increments | JS-05–JS-07 |
+M4 builds Rustic's own JavaScript engine. JavaScript is usually the largest
+consumer of memory and CPU in a page, so M4 is planned for a small heap and a
+fast interpreter from the first value type, not as a later optimization pass.
+Rustic will not have a JIT in M4, and some platforms (iOS outside special
+browser-engine entitlements, locked-down devices) do not allow one at all, so
+interpreter speed and heap size are the performance of the product everywhere.
+
+| Task | Work and deliverable | Catalog | Prerequisite | Status |
+| --- | --- | --- | --- | --- |
+| JS-01 | Lexer/parser, lexical goals, AST, source spans, early errors, strict mode, ASI and UTF-16 string model | `js.parser` | M0 | **Done** ([JS.md](JS.md)); RegExp pattern early errors move to JS-08 (TD-88) |
+| JS-02 | 8-byte values, coercions, references, completion records, strings and atoms, shapes, object internal methods/descriptors and elements | `js.values`, `js.objects` | JS-01 | In progress |
+| JS-03 | Heap: typed arenas with `u32` indices charged to a budget, handle scopes/roots, nonmoving mark/sweep, weak references, allocation-triggered collection, host-object tracing that replaces the DOC-09 `HostHeap` stand-in | `js.heap` | JS-02, DOC-09 (done) | Planned |
+| JS-04 | Bytecode compiler and interpreter: AST to register bytecode, control flow, functions, closures, calls/new, exceptions, property inline caches | `js.interpreter`, `js.functions` | JS-02, JS-03 | Planned |
+| JS-05 | Core built-ins, arrays, strings, numbers, symbols, iterators, JSON, collections | `js.builtins` | JS-04 | Planned |
+| JS-06 | Promise jobs, realms, module records/loading hooks and dynamic imports without ambient I/O | `js.jobs`, `js.modules` | JS-04 | Planned |
+| JS-07 | Standalone runner and pinned Test262 harness: strict/raw/module/negative/async metadata, per-test time and memory limits | evidence for `js.conformance` (M9) | JS-04 | Planned |
+| JS-08 | BigInt, RegExp (own backtracking-bounded engine, pays TD-88), proxies, generators/async, typed arrays/buffers, Intl, in measured increments | `js.advanced`, `js.buffers`, `js.intl` | JS-05–JS-07 | Planned |
+| JS-09 | Limits and performance gate: cancellation, JS stack and heap limits, GC stress mode, the JS benchmark corpus and heap-size report (see below) | `js.limits` | JS-04; grows with JS-05–JS-08 | Planned |
+
+### Memory and performance design
+
+These are plan-level commitments. [ADR 0015](adr/README.md) (JS value and
+memory layout, written with JS-02) records the exact representation; this
+section says what every M4 task must preserve.
+
+- **Compact values.** A `Value` is 8 bytes on every target: an `f64`
+  NaN-boxed in a `u64` through `f64::to_bits`, with other kinds in the quiet-NaN
+  space carrying a `u32` heap index. This is safe Rust, independent of pointer
+  width and byte order, so it behaves identically on the 32-bit and big-endian
+  CI tiers.
+- **Arenas, not `Rc`.** Objects, strings, shapes, environments and functions
+  live in typed arenas addressed by `u32` indices. No per-object `Rc`/`RefCell`,
+  no per-object heap allocation for the header, and every arena allocation is
+  charged to the agent's `rustic_base::Budget`. Exceeding the budget throws or
+  terminates the script cleanly; it never aborts the process.
+- **Shapes and inline caches.** Objects share hidden classes (shape transition
+  trees, with a dictionary mode for objects used as maps). Property slots are a
+  plain vector indexed by the shape, dense array elements are stored apart from
+  named properties, and integer keys never become strings. Property-access
+  bytecodes carry monomorphic/polymorphic inline caches keyed on shape.
+- **Strings.** Latin-1 storage when every code unit fits, UTF-16 otherwise
+  (lone surrogates preserved), interned atoms for property keys and
+  identifiers, and ropes for repeated concatenation that flatten on demand.
+- **Bytecode, not AST walking.** Functions compile to compact register
+  bytecode with per-function constant pools. Inner functions compile on first
+  call, and the AST is dropped after compilation; source text is kept once for
+  `Function.prototype.toString` and stack traces. A lazy pre-parse that skips
+  AST construction for uncalled functions is a measured follow-up to JS-01.
+- **Interpreter frames off the Rust stack.** JS-to-JS calls push frames on a
+  heap-managed stack instead of recursing in Rust, so deep JS recursion is
+  bounded by a frame budget and does not depend on the host thread's stack size
+  (which is small on mobile and 32-bit hosts). Frames are resumable, which
+  generators and async functions in JS-08 rely on.
+- **Collection.** Stop-the-world, nonmoving mark/sweep as in
+  [ADR 0002](adr/0002-ownership-and-execution.md), with an iterative worklist
+  (no recursion), triggered by bytes allocated since the last collection with a
+  growth factor, plus an explicit memory-pressure entry point for mobile hosts
+  (MOB-06). Generational or incremental collection needs measured pause and
+  heap evidence and a barrier plan first.
+- **Budgets and cancellation.** Backward jumps and calls poll the cancellation
+  token and an instruction budget, so an infinite loop is stoppable and chrome
+  stays responsive.
+
+Optimizations beyond this list (superinstructions, quickening, call inline
+caches, escape analysis) follow the [performance plan](PERFORMANCE.md#javascript-runtime):
+profile first, keep the reference behavior, and prove parity with Test262.
 
 **Demo:** closures, exceptions, prototypes, cyclic objects, and promises run in the
 standalone runner. Unsupported syntax is rejected deliberately, not partially
@@ -192,14 +255,19 @@ executed. The engine never delegates execution to another JS runtime.
 
 **Gate:** published selected Test262 results include upstream revision, total
 selected/run/pass/fail/skipped/crash/timeout counts, with expected failures kept
-visible. GC stress proves reachable host cycles survive and unreachable cycles
-are reclaimed. Infinite execution is cancellable. Parser subsets must not be
-advertised as complete ECMAScript support. No JIT until a separate measured ADR.
+visible. GC stress (collection at every allocation) proves reachable host cycles
+survive and unreachable cycles are reclaimed. Infinite execution is cancellable,
+and deep recursion and heap exhaustion fail with catchable errors within their
+budgets. The JS benchmark corpus and heap-size report (JS-09) run with recorded
+results on x64 and ARM64, and the full test suite passes on every CI tier,
+including 32-bit and big-endian emulation. Parser subsets must not be advertised
+as complete ECMAScript support. No JIT until a separate measured security ADR.
 
 The required Wasm track starts after values/heap/execution foundations, follows
 WASM-01–08 in [PRODUCT.md](PRODUCT.md), and integrates with M5 host policy. Its
-decoder/validator/interpreter can be tested independently; full JS/Web binding,
-baseline feature and mobile gates remain mandatory through M9.
+decoder/validator/interpreter can be tested independently and should reuse the
+JS-03 heap, budgets and cancellation; full JS/Web binding, baseline feature and
+mobile gates remain mandatory through M9.
 
 ## 8. M5 — Scripted document integration
 
@@ -350,37 +418,27 @@ coverage, five-platform GPU/Wasm and MV2/uBO operation, and controlled competiti
 measurements. Targets and measured results are reported separately. Final 100%
 progress cannot bypass these gates.
 
-## 14. First implementation queue
+## 14. Current implementation queue
 
-These are issue-ready tasks, not GitHub issues created by this commit. Work in
-order. Status reflects [implementation progress](IMPLEMENTATION.md) as of
-2026-11-08. DOC-06c (the HTML fragment parsing algorithm and all 192 html5lib
-fragment records) is also done. CSS-01 (CSS syntax) is done as the first M2 task. DOC-06d
-(`selectedcontent` mirroring) is done too, so every runnable html5lib tree record
-passes. Item 12 is owned by a separate thread. CSS-02 (selectors, specificity and
-matching), CSS-03 (typed property values), CSS-04 (cascade) and CSS-05
-(computed style) are done; this queue continues with CSS-06 onward in the M2
-table.
+Work in order unless a row says it runs in parallel. Status is as of
+2026-11-11; [implementation progress](IMPLEMENTATION.md) records each finished
+contract. The original twelve-item M1 queue (DOC-01a to DOC-09) is complete.
 
-| Order | Task / suggested issue title | Concrete completion test | Status |
+| Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
-| 1 | DOC-01a: Add typed document/node IDs with generation validation | Reusing an arena slot cannot revive a stale node handle | Done |
-| 2 | DOC-01b: Add input/node/depth budgets and cancellation | Exact limit accepted, next value rejected, cancellation terminates work | Done |
-| 3 | DOC-03: Implement minimal document arena and node kinds | Parent/child invariants survive insert/remove and invalid operations | Done |
-| 4 | DOC-04a: Add DOM mutation and deterministic tree serializer | Same tree emits identical bytes; moves cannot create cycles | Done |
-| 5 | DOC-02a: Implement URL records and tuple/opaque origin types | Relative resolution/serialization fixtures and opaque identity tests | Done (declared subset) |
-| 6 | DOC-05a: Implement incremental tokenizer data/tag/comment states | Chunked/unbroken token sequences match for every fixture split | Done |
-| 7 | DOC-05b: Add entities, raw/RCDATA/script text and encoding cases | Pinned tokenizer subset with errors and malformed inputs | Done |
-| 8 | DOC-06a: Implement initial/before-html/head/body insertion modes | Implied-node and malformed nesting tree fixtures | Done |
-| 9 | DOC-06b: Add table and formatting recovery modes | Foster-parenting/adoption-agency regression corpus | Done (all 1,584 document records, with DOC-06d) |
-| 10 | DOC-07: Expose a bounded local `dump-dom` CLI command | Fixture dump snapshot; URL and unauthorized file inputs rejected | Done |
-| 11 | DOC-08: Add corpus runner and parser fuzz smoke workflow | Seed replay works; crashes/timeouts fail CI and retain reproducers | Done (fuzz smoke + all fragment records) |
-| 12 | DOC-09: Review traced node/JS host-object ownership prototype | Reachable detached tree survives; unreachable cross-object cycles disappear | Done (prototype; ADR 0012) |
+| 1 | JS-02: values, coercions, strings/atoms, shapes and objects | Abstract-operation unit tests against the specification; 8-byte `Value` size asserted on every CI target | In progress |
+| 2 | JS-03: arena heap, roots and mark/sweep with host tracing | DOC-09's detached-tree and listener-cycle tests pass against the real heap; GC-at-every-allocation stress mode; budget exhaustion is atomic | Next |
+| 3 | JS-04: register bytecode, interpreter, functions and inline caches | Closures, exceptions and calls run; deep recursion fails with `RangeError` without Rust stack growth; cancellation stops `for(;;){}` | Planned |
+| 4 | JS-07: standalone runner and Test262 harness | Published counts at a pinned revision with exact expected failures | Planned (starts as soon as JS-04 runs code) |
+| 5 | JS-09: benchmark corpus and heap report | Recorded time and bytes per workload on x64 and ARM64; regressions over 10% need an explanation | Planned (corpus grows with each task) |
+| 6 | JS-05, JS-06, JS-08 | Their Test262 selections, each with an exact expected list | Planned |
+| — | MOB-03/04: Android/iOS CPU surfaces (parallel platform track) | Headless pixels match on device/emulator/simulator | Carried over from M3 |
+| — | M0 follow-up: require the `CI` check on `main` | Repository ruleset active | Waiting for GitHub Actions billing to be restored |
 
-For every issue include task ID, dependencies, specification section/revision,
+For every task record its ID, dependencies, specification section/revision,
 in/out scope, input/output contract, acceptance fixtures, budget behavior, and
-documentation to update. A task should fit a reviewable PR; split further before
-coding when it spans multiple unrelated contracts.
+documentation to update. A task should fit a reviewable change; split further
+before coding when it spans multiple unrelated contracts.
 
 ## 15. Definition of done and risk register
 
@@ -398,6 +456,7 @@ review and a threat-model update; dependency additions get a boundary review.
 | DOM/GC design causes leaks or stale access | Detached tree leaks or GC stress failures | Resolve DOC-09/JS-03 before generating broad bindings |
 | Layout/text consumes schedule | Font/platform-dependent diffs | Deterministic fonts, shaped-text contract, small formatting contexts |
 | JS semantic tail dominates | Test262 failures cluster around abstract operations | Fix shared semantics; publish subset; defer optimization |
+| JS memory or speed falls behind | Bytes per object/closure or benchmark time grows between tasks; GC pauses grow with heap size | JS-09 report on every JS change; fix representation before adding built-ins on top of it |
 | Async/reentry corruption | Stale frames, borrow failures, callbacks after close | Epochs, fake scheduler tests, explicit safe points |
 | Sandbox unavailable on a platform | Renderer retains ambient access | Gate remote mode on that OS; investigate separately |
 | Native dependency or decoder compromise | New unsafe/FFI surface or advisories | Minimize dependencies, isolate, audit/fuzz, update promptly |

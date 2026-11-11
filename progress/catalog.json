@@ -2649,16 +2649,126 @@
           "label": "Values, coercions, references and completions",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "8-byte NaN-boxed values, Latin-1/UTF-16 strings with atoms, Number and BigInt storage",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/value.rs",
+                  "marker": "pub struct Value(u64)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn latin1_strings_take_one_byte_per_code_unit"
+                }
+              ]
+            },
+            {
+              "label": "ToPrimitive, ToNumber, ToString, ToObject, ToPropertyKey, equality and relational comparison",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/convert.rs",
+                  "marker": "pub fn is_loosely_equal"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn equality_and_relational_comparison"
+                }
+              ]
+            },
+            {
+              "label": "Environment records, Reference Records and completion records",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/env.rs",
+                  "marker": "pub fn put_value"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn references_resolve_through_the_chain_to_the_global_object"
+                }
+              ]
+            },
+            {
+              "label": "ToBigInt, ToIndex and the remaining numeric conversions (TD-92)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.objects",
           "label": "Object methods, descriptors and prototypes",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Shared shapes, dictionary fallback, dense and sparse elements on a byte budget",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/shape.rs",
+                  "marker": "pub fn add"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn objects_built_alike_share_shapes_and_cost_eight_bytes_per_property"
+                }
+              ]
+            },
+            {
+              "label": "Ordinary internal methods and property descriptor validation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/internal.rs",
+                  "marker": "fn validate_and_apply"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn define_own_property_validates_against_the_current_descriptor"
+                }
+              ]
+            },
+            {
+              "label": "Array and String exotic objects",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/internal.rs",
+                  "marker": "fn array_set_length"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn array_length_tracks_indices_and_truncates"
+                }
+              ]
+            },
+            {
+              "label": "Arguments, bound function and Proxy exotic objects",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.heap",

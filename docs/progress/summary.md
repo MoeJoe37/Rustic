@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 33.40%** = 32.50% verified complete + 0.90% partial credit. 53/172 capabilities complete, 2 in progress.
+**Overall completion: 34.14%** = 32.50% verified complete + 1.64% partial credit. 53/172 capabilities complete, 4 in progress.
 
-Catalog: `engine-v3`. Source fingerprint: `bf01e2dd118b14866b20c4dc70fe1ee1880074dfe31872ffe57ba5ceaab21993`.
+Catalog: `engine-v3`. Source fingerprint: `69740a033c9383e7a8dea27a2f275e4a23dd1cce2f2fe17f84676ec40c46841c`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v3`. Source fingerprint: `bf01e2dd118b14866b20c4dc70fe1ee188007
 | M1 Document core | 28/28 | 100.00% | 100.00% | 11.27% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 9.00% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 12.22% |
-| M4 ECMAScript runtime | 0/13 | 6.41% | 0.00% | 10.68% |
+| M4 ECMAScript runtime | 0/13 | 13.33% | 0.00% | 10.68% |
 | M5 Scripted documents | 0/11 | 0.00% | 0.00% | 7.46% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 5.12% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 4.46% |
@@ -33,7 +33,7 @@ Catalog: `engine-v3`. Source fingerprint: `bf01e2dd118b14866b20c4dc70fe1ee188007
 | Text & fonts | 4/6 | 0 | 63.63% | 63.63% | 4% | 2.54 |
 | Layout | 6/10 | 0 | 56.52% | 56.52% | 9% | 5.08 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 6% | 4.22 |
-| JavaScript & GC | 0/15 | 1 | 5.70% | 0.00% | 12% | 0.68 |
+| JavaScript & GC | 0/15 | 3 | 11.87% | 0.00% | 12% | 1.42 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Bindings & web APIs | 0/8 | 0 | 0.00% | 0.00% | 6% | 0.00 |
 | Network & navigation | 0/7 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -159,8 +159,16 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Bounded parsing: depth, stack guard, cancellation and the js-parse fuzz target ([source](../../crates/rustic-fuzz/src/js.rs), [test](../../crates/rustic-js/tests/parse.rs))
   - [x] Pinned Test262 parse-phase gate with exact expected failures ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs))
   - [ ] RegExp pattern early errors (TD-88)
-- **planned** `js.values` — Values, coercions, references and completions · size 3 · M4 · 0.49% of engine
-- **planned** `js.objects` — Object methods, descriptors and prototypes · size 3 · M4 · 0.49% of engine
+- **in progress 75.00%** `js.values` — Values, coercions, references and completions · size 3 · M4 · 0.49% of engine
+  - [x] 8-byte NaN-boxed values, Latin-1/UTF-16 strings with atoms, Number and BigInt storage ([source](../../crates/rustic-js/src/runtime/value.rs), [test](../../crates/rustic-js/tests/runtime.rs))
+  - [x] ToPrimitive, ToNumber, ToString, ToObject, ToPropertyKey, equality and relational comparison ([source](../../crates/rustic-js/src/runtime/convert.rs), [test](../../crates/rustic-js/tests/runtime.rs))
+  - [x] Environment records, Reference Records and completion records ([source](../../crates/rustic-js/src/runtime/env.rs), [test](../../crates/rustic-js/tests/runtime.rs))
+  - [ ] ToBigInt, ToIndex and the remaining numeric conversions (TD-92)
+- **in progress 75.00%** `js.objects` — Object methods, descriptors and prototypes · size 3 · M4 · 0.49% of engine
+  - [x] Shared shapes, dictionary fallback, dense and sparse elements on a byte budget ([source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/runtime.rs))
+  - [x] Ordinary internal methods and property descriptor validation ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
+  - [x] Array and String exotic objects ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
+  - [ ] Arguments, bound function and Proxy exotic objects
 - **planned** `js.heap` — Rooted traced heap and host-object cycle collection · size 8 · M4 · 1.31% of engine
 - **planned** `js.interpreter` — Original interpreter/bytecode and control flow · size 8 · M4 · 1.31% of engine
 - **planned** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.82% of engine

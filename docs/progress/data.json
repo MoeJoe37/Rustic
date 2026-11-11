@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v3",
-  "source_fingerprint": "bf01e2dd118b14866b20c4dc70fe1ee1880074dfe31872ffe57ba5ceaab21993",
-  "percent": "33.40",
+  "source_fingerprint": "69740a033c9383e7a8dea27a2f275e4a23dd1cce2f2fe17f84676ec40c46841c",
+  "percent": "34.14",
   "verified_percent": "32.50",
-  "partial_percent": "0.90",
+  "partial_percent": "1.64",
   "completed": 53,
-  "in_progress": 2,
+  "in_progress": 4,
   "total": 172,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "10.68",
       "completed": 0,
       "total": 13,
-      "percent": "6.41",
+      "percent": "13.33",
       "verified_percent": "0.00",
-      "partial_percent": "6.41"
+      "partial_percent": "13.33"
     },
     {
       "id": "M5",
@@ -2925,9 +2925,64 @@
           "label": "Values, coercions, references and completions",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "8-byte NaN-boxed values, Latin-1/UTF-16 strings with atoms, Number and BigInt storage",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/value.rs",
+                  "marker": "pub struct Value(u64)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn latin1_strings_take_one_byte_per_code_unit"
+                }
+              ]
+            },
+            {
+              "label": "ToPrimitive, ToNumber, ToString, ToObject, ToPropertyKey, equality and relational comparison",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/convert.rs",
+                  "marker": "pub fn is_loosely_equal"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn equality_and_relational_comparison"
+                }
+              ]
+            },
+            {
+              "label": "Environment records, Reference Records and completion records",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/env.rs",
+                  "marker": "pub fn put_value"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn references_resolve_through_the_chain_to_the_global_object"
+                }
+              ]
+            },
+            {
+              "label": "ToBigInt, ToIndex and the remaining numeric conversions (TD-92)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "0.49"
         },
         {
@@ -2935,9 +2990,64 @@
           "label": "Object methods, descriptors and prototypes",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Shared shapes, dictionary fallback, dense and sparse elements on a byte budget",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/shape.rs",
+                  "marker": "pub fn add"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn objects_built_alike_share_shapes_and_cost_eight_bytes_per_property"
+                }
+              ]
+            },
+            {
+              "label": "Ordinary internal methods and property descriptor validation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/internal.rs",
+                  "marker": "fn validate_and_apply"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn define_own_property_validates_against_the_current_descriptor"
+                }
+              ]
+            },
+            {
+              "label": "Array and String exotic objects",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/internal.rs",
+                  "marker": "fn array_set_length"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/runtime.rs",
+                  "marker": "fn array_length_tracks_indices_and_truncates"
+                }
+              ]
+            },
+            {
+              "label": "Arguments, bound function and Proxy exotic objects",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "0.49"
         },
         {
@@ -3063,12 +3173,12 @@
       ],
       "points": 73,
       "completed": 0,
-      "in_progress": 1,
+      "in_progress": 3,
       "total": 15,
-      "contribution": "0.68",
-      "percent": "5.70",
+      "contribution": "1.42",
+      "percent": "11.87",
       "verified_percent": "0.00",
-      "partial_percent": "5.70"
+      "partial_percent": "11.87"
     },
     {
       "id": "wasm",

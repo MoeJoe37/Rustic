@@ -3,8 +3,9 @@
 //! This crate starts with JS-01: source text as UTF-16 code units
 //! ([`Source`]), the lexical grammar ([`Lexer`]) and a parser from scripts
 //! and modules to an abstract syntax tree ([`ast`]) with source spans, early
-//! errors, strict mode and automatic semicolon insertion. Values, the heap
-//! and execution follow in JS-02 onward; nothing here runs code. No existing
+//! errors, strict mode and automatic semicolon insertion. JS-02 adds the
+//! [`runtime`] data model: 8-byte values, strings, objects with shapes,
+//! conversions, environments and references. Execution follows in JS-04. No existing
 //! JavaScript engine is used (ADR 0001).
 //!
 //! Parsing is bounded: source length is checked up front, nesting depth is
@@ -17,6 +18,7 @@ pub mod ast;
 mod error;
 mod lexer;
 mod parser;
+pub mod runtime;
 mod source;
 pub mod test262;
 mod token;

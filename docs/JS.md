@@ -1,10 +1,11 @@
-# JavaScript: lexer and parser (JS-01)
+# JavaScript engine (JS-01, JS-02)
 
 `rustic-js` is Rustic's own ECMAScript implementation (M4, ADR 0001: no
 existing JavaScript engine is used or embedded). JS-01 provides the front end:
 UTF-16 source text, the lexical grammar, and a parser from scripts and modules
-to an abstract syntax tree with source spans. Nothing executes yet. Values,
-the heap and the interpreter follow in JS-02 to JS-04.
+to an abstract syntax tree with source spans. JS-02 adds the runtime data
+model (see [Runtime data model](#runtime-data-model-js-02)). Nothing executes
+yet; the heap's collector is JS-03 and the interpreter JS-04.
 
 ## API
 
@@ -105,3 +106,57 @@ stack, that syntax error spans lie inside the source, that a successful parse
 dumps deterministically, and that anything valid in strict mode is valid in
 sloppy mode. Seeds are one snippet per line of
 `crates/rustic-fuzz/corpus/js-parse/`.
+
+## Runtime data model (JS-02)
+
+`rustic_js::runtime` holds values, objects and environments, laid out for a
+small heap as [ADR 0015](adr/0015-js-value-and-memory-layout.md) records:
+
+| Item | Cost |
+| --- | --- |
+| `Value` (any type) | 8 bytes, NaN-boxed; arena handles are `u32` |
+| Object with no properties | 72 bytes (shape, prototype, flags, slot and element vectors, one pointer to rare state) |
+| Each named property of an object built like others | 8 bytes (16 for an accessor); the shared shape describes it |
+| Each dense array element | 8 bytes |
+| String | 24 bytes (12 on 32-bit targets) plus 1 byte per code unit when all units are below 256, otherwise 2 |
+| Binding in a declarative environment | 12 bytes |
+
+An `Agent` owns one `Heap` and the realm's intrinsic objects. Every
+allocation is charged to the heap's byte budget; exceeding it returns
+`Abrupt::OutOfMemory`, which script cannot catch, and the heap is never
+over-committed. Nothing is collected until JS-03 (TD-91).
+
+- **Strings** (`JsStr`) are Latin-1 or UTF-16 with UTF-16 semantics.
+  Property names are interned, so key comparison is an id compare, and array
+  indices are a separate key kind that is never turned into a string.
+- **Objects** start on a shared shape tree. Adding the same keys in the same
+  order reuses the same shapes; deleting the newest key steps back up the
+  tree. Changing attributes, deleting another key or exceeding 32 named
+  properties moves the object to its own ordered dictionary. Indexed elements
+  are a dense vector (holes allowed) until an index lands far past the end or
+  an element gets non-default attributes; then they become a sparse map.
+- **Internal methods** follow §10.1 for ordinary objects, including
+  `ValidateAndApplyPropertyDescriptor`, prototype-cycle checks and
+  `[[OwnPropertyKeys]]` ordering, plus the Array (`length`, `ArraySetLength`)
+  and String (read-only indices) exotic objects. §7.3 operations such as
+  `CreateDataPropertyOrThrow`, `GetMethod`, `SetIntegrityLevel` and
+  `CreateArrayFromList` are on `Agent`.
+- **Conversions and comparisons** (§7.1, §7.2): `ToPrimitive` with
+  `@@toPrimitive`, `ToNumber` (the full StringNumericLiteral grammar,
+  correctly rounded), `Number::toString` (shortest round-trip digits),
+  `ToString`, `ToObject`, `ToPropertyKey`, `SameValue`, `===`, `==` and `<`,
+  including exact BigInt/Number comparison. `ToBigInt` and BigInt arithmetic
+  are not implemented yet (TD-92).
+- **Environments** (§9.1): declarative, function, object (`with`, honoring
+  `@@unscopables`) and global records, with the temporal dead zone stored as
+  an internal "uninitialized" value. Reference Records implement `GetValue`,
+  `PutValue` and `InitializeReferencedBinding`; completion records cover
+  `UpdateEmpty` and `LoopContinues`.
+- **Built-ins** are limited to what conversions call: `valueOf`/`toString` on
+  `Object.prototype` and the wrapper prototypes, `Error.prototype.toString`,
+  and the global value properties. Native functions are plain Rust `fn`s; the
+  full library is JS-05.
+
+`tests/runtime.rs` checks the spec rules above and pins the memory costs in
+the table.
+

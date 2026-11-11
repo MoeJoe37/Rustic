@@ -1116,6 +1116,18 @@ generated from pinned Unicode 17 files. Nothing executes yet: values, heap and
 interpreter are JS-02 to JS-04, and the Test262 runner with published results
 is JS-07. See [JS.md](JS.md) and TD-88/89/90.
 
+## JS-02 — Runtime data model
+
+`rustic_js::runtime` implements the values, objects and environments the
+interpreter will run on, designed for memory first (ADR 0015): values are 8
+bytes, every heap item is a `u32` index into a typed arena charged to a byte
+budget, Latin-1 strings use one byte per unit, and objects share shapes, so a
+property costs one 8-byte slot. Ordinary, Array and String internal methods,
+the §7.1/§7.2 conversions and comparisons, environment and Reference Records
+and completion records follow ECMA-262. Tests check those rules and pin the
+memory costs (72-byte empty object, 8 bytes per shared-shape property and per
+dense element). Collection (JS-03) and BigInt conversions (TD-92) remain.
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,
@@ -1176,6 +1188,7 @@ lists the next tasks.
 | CSS-08: declared CSS conformance gate | Complete: pinned WPT parsing cases for selectors and supported properties, 1,115/1,455 in scope pass, the rest listed with reasons in a ratchet; shorthand serialization, named-color keywords and `calc()` wrappers in specified values remain |
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
+| JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; no collection yet (TD-91), partial BigInt conversions (TD-92); see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
 
 M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and
 cross-document adoption; mutation records and observers are an M5 gate

@@ -22,6 +22,7 @@ instead of rewriting the history of a decision.
 | [0012](0012-dom-tracing-prototype.md) | Per-tree DOM/host tracing prototype and the DOM pre-insert conformance gate | Accepted prototype; real heap with JS-03 |
 | [0013](0013-any-capable-device.md) | Support any device that can run a browser, enforced by tiered CI | Accepted scope update |
 | [0014](0014-reviewed-font-adapters.md) | Bounded HarfRust/Skrifa/Wuff adapters, exact dependency review and auditing | Accepted for M3 text |
+| [0015](0015-js-value-and-memory-layout.md) | 8-byte NaN-boxed JS values, `u32`-indexed budgeted arenas, Latin-1 strings, shapes | Accepted for JS-02; collection with JS-03 |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

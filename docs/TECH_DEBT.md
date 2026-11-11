@@ -122,6 +122,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Open, JS-08 |
 | TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, M4 |
 | TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
+| TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Open, JS-03 |
+| TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and other numeric conversions are missing | Open, JS-05/JS-08 |
+| TD-93 | Watch | JS | Environment bindings are found by a linear name search | Open, JS-04 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1286,4 +1289,38 @@ Watch for: frame-size growth that lowers the limit below realistic nesting
 (the `nesting_beyond_the_limit_fails_without_overflowing` test parses 128
 mixed levels with default limits). Pay by moving deep expression chains to
 an explicit stack if real content needs more.
+
+### TD-91 — The JS heap never frees
+
+JS-02 allocates objects, strings, symbols, BigInts and environments into
+`u32`-indexed arenas and charges each to the heap's byte budget
+(`DEFAULT_HEAP_BYTES`, 256 MiB), but nothing is collected: garbage stays
+until the agent is dropped, and a long computation fails with
+`Abrupt::OutOfMemory` once the budget is spent. Nothing executes script yet,
+so no page can reach this.
+
+Pay with JS-03: roots, nonmoving mark/sweep over the same arenas with free
+lists that keep indices stable, budget release on sweep, and tracing of host
+objects (replacing the DOC-09 `HostHeap` stand-in, TD-17).
+
+### TD-92 — BigInt and number conversions are partial
+
+`BigInt` stores sign and magnitude, prints in decimal, and compares with
+BigInts and Numbers exactly, which is what equality, `<` and `ToString` need.
+`ToBigInt`, `NumberToBigInt` as a conversion, BigInt arithmetic, `ToIndex`,
+`ToBigInt64`/`ToBigUint64` and `Number.prototype.toString(radix)` for radixes
+other than 10 are not implemented. Callers get no silent wrong answers:
+the operations simply do not exist yet.
+
+Pay with the Number built-ins (JS-05) and the BigInt work of JS-08.
+
+### TD-93 — Bindings are found by name search
+
+A declarative environment record finds a binding by a linear search over its
+interned names. This is exact and compact (12 bytes per binding), but costs
+time per lookup in large scopes.
+
+Watch for: JS-04's bytecode compiler should resolve most bindings to slot
+indices at compile time, leaving name search only for `eval` and `with`.
+Pay there if profiles show scope lookup cost.
 

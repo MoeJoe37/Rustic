@@ -689,3 +689,25 @@ fn weak_map_values_reached_through_host_edges_are_found() {
         "found"
     );
 }
+
+#[test]
+fn abandoned_map_iterators_stop_holding_tables_after_a_collection() {
+    let mut a = agent();
+    a.evaluate(
+        "var m = new Map(); for (var i = 0; i < 1000; i++) m.set(i, i); \
+         var it = m.keys(); it.next(); for (var i = 0; i < 990; i++) m.delete(i); it = null;",
+    )
+    .unwrap();
+    // The open iterator kept every position until now.
+    let held = a.collect_garbage(Roots::default()).bytes_after;
+    // The collection found the iterator dead, so the next change
+    // squeezes the holes out.
+    a.evaluate("m.set('x', 1); m.delete('x'); m.size").unwrap();
+    let compacted = a.collect_garbage(Roots::default()).bytes_after;
+    assert!(
+        compacted + 30_000 < held,
+        "{compacted} bytes after compaction, {held} before"
+    );
+    let keys = a.evaluate("[...m.keys()].join()").unwrap();
+    assert_eq!(a.display(keys), "990,991,992,993,994,995,996,997,998,999");
+}

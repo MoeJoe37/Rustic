@@ -253,7 +253,15 @@ impl Agent {
                 }
             }
         }
-        self.heap.charge(48)?;
+        // Replacing a property costs nothing; only a new key is charged.
+        let is_new = self
+            .heap
+            .object(o)
+            .dictionary()
+            .is_none_or(|d| d.get(key).is_none());
+        if is_new {
+            self.heap.charge(48)?;
+        }
         let object = self.heap.object_mut(o);
         object
             .extra_mut()
@@ -280,7 +288,14 @@ impl Agent {
             return Ok(());
         }
         self.make_sparse(o);
-        self.heap.charge(48)?;
+        let is_new = self
+            .heap
+            .object(o)
+            .sparse()
+            .is_none_or(|m| !m.contains_key(&i));
+        if is_new {
+            self.heap.charge(48)?;
+        }
         let object = self.heap.object_mut(o);
         object
             .extra_mut()

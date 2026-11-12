@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "ff45f204d7a3f1959341ea64f62098c3e96d2a4462f006e66f2e35934c1aad76",
-  "percent": "24.74",
+  "source_fingerprint": "7e5e9bd8b87688e26aef11a5771f9bcbc605d68c847efe1566c9a8439904e3af",
+  "percent": "24.90",
   "verified_percent": "20.90",
-  "partial_percent": "3.84",
+  "partial_percent": "4.00",
   "completed": 54,
   "in_progress": 8,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "50.73",
+      "percent": "52.49",
       "verified_percent": "12.30",
-      "partial_percent": "38.43"
+      "partial_percent": "40.19"
     },
     {
       "id": "M5",
@@ -3574,8 +3574,29 @@
             },
             {
               "label": "Map, Set, WeakMap, WeakSet and WeakRef",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/table.rs",
+                  "marker": "pub(crate) struct OrderedTable"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/collections.rs",
+                  "marker": "fn table_iterator_next"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn collections_and_reflect"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn abandoned_map_iterators_stop_holding_tables_after_a_collection"
+                }
+              ]
             },
             {
               "label": "eval (TD-106)",
@@ -3583,7 +3604,7 @@
               "evidence": []
             }
           ],
-          "credit": "71.42",
+          "credit": "85.71",
           "engine_share": "1.09"
         },
         {
@@ -3720,10 +3741,10 @@
       "completed": 1,
       "in_progress": 7,
       "total": 15,
-      "contribution": "4.79",
-      "percent": "47.91",
+      "contribution": "4.94",
+      "percent": "49.48",
       "verified_percent": "10.95",
-      "partial_percent": "36.96"
+      "partial_percent": "38.53"
     },
     {
       "id": "wasm",

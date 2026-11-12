@@ -143,3 +143,6 @@ new Function('a', 'return a * 2')(21) + Symbol.for('x').description + [].concat.
 JSON.stringify(JSON.parse('{"a":[1,"x\\u00e9",{"b":null}],"c":true}', function (k, v) { return v }), null, '--');
 (1.005).toFixed(2) + (255).toString(36) + (0.1).toExponential(3) + 'aßc'.toUpperCase().padEnd(8, '*').split('S').length;
 'a-b-c'.replaceAll('-', '$&$`').at(-2) + String.fromCharCode(0xd83d, 0xde00).codePointAt(0) + 'xyz'.substr(1).repeat(2);
+var m = new Map([[1, 2]]); var it = m.keys(); for (var i = 0; i < 50; i++) { m.set('k' + i, i); m.delete(i % 7) } [...it].length + m.size + [...new Set('hello')].join('');
+var s = new Set([1, 2, 3]); s.forEach(function (v) { if (v < 10) s.add(v + 10); s.delete(v - 1) }); [...s.union([9].values ? new Set([9]) : s)].length + Reflect.ownKeys(Object.groupBy(s, String)).length;
+var w = new WeakMap(); var k = []; w.set(k, new Map([[k, w]])); Reflect.apply(Array.prototype.push, k, [1, 2]) + w.get(k).size + String(new WeakRef(k).deref() === k);

@@ -4,6 +4,7 @@
 //! global object. The full library is JS-05.
 
 mod array;
+mod collections;
 mod error;
 mod function;
 mod global;
@@ -11,6 +12,7 @@ mod json;
 mod math;
 mod number_object;
 mod object;
+mod reflect;
 mod string_object;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
@@ -134,6 +136,8 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     number_object::install(agent)?;
     string_object::install(agent)?;
     json::install(agent)?;
+    collections::install(agent)?;
+    reflect::install(agent)?;
 
     // Value properties of the global object (§19.1).
     let global = i.global;
@@ -286,7 +290,7 @@ fn string_iterator(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Valu
     new_iterator(agent, Value::string(string), IteratorKind::String)
 }
 
-fn iterator_result(agent: &mut Agent, value: Value, done: bool) -> JsResult<Value> {
+pub(crate) fn iterator_result(agent: &mut Agent, value: Value, done: bool) -> JsResult<Value> {
     let result = agent.new_object()?;
     let value_key = PropertyKey::String(agent.names.value);
     let done_key = PropertyKey::String(agent.names.done);
@@ -305,7 +309,7 @@ fn iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value>
                 target,
                 index,
                 kind,
-            }) => Some((o, *target, *index, *kind)),
+            }) if !kind.walks_table() => Some((o, *target, *index, *kind)),
             _ => None,
         });
     let Some((iterator, target, index, kind)) = state else {
@@ -351,6 +355,7 @@ fn iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value>
             }
         }
         (IteratorKind::String, _) => (None, 0),
+        (_, _) => unreachable!("table iterators have their own next"),
     };
     if let Some(Internal::Iterator { target, index, .. }) =
         agent.heap.object_mut(iterator).internal_mut()

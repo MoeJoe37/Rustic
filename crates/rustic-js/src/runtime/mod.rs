@@ -16,6 +16,7 @@ mod number;
 mod object;
 mod shape;
 mod string;
+mod table;
 mod value;
 mod weak;
 

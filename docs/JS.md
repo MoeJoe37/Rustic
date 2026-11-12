@@ -124,10 +124,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (JS-05 areas) |
 | --- | ---: | ---: |
-| Pass | 12,404 | 8,375 |
-| Fail | 5,369 | 1,092 |
+| Pass | 12,441 | 9,439 |
+| Fail | 5,332 | 1,126 |
 | Skipped (modules, async, proposals) | 6,059 | 96 |
-| Pass rate of the files that run | 69.8% | 88.5% |
+| Pass rate of the files that run | 70.0% | 89.3% |
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -144,8 +144,9 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
 
 The built-ins gate runs the `test/built-ins` directories of the library areas
 installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
-Error, Function, JSON, Math, NativeErrors, Number, Object, String, Symbol and
-the global functions). A sparse checkout must include them:
+Error, FinalizationRegistry, Function, JSON, Map, Math, NativeErrors, Number,
+Object, Reflect, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
+iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
 
 Both runs take about 40 seconds on one core. The files that pass are listed
@@ -465,6 +466,23 @@ Part 2 adds the rest of the everyday library, beginning with:
     arrays parse.
   - `stringify` recurses and throws a RangeError when the run's native stack
     budget is spent.
+- **Map and Set.** Every method, the ES2025 set methods (`union`,
+  `intersection`, `difference`, `symmetricDifference`, `isSubsetOf`,
+  `isSupersetOf`, `isDisjointFrom`), `Map.groupBy`, `Object.groupBy`, and the
+  `getOrInsert`/`getOrInsertComputed` methods of the upsert proposal.
+  - Entries live in one insertion-ordered vector with a hash index on
+    SameValueZero (`runtime/table.rs`), about 40 bytes each.
+  - A deleted entry leaves a hole, so an open iterator keeps its place and
+    sees entries added after it.
+  - Holes are squeezed out once they outnumber the live entries and no
+    iterator or `forEach` holds a position. The collector recounts the open
+    iterators of every table, so an iterator abandoned half-way stops holding
+    its table back after the next collection.
+- **Weak collections.** `WeakMap`, `WeakSet`, `WeakRef` and
+  `FinalizationRegistry` on the JS-03 ephemeron tables. A registry records
+  registrations and collects held values when targets die. Its cleanup
+  callback waits for host jobs (JS-06).
+- **Reflect.** All thirteen functions.
 
 Time on the development machine (release): 1 million `push` calls take 300
 ms including the global loop around them (about 120 ns per call). A `map` over
@@ -484,4 +502,4 @@ Installing the rest of the library lazily is the JS-09 lever if agents per
 page start to matter.
 
 With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
-and with the part 2 pieces above to 69.8%.
+and with the part 2 pieces above to 70.0%.

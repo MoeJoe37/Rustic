@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 24.74%** = 20.90% verified complete + 3.84% partial credit. 54/221 capabilities complete, 8 in progress.
+**Overall completion: 24.90%** = 20.90% verified complete + 4.00% partial credit. 54/221 capabilities complete, 8 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `ff45f204d7a3f1959341ea64f62098c3e96d2a4462f006e66f2e35934c1aad76`.
+Catalog: `engine-v4`. Source fingerprint: `7e5e9bd8b87688e26aef11a5771f9bcbc605d68c847efe1566c9a8439904e3af`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `ff45f204d7a3f1959341ea64f62098c3e96d2
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 1/13 | 50.73% | 12.30% | 8.90% |
+| M4 ECMAScript runtime | 1/13 | 52.49% | 12.30% | 8.90% |
 | M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `ff45f204d7a3f1959341ea64f62098c3e96d2
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 1/15 | 7 | 47.91% | 10.95% | 10% | 4.79 |
+| JavaScript & GC | 1/15 | 7 | 49.48% | 10.95% | 10% | 4.94 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -201,13 +201,13 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Private names and brand checks ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Lazy function prototypes and shared scope name lists (120-byte closures) ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [ ] Mapped arguments objects
-- **in progress 71.42%** `js.builtins` — Core built-ins and collections · size 8 · M4 · 1.09% of engine
+- **in progress 85.71%** `js.builtins` — Core built-ins and collections · size 8 · M4 · 1.09% of engine
   - [x] Error and native errors, Object, Function.prototype, global functions and primitive wrapper constructors ([source](../../crates/rustic-js/src/runtime/builtins/error.rs), [source](../../crates/rustic-js/src/runtime/builtins/object.rs), [source](../../crates/rustic-js/src/runtime/builtins/function.rs), [source](../../crates/rustic-js/src/runtime/builtins/global.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Array, iterators and array-likes ([source](../../crates/rustic-js/src/runtime/builtins/array.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Function constructor, Math and Symbol statics ([source](../../crates/rustic-js/src/runtime/builtins/math.rs), [source](../../crates/rustic-js/src/vm/mod.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] String, Number and Boolean prototypes ([source](../../crates/rustic-js/src/runtime/builtins/string_object.rs), [source](../../crates/rustic-js/src/runtime/builtins/number_object.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] JSON ([source](../../crates/rustic-js/src/runtime/builtins/json.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [ ] Map, Set, WeakMap, WeakSet and WeakRef
+  - [x] Map, Set, WeakMap, WeakSet and WeakRef ([source](../../crates/rustic-js/src/runtime/table.rs), [source](../../crates/rustic-js/src/runtime/builtins/collections.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
   - [ ] eval (TD-106)
 - **planned** `js.jobs` — Promises, jobs and realms · size 3 · M4 · 0.41% of engine
 - **planned** `js.modules` — Modules and host loading hooks · size 3 · M4 · 0.41% of engine

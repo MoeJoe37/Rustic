@@ -175,11 +175,13 @@ pub struct Intrinsics {
     /// The global symbol registry of `Symbol.for`: a null-prototype
     /// object from keys to symbols, never reachable from script.
     pub symbol_registry: ObjectId,
+    /// `%MapIteratorPrototype%` and `%SetIteratorPrototype%`.
+    pub table_iterator_prototypes: [ObjectId; 2],
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 18] {
+    pub(crate) fn all(&self) -> [ObjectId; 20] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -199,6 +201,8 @@ impl Intrinsics {
             self.array_values,
             self.array_iterator_next,
             self.symbol_registry,
+            self.table_iterator_prototypes[0],
+            self.table_iterator_prototypes[1],
         ]
     }
 }
@@ -255,6 +259,7 @@ impl Agent {
                 array_values: placeholder,
                 array_iterator_next: placeholder,
                 symbol_registry: placeholder,
+                table_iterator_prototypes: [placeholder; 2],
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -317,6 +322,7 @@ impl Agent {
             array_values: object_prototype,
             array_iterator_next: object_prototype,
             symbol_registry: self.heap.alloc_object(Object::new(Class::Ordinary, None))?,
+            table_iterator_prototypes: [object_prototype; 2],
         };
         super::builtins::install(self)
     }

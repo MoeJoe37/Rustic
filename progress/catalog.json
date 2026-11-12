@@ -3260,8 +3260,29 @@
             },
             {
               "label": "Map, Set, WeakMap, WeakSet and WeakRef",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/table.rs",
+                  "marker": "pub(crate) struct OrderedTable"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/collections.rs",
+                  "marker": "fn table_iterator_next"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn collections_and_reflect"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn abandoned_map_iterators_stop_holding_tables_after_a_collection"
+                }
+              ]
             },
             {
               "label": "eval (TD-106)",

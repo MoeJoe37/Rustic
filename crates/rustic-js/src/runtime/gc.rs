@@ -224,6 +224,10 @@ struct Marker<'h> {
     weak_refs: Vec<u32>,
     weak_maps: Vec<u32>,
     registries: Vec<u32>,
+    /// Map and Set objects, and the tables live iterators walk, for
+    /// recounting open iterators.
+    tables: Vec<u32>,
+    table_iterators: Vec<u32>,
     /// A symbol or object was newly marked since the flag was cleared, so
     /// another ephemeron pass may find more live keys.
     progress: bool,
@@ -357,7 +361,20 @@ impl Marker<'_> {
             match &extra.internal {
                 None => {}
                 Some(Internal::Host(data)) => self.hosts.push(*data),
-                Some(Internal::Iterator { target, .. }) => self.value(*target),
+                Some(Internal::Iterator { target, kind, .. }) => {
+                    self.value(*target);
+                    if kind.walks_table() {
+                        if let Some(table) = target.as_object() {
+                            self.table_iterators.push(table.0);
+                        }
+                    }
+                }
+                Some(Internal::Table(table)) => {
+                    for v in table.values() {
+                        self.value(v);
+                    }
+                    self.tables.push(index);
+                }
                 Some(Internal::Bound { target, this, args }) => {
                     self.value(Value::object(*target));
                     self.value(*this);
@@ -401,6 +418,7 @@ fn object_footprint(object: &Object) -> usize {
         bytes += match &extra.internal {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
+            Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()
             }
@@ -498,6 +516,8 @@ impl Agent {
             weak_refs: Vec::new(),
             weak_maps: Vec::new(),
             registries: Vec::new(),
+            tables: Vec::new(),
+            table_iterators: Vec::new(),
             progress: false,
         };
         marker.marks.shapes.insert(ROOT_SHAPE.0);
@@ -531,6 +551,8 @@ impl Agent {
             weak_refs,
             weak_maps,
             registries,
+            tables,
+            table_iterators,
             ..
         } = marker;
 
@@ -543,6 +565,17 @@ impl Agent {
                 if !marks.is_live(*target) {
                     *target = Value::UNINITIALIZED;
                 }
+            }
+        }
+        // Only iterators that survive hold a table's positions.
+        for &index in &tables {
+            if let Some(Internal::Table(table)) = heap.objects.get_mut(index).internal_mut() {
+                table.iterators = 0;
+            }
+        }
+        for index in table_iterators {
+            if let Some(Internal::Table(table)) = heap.objects.get_mut(index).internal_mut() {
+                table.iterators += 1;
             }
         }
         for index in weak_maps {

@@ -719,6 +719,23 @@ fn function_prototypes_are_created_on_first_use() {
 }
 
 #[test]
+fn overwriting_a_dictionary_property_charges_nothing() {
+    // The global object holds more properties than a shape does, so it is a
+    // dictionary; updating a global must not charge a new entry each time.
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("var g = 0; var k = 0; var o = []; o[1000000] = 0")
+        .expect("runs");
+    let before = agent.heap.bytes_used();
+    agent
+        .evaluate("for (var k = 0; k < 2000; k++) { g = k; o[1000000] = k }")
+        .expect("runs");
+    let grown = agent.heap.bytes_used() - before;
+    // What remains is the compiled script, not a cost per iteration.
+    assert!(grown < 2048, "updates charged {grown} bytes");
+}
+
+#[test]
 fn closures_and_their_scopes_stay_small() {
     // The memory gate for functions: a closure with no captured variable,
     // and one that captures a variable in its own scope environment.
@@ -1450,6 +1467,70 @@ fn strings_numbers_and_json() {
     check(
         "JSON.parse('['.repeat(50000) + ']'.repeat(50000)).length",
         "1",
+    );
+}
+
+#[test]
+fn collections_and_reflect() {
+    let _report = Report;
+    check(
+        "var m = new Map([[1, 'a'], ['1', 'b'], [NaN, 'n']]); m.set(-0, 'z'); m.size + m.get(1) + m.get('1') + m.get(NaN) + m.get(0) + [...m.keys()].join()",
+        "4abnz1,1,NaN,0",
+    );
+    // Iteration sees entries added during the loop and skips deleted ones.
+    check(
+        "var s = new Set([1, 2, 3]); var seen = []; for (var v of s) { seen.push(v); if (v === 1) { s.delete(2); s.add(4) } } seen.join() + '|' + s.size",
+        "1,3,4|3",
+    );
+    // Holes are squeezed out when no iterator is open.
+    check(
+        "var b = new Map(); for (var i = 0; i < 1000; i++) b.set(i, i); for (var i = 0; i < 990; i++) b.delete(i); b.size + '|' + [...b.values()].slice(0, 2)",
+        "10|990,991",
+    );
+    check(
+        "var m = new Map([[1, 1]]); var it = m.entries(); m.clear(); it.next().done + ',' + m.size",
+        "true,0",
+    );
+    check(
+        "[...new Set([1, 2, 3]).union(new Set([3, 4]))] + '|' + [...new Set([1, 2, 3]).intersection(new Set([2, 3, 9]))] + '|' + [...new Set([1, 2]).symmetricDifference(new Set([2, 3]))] + '|' + new Set([1]).isSubsetOf(new Set([1, 2]))",
+        "1,2,3,4|2,3|1,3|true",
+    );
+    check(
+        "Object.prototype.toString.call(new Map) + Object.prototype.toString.call(new Set().values())",
+        "[object Map][object Set Iterator]",
+    );
+    check(
+        "var g = Object.groupBy([1, 2, 3, 4], function (x) { return x % 2 ? 'odd' : 'even' }); g.odd + '|' + Map.groupBy([1, 2, 3], function (x) { return x > 1 }).get(true)",
+        "1,3|2,3",
+    );
+    check(
+        "var m = new Map(); m.getOrInsert('k', 1) + m.getOrInsert('k', 2) + m.getOrInsertComputed('j', function (k) { return k + '!' })",
+        "2j!",
+    );
+    check(
+        "var wm = new WeakMap(); var k = {}; wm.set(k, 5); var r; try { wm.set(1, 1) } catch (e) { r = e.name } wm.get(k) + ',' + wm.has({}) + ',' + (new WeakRef(k).deref() === k) + ',' + r",
+        "5,false,true,TypeError",
+    );
+    check(
+        "var r; try { Map() } catch (e) { r = e.name } r + (new (class extends Set {})([1]) instanceof Set)",
+        "TypeErrortrue",
+    );
+    // Reflect.
+    check(
+        "Reflect.ownKeys({ b: 1, 1: 2, [Symbol.iterator]: 3 }).length + ',' + Reflect.has({ x: 1 }, 'x') + ',' + Reflect.apply(Math.max, null, [1, 3, 2])",
+        "3,true,3",
+    );
+    check(
+        "function F() { this.nt = new.target } class G {} var o = Reflect.construct(F, [], G); (o instanceof G) + ',' + (o.nt === G) + ',' + (Reflect.getPrototypeOf(o) === G.prototype)",
+        "true,true,true",
+    );
+    check(
+        "var o = Reflect.construct(function F() { this.nt = new.target }, [], Array); (Object.getPrototypeOf(o) === Array.prototype)",
+        "true",
+    );
+    check(
+        "var o = Object.freeze({ a: 1 }); Reflect.set(o, 'a', 2) + ',' + Reflect.defineProperty(o, 'b', { value: 1 }) + ',' + Reflect.deleteProperty(o, 'a')",
+        "false,false,false",
     );
 }
 

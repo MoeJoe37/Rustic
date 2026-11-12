@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 12404 pass, 5369 fail, 6059 skipped (modules, async, proposals).
+# 12441 pass, 5332 fail, 6059 skipped (modules, async, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1gs.js
 arguments-object/10.5-7-b-2-s.js
@@ -3281,6 +3281,8 @@ expressions/class/elements/private-method-shadowed-by-field-on-nested-class.js
 expressions/class/elements/private-method-shadowed-by-getter-on-nested-class.js
 expressions/class/elements/private-method-shadowed-by-setter-on-nested-class.js
 expressions/class/elements/private-method-shadowed-on-nested-class.js
+expressions/class/elements/private-methods/prod-private-method-initialize-order.js
+expressions/class/elements/private-methods/prod-private-method.js
 expressions/class/elements/private-setter-access-on-inner-arrow-function.js
 expressions/class/elements/private-setter-access-on-inner-function.js
 expressions/class/elements/private-setter-on-nested-class.js
@@ -3847,14 +3849,19 @@ expressions/class/subclass-builtins/subclass-Boolean.js
 expressions/class/subclass-builtins/subclass-Error.js
 expressions/class/subclass-builtins/subclass-EvalError.js
 expressions/class/subclass-builtins/subclass-Function.js
+expressions/class/subclass-builtins/subclass-Map.js
 expressions/class/subclass-builtins/subclass-Number.js
 expressions/class/subclass-builtins/subclass-Object.js
 expressions/class/subclass-builtins/subclass-RangeError.js
 expressions/class/subclass-builtins/subclass-ReferenceError.js
+expressions/class/subclass-builtins/subclass-Set.js
 expressions/class/subclass-builtins/subclass-String.js
 expressions/class/subclass-builtins/subclass-SyntaxError.js
 expressions/class/subclass-builtins/subclass-TypeError.js
 expressions/class/subclass-builtins/subclass-URIError.js
+expressions/class/subclass-builtins/subclass-WeakMap.js
+expressions/class/subclass-builtins/subclass-WeakRef.js
+expressions/class/subclass-builtins/subclass-WeakSet.js
 expressions/coalesce/abrupt-is-a-short-circuit.js
 expressions/coalesce/cannot-chain-head-with-logical-and.js
 expressions/coalesce/cannot-chain-head-with-logical-or.js
@@ -5437,6 +5444,8 @@ expressions/new.target/value-via-fpapply.js
 expressions/new.target/value-via-fpcall.js
 expressions/new.target/value-via-member.js
 expressions/new.target/value-via-new.js
+expressions/new.target/value-via-reflect-apply.js
+expressions/new.target/value-via-reflect-construct.js
 expressions/new.target/value-via-super-call.js
 expressions/new.target/value-via-super-property.js
 expressions/new.target/value-via-tagged-template.js
@@ -6091,6 +6100,7 @@ expressions/optional-chaining/iteration-statement-for-in.js
 expressions/optional-chaining/iteration-statement-for-of-type-error.js
 expressions/optional-chaining/iteration-statement-for.js
 expressions/optional-chaining/iteration-statement-while.js
+expressions/optional-chaining/new-target-optional-call.js
 expressions/optional-chaining/optional-call-preserves-this.js
 expressions/optional-chaining/optional-chain-expression-optional-expression.js
 expressions/optional-chaining/optional-chain-prod-arguments.js
@@ -6365,6 +6375,7 @@ expressions/super/call-arg-evaluation-err.js
 expressions/super/call-bind-this-value-twice.js
 expressions/super/call-bind-this-value.js
 expressions/super/call-construct-error.js
+expressions/super/call-construct-invocation.js
 expressions/super/call-expr-value.js
 expressions/super/call-poisoned-underscore-proto.js
 expressions/super/call-proto-not-ctor.js
@@ -6524,6 +6535,7 @@ expressions/this/11.1.1-1.js
 expressions/this/S11.1.1_A1.js
 expressions/typeof/boolean.js
 expressions/typeof/built-in-functions.js
+expressions/typeof/built-in-ordinary-objects-no-call.js
 expressions/typeof/get-value-ref-err.js
 expressions/typeof/get-value.js
 expressions/typeof/number.js
@@ -9088,6 +9100,8 @@ statements/class/elements/private-method-shadowed-by-field-on-nested-class.js
 statements/class/elements/private-method-shadowed-by-getter-on-nested-class.js
 statements/class/elements/private-method-shadowed-by-setter-on-nested-class.js
 statements/class/elements/private-method-shadowed-on-nested-class.js
+statements/class/elements/private-methods/prod-private-method-initialize-order.js
+statements/class/elements/private-methods/prod-private-method.js
 statements/class/elements/private-setter-access-on-inner-arrow-function.js
 statements/class/elements/private-setter-access-on-inner-function.js
 statements/class/elements/private-setter-brand-check-multiple-evaluations-of-class.js
@@ -9730,14 +9744,19 @@ statements/class/subclass-builtins/subclass-Boolean.js
 statements/class/subclass-builtins/subclass-Error.js
 statements/class/subclass-builtins/subclass-EvalError.js
 statements/class/subclass-builtins/subclass-Function.js
+statements/class/subclass-builtins/subclass-Map.js
 statements/class/subclass-builtins/subclass-Number.js
 statements/class/subclass-builtins/subclass-Object.js
 statements/class/subclass-builtins/subclass-RangeError.js
 statements/class/subclass-builtins/subclass-ReferenceError.js
+statements/class/subclass-builtins/subclass-Set.js
 statements/class/subclass-builtins/subclass-String.js
 statements/class/subclass-builtins/subclass-SyntaxError.js
 statements/class/subclass-builtins/subclass-TypeError.js
 statements/class/subclass-builtins/subclass-URIError.js
+statements/class/subclass-builtins/subclass-WeakMap.js
+statements/class/subclass-builtins/subclass-WeakRef.js
+statements/class/subclass-builtins/subclass-WeakSet.js
 statements/class/subclass/binding.js
 statements/class/subclass/builtin-objects/Array/contructor-calls-super-multiple-arguments.js
 statements/class/subclass/builtin-objects/Array/contructor-calls-super-single-argument.js
@@ -9753,6 +9772,8 @@ statements/class/subclass/builtin-objects/Function/instance-length.js
 statements/class/subclass/builtin-objects/Function/instance-name.js
 statements/class/subclass/builtin-objects/Function/regular-subclassing.js
 statements/class/subclass/builtin-objects/Function/super-must-be-called.js
+statements/class/subclass/builtin-objects/Map/regular-subclassing.js
+statements/class/subclass/builtin-objects/Map/super-must-be-called.js
 statements/class/subclass/builtin-objects/NativeError/EvalError-message.js
 statements/class/subclass/builtin-objects/NativeError/EvalError-name.js
 statements/class/subclass/builtin-objects/NativeError/EvalError-super.js
@@ -9777,11 +9798,17 @@ statements/class/subclass/builtin-objects/Object/constructor-return-undefined-th
 statements/class/subclass/builtin-objects/Object/constructor-returns-non-object.js
 statements/class/subclass/builtin-objects/Object/regular-subclassing.js
 statements/class/subclass/builtin-objects/Object/replacing-prototype.js
+statements/class/subclass/builtin-objects/Set/regular-subclassing.js
+statements/class/subclass/builtin-objects/Set/super-must-be-called.js
 statements/class/subclass/builtin-objects/String/length.js
 statements/class/subclass/builtin-objects/String/regular-subclassing.js
 statements/class/subclass/builtin-objects/String/super-must-be-called.js
 statements/class/subclass/builtin-objects/Symbol/new-symbol-with-super-throws.js
 statements/class/subclass/builtin-objects/Symbol/symbol-valid-as-extends-value.js
+statements/class/subclass/builtin-objects/WeakMap/regular-subclassing.js
+statements/class/subclass/builtin-objects/WeakMap/super-must-be-called.js
+statements/class/subclass/builtin-objects/WeakSet/regular-subclassing.js
+statements/class/subclass/builtin-objects/WeakSet/super-must-be-called.js
 statements/class/subclass/class-definition-evaluation-empty-constructor-heritage-present.js
 statements/class/subclass/class-definition-null-proto-contains-return-override.js
 statements/class/subclass/class-definition-null-proto-missing-return-override.js
@@ -10754,9 +10781,19 @@ statements/for-of/labelled-fn-stmt-var.js
 statements/for-of/let-array-with-newline.js
 statements/for-of/let-block-with-newline.js
 statements/for-of/let-identifier-with-newline.js
+statements/for-of/map-contract-expand.js
+statements/for-of/map-contract.js
+statements/for-of/map-expand-contract.js
+statements/for-of/map-expand.js
+statements/for-of/map.js
 statements/for-of/scope-body-lex-boundary.js
 statements/for-of/scope-body-lex-close.js
 statements/for-of/scope-body-var-none.js
+statements/for-of/set-contract-expand.js
+statements/for-of/set-contract.js
+statements/for-of/set-expand-contract.js
+statements/for-of/set-expand.js
+statements/for-of/set.js
 statements/for-of/string-astral-truncated.js
 statements/for-of/string-astral.js
 statements/for-of/string-bmp.js

@@ -43,6 +43,10 @@ pub enum Class {
     WeakSet,
     /// A FinalizationRegistry (§26.2).
     FinalizationRegistry,
+    /// A Map (§24.1).
+    Map,
+    /// A Set (§24.2).
+    Set,
 }
 
 /// A complete or partial property descriptor (§6.2.6).
@@ -266,6 +270,22 @@ pub(crate) enum IteratorKind {
     ArrayEntries,
     /// The code points of a string.
     String,
+    /// The keys of a Map or the values of a Set.
+    TableKeys,
+    /// The values of a Map or Set.
+    TableValues,
+    /// `[key, value]` pairs of a Map or `[value, value]` of a Set.
+    TableEntries,
+}
+
+impl IteratorKind {
+    /// Whether the iterator walks a Map or Set table.
+    pub(crate) fn walks_table(self) -> bool {
+        matches!(
+            self,
+            IteratorKind::TableKeys | IteratorKind::TableValues | IteratorKind::TableEntries
+        )
+    }
 }
 
 /// Internal slots the collector treats specially.
@@ -289,6 +309,9 @@ pub(crate) enum Internal {
     },
     /// `[[WeakRefTarget]]`; `UNINITIALIZED` once the target is collected.
     WeakRef(Value),
+    /// `[[MapData]]` or `[[SetData]]` (a Set stores each value as its own
+    /// key and value).
+    Table(Box<super::table::OrderedTable>),
     /// `[[WeakMapData]]` or `[[WeakSetData]]` keyed by the key's bits. An
     /// entry is an ephemeron: its value is live only while its key is.
     WeakMap(HashMap<u64, Value>),

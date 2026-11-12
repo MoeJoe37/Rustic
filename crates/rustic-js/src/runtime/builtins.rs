@@ -8,6 +8,7 @@ mod collections;
 mod date;
 mod error;
 mod function;
+mod generator;
 mod global;
 mod iterator;
 mod json;
@@ -141,6 +142,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     collections::install(agent)?;
     date::install(agent)?;
     iterator::install(agent)?;
+    generator::install(agent)?;
     reflect::install(agent)?;
 
     // Value properties of the global object (§19.1).

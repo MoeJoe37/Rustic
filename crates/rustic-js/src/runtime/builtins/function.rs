@@ -50,7 +50,7 @@ fn function_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
         }
         None => String::new(),
     };
-    let f = agent.create_dynamic_function(&parameter_text.join(","), &body_text)?;
+    let f = agent.create_dynamic_function("function", &parameter_text.join(","), &body_text)?;
     // A subclass's prototype (§20.2.1.1.1 step 23).
     if let (Some(target), Some(o)) = (agent.new_target(), f.as_object()) {
         if agent.active_function() != Some(target) {

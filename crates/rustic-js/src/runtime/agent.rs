@@ -184,11 +184,16 @@ pub struct Intrinsics {
     /// `%eval%`: a call of the bare name `eval` that reaches this function
     /// is a direct eval.
     pub eval: ObjectId,
+    /// `%GeneratorFunction.prototype%`, the prototype of generator
+    /// functions.
+    pub generator_function_prototype: ObjectId,
+    /// `%GeneratorPrototype%` (`%GeneratorFunction.prototype.prototype%`).
+    pub generator_prototype: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 24] {
+    pub(crate) fn all(&self) -> [ObjectId; 26] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -214,6 +219,8 @@ impl Intrinsics {
             self.iterator_helper_prototypes[1],
             self.iterator,
             self.eval,
+            self.generator_function_prototype,
+            self.generator_prototype,
         ]
     }
 }
@@ -274,6 +281,8 @@ impl Agent {
                 iterator_helper_prototypes: [placeholder; 2],
                 iterator: placeholder,
                 eval: placeholder,
+                generator_function_prototype: placeholder,
+                generator_prototype: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -340,6 +349,8 @@ impl Agent {
             iterator_helper_prototypes: [object_prototype; 2],
             iterator: object_prototype,
             eval: object_prototype,
+            generator_function_prototype: object_prototype,
+            generator_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

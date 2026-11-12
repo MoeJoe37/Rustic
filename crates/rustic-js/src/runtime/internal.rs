@@ -91,13 +91,24 @@ impl Agent {
         f: ObjectId,
         attributes: Attributes,
     ) -> JsResult<Value> {
-        let prototype = self.new_object()?;
-        let constructor = PropertyKey::String(self.names.constructor);
-        self.define_property_or_throw(
-            prototype,
-            constructor,
-            PropertyDescriptor::data_with(Value::object(f), true, false, true),
-        )?;
+        let generator = self
+            .heap
+            .closure(f)
+            .is_some_and(|closure| self.heap.code(closure.code).generator);
+        let prototype = if generator {
+            // A generator function's `prototype` inherits from
+            // %GeneratorPrototype% and has no `constructor` (§15.5.3).
+            self.new_object_with(Some(self.intrinsics.generator_prototype))?
+        } else {
+            let prototype = self.new_object()?;
+            let constructor = PropertyKey::String(self.names.constructor);
+            self.define_property_or_throw(
+                prototype,
+                constructor,
+                PropertyDescriptor::data_with(Value::object(f), true, false, true),
+            )?;
+            prototype
+        };
         let value = Value::object(prototype);
         let key = PropertyKey::String(self.names.prototype);
         self.store(

@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Generators, async functions, modules, RegExp literals and BigInt literals are rejected by the bytecode compiler | Open, JS-06/JS-08 |
+| TD-97 | Deliberate | JS | Async functions, modules, RegExp literals and BigInt literals are rejected by the bytecode compiler (generators paid) | Open, JS-06/JS-08 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Open, JS-05 |
@@ -1374,14 +1374,16 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. Generators, async functions and `for await`, modules, regular
-expression literals and BigInt literals return
-`CompileError::Unsupported` with a span before any code runs, so a script
-either runs with correct semantics or not at all. There is no `eval`.
+calls. Async functions and `for await`, modules, regular expression
+literals and BigInt literals return `CompileError::Unsupported` with a span
+before any code runs, so a script either runs with correct semantics or not
+at all.
 
 Private names, object-literal `super`, tagged templates and optional calls
-were paid on 2026-11-12, which ends the JS-04 share. Pay modules with JS-06; generators, async functions, RegExp and
-BigInt with JS-08. Trigger: the Test262 runner (JS-07).
+were paid on 2026-11-12, which ends the JS-04 share; `eval` and generators
+(JS-08 part 1) were paid the same day. Pay modules with JS-06; async
+functions, RegExp and BigInt with JS-08. Trigger: the Test262 runner
+(JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1413,7 +1415,8 @@ destructuring (`[a, b] = iterable`) closes it after a normal finish, but not
 when evaluating a target or default throws midway.
 
 Pay with JS-05's iterator helpers. Trigger: generators (JS-08) make the
-missing `return()` call observable in common code.
+missing `return()` call observable in common code. Generators run since
+2026-11-12, so this is due next.
 
 ### TD-101 — Strings concatenate by copying
 

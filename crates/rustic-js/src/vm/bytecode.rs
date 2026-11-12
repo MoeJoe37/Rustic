@@ -364,6 +364,34 @@ pub enum Op {
     Return { src: Reg },
     /// Throw `src`.
     Throw { src: Reg },
+    /// The end of a generator function's parameter and declaration
+    /// instantiation: create the generator object, suspend the frame in
+    /// it and return the object to the caller.
+    GeneratorStart,
+    /// Suspend the generator, giving the caller an iterator result for
+    /// `src` (or `src` itself when `raw`, for `yield*`). On resumption
+    /// `dst` receives the value sent in and `mode` how it was sent: 0 for
+    /// `next`, 1 for `throw`, 2 for `return`.
+    Yield {
+        src: Reg,
+        dst: Reg,
+        mode: Reg,
+        raw: bool,
+    },
+    /// One step of `yield*` (§15.5.5): call the `next`, `throw` or
+    /// `return` method (by `mode`) of `iterator` (whose `next` is in the
+    /// register after it) with `value`, leaving the result object in
+    /// `dst`. A missing `return` produces `{value, done: true}`; a missing
+    /// `throw` closes the iterator and throws a TypeError.
+    Delegate {
+        dst: Reg,
+        iterator: Reg,
+        value: Reg,
+        mode: Reg,
+    },
+    /// `iterator, iterator + 1 = GetIterator(src)` as a real iterator
+    /// object and its `next` method (no array fast path).
+    GetIteratorObject { iterator: Reg, src: Reg },
 
     /// Start a for-in over `src`: `state` holds the object (undefined
     /// for null and undefined), `state + 1` an array of its enumerable
@@ -503,6 +531,8 @@ pub struct FunctionCode {
     pub strict: bool,
     /// What kind of function this is.
     pub kind: FunctionKind,
+    /// A generator function: a call returns a generator object.
+    pub generator: bool,
     /// Named property access sites with their inline caches.
     pub sites: Box<[NamedSite]>,
     /// Tagged template sites.

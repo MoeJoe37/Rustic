@@ -112,6 +112,8 @@ const BUILT_IN_DIRS: &[&str] = &[
     "Error",
     "FinalizationRegistry",
     "Function",
+    "GeneratorFunction",
+    "GeneratorPrototype",
     "Iterator",
     "JSON",
     "Map",

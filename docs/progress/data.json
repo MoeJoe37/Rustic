@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "92c8070b9410f9877c5aedeb967446791c1dd7bd4050b9a3819809d4a350488a",
-  "percent": "25.05",
+  "source_fingerprint": "0ed46140d9fe796875c144fe675f325a8c72bcbe02b6045575c1e95826fc8fa8",
+  "percent": "25.27",
   "verified_percent": "21.99",
-  "partial_percent": "3.06",
+  "partial_percent": "3.28",
   "completed": 55,
-  "in_progress": 7,
+  "in_progress": 8,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 2,
       "total": 13,
-      "percent": "54.25",
+      "percent": "56.71",
       "verified_percent": "24.61",
-      "partial_percent": "29.64"
+      "partial_percent": "32.10"
     },
     {
       "id": "M5",
@@ -3510,9 +3510,52 @@
           "label": "BigInt, RegExp, proxies, generators and async",
           "size": 8,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Generators, yield* and %GeneratorFunction%",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "pub(crate) fn generator_resume"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn generators()"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn suspended_generators_keep_their_frames_alive"
+                }
+              ]
+            },
+            {
+              "label": "Async functions, await and for await",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "BigInt arithmetic and literals",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "RegExp engine and literals (TD-88)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Proxy",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "20.00",
           "engine_share": "1.09"
         },
         {
@@ -3617,12 +3660,12 @@
       ],
       "points": 73,
       "completed": 2,
-      "in_progress": 6,
+      "in_progress": 7,
       "total": 15,
-      "contribution": "5.10",
-      "percent": "51.04",
+      "contribution": "5.32",
+      "percent": "53.23",
       "verified_percent": "21.91",
-      "partial_percent": "29.13"
+      "partial_percent": "31.32"
     },
     {
       "id": "wasm",

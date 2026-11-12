@@ -7,8 +7,9 @@ to an abstract syntax tree with source spans. JS-02 adds the runtime data
 model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
 garbage collector (see [Garbage collection](#garbage-collection-js-03)).
 JS-04 compiles scripts to bytecode and runs them (see
-[Bytecode and interpreter](#bytecode-and-interpreter-js-04)); generators,
-async functions, modules and regular expressions do not run yet.
+[Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
+generators (JS-08 part 1); async functions, modules and regular expressions
+do not run yet.
 
 ## API
 
@@ -144,7 +145,8 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
 
 The built-ins gate runs the `test/built-ins` directories of the library areas
 installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
-Date, Error, FinalizationRegistry, Function, Iterator, JSON, Map, Math, NativeErrors, Number,
+Date, Error, FinalizationRegistry, Function, GeneratorFunction,
+GeneratorPrototype, Iterator, JSON, Map, Math, NativeErrors, Number,
 Object, Reflect, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
@@ -158,17 +160,20 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 
 Most `test/language` failures are not interpreter bugs yet:
 
-- About 3,700 files need generators or async functions (JS-08).
+- About 590 files need async functions (JS-08).
+- About 240 need regular expressions.
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
-- About 240 need regular expressions.
 - Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
-  the rest.
+  the rest. The real assertion failures left are mostly parameter TDZ in
+  defaults (`dflt-params-ref-later`), function names from computed symbol
+  keys, the mapped `arguments` object (TD-99) and the restricted `caller`
+  and `arguments` properties.
 
-In the built-ins, the failures are mostly tests that are written with
-generators, test proposals not implemented yet (of the 361 `Iterator`
-failures, about 180 and 170), or reach for `RegExp`, `Proxy`, Temporal, typed arrays or `$262`. Skipped files are never counted as
-passing. Module and async files join with JS-06 (TD-105).
+In the built-ins, the failures are mostly proposals not implemented yet
+(about 170 of the 217 `Iterator` failures), or tests that reach for
+`RegExp`, `Proxy`, Temporal, typed arrays or `$262`. Skipped files are never
+counted as passing. Module and async files join with JS-06 (TD-105).
 
 ## Fuzzing
 
@@ -338,8 +343,43 @@ calls a function value. The design is recorded in
   evaluation of one site passes the same object and allocates nothing.
   `f?.()`, `o.m?.()` and `(o?.m)()` short-circuit without evaluating their
   arguments and keep the receiver.
+- **Generators** (JS-08 part 1, §27.5): `function*` declarations and
+  expressions, generator methods in objects and classes, `yield`, `yield*`
+  and `%GeneratorFunction%`.
+  - A call runs the parameter and declaration instantiation, then
+    `GeneratorStart` moves the frame into the generator object and returns
+    it. The object keeps the frame's registers in one boxed slice, with the
+    resume point, environment, `this` and function: about 100 bytes plus 8
+    per register, and nothing else. No Rust stack and no separate value
+    stack are kept per generator.
+  - `next`, `throw` and `return` copy the registers back onto the agent's
+    value stack and run the frame in a nested run until `yield` copies them
+    out again. A resumption writes the sent value and the resume mode to
+    the `yield`'s registers; compiled code after each `yield` then goes on,
+    throws, or returns through any `finally` blocks with the ordinary exit
+    path, so `return()` runs `finally` code that may itself yield.
+  - `yield*` is a loop in bytecode around one `Delegate` op, which calls the
+    inner `next`, `throw` or `return` and checks the result; inner results
+    are passed out unchanged. A missing `throw` closes the inner iterator
+    and throws a TypeError, as §15.5.5 requires.
+  - A generator function's `prototype` (inheriting `%GeneratorPrototype%`,
+    without `constructor`) is created on first use, as for other functions
+    (TD-98). Generators are not constructors.
+  - The collector traces a suspended generator's registers, environment and
+    code (`suspended_generators_keep_their_frames_alive`).
+  - A generator body runs nested under its `next` call, and native code on
+    the Rust stack normally blocks collection. When `next` was called from
+    a site that holds nothing unrooted (a bytecode call, an iterator step,
+    a `yield*` step or the host) at the collectable level, the body
+    collects at its own safe points, so `for (x of gen())` over an
+    allocating generator stays within the heap. Called from anywhere else
+    (a conversion, a callback of a native), the body does not collect
+    (`generator_bodies_collect_at_their_safe_points`).
+  - Test262: with generators, `test/language` went from 13,087 to 16,138 of
+    17,773 files (90.8%), and the built-ins gate gained 268 files, mostly in
+    `Iterator`; `GeneratorFunction` and `GeneratorPrototype` are gated.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): generators, async functions, modules, regular
+  anything runs, TD-97): async functions, modules, regular
   expression literals and BigInt literals. Built-in constructors
   cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
   (TD-92).
@@ -531,11 +571,10 @@ Part 2 adds the rest of the everyday library, beginning with:
     throws, as a running generator does.
   - `return` closes the inner iterator of `flatMap` first, then the
     underlying one; a throwing callback closes the underlying iterator.
-  - Test262 `test/built-ins/Iterator`: every file that runs without
-    generators passes (317 of 678). Of the rest, about 180 are written with
-    generators (JS-08), about 170 test proposals not implemented yet (`zip`,
-    `zipKeyed`, `chunks`, `windows`, `includes`, `join`), and a few need
-    `$262` or `RegExp`.
+  - Test262 `test/built-ins/Iterator`: 467 of 684 files pass. Of the rest,
+    about 170 test proposals not implemented yet (`zip`, `zipKeyed`,
+    `chunks`, `windows`, `includes`, `join`), and a few need `$262`,
+    `RegExp` or async.
 
 Time on the development machine (release): 1 million `push` calls take 300
 ms including the global loop around them (about 120 ns per call). A `map` over
@@ -555,4 +594,5 @@ Installing the rest of the library lazily is the JS-09 lever if agents per
 page start to matter.
 
 With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
-and with the part 2 pieces above to 70.0%.
+and with the part 2 pieces above to 70.0%. Eval took it to 73.6% and
+generators to 90.8%.

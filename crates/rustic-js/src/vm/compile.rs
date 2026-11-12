@@ -232,6 +232,8 @@ struct Gen<'a, 't> {
     /// caller's to its variable environment, or `None` when that is the
     /// global environment (see [`compile_eval`]).
     eval: Option<Option<u16>>,
+    /// Compiling a generator function's body.
+    generator: bool,
 }
 
 impl<'a, 't> Gen<'a, 't> {
@@ -277,6 +279,7 @@ impl<'a, 't> Gen<'a, 't> {
             home_object: false,
             next_home_object: false,
             eval: None,
+            generator: false,
         }
     }
 
@@ -314,6 +317,7 @@ impl<'a, 't> Gen<'a, 't> {
             name: self.name,
             strict: self.strict,
             kind: self.kind,
+            generator: self.generator,
             sites: self.sites.into_boxed_slice(),
             templates: self.templates.into_boxed_slice(),
         };
@@ -564,11 +568,8 @@ impl<'a, 't> Gen<'a, 't> {
         for s in body {
             if let StatementKind::Function(f) = &s.kind {
                 let Some(id) = &f.id else { continue };
-                if f.is_async || f.is_generator {
-                    return Err(CompileError::Unsupported(
-                        "generator and async functions",
-                        f.span,
-                    ));
+                if f.is_async {
+                    return Err(CompileError::Unsupported("async functions", f.span));
                 }
                 let mark = self.mark();
                 let r = self.temp()?;
@@ -1630,11 +1631,8 @@ impl<'a, 't> Gen<'a, 't> {
         name_hint: Option<&str>,
         kind: FunctionKind,
     ) -> CResult<()> {
-        if f.is_async || f.is_generator {
-            return Err(CompileError::Unsupported(
-                "generator and async functions",
-                f.span,
-            ));
+        if f.is_async {
+            return Err(CompileError::Unsupported("async functions", f.span));
         }
         let scope = self.tree.scope_of(f).expect("functions are analyzed");
         let name = match (&f.id, name_hint) {
@@ -1657,6 +1655,7 @@ impl<'a, 't> Gen<'a, 't> {
                 _ => self.next_home.take(),
             };
             g.home_object = std::mem::take(&mut self.next_home_object);
+            g.generator = f.is_generator;
             g.guard()?;
             if kind == FunctionKind::ClassConstructor {
                 // Fields are defined before the parameters are bound. The
@@ -1675,6 +1674,9 @@ impl<'a, 't> Gen<'a, 't> {
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
             g.enter_function_body(f)?;
             g.function_prologue(&f.body)?;
+            if g.generator {
+                g.emit(Op::GeneratorStart);
+            }
             g.statements(&f.body)?;
             g.finish(params, length)?
         };
@@ -1863,6 +1865,82 @@ impl<'a, 't> Gen<'a, 't> {
             }
             self.store_binding_at(body, i, value)?;
         }
+        self.release(mark);
+        Ok(())
+    }
+
+    /// After a `yield` resumes: go on for `next`, throw the sent value
+    /// for `throw`, and return it (through any `finally`) for `return`.
+    fn resumption(&mut self, value: Reg, mode: Reg) -> CResult<()> {
+        let resume = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 0,
+            target: 0,
+        });
+        let close = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 2,
+            target: 0,
+        });
+        self.emit(Op::Throw { src: value });
+        self.patch_here(close);
+        self.emit_exit(Exit::Return, Some(value))?;
+        self.patch_here(resume);
+        Ok(())
+    }
+
+    /// `yield* argument` (§15.5.5, sync generators): pass each `next`,
+    /// `throw` and `return` on to the inner iterator and its results
+    /// back out unchanged, until the inner iterator is done.
+    fn yield_delegate(&mut self, argument: &Expression, dst: Reg) -> CResult<()> {
+        let mark = self.mark();
+        let iterator = self.temps(2)?;
+        let value = self.temp()?;
+        self.expr(argument, value)?;
+        self.emit(Op::GetIteratorObject {
+            iterator,
+            src: value,
+        });
+        let received = value;
+        self.emit(Op::Undefined { dst: received });
+        let mode = self.temp()?;
+        self.emit(Op::Int {
+            dst: mode,
+            value: 0,
+        });
+        let result = self.temp()?;
+        let done = self.temp()?;
+        let top = self.here();
+        self.emit(Op::Delegate {
+            dst: result,
+            iterator,
+            value: received,
+            mode,
+        });
+        self.get_named(done, result, "done")?;
+        let finished = self.emit(Op::JumpIfTrue {
+            cond: done,
+            target: 0,
+        });
+        self.emit(Op::Yield {
+            src: result,
+            dst: received,
+            mode,
+            raw: true,
+        });
+        self.emit(Op::Loop { target: top });
+        self.patch_here(finished);
+        self.get_named(received, result, "value")?;
+        let close = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 2,
+            target: 0,
+        });
+        self.emit(Op::Move { dst, src: received });
+        let end = self.jump();
+        self.patch_here(close);
+        self.emit_exit(Exit::Return, Some(received))?;
+        self.patch_here(end);
         self.release(mark);
         Ok(())
     }
@@ -3319,11 +3397,35 @@ impl<'a, 't> Gen<'a, 't> {
             ExpressionKind::ImportMeta | ExpressionKind::ImportCall { .. } => {
                 return Err(CompileError::Unsupported("modules", e.span));
             }
-            ExpressionKind::Yield { .. } | ExpressionKind::Await(_) => {
-                return Err(CompileError::Unsupported(
-                    "generator and async functions",
-                    e.span,
-                ));
+            ExpressionKind::Yield {
+                argument,
+                delegate: false,
+            } => {
+                let value = self.temp()?;
+                match argument {
+                    Some(a) => self.expr(a, value)?,
+                    None => {
+                        self.emit(Op::Undefined { dst: value });
+                    }
+                }
+                let mode = self.temp()?;
+                self.emit(Op::Yield {
+                    src: value,
+                    dst,
+                    mode,
+                    raw: false,
+                });
+                self.resumption(dst, mode)?;
+            }
+            ExpressionKind::Yield {
+                argument,
+                delegate: true,
+            } => {
+                let argument = argument.as_deref().expect("yield* has an operand");
+                self.yield_delegate(argument, dst)?;
+            }
+            ExpressionKind::Await(_) => {
+                return Err(CompileError::Unsupported("async functions", e.span));
             }
         }
         self.release(mark);

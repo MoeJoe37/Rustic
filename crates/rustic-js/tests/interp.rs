@@ -1825,7 +1825,7 @@ fn arrays_math_symbols_and_dynamic_functions() {
 
 #[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in ["function* g() {}", "async function f() {}", "/x/"] {
+    for source in ["async function f() {}", "/x/", "({ async *m() {} })"] {
         let mut agent = Agent::new().expect("agent");
         assert!(
             matches!(agent.evaluate(source), Err(EvalError::Compile(_))),
@@ -2113,4 +2113,103 @@ fn host_calls_and_reentrancy() {
         .get(made.as_object().expect("object"), v_key)
         .expect("v");
     assert_eq!(v, Value::number(4.0));
+}
+
+#[test]
+fn generators() {
+    let _report = Report;
+    check(
+        "function* g(a) { var x = yield a; var y = yield x * 2; return x + y } \
+         var it = g(5); var r = [it.next().value, it.next(3).value]; var e = it.next(4); \
+         r.join() + ':' + e.value + e.done + ':' + it.next().done",
+        "5,6:7true:true",
+    );
+    check(
+        "function* g() { yield 1; yield 2; yield 3 } [...g()].join()",
+        "1,2,3",
+    );
+    check(
+        "function* g() { yield 1; yield 2 } var s = 0; for (var v of g()) s += v; s",
+        "3",
+    );
+    // `return` runs finally blocks, which may yield.
+    check(
+        "var log = []; function* g() { try { yield 1; yield 2 } finally { log.push('f'); yield 'c' } } \
+         var it = g(); it.next(); var a = it.return(9); var b = it.next(); \
+         log.join() + a.value + a.done + b.value + b.done",
+        "fcfalse9true",
+    );
+    check(
+        "function* g() { try { yield 1 } catch (e) { yield 'caught ' + e } } \
+         var it = g(); it.next(); it.throw('x').value",
+        "caught x",
+    );
+    check(
+        "function* g() { yield 1 } var it = g(); try { it.throw(new Error('early')) } catch (e) { e.message + it.next().done }",
+        "earlytrue",
+    );
+    // yield* forwards results unchanged, and its value is the inner return.
+    check(
+        "function* inner() { var x = yield 'a'; return x + '!' } \
+         function* outer() { var r = yield* inner(); yield r } \
+         var it = outer(); it.next().value + it.next('b').value + it.next().done",
+        "ab!true",
+    );
+    check(
+        "function* g() { yield* [1, 2]; yield* 'xy' } [...g()].join('')",
+        "12xy",
+    );
+    check(
+        "var closed = 0; var inner = { [Symbol.iterator]() { return this }, next() { return {value: 1, done: false} }, \
+         return(v) { closed++; return {value: v, done: true} } }; \
+         function* g() { yield* inner } var it = g(); it.next(); var r = it.return(5); closed + ':' + r.value + r.done",
+        "1:5true",
+    );
+    check(
+        "function* g() { yield this.k; yield typeof new.target } var it = g.call({k: 7}); it.next().value + it.next().value",
+        "7undefined",
+    );
+    check(
+        "function* g() {} try { new g() } catch (e) { e.name }",
+        "TypeError",
+    );
+    check(
+        "function* g() { yield 1 } var it = g(); \
+         [Object.getPrototypeOf(it) === g.prototype, Object.getPrototypeOf(g.prototype) === Object.getPrototypeOf(function* () {}).prototype, \
+          it[Symbol.iterator]() === it, Object.prototype.toString.call(it), g.prototype.hasOwnProperty('constructor')].join()",
+        "true,true,true,[object Generator],false",
+    );
+    check(
+        "function* g() { it.next() } var it = g(); try { it.next() } catch (e) { e.name }",
+        "TypeError",
+    );
+    check(
+        "var GF = Object.getPrototypeOf(function* () {}).constructor; var f = GF('a', 'yield a; yield a + 1'); [...f(3)].join()",
+        "3,4",
+    );
+    check(
+        "var o = { *m() { yield super.toString === Object.prototype.toString } }; o.m().next().value",
+        "true",
+    );
+    check(
+        "class C { static *[Symbol.iterator]() { yield 'c' } } [...C].join()",
+        "c",
+    );
+    check(
+        "function* g(n) { for (let i = 0; i < n; i++) { let j = i; yield () => j } } \
+         [...g(3)].map(f => f()).join()",
+        "0,1,2",
+    );
+    check(
+        "function* g() { var a = arguments; yield a.length; yield a[1] } var it = g(4, 5); it.next().value + it.next().value",
+        "7",
+    );
+    check(
+        "function* g() { with ({w: 1}) { yield w; yield w + 1 } } [...g()].join()",
+        "1,2",
+    );
+    check(
+        "function* d(x = 1) { yield x } d().next().value + d(4).next().value",
+        "5",
+    );
 }

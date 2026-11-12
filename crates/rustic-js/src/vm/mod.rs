@@ -93,16 +93,22 @@ impl Agent {
         Ok(self.run_script(code)?)
     }
 
-    /// `CreateDynamicFunction` (§20.2.1.1.1) for ordinary functions: the
+    /// `CreateDynamicFunction` (§20.2.1.1.1) for ordinary and generator functions: the
     /// `Function` constructor. The parameters and body are parsed as one
     /// function expression in the global scope; text that closes the
     /// function early to smuggle in other code parses as something else
     /// and is a SyntaxError.
-    pub(crate) fn create_dynamic_function(&mut self, params: &str, body: &str) -> JsResult<Value> {
+    /// `keyword` is `function` or `function*`.
+    pub(crate) fn create_dynamic_function(
+        &mut self,
+        keyword: &str,
+        params: &str,
+        body: &str,
+    ) -> JsResult<Value> {
         use crate::ast::{ExpressionKind, StatementKind};
         // The function is unnamed so that `anonymous` is not bound inside it;
         // its `name` is set afterwards.
-        let text = format!("(function ({params}\n) {{\n{body}\n}})");
+        let text = format!("({keyword} ({params}\n) {{\n{body}\n}})");
         let syntax_error = |agent: &mut Agent, message: &str| {
             Err(agent.throw(crate::runtime::ErrorKind::SyntaxError, message))
         };

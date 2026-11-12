@@ -328,6 +328,47 @@ pub(crate) enum Internal {
     /// `[[Iterated]]` of a `%WrapForValidIteratorPrototype%` object from
     /// `Iterator.from`: the iterator and its `next` method.
     Wrapped { iterator: Value, next: Value },
+    /// A generator object's suspended frame (§27.5).
+    Generator(Box<Generator>),
+}
+
+/// `[[GeneratorState]]`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GeneratorState {
+    SuspendedStart,
+    SuspendedYield,
+    Executing,
+    Completed,
+}
+
+/// A generator's frame while it is not running: where it stopped and its
+/// registers. While it runs, its registers live on the value stack and
+/// the copy here is stale until the next `yield` writes it back.
+#[derive(Clone, Debug)]
+pub(crate) struct Generator {
+    pub state: GeneratorState,
+    pub code: CodeId,
+    /// The op to resume at.
+    pub pc: u32,
+    pub env: EnvId,
+    /// Environments the frame had pushed.
+    pub depth: u16,
+    pub this: Value,
+    pub function: Value,
+    pub new_target: Value,
+    /// Where a resumption writes the value sent in and how it was sent
+    /// (the `dst` and `mode` of the `yield`); `None` before the start.
+    pub resume: Option<(u16, u16)>,
+    pub registers: Box<[Value]>,
+}
+
+impl Generator {
+    /// Every value the generator holds, for the collector.
+    pub(crate) fn values(&self) -> impl Iterator<Item = Value> + '_ {
+        [self.this, self.function, self.new_target]
+            .into_iter()
+            .chain(self.registers.iter().copied())
+    }
 }
 
 /// What an iterator helper does on `next`.

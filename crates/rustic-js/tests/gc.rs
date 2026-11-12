@@ -732,3 +732,65 @@ fn iterator_helpers_keep_their_iterators_and_functions_alive() {
     assert_eq!(a.display(first), "10");
     assert_eq!(a.display(rest), "20,true,0,true,3");
 }
+
+#[test]
+fn suspended_generators_keep_their_frames_alive() {
+    let mut a = agent();
+    // Only the suspended frames reference these objects: the registers,
+    // the captured environment and `this`.
+    a.evaluate(
+        "var g = (function* (n) { var local = { v: n }; let captured = { v: n + 1 }; \
+             var f = function () { return captured.v }; \
+             var sent = yield local.v; yield [sent.v, f(), this.t.v].join(); return local.v })\
+             .call({ t: { v: 9 } }, 4); \
+         g.next();",
+    )
+    .unwrap();
+    for _ in 0..3 {
+        a.evaluate(
+            "var junk = []; for (var i = 0; i < 2000; i++) junk.push({ i: i }); junk = null",
+        )
+        .unwrap();
+        a.collect_garbage(Roots::default());
+    }
+    let second = a.evaluate("g.next({ v: 7 }).value").unwrap();
+    assert_eq!(a.display(second), "7,5,9");
+    a.collect_garbage(Roots::default());
+    let last = a
+        .evaluate("var r = g.next(); r.value + ':' + r.done")
+        .unwrap();
+    assert_eq!(a.display(last), "4:true");
+}
+
+#[test]
+fn generator_bodies_collect_at_their_safe_points() {
+    // Each step allocates far more than the heap holds in total; only
+    // collection inside the generator body keeps it within the limit.
+    let mut a = Agent::with_heap_limit(1024 * 1024).unwrap();
+    let r = a
+        .evaluate(
+            "function* g() { for (var n = 0; n < 3; n++) { var t = 0; \
+               for (var i = 0; i < 100000; i++) { var o = { i: i, s: 'x' + i }; t += o.i & 1 } yield t } } \
+             var s = 0; for (var v of g()) s += v; \
+             var it = g(); s += it.next().value; s",
+        )
+        .unwrap();
+    assert_eq!(a.display(r), "200000");
+    // A generator stepped from native code while a value is unrooted (the
+    // left operand's primitive, mid-conversion) must not collect, even
+    // when every safe point asks to.
+    let mut a = agent();
+    a.heap.set_gc_stress(true);
+    a.evaluate(
+        "function* h() { for (var i = 0; i < 500; i++) var junk = { i: i, s: 'abcdefgh' + i }; yield 1 } \
+         var gen = h(); gen.valueOf = gen.next; \
+         var left = { toString: function () { return 'leftside' + 'abc' } }; \
+         var bound = { valueOf: h().next.bind(h()), toString: function () { return '!' } };",
+    )
+    .unwrap();
+    let before = a.heap.collections();
+    let r = a.evaluate("(left + gen) + (left + bound)").unwrap();
+    assert_eq!(a.display(r), "leftsideabc[object Generator]leftsideabc!");
+    // The generator body ran without collecting.
+    assert!(a.heap.collections() - before < 10);
+}

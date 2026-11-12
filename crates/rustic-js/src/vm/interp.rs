@@ -22,8 +22,9 @@ use super::bytecode::{
 use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
     Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, Class, EnvId, ErrorKind, FLAG_EXTENSIBLE,
-    FLAG_PROTOTYPE, JsResult, Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference,
-    ReferenceBase, ShapeId, StringId, Tracer, Value,
+    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, JsResult, Kind, NativeFn, ObjectId,
+    PropertyDescriptor, PropertyKey, Reference, ReferenceBase, ShapeId, StringId, Tracer, Value,
+    iterator_result,
 };
 
 /// Bounds on what running script may use beyond the heap.
@@ -81,6 +82,8 @@ struct Frame {
     /// The function object, or undefined for a script.
     function: Value,
     new_target: Value,
+    /// The generator object whose body this frame runs, or undefined.
+    generator: Value,
 }
 
 /// The interpreter's state in an agent.
@@ -88,8 +91,18 @@ struct Frame {
 pub(crate) struct VmState {
     stack: Vec<Value>,
     frames: Vec<Frame>,
-    /// Native calls and nested runs in progress. Collection needs zero.
+    /// Native calls and nested runs in progress.
     native_depth: u32,
+    /// The `native_depth` at which collection may run: zero, or the depth
+    /// of a generator body resumed by a generator method that script
+    /// called directly (see [`Agent::generator_resume`]).
+    collect_floor: u32,
+    /// Set just before a call from a site that holds no unrooted values
+    /// on the Rust stack (a bytecode call, an iterator step, a `yield*`
+    /// step, a host call); `call_native` moves it to `native_from_safe_site`.
+    safe_site: bool,
+    /// The running native function was called from such a site.
+    native_from_safe_site: bool,
     cancel: Option<CancellationToken>,
     /// Bumped when a global lexical binding is created, which can shadow
     /// a property of the global object that a site has cached.
@@ -115,6 +128,8 @@ pub(crate) struct VmState {
     pub(crate) clock: Option<f64>,
     /// Local time minus UTC, in milliseconds.
     pub(crate) time_zone_offset_ms: f64,
+    /// Set by a `yield` that ended a run, as opposed to a `return`.
+    yielded: bool,
 }
 
 fn stack_address() -> usize {
@@ -134,6 +149,7 @@ impl VmState {
             tracer.value(frame.this);
             tracer.value(frame.function);
             tracer.value(frame.new_target);
+            tracer.value(frame.generator);
         }
     }
 }
@@ -214,6 +230,7 @@ impl Agent {
     /// Whether another run nested inside native code still fits; the
     /// outermost run records where the Rust stack starts.
     fn enter_nested_run(&mut self) -> JsResult<()> {
+        self.vm.safe_site = false;
         if self.vm.frames.is_empty() {
             self.vm.stack_base = stack_address();
             return Ok(());
@@ -314,7 +331,13 @@ impl Agent {
                 }
                 self.run(floor)
             }
-            _ => self.call(f, this, args),
+            _ => {
+                // The host roots what it passes (see `run_script`).
+                self.vm.safe_site = true;
+                let result = self.call(f, this, args);
+                self.vm.safe_site = false;
+                result
+            }
         }
     }
 
@@ -328,6 +351,7 @@ impl Agent {
         args: &[Value],
     ) -> JsResult<Value> {
         self.vm.native_depth += 1;
+        self.vm.native_from_safe_site = std::mem::take(&mut self.vm.safe_site);
         let saved = self.vm.native_new_target.take();
         let saved_function = self.vm.native_function.replace(f);
         let result = behavior(self, this, args);
@@ -517,7 +541,12 @@ impl Agent {
             this,
             home: Value::UNDEFINED,
         })?;
-        let mut object = Object::new(Class::Function, Some(self.intrinsics.function_prototype));
+        let proto = if code.generator {
+            self.intrinsics.generator_function_prototype
+        } else {
+            self.intrinsics.function_prototype
+        };
+        let mut object = Object::new(Class::Function, Some(proto));
         object.set_flag(FLAG_CLOSURE, true);
         object.length = closure;
         let f = self.heap.alloc_object(object)?;
@@ -538,7 +567,7 @@ impl Agent {
             name_key,
             PropertyDescriptor::data_with(Value::string(code.name), false, false, true),
         )?;
-        if code.kind == FunctionKind::Normal {
+        if code.kind == FunctionKind::Normal || code.generator {
             // The object itself is created on first use (see
             // `realize_function_prototype`); most functions never need it.
             let prototype_key = PropertyKey::String(self.names.prototype);
@@ -600,10 +629,10 @@ impl Agent {
 
     /// Whether `new` accepts `o`.
     fn is_constructor(&self, o: ObjectId) -> bool {
-        self.heap
-            .closure(o)
-            .is_some_and(|closure| self.heap.code(closure.code).kind.is_constructor())
-            || self.native_constructor(Value::object(o)).is_some()
+        self.heap.closure(o).is_some_and(|closure| {
+            let code = self.heap.code(closure.code);
+            code.kind.is_constructor() && !code.generator
+        }) || self.native_constructor(Value::object(o)).is_some()
     }
 
     /// The parent constructor a `super()` call constructs.
@@ -663,8 +692,9 @@ impl Agent {
     /// `this`.
     fn construct_this(&mut self, f: ObjectId, new_target: Value) -> JsResult<Value> {
         let closure = self.heap.closure(f).expect("caller checked for a closure");
-        let kind = self.heap.code(closure.code).kind;
-        if !kind.is_constructor() {
+        let code = self.heap.code(closure.code);
+        let kind = code.kind;
+        if !kind.is_constructor() || code.generator {
             return self.type_error("value is not a constructor");
         }
         if kind == FunctionKind::DerivedConstructor {
@@ -759,6 +789,7 @@ impl Agent {
             this,
             function,
             new_target,
+            generator: Value::UNDEFINED,
         });
         Ok(())
     }
@@ -853,7 +884,7 @@ impl Agent {
             }
             *left -= 1;
         }
-        if self.vm.native_depth == 0 && self.should_collect() {
+        if self.vm.native_depth == self.vm.collect_floor && self.should_collect() {
             self.collect_garbage(crate::runtime::Roots::default());
         }
         Ok(())
@@ -1532,6 +1563,7 @@ impl Agent {
                             return Ok(Flow::Switch);
                         }
                         Callee::Native(behavior, o) => {
+                            self.vm.safe_site = true;
                             reg!(dst) = t!(self.call_native_at(behavior, o, this, args_at, argc));
                         }
                         Callee::NotCallable => {
@@ -1739,6 +1771,65 @@ impl Agent {
                 }
                 Op::Throw { src } => {
                     t!(Err(Abrupt::Throw(reg!(src))));
+                }
+                Op::GeneratorStart => {
+                    let generator = t!(self.generator_create(code, base, pc, env));
+                    let frame = self.vm.frames.pop().expect("a generator frame");
+                    self.vm.stack.truncate(frame.floor as usize);
+                    if self.vm.frames.len() == floor {
+                        return Ok(Flow::Done(generator));
+                    }
+                    let caller = self.vm.frames.last().expect("a caller above the floor");
+                    let slot = caller.base as usize + usize::from(frame.ret);
+                    self.vm.stack[slot] = generator;
+                    return Ok(Flow::Switch);
+                }
+                Op::Yield {
+                    src,
+                    dst,
+                    mode,
+                    raw,
+                } => {
+                    let value = reg!(src);
+                    let result = if raw {
+                        value
+                    } else {
+                        t!(iterator_result(self, value, false))
+                    };
+                    let frame = self.vm.frames.pop().expect("a generator frame");
+                    debug_assert_eq!(self.vm.frames.len(), floor, "generators resume in a run");
+                    let o = frame
+                        .generator
+                        .as_object()
+                        .expect("yield runs in a generator");
+                    let registers = &self.vm.stack[base..base + usize::from(code.registers)];
+                    if let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() {
+                        g.registers.copy_from_slice(registers);
+                        g.state = GeneratorState::SuspendedYield;
+                        g.pc = pc as u32;
+                        g.env = env;
+                        g.depth = frame.depth;
+                        g.resume = Some((dst, mode));
+                    }
+                    self.vm.stack.truncate(frame.floor as usize);
+                    self.vm.yielded = true;
+                    return Ok(Flow::Done(result));
+                }
+                Op::Delegate {
+                    dst,
+                    iterator,
+                    value,
+                    mode,
+                } => {
+                    let (it, next) = (reg!(iterator), reg!(iterator + 1));
+                    let (received, mode) = (reg!(value), reg!(mode));
+                    reg!(dst) = t!(self.delegate_step(it, next, received, mode));
+                }
+                Op::GetIteratorObject { iterator, src } => {
+                    let source = reg!(src);
+                    let (it, next) = t!(self.get_iterator_object(source));
+                    reg!(iterator) = it;
+                    reg!(iterator + 1) = next;
                 }
 
                 Op::ForInStart { state, src } => {
@@ -2425,6 +2516,196 @@ impl Agent {
         Ok((iterator, next))
     }
 
+    // ---- generators -------------------------------------------------------
+
+    /// `OrdinaryCreateFromConstructor(F, "%GeneratorPrototype%")` with the
+    /// running frame (stopped at `pc`) suspended in it (§15.5.2).
+    fn generator_create(
+        &mut self,
+        code: &FunctionCode,
+        base: usize,
+        pc: usize,
+        env: EnvId,
+    ) -> JsResult<Value> {
+        let frame = self.vm.frames.last().expect("a generator frame");
+        let (code_id, depth, this, function, new_target) = (
+            frame.code_id,
+            frame.depth,
+            frame.this,
+            frame.function,
+            frame.new_target,
+        );
+        let f = function.as_object().expect("a generator runs a function");
+        let prototype = self.get(f, PropertyKey::String(self.names.prototype))?;
+        let prototype = prototype
+            .as_object()
+            .unwrap_or(self.intrinsics.generator_prototype);
+        let registers: Box<[Value]> =
+            self.vm.stack[base..base + usize::from(code.registers)].into();
+        self.heap.charge(
+            std::mem::size_of::<crate::runtime::Extra>()
+                + std::mem::size_of::<Generator>()
+                + 8 * registers.len(),
+        )?;
+        let mut object = crate::runtime::Object::new(Class::Ordinary, Some(prototype));
+        object.extra_mut().internal = Some(Internal::Generator(Box::new(Generator {
+            state: GeneratorState::SuspendedStart,
+            code: code_id,
+            pc: pc as u32,
+            env,
+            depth,
+            this,
+            function,
+            new_target,
+            resume: None,
+            registers,
+        })));
+        Ok(Value::object(self.heap.alloc_object(object)?))
+    }
+
+    /// `GeneratorResume` and `GeneratorResumeAbrupt` (§27.5.3.3-4) of a
+    /// suspended generator: run it until it yields or finishes, and
+    /// return the iterator result for the caller of `next`, `throw` or
+    /// `return`.
+    pub(crate) fn generator_resume(
+        &mut self,
+        o: ObjectId,
+        mode: u8,
+        value: Value,
+    ) -> JsResult<Value> {
+        self.enter_nested_run()?;
+        let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() else {
+            unreachable!("the caller validated the generator");
+        };
+        let (code_id, pc, env, depth, this, function, new_target, resume) = (
+            g.code,
+            g.pc,
+            g.env,
+            g.depth,
+            g.this,
+            g.function,
+            g.new_target,
+            g.resume,
+        );
+        let floor = self.vm.frames.len();
+        let base = self.vm.stack.len();
+        let count = g.registers.len();
+        if floor >= self.vm.limits.max_frames || base + count > self.vm.limits.max_stack_values {
+            return Err(self.throw(ErrorKind::RangeError, "Maximum call stack size exceeded"));
+        }
+        g.state = GeneratorState::Executing;
+        self.vm.stack.extend_from_slice(&g.registers);
+        if let Some((dst, mode_reg)) = resume {
+            self.vm.stack[base + usize::from(dst)] = value;
+            self.vm.stack[base + usize::from(mode_reg)] = Value::number(f64::from(mode));
+        }
+        let code = Rc::clone(self.heap.code(code_id));
+        // The stack limit keeps every index within `u32`.
+        self.vm.frames.push(Frame {
+            code,
+            code_id,
+            pc,
+            base: base as u32,
+            floor: base as u32,
+            args_at: base as u32,
+            argc: 0,
+            env,
+            depth,
+            ret: 0,
+            construct: false,
+            this,
+            function,
+            new_target,
+            generator: Value::object(o),
+        });
+        // When the generator method that resumed this run was called from
+        // a safe site at the collectable level, nothing on the Rust stack
+        // holds unrooted values: the generator is rooted by its frame, and
+        // the method's receiver and arguments by the caller's registers.
+        // Then the body collects at its safe points, so a long-running
+        // generator does not grow the heap unchecked.
+        let outer_floor = self.vm.collect_floor;
+        let collectable = std::mem::take(&mut self.vm.native_from_safe_site)
+            && self.vm.native_depth == outer_floor + 1;
+        self.vm.native_depth += 1;
+        if collectable {
+            self.vm.collect_floor = self.vm.native_depth;
+        }
+        let result = self.run(floor);
+        self.vm.native_depth -= 1;
+        self.vm.collect_floor = outer_floor;
+        let yielded = std::mem::take(&mut self.vm.yielded);
+        if !(yielded && result.is_ok()) {
+            if let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() {
+                g.state = GeneratorState::Completed;
+                // Drop what the finished frame held.
+                g.registers = Box::new([]);
+                g.this = Value::UNDEFINED;
+                g.new_target = Value::UNDEFINED;
+            }
+        }
+        match result {
+            Ok(v) if yielded => Ok(v),
+            Ok(v) => iterator_result(self, v, true),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// `GetIterator(value, sync)` as a real iterator record.
+    fn get_iterator_object(&mut self, source: Value) -> JsResult<(Value, Value)> {
+        let key = PropertyKey::Symbol(self.symbols.iterator);
+        let Some(method) = self.get_method(source, key)? else {
+            return self.type_error("value is not iterable");
+        };
+        let iterator = self.call(method, source, &[])?;
+        let Some(object) = iterator.as_object() else {
+            return self.type_error("iterator is not an object");
+        };
+        let next = self.get(object, PropertyKey::String(self.names.next))?;
+        Ok((iterator, next))
+    }
+
+    /// One step of `yield*` (§15.5.5 step 7): pass `received` on by
+    /// `mode` and return the inner result object.
+    fn delegate_step(
+        &mut self,
+        iterator: Value,
+        next: Value,
+        received: Value,
+        mode: Value,
+    ) -> JsResult<Value> {
+        let mode = mode.as_number().unwrap_or(0.0);
+        let result = if mode == 0.0 {
+            self.vm.safe_site = true;
+            let result = self.call(next, iterator, &[received]);
+            self.vm.safe_site = false;
+            result?
+        } else {
+            let name = if mode == 1.0 { "throw" } else { "return" };
+            let key = self.heap.key(name)?;
+            match self.get_method(iterator, key)? {
+                Some(method) => {
+                    // `method` is unrooted, but nothing uses it after the call.
+                    self.vm.safe_site = true;
+                    let result = self.call(method, iterator, &[received]);
+                    self.vm.safe_site = false;
+                    result?
+                }
+                None if mode == 1.0 => {
+                    // The protocol is broken: close the inner iterator,
+                    // then report it.
+                    self.iterator_close(iterator)?;
+                    return self.type_error("the delegated iterator has no throw method");
+                }
+                None => return iterator_result(self, received, true),
+            }
+        };
+        if result.as_object().is_none() {
+            return self.type_error("iterator result is not an object");
+        }
+        Ok(result)
+    }
+
     /// Whether `%ArrayIteratorPrototype%` still has its own `next` and no
     /// `return`, so walking an array by index is unobservable.
     fn array_iteration_is_pristine(&mut self) -> JsResult<bool> {
@@ -2439,7 +2720,10 @@ impl Agent {
 
     /// `IteratorStepValue`: the next value, or `None` when done.
     fn iterator_step(&mut self, iterator: Value, next: Value) -> JsResult<Option<Value>> {
-        let result = self.call(next, iterator, &[])?;
+        self.vm.safe_site = true;
+        let result = self.call(next, iterator, &[]);
+        self.vm.safe_site = false;
+        let result = result?;
         let Some(result) = result.as_object() else {
             return self.type_error("iterator result is not an object");
         };

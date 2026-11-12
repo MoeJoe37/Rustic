@@ -24,6 +24,7 @@ pub use agent::{
     Abrupt, Agent, ErrorKind, Intrinsics, JsResult, Names, NativeFn, WellKnownSymbols,
 };
 pub use bigint::BigInt;
+pub(crate) use builtins::iterator_result;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
 pub(crate) use env::{BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT};
@@ -38,8 +39,8 @@ pub use number::{
 };
 pub use object::{Class, PropertyDescriptor};
 pub(crate) use object::{
-    Closure, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR, FLAG_PROTOTYPE, Internal,
-    Object,
+    Closure, Extra, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR, FLAG_PROTOTYPE,
+    Generator, GeneratorState, Internal, Object,
 };
 pub(crate) use shape::ShapeId;
 pub use shape::{Attributes, MAX_SHAPE_PROPERTIES, PropertyKey};

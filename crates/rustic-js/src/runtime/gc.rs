@@ -384,6 +384,13 @@ impl Marker<'_> {
                     self.value(*iterator);
                     self.value(*next);
                 }
+                Some(Internal::Generator(generator)) => {
+                    for v in generator.values() {
+                        self.value(v);
+                    }
+                    self.code(generator.code);
+                    self.env(generator.env);
+                }
                 Some(Internal::Bound { target, this, args }) => {
                     self.value(Value::object(*target));
                     self.value(*this);
@@ -430,6 +437,9 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Helper(helper)) => {
                 std::mem::size_of::<super::object::Helper>() + 8 * helper.items.len()
+            }
+            Some(Internal::Generator(generator)) => {
+                std::mem::size_of::<super::object::Generator>() + 8 * generator.registers.len()
             }
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()

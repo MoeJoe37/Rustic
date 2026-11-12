@@ -1,4 +1,4 @@
-# JavaScript engine (JS-01 to JS-04)
+# JavaScript engine (JS-01 to JS-05)
 
 `rustic-js` is Rustic's own ECMAScript implementation (M4, ADR 0001: no
 existing JavaScript engine is used or embedded). JS-01 provides the front end:
@@ -125,12 +125,13 @@ writes the verdict and reason for every file. At the pinned revision, on
 
 | | Files |
 | --- | ---: |
-| Pass | 7,895 |
-| Fail | 9,878 |
+| Pass | 10,726 |
+| Fail | 7,047 |
 | Skipped (modules 817, async, proposals) | 6,059 |
 
-That is 44.4% of the 17,773 files that run, and 33.1% of all 23,832. The
-first run passed 7,708; it found four interpreter bugs, now fixed and covered
+That is 60.4% of the 17,773 files that run, and 45.0% of all 23,832. The
+first run passed 7,708 and the interpreter fixes raised that to 7,895 before
+JS-05 part 1 added the core built-ins. The first run it found four interpreter bugs, now fixed and covered
 by `test262_findings` in `tests/interp.rs`: a `var` inside a block at the top
 of a script was never declared as a global, assignments inside `with` looked
 up their target after computing the value, `x = (function () {})` left the
@@ -143,10 +144,10 @@ a file that stops passing fails the gate, and so does one that starts passing
 until the list is regenerated with `RUSTIC_TEST262_BLESS=1`. Run the gate in
 release mode on a 64-bit host; the list is not checked on other targets.
 
-Most failures are not interpreter bugs yet. 3,308 files need generators or
-async functions (JS-08), about 5,600 stop at a global that does not exist
-(`Array`, `Object`, `TypeError`, `eval`, `Symbol`, ...; JS-05), and 227 need
-regular expressions. Skipped files are never counted as passing. Only
+Most failures are not interpreter bugs yet. About 3,300 files need
+generators or async functions (JS-08), about 1,600 need `Array`, about 550
+need `eval` (TD-106) and about 240 need regular expressions. About 740 fail an
+assertion and are the next place to look for interpreter bugs. Skipped files are never counted as passing. Only
 `test/language` is run: `test/built-ins` joins with JS-05, and module and
 async files with JS-06 (TD-105).
 
@@ -370,3 +371,44 @@ and collecting at every safe point) with a 2 MiB heap and a step budget, and
 requires the same outcome each time and a usable agent afterwards. Its first
 runs found a loop that could not be cancelled and a function that ran off the
 end of its code; both are fixed and kept as seeds or regressions.
+
+## Built-ins (JS-05)
+
+JS-05 installs the standard library in parts. Each part is one module under
+`crates/rustic-js/src/runtime/builtins/`. A function is a native function
+object: a Rust `fn(&mut Agent, this, args)`, its interned name and its
+`length`, about 115 bytes. Tables of `method(name, fn, length)` entries keep
+installation to a loop, and `install_constructor` links a constructor to its
+prototype.
+
+Part 1 holds what other built-ins and the Test262 harness lean on:
+
+- **Error.** `Error` and the native errors (`TypeError`, `RangeError`,
+  `ReferenceError`, `SyntaxError`, `EvalError`, `URIError`), with `cause`.
+  The native error constructors inherit from `Error`.
+- **Object.** The constructor and its 22 static methods (`keys`, `entries`,
+  `assign`, `defineProperty`, `freeze`, `getOwnPropertyDescriptors`,
+  `fromEntries` and the others; `groupBy` waits for iterators). `Object.prototype` gets `hasOwnProperty`,
+  `isPrototypeOf`, `propertyIsEnumerable`, `toLocaleString` and the
+  `__proto__` accessor.
+- **Function.** `call`, `apply`, `bind` and `[Symbol.hasInstance]` on
+  `Function.prototype`, and its `toString`. Source text is not kept, so
+  `toString` uses the `NativeFunction` form for every function.
+  - A bound function is a native function that holds its target, its `this`
+    and its arguments, and it costs 8 bytes per bound argument.
+  - The `Function` constructor needs dynamic code and is not installed yet
+    (TD-106).
+- **Globals.** `isFinite`, `isNaN`, `parseFloat`, `parseInt` (any radix),
+  and the `Boolean`, `Number`, `String` and `Symbol` constructors.
+
+A native function can be a constructor, marked by `FLAG_NATIVE_CONSTRUCTOR`.
+`new` calls it with a new target, which the function reads with
+`Agent::new_target()`. Native constructors work as `extends` bases and
+`super()` targets, and `Agent::construct_with` passes a new target through.
+
+A new agent now holds 83 objects in 17,390 bytes, up from 32 objects in
+6,477 bytes before JS-05. Most of the growth is native function objects.
+Installing the rest of the library lazily is the JS-09 lever if agents per
+page start to matter.
+
+With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%.

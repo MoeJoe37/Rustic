@@ -3,11 +3,18 @@
 //! wrapper prototypes' brand checks, and the value properties of the
 //! global object. The full library is JS-05.
 
-use super::agent::{Agent, JsResult};
+mod error;
+mod function;
+mod global;
+mod object;
+
+use super::FLAG_NATIVE_CONSTRUCTOR;
+use super::agent::{Agent, JsResult, NativeFn};
 use super::number::number_to_string;
 use super::object::{Class, Internal, IteratorKind, PropertyDescriptor};
 use super::shape::PropertyKey;
 use super::string::JsStr;
+use super::value::ObjectId;
 use super::value::{Kind, Value};
 
 pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
@@ -121,6 +128,10 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     }
 
     install_iterators(agent)?;
+    object::install(agent)?;
+    function::install(agent)?;
+    error::install(agent)?;
+    global::install(agent)?;
 
     // Value properties of the global object (§19.1).
     let global = i.global;
@@ -399,4 +410,93 @@ fn error_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Valu
         _ => format!("{name}: {message}"),
     };
     agent.string(&text)
+}
+
+// ---- support for the library modules -------------------------------------
+
+/// One method of a built-in object: its name, behavior and `length`.
+#[derive(Clone, Copy)]
+pub(crate) struct Method {
+    name: &'static str,
+    behavior: NativeFn,
+    length: u32,
+}
+
+/// A [`Method`], for the tables of the library modules.
+pub(crate) const fn method(name: &'static str, behavior: NativeFn, length: u32) -> Method {
+    Method {
+        name,
+        behavior,
+        length,
+    }
+}
+
+/// Define each method of `table` on `target`: writable, not enumerable,
+/// configurable (§18).
+pub(crate) fn install_methods(
+    agent: &mut Agent,
+    target: ObjectId,
+    table: &[Method],
+) -> JsResult<()> {
+    for m in table {
+        let key = agent.heap.key(m.name)?;
+        agent.define_method(target, key, m.behavior, m.name, m.length)?;
+    }
+    Ok(())
+}
+
+/// A built-in constructor named `name` whose `prototype` is `prototype`,
+/// linked both ways and bound on the global object.
+pub(crate) fn install_constructor(
+    agent: &mut Agent,
+    name: &'static str,
+    behavior: NativeFn,
+    length: u32,
+    prototype: ObjectId,
+) -> JsResult<ObjectId> {
+    let f = agent.new_native_function(behavior, name, length)?;
+    agent
+        .heap
+        .object_mut(f)
+        .set_flag(FLAG_NATIVE_CONSTRUCTOR, true);
+    let prototype_key = PropertyKey::String(agent.names.prototype);
+    agent.define_property_or_throw(
+        f,
+        prototype_key,
+        PropertyDescriptor::data_with(Value::object(prototype), false, false, false),
+    )?;
+    let constructor_key = agent.heap.key("constructor")?;
+    agent.define_property_or_throw(
+        prototype,
+        constructor_key,
+        PropertyDescriptor::data_with(Value::object(f), true, false, true),
+    )?;
+    let global = agent.intrinsics.global;
+    let name_key = agent.heap.key(name)?;
+    agent.define_property_or_throw(
+        global,
+        name_key,
+        PropertyDescriptor::data_with(Value::object(f), true, false, true),
+    )?;
+    Ok(f)
+}
+
+/// The argument at `index`, or `undefined`.
+pub(crate) fn arg(args: &[Value], index: usize) -> Value {
+    args.get(index).copied().unwrap_or(Value::UNDEFINED)
+}
+
+/// `GetPrototypeFromConstructor(newTarget, default)` (§10.1.14) for the
+/// running built-in: `default` when it was called rather than
+/// constructed.
+pub(crate) fn prototype_from_new_target(
+    agent: &mut Agent,
+    default: ObjectId,
+) -> JsResult<ObjectId> {
+    let Some(target) = agent.new_target() else {
+        return Ok(default);
+    };
+    let key = PropertyKey::String(agent.names.prototype);
+    let prototype = agent.get(target, key)?;
+    Ok(prototype.as_object().unwrap_or(default))
 }

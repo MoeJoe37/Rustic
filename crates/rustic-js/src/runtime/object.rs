@@ -276,6 +276,13 @@ pub(crate) enum Internal {
     },
     /// A host object's embedder data.
     Host(u64),
+    /// A bound function exotic object (§10.4.1): `[[BoundTargetFunction]]`,
+    /// `[[BoundThis]]` and `[[BoundArguments]]`.
+    Bound {
+        target: ObjectId,
+        this: Value,
+        args: Box<[Value]>,
+    },
     /// `[[WeakRefTarget]]`; `UNINITIALIZED` once the target is collected.
     WeakRef(Value),
     /// `[[WeakMapData]]` or `[[WeakSetData]]` keyed by the key's bits. An
@@ -296,6 +303,9 @@ pub(crate) const FLAG_ARRAY_LENGTH_WRITABLE: u8 = 2;
 /// properties can change what other objects inherit, so it invalidates
 /// the interpreter's inline caches.
 pub(crate) const FLAG_PROTOTYPE: u8 = 8;
+/// A native function that also has `[[Construct]]`: a built-in
+/// constructor.
+pub(crate) const FLAG_NATIVE_CONSTRUCTOR: u8 = 16;
 /// A function compiled from source; `length` indexes the closure arena.
 pub(crate) const FLAG_CLOSURE: u8 = 4;
 

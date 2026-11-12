@@ -100,6 +100,11 @@ pub(crate) struct VmState {
     steps_left: Option<u64>,
     /// When set, every cache epoch is unique, so no site ever hits.
     caches_off: Option<std::cell::Cell<u32>>,
+    /// `NewTarget` of the running native function: `None` when it was
+    /// called rather than constructed.
+    native_new_target: Option<ObjectId>,
+    /// The running native function object (the active function).
+    native_function: Option<ObjectId>,
 }
 
 fn stack_address() -> usize {
@@ -126,7 +131,7 @@ impl VmState {
 /// What a callee is.
 enum Callee {
     Closure(ObjectId),
-    Native(NativeFn),
+    Native(NativeFn, ObjectId),
     NotCallable,
 }
 
@@ -254,13 +259,106 @@ impl Agent {
     pub(crate) fn call_native(
         &mut self,
         behavior: NativeFn,
+        f: ObjectId,
         this: Value,
         args: &[Value],
     ) -> JsResult<Value> {
         self.vm.native_depth += 1;
+        let saved = self.vm.native_new_target.take();
+        let saved_function = self.vm.native_function.replace(f);
         let result = behavior(self, this, args);
+        self.vm.native_new_target = saved;
+        self.vm.native_function = saved_function;
         self.vm.native_depth -= 1;
         result
+    }
+
+    /// The running built-in function object.
+    pub fn active_function(&self) -> Option<ObjectId> {
+        self.vm.native_function
+    }
+
+    /// `Construct(f, args, newTarget)` (§7.3.15).
+    pub fn construct_with(
+        &mut self,
+        f: Value,
+        args: &[Value],
+        new_target: ObjectId,
+    ) -> JsResult<Value> {
+        if let Some(behavior) = self.native_constructor(f) {
+            let f = f.as_object().expect("a constructor is an object");
+            return self.construct_native(behavior, f, args, new_target);
+        }
+        let Callee::Closure(o) = self.callee(f) else {
+            return self.type_error("value is not a constructor");
+        };
+        let nt = Value::object(new_target);
+        let this = self.construct_this(o, nt)?;
+        self.enter_nested_run()?;
+        let floor = self.vm.frames.len();
+        let args_at = self.vm.stack.len();
+        self.vm.stack.extend_from_slice(args);
+        if let Err(e) = self.push_closure_frame(o, this, nt, args_at, args.len(), 0, true, args_at)
+        {
+            self.vm.stack.truncate(args_at);
+            return Err(e);
+        }
+        self.vm.native_depth += 1;
+        let result = self.run(floor);
+        self.vm.native_depth -= 1;
+        result
+    }
+
+    /// `[[Construct]]` of a built-in constructor: its behavior runs with
+    /// [`Agent::new_target`] set.
+    pub(crate) fn construct_native(
+        &mut self,
+        behavior: NativeFn,
+        f: ObjectId,
+        args: &[Value],
+        new_target: ObjectId,
+    ) -> JsResult<Value> {
+        self.vm.native_depth += 1;
+        let saved = self.vm.native_new_target.replace(new_target);
+        let saved_function = self.vm.native_function.replace(f);
+        let result = behavior(self, Value::UNDEFINED, args);
+        self.vm.native_new_target = saved;
+        self.vm.native_function = saved_function;
+        self.vm.native_depth -= 1;
+        result
+    }
+
+    fn construct_native_at(
+        &mut self,
+        behavior: NativeFn,
+        f: ObjectId,
+        args_at: usize,
+        argc: usize,
+        new_target: ObjectId,
+    ) -> JsResult<Value> {
+        let args = self.vm.stack[args_at..args_at + argc].to_vec();
+        self.construct_native(behavior, f, &args, new_target)
+    }
+
+    /// The `NewTarget` of the running built-in: `None` when it was called
+    /// as a function.
+    pub fn new_target(&self) -> Option<ObjectId> {
+        self.vm.native_new_target
+    }
+
+    /// `IsConstructor(value)` (§7.2.4).
+    pub fn is_constructor_value(&self, value: Value) -> bool {
+        value.as_object().is_some_and(|o| self.is_constructor(o))
+    }
+
+    /// The behavior of `f` if it is a built-in constructor.
+    fn native_constructor(&self, f: Value) -> Option<NativeFn> {
+        let object = self.heap.object(f.as_object()?);
+        if object.has_flag(crate::runtime::FLAG_NATIVE_CONSTRUCTOR) {
+            object.native()
+        } else {
+            None
+        }
     }
 
     /// Run a closure to completion inside native code. No collection
@@ -296,6 +394,10 @@ impl Agent {
 
     /// `Construct(f, args)` with `f` as the new target.
     pub fn construct(&mut self, f: Value, args: &[Value]) -> JsResult<Value> {
+        if let Some(behavior) = self.native_constructor(f) {
+            let target = f.as_object().expect("a constructor is an object");
+            return self.construct_native(behavior, target, args, target);
+        }
         let Callee::Closure(o) = self.callee(f) else {
             return self.type_error("value is not a constructor");
         };
@@ -324,7 +426,7 @@ impl Agent {
         if object.closure_index().is_some() {
             Callee::Closure(o)
         } else if let Some(native) = object.native() {
-            Callee::Native(native)
+            Callee::Native(native, o)
         } else {
             Callee::NotCallable
         }
@@ -437,6 +539,7 @@ impl Agent {
         self.heap
             .closure(o)
             .is_some_and(|closure| self.heap.code(closure.code).kind.is_constructor())
+            || self.native_constructor(Value::object(o)).is_some()
     }
 
     /// The parent constructor a `super()` call constructs.
@@ -1039,6 +1142,18 @@ impl Agent {
                     t!(self.safepoint());
                     let (f, nt) = (reg!(callee), reg!(new_target));
                     let o = t!(self.super_constructor(f));
+                    if let Some(behavior) = self.native_constructor(f) {
+                        let target = nt.as_object().unwrap_or(o);
+                        let at = base + usize::from(args);
+                        reg!(dst) = t!(self.construct_native_at(
+                            behavior,
+                            f.as_object().expect("a constructor is an object"),
+                            at,
+                            usize::from(argc),
+                            target
+                        ));
+                        continue;
+                    }
                     let this = t!(self.construct_this(o, nt));
                     let top = self.vm.stack.len();
                     t!(self.push_closure_frame(
@@ -1064,6 +1179,17 @@ impl Agent {
                     t!(self.safepoint());
                     let (f, nt, array) = (reg!(callee), reg!(new_target), reg!(array));
                     let o = t!(self.super_constructor(f));
+                    if let Some(behavior) = self.native_constructor(f) {
+                        let target = nt.as_object().unwrap_or(o);
+                        let args_at = self.vm.stack.len();
+                        let argc = self.push_array_elements(array);
+                        let ctor = f.as_object().expect("a constructor is an object");
+                        let result =
+                            self.construct_native_at(behavior, ctor, args_at, argc, target);
+                        self.vm.stack.truncate(args_at);
+                        reg!(dst) = t!(result);
+                        continue;
+                    }
                     let this = t!(self.construct_this(o, nt));
                     let args_at = self.vm.stack.len();
                     let argc = self.push_array_elements(array);
@@ -1341,8 +1467,8 @@ impl Agent {
                             self.vm.frames[caller].pc = pc as u32;
                             return Ok(Flow::Switch);
                         }
-                        Callee::Native(behavior) => {
-                            reg!(dst) = t!(self.call_native_at(behavior, this, args_at, argc));
+                        Callee::Native(behavior, o) => {
+                            reg!(dst) = t!(self.call_native_at(behavior, o, this, args_at, argc));
                         }
                         Callee::NotCallable => {
                             t!(self.type_error::<()>("value is not a function"));
@@ -1357,6 +1483,18 @@ impl Agent {
                 } => {
                     t!(self.safepoint());
                     let f = reg!(callee);
+                    if let Some(behavior) = self.native_constructor(f) {
+                        let target = f.as_object().expect("a constructor is an object");
+                        let at = base + usize::from(args);
+                        reg!(dst) = t!(self.construct_native_at(
+                            behavior,
+                            f.as_object().expect("a constructor is an object"),
+                            at,
+                            usize::from(argc),
+                            target
+                        ));
+                        continue;
+                    }
                     let Callee::Closure(o) = self.callee(f) else {
                         t!(self.type_error::<()>("value is not a constructor"));
                         unreachable!("the error returned");
@@ -1406,8 +1544,8 @@ impl Agent {
                             self.vm.frames[caller].pc = pc as u32;
                             return Ok(Flow::Switch);
                         }
-                        Callee::Native(behavior) => {
-                            let result = self.call_native_at(behavior, this, args_at, argc);
+                        Callee::Native(behavior, o) => {
+                            let result = self.call_native_at(behavior, o, this, args_at, argc);
                             self.vm.stack.truncate(args_at);
                             reg!(dst) = t!(result);
                         }
@@ -1420,6 +1558,17 @@ impl Agent {
                 Op::NewSpread { dst, callee, array } => {
                     t!(self.safepoint());
                     let (f, array) = (reg!(callee), reg!(array));
+                    if let Some(behavior) = self.native_constructor(f) {
+                        let target = f.as_object().expect("a constructor is an object");
+                        let args_at = self.vm.stack.len();
+                        let argc = self.push_array_elements(array);
+                        let ctor = f.as_object().expect("a constructor is an object");
+                        let result =
+                            self.construct_native_at(behavior, ctor, args_at, argc, target);
+                        self.vm.stack.truncate(args_at);
+                        reg!(dst) = t!(result);
+                        continue;
+                    }
                     let Callee::Closure(o) = self.callee(f) else {
                         t!(self.type_error::<()>("value is not a constructor"));
                         unreachable!("the error returned");
@@ -1548,6 +1697,7 @@ impl Agent {
     fn call_native_at(
         &mut self,
         behavior: NativeFn,
+        f: ObjectId,
         this: Value,
         args_at: usize,
         argc: usize,
@@ -1555,10 +1705,10 @@ impl Agent {
         if argc <= INLINE_ARGS {
             let mut inline = [Value::UNDEFINED; INLINE_ARGS];
             inline[..argc].copy_from_slice(&self.vm.stack[args_at..args_at + argc]);
-            self.call_native(behavior, this, &inline[..argc])
+            self.call_native(behavior, f, this, &inline[..argc])
         } else {
             let args = self.vm.stack[args_at..args_at + argc].to_vec();
-            self.call_native(behavior, this, &args)
+            self.call_native(behavior, f, this, &args)
         }
     }
 
@@ -2278,9 +2428,9 @@ impl Agent {
 
     /// `InstanceofOperator(value, target)`.
     fn instance_of(&mut self, value: Value, target: Value) -> JsResult<bool> {
-        let Some(target_object) = target.as_object() else {
+        if target.as_object().is_none() {
             return self.type_error("right side of 'instanceof' is not an object");
-        };
+        }
         let key = PropertyKey::Symbol(self.symbols.has_instance);
         if let Some(method) = self.get_method(target, key)? {
             let result = self.call(method, target, &[value])?;
@@ -2289,7 +2439,22 @@ impl Agent {
         if !self.is_callable(target) {
             return self.type_error("right side of 'instanceof' is not callable");
         }
-        // OrdinaryHasInstance.
+        self.ordinary_has_instance(target, value)
+    }
+
+    /// `OrdinaryHasInstance(C, O)` (§7.3.21).
+    pub(crate) fn ordinary_has_instance(&mut self, target: Value, value: Value) -> JsResult<bool> {
+        if !self.is_callable(target) {
+            return Ok(false);
+        }
+        let target_object = target.as_object().expect("callables are objects");
+        let bound = match self.heap.object(target_object).internal() {
+            Some(crate::runtime::Internal::Bound { target, .. }) => Some(*target),
+            _ => None,
+        };
+        if let Some(inner) = bound {
+            return self.instance_of(value, Value::object(inner));
+        }
         let Some(mut object) = value.as_object() else {
             return Ok(false);
         };

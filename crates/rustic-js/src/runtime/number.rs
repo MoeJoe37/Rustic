@@ -52,7 +52,7 @@ pub fn number_to_string(x: f64) -> String {
     }
 }
 
-fn is_str_whitespace(unit: u16) -> bool {
+pub(crate) fn is_str_whitespace(unit: u16) -> bool {
     let cp = u32::from(unit);
     is_whitespace(cp) || is_line_terminator(cp)
 }

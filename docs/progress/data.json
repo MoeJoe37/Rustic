@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "3206c9539b0dc9efb6b0b6694c1511bfceb79f437b8afdf10df677b3a394ca58",
-  "percent": "23.96",
+  "source_fingerprint": "ad8524faf1a9ea1e64103c8bbdcf345666bc6c97e86dfef96cca74033ae0aec6",
+  "percent": "24.14",
   "verified_percent": "20.90",
-  "partial_percent": "3.06",
+  "partial_percent": "3.24",
   "completed": 54,
-  "in_progress": 7,
+  "in_progress": 8,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "41.94",
+      "percent": "43.99",
       "verified_percent": "12.30",
-      "partial_percent": "29.64"
+      "partial_percent": "31.69"
     },
     {
       "id": "M5",
@@ -3464,9 +3464,67 @@
           "label": "Core built-ins and collections",
           "size": 8,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Error and native errors, Object, Function.prototype, global functions and primitive wrapper constructors",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/error.rs",
+                  "marker": "fn construct_error"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/object.rs",
+                  "marker": "\"getOwnPropertyDescriptors\""
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/function.rs",
+                  "marker": "fn new_bound_function"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/global.rs",
+                  "marker": "fn parse_int"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn core_built_ins"
+                }
+              ]
+            },
+            {
+              "label": "Array, iterators and array-likes",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "String, Number, Boolean and Symbol prototypes, Math",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "JSON",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Map, Set, WeakMap, WeakSet and WeakRef",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Function constructor and eval (TD-106)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "16.66",
           "engine_share": "1.09"
         },
         {
@@ -3601,12 +3659,12 @@
       ],
       "points": 73,
       "completed": 1,
-      "in_progress": 6,
+      "in_progress": 7,
       "total": 15,
-      "contribution": "4.00",
-      "percent": "40.08",
+      "contribution": "4.19",
+      "percent": "41.91",
       "verified_percent": "10.95",
-      "partial_percent": "29.13"
+      "partial_percent": "30.96"
     },
     {
       "id": "wasm",

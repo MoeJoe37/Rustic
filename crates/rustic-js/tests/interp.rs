@@ -932,7 +932,7 @@ fn class_inheritance() {
         "3",
     );
     check(
-        "var o = {m() {}}; try { o.x = class extends Object {} } catch (e) { e.name }",
+        "var o = {m() {}}; try { o.x = class extends NoSuchBase {} } catch (e) { e.name }",
         "ReferenceError",
     );
     check(
@@ -1279,6 +1279,101 @@ fn test262_findings() {
     check(
         "function f(a = 1, b = () => a) { var a = 5; return b() + a } f()",
         "6",
+    );
+}
+
+#[test]
+fn core_built_ins() {
+    let _report = Report;
+    // Errors: constructors, `new` or not, causes, subclassing.
+    check(
+        "var e = new TypeError('bad', { cause: 1 }); e.name + ':' + e.message + ':' + e.cause + ':' + (e instanceof Error) + ':' + Object.keys(e).length",
+        "TypeError:bad:1:true:0",
+    );
+    check("RangeError('x') instanceof RangeError", "true");
+    check(
+        "String(new EvalError('e')) + ',' + String(URIError())",
+        "EvalError: e,URIError",
+    );
+    check(
+        "class E extends Error { constructor(m) { super(m); this.extra = 1 } } var e = new E('m'); (e instanceof E) + ',' + (e instanceof Error) + ',' + e.message + e.extra",
+        "true,true,m1",
+    );
+    check("Object.getPrototypeOf(TypeError) === Error", "true");
+    // Object statics.
+    check(
+        "var o = Object.create({ inherited: 1 }, { own: { value: 2, enumerable: true } }); Object.keys(o)[0] + '|' + Object.values(o)[0] + '|' + o.inherited",
+        "own|2|1",
+    );
+    check(
+        "var o = Object.defineProperty({}, 'x', { get: function () { return 5 }, configurable: true }); var d = Object.getOwnPropertyDescriptor(o, 'x'); typeof d.get + d.enumerable + d.configurable + ('value' in d) + o.x",
+        "functionfalsetruefalse5",
+    );
+    check(
+        "var o = Object.freeze({ a: 1 }); 'use strict'; o.a = 2; Object.isFrozen(o) + ',' + o.a + ',' + Object.isSealed(o) + ',' + Object.isExtensible(o)",
+        "true,1,true,false",
+    );
+    check(
+        "(function () { 'use strict'; try { Object.freeze({ a: 1 }).a = 2 } catch (e) { return e instanceof TypeError } })()",
+        "true",
+    );
+    check(
+        "Object.assign({ a: 1 }, { b: 2 }, null, 'xy').b + Object.assign({}, 'xy')[1] + JSON",
+        "!ReferenceError: JSON is not defined",
+    );
+    check(
+        "var s = Symbol('k'); var o = { [s]: 1, a: 2 }; Object.getOwnPropertyNames(o).length + ',' + Object.getOwnPropertySymbols(o)[0].toString()",
+        "1,Symbol(k)",
+    );
+    check(
+        "Object.is(NaN, NaN) + ',' + Object.is(0, -0) + ',' + Object.hasOwn({ a: 1 }, 'a') + ',' + Object.entries({ a: 1 })[0][1]",
+        "true,false,true,1",
+    );
+    check(
+        "var o = {}; Object.setPrototypeOf(o, Array.prototype) === o",
+        "!ReferenceError: Array is not defined",
+    );
+    check(
+        "var p = {}; var o = Object.setPrototypeOf({}, p); (Object.getPrototypeOf(o) === p) + ',' + p.isPrototypeOf(o) + ',' + o.__proto__ === p",
+        "false",
+    );
+    check("var o = {}; o.__proto__ = { k: 3 }; o.k", "3");
+    check(
+        "typeof Object(1) + typeof Object('s') + (Object(null) instanceof Object) + ({}).hasOwnProperty.call({ q: 1 }, 'q')",
+        "objectobjecttruetrue",
+    );
+    check("Object.fromEntries([['a', 1], ['b', 2]]).b", "2");
+    // Function.prototype.
+    check(
+        "function f(a, b) { return this.v + a + b } f.call({ v: 1 }, 2, 3) + f.apply({ v: 1 }, [2, 3]) + f.bind({ v: 1 }, 2)(3)",
+        "18",
+    );
+    check(
+        "function P(a, b) { this.s = a + b } var B = P.bind(null, 1); var o = new B(2); o.s + ',' + (o instanceof P) + ',' + (o instanceof B) + ',' + B.name + ',' + B.length",
+        "3,true,true,bound P,1",
+    );
+    check("Math.max.call", "!ReferenceError: Math is not defined");
+    check(
+        "(function foo() {}).toString()",
+        "function foo() { [native code] }",
+    );
+    // Globals and wrappers.
+    check(
+        "parseInt('  0x1F') + ',' + parseInt('12px', 10) + ',' + parseInt('z', 36) + ',' + parseInt('', 10) + ',' + parseFloat('3.5e2abc') + ',' + parseFloat('-.5') + ',' + parseFloat('Infinityx')",
+        "31,12,35,NaN,350,-0.5,Infinity",
+    );
+    check(
+        "isNaN('x') + ',' + isFinite('12') + ',' + isFinite(1 / 0)",
+        "true,true,false",
+    );
+    check(
+        "typeof Boolean(1) + typeof new Boolean(0) + new Number(5) + Number('0b101') + String(Symbol('d')) + new String('ab').length",
+        "booleanobject55Symbol(d)2",
+    );
+    check("new Symbol()", "!TypeError: Symbol is not a constructor");
+    check(
+        "typeof Symbol() + (Symbol('a') !== Symbol('a'))",
+        "symboltrue",
     );
 }
 

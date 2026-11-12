@@ -358,6 +358,13 @@ impl Marker<'_> {
                 None => {}
                 Some(Internal::Host(data)) => self.hosts.push(*data),
                 Some(Internal::Iterator { target, .. }) => self.value(*target),
+                Some(Internal::Bound { target, this, args }) => {
+                    self.value(Value::object(*target));
+                    self.value(*this);
+                    for &v in args.iter() {
+                        self.value(v);
+                    }
+                }
                 // The target is weak: cleared after marking if nothing
                 // else reaches it.
                 Some(Internal::WeakRef(_)) => self.weak_refs.push(index),
@@ -393,6 +400,7 @@ fn object_footprint(object: &Object) -> usize {
         }
         bytes += match &extra.internal {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
+            Some(Internal::Bound { args, .. }) => 8 * args.len(),
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()
             }

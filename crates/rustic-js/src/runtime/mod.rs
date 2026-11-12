@@ -36,7 +36,10 @@ pub use number::{
     to_uint32,
 };
 pub use object::{Class, PropertyDescriptor};
-pub(crate) use object::{Closure, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Object};
+pub(crate) use object::{
+    Closure, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR, FLAG_PROTOTYPE, Internal,
+    Object,
+};
 pub(crate) use shape::ShapeId;
 pub use shape::{Attributes, MAX_SHAPE_PROPERTIES, PropertyKey};
 pub use string::JsStr;

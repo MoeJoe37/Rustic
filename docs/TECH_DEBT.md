@@ -137,6 +137,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
 | TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs only `test/language` | Open, JS-05/JS-06 |
+| TD-106 | Deliberate | JS | No dynamic code: the `Function` constructor and `eval` are missing, and `Function.prototype.toString` prints every function in the native form | Open, JS-05 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1465,3 +1466,16 @@ base.
 Pay with: `test/built-ins` in the gate as JS-05 lands each library area;
 module and async files when promise jobs and module loading exist (JS-06);
 `$262` with realms (JS-06). Trigger: each of those steps.
+
+### TD-106 — No dynamic code
+
+The `Function` constructor and `eval` compile source text at run time, and
+neither exists yet. About 530 Test262 files fail on `eval` alone, and two
+earlier passes were false ones that now fail. `Function.prototype.toString`
+prints every function in the `NativeFunction` form because source text is not
+kept, which the specification allows only for built-in and host functions.
+
+Pay with: `eval` (direct and indirect) and the `Function` family of
+constructors on top of the existing compiler, keeping a source span per
+function so `toString` can return its text. Trigger: JS-05 part 2 or the
+first page script that needs either.

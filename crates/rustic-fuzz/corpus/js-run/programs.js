@@ -132,3 +132,7 @@ var p = { m(n) { return n + this.k } }; var o = { __proto__: p, k: 1, m(n) { ret
 var o = { f(n) { return n } }, u, t = 0; for (var i = 0; i < 20; i++) t += (i % 2 ? o : u)?.f?.(i) ?? -1; t
 var t = 0; function f(a = 1, b = () => a) { var a = 5; for (var i = 0; i < 9; i++) a += i; return b() + a } for (var j = 0; j < 9; j++) t += f(j); t
 var s = { x: 1 }, x = 0; with (s) { for (var i = 0; i < 9; i++) { x += i; if (i == 4) delete s.x } } s.x + ',' + x
+var o = Object.create(null, { a: { value: 1, enumerable: true }, b: { get: function () { return 2 }, enumerable: true } }); var t = 0; for (var k of Object.keys(o)) t += o[k]; Object.freeze(o); t + Object.isFrozen(o)
+function F(a, b) { this.v = a * b } var G = F.bind(null, 3), s = 0; for (var i = 0; i < 9; i++) s += new G(i).v + F.call({}, i, 2) | 0; s
+var n = 0; for (var i = 0; i < 20; i++) { try { if (i % 3) throw new RangeError('r' + i); n += parseInt('1' + i, 10) } catch (e) { n += e instanceof Error ? e.message.length : -1 } } n
+class E extends TypeError { constructor(m) { super(m); this.k = 2 } } var c = 0; for (var i = 0; i < 9; i++) { try { throw new E(String(i)) } catch (e) { c += e.k + Number(e.message) } } c

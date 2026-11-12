@@ -3150,8 +3150,66 @@
           "label": "Core built-ins and collections",
           "size": 8,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Error and native errors, Object, Function.prototype, global functions and primitive wrapper constructors",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/error.rs",
+                  "marker": "fn construct_error"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/object.rs",
+                  "marker": "\"getOwnPropertyDescriptors\""
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/function.rs",
+                  "marker": "fn new_bound_function"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/global.rs",
+                  "marker": "fn parse_int"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn core_built_ins"
+                }
+              ]
+            },
+            {
+              "label": "Array, iterators and array-likes",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "String, Number, Boolean and Symbol prototypes, Math",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "JSON",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Map, Set, WeakMap, WeakSet and WeakRef",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Function constructor and eval (TD-106)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.jobs",

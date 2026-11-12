@@ -360,7 +360,9 @@ impl Agent {
             length_key,
             PropertyDescriptor::data_with(Value::number(f64::from(length)), false, false, true),
         )?;
-        let name_value = self.string(name)?;
+        // Names are atoms: most are property keys anyway, so they cost
+        // nothing extra.
+        let name_value = Value::string(self.heap.intern_str(name)?);
         let name_key = PropertyKey::String(self.names.name);
         self.define_property_or_throw(
             f,
@@ -438,7 +440,7 @@ impl Agent {
             return self.type_error("value is not a function");
         };
         if let Some(behavior) = self.heap.object(o).native() {
-            return self.call_native(behavior, this, args);
+            return self.call_native(behavior, o, this, args);
         }
         if self.heap.object(o).closure_index().is_some() {
             return self.call_closure(o, this, args);

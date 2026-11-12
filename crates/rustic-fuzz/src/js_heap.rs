@@ -177,7 +177,7 @@ impl Run {
             }
             10 => {
                 if let (Some(o), Some(proto)) = (self.pick(arg), self.pick(arg / 7)) {
-                    if self.agent.set_prototype_of(o, Some(proto)) {
+                    if self.agent.set_prototype_of(o, Some(proto)).unwrap() {
                         self.objects.get_mut(&o).ok_or("unknown object")?.1 = Some(proto);
                     }
                 }
@@ -260,7 +260,7 @@ impl Run {
             .map(|(o, (p, proto))| (*o, p.clone(), *proto))
             .collect();
         for (o, properties, proto) in snapshot {
-            if self.agent.get_prototype_of(o) != proto {
+            if self.agent.get_prototype_of(o).unwrap() != proto {
                 return Err(format!("prototype of {o:?} changed"));
             }
             for (key, expected) in properties {

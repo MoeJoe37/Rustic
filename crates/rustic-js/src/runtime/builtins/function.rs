@@ -29,6 +29,55 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         prototype,
         key,
         PropertyDescriptor::data_with(Value::object(f), false, false, false),
+    )?;
+    // `%ThrowTypeError%` (§10.2.4.1): one frozen function per realm.
+    let thrower = agent.new_native_function(throw_type_error, "", 0)?;
+    for name in [agent.names.length, agent.names.name] {
+        agent.define_property_or_throw(
+            thrower,
+            PropertyKey::String(name),
+            PropertyDescriptor {
+                configurable: Some(false),
+                ..Default::default()
+            },
+        )?;
+    }
+    agent.prevent_extensions(thrower)?;
+    agent.intrinsics.throw_type_error = thrower;
+    // `AddRestrictedFunctionProperties` (§10.2.4): `caller` and
+    // `arguments` throw for every function that inherits them.
+    for name in ["caller", "arguments"] {
+        let key = agent.heap.key(name)?;
+        let thrower = Value::object(thrower);
+        agent.define_property_or_throw(
+            prototype,
+            key,
+            PropertyDescriptor::accessor(thrower, thrower, false, true),
+        )?;
+    }
+    Ok(())
+}
+
+/// `%ThrowTypeError%`. Reached through the inherited `caller` or
+/// `arguments` of a sloppy function it answers `null` instead, as
+/// browsers do for such functions (which §17.1 lets have their own
+/// properties of those names); scripts on the web read them.
+fn throw_type_error(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let sloppy = this
+        .as_object()
+        .and_then(|o| agent.heap.closure(o))
+        .is_some_and(|closure| {
+            let code = agent.heap.code(closure.code);
+            !code.strict
+                && code.kind == crate::vm::bytecode::FunctionKind::Normal
+                && !code.generator
+                && !code.is_async
+        });
+    if sloppy {
+        return Ok(Value::NULL);
+    }
+    agent.type_error(
+        "'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them",
     )
 }
 
@@ -56,7 +105,7 @@ fn function_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
         if agent.active_function() != Some(target) {
             let default = agent.intrinsics.function_prototype;
             let prototype = super::prototype_from_new_target(agent, default)?;
-            agent.set_prototype_of(o, Some(prototype));
+            agent.set_prototype_of(o, Some(prototype))?;
         }
     }
     Ok(f)
@@ -161,7 +210,7 @@ fn new_bound_function(
     this: Value,
     args: Vec<Value>,
 ) -> JsResult<ObjectId> {
-    let prototype = agent.get_prototype_of(target);
+    let prototype = agent.get_prototype_of(target)?;
     let constructor = agent.is_constructor_value(Value::object(target));
     agent.heap.charge(8 * args.len())?;
     let mut object = Object::new(Class::Function, prototype);

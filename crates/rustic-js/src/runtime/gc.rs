@@ -414,6 +414,12 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
+                Some(Internal::Proxy { target, handler }) => {
+                    for o in [target, handler].into_iter().flatten() {
+                        self.value(Value::object(*o));
+                    }
+                }
+                Some(Internal::Arguments { env, .. }) => self.env(*env),
                 Some(Internal::Bound { target, this, args }) => {
                     self.value(Value::object(*target));
                     self.value(*this);
@@ -457,6 +463,7 @@ fn object_footprint(object: &Object) -> usize {
         bytes += match &extra.internal {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
+            Some(Internal::Arguments { slots, .. }) => 4 * slots.len(),
             Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Helper(helper)) => {
                 std::mem::size_of::<super::object::Helper>() + 8 * helper.items.len()

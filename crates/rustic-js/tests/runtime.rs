@@ -25,7 +25,7 @@ fn text(agent: &Agent, value: Value) -> String {
 fn thrown_proto(agent: &Agent, result: JsResult<impl std::fmt::Debug>) -> ObjectId {
     match result {
         Err(Abrupt::Throw(v)) => agent
-            .get_prototype_of(v.as_object().expect("errors are objects"))
+            .stored_prototype(v.as_object().expect("errors are objects"))
             .unwrap(),
         other => panic!("expected a throw, got {other:?}"),
     }
@@ -86,7 +86,7 @@ fn deleting_or_many_properties_switch_to_a_dictionary_without_losing_order() {
             .unwrap();
     }
     a.delete(o, keys[3]).unwrap();
-    let own = a.own_property_keys(o);
+    let own = a.own_property_keys(o).unwrap();
     assert_eq!(own.len(), 39);
     assert_eq!(own[3], keys[4]);
     assert_eq!(a.get(o, keys[39]).unwrap(), Value::number(39.0));
@@ -308,7 +308,7 @@ fn own_keys_put_indices_first_then_strings_then_symbols() {
         .unwrap();
     let c = key(&mut a, "c");
     a.create_data_property(o, c, Value::NULL).unwrap();
-    let keys = a.own_property_keys(o);
+    let keys = a.own_property_keys(o).unwrap();
     assert_eq!(
         names(&a, &keys),
         ["2", "10", "b", "a", "c", &format!("@{}", sym.index())]
@@ -320,12 +320,12 @@ fn prototypes_reject_cycles_and_non_extensible_objects() {
     let mut a = agent();
     let x = a.new_object().unwrap();
     let y = a.new_object_with(Some(x)).unwrap();
-    assert!(!a.set_prototype_of(x, Some(y)));
-    assert!(a.set_prototype_of(x, None));
-    a.prevent_extensions(y);
-    assert!(!a.set_prototype_of(y, None));
+    assert!(!a.set_prototype_of(x, Some(y)).unwrap());
+    assert!(a.set_prototype_of(x, None).unwrap());
+    a.prevent_extensions(y).unwrap();
+    assert!(!a.set_prototype_of(y, None).unwrap());
     assert!(
-        a.set_prototype_of(y, Some(x)),
+        a.set_prototype_of(y, Some(x)).unwrap(),
         "unchanged prototype is fine"
     );
     let k = key(&mut a, "new");
@@ -362,7 +362,8 @@ fn array_length_tracks_indices_and_truncates() {
     assert_eq!(a.get(arr, length).unwrap(), Value::number(5.0));
     a.set(arr, length, Value::number(2.0), true).unwrap();
     assert_eq!(a.get(arr, PropertyKey::Index(3)).unwrap(), Value::UNDEFINED);
-    assert_eq!(names(&a, &a.own_property_keys(arr)), ["0", "1", "length"]);
+    let keys = a.own_property_keys(arr).unwrap();
+    assert_eq!(names(&a, &keys), ["0", "1", "length"]);
     // A far index makes the elements sparse but keeps semantics.
     a.create_data_property(arr, PropertyKey::Index(1_000_000), Value::TRUE)
         .unwrap();
@@ -451,10 +452,8 @@ fn string_objects_expose_read_only_indices() {
     assert!(!a.delete(o, PropertyKey::Index(0)).unwrap());
     a.create_data_property(o, PropertyKey::Index(5), Value::TRUE)
         .unwrap();
-    assert_eq!(
-        names(&a, &a.own_property_keys(o)),
-        ["0", "1", "5", "length"]
-    );
+    let keys = a.own_property_keys(o).unwrap();
+    assert_eq!(names(&a, &keys), ["0", "1", "5", "length"]);
     // Primitives read through their prototype without a wrapper.
     assert_eq!(a.get_v(s, length).unwrap(), Value::number(2.0));
 }

@@ -18,6 +18,7 @@ mod math;
 mod number_object;
 mod object;
 pub(crate) mod promise;
+pub(crate) mod proxy;
 mod reflect;
 pub(crate) mod regexp;
 mod string_object;
@@ -143,6 +144,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     promise::install(agent)?;
     async_generator::install(agent)?;
     reflect::install(agent)?;
+    proxy::install(agent)?;
     regexp::install(agent)?;
 
     // Value properties of the global object (§19.1).
@@ -407,7 +409,8 @@ pub(crate) fn object_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> J
         _ => {
             let o = agent.to_object(this)?;
             match agent.class(o) {
-                Class::Array => "Array",
+                _ if array::is_array(agent, Value::object(o))? => "Array",
+                Class::Arguments => "Arguments",
                 Class::Function => "Function",
                 Class::Error => "Error",
                 Class::Boolean => "Boolean",

@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::bytecode::{
-    BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, TemplateSite, UnOp,
-    declare,
+    BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, TemplateSite,
+    UNMAPPED_PARAMETER, UnOp, declare,
 };
 use super::scope::{
     BRAND, BindingKind, CLASS, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER, PRIVATE_SETTER,
@@ -207,6 +207,8 @@ struct Gen<'a, 't> {
     handlers: Vec<Handler>,
     sites: Vec<NamedSite>,
     templates: Vec<TemplateSite>,
+    /// See [`FunctionCode::arguments_map`].
+    arguments_map: Option<Box<[u16]>>,
     /// Registers of uncaptured bindings.
     locals: HashMap<(ScopeId, usize), Reg>,
     next_reg: u32,
@@ -273,6 +275,7 @@ impl<'a, 't> Gen<'a, 't> {
             handlers: Vec::new(),
             sites: Vec::new(),
             templates: Vec::new(),
+            arguments_map: None,
             locals: HashMap::new(),
             next_reg: 0,
             max_reg: 0,
@@ -349,6 +352,7 @@ impl<'a, 't> Gen<'a, 't> {
             is_async: self.is_async,
             sites: self.sites.into_boxed_slice(),
             templates: self.templates.into_boxed_slice(),
+            arguments_map: self.arguments_map,
         };
         Ok(self.agent.heap.alloc_code(code)?)
     }
@@ -1794,6 +1798,27 @@ impl<'a, 't> Gen<'a, 't> {
         if let Some(&index) = self.scope_index.get(&scope) {
             self.emit(Op::PushScope { scope: index });
             self.depth += 1;
+        }
+        if self.tree.scopes[scope].mapped_arguments {
+            // Index i of `arguments` aliases the last parameter named
+            // like parameter i, and only if that is parameter i itself.
+            let map = params
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let PatternKind::Identifier(id) = &p.kind else {
+                        return UNMAPPED_PARAMETER;
+                    };
+                    let hidden = params[i + 1..].iter().any(|later| {
+                        matches!(&later.kind, PatternKind::Identifier(other) if other.name == id.name)
+                    });
+                    match self.tree.scopes[scope].find(&id.name) {
+                        Some(index) if !hidden => self.slot_of(scope, index),
+                        _ => UNMAPPED_PARAMETER,
+                    }
+                })
+                .collect();
+            self.arguments_map = Some(map);
         }
         // Captured vars start undefined; captured lets stay in the TDZ.
         let bindings = self.tree.scopes[scope].bindings.clone();

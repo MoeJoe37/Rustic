@@ -78,7 +78,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         .set_flag(crate::runtime::FLAG_NATIVE_CONSTRUCTOR, true);
     let function = agent.get(function_prototype, constructor_key)?;
     if let Some(function) = function.as_object() {
-        agent.set_prototype_of(async_constructor, Some(function));
+        agent.set_prototype_of(async_constructor, Some(function))?;
     }
     agent.define_property_or_throw(
         async_constructor,
@@ -129,7 +129,7 @@ pub(super) fn dynamic_function(
     if let (Some(target), Some(o)) = (agent.new_target(), f.as_object()) {
         if agent.active_function() != Some(target) {
             let prototype = prototype_from_new_target(agent, default)?;
-            agent.set_prototype_of(o, Some(prototype));
+            agent.set_prototype_of(o, Some(prototype))?;
         }
     }
     Ok(f)

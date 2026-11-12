@@ -10,8 +10,8 @@ JS-04 compiles scripts to bytecode and runs them (see
 [Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
 generators (JS-08 part 1), promises with a job queue and async functions
 (JS-06 part 1), async generators with `for await` (JS-08 part 2) and
-regular expressions (JS-08 part 3) and BigInt (JS-08 part 4); modules do not
-run yet.
+regular expressions (JS-08 part 3), BigInt (JS-08 part 4) and proxies with
+mapped `arguments` objects (JS-08 part 5); modules do not run yet.
 
 ## API
 
@@ -128,10 +128,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,313 | 13,269 |
-| Fail | 1,114 | 1,530 |
-| Skipped (modules, proposals) | 1,405 | 110 |
-| Pass rate of the files that run | 95.0% | 89.6% |
+| Pass | 21,402 | 13,724 |
+| Fail | 1,025 | 1,385 |
+| Skipped (modules, proposals) | 1,405 | 111 |
+| Pass rate of the files that run | 95.4% | 90.8% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -160,7 +160,7 @@ Date, Error, FinalizationRegistry, Function, GeneratorFunction,
 GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
 prototypes, BigInt, Iterator, JSON, Map, Math, NativeErrors, Number,
-Object, Reflect, RegExp, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
+Object, Proxy, Reflect, RegExp, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
 
@@ -176,16 +176,15 @@ Most `test/language` failures are not interpreter bugs yet:
 - About 440 are dynamic `import()` files (modules, JS-06).
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
-- Modules, `Proxy` and typed arrays account for most of
+- Modules and typed arrays account for most of
   the rest. The real assertion failures left are mostly parameter TDZ in
-  defaults (`dflt-params-ref-later`), function names from computed symbol
-  keys, the mapped `arguments` object (TD-99) and the restricted `caller`
-  and `arguments` properties.
+  defaults (`dflt-params-ref-later`) and function names from computed symbol
+  keys.
 
 In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
-`Proxy`, Temporal, typed arrays or `$262`. Skipped files are never
+Temporal, typed arrays or `$262`. Skipped files are never
 counted as passing. Module files join with JS-06 module loading (TD-105).
 
 ## Fuzzing
@@ -495,6 +494,37 @@ calls a function value. The design is recorded in
     RangeError before allocating (TD-112).
   - Test262: `test/built-ins/BigInt` passes 76 of 77 files (the other needs
     a second realm), and `test/language` went from 21,220 to 21,313.
+- **Proxy** (JS-08 part 5, §10.5, §28.2): `new Proxy`, `Proxy.revocable`
+  and all thirteen traps with their invariant checks
+  (`builtins/proxy.rs`).
+  - Objects that override internal methods carry one flag bit. The ordinary
+    internal methods test it and hand such an object to `runtime/exotic.rs`,
+    so ordinary objects pay one predictable branch and nothing else.
+    `[[GetPrototypeOf]]`, `[[SetPrototypeOf]]`, `[[IsExtensible]]`,
+    `[[PreventExtensions]]` and `[[OwnPropertyKeys]]` can now throw.
+  - A proxy on a prototype chain intercepts inherited reads and writes, and
+    the inline caches never record a lookup that passed one.
+  - A proxy for a function is itself a function object, so calls, `new`,
+    `extends` and `typeof` need nothing special. `IsArray` looks through
+    proxies. Private names never pass through one.
+  - Proxies can nest through targets, handlers and prototype chains 128
+    deep in one operation; deeper is a RangeError instead of native stack
+    growth.
+  - `for-in` over a proxy asks its traps for all keys up front (TD-113).
+  - Test262: `test/built-ins/Proxy` passes 273 of 310 files and
+    `test/built-ins/Reflect` all 153; the 37 Proxy failures need a second
+    realm.
+- **Arguments objects** (§10.4.4): a sloppy function with a simple
+  parameter list gets a mapped arguments object when it names `arguments`
+  (or contains a direct `eval`). The compiler then keeps its parameters in
+  the function's environment, and the object's mapped indices read and
+  write those slots, so `arguments[0] = 1` changes the parameter and back.
+  Deleting an index, making it an accessor or making it read-only ends its
+  mapping. A function that never names `arguments` is compiled as before,
+  with parameters in registers. Strict functions and functions with
+  defaults, rests or patterns get the unmapped object, whose `callee`
+  throws. `f.caller` and `f.arguments` are `null` for sloppy functions and
+  throw for strict ones (TD-114).
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
   anything runs, TD-97): modules and regular expression
   literals that use a property escape (TD-110).

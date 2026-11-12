@@ -54,7 +54,7 @@ fn key_value(agent: &mut Agent, key: PropertyKey) -> JsResult<Value> {
 /// `EnumerableOwnProperties(O, key)` (§7.3.23): string keys only.
 fn enumerable_keys(agent: &mut Agent, o: ObjectId) -> JsResult<Vec<PropertyKey>> {
     let mut keys = Vec::new();
-    for key in agent.own_property_keys(o) {
+    for key in agent.own_property_keys(o)? {
         if matches!(key, PropertyKey::Symbol(_)) {
             continue;
         }
@@ -348,8 +348,9 @@ fn internalize(
     }
     let open = |agent: &mut Agent, holder: ObjectId, name: PropertyKey| -> JsResult<Frame> {
         let value = agent.get(holder, name)?;
+        let is_array = super::array::is_array(agent, value)?;
         let children = match value.as_object() {
-            Some(o) if agent.class(o) == Class::Array => {
+            Some(o) if is_array => {
                 let length = agent.length_of_array_like(o)?;
                 agent.heap.charge(8 * length.min(1e9) as usize)?;
                 // The heap budget keeps the length far below 2³².
@@ -419,7 +420,7 @@ fn stringify(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     if let Some(r) = replacer.as_object() {
         if agent.is_callable(replacer) {
             state.replacer = Some(replacer);
-        } else if agent.class(r) == Class::Array {
+        } else if super::array::is_array(agent, replacer)? {
             let length = agent.length_of_array_like(r)?;
             let mut list: Vec<PropertyKey> = Vec::new();
             let mut k = 0.0;
@@ -570,7 +571,7 @@ fn serialize_property(
         }
         Kind::BigInt(_) => return agent.type_error("JSON.stringify cannot serialize a BigInt"),
         Kind::Object(o) if !agent.is_callable(value) => {
-            if agent.class(o) == Class::Array {
+            if super::array::is_array(agent, value)? {
                 serialize_array(agent, state, o)?;
             } else {
                 serialize_object(agent, state, o)?;

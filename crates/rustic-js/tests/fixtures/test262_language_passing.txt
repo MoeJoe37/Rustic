@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 21313 pass, 1114 fail, 1405 skipped (modules, proposals).
+# 21402 pass, 1025 fail, 1405 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -9,8 +9,18 @@ arguments-object/10.5-7-b-2-s.js
 arguments-object/10.5-7-b-3-s.js
 arguments-object/10.5-7-b-4-s.js
 arguments-object/10.6-10-c-ii-1-s.js
+arguments-object/10.6-10-c-ii-1.js
+arguments-object/10.6-10-c-ii-2.js
 arguments-object/10.6-11-b-1.js
 arguments-object/10.6-12-1.js
+arguments-object/10.6-12-2.js
+arguments-object/10.6-13-a-1.js
+arguments-object/10.6-13-c-1-s.js
+arguments-object/10.6-13-c-2-s.js
+arguments-object/10.6-13-c-3-s.js
+arguments-object/10.6-14-c-1-s.js
+arguments-object/10.6-14-c-4-s.js
+arguments-object/10.6-2gs.js
 arguments-object/10.6-5-1.js
 arguments-object/10.6-6-1.js
 arguments-object/10.6-6-2.js
@@ -22,9 +32,11 @@ arguments-object/10.6-7-1.js
 arguments-object/S10.1.6_A1_T2.js
 arguments-object/S10.6_A1.js
 arguments-object/S10.6_A2.js
+arguments-object/S10.6_A3_T1.js
 arguments-object/S10.6_A3_T2.js
 arguments-object/S10.6_A3_T3.js
 arguments-object/S10.6_A3_T4.js
+arguments-object/S10.6_A4.js
 arguments-object/S10.6_A5_T1.js
 arguments-object/S10.6_A5_T2.js
 arguments-object/S10.6_A5_T3.js
@@ -200,18 +212,38 @@ arguments-object/gen-meth-args-trailing-comma-undefined.js
 arguments-object/mapped/Symbol.iterator.js
 arguments-object/mapped/enumerable-configurable-accessor-descriptor.js
 arguments-object/mapped/mapped-arguments-nonconfigurable-1.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-2.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-3.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-4.js
 arguments-object/mapped/mapped-arguments-nonconfigurable-delete-1.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-delete-2.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-delete-3.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-delete-4.js
 arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-1.js
 arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-2.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-3.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-4.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-5.js
 arguments-object/mapped/mapped-arguments-nonconfigurable-strict-delete-1.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-strict-delete-2.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-strict-delete-3.js
+arguments-object/mapped/mapped-arguments-nonconfigurable-strict-delete-4.js
 arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-1.js
 arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-2.js
 arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-3.js
 arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-4.js
 arguments-object/mapped/nonconfigurable-descriptors-basic.js
+arguments-object/mapped/nonconfigurable-descriptors-define-failure.js
+arguments-object/mapped/nonconfigurable-descriptors-set-value-by-arguments.js
+arguments-object/mapped/nonconfigurable-descriptors-set-value-with-define-property.js
+arguments-object/mapped/nonconfigurable-descriptors-with-param-assign.js
 arguments-object/mapped/nonconfigurable-nonenumerable-nonwritable-descriptors-basic.js
+arguments-object/mapped/nonconfigurable-nonenumerable-nonwritable-descriptors-set-by-arguments.js
+arguments-object/mapped/nonconfigurable-nonenumerable-nonwritable-descriptors-set-by-param.js
 arguments-object/mapped/nonconfigurable-nonwritable-descriptors-basic.js
 arguments-object/mapped/nonconfigurable-nonwritable-descriptors-define-property-consecutive.js
+arguments-object/mapped/nonconfigurable-nonwritable-descriptors-set-by-arguments.js
+arguments-object/mapped/nonconfigurable-nonwritable-descriptors-set-by-param.js
 arguments-object/mapped/nonwritable-nonconfigurable-descriptors-basic.js
 arguments-object/mapped/nonwritable-nonconfigurable-descriptors-set-by-arguments.js
 arguments-object/mapped/nonwritable-nonconfigurable-descriptors-set-by-param.js
@@ -219,6 +251,7 @@ arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-ba
 arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-arguments.js
 arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-define-property.js
 arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-param.js
+arguments-object/mapped/writable-enumerable-configurable-descriptor.js
 arguments-object/meth-args-trailing-comma-multiple.js
 arguments-object/meth-args-trailing-comma-null.js
 arguments-object/meth-args-trailing-comma-single-args.js
@@ -957,6 +990,7 @@ expressions/array/spread-sngl-expr.js
 expressions/array/spread-sngl-iter.js
 expressions/array/spread-sngl-literal.js
 expressions/array/spread-sngl-obj-ident.js
+expressions/arrow-function/ArrowFunction_restricted-properties.js
 expressions/arrow-function/array-destructuring-param-strict-body.js
 expressions/arrow-function/arrow/binding-tests-1.js
 expressions/arrow-function/arrow/binding-tests-2.js
@@ -5941,6 +5975,7 @@ expressions/class/elements/fields-duplicate-privatenames.js
 expressions/class/elements/fields-literal-name-propname-constructor.js
 expressions/class/elements/fields-literal-name-static-propname-constructor.js
 expressions/class/elements/fields-literal-name-static-propname-prototype.js
+expressions/class/elements/fields-multiple-definitions-static-private-methods-proxy.js
 expressions/class/elements/fields-run-once-on-double-super.js
 expressions/class/elements/fields-string-name-propname-constructor.js
 expressions/class/elements/fields-string-name-static-propname-constructor.js
@@ -6269,6 +6304,7 @@ expressions/class/elements/private-field-as-async-arrow-function.js
 expressions/class/elements/private-field-as-async-function.js
 expressions/class/elements/private-field-as-function.js
 expressions/class/elements/private-field-on-nested-class.js
+expressions/class/elements/private-fields-proxy-default-handler-throws.js
 expressions/class/elements/private-generator-method-name.js
 expressions/class/elements/private-getter-access-on-inner-arrow-function.js
 expressions/class/elements/private-getter-access-on-inner-function.js
@@ -6546,6 +6582,7 @@ expressions/class/elements/static-field-init-with-this.js
 expressions/class/elements/static-field-redeclaration.js
 expressions/class/elements/static-literal-init-err-contains-arguments.js
 expressions/class/elements/static-literal-init-err-contains-super.js
+expressions/class/elements/static-private-fields-proxy-default-handler-throws.js
 expressions/class/elements/static-private-getter-access-on-inner-arrow-function.js
 expressions/class/elements/static-private-getter-access-on-inner-class.js
 expressions/class/elements/static-private-getter-access-on-inner-function.js
@@ -6557,6 +6594,7 @@ expressions/class/elements/static-private-method-access-on-inner-function.js
 expressions/class/elements/static-private-method-and-instance-method-brand-check.js
 expressions/class/elements/static-private-method-referenced-from-instance-method.js
 expressions/class/elements/static-private-method-subclass-receiver.js
+expressions/class/elements/static-private-methods-proxy-default-handler-throws.js
 expressions/class/elements/static-private-setter-access-on-inner-arrow-function.js
 expressions/class/elements/static-private-setter-access-on-inner-class.js
 expressions/class/elements/static-private-setter-access-on-inner-function.js
@@ -7043,6 +7081,7 @@ expressions/class/private-static-setter-multiple-evaluations-of-class-direct-eva
 expressions/class/private-static-setter-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-static-setter-multiple-evaluations-of-class-factory.js
 expressions/class/private-static-setter-multiple-evaluations-of-class-function-ctor.js
+expressions/class/restricted-properties.js
 expressions/class/scope-gen-meth-paramsbody-var-close.js
 expressions/class/scope-gen-meth-paramsbody-var-open.js
 expressions/class/scope-meth-paramsbody-var-close.js
@@ -9790,6 +9829,9 @@ expressions/object/dstr/meth-obj-ptrn-prop-obj.js
 expressions/object/dstr/meth-obj-ptrn-rest-getter.js
 expressions/object/dstr/meth-obj-ptrn-rest-skip-non-enumerable.js
 expressions/object/dstr/meth-obj-ptrn-rest-val-obj.js
+expressions/object/dstr/object-rest-proxy-get-not-called-on-dontenum-keys.js
+expressions/object/dstr/object-rest-proxy-gopd-not-called-on-excluded-keys.js
+expressions/object/dstr/object-rest-proxy-ownkeys-returned-keys-order.js
 expressions/object/getter-body-strict-inside.js
 expressions/object/getter-body-strict-outside.js
 expressions/object/getter-param-dflt.js
@@ -10195,6 +10237,10 @@ expressions/object/method-definition/yield-star-before-newline.js
 expressions/object/method-definition/yield-weak-binding.js
 expressions/object/method.js
 expressions/object/not-defined.js
+expressions/object/object-spread-proxy-get-not-called-on-dontenum-keys.js
+expressions/object/object-spread-proxy-no-excluded-keys.js
+expressions/object/object-spread-proxy-ownkeys-returned-keys-order.js
+expressions/object/prop-def-id-eval-error-2.js
 expressions/object/prop-def-id-eval-error.js
 expressions/object/prop-def-id-get-error.js
 expressions/object/prop-def-id-valid.js
@@ -10750,6 +10796,7 @@ expressions/typeof/get-value.js
 expressions/typeof/native-call.js
 expressions/typeof/null.js
 expressions/typeof/number.js
+expressions/typeof/proxy.js
 expressions/typeof/string.js
 expressions/typeof/symbol.js
 expressions/typeof/syntax.js
@@ -10842,6 +10889,7 @@ expressions/void/S11.4.2_A4_T5.js
 expressions/void/S11.4.2_A4_T6.js
 expressions/yield/arguments-object-attributes.js
 expressions/yield/captured-free-vars.js
+expressions/yield/formal-parameters-after-reassignment-non-strict.js
 expressions/yield/formal-parameters-after-reassignment-strict.js
 expressions/yield/formal-parameters.js
 expressions/yield/from-catch.js
@@ -12253,6 +12301,7 @@ statements/async-function/evaluation-body-that-throws-after-await.js
 statements/async-function/evaluation-body-that-throws.js
 statements/async-function/evaluation-body.js
 statements/async-function/evaluation-default-that-throws.js
+statements/async-function/evaluation-mapped-arguments.js
 statements/async-function/evaluation-this-value-global.js
 statements/async-function/evaluation-this-value-passed.js
 statements/async-function/evaluation-unmapped-arguments.js
@@ -13106,6 +13155,7 @@ statements/class/definition/methods-gen-yield-star-after-newline.js
 statements/class/definition/methods-gen-yield-star-before-newline.js
 statements/class/definition/methods-gen-yield-weak-binding.js
 statements/class/definition/methods-named-eval-arguments.js
+statements/class/definition/methods-restricted-properties.js
 statements/class/definition/methods.js
 statements/class/definition/numeric-property-names.js
 statements/class/definition/prototype-getter.js
@@ -15486,6 +15536,7 @@ statements/class/elements/async-private-method/returns-async-arrow.js
 statements/class/elements/async-private-method/returns-async-function-returns-arguments-from-own-function.js
 statements/class/elements/async-private-method/returns-async-function-returns-newtarget.js
 statements/class/elements/async-private-method/returns-async-function.js
+statements/class/elements/class-field-is-observable-by-proxy.js
 statements/class/elements/class-field-on-frozen-objects.js
 statements/class/elements/comp-name-init-err-contains-arguments.js
 statements/class/elements/comp-name-init-err-contains-super.js
@@ -15991,6 +16042,7 @@ statements/class/elements/private-ternary-init-err-contains-arguments.js
 statements/class/elements/private-ternary-init-err-contains-super.js
 statements/class/elements/private-typeof-init-err-contains-arguments.js
 statements/class/elements/private-typeof-init-err-contains-super.js
+statements/class/elements/privatefield-on-proxy.js
 statements/class/elements/privatefieldadd-typeerror.js
 statements/class/elements/privatefieldget-primitive-receiver.js
 statements/class/elements/privatefieldget-success-1.js
@@ -16017,6 +16069,8 @@ statements/class/elements/privatefieldset-typeerror-6.js
 statements/class/elements/privatefieldset-typeerror-7.js
 statements/class/elements/privatefieldset-typeerror-8.js
 statements/class/elements/privatefieldset-typeerror-9.js
+statements/class/elements/privategetter-on-proxy.js
+statements/class/elements/privatemethods-on-proxy.js
 statements/class/elements/privatename-not-valid-earlyerr-script-1.js
 statements/class/elements/privatename-not-valid-earlyerr-script-2.js
 statements/class/elements/privatename-not-valid-earlyerr-script-3.js
@@ -16040,6 +16094,7 @@ statements/class/elements/prod-private-method-before-super-return-in-constructor
 statements/class/elements/prod-private-method-before-super-return-in-field-initializer.js
 statements/class/elements/prod-private-setter-before-super-return-in-constructor.js
 statements/class/elements/prod-private-setter-before-super-return-in-field-initializer.js
+statements/class/elements/public-class-field-initialization-is-visible-to-proxy.js
 statements/class/elements/public-class-field-initialization-on-super-class-with-setter.js
 statements/class/elements/redeclaration-symbol.js
 statements/class/elements/redeclaration.js
@@ -16264,6 +16319,7 @@ statements/class/elements/static-field-redeclaration.js
 statements/class/elements/static-fielddefinition-initializer-abrupt-completion.js
 statements/class/elements/static-literal-init-err-contains-arguments.js
 statements/class/elements/static-literal-init-err-contains-super.js
+statements/class/elements/static-private-fields-proxy-default-handler-throws.js
 statements/class/elements/static-private-getter-access-on-inner-arrow-function.js
 statements/class/elements/static-private-getter-access-on-inner-class.js
 statements/class/elements/static-private-getter-access-on-inner-function.js
@@ -16747,6 +16803,7 @@ statements/class/private-non-static-getter-static-setter-early-error.js
 statements/class/private-non-static-setter-static-getter-early-error.js
 statements/class/private-static-getter-non-static-setter-early-error.js
 statements/class/private-static-setter-non-static-getter-early-error.js
+statements/class/restricted-properties.js
 statements/class/scope-gen-meth-paramsbody-var-close.js
 statements/class/scope-gen-meth-paramsbody-var-open.js
 statements/class/scope-meth-paramsbody-var-close.js
@@ -16797,6 +16854,7 @@ statements/class/static-method-gen-non-configurable-err.js
 statements/class/static-method-length-dflt.js
 statements/class/static-method-non-configurable-err.js
 statements/class/static-method-param-yield.js
+statements/class/strict-mode/arguments-callee.js
 statements/class/strict-mode/with.js
 statements/class/subclass-builtins/subclass-AggregateError.js
 statements/class/subclass-builtins/subclass-Array.js
@@ -16870,6 +16928,7 @@ statements/class/subclass/builtin-objects/Object/regular-subclassing.js
 statements/class/subclass/builtin-objects/Object/replacing-prototype.js
 statements/class/subclass/builtin-objects/Promise/regular-subclassing.js
 statements/class/subclass/builtin-objects/Promise/super-must-be-called.js
+statements/class/subclass/builtin-objects/Proxy/no-prototype-throws.js
 statements/class/subclass/builtin-objects/RegExp/lastIndex.js
 statements/class/subclass/builtin-objects/RegExp/regular-subclassing.js
 statements/class/subclass/builtin-objects/RegExp/super-must-be-called.js
@@ -16903,7 +16962,11 @@ statements/class/subclass/derived-class-return-override-with-string.js
 statements/class/subclass/derived-class-return-override-with-symbol.js
 statements/class/subclass/derived-class-return-override-with-this.js
 statements/class/subclass/derived-class-return-override-with-undefined.js
+statements/class/subclass/superclass-arrow-function.js
+statements/class/subclass/superclass-async-function.js
+statements/class/subclass/superclass-async-generator-function.js
 statements/class/subclass/superclass-bound-function.js
+statements/class/subclass/superclass-generator-function.js
 statements/class/subclass/superclass-prototype-setter-constructor.js
 statements/class/subclass/superclass-prototype-setter-method-override.js
 statements/class/subclass/superclass-static-method-override.js
@@ -18468,6 +18531,7 @@ statements/for-in/var-eval-strict.js
 statements/for-of/Array.prototype.Symbol.iterator.js
 statements/for-of/Array.prototype.entries.js
 statements/for-of/Array.prototype.keys.js
+statements/for-of/arguments-mapped-aliasing.js
 statements/for-of/arguments-mapped-mutation.js
 statements/for-of/arguments-mapped.js
 statements/for-of/arguments-unmapped-aliasing.js
@@ -19098,6 +19162,7 @@ statements/for-of/head-var-bound-names-in-stmt.js
 statements/for-of/head-var-bound-names-let.js
 statements/for-of/head-var-init.js
 statements/for-of/head-var-no-expr.js
+statements/for-of/iterator-as-proxy.js
 statements/for-of/iterator-close-non-object.js
 statements/for-of/iterator-close-non-throw-get-method-abrupt.js
 statements/for-of/iterator-close-non-throw-get-method-is-null.js
@@ -19111,6 +19176,7 @@ statements/for-of/iterator-close-via-throw.js
 statements/for-of/iterator-next-error.js
 statements/for-of/iterator-next-reference.js
 statements/for-of/iterator-next-result-done-attr.js
+statements/for-of/iterator-next-result-type.js
 statements/for-of/iterator-next-result-value-attr-error.js
 statements/for-of/iterator-next-result-value-attr.js
 statements/for-of/labelled-fn-stmt-const.js
@@ -19557,22 +19623,38 @@ statements/function/13.1-4gs.js
 statements/function/13.1-5gs.js
 statements/function/13.1-8gs.js
 statements/function/13.2-1-s.js
+statements/function/13.2-10-s.js
 statements/function/13.2-11-s.js
 statements/function/13.2-12-s.js
+statements/function/13.2-13-s.js
+statements/function/13.2-14-s.js
 statements/function/13.2-15-1.js
 statements/function/13.2-15-s.js
 statements/function/13.2-16-s.js
 statements/function/13.2-17-1.js
+statements/function/13.2-17-s.js
 statements/function/13.2-18-1.js
+statements/function/13.2-18-s.js
+statements/function/13.2-19-b-3gs.js
 statements/function/13.2-19-s.js
+statements/function/13.2-2-s.js
 statements/function/13.2-20-s.js
+statements/function/13.2-21-s.js
+statements/function/13.2-22-s.js
 statements/function/13.2-23-s.js
 statements/function/13.2-24-s.js
+statements/function/13.2-25-s.js
+statements/function/13.2-26-s.js
 statements/function/13.2-27-s.js
 statements/function/13.2-28-s.js
 statements/function/13.2-3-s.js
+statements/function/13.2-30-s.js
+statements/function/13.2-4-s.js
+statements/function/13.2-5-s.js
+statements/function/13.2-6-s.js
 statements/function/13.2-7-s.js
 statements/function/13.2-8-s.js
+statements/function/13.2-9-s.js
 statements/function/S10.1.1_A1_T1.js
 statements/function/S13.2.1_A1_T1.js
 statements/function/S13.2.1_A4_T1.js
@@ -19609,6 +19691,8 @@ statements/function/S13.2.2_A16_T2.js
 statements/function/S13.2.2_A16_T3.js
 statements/function/S13.2.2_A17_T2.js
 statements/function/S13.2.2_A17_T3.js
+statements/function/S13.2.2_A18_T1.js
+statements/function/S13.2.2_A18_T2.js
 statements/function/S13.2.2_A19_T1.js
 statements/function/S13.2.2_A19_T2.js
 statements/function/S13.2.2_A19_T3.js
@@ -20183,6 +20267,7 @@ statements/generators/prototype-uniqueness.js
 statements/generators/prototype-value.js
 statements/generators/rest-param-strict-body.js
 statements/generators/rest-params-trailing-comma-early-error.js
+statements/generators/restricted-properties.js
 statements/generators/return.js
 statements/generators/scope-body-lex-distinct.js
 statements/generators/scope-param-elem-var-close.js
@@ -21119,8 +21204,11 @@ statements/with/decl-const.js
 statements/with/decl-fun.js
 statements/with/decl-gen.js
 statements/with/decl-let.js
+statements/with/get-binding-value-idref-with-proxy-env.js
 statements/with/get-mutable-binding-binding-deleted-in-get-unscopables-strict-mode.js
 statements/with/get-mutable-binding-binding-deleted-in-get-unscopables.js
+statements/with/has-binding-idref-with-proxy-env.js
+statements/with/has-property-err.js
 statements/with/labelled-fn-stmt.js
 statements/with/let-array-with-newline.js
 statements/with/let-block-with-newline.js
@@ -21216,6 +21304,7 @@ types/reference/S8.7_A5_T2.js
 types/reference/S8.7_A6.js
 types/reference/S8.7_A7.js
 types/reference/get-value-prop-base-primitive.js
+types/reference/put-value-prop-base-primitive.js
 types/string/S8.4_A1.js
 types/string/S8.4_A10.js
 types/string/S8.4_A11.js

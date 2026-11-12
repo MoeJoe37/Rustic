@@ -130,7 +130,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 | TD-97 | Deliberate | JS | Modules are rejected by the bytecode compiler (generators, async functions, async generators and RegExp literals paid) | Open, JS-06 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
-| TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
+| TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
 | TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Open, JS-09 |
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
@@ -144,6 +144,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, JS-09 |
+| TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
+| TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1420,6 +1422,12 @@ only; the Annex B hoisting to the function scope is missing.
 Pay with the exotic objects of JS-05. Trigger: a Test262 selection or real
 script that depends on either.
 
+**Arguments part paid** by JS-08 part 5: a sloppy function with a simple
+parameter list that names `arguments` gets a mapped arguments object
+(§10.4.4), every arguments object has the `Arguments` class and a `callee`,
+and unmapped ones throw from it. The Annex B hoisting of function declarations
+in blocks is still missing.
+
 ### TD-100 — Destructuring does not close iterators on error (Paid)
 
 `for-of` closes its iterator on `break`, `return` and throw. Array
@@ -1597,3 +1605,33 @@ Pay with: Karatsuba (and Toom-3 if measured) multiplication, a
 divide-and-conquer radix conversion, polling the step budget inside long
 operations, and then raising the cap. Trigger: a page or benchmark that needs
 integers above 2²⁰ bits, or a measured hot spot in BigInt arithmetic (JS-09).
+
+### TD-113 — for-in over a proxy enumerates eagerly
+
+`for-in` collects the enumerable string keys of the object and its prototype
+chain when the loop starts, then skips keys that are gone by the time they
+come up. For ordinary objects nothing can observe the difference from the
+specification's lazy `EnumerateObjectProperties`. For a proxy the `ownKeys`,
+`getOwnPropertyDescriptor` and `getPrototypeOf` traps of the whole chain run
+before the first iteration instead of interleaved with the body, and a key is
+not asked about again. The set and order of visited keys are the same.
+
+Pay with: a for-in iterator that walks one object at a time and calls
+`[[GetOwnProperty]]` as each key comes up. Trigger: a script or Test262 file
+that depends on the interleaving.
+
+### TD-114 — Sloppy functions answer `null` for `caller` and `arguments`
+
+The specification gives `%Function.prototype%` accessor properties `caller`
+and `arguments` whose getter and setter are `%ThrowTypeError%`, and lets
+sloppy functions have their own properties of those names; browsers give
+them such properties, and scripts read `f.caller` and `f.arguments` without
+expecting a throw. Own properties would cost every closure two slots, so
+instead `%ThrowTypeError%` returns `null` when its receiver is a sloppy,
+non-generator, non-async function compiled from source, and throws for every
+other receiver (strict functions, classes, built-ins, arguments objects).
+The visible differences from other engines: the properties are inherited
+rather than own, and they are always `null` rather than the actual caller or
+arguments (which other engines only provide without optimization).
+
+Pay with: nothing planned; revisit only if a site needs the real caller.

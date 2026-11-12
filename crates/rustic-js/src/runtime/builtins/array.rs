@@ -202,11 +202,18 @@ fn range_error<T>(agent: &mut Agent, message: &str) -> JsResult<T> {
     Err(agent.throw(ErrorKind::RangeError, message))
 }
 
-/// `IsArray(argument)` (§7.2.2). There are no proxies yet.
-pub(crate) fn is_array(agent: &Agent, value: Value) -> bool {
-    value
-        .as_object()
-        .is_some_and(|o| agent.class(o) == Class::Array)
+/// `IsArray(argument)` (§7.2.2): a proxy is an array when its target is,
+/// and a revoked proxy is a TypeError.
+pub(crate) fn is_array(agent: &mut Agent, value: Value) -> JsResult<bool> {
+    let Some(mut o) = value.as_object() else {
+        return Ok(false);
+    };
+    // A proxy's target is fixed and cannot be the proxy itself, so the
+    // chain of targets ends.
+    while agent.is_exotic_proxy(o) {
+        o = super::proxy::target_of(agent, o)?;
+    }
+    Ok(agent.class(o) == Class::Array)
 }
 
 /// `ArrayCreate(length, proto)` (§10.4.2.2).
@@ -227,7 +234,7 @@ fn array_create(agent: &mut Agent, length: f64, prototype: Option<ObjectId>) -> 
 
 /// `ArraySpeciesCreate(originalArray, length)` (§10.4.2.3).
 fn array_species_create(agent: &mut Agent, original: ObjectId, length: f64) -> JsResult<ObjectId> {
-    if !is_array(agent, Value::object(original)) {
+    if !is_array(agent, Value::object(original))? {
         return array_create(agent, length, None);
     }
     let key = agent.heap.key("constructor")?;
@@ -296,7 +303,7 @@ fn species_getter(_: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 
 /// `Array.isArray(arg)` (§23.1.2.2).
 fn is_array_method(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
-    Ok(Value::boolean(is_array(agent, arg(args, 0))))
+    Ok(Value::boolean(is_array(agent, arg(args, 0))?))
 }
 
 /// A new object from `this` as a constructor, or an array.
@@ -888,7 +895,7 @@ fn is_concat_spreadable(agent: &mut Agent, value: Value) -> JsResult<bool> {
     if spreadable != Value::UNDEFINED {
         return Ok(agent.to_boolean(spreadable));
     }
-    Ok(is_array(agent, value))
+    is_array(agent, value)
 }
 
 /// `Array.prototype.concat` (§23.1.3.2).
@@ -969,7 +976,7 @@ fn flatten_into_array(
                 )?;
             }
         }
-        if depth > 0.0 && is_array(agent, element) {
+        if depth > 0.0 && is_array(agent, element)? {
             let inner = element.as_object().expect("arrays are objects");
             let length = agent.length_of_array_like(inner)?;
             agent.heap.charge(std::mem::size_of::<Level>())?;

@@ -92,7 +92,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         .set_flag(FLAG_NATIVE_CONSTRUCTOR, true);
     let function = agent.get(function_prototype, constructor_key)?;
     if let Some(function) = function.as_object() {
-        agent.set_prototype_of(constructor, Some(function));
+        agent.set_prototype_of(constructor, Some(function))?;
     }
     agent.define_property_or_throw(
         constructor,

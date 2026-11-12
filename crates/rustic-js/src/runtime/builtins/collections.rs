@@ -66,7 +66,7 @@ const WEAK_SET_METHODS: &[Method] = &[
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let object_prototype = agent.intrinsics.object_prototype;
     let iterator_prototype = agent
-        .get_prototype_of(agent.intrinsics.array_iterator_prototype)
+        .get_prototype_of(agent.intrinsics.array_iterator_prototype)?
         .expect("%ArrayIteratorPrototype% inherits from %IteratorPrototype%");
 
     let map_prototype = agent.new_object_with(Some(object_prototype))?;
@@ -1051,7 +1051,7 @@ fn weak_map_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
     let default = own_prototype(agent)?;
     let prototype = prototype_from_new_target(agent, default)?;
     let map = agent.new_weak_map()?;
-    agent.set_prototype_of(map, Some(prototype));
+    agent.set_prototype_of(map, Some(prototype))?;
     fill_from_iterable(agent, map, arg(args, 0), "set", true)?;
     Ok(Value::object(map))
 }
@@ -1061,7 +1061,7 @@ fn weak_set_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
     let default = own_prototype(agent)?;
     let prototype = prototype_from_new_target(agent, default)?;
     let set = agent.new_weak_set()?;
-    agent.set_prototype_of(set, Some(prototype));
+    agent.set_prototype_of(set, Some(prototype))?;
     fill_from_iterable(agent, set, arg(args, 0), "add", false)?;
     Ok(Value::object(set))
 }
@@ -1156,7 +1156,7 @@ fn weak_ref_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
     let default = own_prototype(agent)?;
     let prototype = prototype_from_new_target(agent, default)?;
     let weak_ref = agent.new_weak_ref(target)?;
-    agent.set_prototype_of(weak_ref, Some(prototype));
+    agent.set_prototype_of(weak_ref, Some(prototype))?;
     Ok(Value::object(weak_ref))
 }
 
@@ -1173,7 +1173,7 @@ fn registry_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
     let default = own_prototype(agent)?;
     let prototype = prototype_from_new_target(agent, default)?;
     let registry = agent.new_finalization_registry()?;
-    agent.set_prototype_of(registry, Some(prototype));
+    agent.set_prototype_of(registry, Some(prototype))?;
     Ok(Value::object(registry))
 }
 

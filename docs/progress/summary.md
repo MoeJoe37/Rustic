@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 26.44%** = 23.09% verified complete + 3.35% partial credit. 57/221 capabilities complete, 7 in progress.
+**Overall completion: 26.81%** = 25.28% verified complete + 1.53% partial credit. 60/221 capabilities complete, 4 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `4c46efca6e6af84e832441998e2837ff6d945f33382cd489cf236b03e30c542a`.
+Catalog: `engine-v4`. Source fingerprint: `23bf58e5f0e1cbed4050b434bd1518e6dca54df2dafe8ae416c0ed54d41f9473`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `4c46efca6e6af84e832441998e2837ff6d945
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 4/13 | 69.85% | 36.92% | 8.90% |
+| M4 ECMAScript runtime | 7/13 | 74.01% | 61.53% | 8.90% |
 | M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `4c46efca6e6af84e832441998e2837ff6d945
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 4/15 | 6 | 64.93% | 32.87% | 10% | 6.49 |
+| JavaScript & GC | 7/15 | 3 | 68.64% | 54.79% | 10% | 6.86 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -166,11 +166,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 - **complete** `js.parser` — Lexer/parser, ASI, early errors and UTF-16 · size 5 · M4 · 0.68% of engine ([source](../../crates/rustic-js/src/lexer.rs), [test](../../crates/rustic-js/tests/lexer.rs), [source](../../crates/rustic-js/src/parser/mod.rs), [test](../../crates/rustic-js/tests/parse.rs), [source](../../crates/rustic-js/src/parser/scope.rs), [test](../../crates/rustic-js/tests/parse.rs), [source](../../crates/rustic-fuzz/src/js.rs), [test](../../crates/rustic-js/tests/parse.rs), [source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs), [source](../../crates/rustic-js/src/parser/expression.rs), [test](../../crates/rustic-js/tests/parse.rs))
 - **complete** `js.values` — Values, coercions, references and completions · size 3 · M4 · 0.41% of engine ([source](../../crates/rustic-js/src/runtime/value.rs), [test](../../crates/rustic-js/tests/runtime.rs), [source](../../crates/rustic-js/src/runtime/convert.rs), [test](../../crates/rustic-js/tests/runtime.rs), [source](../../crates/rustic-js/src/runtime/env.rs), [test](../../crates/rustic-js/tests/runtime.rs), [source](../../crates/rustic-js/src/runtime/builtins/bigint.rs), [test](../../crates/rustic-js/tests/interp.rs))
-- **in progress 75.00%** `js.objects` — Object methods, descriptors and prototypes · size 3 · M4 · 0.41% of engine
-  - [x] Shared shapes, dictionary fallback, dense and sparse elements on a byte budget ([source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/runtime.rs))
-  - [x] Ordinary internal methods and property descriptor validation ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
-  - [x] Array and String exotic objects ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
-  - [ ] Arguments, bound function and Proxy exotic objects
+- **complete** `js.objects` — Object methods, descriptors and prototypes · size 3 · M4 · 0.41% of engine ([source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/runtime.rs), [source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs), [source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs), [source](../../crates/rustic-js/src/runtime/exotic.rs), [source](../../crates/rustic-js/src/runtime/builtins/proxy.rs), [source](../../crates/rustic-js/src/runtime/builtins/function.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
 - **complete** `js.heap` — Rooted traced heap and host-object cycle collection · size 8 · M4 · 1.09% of engine ([source](../../crates/rustic-js/src/runtime/gc.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-fuzz/src/js_heap.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/weak.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-bindings/src/heap.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs))
 - **in progress 88.88%** `js.interpreter` — Original interpreter/bytecode and control flow · size 8 · M4 · 1.09% of engine
   - [x] Scope resolution to registers and environment slots, register bytecode in a collected arena ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
@@ -182,28 +178,14 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Tagged templates, optional calls and object-literal super ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Regular expression literals ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [ ] Generators, async functions and modules on the bytecode
-- **in progress 87.50%** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.68% of engine
-  - [x] Function declarations, expressions, arrows, defaults, rest parameters and arguments ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] Call and construct with prototypes, this binding and new.target ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] try/catch/finally with uncatchable cancellation and out-of-memory ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] Frames on agent stacks: bounded recursion without Rust stack growth, host calls and reentrancy ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] Classes: constructors, extends, super, accessors, fields and static blocks ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] Private names and brand checks ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] Lazy function prototypes and shared scope name lists (120-byte closures) ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [ ] Mapped arguments objects
+- **complete** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.68% of engine ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/scope.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
 - **complete** `js.builtins` — Core built-ins and collections · size 8 · M4 · 1.09% of engine ([source](../../crates/rustic-js/src/runtime/builtins.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/test262.rs))
 - **in progress 33.33%** `js.jobs` — Promises, jobs and realms · size 3 · M4 · 0.41% of engine
   - [x] Promise, reaction jobs and the job queue ([source](../../crates/rustic-js/src/runtime/builtins/promise.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
   - [ ] Host rejection tracking (TD-109)
   - [ ] Realms and $262.createRealm
 - **planned** `js.modules` — Modules and host loading hooks · size 3 · M4 · 0.41% of engine
-- **in progress 83.33%** `js.advanced` — BigInt, RegExp, proxies, generators and async · size 8 · M4 · 1.09% of engine
-  - [x] Generators, yield* and %GeneratorFunction% ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [x] Async functions and await ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [x] Async generators and for await ([source](../../crates/rustic-js/src/vm/interp.rs), [source](../../crates/rustic-js/src/runtime/builtins/async_generator.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [x] BigInt arithmetic and literals ([source](../../crates/rustic-js/src/runtime/bigint.rs), [source](../../crates/rustic-js/src/runtime/builtins/bigint.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/src/runtime/bigint.rs))
-  - [x] RegExp engine and literals (TD-88) ([source](../../crates/rustic-js/src/regexp/vm.rs), [source](../../crates/rustic-js/src/runtime/builtins/regexp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [ ] Proxy
+- **complete** `js.advanced` — BigInt, RegExp, proxies, generators and async · size 8 · M4 · 1.09% of engine ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [source](../../crates/rustic-js/src/runtime/builtins/async_generator.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/bigint.rs), [source](../../crates/rustic-js/src/runtime/builtins/bigint.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/src/runtime/bigint.rs), [source](../../crates/rustic-js/src/regexp/vm.rs), [source](../../crates/rustic-js/src/runtime/builtins/regexp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/builtins/proxy.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
 - **planned** `js.buffers` — Buffers, typed arrays and memory semantics · size 3 · M4 · 0.41% of engine
 - **planned** `js.intl` — Intl and required Unicode semantics · size 5 · M4 · 0.68% of engine
 - **planned** `js.wasm` — JavaScript/WebAssembly identity, conversions and tracing integration · size 3 · M9 · 0.41% of engine

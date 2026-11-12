@@ -168,3 +168,5 @@ var out = 'a1b22c333'.replace(/\d+/g, (s, i) => '[' + s.length + i + ']') + 'x-y
 var out = ''; for (var p of ['(a|ab)(c|bcd)(d*)', '^(?:a+|b)*?c$', '(?i:[^ab])c', '\\b\\w+\\B', '(a*)*b', '[\\d--4]', '(?<!x)y{2,3}?']) { try { out += new RegExp(p, p.indexOf('--') > 0 ? 'v' : 'u').exec('abcd aac 4567 xyyy yyb Bc') + ';' } catch (e) { out += e.name } }
 var out = String(/[/]\//) + RegExp.escape('a.b*c ') + /x/gimsuyd.flags + Object.prototype.toString.call(/x/) + RegExp('\\u{1F600}', 'u').test('\u{1F600}')
 var a = 2n ** 80n, b = -a / 3n; String([a % 7n, b >> 3n, BigInt.asIntN(8, a - 1n), ~b & 0xffn])
+var log = []; var p = new Proxy({ a: 1 }, { get(t, k, r) { log.push(String(k)); return Reflect.get(t, k, r) }, has(t, k) { return k in t }, ownKeys(t) { return Reflect.ownKeys(t).reverse() } }); p.b = 2; String([p.a, 'b' in p, Object.keys(p), log, typeof new Proxy(function () {}, {})])
+function f(a, b) { arguments[0] = b; b = a + 1; delete arguments[1]; b = 9; return [a, b, arguments.length, arguments[1], arguments.callee === f].join() } f(1, 2) + f(3)

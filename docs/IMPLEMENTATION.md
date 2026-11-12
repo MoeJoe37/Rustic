@@ -1313,6 +1313,24 @@ allocation (TD-112); TD-92 is paid. Test262 `test/language`: 21,313 of 22,427
 run files (95.0%); `test/built-ins` with BigInt gated: 13,269 of 14,799
 (89.6%).
 
+## JS-08 part 5: Proxy and mapped arguments objects
+
+Exotic objects now have one dispatch point: an object flagged exotic is
+handed by the ordinary internal methods to `runtime/exotic.rs`. The five
+internal methods a proxy can make throw (`[[GetPrototypeOf]]`,
+`[[SetPrototypeOf]]`, `[[IsExtensible]]`, `[[PreventExtensions]]`,
+`[[OwnPropertyKeys]]`) return `JsResult`. `builtins/proxy.rs` implements
+`Proxy`, `Proxy.revocable` and the thirteen traps with the invariants of
+§10.5; proxies for functions are function objects; nesting is bounded at 128
+levels. Mapped arguments objects (§10.4.4) alias parameters that the
+compiler moves into the function environment when a sloppy function with
+simple parameters names `arguments`; `%ThrowTypeError%` and the restricted
+`caller`/`arguments` accessors exist (TD-114). `for-in` over a proxy is
+eager (TD-113); the arguments half of TD-99 is paid. Test262
+`test/language`: 21,402 of 22,427 run files (95.4%); `test/built-ins` with
+Proxy gated: 13,724 of 15,109 (90.8%), Proxy 273 of 310 and Reflect 153 of
+153.
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,

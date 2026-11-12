@@ -2724,61 +2724,62 @@
           "label": "Object methods, descriptors and prototypes",
           "size": 3,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Shared shapes, dictionary fallback, dense and sparse elements on a byte budget",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/shape.rs",
-                  "marker": "pub fn add"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn objects_built_alike_share_shapes_and_cost_eight_bytes_per_property"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/shape.rs",
+              "marker": "pub fn add"
             },
             {
-              "label": "Ordinary internal methods and property descriptor validation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/internal.rs",
-                  "marker": "fn validate_and_apply"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn define_own_property_validates_against_the_current_descriptor"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn objects_built_alike_share_shapes_and_cost_eight_bytes_per_property"
             },
             {
-              "label": "Array and String exotic objects",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/internal.rs",
-                  "marker": "fn array_set_length"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn array_length_tracks_indices_and_truncates"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/internal.rs",
+              "marker": "fn validate_and_apply"
             },
             {
-              "label": "Arguments, bound function and Proxy exotic objects",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn define_own_property_validates_against_the_current_descriptor"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/internal.rs",
+              "marker": "fn array_set_length"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn array_length_tracks_indices_and_truncates"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/exotic.rs",
+              "marker": "pub(crate) fn exotic_get_own_property"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/proxy.rs",
+              "marker": "pub(crate) fn own_property_keys"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/function.rs",
+              "marker": "fn bound_function_call"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn proxies()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn arguments_objects()"
             }
           ]
         },
@@ -2994,125 +2995,97 @@
           "label": "Functions, closures, call/construct and exceptions",
           "size": 5,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Function declarations, expressions, arrows, defaults, rest parameters and arguments",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn new_closure"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn functions_and_closures"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn new_closure"
             },
             {
-              "label": "Call and construct with prototypes, this binding and new.target",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn construct"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn constructors_and_prototypes"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn functions_and_closures"
             },
             {
-              "label": "try/catch/finally with uncatchable cancellation and out-of-memory",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn unwind"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn exceptions"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn construct"
             },
             {
-              "label": "Frames on agent stacks: bounded recursion without Rust stack growth, host calls and reentrancy",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "pub struct VmLimits"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn recursion_is_bounded_without_the_rust_stack"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn constructors_and_prototypes"
             },
             {
-              "label": "Classes: constructors, extends, super, accessors, fields and static blocks",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "fn class_definition"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn class_inheritance"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn unwind"
             },
             {
-              "label": "Private names and brand checks",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "fn private_brand_check"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn private_names"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn exceptions"
             },
             {
-              "label": "Lazy function prototypes and shared scope name lists (120-byte closures)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/internal.rs",
-                  "marker": "fn realize_function_prototype"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn closures_and_their_scopes_stay_small"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "pub struct VmLimits"
             },
             {
-              "label": "Mapped arguments objects",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn recursion_is_bounded_without_the_rust_stack"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "fn class_definition"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn class_inheritance"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "fn private_brand_check"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn private_names"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/internal.rs",
+              "marker": "fn realize_function_prototype"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn closures_and_their_scopes_stay_small"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/scope.rs",
+              "marker": "fn map_arguments"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn new_arguments_object"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn arguments_objects()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn mapped_arguments_survive_collection"
             }
           ]
         },
@@ -3194,128 +3167,107 @@
           "label": "BigInt, RegExp, proxies, generators and async",
           "size": 8,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Generators, yield* and %GeneratorFunction%",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "pub(crate) fn generator_resume"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn generators()"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn suspended_generators_keep_their_frames_alive"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "pub(crate) fn generator_resume"
             },
             {
-              "label": "Async functions and await",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn async_resume"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn promises_and_async_functions"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn generators()"
             },
             {
-              "label": "Async generators and for await",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "pub(crate) fn async_generator_run"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/async_generator.rs",
-                  "marker": "pub(crate) fn create_async_from_sync_iterator"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn async_generators_and_for_await"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn async_generators_and_their_queues_survive_collection"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/gc.rs",
+              "marker": "fn suspended_generators_keep_their_frames_alive"
             },
             {
-              "label": "BigInt arithmetic and literals",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/bigint.rs",
-                  "marker": "fn div_rem_magnitude"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/bigint.rs",
-                  "marker": "pub(crate) fn bigint_binary"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn bigint_arithmetic"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/src/runtime/bigint.rs",
-                  "marker": "fn long_division_agrees_with_multiplication"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn async_resume"
             },
             {
-              "label": "RegExp engine and literals (TD-88)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/regexp/vm.rs",
-                  "marker": "pub(crate) fn compile"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/regexp.rs",
-                  "marker": "fn builtin_exec"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn regular_expressions()"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn regexps_and_their_iterators_survive_collection"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn promises_and_async_functions"
             },
             {
-              "label": "Proxy",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "pub(crate) fn async_generator_run"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/async_generator.rs",
+              "marker": "pub(crate) fn create_async_from_sync_iterator"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn async_generators_and_for_await"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/gc.rs",
+              "marker": "fn async_generators_and_their_queues_survive_collection"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/bigint.rs",
+              "marker": "fn div_rem_magnitude"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/bigint.rs",
+              "marker": "pub(crate) fn bigint_binary"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn bigint_arithmetic"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/src/runtime/bigint.rs",
+              "marker": "fn long_division_agrees_with_multiplication"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/regexp/vm.rs",
+              "marker": "pub(crate) fn compile"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/regexp.rs",
+              "marker": "fn builtin_exec"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn regular_expressions()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/gc.rs",
+              "marker": "fn regexps_and_their_iterators_survive_collection"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/proxy.rs",
+              "marker": "fn proxy_create"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn proxies()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn proxies_keep_their_target_and_handler_alive"
             }
           ]
         },

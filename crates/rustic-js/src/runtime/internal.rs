@@ -7,7 +7,8 @@ use std::collections::BTreeMap;
 use super::agent::{Agent, ErrorKind, JsResult};
 use super::number::to_uint32;
 use super::object::{
-    Class, Dictionary, FLAG_ARRAY_LENGTH_WRITABLE, FLAG_EXTENSIBLE, PropertyDescriptor, Stored,
+    Class, Dictionary, FLAG_ARRAY_LENGTH_WRITABLE, FLAG_EXOTIC, FLAG_EXTENSIBLE,
+    PropertyDescriptor, Stored,
 };
 use super::shape::{Attributes, PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
@@ -209,7 +210,7 @@ impl Agent {
         object.extra_mut().dictionary = Some(dictionary);
     }
 
-    fn make_sparse(&mut self, o: ObjectId) {
+    pub(crate) fn make_sparse(&mut self, o: ObjectId) {
         let object = self.heap.object_mut(o);
         if object.sparse().is_some() {
             return;
@@ -363,24 +364,57 @@ impl Agent {
 
     // ---- ordinary internal methods ------------------------------------
 
-    /// `[[GetPrototypeOf]]`.
-    pub fn get_prototype_of(&self, o: ObjectId) -> Option<ObjectId> {
+    /// Whether `o` overrides internal methods (a Proxy, a mapped
+    /// arguments object, a typed array or a module namespace): its
+    /// behavior is in `exotic.rs`.
+    #[inline]
+    pub(crate) fn is_exotic(&self, o: ObjectId) -> bool {
+        self.heap.object(o).has_flag(FLAG_EXOTIC)
+    }
+
+    /// The `[[Prototype]]` slot as stored, without running a proxy's
+    /// trap: what `[[GetPrototypeOf]]` returns for every other object.
+    pub fn stored_prototype(&self, o: ObjectId) -> Option<ObjectId> {
         self.heap.object(o).proto()
     }
 
-    /// `[[SetPrototypeOf]]` (OrdinarySetPrototypeOf).
-    pub fn set_prototype_of(&mut self, o: ObjectId, proto: Option<ObjectId>) -> bool {
+    /// `[[GetPrototypeOf]]`.
+    pub fn get_prototype_of(&mut self, o: ObjectId) -> JsResult<Option<ObjectId>> {
+        if self.is_exotic(o) {
+            return self.exotic_get_prototype_of(o);
+        }
+        Ok(self.heap.object(o).proto())
+    }
+
+    /// `[[SetPrototypeOf]]`.
+    pub fn set_prototype_of(&mut self, o: ObjectId, proto: Option<ObjectId>) -> JsResult<bool> {
+        if self.is_exotic(o) {
+            return self.exotic_set_prototype_of(o, proto);
+        }
+        Ok(self.ordinary_set_prototype_of(o, proto))
+    }
+
+    /// `OrdinarySetPrototypeOf` (§10.1.2.1).
+    pub(crate) fn ordinary_set_prototype_of(
+        &mut self,
+        o: ObjectId,
+        proto: Option<ObjectId>,
+    ) -> bool {
         let current = self.heap.object(o).proto();
         if current == proto {
             return true;
         }
-        if !self.is_extensible(o) {
+        if !self.heap.object(o).has_flag(FLAG_EXTENSIBLE) {
             return false;
         }
         let mut p = proto;
         while let Some(candidate) = p {
             if candidate == o {
                 return false;
+            }
+            // A Proxy on the chain ends the cycle check (step 8.c.i).
+            if self.is_exotic_proxy(candidate) {
+                break;
             }
             p = self.heap.object(candidate).proto();
         }
@@ -397,18 +431,36 @@ impl Agent {
     }
 
     /// `[[IsExtensible]]`.
-    pub fn is_extensible(&self, o: ObjectId) -> bool {
-        self.heap.object(o).has_flag(FLAG_EXTENSIBLE)
+    pub fn is_extensible(&mut self, o: ObjectId) -> JsResult<bool> {
+        if self.is_exotic(o) {
+            return self.exotic_is_extensible(o);
+        }
+        Ok(self.heap.object(o).has_flag(FLAG_EXTENSIBLE))
     }
 
     /// `[[PreventExtensions]]`.
-    pub fn prevent_extensions(&mut self, o: ObjectId) -> bool {
+    pub fn prevent_extensions(&mut self, o: ObjectId) -> JsResult<bool> {
+        if self.is_exotic(o) {
+            return self.exotic_prevent_extensions(o);
+        }
         self.heap.object_mut(o).set_flag(FLAG_EXTENSIBLE, false);
-        true
+        Ok(true)
     }
 
     /// `[[GetOwnProperty]]`.
     pub fn get_own_property(
+        &mut self,
+        o: ObjectId,
+        key: PropertyKey,
+    ) -> JsResult<Option<PropertyDescriptor>> {
+        if self.is_exotic(o) {
+            return self.exotic_get_own_property(o, key);
+        }
+        self.ordinary_get_own_property(o, key)
+    }
+
+    /// `OrdinaryGetOwnProperty` (with the String exotic indices).
+    pub(crate) fn ordinary_get_own_property(
         &mut self,
         o: ObjectId,
         key: PropertyKey,
@@ -427,6 +479,9 @@ impl Agent {
         key: PropertyKey,
         desc: PropertyDescriptor,
     ) -> JsResult<bool> {
+        if self.is_exotic(o) {
+            return self.exotic_define_own_property(o, key, desc);
+        }
         match self.heap.object(o).class {
             Class::Array => self.array_define_own_property(o, key, desc),
             Class::String => {
@@ -449,12 +504,13 @@ impl Agent {
         key: PropertyKey,
         desc: PropertyDescriptor,
     ) -> JsResult<bool> {
-        let current = self.get_own_property(o, key)?;
-        let extensible = self.is_extensible(o);
+        let current = self.ordinary_get_own_property(o, key)?;
+        let extensible = self.heap.object(o).has_flag(FLAG_EXTENSIBLE);
         self.validate_and_apply(Some((o, key)), extensible, desc, current)
     }
 
-    fn validate_only(
+    /// `IsCompatiblePropertyDescriptor` (§10.1.6.2).
+    pub(crate) fn validate_only(
         &mut self,
         extensible: bool,
         desc: PropertyDescriptor,
@@ -587,12 +643,26 @@ impl Agent {
 
     /// `[[HasProperty]]`.
     pub fn has_property(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
+        self.has_property_from(o, key, false)
+    }
+
+    /// `OrdinaryHasProperty` when `ordinary_first`, for the exotic objects
+    /// that fall back to it; exotic objects further up are asked as usual.
+    pub(crate) fn has_property_from(
+        &mut self,
+        o: ObjectId,
+        key: PropertyKey,
+        mut ordinary_first: bool,
+    ) -> JsResult<bool> {
         let mut current = Some(o);
         while let Some(object) = current {
+            if !std::mem::take(&mut ordinary_first) && self.is_exotic(object) {
+                return self.exotic_has_property(object, key);
+            }
             if self.locate(object, key).is_some() {
                 return Ok(true);
             }
-            current = self.get_prototype_of(object);
+            current = self.heap.object(object).proto();
         }
         Ok(false)
     }
@@ -604,8 +674,23 @@ impl Agent {
         key: PropertyKey,
         receiver: Value,
     ) -> JsResult<Value> {
+        self.get_from(o, key, receiver, false)
+    }
+
+    /// `OrdinaryGet` when `ordinary_first`, for the exotic objects that
+    /// fall back to it; exotic objects further up are asked as usual.
+    pub(crate) fn get_from(
+        &mut self,
+        o: ObjectId,
+        key: PropertyKey,
+        receiver: Value,
+        mut ordinary_first: bool,
+    ) -> JsResult<Value> {
         let mut current = Some(o);
         while let Some(object) = current {
+            if !std::mem::take(&mut ordinary_first) && self.is_exotic(object) {
+                return self.exotic_get(object, key, receiver);
+            }
             if let Some(location) = self.locate(object, key) {
                 // Fast paths that need no descriptor.
                 match location {
@@ -629,7 +714,7 @@ impl Agent {
                 }
                 return Ok(desc.value.unwrap_or(Value::UNDEFINED));
             }
-            current = self.get_prototype_of(object);
+            current = self.heap.object(object).proto();
         }
         Ok(Value::UNDEFINED)
     }
@@ -643,6 +728,22 @@ impl Agent {
         value: Value,
         receiver: Value,
     ) -> JsResult<bool> {
+        self.set_from(o, key, value, receiver, false)
+    }
+
+    /// `OrdinarySet` when `ordinary_first`, for the exotic objects that
+    /// fall back to it; exotic objects further up are asked as usual.
+    pub(crate) fn set_from(
+        &mut self,
+        o: ObjectId,
+        key: PropertyKey,
+        value: Value,
+        receiver: Value,
+        mut ordinary_first: bool,
+    ) -> JsResult<bool> {
+        if !ordinary_first && self.is_exotic(o) {
+            return self.exotic_set(o, key, value, receiver);
+        }
         // Fast path: a writable own data property on the receiver itself.
         if receiver == Value::object(o) {
             match self.locate(o, key) {
@@ -664,10 +765,14 @@ impl Agent {
         }
         let mut current = o;
         let own = loop {
-            if let Some(desc) = self.get_own_property(current, key)? {
+            if !std::mem::take(&mut ordinary_first) && self.is_exotic(current) {
+                // The parent's own `[[Set]]` decides (§10.1.9.2 step 2.b).
+                return self.exotic_set(current, key, value, receiver);
+            }
+            if let Some(desc) = self.ordinary_get_own_property(current, key)? {
                 break desc;
             }
-            match self.get_prototype_of(current) {
+            match self.heap.object(current).proto() {
                 Some(parent) => current = parent,
                 None => break PropertyDescriptor::data(Value::UNDEFINED),
             }
@@ -706,7 +811,15 @@ impl Agent {
 
     /// `[[Delete]]`.
     pub fn delete(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
-        match self.get_own_property(o, key)? {
+        if self.is_exotic(o) {
+            return self.exotic_delete(o, key);
+        }
+        self.ordinary_delete(o, key)
+    }
+
+    /// `OrdinaryDelete` (§10.1.10.1).
+    pub(crate) fn ordinary_delete(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
+        match self.ordinary_get_own_property(o, key)? {
             None => Ok(true),
             Some(desc) if desc.configurable == Some(true) => {
                 self.remove(o, key);
@@ -718,7 +831,15 @@ impl Agent {
 
     /// `[[OwnPropertyKeys]]`: array indices ascending, then strings and
     /// then symbols in creation order (§10.1.11.1).
-    pub fn own_property_keys(&self, o: ObjectId) -> Vec<PropertyKey> {
+    pub fn own_property_keys(&mut self, o: ObjectId) -> JsResult<Vec<PropertyKey>> {
+        if self.is_exotic(o) {
+            return self.exotic_own_property_keys(o);
+        }
+        Ok(self.ordinary_own_property_keys(o))
+    }
+
+    /// `OrdinaryOwnPropertyKeys` (§10.1.11.1).
+    pub(crate) fn ordinary_own_property_keys(&self, o: ObjectId) -> Vec<PropertyKey> {
         let object = self.heap.object(o);
         let mut keys = Vec::new();
         let string_len = self.string_data(o).map_or(0, JsStr::len);
@@ -893,7 +1014,7 @@ impl Agent {
             return Ok(false);
         }
         let mut indices: Vec<u32> = self
-            .own_property_keys(a)
+            .ordinary_own_property_keys(a)
             .into_iter()
             .filter_map(|k| match k {
                 PropertyKey::Index(i) if i >= new_len => Some(i),
@@ -1033,6 +1154,9 @@ impl Agent {
 
     /// `HasOwnProperty(O, P)`.
     pub fn has_own_property(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
+        if self.is_exotic(o) {
+            return Ok(self.exotic_get_own_property(o, key)?.is_some());
+        }
         Ok(self.locate(o, key).is_some())
     }
 
@@ -1074,10 +1198,10 @@ impl Agent {
 
     /// `SetIntegrityLevel(O, level)`.
     pub fn set_integrity_level(&mut self, o: ObjectId, level: IntegrityLevel) -> JsResult<bool> {
-        if !self.prevent_extensions(o) {
+        if !self.prevent_extensions(o)? {
             return Ok(false);
         }
-        for key in self.own_property_keys(o) {
+        for key in self.own_property_keys(o)? {
             let desc = match level {
                 IntegrityLevel::Sealed => PropertyDescriptor {
                     configurable: Some(false),
@@ -1108,10 +1232,10 @@ impl Agent {
 
     /// `TestIntegrityLevel(O, level)`.
     pub fn test_integrity_level(&mut self, o: ObjectId, level: IntegrityLevel) -> JsResult<bool> {
-        if self.is_extensible(o) {
+        if self.is_extensible(o)? {
             return Ok(false);
         }
-        for key in self.own_property_keys(o) {
+        for key in self.own_property_keys(o)? {
             if let Some(desc) = self.get_own_property(o, key)? {
                 if desc.configurable == Some(true) {
                     return Ok(false);

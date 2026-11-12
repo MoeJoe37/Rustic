@@ -88,7 +88,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
 
     // %RegExpStringIteratorPrototype% (§22.2.9.2).
     let iterator_prototype = agent
-        .get_prototype_of(agent.intrinsics.array_iterator_prototype)
+        .get_prototype_of(agent.intrinsics.array_iterator_prototype)?
         .expect("%ArrayIteratorPrototype% inherits from %IteratorPrototype%");
     let string_iterator = agent.new_object_with(Some(iterator_prototype))?;
     install_methods(

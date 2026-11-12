@@ -150,6 +150,9 @@ pub(crate) struct Scope {
     /// A sloppy direct `eval` inside adds its `var`s to this function
     /// scope's environment, so the scope always has one.
     pub eval_vars: bool,
+    /// The function's `arguments` object is mapped (§10.4.4): its indices
+    /// alias the parameters, which therefore live in the environment.
+    pub mapped_arguments: bool,
 }
 
 impl Scope {
@@ -326,6 +329,7 @@ impl Resolver {
             arrow: false,
             dynamic: false,
             eval_vars: false,
+            mapped_arguments: false,
         });
         if let Some(key) = key {
             self.tree.by_node.insert(key, id);
@@ -1034,7 +1038,34 @@ impl Resolver {
             self.pattern(p);
         }
         self.statements(body);
+        self.map_arguments(scope, params, rest);
         self.stack.pop();
+    }
+
+    /// Decide whether the function of `scope` gets a mapped arguments
+    /// object (§10.2.11 step 22): sloppy code with a simple parameter
+    /// list that uses `arguments`. Its parameters then live in the
+    /// environment, where the object can reach them.
+    fn map_arguments(&mut self, scope: ScopeId, params: &[Pattern], rest: Option<&Pattern>) {
+        let s = &self.tree.scopes[scope];
+        let simple = rest.is_none()
+            && params
+                .iter()
+                .all(|p| matches!(p.kind, PatternKind::Identifier(_)));
+        let uses_arguments = s
+            .bindings
+            .iter()
+            .any(|b| b.kind == BindingKind::Arguments && b.used);
+        if s.arrow || s.strict || !simple || !uses_arguments {
+            return;
+        }
+        let s = &mut self.tree.scopes[scope];
+        s.mapped_arguments = true;
+        for b in &mut s.bindings {
+            if b.kind == BindingKind::Param {
+                b.captured = true;
+            }
+        }
     }
 
     fn declares_var(&mut self, body: &[Statement], name: &str) -> bool {
@@ -1049,6 +1080,7 @@ impl Resolver {
             arrow: false,
             dynamic: false,
             eval_vars: false,
+            mapped_arguments: false,
         });
         self.hoist_vars(probe, body, true);
         let found = self.tree.scopes[probe].find(name).is_some();

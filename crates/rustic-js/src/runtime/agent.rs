@@ -210,11 +210,13 @@ pub struct Intrinsics {
     pub regexp_prototype: ObjectId,
     /// `%RegExpStringIteratorPrototype%`.
     pub regexp_string_iterator_prototype: ObjectId,
+    /// `%ThrowTypeError%` (§10.2.4.1).
+    pub throw_type_error: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 36] {
+    pub(crate) fn all(&self) -> [ObjectId; 37] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -252,6 +254,7 @@ impl Intrinsics {
             self.regexp,
             self.regexp_prototype,
             self.regexp_string_iterator_prototype,
+            self.throw_type_error,
         ]
     }
 }
@@ -334,6 +337,7 @@ impl Agent {
                 regexp: placeholder,
                 regexp_prototype: placeholder,
                 regexp_string_iterator_prototype: placeholder,
+                throw_type_error: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -413,6 +417,7 @@ impl Agent {
             regexp: object_prototype,
             regexp_prototype: object_prototype,
             regexp_string_iterator_prototype: object_prototype,
+            throw_type_error: object_prototype,
         };
         super::builtins::install(self)
     }

@@ -583,7 +583,14 @@ pub struct FunctionCode {
     pub sites: Box<[NamedSite]>,
     /// Tagged template sites.
     pub templates: Box<[TemplateSite]>,
+    /// For a function with a mapped arguments object (§10.4.4), the
+    /// environment slot of each parameter; [`UNMAPPED_PARAMETER`] for a
+    /// parameter that a later one of the same name hides.
+    pub arguments_map: Option<Box<[u16]>>,
 }
+
+/// An entry of [`FunctionCode::arguments_map`] that maps nothing.
+pub(crate) const UNMAPPED_PARAMETER: u16 = u16::MAX;
 
 /// A tagged template site: its strings and, once it has run, its
 /// template object.

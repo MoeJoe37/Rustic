@@ -130,6 +130,7 @@ const BUILT_IN_DIRS: &[&str] = &[
     "Number",
     "Object",
     "Promise",
+    "Proxy",
     "Reflect",
     "RegExp",
     "RegExpStringIteratorPrototype",

@@ -46,7 +46,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
             }
         };
         let f = install_constructor(agent, name, behavior, 1, prototype)?;
-        agent.set_prototype_of(f, Some(error));
+        agent.set_prototype_of(f, Some(error))?;
     }
 
     // AggregateError (§20.5.7).
@@ -66,7 +66,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         PropertyDescriptor::data_with(empty, true, false, true),
     )?;
     let f = install_constructor(agent, "AggregateError", aggregate_error, 2, prototype)?;
-    agent.set_prototype_of(f, Some(error));
+    agent.set_prototype_of(f, Some(error))?;
     agent.intrinsics.aggregate_error_prototype = prototype;
     Ok(())
 }

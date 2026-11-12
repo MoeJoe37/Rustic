@@ -17,7 +17,8 @@ use std::rc::Rc;
 use rustic_base::CancellationToken;
 
 use super::bytecode::{
-    BinOp, CacheKind, CodeId, FunctionCode, FunctionKind, Op, Reg, SiteCache, UnOp, declare,
+    BinOp, CacheKind, CodeId, FunctionCode, FunctionKind, Op, Reg, SiteCache, UNMAPPED_PARAMETER,
+    UnOp, declare,
 };
 use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
@@ -96,6 +97,8 @@ pub(crate) struct VmState {
     frames: Vec<Frame>,
     /// Native calls and nested runs in progress.
     native_depth: u32,
+    /// How many proxy internal methods are running inside each other.
+    pub(crate) proxy_depth: u32,
     /// The `native_depth` at which collection may run: zero, or the depth
     /// of a generator body resumed by a generator method that script
     /// called directly (see [`Agent::generator_resume`]).
@@ -689,7 +692,7 @@ impl Agent {
             }
         };
         let proto = self.new_object_with(proto_parent)?;
-        self.set_prototype_of(f, Some(constructor_parent));
+        self.set_prototype_of(f, Some(constructor_parent))?;
         self.define_property_or_throw(
             f,
             prototype_key,
@@ -1211,7 +1214,7 @@ impl Agent {
                         t!(self.type_error::<()>("value has no prototype"));
                         unreachable!("the error returned");
                     };
-                    reg!(dst) = self.get_prototype_of(o).map_or(Value::NULL, Value::object);
+                    reg!(dst) = self.get_prototype_of(o)?.map_or(Value::NULL, Value::object);
                 }
                 Op::GetSuper {
                     dst,
@@ -1454,8 +1457,10 @@ impl Agent {
                 Op::Arguments { dst } => {
                     let frame = frame!();
                     let (at, n) = (frame.args_at as usize, frame.argc as usize);
+                    let function = frame.function;
                     let args = self.vm.stack[at..at + n].to_vec();
-                    reg!(dst) = t!(self.new_arguments_object(&args));
+                    let map = code.arguments_map.as_deref().map(|slots| (env, slots));
+                    reg!(dst) = t!(self.new_arguments_object(&args, function, map));
                 }
                 Op::Rest { dst, from } => {
                     let frame = frame!();
@@ -2046,9 +2051,9 @@ impl Agent {
                     let (o, v) = (reg!(object), reg!(value));
                     let o = o.as_object().expect("literals are objects");
                     if let Some(proto) = v.as_object() {
-                        self.set_prototype_of(o, Some(proto));
+                        self.set_prototype_of(o, Some(proto))?;
                     } else if v == Value::NULL {
-                        self.set_prototype_of(o, None);
+                        self.set_prototype_of(o, None)?;
                     }
                 }
                 Op::Loop { target } => {
@@ -2335,7 +2340,9 @@ impl Agent {
     /// cannot be searched by shape at all.
     fn chain_link_has(&self, o: ObjectId, key: PropertyKey) -> bool {
         let object = self.heap.object(o);
-        object.dictionary().is_some()
+        // An exotic object (a proxy, say) answers through its own methods.
+        object.has_flag(crate::runtime::FLAG_EXOTIC)
+            || object.dictionary().is_some()
             || self.heap.shapes.lookup(object.shape, key).is_some()
             || (object.class == Class::Array && key == PropertyKey::String(self.names.length))
     }
@@ -2540,7 +2547,7 @@ impl Agent {
         }
         let target = target.as_object().expect("spread targets are objects");
         let from = self.to_object(source)?;
-        for key in self.own_property_keys(from) {
+        for key in self.own_property_keys(from)? {
             if excluded.contains(&key) {
                 continue;
             }
@@ -2555,9 +2562,20 @@ impl Agent {
         Ok(())
     }
 
-    /// An unmapped arguments object (§10.4.4.6).
-    fn new_arguments_object(&mut self, args: &[Value]) -> JsResult<Value> {
-        let object = self.new_object()?;
+    /// The arguments object of a call (§10.4.4.6, §10.4.4.7): mapped to
+    /// the parameters in `map` (the function's environment and the slot
+    /// of each parameter) or unmapped.
+    fn new_arguments_object(
+        &mut self,
+        args: &[Value],
+        function: Value,
+        map: Option<(EnvId, &[u16])>,
+    ) -> JsResult<Value> {
+        use crate::runtime::Object;
+        let object = self.heap.alloc_object(Object::new(
+            Class::Arguments,
+            Some(self.intrinsics.object_prototype),
+        ))?;
         for (i, &v) in args.iter().enumerate() {
             // Argument counts are bounded by the value stack limit.
             self.create_data_property_or_throw(object, PropertyKey::Index(i as u32), v)?;
@@ -2575,6 +2593,37 @@ impl Agent {
             iterator_key,
             PropertyDescriptor::data_with(values, true, false, true),
         )?;
+        let callee_key = self.heap.key("callee")?;
+        let Some((env, slots)) = map else {
+            // Unmapped: `callee` throws when touched.
+            let thrower = Value::object(self.intrinsics.throw_type_error);
+            self.define_property_or_throw(
+                object,
+                callee_key,
+                PropertyDescriptor::accessor(thrower, thrower, false, false),
+            )?;
+            return Ok(Value::object(object));
+        };
+        self.define_property_or_throw(
+            object,
+            callee_key,
+            PropertyDescriptor::data_with(function, true, false, true),
+        )?;
+        let mapped: Box<[Option<u16>]> = slots
+            .iter()
+            .take(args.len())
+            .map(|&slot| (slot != UNMAPPED_PARAMETER).then_some(slot))
+            .collect();
+        if mapped.iter().any(Option::is_some) {
+            self.heap
+                .charge(std::mem::size_of::<crate::runtime::Extra>() + 4 * mapped.len())?;
+            // Mapped indices are read through the exotic methods, so they
+            // must not sit where the element fast paths look.
+            self.make_sparse(object);
+            let o = self.heap.object_mut(object);
+            o.set_flag(crate::runtime::FLAG_EXOTIC, true);
+            o.extra_mut().internal = Some(Internal::Arguments { env, slots: mapped });
+        }
         Ok(Value::object(object))
     }
 
@@ -2591,7 +2640,7 @@ impl Agent {
         let mut seen = std::collections::HashSet::new();
         let mut current = Some(object);
         while let Some(o) = current {
-            for key in self.own_property_keys(o) {
+            for key in self.own_property_keys(o)? {
                 if matches!(key, PropertyKey::Symbol(_)) || !seen.insert(key) {
                     continue;
                 }
@@ -2603,7 +2652,7 @@ impl Agent {
                     keys.push(self.key_to_value(key)?);
                 }
             }
-            current = self.get_prototype_of(o);
+            current = self.get_prototype_of(o)?;
         }
         let keys = self.create_array_from_list(&keys)?;
         Ok((Value::object(object), Value::object(keys)))
@@ -2626,8 +2675,10 @@ impl Agent {
             index += 1;
             let object = object.as_object().expect("keys imply an object");
             let property = self.to_property_key(key)?;
-            // Keys deleted during the walk are skipped (§14.7.5.9).
-            if self.has_property(object, property)? {
+            // Keys deleted during the walk are skipped (§14.7.5.9). A
+            // proxy already answered for each key when the keys were
+            // collected, and has no `has` trap to ask again.
+            if self.is_exotic_proxy(object) || self.has_property(object, property)? {
                 return Ok((Some(key), Value::number(index as f64)));
             }
         }
@@ -3360,7 +3411,7 @@ impl Agent {
         let Some(prototype) = prototype.as_object() else {
             return self.type_error("function has a non-object prototype");
         };
-        while let Some(parent) = self.get_prototype_of(object) {
+        while let Some(parent) = self.get_prototype_of(object)? {
             if parent == prototype {
                 return Ok(true);
             }

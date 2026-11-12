@@ -25,7 +25,7 @@ const PROTOTYPE_METHODS: &[Method] = &[
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let iterator_prototype = agent
-        .get_prototype_of(agent.intrinsics.array_iterator_prototype)
+        .get_prototype_of(agent.intrinsics.array_iterator_prototype)?
         .expect("%ArrayIteratorPrototype% inherits from %IteratorPrototype%");
     let function_prototype = agent.intrinsics.function_prototype;
     let constructor_key = PropertyKey::String(agent.names.constructor);
@@ -74,7 +74,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         .set_flag(FLAG_NATIVE_CONSTRUCTOR, true);
     let function = agent.get(function_prototype, constructor_key)?;
     if let Some(function) = function.as_object() {
-        agent.set_prototype_of(constructor, Some(function));
+        agent.set_prototype_of(constructor, Some(function))?;
     }
     agent.define_property_or_throw(
         constructor,
@@ -120,7 +120,7 @@ fn generator_function(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
         if agent.active_function() != Some(target) {
             let default = agent.intrinsics.generator_function_prototype;
             let prototype = prototype_from_new_target(agent, default)?;
-            agent.set_prototype_of(o, Some(prototype));
+            agent.set_prototype_of(o, Some(prototype))?;
         }
     }
     Ok(f)

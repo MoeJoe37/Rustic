@@ -39,7 +39,7 @@ const PROTOTYPE_METHODS: &[Method] = &[
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let iterator_prototype = agent
-        .get_prototype_of(agent.intrinsics.array_iterator_prototype)
+        .get_prototype_of(agent.intrinsics.array_iterator_prototype)?
         .expect("%ArrayIteratorPrototype% inherits from %IteratorPrototype%");
     let iterator = super::install_constructor(
         agent,
@@ -209,7 +209,7 @@ fn iterator_constructor(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Va
         Some(t) if Some(t) == active => agent.type_error("Iterator is an abstract class"),
         Some(_) => {
             let default = agent
-                .get_prototype_of(agent.intrinsics.array_iterator_prototype)
+                .get_prototype_of(agent.intrinsics.array_iterator_prototype)?
                 .expect("%IteratorPrototype% exists");
             let prototype = prototype_from_new_target(agent, default)?;
             Ok(Value::object(agent.new_object_with(Some(prototype))?))
@@ -313,7 +313,7 @@ fn ignore_prototype_setter(
         return agent.type_error("setter called on a non-object");
     };
     let home = agent
-        .get_prototype_of(agent.intrinsics.array_iterator_prototype)
+        .get_prototype_of(agent.intrinsics.array_iterator_prototype)?
         .expect("%IteratorPrototype% exists");
     if o == home {
         return agent.type_error("cannot set this property on Iterator.prototype");

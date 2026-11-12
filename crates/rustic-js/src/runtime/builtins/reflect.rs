@@ -113,7 +113,9 @@ fn get_own_property_descriptor(agent: &mut Agent, _: Value, args: &[Value]) -> J
 
 fn get_prototype_of(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let o = target(agent, args, "getPrototypeOf")?;
-    Ok(agent.get_prototype_of(o).map_or(Value::NULL, Value::object))
+    Ok(agent
+        .get_prototype_of(o)?
+        .map_or(Value::NULL, Value::object))
 }
 
 fn has(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -124,12 +126,12 @@ fn has(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 
 fn is_extensible(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let o = target(agent, args, "isExtensible")?;
-    Ok(Value::boolean(agent.is_extensible(o)))
+    Ok(Value::boolean(agent.is_extensible(o)?))
 }
 
 fn own_keys(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let o = target(agent, args, "ownKeys")?;
-    let keys = agent.own_property_keys(o);
+    let keys = agent.own_property_keys(o)?;
     let mut values = Vec::with_capacity(keys.len());
     for key in keys {
         values.push(match key {
@@ -143,7 +145,7 @@ fn own_keys(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 
 fn prevent_extensions(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let o = target(agent, args, "preventExtensions")?;
-    Ok(Value::boolean(agent.prevent_extensions(o)))
+    Ok(Value::boolean(agent.prevent_extensions(o)?))
 }
 
 fn set(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -173,5 +175,5 @@ fn set_prototype_of(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Val
             }
         },
     };
-    Ok(Value::boolean(agent.set_prototype_of(o, prototype)))
+    Ok(Value::boolean(agent.set_prototype_of(o, prototype)?))
 }

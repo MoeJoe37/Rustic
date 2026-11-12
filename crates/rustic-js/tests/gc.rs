@@ -113,7 +113,7 @@ fn unrooted_cycles_are_collected() {
             .unwrap();
         a.create_data_property_or_throw(q, other, Value::object(p))
             .unwrap();
-        a.set_prototype_of(p, Some(q));
+        a.set_prototype_of(p, Some(q)).unwrap();
     }
     let stats = a.collect_garbage(Roots::default());
     assert_eq!(stats.objects_freed, 2000);
@@ -145,7 +145,7 @@ fn deep_chains_mark_without_recursion() {
     assert_eq!(stats.envs_freed, 0);
     assert_eq!((a.heap.object_count(), a.heap.env_count()), (objects, envs));
     let mut walk = proto;
-    while let Some(p) = a.get_prototype_of(walk) {
+    while let Some(p) = a.get_prototype_of(walk).unwrap() {
         walk = p;
         if walk == bottom {
             break;
@@ -249,7 +249,7 @@ fn shapes_used_only_by_garbage_are_freed_and_transitions_rebuilt() {
         .unwrap();
     assert_eq!(a.heap.shape_count(), shapes + 1);
     assert_eq!(a.get(o, y).unwrap(), Value::number(3.0));
-    let keys = a.own_property_keys(o);
+    let keys = a.own_property_keys(o).unwrap();
     assert_eq!(keys, [x, y]);
 }
 
@@ -411,7 +411,7 @@ fn freed_tails_return_arena_memory() {
 fn is_type_error(agent: &Agent, result: JsResult<impl std::fmt::Debug>) -> bool {
     match result {
         Err(Abrupt::Throw(v)) => {
-            agent.get_prototype_of(v.as_object().unwrap())
+            agent.stored_prototype(v.as_object().unwrap())
                 == Some(agent.intrinsics.type_error_prototype)
         }
         _ => false,

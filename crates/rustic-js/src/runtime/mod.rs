@@ -9,6 +9,7 @@ mod builtins;
 mod completion;
 mod convert;
 mod env;
+mod exotic;
 mod gc;
 mod heap;
 mod internal;
@@ -46,8 +47,8 @@ pub use number::{
 };
 pub use object::{Class, PropertyDescriptor};
 pub(crate) use object::{
-    Closure, Extra, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR, FLAG_PROTOTYPE,
-    Generator, GeneratorState, Internal, Job, Object,
+    Closure, Extra, FLAG_CLOSURE, FLAG_EXOTIC, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR,
+    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, Object,
 };
 pub(crate) use shape::ShapeId;
 pub use shape::{Attributes, MAX_SHAPE_PROPERTIES, PropertyKey};

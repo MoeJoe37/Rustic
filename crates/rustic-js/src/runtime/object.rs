@@ -49,6 +49,8 @@ pub enum Class {
     Set,
     /// A Date (`[[DateValue]]` in the primitive slot, §21.4).
     Date,
+    /// An arguments object (§10.4.4), mapped or not.
+    Arguments,
 }
 
 /// A complete or partial property descriptor (§6.2.6).
@@ -351,6 +353,19 @@ pub(crate) enum Internal {
     Generator(Box<Generator>),
     /// A promise's internal slots (§27.2.6).
     Promise(Box<PromiseRecord>),
+    /// A Proxy exotic object (§10.5): `[[ProxyTarget]]` and
+    /// `[[ProxyHandler]]`, both `None` once revoked.
+    Proxy {
+        target: Option<ObjectId>,
+        handler: Option<ObjectId>,
+    },
+    /// The `[[ParameterMap]]` of a mapped arguments object (§10.4.4.7):
+    /// for each index still mapped, the slot of the parameter in the
+    /// function's environment.
+    Arguments {
+        env: EnvId,
+        slots: Box<[Option<u16>]>,
+    },
     /// The values a built-in closure captures (the resolving functions of
     /// a promise, the element functions of `Promise.all`, ...); the
     /// behavior knows what each position means.
@@ -590,6 +605,12 @@ pub(crate) const FLAG_PROTOTYPE: u8 = 8;
 pub(crate) const FLAG_NATIVE_CONSTRUCTOR: u8 = 16;
 /// A function compiled from source; `length` indexes the closure arena.
 pub(crate) const FLAG_CLOSURE: u8 = 4;
+/// An exotic object whose internal methods are overridden: a Proxy, a
+/// mapped arguments object, a typed array or a module namespace. The
+/// kind is in the object's [`Internal`] slot, and the ordinary internal
+/// methods hand such an object to `exotic.rs`. Its dense `elements` stay
+/// empty, so the interpreter's element fast paths never see one.
+pub(crate) const FLAG_EXOTIC: u8 = 32;
 
 const NO_PROTOTYPE: u32 = u32::MAX;
 

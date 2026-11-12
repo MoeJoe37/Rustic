@@ -159,7 +159,7 @@ fn assign(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
             continue;
         }
         let from = agent.to_object(source)?;
-        for key in agent.own_property_keys(from) {
+        for key in agent.own_property_keys(from)? {
             let Some(desc) = agent.get_own_property(from, key)? else {
                 continue;
             };
@@ -192,7 +192,7 @@ fn create(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 fn object_define_properties(agent: &mut Agent, o: ObjectId, properties: Value) -> JsResult<()> {
     let props = agent.to_object(properties)?;
     let mut descriptors = Vec::new();
-    for key in agent.own_property_keys(props) {
+    for key in agent.own_property_keys(props)? {
         let Some(desc) = agent.get_own_property(props, key)? else {
             continue;
         };
@@ -234,7 +234,7 @@ enum Collect {
 fn enumerable_own(agent: &mut Agent, value: Value, kind: Collect) -> JsResult<Value> {
     let o = agent.to_object(value)?;
     let mut list = Vec::new();
-    for key in agent.own_property_keys(o) {
+    for key in agent.own_property_keys(o)? {
         if matches!(key, PropertyKey::Symbol(_)) {
             continue;
         }
@@ -313,17 +313,16 @@ fn is_sealed(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn is_extensible(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
-    Ok(Value::boolean(
-        arg(args, 0)
-            .as_object()
-            .is_some_and(|o| agent.is_extensible(o)),
-    ))
+    Ok(Value::boolean(match arg(args, 0).as_object() {
+        Some(o) => agent.is_extensible(o)?,
+        None => false,
+    }))
 }
 
 fn prevent_extensions(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let value = arg(args, 0);
     if let Some(o) = value.as_object() {
-        if !agent.prevent_extensions(o) {
+        if !agent.prevent_extensions(o)? {
             return agent.type_error("Object.preventExtensions: the object cannot be changed");
         }
     }
@@ -358,7 +357,7 @@ fn get_own_property_descriptor(agent: &mut Agent, _: Value, args: &[Value]) -> J
 fn get_own_property_descriptors(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let o = agent.to_object(arg(args, 0))?;
     let result = agent.new_object()?;
-    for key in agent.own_property_keys(o) {
+    for key in agent.own_property_keys(o)? {
         let desc = agent.get_own_property(o, key)?;
         let value = from_property_descriptor(agent, desc)?;
         if value != Value::UNDEFINED {
@@ -372,7 +371,7 @@ fn get_own_property_descriptors(agent: &mut Agent, _: Value, args: &[Value]) -> 
 fn own_keys(agent: &mut Agent, value: Value, symbols: bool) -> JsResult<Value> {
     let o = agent.to_object(value)?;
     let mut list = Vec::new();
-    for key in agent.own_property_keys(o) {
+    for key in agent.own_property_keys(o)? {
         if matches!(key, PropertyKey::Symbol(_)) == symbols {
             list.push(agent.key_to_value(key)?);
         }
@@ -390,7 +389,9 @@ fn get_own_property_symbols(agent: &mut Agent, _: Value, args: &[Value]) -> JsRe
 
 fn get_prototype_of(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let o = agent.to_object(arg(args, 0))?;
-    Ok(agent.get_prototype_of(o).map_or(Value::NULL, Value::object))
+    Ok(agent
+        .get_prototype_of(o)?
+        .map_or(Value::NULL, Value::object))
 }
 
 fn set_prototype_of(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -402,7 +403,7 @@ fn set_prototype_of(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Val
         None => return agent.type_error("Object prototype may only be an object or null"),
     };
     if let Some(o) = value.as_object() {
-        if !agent.set_prototype_of(o, proto) {
+        if !agent.set_prototype_of(o, proto)? {
             return agent.type_error("Object.setPrototypeOf: the prototype cannot be set");
         }
     }
@@ -432,7 +433,7 @@ fn is_prototype_of(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<V
         return Ok(Value::FALSE);
     };
     let o = agent.to_object(this)?;
-    while let Some(parent) = agent.get_prototype_of(v) {
+    while let Some(parent) = agent.get_prototype_of(v)? {
         if parent == o {
             return Ok(Value::TRUE);
         }
@@ -460,7 +461,9 @@ fn to_locale_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Val
 /// `get Object.prototype.__proto__` (§20.1.3.8.1).
 fn proto_getter(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let o = agent.to_object(this)?;
-    Ok(agent.get_prototype_of(o).map_or(Value::NULL, Value::object))
+    Ok(agent
+        .get_prototype_of(o)?
+        .map_or(Value::NULL, Value::object))
 }
 
 /// `set Object.prototype.__proto__` (§20.1.3.8.2).
@@ -473,7 +476,7 @@ fn proto_setter(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
         None => return Ok(Value::UNDEFINED),
     };
     if let Some(o) = this.as_object() {
-        if !agent.set_prototype_of(o, proto) {
+        if !agent.set_prototype_of(o, proto)? {
             return agent.type_error("Object.prototype.__proto__: the prototype cannot be set");
         }
     }

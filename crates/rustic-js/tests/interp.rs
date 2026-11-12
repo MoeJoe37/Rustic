@@ -2622,3 +2622,311 @@ fn bigint_library_and_conversions() {
     check("var m = new Map([[1n, 'a']]); m.get(1n)", "a");
     check("[1n, 2n].includes(2n) && [1n].indexOf(1n) === 0", "true");
 }
+
+#[test]
+fn proxies() {
+    let _report = Report;
+    // Without traps a proxy forwards everything to its target.
+    check(
+        "var t = { a: 1 }; var p = new Proxy(t, {}); p.b = 2; p.a + t.b + ('a' in p) + Object.keys(p).join()",
+        "4a,b",
+    );
+    check(
+        "var p = new Proxy([1, 2], {}); Array.isArray(p) + String(p.length) + Object.prototype.toString.call(p)",
+        "true2[object Array]",
+    );
+    check(
+        "JSON.stringify(new Proxy([1, { a: 2 }], {}))",
+        "[1,{\"a\":2}]",
+    );
+    // Each trap sees the operation.
+    check(
+        "var log = []; var p = new Proxy({}, { get(t, k, r) { log.push('get ' + String(k)); return 7 }, \
+         has(t, k) { log.push('has ' + k); return true }, set(t, k, v, r) { log.push('set ' + k + '=' + v); return true }, \
+         deleteProperty(t, k) { log.push('delete ' + k); return true } }); \
+         p.x; 'y' in p; p.z = 3; delete p.w; log.join()",
+        "get x,has y,set z=3,delete w",
+    );
+    check(
+        "var p = new Proxy({}, { ownKeys() { return ['b', 'a', Symbol.iterator] }, \
+         getOwnPropertyDescriptor(t, k) { return { value: k, enumerable: true, configurable: true } } }); \
+         Object.keys(p).join() + Reflect.ownKeys(p).length + JSON.stringify(p)",
+        "b,a3{}",
+    );
+    check(
+        "var p = new Proxy({}, { ownKeys() { return ['a'] }, getOwnPropertyDescriptor() { return { value: 1, enumerable: true, configurable: true } } }); var s = ''; for (var k in p) s += k; s",
+        "a",
+    );
+    check(
+        "var p = new Proxy({}, { defineProperty(t, k, d) { t[k] = d.value * 2; return true } }); \
+         Object.defineProperty(p, 'x', { value: 21, configurable: true }); p.x",
+        "42",
+    );
+    check(
+        "var proto = { marker: 1 }; var p = new Proxy({}, { getPrototypeOf() { return proto }, \
+         setPrototypeOf(t, v) { return false } }); \
+         (Object.getPrototypeOf(p) === proto) + String(Reflect.setPrototypeOf(p, null)) + (p instanceof Object)",
+        "truefalsetrue",
+    );
+    check(
+        "var p = new Proxy({}, { isExtensible(t) { return Reflect.isExtensible(t) }, preventExtensions(t) { Object.preventExtensions(t); return true } }); Object.preventExtensions(p); Object.isExtensible(p)",
+        "false",
+    );
+    // Callable and constructible proxies.
+    check(
+        "var p = new Proxy(function (a, b) { return a + b }, { apply(t, self, args) { return t(...args) * 10 } }); p(1, 2) + typeof p",
+        "30function",
+    );
+    check(
+        "var P = new Proxy(class A { constructor(x) { this.x = x } }, { construct(t, args, nt) { return new t(args[0] + 1) } }); new P(1).x",
+        "2",
+    );
+    check(
+        "var P = new Proxy(function () {}, {}); class B extends P {} new B() instanceof P",
+        "true",
+    );
+    check(
+        "var p = new Proxy(() => 1, {}); new p()",
+        "!TypeError: value is not a constructor",
+    );
+    check(
+        "typeof new Proxy({}, {}) + typeof new Proxy(class {}, {})",
+        "objectfunction",
+    );
+    // A proxy on a prototype chain intercepts inherited access and writes.
+    check(
+        "var log = ''; var o = Object.create(new Proxy({}, { get(t, k, r) { return r === o ? 'own' : 'other' }, set(t, k, v, r) { log += k; return true } })); o.q = 1; o.missing + log + Object.keys(o).length",
+        "ownq0",
+    );
+    check(
+        "function f(o) { o.k = 1; return Object.keys(o).length } var hits = 0; var px = new Proxy({}, { set() { hits++; return true } }); f(Object.create(px)); f(Object.create(px)); f(Object.create(px)); hits",
+        "3",
+    );
+    // Invariants (§10.5): a trap may not lie about a frozen target.
+    check(
+        "var t = Object.freeze({ a: 1 }); new Proxy(t, { get() { return 2 } }).a",
+        "!TypeError: 'get' on proxy: property is a read-only and non-configurable data property on the proxy target but the proxy did not return its actual value",
+    );
+    check(
+        "var t = Object.freeze({ a: 1 }); 'a' in new Proxy(t, { has() { return false } })",
+        "!TypeError: 'has' on proxy: trap returned falsish for a property which exists in the proxy target as non-configurable",
+    );
+    check(
+        "var t = Object.preventExtensions({ a: 1 }); Object.keys(new Proxy(t, { ownKeys() { return ['a', 'b'] } }))",
+        "!TypeError: 'ownKeys' on proxy: trap returned extra keys but the proxy target is non-extensible",
+    );
+    check(
+        "Object.keys(new Proxy({}, { ownKeys() { return ['a', 'a'] } }))",
+        "!TypeError: 'ownKeys' on proxy: trap returned duplicate entries",
+    );
+    check(
+        "Object.keys(new Proxy({}, { ownKeys() { return [1] } }))",
+        "!TypeError: 'ownKeys' on proxy: trap result elements must be strings or symbols",
+    );
+    check(
+        "Object.getPrototypeOf(new Proxy({}, { getPrototypeOf() { return 1 } }))",
+        "!TypeError: 'getPrototypeOf' on proxy: trap returned neither object nor null",
+    );
+    check(
+        "'use strict'; new Proxy({}, { set() { return false } }).x = 1",
+        "!TypeError: cannot assign to read-only property",
+    );
+    // Revocation.
+    check(
+        "var r = Proxy.revocable({ a: 1 }, {}); var before = r.proxy.a; r.revoke(); r.revoke(); before + typeof r.proxy",
+        "1object",
+    );
+    check(
+        "var r = Proxy.revocable({}, {}); r.revoke(); r.proxy.a",
+        "!TypeError: Cannot perform an operation on a revoked proxy",
+    );
+    check(
+        "var r = Proxy.revocable([], {}); r.revoke(); Array.isArray(r.proxy)",
+        "!TypeError: Cannot perform an operation on a revoked proxy",
+    );
+    check(
+        "Proxy({}, {})",
+        "!TypeError: Constructor Proxy requires 'new'",
+    );
+    check(
+        "new Proxy(1, {})",
+        "!TypeError: Cannot create proxy with a non-object as target or handler",
+    );
+    check(
+        "Proxy.length + Proxy.name + ('prototype' in Proxy) + Proxy.revocable.length",
+        "2Proxyfalse2",
+    );
+    // A deep chain of proxies ends in a RangeError, not a native overflow.
+    check(
+        "var p = {}; for (var i = 0; i < 100000; i++) p = new Proxy(p, {}); try { p.x; 'no error' } catch (e) { e.name }",
+        "RangeError",
+    );
+    check(
+        "var f = function () { return 1 }; for (var i = 0; i < 100000; i++) f = new Proxy(f, {}); try { f(); 'no error' } catch (e) { e.name }",
+        "RangeError",
+    );
+    // Private names do not pass through a proxy.
+    check(
+        "class C { #x = 1; static get(o) { return o.#x } } C.get(new Proxy(new C(), {}))",
+        "!TypeError: cannot read a private member from an object whose class did not declare it",
+    );
+}
+
+#[test]
+fn arguments_objects() {
+    let _report = Report;
+    // Sloppy functions with simple parameters: indices alias parameters.
+    check(
+        "function f(a, b) { arguments[0] = 9; b = 7; return a + ',' + arguments[1] } f(1, 2)",
+        "9,7",
+    );
+    check("function f(a) { a = 2; return arguments[0] } f(1)", "2");
+    check("function f(a) { arguments[0] = 2; return a } f(1)", "2");
+    // Only the arguments actually passed are mapped.
+    check(
+        "function f(a, b) { b = 5; arguments[1] = 6; return b + ',' + arguments.length } f(1)",
+        "5,1",
+    );
+    check(
+        "function f(a, b) { arguments[1] = 6; return String(b) } f(1)",
+        "undefined",
+    );
+    // The later of two parameters with one name is the mapped one.
+    check(
+        "function f(a, a) { a = 3; return arguments[0] + ',' + arguments[1] } f(1, 2)",
+        "1,3",
+    );
+    // Closures and arrows see the same variables.
+    check(
+        "function f(a) { var g = () => { arguments[0] = 5 }; g(); return a } f(1)",
+        "5",
+    );
+    check(
+        "function f(a) { var set = function () { a = 8 }; set(); return arguments[0] } f(1)",
+        "8",
+    );
+    check(
+        "function f(a) { eval('a = 4'); return arguments[0] } f(1)",
+        "4",
+    );
+    // Deleting or redefining an index ends the mapping.
+    check(
+        "function f(a) { delete arguments[0]; arguments[0] = 5; return a } f(1)",
+        "1",
+    );
+    check(
+        "function f(a) { Object.defineProperty(arguments, '0', { get() { return 9 } }); a = 3; return arguments[0] } f(1)",
+        "9",
+    );
+    check(
+        "function f(a) { Object.defineProperty(arguments, '0', { writable: false }); a = 3; return arguments[0] } f(1)",
+        "1",
+    );
+    check(
+        "function f(a) { Object.defineProperty(arguments, '0', { value: 6 }); return a } f(1)",
+        "6",
+    );
+    check(
+        "function f(a) { a = 2; return Object.getOwnPropertyDescriptor(arguments, '0').value } f(1)",
+        "2",
+    );
+    check(
+        "function f(a) { Object.freeze(arguments); a = 2; return arguments[0] } f(1)",
+        "1",
+    );
+    check(
+        "function f(a) { a = 2; return [...arguments].join() + Array.prototype.slice.call(arguments).join() } f(1, 5)",
+        "2,52,5",
+    );
+    check(
+        "function f(a) { var o = Object.create(arguments); o[0] = 7; return a } f(1)",
+        "1",
+    );
+    check(
+        "function f(a) { return f === arguments.callee } f(1)",
+        "true",
+    );
+    check(
+        "function f(a) { return Object.prototype.toString.call(arguments) + Object.keys(arguments).join() } f(1, 2)",
+        "[object Arguments]0,1",
+    );
+    check(
+        "function f(a) { var d = Object.getOwnPropertyDescriptor(arguments, 'callee'); return d.writable + ',' + d.enumerable + ',' + d.configurable } f()",
+        "true,false,true",
+    );
+    // Strict functions and non-simple parameter lists are unmapped.
+    check(
+        "function f(a) { 'use strict'; a = 2; arguments[0] = 3; return a + ',' + arguments[0] } f(1)",
+        "2,3",
+    );
+    check("function f(a = 0) { a = 2; return arguments[0] } f(1)", "1");
+    check(
+        "function f(a, ...r) { a = 2; return arguments[0] } f(1)",
+        "1",
+    );
+    check(
+        "function f({ a }) { a = 2; return arguments[0].a } f({ a: 1 })",
+        "1",
+    );
+    check(
+        "function f() { 'use strict'; return arguments.callee } f()",
+        "!TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them",
+    );
+    check(
+        "function f(a = 1) { var d = Object.getOwnPropertyDescriptor(arguments, 'callee'); return (d.get === d.set) + ',' + d.configurable } f()",
+        "true,false",
+    );
+    check(
+        "function f() {} function g() { 'use strict' } String(f.caller) + String(f.arguments) + Object.hasOwn(f, 'caller')",
+        "nullnullfalse",
+    );
+    check(
+        "function g() { 'use strict' } g.caller",
+        "!TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them",
+    );
+    check(
+        "function f() { return arguments.callee === f && delete arguments.callee } f()",
+        "true",
+    );
+    check(
+        "var t = Object.getOwnPropertyDescriptor(Function.prototype, 'caller').get; Object.isFrozen(t) + ',' + t.length + ',' + t.name",
+        "true,0,",
+    );
+    // A function that never names `arguments` keeps its parameters in
+    // registers, and generators map like other functions.
+    check(
+        "function* g(a) { arguments[0] = 4; yield a; a = 5; yield arguments[0] } [...g(1)].join()",
+        "4,5",
+    );
+    check(
+        "function f(a, b, c) { for (var i = 0; i < arguments.length; i++) arguments[i] *= 2; return a + b + c } f(1, 2, 3)",
+        "12",
+    );
+}
+
+#[test]
+fn mapped_arguments_survive_collection() {
+    let mut agent = Agent::new().expect("agent");
+    agent.heap.set_gc_stress(true);
+    let result = run_in(
+        &mut agent,
+        "function f(a, b) { var keep = arguments; return function (v) { a = v; var junk = []; \
+         for (var i = 0; i < 50; i++) junk.push({ i }); return keep[0] + keep[1] } } \
+         var g = f(1, 2); g(10) + g(20)",
+    );
+    assert_eq!(result, "34");
+}
+
+#[test]
+fn proxies_keep_their_target_and_handler_alive() {
+    let mut agent = Agent::new().expect("agent");
+    agent.heap.set_gc_stress(true);
+    let result = run_in(
+        &mut agent,
+        "function make() { return new Proxy({ n: 1 }, { get(t, k) { return k === 'n' ? t.n + 1 : undefined } }) } \
+         var p = make(); var r = Proxy.revocable({ v: 5 }, {}); var total = 0; \
+         for (var i = 0; i < 40; i++) { var junk = [{}, {}, {}]; total += p.n + r.proxy.v } \
+         r.revoke(); total",
+    );
+    assert_eq!(result, "280");
+}

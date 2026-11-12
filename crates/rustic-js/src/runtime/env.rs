@@ -635,7 +635,7 @@ impl Agent {
         name: StringId,
     ) -> JsResult<bool> {
         match self.get_own_property(global, PropertyKey::String(name))? {
-            None => Ok(self.is_extensible(global)),
+            None => Ok(self.is_extensible(global)?),
             Some(desc) => Ok(desc.configurable == Some(true)
                 || (desc.value.is_some()
                     && desc.writable == Some(true)
@@ -648,7 +648,7 @@ impl Agent {
         if self.has_own_property(global, PropertyKey::String(name))? {
             return Ok(true);
         }
-        Ok(self.is_extensible(global))
+        self.is_extensible(global)
     }
 
     /// `CreateGlobalVarBinding(N, D)`.
@@ -662,7 +662,7 @@ impl Agent {
             return self.type_error("not a global environment");
         };
         let key = PropertyKey::String(name);
-        if !self.has_own_property(object, key)? && self.is_extensible(object) {
+        if !self.has_own_property(object, key)? && self.is_extensible(object)? {
             let desc = PropertyDescriptor::data_with(Value::UNDEFINED, true, true, deletable);
             self.define_property_or_throw(object, key, desc)?;
         }

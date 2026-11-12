@@ -757,7 +757,11 @@ impl Agent {
         }
     }
 
-    fn reference_error_for(&mut self, name: StringId, what: &str) -> super::agent::Abrupt {
+    pub(crate) fn reference_error_for(
+        &mut self,
+        name: StringId,
+        what: &str,
+    ) -> super::agent::Abrupt {
         let text = format!("{} {what}", self.heap.string(name).to_text());
         self.throw(ErrorKind::ReferenceError, &text)
     }

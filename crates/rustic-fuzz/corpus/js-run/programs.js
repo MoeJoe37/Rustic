@@ -130,3 +130,5 @@ function tag(s, a) { return s.raw[0] + s[1] + a + s.length } var r = ''; for (va
 var seen = []; function id(s) { seen.push(s); return s } for (var i = 0; i < 9; i++) id`x${i}y`; var same = 0; for (var s of seen) same += s === seen[0]; same
 var p = { m(n) { return n + this.k } }; var o = { __proto__: p, k: 1, m(n) { return super.m(n) * 2 }, a(n) { return (() => super.m(n))() } }; var t = 0; for (var i = 0; i < 20; i++) t += o.m(i) + o.a(i); t
 var o = { f(n) { return n } }, u, t = 0; for (var i = 0; i < 20; i++) t += (i % 2 ? o : u)?.f?.(i) ?? -1; t
+var t = 0; function f(a = 1, b = () => a) { var a = 5; for (var i = 0; i < 9; i++) a += i; return b() + a } for (var j = 0; j < 9; j++) t += f(j); t
+var s = { x: 1 }, x = 0; with (s) { for (var i = 0; i < 9; i++) { x += i; if (i == 4) delete s.x } } s.x + ',' + x

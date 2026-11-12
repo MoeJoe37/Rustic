@@ -1234,6 +1234,55 @@ fn tagged_templates() {
 }
 
 #[test]
+fn test262_findings() {
+    let _report = Report;
+    // A `var` nested in a block of a script is a global, strict or not.
+    check("'use strict'; { var x = 1 } x", "1");
+    check(
+        "try { var y = 2 } catch (e) {} if (0) { var z } y + '' + z",
+        "2undefined",
+    );
+    // Inside `with`, an assignment binds its target before the value
+    // runs (§13.15.2), also for compound assignment and `++`.
+    check(
+        "var x = 0, s = { x: 1 }; with (s) { x = (delete s.x, 2) } s.x + ',' + x",
+        "2,0",
+    );
+    check(
+        "var x = 0, s = { x: 1 }; with (s) { x += (delete s.x, 2) } s.x + ',' + x",
+        "3,0",
+    );
+    check(
+        "var s = {}; with (s) { y2 = 4 } y2 + '' + ('y2' in s)",
+        "4false",
+    );
+    // A parenthesized anonymous function is named; a comma expression
+    // is not.
+    check(
+        "var cover = (function () {}), xCover = (0, function () {}); cover.name + ',' + xCover.name",
+        "cover,",
+    );
+    check("var [a = (class {})] = []; a.name", "a");
+    // With parameter expressions, closures in the parameters do not see
+    // the body's vars (§10.2.11 step 28), which start with the value of
+    // a parameter of the same name.
+    check(
+        "var probe; function f(_ = probe = function () { return x }) { var x = 'inside'; return probe() + x } var x = 'outside'; f()",
+        "outsideinside",
+    );
+    check("function f(a, b = 1) { var a; return a + b } f(5)", "6");
+    check(
+        "function f(a = 1) { function g() { return a } var a = 3; return g() + a } f()",
+        "6",
+    );
+    check("var f = (a = 2) => { var a; return a * 3 }; f()", "6");
+    check(
+        "function f(a = 1, b = () => a) { var a = 5; return b() + a } f()",
+        "6",
+    );
+}
+
+#[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
     for source in ["function* g() {}", "async function f() {}", "/x/"] {
         let mut agent = Agent::new().expect("agent");

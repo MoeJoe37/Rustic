@@ -125,11 +125,18 @@ writes the verdict and reason for every file. At the pinned revision, on
 
 | | Files |
 | --- | ---: |
-| Pass | 7,708 |
-| Fail | 10,065 |
+| Pass | 7,895 |
+| Fail | 9,878 |
 | Skipped (modules 817, async, proposals) | 6,059 |
 
-That is 43.4% of the 17,773 files that run, and 32.3% of all 23,832. The
+That is 44.4% of the 17,773 files that run, and 33.1% of all 23,832. The
+first run passed 7,708; it found four interpreter bugs, now fixed and covered
+by `test262_findings` in `tests/interp.rs`: a `var` inside a block at the top
+of a script was never declared as a global, assignments inside `with` looked
+up their target after computing the value, `x = (function () {})` left the
+function unnamed, and closures in parameter defaults could see the body's
+`var`s (the body now gets its own scope when the parameters contain
+expressions, as §10.2.11 requires). The
 whole run takes 16 seconds on one core. The files that pass are listed in
 `tests/fixtures/test262_language_passing.txt`, and the gate compares exactly:
 a file that stops passing fails the gate, and so does one that starts passing

@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 7708 pass, 10065 fail, 6059 skipped (modules, async, proposals).
+# 7895 pass, 9878 fail, 6059 skipped (modules, async, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1gs.js
 arguments-object/10.5-7-b-2-s.js
@@ -13,6 +13,7 @@ arguments-object/10.6-6-3.js
 arguments-object/10.6-6-4-s.js
 arguments-object/10.6-6-4.js
 arguments-object/S10.1.6_A1_T2.js
+arguments-object/S10.6_A1.js
 arguments-object/S10.6_A3_T2.js
 arguments-object/S10.6_A3_T3.js
 arguments-object/S10.6_A3_T4.js
@@ -442,6 +443,7 @@ expressions/arrow-function/dstr/ary-ptrn-elem-ary-empty-iter.js
 expressions/arrow-function/dstr/ary-ptrn-elem-id-init-exhausted.js
 expressions/arrow-function/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/arrow-function/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+expressions/arrow-function/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/arrow-function/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/arrow-function/dstr/ary-ptrn-elem-id-init-hole.js
 expressions/arrow-function/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -468,6 +470,7 @@ expressions/arrow-function/dstr/dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-hole.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-elem-id-init-skipped.js
@@ -489,6 +492,7 @@ expressions/arrow-function/dstr/dflt-ary-ptrn-rest-obj-id.js
 expressions/arrow-function/dstr/dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/arrow-function/dstr/dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/arrow-function/dstr/dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/arrow-function/dstr/dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/arrow-function/dstr/dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/arrow-function/dstr/dflt-obj-ptrn-id-init-skipped.js
 expressions/arrow-function/dstr/dflt-obj-ptrn-id-init-throws.js
@@ -499,6 +503,7 @@ expressions/arrow-function/dstr/dflt-obj-ptrn-prop-eval-err.js
 expressions/arrow-function/dstr/dflt-obj-ptrn-prop-id-init-throws.js
 expressions/arrow-function/dstr/obj-ptrn-id-init-fn-name-arrow.js
 expressions/arrow-function/dstr/obj-ptrn-id-init-fn-name-class.js
+expressions/arrow-function/dstr/obj-ptrn-id-init-fn-name-cover.js
 expressions/arrow-function/dstr/obj-ptrn-id-init-fn-name-fn.js
 expressions/arrow-function/dstr/obj-ptrn-id-init-skipped.js
 expressions/arrow-function/dstr/obj-ptrn-id-init-throws.js
@@ -574,6 +579,7 @@ expressions/arrow-function/params-trailing-comma-single.js
 expressions/arrow-function/rest-param-strict-body.js
 expressions/arrow-function/rest-params-trailing-comma-early-error.js
 expressions/arrow-function/scope-paramsbody-var-close.js
+expressions/arrow-function/scope-paramsbody-var-open.js
 expressions/arrow-function/statement-body-requires-braces-must-return-explicitly-missing.js
 expressions/arrow-function/statement-body-requires-braces-must-return-explicitly.js
 expressions/arrow-function/static-init-await-binding.js
@@ -626,6 +632,9 @@ expressions/arrow-function/syntax/variations.js
 expressions/assignment/S11.13.1_A3.1.js
 expressions/assignment/S11.13.1_A3.2.js
 expressions/assignment/S11.13.1_A4_T1.js
+expressions/assignment/S11.13.1_A5_T1.js
+expressions/assignment/S11.13.1_A5_T2.js
+expressions/assignment/S11.13.1_A5_T3.js
 expressions/assignment/S11.13.1_A7_T4.js
 expressions/assignment/S8.12.5_A1.js
 expressions/assignment/S8.12.5_A2.js
@@ -1613,6 +1622,7 @@ expressions/class/dstr/meth-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/meth-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/meth-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/meth-ary-ptrn-elem-id-init-skipped.js
@@ -1639,6 +1649,7 @@ expressions/class/dstr/meth-dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/meth-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -1660,6 +1671,7 @@ expressions/class/dstr/meth-dflt-ary-ptrn-rest-obj-id.js
 expressions/class/dstr/meth-dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/meth-dflt-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/meth-dflt-obj-ptrn-id-init-throws.js
@@ -1670,6 +1682,7 @@ expressions/class/dstr/meth-dflt-obj-ptrn-prop-eval-err.js
 expressions/class/dstr/meth-dflt-obj-ptrn-prop-id-init-throws.js
 expressions/class/dstr/meth-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/meth-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/meth-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/meth-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/meth-obj-ptrn-id-init-throws.js
@@ -1685,6 +1698,7 @@ expressions/class/dstr/meth-static-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/meth-static-ary-ptrn-elem-id-init-skipped.js
@@ -1711,6 +1725,7 @@ expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -1732,6 +1747,7 @@ expressions/class/dstr/meth-static-dflt-ary-ptrn-rest-obj-id.js
 expressions/class/dstr/meth-static-dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/meth-static-dflt-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/meth-static-dflt-obj-ptrn-id-init-throws.js
@@ -1742,6 +1758,7 @@ expressions/class/dstr/meth-static-dflt-obj-ptrn-prop-eval-err.js
 expressions/class/dstr/meth-static-dflt-obj-ptrn-prop-id-init-throws.js
 expressions/class/dstr/meth-static-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/meth-static-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/meth-static-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/meth-static-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/meth-static-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/meth-static-obj-ptrn-id-init-throws.js
@@ -1781,6 +1798,7 @@ expressions/class/dstr/private-meth-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/private-meth-ary-ptrn-elem-id-init-skipped.js
@@ -1806,6 +1824,7 @@ expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -1826,12 +1845,14 @@ expressions/class/dstr/private-meth-dflt-ary-ptrn-rest-obj-id.js
 expressions/class/dstr/private-meth-dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-dflt-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/private-meth-dflt-obj-ptrn-id-trailing-comma.js
 expressions/class/dstr/private-meth-dflt-obj-ptrn-prop-ary-trailing-comma.js
 expressions/class/dstr/private-meth-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/private-meth-obj-ptrn-id-trailing-comma.js
@@ -1843,6 +1864,7 @@ expressions/class/dstr/private-meth-static-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/private-meth-static-ary-ptrn-elem-id-init-skipped.js
@@ -1868,6 +1890,7 @@ expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-hole.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -1888,12 +1911,14 @@ expressions/class/dstr/private-meth-static-dflt-ary-ptrn-rest-obj-id.js
 expressions/class/dstr/private-meth-static-dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/private-meth-static-dflt-obj-ptrn-id-trailing-comma.js
 expressions/class/dstr/private-meth-static-dflt-obj-ptrn-prop-ary-trailing-comma.js
 expressions/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-arrow.js
 expressions/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-class.js
+expressions/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-cover.js
 expressions/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-fn.js
 expressions/class/dstr/private-meth-static-obj-ptrn-id-init-skipped.js
 expressions/class/dstr/private-meth-static-obj-ptrn-id-trailing-comma.js
@@ -2472,10 +2497,14 @@ expressions/class/params-dflt-meth-ref-arguments.js
 expressions/class/params-dflt-meth-static-args-unmapped.js
 expressions/class/params-dflt-meth-static-ref-arguments.js
 expressions/class/scope-meth-paramsbody-var-close.js
+expressions/class/scope-meth-paramsbody-var-open.js
 expressions/class/scope-name-lex-close.js
 expressions/class/scope-setter-paramsbody-var-close.js
+expressions/class/scope-setter-paramsbody-var-open.js
 expressions/class/scope-static-meth-paramsbody-var-close.js
+expressions/class/scope-static-meth-paramsbody-var-open.js
 expressions/class/scope-static-setter-paramsbody-var-close.js
+expressions/class/scope-static-setter-paramsbody-var-open.js
 expressions/class/static-gen-method-param-dflt-yield.js
 expressions/class/static-init-await-binding.js
 expressions/class/static-init-await-reference.js
@@ -2553,6 +2582,39 @@ expressions/compound-assignment/S11.13.2_A4.6_T1.4.js
 expressions/compound-assignment/S11.13.2_A4.7_T1.4.js
 expressions/compound-assignment/S11.13.2_A4.8_T1.4.js
 expressions/compound-assignment/S11.13.2_A4.9_T1.4.js
+expressions/compound-assignment/S11.13.2_A5.10_T1.js
+expressions/compound-assignment/S11.13.2_A5.10_T2.js
+expressions/compound-assignment/S11.13.2_A5.10_T3.js
+expressions/compound-assignment/S11.13.2_A5.11_T1.js
+expressions/compound-assignment/S11.13.2_A5.11_T2.js
+expressions/compound-assignment/S11.13.2_A5.11_T3.js
+expressions/compound-assignment/S11.13.2_A5.1_T1.js
+expressions/compound-assignment/S11.13.2_A5.1_T2.js
+expressions/compound-assignment/S11.13.2_A5.1_T3.js
+expressions/compound-assignment/S11.13.2_A5.2_T1.js
+expressions/compound-assignment/S11.13.2_A5.2_T2.js
+expressions/compound-assignment/S11.13.2_A5.2_T3.js
+expressions/compound-assignment/S11.13.2_A5.3_T1.js
+expressions/compound-assignment/S11.13.2_A5.3_T2.js
+expressions/compound-assignment/S11.13.2_A5.3_T3.js
+expressions/compound-assignment/S11.13.2_A5.4_T1.js
+expressions/compound-assignment/S11.13.2_A5.4_T2.js
+expressions/compound-assignment/S11.13.2_A5.4_T3.js
+expressions/compound-assignment/S11.13.2_A5.5_T1.js
+expressions/compound-assignment/S11.13.2_A5.5_T2.js
+expressions/compound-assignment/S11.13.2_A5.5_T3.js
+expressions/compound-assignment/S11.13.2_A5.6_T1.js
+expressions/compound-assignment/S11.13.2_A5.6_T2.js
+expressions/compound-assignment/S11.13.2_A5.6_T3.js
+expressions/compound-assignment/S11.13.2_A5.7_T1.js
+expressions/compound-assignment/S11.13.2_A5.7_T2.js
+expressions/compound-assignment/S11.13.2_A5.7_T3.js
+expressions/compound-assignment/S11.13.2_A5.8_T1.js
+expressions/compound-assignment/S11.13.2_A5.8_T2.js
+expressions/compound-assignment/S11.13.2_A5.8_T3.js
+expressions/compound-assignment/S11.13.2_A5.9_T1.js
+expressions/compound-assignment/S11.13.2_A5.9_T2.js
+expressions/compound-assignment/S11.13.2_A5.9_T3.js
 expressions/compound-assignment/S11.13.2_A7.10_T3.js
 expressions/compound-assignment/S11.13.2_A7.11_T3.js
 expressions/compound-assignment/S11.13.2_A7.1_T3.js
@@ -2903,6 +2965,7 @@ expressions/function/dstr/ary-ptrn-elem-ary-empty-iter.js
 expressions/function/dstr/ary-ptrn-elem-id-init-exhausted.js
 expressions/function/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/function/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+expressions/function/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/function/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/function/dstr/ary-ptrn-elem-id-init-hole.js
 expressions/function/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -2929,6 +2992,7 @@ expressions/function/dstr/dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/function/dstr/dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/function/dstr/dflt-ary-ptrn-elem-id-init-hole.js
 expressions/function/dstr/dflt-ary-ptrn-elem-id-init-skipped.js
@@ -2950,6 +3014,7 @@ expressions/function/dstr/dflt-ary-ptrn-rest-obj-id.js
 expressions/function/dstr/dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/function/dstr/dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/function/dstr/dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/function/dstr/dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/function/dstr/dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/function/dstr/dflt-obj-ptrn-id-init-skipped.js
 expressions/function/dstr/dflt-obj-ptrn-id-init-throws.js
@@ -2960,6 +3025,7 @@ expressions/function/dstr/dflt-obj-ptrn-prop-eval-err.js
 expressions/function/dstr/dflt-obj-ptrn-prop-id-init-throws.js
 expressions/function/dstr/obj-ptrn-id-init-fn-name-arrow.js
 expressions/function/dstr/obj-ptrn-id-init-fn-name-class.js
+expressions/function/dstr/obj-ptrn-id-init-fn-name-cover.js
 expressions/function/dstr/obj-ptrn-id-init-fn-name-fn.js
 expressions/function/dstr/obj-ptrn-id-init-skipped.js
 expressions/function/dstr/obj-ptrn-id-init-throws.js
@@ -3006,6 +3072,7 @@ expressions/function/rest-params-trailing-comma-early-error.js
 expressions/function/scope-name-var-close.js
 expressions/function/scope-name-var-open-non-strict.js
 expressions/function/scope-paramsbody-var-close.js
+expressions/function/scope-paramsbody-var-open.js
 expressions/function/static-init-await-binding.js
 expressions/function/static-init-await-reference.js
 expressions/function/use-strict-with-non-simple-param.js
@@ -3351,6 +3418,7 @@ expressions/object/dstr/meth-ary-ptrn-elem-ary-empty-iter.js
 expressions/object/dstr/meth-ary-ptrn-elem-id-init-exhausted.js
 expressions/object/dstr/meth-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/object/dstr/meth-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/object/dstr/meth-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/object/dstr/meth-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/object/dstr/meth-ary-ptrn-elem-id-init-hole.js
 expressions/object/dstr/meth-ary-ptrn-elem-id-init-skipped.js
@@ -3377,6 +3445,7 @@ expressions/object/dstr/meth-dflt-ary-ptrn-elem-ary-empty-iter.js
 expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-exhausted.js
 expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-hole.js
 expressions/object/dstr/meth-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -3398,6 +3467,7 @@ expressions/object/dstr/meth-dflt-ary-ptrn-rest-obj-id.js
 expressions/object/dstr/meth-dflt-ary-ptrn-rest-obj-prop-id.js
 expressions/object/dstr/meth-dflt-obj-ptrn-id-init-fn-name-arrow.js
 expressions/object/dstr/meth-dflt-obj-ptrn-id-init-fn-name-class.js
+expressions/object/dstr/meth-dflt-obj-ptrn-id-init-fn-name-cover.js
 expressions/object/dstr/meth-dflt-obj-ptrn-id-init-fn-name-fn.js
 expressions/object/dstr/meth-dflt-obj-ptrn-id-init-skipped.js
 expressions/object/dstr/meth-dflt-obj-ptrn-id-init-throws.js
@@ -3408,6 +3478,7 @@ expressions/object/dstr/meth-dflt-obj-ptrn-prop-eval-err.js
 expressions/object/dstr/meth-dflt-obj-ptrn-prop-id-init-throws.js
 expressions/object/dstr/meth-obj-ptrn-id-init-fn-name-arrow.js
 expressions/object/dstr/meth-obj-ptrn-id-init-fn-name-class.js
+expressions/object/dstr/meth-obj-ptrn-id-init-fn-name-cover.js
 expressions/object/dstr/meth-obj-ptrn-id-init-fn-name-fn.js
 expressions/object/dstr/meth-obj-ptrn-id-init-skipped.js
 expressions/object/dstr/meth-obj-ptrn-id-init-throws.js
@@ -3659,7 +3730,9 @@ expressions/object/prop-dup-set-set.js
 expressions/object/properties-names-eval-arguments.js
 expressions/object/property-name-yield.js
 expressions/object/scope-meth-paramsbody-var-close.js
+expressions/object/scope-meth-paramsbody-var-open.js
 expressions/object/scope-setter-paramsbody-var-close.js
+expressions/object/scope-setter-paramsbody-var-open.js
 expressions/object/setter-body-strict-inside.js
 expressions/object/setter-body-strict-outside.js
 expressions/object/setter-param-arguments-strict-inside.js
@@ -3696,6 +3769,9 @@ expressions/optional-chaining/super-property-optional-call.js
 expressions/optional-chaining/update-expression-postfix.js
 expressions/optional-chaining/update-expression-prefix.js
 expressions/postfix-decrement/11.3.2-2-3-s.js
+expressions/postfix-decrement/S11.3.2_A5_T1.js
+expressions/postfix-decrement/S11.3.2_A5_T2.js
+expressions/postfix-decrement/S11.3.2_A5_T3.js
 expressions/postfix-decrement/S11.3.2_A6_T3.js
 expressions/postfix-decrement/arguments-nostrict.js
 expressions/postfix-decrement/arguments.js
@@ -3712,6 +3788,9 @@ expressions/postfix-decrement/this.js
 expressions/postfix-decrement/whitespace.js
 expressions/postfix-increment/11.3.1-2-1gs.js
 expressions/postfix-increment/11.3.1-2-3.js
+expressions/postfix-increment/S11.3.1_A5_T1.js
+expressions/postfix-increment/S11.3.1_A5_T2.js
+expressions/postfix-increment/S11.3.1_A5_T3.js
 expressions/postfix-increment/S11.3.1_A6_T3.js
 expressions/postfix-increment/arguments-nostrict.js
 expressions/postfix-increment/arguments.js
@@ -3728,6 +3807,9 @@ expressions/postfix-increment/this.js
 expressions/postfix-increment/whitespace.js
 expressions/prefix-decrement/11.4.5-2-2gs.js
 expressions/prefix-decrement/11.4.5-2-3-s.js
+expressions/prefix-decrement/S11.4.5_A5_T1.js
+expressions/prefix-decrement/S11.4.5_A5_T2.js
+expressions/prefix-decrement/S11.4.5_A5_T3.js
 expressions/prefix-decrement/S11.4.5_A6_T3.js
 expressions/prefix-decrement/arguments-nostrict.js
 expressions/prefix-decrement/arguments.js
@@ -3739,6 +3821,9 @@ expressions/prefix-decrement/target-newtarget.js
 expressions/prefix-decrement/this.js
 expressions/prefix-decrement/whitespace.js
 expressions/prefix-increment/11.4.4-2-3-s.js
+expressions/prefix-increment/S11.4.4_A5_T1.js
+expressions/prefix-increment/S11.4.4_A5_T2.js
+expressions/prefix-increment/S11.4.4_A5_T3.js
 expressions/prefix-increment/S11.4.4_A6_T3.js
 expressions/prefix-increment/arguments-nostrict.js
 expressions/prefix-increment/arguments.js
@@ -4852,6 +4937,10 @@ statements/break/S12.8_A1_T1.js
 statements/break/S12.8_A1_T2.js
 statements/break/S12.8_A1_T3.js
 statements/break/S12.8_A1_T4.js
+statements/break/S12.8_A3.js
+statements/break/S12.8_A4_T1.js
+statements/break/S12.8_A4_T2.js
+statements/break/S12.8_A4_T3.js
 statements/break/S12.8_A5_T1.js
 statements/break/S12.8_A5_T2.js
 statements/break/S12.8_A5_T3.js
@@ -5075,6 +5164,7 @@ statements/class/dstr/meth-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/meth-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/meth-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/meth-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/meth-ary-ptrn-elem-id-init-skipped.js
@@ -5101,6 +5191,7 @@ statements/class/dstr/meth-dflt-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/meth-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -5122,6 +5213,7 @@ statements/class/dstr/meth-dflt-ary-ptrn-rest-obj-id.js
 statements/class/dstr/meth-dflt-ary-ptrn-rest-obj-prop-id.js
 statements/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/meth-dflt-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/meth-dflt-obj-ptrn-id-init-skipped.js
 statements/class/dstr/meth-dflt-obj-ptrn-id-init-throws.js
@@ -5132,6 +5224,7 @@ statements/class/dstr/meth-dflt-obj-ptrn-prop-eval-err.js
 statements/class/dstr/meth-dflt-obj-ptrn-prop-id-init-throws.js
 statements/class/dstr/meth-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/meth-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/meth-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/meth-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/meth-obj-ptrn-id-init-skipped.js
 statements/class/dstr/meth-obj-ptrn-id-init-throws.js
@@ -5147,6 +5240,7 @@ statements/class/dstr/meth-static-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/meth-static-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/meth-static-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/meth-static-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/meth-static-ary-ptrn-elem-id-init-skipped.js
@@ -5173,6 +5267,7 @@ statements/class/dstr/meth-static-dflt-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -5194,6 +5289,7 @@ statements/class/dstr/meth-static-dflt-ary-ptrn-rest-obj-id.js
 statements/class/dstr/meth-static-dflt-ary-ptrn-rest-obj-prop-id.js
 statements/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/meth-static-dflt-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/meth-static-dflt-obj-ptrn-id-init-skipped.js
 statements/class/dstr/meth-static-dflt-obj-ptrn-id-init-throws.js
@@ -5204,6 +5300,7 @@ statements/class/dstr/meth-static-dflt-obj-ptrn-prop-eval-err.js
 statements/class/dstr/meth-static-dflt-obj-ptrn-prop-id-init-throws.js
 statements/class/dstr/meth-static-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/meth-static-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/meth-static-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/meth-static-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/meth-static-obj-ptrn-id-init-skipped.js
 statements/class/dstr/meth-static-obj-ptrn-id-init-throws.js
@@ -5243,6 +5340,7 @@ statements/class/dstr/private-meth-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/private-meth-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/private-meth-ary-ptrn-elem-id-init-skipped.js
@@ -5268,6 +5366,7 @@ statements/class/dstr/private-meth-dflt-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -5288,12 +5387,14 @@ statements/class/dstr/private-meth-dflt-ary-ptrn-rest-obj-id.js
 statements/class/dstr/private-meth-dflt-ary-ptrn-rest-obj-prop-id.js
 statements/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-dflt-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-dflt-obj-ptrn-id-init-skipped.js
 statements/class/dstr/private-meth-dflt-obj-ptrn-id-trailing-comma.js
 statements/class/dstr/private-meth-dflt-obj-ptrn-prop-ary-trailing-comma.js
 statements/class/dstr/private-meth-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/private-meth-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-obj-ptrn-id-init-skipped.js
 statements/class/dstr/private-meth-obj-ptrn-id-trailing-comma.js
@@ -5305,6 +5406,7 @@ statements/class/dstr/private-meth-static-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/private-meth-static-ary-ptrn-elem-id-init-skipped.js
@@ -5330,6 +5432,7 @@ statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-ary-empty-iter.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-exhausted.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-class.js
+statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-hole.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-elem-id-init-skipped.js
@@ -5350,12 +5453,14 @@ statements/class/dstr/private-meth-static-dflt-ary-ptrn-rest-obj-id.js
 statements/class/dstr/private-meth-static-dflt-ary-ptrn-rest-obj-prop-id.js
 statements/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-static-dflt-obj-ptrn-id-init-skipped.js
 statements/class/dstr/private-meth-static-dflt-obj-ptrn-id-trailing-comma.js
 statements/class/dstr/private-meth-static-dflt-obj-ptrn-prop-ary-trailing-comma.js
 statements/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-arrow.js
 statements/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-class.js
+statements/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-cover.js
 statements/class/dstr/private-meth-static-obj-ptrn-id-init-fn-name-fn.js
 statements/class/dstr/private-meth-static-obj-ptrn-id-init-skipped.js
 statements/class/dstr/private-meth-static-obj-ptrn-id-trailing-comma.js
@@ -5964,10 +6069,14 @@ statements/class/private-non-static-setter-static-getter-early-error.js
 statements/class/private-static-getter-non-static-setter-early-error.js
 statements/class/private-static-setter-non-static-getter-early-error.js
 statements/class/scope-meth-paramsbody-var-close.js
+statements/class/scope-meth-paramsbody-var-open.js
 statements/class/scope-name-lex-close.js
 statements/class/scope-setter-paramsbody-var-close.js
+statements/class/scope-setter-paramsbody-var-open.js
 statements/class/scope-static-meth-paramsbody-var-close.js
+statements/class/scope-static-meth-paramsbody-var-open.js
 statements/class/scope-static-setter-paramsbody-var-close.js
+statements/class/scope-static-setter-paramsbody-var-open.js
 statements/class/static-classelementname-abrupt-completion.js
 statements/class/static-gen-method-param-dflt-yield.js
 statements/class/static-init-abrupt.js
@@ -6031,6 +6140,7 @@ statements/const/dstr/ary-ptrn-elem-ary-empty-iter.js
 statements/const/dstr/ary-ptrn-elem-id-init-exhausted.js
 statements/const/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/const/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+statements/const/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 statements/const/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 statements/const/dstr/ary-ptrn-elem-id-init-hole.js
 statements/const/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -6052,6 +6162,7 @@ statements/const/dstr/ary-ptrn-rest-obj-id.js
 statements/const/dstr/ary-ptrn-rest-obj-prop-id.js
 statements/const/dstr/obj-ptrn-id-init-fn-name-arrow.js
 statements/const/dstr/obj-ptrn-id-init-fn-name-class.js
+statements/const/dstr/obj-ptrn-id-init-fn-name-cover.js
 statements/const/dstr/obj-ptrn-id-init-fn-name-fn.js
 statements/const/dstr/obj-ptrn-id-init-skipped.js
 statements/const/dstr/obj-ptrn-id-init-throws.js
@@ -6114,10 +6225,16 @@ statements/debugger/expression.js
 statements/debugger/statement.js
 statements/do-while/S12.6.1_A1.js
 statements/do-while/S12.6.1_A10.js
+statements/do-while/S12.6.1_A11.js
 statements/do-while/S12.6.1_A12.js
+statements/do-while/S12.6.1_A14_T1.js
+statements/do-while/S12.6.1_A14_T2.js
 statements/do-while/S12.6.1_A15.js
 statements/do-while/S12.6.1_A2.js
 statements/do-while/S12.6.1_A4_T1.js
+statements/do-while/S12.6.1_A4_T2.js
+statements/do-while/S12.6.1_A4_T3.js
+statements/do-while/S12.6.1_A4_T4.js
 statements/do-while/S12.6.1_A4_T5.js
 statements/do-while/S12.6.1_A6_T1.js
 statements/do-while/S12.6.1_A6_T2.js
@@ -6125,6 +6242,7 @@ statements/do-while/S12.6.1_A6_T3.js
 statements/do-while/S12.6.1_A6_T4.js
 statements/do-while/S12.6.1_A6_T5.js
 statements/do-while/S12.6.1_A6_T6.js
+statements/do-while/S12.6.1_A9.js
 statements/do-while/decl-async-fun.js
 statements/do-while/decl-async-gen.js
 statements/do-while/decl-cls.js
@@ -6226,7 +6344,10 @@ statements/for-await-of/head-const-init.js
 statements/for-await-of/head-let-init.js
 statements/for-await-of/head-var-init.js
 statements/for-await-of/let-array-with-newline.js
+statements/for-in/S12.6.4_A1.js
+statements/for-in/S12.6.4_A14_T2.js
 statements/for-in/S12.6.4_A15.js
+statements/for-in/S12.6.4_A2.js
 statements/for-in/decl-async-fun.js
 statements/for-in/decl-async-gen.js
 statements/for-in/decl-cls.js
@@ -6300,6 +6421,7 @@ statements/for-in/return-from-try.js
 statements/for-in/return.js
 statements/for-in/scope-body-lex-boundary.js
 statements/for-in/scope-body-lex-close.js
+statements/for-in/scope-body-var-none.js
 statements/for-in/var-arguments-fn-strict-init.js
 statements/for-in/var-arguments-fn-strict.js
 statements/for-in/var-arguments-strict-init.js
@@ -6389,6 +6511,7 @@ statements/for-of/dstr/const-ary-ptrn-elem-ary-empty-iter.js
 statements/for-of/dstr/const-ary-ptrn-elem-id-init-exhausted.js
 statements/for-of/dstr/const-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/for-of/dstr/const-ary-ptrn-elem-id-init-fn-name-class.js
+statements/for-of/dstr/const-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/for-of/dstr/const-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/for-of/dstr/const-ary-ptrn-elem-id-init-hole.js
 statements/for-of/dstr/const-ary-ptrn-elem-id-init-skipped.js
@@ -6411,6 +6534,7 @@ statements/for-of/dstr/const-ary-ptrn-rest-obj-id.js
 statements/for-of/dstr/const-ary-ptrn-rest-obj-prop-id.js
 statements/for-of/dstr/const-obj-ptrn-id-init-fn-name-arrow.js
 statements/for-of/dstr/const-obj-ptrn-id-init-fn-name-class.js
+statements/for-of/dstr/const-obj-ptrn-id-init-fn-name-cover.js
 statements/for-of/dstr/const-obj-ptrn-id-init-fn-name-fn.js
 statements/for-of/dstr/const-obj-ptrn-id-init-skipped.js
 statements/for-of/dstr/const-obj-ptrn-id-init-throws.js
@@ -6427,6 +6551,7 @@ statements/for-of/dstr/let-ary-ptrn-elem-ary-empty-iter.js
 statements/for-of/dstr/let-ary-ptrn-elem-id-init-exhausted.js
 statements/for-of/dstr/let-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/for-of/dstr/let-ary-ptrn-elem-id-init-fn-name-class.js
+statements/for-of/dstr/let-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/for-of/dstr/let-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/for-of/dstr/let-ary-ptrn-elem-id-init-hole.js
 statements/for-of/dstr/let-ary-ptrn-elem-id-init-skipped.js
@@ -6449,6 +6574,7 @@ statements/for-of/dstr/let-ary-ptrn-rest-obj-id.js
 statements/for-of/dstr/let-ary-ptrn-rest-obj-prop-id.js
 statements/for-of/dstr/let-obj-ptrn-id-init-fn-name-arrow.js
 statements/for-of/dstr/let-obj-ptrn-id-init-fn-name-class.js
+statements/for-of/dstr/let-obj-ptrn-id-init-fn-name-cover.js
 statements/for-of/dstr/let-obj-ptrn-id-init-fn-name-fn.js
 statements/for-of/dstr/let-obj-ptrn-id-init-skipped.js
 statements/for-of/dstr/let-obj-ptrn-id-init-throws.js
@@ -6530,6 +6656,7 @@ statements/for-of/dstr/var-ary-ptrn-elem-ary-empty-iter.js
 statements/for-of/dstr/var-ary-ptrn-elem-id-init-exhausted.js
 statements/for-of/dstr/var-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/for-of/dstr/var-ary-ptrn-elem-id-init-fn-name-class.js
+statements/for-of/dstr/var-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/for-of/dstr/var-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/for-of/dstr/var-ary-ptrn-elem-id-init-hole.js
 statements/for-of/dstr/var-ary-ptrn-elem-id-init-skipped.js
@@ -6552,6 +6679,7 @@ statements/for-of/dstr/var-ary-ptrn-rest-obj-id.js
 statements/for-of/dstr/var-ary-ptrn-rest-obj-prop-id.js
 statements/for-of/dstr/var-obj-ptrn-id-init-fn-name-arrow.js
 statements/for-of/dstr/var-obj-ptrn-id-init-fn-name-class.js
+statements/for-of/dstr/var-obj-ptrn-id-init-fn-name-cover.js
 statements/for-of/dstr/var-obj-ptrn-id-init-fn-name-fn.js
 statements/for-of/dstr/var-obj-ptrn-id-init-skipped.js
 statements/for-of/dstr/var-obj-ptrn-id-init-throws.js
@@ -6600,6 +6728,7 @@ statements/for-of/let-block-with-newline.js
 statements/for-of/let-identifier-with-newline.js
 statements/for-of/scope-body-lex-boundary.js
 statements/for-of/scope-body-lex-close.js
+statements/for-of/scope-body-var-none.js
 statements/for-of/string-astral-truncated.js
 statements/for-of/string-astral.js
 statements/for-of/string-bmp.js
@@ -6616,6 +6745,10 @@ statements/for/12.6.3_2-3-a-ii-19.js
 statements/for/12.6.3_2-3-a-ii-20.js
 statements/for/12.6.3_2-3-a-ii-21.js
 statements/for/S12.6.3_A1.js
+statements/for/S12.6.3_A10.1_T1.js
+statements/for/S12.6.3_A10.1_T2.js
+statements/for/S12.6.3_A10_T1.js
+statements/for/S12.6.3_A10_T2.js
 statements/for/S12.6.3_A11.1_T1.js
 statements/for/S12.6.3_A11.1_T2.js
 statements/for/S12.6.3_A11.1_T3.js
@@ -6633,10 +6766,12 @@ statements/for/S12.6.3_A14.js
 statements/for/S12.6.3_A15.js
 statements/for/S12.6.3_A2.1.js
 statements/for/S12.6.3_A2.2.js
+statements/for/S12.6.3_A2.js
 statements/for/S12.6.3_A3.js
 statements/for/S12.6.3_A4.1.js
 statements/for/S12.6.3_A4_T1.js
 statements/for/S12.6.3_A4_T2.js
+statements/for/S12.6.3_A6.js
 statements/for/S12.6.3_A7.1_T1.js
 statements/for/S12.6.3_A7.1_T2.js
 statements/for/S12.6.3_A7_T1.js
@@ -6661,6 +6796,7 @@ statements/for/dstr/const-ary-ptrn-elem-ary-empty-iter.js
 statements/for/dstr/const-ary-ptrn-elem-id-init-exhausted.js
 statements/for/dstr/const-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/for/dstr/const-ary-ptrn-elem-id-init-fn-name-class.js
+statements/for/dstr/const-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/for/dstr/const-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/for/dstr/const-ary-ptrn-elem-id-init-hole.js
 statements/for/dstr/const-ary-ptrn-elem-id-init-skipped.js
@@ -6682,6 +6818,7 @@ statements/for/dstr/const-ary-ptrn-rest-obj-id.js
 statements/for/dstr/const-ary-ptrn-rest-obj-prop-id.js
 statements/for/dstr/const-obj-ptrn-id-init-fn-name-arrow.js
 statements/for/dstr/const-obj-ptrn-id-init-fn-name-class.js
+statements/for/dstr/const-obj-ptrn-id-init-fn-name-cover.js
 statements/for/dstr/const-obj-ptrn-id-init-fn-name-fn.js
 statements/for/dstr/const-obj-ptrn-id-init-skipped.js
 statements/for/dstr/const-obj-ptrn-id-init-throws.js
@@ -6697,6 +6834,7 @@ statements/for/dstr/let-ary-ptrn-elem-ary-empty-iter.js
 statements/for/dstr/let-ary-ptrn-elem-id-init-exhausted.js
 statements/for/dstr/let-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/for/dstr/let-ary-ptrn-elem-id-init-fn-name-class.js
+statements/for/dstr/let-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/for/dstr/let-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/for/dstr/let-ary-ptrn-elem-id-init-hole.js
 statements/for/dstr/let-ary-ptrn-elem-id-init-skipped.js
@@ -6718,6 +6856,7 @@ statements/for/dstr/let-ary-ptrn-rest-obj-id.js
 statements/for/dstr/let-ary-ptrn-rest-obj-prop-id.js
 statements/for/dstr/let-obj-ptrn-id-init-fn-name-arrow.js
 statements/for/dstr/let-obj-ptrn-id-init-fn-name-class.js
+statements/for/dstr/let-obj-ptrn-id-init-fn-name-cover.js
 statements/for/dstr/let-obj-ptrn-id-init-fn-name-fn.js
 statements/for/dstr/let-obj-ptrn-id-init-skipped.js
 statements/for/dstr/let-obj-ptrn-id-init-throws.js
@@ -6733,6 +6872,7 @@ statements/for/dstr/var-ary-ptrn-elem-ary-empty-iter.js
 statements/for/dstr/var-ary-ptrn-elem-id-init-exhausted.js
 statements/for/dstr/var-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/for/dstr/var-ary-ptrn-elem-id-init-fn-name-class.js
+statements/for/dstr/var-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/for/dstr/var-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/for/dstr/var-ary-ptrn-elem-id-init-hole.js
 statements/for/dstr/var-ary-ptrn-elem-id-init-skipped.js
@@ -6754,6 +6894,7 @@ statements/for/dstr/var-ary-ptrn-rest-obj-id.js
 statements/for/dstr/var-ary-ptrn-rest-obj-prop-id.js
 statements/for/dstr/var-obj-ptrn-id-init-fn-name-arrow.js
 statements/for/dstr/var-obj-ptrn-id-init-fn-name-class.js
+statements/for/dstr/var-obj-ptrn-id-init-fn-name-cover.js
 statements/for/dstr/var-obj-ptrn-id-init-fn-name-fn.js
 statements/for/dstr/var-obj-ptrn-id-init-skipped.js
 statements/for/dstr/var-obj-ptrn-id-init-throws.js
@@ -6802,14 +6943,19 @@ statements/function/S13.2.1_A6_T1.js
 statements/function/S13.2.1_A6_T2.js
 statements/function/S13.2.1_A6_T3.js
 statements/function/S13.2.1_A6_T4.js
+statements/function/S13.2.1_A7_T1.js
+statements/function/S13.2.1_A7_T2.js
 statements/function/S13.2.1_A7_T3.js
+statements/function/S13.2.1_A7_T4.js
 statements/function/S13.2.1_A8_T1.js
 statements/function/S13.2.1_A8_T2.js
 statements/function/S13.2.1_A9.1_T1.js
 statements/function/S13.2.1_A9.1_T2.js
 statements/function/S13.2.1_A9_T1.js
 statements/function/S13.2.1_A9_T2.js
+statements/function/S13.2.2_A10.js
 statements/function/S13.2.2_A11.js
+statements/function/S13.2.2_A12.js
 statements/function/S13.2.2_A13.js
 statements/function/S13.2.2_A15_T1.js
 statements/function/S13.2.2_A15_T2.js
@@ -6876,6 +7022,7 @@ statements/function/S13_A4_T2.js
 statements/function/S13_A4_T3.js
 statements/function/S13_A4_T4.js
 statements/function/S13_A6_T1.js
+statements/function/S13_A6_T2.js
 statements/function/S13_A7_T1.js
 statements/function/S13_A7_T3.js
 statements/function/S13_A8_T1.js
@@ -6902,6 +7049,7 @@ statements/function/dstr/ary-ptrn-elem-ary-empty-iter.js
 statements/function/dstr/ary-ptrn-elem-id-init-exhausted.js
 statements/function/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/function/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+statements/function/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 statements/function/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 statements/function/dstr/ary-ptrn-elem-id-init-hole.js
 statements/function/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -6928,6 +7076,7 @@ statements/function/dstr/dflt-ary-ptrn-elem-ary-empty-iter.js
 statements/function/dstr/dflt-ary-ptrn-elem-id-init-exhausted.js
 statements/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-class.js
+statements/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-cover.js
 statements/function/dstr/dflt-ary-ptrn-elem-id-init-fn-name-fn.js
 statements/function/dstr/dflt-ary-ptrn-elem-id-init-hole.js
 statements/function/dstr/dflt-ary-ptrn-elem-id-init-skipped.js
@@ -6949,6 +7098,7 @@ statements/function/dstr/dflt-ary-ptrn-rest-obj-id.js
 statements/function/dstr/dflt-ary-ptrn-rest-obj-prop-id.js
 statements/function/dstr/dflt-obj-ptrn-id-init-fn-name-arrow.js
 statements/function/dstr/dflt-obj-ptrn-id-init-fn-name-class.js
+statements/function/dstr/dflt-obj-ptrn-id-init-fn-name-cover.js
 statements/function/dstr/dflt-obj-ptrn-id-init-fn-name-fn.js
 statements/function/dstr/dflt-obj-ptrn-id-init-skipped.js
 statements/function/dstr/dflt-obj-ptrn-id-init-throws.js
@@ -6959,6 +7109,7 @@ statements/function/dstr/dflt-obj-ptrn-prop-eval-err.js
 statements/function/dstr/dflt-obj-ptrn-prop-id-init-throws.js
 statements/function/dstr/obj-ptrn-id-init-fn-name-arrow.js
 statements/function/dstr/obj-ptrn-id-init-fn-name-class.js
+statements/function/dstr/obj-ptrn-id-init-fn-name-cover.js
 statements/function/dstr/obj-ptrn-id-init-fn-name-fn.js
 statements/function/dstr/obj-ptrn-id-init-skipped.js
 statements/function/dstr/obj-ptrn-id-init-throws.js
@@ -7015,6 +7166,7 @@ statements/function/params-trailing-comma-single.js
 statements/function/rest-param-strict-body.js
 statements/function/rest-params-trailing-comma-early-error.js
 statements/function/scope-paramsbody-var-close.js
+statements/function/scope-paramsbody-var-open.js
 statements/function/static-init-await-binding-invalid.js
 statements/function/static-init-await-binding-valid.js
 statements/function/use-strict-with-non-simple-param.js
@@ -7132,6 +7284,7 @@ statements/let/dstr/ary-ptrn-elem-ary-empty-iter.js
 statements/let/dstr/ary-ptrn-elem-id-init-exhausted.js
 statements/let/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/let/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+statements/let/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 statements/let/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 statements/let/dstr/ary-ptrn-elem-id-init-hole.js
 statements/let/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -7153,6 +7306,7 @@ statements/let/dstr/ary-ptrn-rest-obj-id.js
 statements/let/dstr/ary-ptrn-rest-obj-prop-id.js
 statements/let/dstr/obj-ptrn-id-init-fn-name-arrow.js
 statements/let/dstr/obj-ptrn-id-init-fn-name-class.js
+statements/let/dstr/obj-ptrn-id-init-fn-name-cover.js
 statements/let/dstr/obj-ptrn-id-init-fn-name-fn.js
 statements/let/dstr/obj-ptrn-id-init-skipped.js
 statements/let/dstr/obj-ptrn-id-init-throws.js
@@ -7305,7 +7459,12 @@ statements/try/12.14-13.js
 statements/try/12.14-14.js
 statements/try/12.14-15.js
 statements/try/12.14-16.js
+statements/try/12.14-3.js
+statements/try/12.14-4.js
+statements/try/12.14-6.js
+statements/try/12.14-8.js
 statements/try/12.14-9.js
+statements/try/S12.14_A1.js
 statements/try/S12.14_A10_T1.js
 statements/try/S12.14_A10_T2.js
 statements/try/S12.14_A10_T3.js
@@ -7316,8 +7475,10 @@ statements/try/S12.14_A11_T2.js
 statements/try/S12.14_A11_T3.js
 statements/try/S12.14_A11_T4.js
 statements/try/S12.14_A13_T1.js
+statements/try/S12.14_A13_T2.js
 statements/try/S12.14_A13_T3.js
 statements/try/S12.14_A14.js
+statements/try/S12.14_A15.js
 statements/try/S12.14_A16_T1.js
 statements/try/S12.14_A16_T10.js
 statements/try/S12.14_A16_T11.js
@@ -7338,6 +7499,7 @@ statements/try/S12.14_A18_T3.js
 statements/try/S12.14_A18_T4.js
 statements/try/S12.14_A18_T5.js
 statements/try/S12.14_A18_T6.js
+statements/try/S12.14_A2.js
 statements/try/S12.14_A3.js
 statements/try/S12.14_A4.js
 statements/try/S12.14_A5.js
@@ -7363,6 +7525,7 @@ statements/try/dstr/ary-ptrn-elem-ary-empty-iter.js
 statements/try/dstr/ary-ptrn-elem-id-init-exhausted.js
 statements/try/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/try/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+statements/try/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 statements/try/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 statements/try/dstr/ary-ptrn-elem-id-init-hole.js
 statements/try/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -7384,6 +7547,7 @@ statements/try/dstr/ary-ptrn-rest-obj-id.js
 statements/try/dstr/ary-ptrn-rest-obj-prop-id.js
 statements/try/dstr/obj-ptrn-id-init-fn-name-arrow.js
 statements/try/dstr/obj-ptrn-id-init-fn-name-class.js
+statements/try/dstr/obj-ptrn-id-init-fn-name-cover.js
 statements/try/dstr/obj-ptrn-id-init-fn-name-fn.js
 statements/try/dstr/obj-ptrn-id-init-skipped.js
 statements/try/dstr/obj-ptrn-id-init-throws.js
@@ -7410,9 +7574,13 @@ statements/variable/12.2.1-1gs.js
 statements/variable/12.2.1-4gs.js
 statements/variable/S12.2_A10.js
 statements/variable/S12.2_A11.js
+statements/variable/S12.2_A12.js
 statements/variable/S12.2_A2.js
 statements/variable/S12.2_A3.js
 statements/variable/S12.2_A4.js
+statements/variable/S12.2_A6_T1.js
+statements/variable/S12.2_A6_T2.js
+statements/variable/S12.2_A7.js
 statements/variable/S12.2_A8_T1.js
 statements/variable/S12.2_A8_T2.js
 statements/variable/S12.2_A8_T3.js
@@ -7422,6 +7590,7 @@ statements/variable/S12.2_A8_T6.js
 statements/variable/S12.2_A8_T7.js
 statements/variable/S12.2_A8_T8.js
 statements/variable/S12.2_A9.js
+statements/variable/S14_A1.js
 statements/variable/arguments-fn-non-strict.js
 statements/variable/arguments-fn-strict-list-final-init.js
 statements/variable/arguments-fn-strict-list-final.js
@@ -7449,6 +7618,7 @@ statements/variable/dstr/ary-ptrn-elem-ary-empty-iter.js
 statements/variable/dstr/ary-ptrn-elem-id-init-exhausted.js
 statements/variable/dstr/ary-ptrn-elem-id-init-fn-name-arrow.js
 statements/variable/dstr/ary-ptrn-elem-id-init-fn-name-class.js
+statements/variable/dstr/ary-ptrn-elem-id-init-fn-name-cover.js
 statements/variable/dstr/ary-ptrn-elem-id-init-fn-name-fn.js
 statements/variable/dstr/ary-ptrn-elem-id-init-hole.js
 statements/variable/dstr/ary-ptrn-elem-id-init-skipped.js
@@ -7474,6 +7644,7 @@ statements/variable/dstr/obj-ptrn-elem-id-static-init-await-invalid.js
 statements/variable/dstr/obj-ptrn-elem-id-static-init-await-valid.js
 statements/variable/dstr/obj-ptrn-id-init-fn-name-arrow.js
 statements/variable/dstr/obj-ptrn-id-init-fn-name-class.js
+statements/variable/dstr/obj-ptrn-id-init-fn-name-cover.js
 statements/variable/dstr/obj-ptrn-id-init-fn-name-fn.js
 statements/variable/dstr/obj-ptrn-id-init-skipped.js
 statements/variable/dstr/obj-ptrn-id-init-throws.js
@@ -7498,9 +7669,15 @@ statements/variable/static-init-await-binding-invalid.js
 statements/variable/static-init-await-binding-valid.js
 statements/while/S12.6.2_A1.js
 statements/while/S12.6.2_A10.js
+statements/while/S12.6.2_A11.js
+statements/while/S12.6.2_A14_T1.js
+statements/while/S12.6.2_A14_T2.js
 statements/while/S12.6.2_A15.js
 statements/while/S12.6.2_A2.js
 statements/while/S12.6.2_A4_T1.js
+statements/while/S12.6.2_A4_T2.js
+statements/while/S12.6.2_A4_T3.js
+statements/while/S12.6.2_A4_T4.js
 statements/while/S12.6.2_A4_T5.js
 statements/while/S12.6.2_A6_T1.js
 statements/while/S12.6.2_A6_T2.js
@@ -7508,6 +7685,7 @@ statements/while/S12.6.2_A6_T3.js
 statements/while/S12.6.2_A6_T4.js
 statements/while/S12.6.2_A6_T5.js
 statements/while/S12.6.2_A6_T6.js
+statements/while/S12.6.2_A9.js
 statements/while/decl-async-fun.js
 statements/while/decl-async-gen.js
 statements/while/decl-cls.js
@@ -7532,18 +7710,27 @@ statements/with/12.10-2-3.js
 statements/with/12.10-7-1.js
 statements/with/12.10.1-11gs.js
 statements/with/12.10.1-13-s.js
+statements/with/S12.10_A1.10_T3.js
+statements/with/S12.10_A1.10_T5.js
 statements/with/S12.10_A1.11_T3.js
 statements/with/S12.10_A1.11_T5.js
 statements/with/S12.10_A1.12_T3.js
 statements/with/S12.10_A1.12_T5.js
+statements/with/S12.10_A1.1_T3.js
 statements/with/S12.10_A1.2_T3.js
 statements/with/S12.10_A1.2_T5.js
 statements/with/S12.10_A1.3_T3.js
 statements/with/S12.10_A1.3_T5.js
+statements/with/S12.10_A1.4_T3.js
+statements/with/S12.10_A1.4_T5.js
+statements/with/S12.10_A1.5_T3.js
+statements/with/S12.10_A1.5_T5.js
+statements/with/S12.10_A1.6_T3.js
 statements/with/S12.10_A1.7_T3.js
 statements/with/S12.10_A1.7_T5.js
 statements/with/S12.10_A1.8_T3.js
 statements/with/S12.10_A1.8_T5.js
+statements/with/S12.10_A1.9_T3.js
 statements/with/S12.10_A3.10_T1.js
 statements/with/S12.10_A3.10_T2.js
 statements/with/S12.10_A3.10_T3.js

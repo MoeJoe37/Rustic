@@ -279,6 +279,10 @@ pub enum Op {
     /// `dst = the template object of `templates[site]``: the frozen
     /// array of strings a tag function receives, made once per site.
     TemplateObject { dst: Reg, site: u32 },
+    /// `name = src` through a reference resolved earlier: `base` is the
+    /// binding object [`Op::WithBase`] found, or `undefined` to resolve
+    /// the name now.
+    SetNameIn { base: Reg, src: Reg, name: u32 },
     /// `dst = the `[[HomeObject]]` of the running function`.
     Home { dst: Reg },
     /// `dst = the arguments object`

@@ -941,6 +941,21 @@ impl Resolver {
         if !arrow && self.tree.scopes[scope].find("arguments").is_none() {
             self.declare(scope, "arguments", BindingKind::Arguments);
         }
+        // §10.2.11 step 28: with parameter expressions, the body's vars
+        // live in their own scope, which closures made by the parameter
+        // expressions cannot see.
+        if params.iter().chain(rest).any(pattern_has_expression) {
+            for p in params.iter().chain(rest) {
+                self.pattern(p);
+            }
+            let body_scope = self.open(ScopeKind::Block, Some(node_key(node, ROLE_BODY)), false);
+            self.hoist_vars(body_scope, body, true);
+            self.declare_lexical(body_scope, body, true);
+            self.statements(body);
+            self.stack.pop();
+            self.stack.pop();
+            return;
+        }
         self.hoist_vars(scope, body, true);
         // A var or function named like the function itself replaces it.
         if let Some(name) = self_name {
@@ -1143,6 +1158,25 @@ impl Resolver {
                     }
                 }
             }
+        }
+    }
+}
+
+/// `ContainsExpression` of a parameter: a default value or a computed
+/// key anywhere in it.
+fn pattern_has_expression(p: &Pattern) -> bool {
+    match &p.kind {
+        PatternKind::Identifier(_) => false,
+        PatternKind::Member(_) | PatternKind::Assignment { .. } => true,
+        PatternKind::Object { properties, rest } => {
+            properties.iter().any(|property| {
+                matches!(property.key, PropertyKey::Computed(_))
+                    || pattern_has_expression(&property.value)
+            }) || rest.as_deref().is_some_and(pattern_has_expression)
+        }
+        PatternKind::Array { elements, rest } => {
+            elements.iter().flatten().any(pattern_has_expression)
+                || rest.as_deref().is_some_and(pattern_has_expression)
         }
     }
 }

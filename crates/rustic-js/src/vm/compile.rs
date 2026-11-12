@@ -1360,6 +1360,35 @@ impl<'a, 't> Gen<'a, 't> {
         }
     }
 
+    /// Inside `with`, resolve the reference of an assignment to `name`
+    /// before its value is computed: the register holds the binding
+    /// object, or `undefined` when the name is not found in one.
+    fn name_reference(&mut self, name: &str) -> CResult<Option<Reg>> {
+        if self.resolve(name) != Resolution::Dynamic || !self.under_with() {
+            return Ok(None);
+        }
+        let base = self.temp()?;
+        let atom = self.atom(name)?;
+        self.emit(Op::WithBase {
+            dst: base,
+            name: atom,
+        });
+        Ok(Some(base))
+    }
+
+    /// Assign `src` to `name` through a reference from
+    /// [`Self::name_reference`].
+    fn store_name(&mut self, name: &str, src: Reg, base: Option<Reg>) -> CResult<()> {
+        match base {
+            Some(base) => {
+                let name = self.atom(name)?;
+                self.emit(Op::SetNameIn { base, src, name });
+                Ok(())
+            }
+            None => self.store_binding(name, src, false),
+        }
+    }
+
     /// Store `src` into a binding: `init` for declarations (no TDZ or
     /// constness checks), otherwise an assignment.
     fn store_binding(&mut self, name: &str, src: Reg, init: bool) -> CResult<()> {
@@ -1449,7 +1478,10 @@ impl<'a, 't> Gen<'a, 't> {
         }
         let mut vars = Vec::new();
         for s in body {
-            collect_nested_vars(s, &mut vars);
+            // Top-level `var` statements were declared above.
+            if !matches!(s.kind, StatementKind::Variable(_)) {
+                collect_nested_vars(s, &mut vars);
+            }
         }
         for n in vars {
             let name = self.atom(&n)?;
@@ -1529,6 +1561,7 @@ impl<'a, 't> Gen<'a, 't> {
                 g.next_reg = 0;
             }
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
+            g.enter_function_body(f)?;
             g.function_prologue(&f.body)?;
             g.statements(&f.body)?;
             g.finish(params, length)?
@@ -1569,6 +1602,7 @@ impl<'a, 't> Gen<'a, 't> {
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
             match &f.body {
                 ArrowBody::Block(body) => {
+                    g.enter_function_body(f)?;
                     g.function_prologue(body)?;
                     g.statements(body)?;
                 }
@@ -1681,6 +1715,43 @@ impl<'a, 't> Gen<'a, 't> {
             let hops = self.hops(scope);
             self.emit(Op::InitSlot { src, hops, slot });
         }
+        Ok(())
+    }
+
+    /// Enter the separate scope of a body whose parameters contain
+    /// expressions, if the resolver made one: its vars start as
+    /// `undefined`, or with the value of the parameter of the same name.
+    fn enter_function_body<T: 'static>(&mut self, node: &T) -> CResult<()> {
+        let Some(body) = self.tree.scope_of_role(node, ROLE_BODY) else {
+            return Ok(());
+        };
+        let function_scope = self.scope;
+        self.layout_scope(body)?;
+        self.scope = body;
+        if let Some(&index) = self.scope_index.get(&body) {
+            self.emit(Op::PushScope { scope: index });
+            self.depth += 1;
+        }
+        let bindings = self.tree.scopes[body].bindings.clone();
+        let mark = self.mark();
+        let value = self.temp()?;
+        for (i, b) in bindings.iter().enumerate() {
+            if b.kind.has_tdz() {
+                if !b.captured {
+                    let r = self.locals[&(body, i)];
+                    self.emit(Op::Uninit { dst: r });
+                }
+                continue;
+            }
+            match self.tree.scopes[function_scope].find(&b.name) {
+                Some(outer) => self.load_binding_at(function_scope, outer, &b.name, value)?,
+                None => {
+                    self.emit(Op::Undefined { dst: value });
+                }
+            }
+            self.store_binding_at(body, i, value)?;
+        }
+        self.release(mark);
         Ok(())
     }
 
@@ -2664,6 +2735,8 @@ impl<'a, 't> Gen<'a, 't> {
             (ExpressionKind::Class(c), Some(n)) if c.id.is_none() => {
                 self.class_definition(c, dst, Some(n))
             }
+            // `x = (function () {})` names the function too.
+            (ExpressionKind::Parenthesized(inner), Some(_)) => self.expr_named(inner, dst, name),
             _ => self.expr(e, dst),
         }
     }
@@ -3747,6 +3820,14 @@ impl<'a, 't> Gen<'a, 't> {
                     // Evaluate the reference (object, key) before the value.
                     return self.member_update(m, dst, |g, _old, out| g.expr(value, out), false);
                 }
+                PatternKind::Identifier(id) => {
+                    let base = self.name_reference(&id.name)?;
+                    let v = self.temp()?;
+                    self.expr_named(value, v, hint)?;
+                    self.store_name(&id.name, v, base)?;
+                    self.emit(Op::Move { dst, src: v });
+                    return Ok(());
+                }
                 _ => {
                     let v = self.temp()?;
                     self.expr_named(value, v, hint)?;
@@ -3760,6 +3841,7 @@ impl<'a, 't> Gen<'a, 't> {
         match &target.kind {
             PatternKind::Identifier(id) => {
                 let name = id.name.clone();
+                let base = self.name_reference(&name)?;
                 self.load_binding(&name, dst)?;
                 if logical {
                     let skip = match op {
@@ -3779,13 +3861,13 @@ impl<'a, 't> Gen<'a, 't> {
                             let skip = self.jump();
                             self.patch_here(go);
                             self.expr_named(value, dst, Some(&name))?;
-                            self.store_binding(&name, dst, false)?;
+                            self.store_name(&name, dst, base)?;
                             self.patch_here(skip);
                             return Ok(());
                         }
                     };
                     self.expr_named(value, dst, Some(&name))?;
-                    self.store_binding(&name, dst, false)?;
+                    self.store_name(&name, dst, base)?;
                     self.patch_here(skip);
                 } else {
                     let r = self.operand(value)?;
@@ -3795,7 +3877,7 @@ impl<'a, 't> Gen<'a, 't> {
                         a: dst,
                         b: r,
                     });
-                    self.store_binding(&name, dst, false)?;
+                    self.store_name(&name, dst, base)?;
                 }
                 Ok(())
             }
@@ -3993,6 +4075,7 @@ impl<'a, 't> Gen<'a, 't> {
         };
         match &target.kind {
             PatternKind::Identifier(id) => {
+                let base = self.name_reference(&id.name)?;
                 let old = self.temp()?;
                 self.load_binding(&id.name, old)?;
                 self.emit(Op::Unary {
@@ -4006,7 +4089,7 @@ impl<'a, 't> Gen<'a, 't> {
                     dst: new,
                     src: old,
                 });
-                self.store_binding(&id.name, new, false)?;
+                self.store_name(&id.name, new, base)?;
                 self.emit(Op::Move {
                     dst,
                     src: if prefix { new } else { old },
@@ -4082,6 +4165,7 @@ fn collect_nested_vars(s: &Statement, out: &mut Vec<String>) {
         }
     };
     match &s.kind {
+        StatementKind::Variable(d) => var_decl(d, out),
         StatementKind::Block(b) => b.iter().for_each(|s| collect_nested_vars(s, out)),
         StatementKind::If {
             consequent,

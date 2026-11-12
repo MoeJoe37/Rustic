@@ -851,6 +851,25 @@ impl Agent {
                     let value = reg!(src);
                     t!(self.put_value(&reference, value));
                 }
+                Op::SetNameIn { base, src, name } => {
+                    let name = self.name_of(code, name);
+                    let value = reg!(src);
+                    match reg!(base).as_object() {
+                        // §9.1.1.2.5: the binding object, even if the
+                        // property is gone by now.
+                        Some(o) => {
+                            let key = PropertyKey::String(name);
+                            if code.strict && !t!(self.has_property(o, key)) {
+                                t!(Err(self.reference_error_for(name, "is not defined")));
+                            }
+                            t!(self.set(o, key, value, code.strict));
+                        }
+                        None => {
+                            let reference = t!(self.resolve_binding(env, name, code.strict));
+                            t!(self.put_value(&reference, value));
+                        }
+                    }
+                }
                 Op::GetGlobal { dst, site } => {
                     reg!(dst) = t!(self.get_global(code, site));
                 }

@@ -9,8 +9,8 @@ garbage collector (see [Garbage collection](#garbage-collection-js-03)).
 JS-04 compiles scripts to bytecode and runs them (see
 [Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
 generators (JS-08 part 1), promises with a job queue and async functions
-(JS-06 part 1); async generators, modules and regular expressions do not
-run yet.
+(JS-06 part 1) and async generators with `for await` (JS-08 part 2); modules
+and regular expressions do not run yet.
 
 ## API
 
@@ -126,16 +126,17 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 16,723 | 11,487 |
-| Fail | 5,704 | 1,226 |
-| Skipped (modules, proposals) | 1,405 | 101 |
-| Pass rate of the files that run | 74.6% | 90.4% |
+| Pass | 20,966 | 11,599 |
+| Fail | 1,461 | 1,227 |
+| Skipped (modules, proposals) | 1,405 | 110 |
+| Pass rate of the files that run | 93.5% | 90.4% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
 `Test262:AsyncTestComplete`. That moved about 4,650 `test/language` files
-from skipped to run, most of which need async generators or `for await`
-(about 4,350); before it, 16,150 of 17,773 run files passed (90.9%).
+from skipped to run, most of which needed async generators or `for await`
+(about 4,350); before it, 16,150 of 17,773 run files passed (90.9%), and
+16,723 of 22,427 after it until async generators landed.
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -153,7 +154,9 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
 The built-ins gate runs the `test/built-ins` directories of the library areas
 installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
 Date, Error, FinalizationRegistry, Function, GeneratorFunction,
-GeneratorPrototype, Iterator, JSON, Map, Math, NativeErrors, Number,
+GeneratorPrototype, Promise, AggregateError, AsyncFunction,
+AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
+prototypes, Iterator, JSON, Map, Math, NativeErrors, Number,
 Object, Reflect, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
@@ -167,8 +170,7 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 
 Most `test/language` failures are not interpreter bugs yet:
 
-- About 3,780 files need async generators and 570 `for await` (JS-08).
-- About 410 are module files reached through async ones, and 240 need
+- About 440 are dynamic `import()` files (modules, JS-06), and 240 need
   regular expressions.
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
@@ -411,8 +413,29 @@ calls a function value. The design is recorded in
     resumes the frame with the value or throws it. A catch-all handler
     rejects the promise on a throw, and `return` resolves it.
   - Unhandled rejections are not reported to the host yet (TD-109).
+- **Async generators and `for await`** (§27.6, §14.7.5): `async function*`
+  declarations, expressions and methods, `yield*` over async and sync
+  iterables, `for await`, `%AsyncGeneratorFunction%`,
+  `%AsyncIteratorPrototype%` and `%AsyncFromSyncIteratorPrototype%`
+  (`builtins/async_generator.rs`).
+  - An async generator is a generator object whose record also holds its
+    queue of requests (16 bytes each). `next`, `throw` and `return` queue
+    a request with a new promise; if the generator is suspended, the
+    driver (`Agent::async_generator_run`) runs the body. Each `yield`
+    settles the head request and goes straight on to the next one if
+    another is waiting; an `await` suspends the frame like an async
+    function's, and its job resumes the driver. The end of the body
+    settles the remaining requests, awaiting the value of a `return`.
+  - The spec's awaits are compiled as `await` ops: on the operand of
+    `yield` and `return`, on a `return` sent into a `yield`, and on each
+    result of the inner iterator of `yield*` and `for await`. Closing a
+    `for await` early calls `return` and awaits it; after a throw its
+    errors are dropped.
+  - Test262: `test/language` went from 16,723 to 20,966 of 22,427 run
+    files (93.5%), and the four async iteration directories of
+    `test/built-ins` pass except two realm tests.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): async generators, `for await`, modules, regular
+  anything runs, TD-97): modules, regular
   expression literals and BigInt literals. Built-in constructors
   cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
   (TD-92).

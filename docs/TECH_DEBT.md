@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Async generators, `for await`, modules and RegExp literals are rejected by the bytecode compiler (generators and async functions paid) | Open, JS-06/JS-08 |
+| TD-97 | Deliberate | JS | Modules and RegExp literals are rejected by the bytecode compiler (generators, async functions and async generators paid) | Open, JS-06/JS-08 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
@@ -1375,15 +1375,14 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. Async generators and `for await`, modules and regular expression
-literals return `CompileError::Unsupported` with a span before any code
+calls. Modules and regular expression literals return `CompileError::Unsupported` with a span before any code
 runs, so a script either runs with correct semantics or not at all.
 
 Private names, object-literal `super`, tagged templates and optional calls
 were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
-(JS-08 part 1) and async functions with promises (JS-06 part 1) were paid
-the same day. Pay modules with JS-06; async generators, `for await` and
-RegExp with JS-08. Trigger: the Test262 runner (JS-07).
+(JS-08 part 1), async functions with promises (JS-06 part 1) and async
+generators with `for await` (JS-08 part 2) were paid the same day. Pay
+modules with JS-06 and RegExp with JS-08. Trigger: the Test262 runner (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 

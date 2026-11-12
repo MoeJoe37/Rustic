@@ -197,11 +197,18 @@ pub struct Intrinsics {
     pub aggregate_error_prototype: ObjectId,
     /// `%AsyncFunction.prototype%`, the prototype of async functions.
     pub async_function_prototype: ObjectId,
+    /// `%AsyncGeneratorFunction.prototype%`, the prototype of async
+    /// generator functions.
+    pub async_generator_function_prototype: ObjectId,
+    /// `%AsyncGeneratorPrototype%`.
+    pub async_generator_prototype: ObjectId,
+    /// `%AsyncFromSyncIteratorPrototype%`.
+    pub async_from_sync_iterator_prototype: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 30] {
+    pub(crate) fn all(&self) -> [ObjectId; 33] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -233,6 +240,9 @@ impl Intrinsics {
             self.promise_prototype,
             self.aggregate_error_prototype,
             self.async_function_prototype,
+            self.async_generator_function_prototype,
+            self.async_generator_prototype,
+            self.async_from_sync_iterator_prototype,
         ]
     }
 }
@@ -299,6 +309,9 @@ impl Agent {
                 promise_prototype: placeholder,
                 aggregate_error_prototype: placeholder,
                 async_function_prototype: placeholder,
+                async_generator_function_prototype: placeholder,
+                async_generator_prototype: placeholder,
+                async_from_sync_iterator_prototype: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -371,6 +384,9 @@ impl Agent {
             promise_prototype: object_prototype,
             aggregate_error_prototype: object_prototype,
             async_function_prototype: object_prototype,
+            async_generator_function_prototype: object_prototype,
+            async_generator_prototype: object_prototype,
+            async_from_sync_iterator_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

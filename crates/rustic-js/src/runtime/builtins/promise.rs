@@ -96,6 +96,19 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
 
 /// `AsyncFunction(...params, body)` (§27.7.1.1).
 fn async_function(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let default = agent.intrinsics.async_function_prototype;
+    dynamic_function(agent, args, "async function", default)
+}
+
+/// CreateDynamicFunction (§20.2.1.1.1) for a constructor of the given
+/// kind: `keyword` starts the function expression, and `default` is the
+/// prototype when `new.target` is the constructor itself.
+pub(super) fn dynamic_function(
+    agent: &mut Agent,
+    args: &[Value],
+    keyword: &str,
+    default: ObjectId,
+) -> JsResult<Value> {
     let (params, body) = match args.split_last() {
         None => (&[][..], None),
         Some((body, params)) => (params, Some(*body)),
@@ -112,11 +125,9 @@ fn async_function(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value
         }
         None => String::new(),
     };
-    let f =
-        agent.create_dynamic_function("async function", &parameter_text.join(","), &body_text)?;
+    let f = agent.create_dynamic_function(keyword, &parameter_text.join(","), &body_text)?;
     if let (Some(target), Some(o)) = (agent.new_target(), f.as_object()) {
         if agent.active_function() != Some(target) {
-            let default = agent.intrinsics.async_function_prototype;
             let prototype = prototype_from_new_target(agent, default)?;
             agent.set_prototype_of(o, Some(prototype));
         }
@@ -254,7 +265,7 @@ fn resolving_functions(agent: &mut Agent, promise: ObjectId) -> JsResult<(Value,
 }
 
 /// A built-in function with `slots` captured values (all undefined).
-fn closure(
+pub(super) fn closure(
     agent: &mut Agent,
     behavior: NativeFn,
     name: &str,
@@ -277,7 +288,7 @@ fn set_captures(agent: &mut Agent, f: ObjectId, values: &[Value]) {
     }
 }
 
-fn captures(agent: &Agent, f: ObjectId) -> Box<[Value]> {
+pub(super) fn captures(agent: &Agent, f: ObjectId) -> Box<[Value]> {
     match agent.heap.object(f).internal() {
         Some(Internal::Captures(c)) => c.clone(),
         _ => Box::new([]),
@@ -291,7 +302,7 @@ fn set_capture(agent: &mut Agent, f: ObjectId, index: usize, value: Value) {
 }
 
 /// The running built-in closure.
-fn me(agent: &Agent) -> ObjectId {
+pub(super) fn me(agent: &Agent) -> ObjectId {
     agent
         .active_function()
         .expect("a built-in closure is running")
@@ -329,10 +340,10 @@ fn reject_function(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Valu
 /// A PromiseCapability Record; `resolve` undefined means the promise is
 /// an intrinsic one settled directly.
 #[derive(Clone, Copy)]
-struct Capability {
-    promise: Value,
-    resolve: Value,
-    reject: Value,
+pub(super) struct Capability {
+    pub(super) promise: Value,
+    pub(super) resolve: Value,
+    pub(super) reject: Value,
 }
 
 /// `NewPromiseCapability(C)` (§27.2.1.5).
@@ -375,7 +386,7 @@ fn capability_executor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<
 }
 
 impl Capability {
-    fn resolve(self, agent: &mut Agent, value: Value) -> JsResult<()> {
+    pub(super) fn resolve(self, agent: &mut Agent, value: Value) -> JsResult<()> {
         if self.resolve == Value::UNDEFINED {
             let promise = self.promise.as_object().expect("an intrinsic promise");
             resolve_promise(agent, promise, value)
@@ -386,7 +397,7 @@ impl Capability {
         }
     }
 
-    fn reject(self, agent: &mut Agent, reason: Value) -> JsResult<()> {
+    pub(super) fn reject(self, agent: &mut Agent, reason: Value) -> JsResult<()> {
         if self.resolve == Value::UNDEFINED {
             let promise = self.promise.as_object().expect("an intrinsic promise");
             settle(agent, promise, reason, false);
@@ -431,7 +442,7 @@ impl Capability {
 
 /// `PerformPromiseThen(promise, onFulfilled, onRejected, capability)`
 /// (§27.2.5.4.1).
-fn perform_then(
+pub(super) fn perform_then(
     agent: &mut Agent,
     promise: ObjectId,
     on_fulfilled: Value,
@@ -526,7 +537,7 @@ pub(crate) fn new_intrinsic_promise(agent: &mut Agent) -> JsResult<ObjectId> {
 }
 
 /// `PromiseResolve(C, x)` (§27.2.4.7.1).
-fn promise_resolve(agent: &mut Agent, c: Value, x: Value) -> JsResult<Value> {
+pub(super) fn promise_resolve(agent: &mut Agent, c: Value, x: Value) -> JsResult<Value> {
     if is_promise(agent, x) {
         let o = x.as_object().expect("a promise is an object");
         let constructor = agent.get(o, PropertyKey::String(agent.names.constructor))?;

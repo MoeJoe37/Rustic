@@ -166,6 +166,17 @@ enum ControlKind {
     /// A `for-of` loop body: exits close the iterator, except a
     /// `continue` of the loop itself (the control at `owner`).
     Iterator { iterator: Reg, owner: usize },
+    /// The same for the async iterator of a `for await`: closing awaits
+    /// the result of `return`.
+    AsyncIterator { iterator: Reg, owner: usize },
+}
+
+/// Which loop `for_in_of` compiles.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ForKind {
+    In,
+    Of,
+    AwaitOf,
 }
 
 #[derive(Debug)]
@@ -304,8 +315,9 @@ impl<'a, 't> Gen<'a, 't> {
             self.emit(Op::Undefined { dst: r });
         }
         self.emit(Op::Return { src: r });
-        if self.is_async {
+        if self.is_async && !self.generator {
             // Everything after `AsyncStart` rejects the promise on a throw.
+            // (An async generator's driver settles its requests instead.)
             let landing = self.here();
             let exception = self.temp()?;
             self.handlers.push(Handler {
@@ -370,7 +382,9 @@ impl<'a, 't> Gen<'a, 't> {
             | Op::JumpUnlessInt { target: t, .. }
             | Op::Loop { target: t }
             | Op::ForInNext { done: t, .. }
-            | Op::IteratorStep { done: t, .. } => *t = target,
+            | Op::IteratorStep { done: t, .. }
+            | Op::AsyncDelegate { missing: t, .. }
+            | Op::AsyncIteratorReturn { missing: t, .. } => *t = target,
             other => unreachable!("not a jump: {other:?}"),
         }
     }
@@ -585,9 +599,6 @@ impl<'a, 't> Gen<'a, 't> {
         for s in body {
             if let StatementKind::Function(f) = &s.kind {
                 let Some(id) = &f.id else { continue };
-                if f.is_async && f.is_generator {
-                    return Err(CompileError::Unsupported("async generators", f.span));
-                }
                 let mark = self.mark();
                 let r = self.temp()?;
                 self.function_expression(f, r, None, FunctionKind::Normal)?;
@@ -1648,9 +1659,6 @@ impl<'a, 't> Gen<'a, 't> {
         name_hint: Option<&str>,
         kind: FunctionKind,
     ) -> CResult<()> {
-        if f.is_async && f.is_generator {
-            return Err(CompileError::Unsupported("async generators", f.span));
-        }
         let scope = self.tree.scope_of(f).expect("functions are analyzed");
         let name = match (&f.id, name_hint) {
             (Some(id), _) => self.atom_id(&id.name)?,
@@ -1675,7 +1683,7 @@ impl<'a, 't> Gen<'a, 't> {
             g.generator = f.is_generator;
             g.is_async = f.is_async;
             g.guard()?;
-            if g.is_async {
+            if g.is_async && !g.generator {
                 g.emit(Op::AsyncStart);
             }
             if kind == FunctionKind::ClassConstructor {
@@ -1911,6 +1919,167 @@ impl<'a, 't> Gen<'a, 't> {
         Ok(())
     }
 
+    /// `dst = await src` in generated code: a rejection is thrown.
+    fn emit_await(&mut self, src: Reg, dst: Reg) -> CResult<()> {
+        let mark = self.mark();
+        let mode = self.temp()?;
+        self.emit(Op::Await { src, dst, mode });
+        let resume = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 0,
+            target: 0,
+        });
+        self.emit(Op::Throw { src: dst });
+        self.patch_here(resume);
+        self.release(mark);
+        Ok(())
+    }
+
+    /// After a `yield` in an async generator resumes: as [`resumption`],
+    /// but a `return` awaits its value first, and a rejection of that
+    /// becomes a throw at the `yield` (AsyncGeneratorUnwrapYieldResumption,
+    /// §27.6.3.7).
+    ///
+    /// [`resumption`]: Self::resumption
+    fn async_resumption(&mut self, value: Reg, mode: Reg) -> CResult<()> {
+        let resume = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 0,
+            target: 0,
+        });
+        let close = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 2,
+            target: 0,
+        });
+        self.emit(Op::Throw { src: value });
+        self.patch_here(close);
+        self.emit_await(value, value)?;
+        self.emit_exit(Exit::Return, Some(value))?;
+        self.patch_here(resume);
+        Ok(())
+    }
+
+    /// `yield* argument` in an async generator (§15.5.5 with
+    /// generatorKind async): the inner iterator is an async one (or a
+    /// sync one wrapped), each of its results is awaited, and its values
+    /// are yielded without awaiting them again.
+    fn async_yield_delegate(&mut self, argument: &Expression, dst: Reg) -> CResult<()> {
+        let mark = self.mark();
+        let iterator = self.temps(2)?;
+        let received = self.temp()?;
+        self.expr(argument, received)?;
+        self.emit(Op::GetAsyncIterator {
+            iterator,
+            src: received,
+        });
+        self.emit(Op::Undefined { dst: received });
+        let mode = self.temp()?;
+        self.emit(Op::Int {
+            dst: mode,
+            value: 0,
+        });
+        let result = self.temp()?;
+        let done = self.temp()?;
+        let await_mode = self.temp()?;
+        let top = self.here();
+        let delegate = self.emit(Op::AsyncDelegate {
+            dst: result,
+            iterator,
+            value: received,
+            mode,
+            missing: 0,
+        });
+        self.emit_await(result, result)?;
+        self.emit(Op::RequireObject { src: result });
+        self.get_named(done, result, "done")?;
+        let finished = self.emit(Op::JumpIfTrue {
+            cond: done,
+            target: 0,
+        });
+        self.get_named(received, result, "value")?;
+        self.emit(Op::Yield {
+            src: received,
+            dst: received,
+            mode,
+            raw: false,
+        });
+        // A `return` sent in is awaited before it is passed on; if that
+        // rejects, the rejection is passed on as a throw.
+        let is_return = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 2,
+            target: 0,
+        });
+        let next = self.jump();
+        self.patch_here(is_return);
+        self.emit(Op::Await {
+            src: received,
+            dst: received,
+            mode: await_mode,
+        });
+        let fulfilled = self.emit(Op::JumpIfInt {
+            a: await_mode,
+            value: 0,
+            target: 0,
+        });
+        self.emit(Op::Int {
+            dst: mode,
+            value: 1,
+        });
+        self.patch_here(fulfilled);
+        self.patch_here(next);
+        self.emit(Op::Loop { target: top });
+        // The inner iterator lacks the method.
+        self.patch_here(delegate);
+        let no_throw = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 1,
+            target: 0,
+        });
+        // No `return`: return the awaited value sent in.
+        self.emit_await(received, received)?;
+        self.emit_exit(Exit::Return, Some(received))?;
+        // No `throw`: the inner iterator was closed; await that, then
+        // report the broken protocol.
+        self.patch_here(no_throw);
+        self.emit_await(result, result)?;
+        self.emit(Op::NoThrowMethod);
+        self.patch_here(finished);
+        self.get_named(received, result, "value")?;
+        let close = self.emit(Op::JumpIfInt {
+            a: mode,
+            value: 2,
+            target: 0,
+        });
+        self.emit(Op::Move { dst, src: received });
+        let end = self.jump();
+        self.patch_here(close);
+        self.emit_await(received, received)?;
+        self.emit_exit(Exit::Return, Some(received))?;
+        self.patch_here(end);
+        self.release(mark);
+        Ok(())
+    }
+
+    /// AsyncIteratorClose (§7.4.13) for a normal exit from `for await`:
+    /// call `return`, await its result and require an object.
+    fn async_iterator_close(&mut self, iterator: Reg) -> CResult<()> {
+        let mark = self.mark();
+        let result = self.temp()?;
+        let missing = self.emit(Op::AsyncIteratorReturn {
+            dst: result,
+            iterator,
+            missing: 0,
+            silent: false,
+        });
+        self.emit_await(result, result)?;
+        self.emit(Op::RequireObject { src: result });
+        self.patch_here(missing);
+        self.release(mark);
+        Ok(())
+    }
+
     /// `yield* argument` (§15.5.5, sync generators): pass each `next`,
     /// `throw` and `return` on to the inner iterator and its results
     /// back out unchanged, until the inner iterator is done.
@@ -2045,7 +2214,7 @@ impl<'a, 't> Gen<'a, 't> {
                 body,
             )?,
             StatementKind::ForIn { left, right, body } => {
-                self.for_in_of(s, labels, left, right, body, false)?;
+                self.for_in_of(s, labels, left, right, body, ForKind::In)?;
             }
             StatementKind::ForOf {
                 left,
@@ -2053,10 +2222,12 @@ impl<'a, 't> Gen<'a, 't> {
                 body,
                 is_await,
             } => {
-                if *is_await {
-                    return Err(CompileError::Unsupported("for await", s.span));
-                }
-                self.for_in_of(s, labels, left, right, body, true)?;
+                let kind = if *is_await {
+                    ForKind::AwaitOf
+                } else {
+                    ForKind::Of
+                };
+                self.for_in_of(s, labels, left, right, body, kind)?;
             }
             StatementKind::While { test, body } => {
                 self.push_control(ControlKind::Loop, labels, true);
@@ -2094,6 +2265,10 @@ impl<'a, 't> Gen<'a, 't> {
                     None => {
                         self.emit(Op::Undefined { dst: r });
                     }
+                }
+                if self.is_async && self.generator && e.is_some() {
+                    // An async generator awaits what it returns.
+                    self.emit_await(r, r)?;
                 }
                 if self.kind == FunctionKind::DerivedConstructor {
                     // An object is returned as is; `undefined` means
@@ -2266,6 +2441,12 @@ impl<'a, 't> Gen<'a, 't> {
                         });
                     }
                 }
+                ControlKind::AsyncIterator { iterator, owner } => {
+                    if exit != Exit::Continue(*owner) {
+                        let iterator = *iterator;
+                        self.async_iterator_close(iterator)?;
+                    }
+                }
                 ControlKind::Loop | ControlKind::Breakable => {}
             }
         }
@@ -2402,8 +2583,10 @@ impl<'a, 't> Gen<'a, 't> {
         left: &ForHead,
         right: &Expression,
         body: &Statement,
-        of: bool,
+        kind: ForKind,
     ) -> CResult<()> {
+        let of = kind != ForKind::In;
+        let is_await = kind == ForKind::AwaitOf;
         let scope = self.tree.scope_of(s).expect("for-in/of is analyzed");
         // The right side sees the loop's lexical names in their TDZ; this
         // engine evaluates it outside the loop scope (TDZ violations there
@@ -2414,7 +2597,9 @@ impl<'a, 't> Gen<'a, 't> {
         // the for-in state otherwise.
         let iterator = self.temps(3)?;
         let next = iterator + 1;
-        if of {
+        if is_await {
+            self.emit(Op::GetAsyncIterator { iterator, src });
+        } else if of {
             self.emit(Op::GetIterator {
                 iterator,
                 next,
@@ -2433,14 +2618,41 @@ impl<'a, 't> Gen<'a, 't> {
         // exits. Model it as a loop whose exits close the iterator.
         self.push_control(ControlKind::Loop, labels, true);
         let loop_index = self.controls.len() - 1;
-        let kind = ControlKind::Iterator {
-            iterator,
-            owner: loop_index,
+        let kind = if is_await {
+            ControlKind::AsyncIterator {
+                iterator,
+                owner: loop_index,
+            }
+        } else {
+            ControlKind::Iterator {
+                iterator,
+                owner: loop_index,
+            }
         };
         let top = self.here();
         self.controls[loop_index].continue_target = Some(top);
         let value = self.temp()?;
-        let step = if of {
+        let step = if is_await {
+            // `value = (await next.call(iterator))`, checked, then its
+            // `done` and `value`.
+            self.emit(Op::Call {
+                dst: value,
+                callee: next,
+                this: iterator,
+                args: value,
+                argc: 0,
+            });
+            self.emit_await(value, value)?;
+            self.emit(Op::RequireObject { src: value });
+            let done = self.temp()?;
+            self.get_named(done, value, "done")?;
+            let step = self.emit(Op::JumpIfTrue {
+                cond: done,
+                target: 0,
+            });
+            self.get_named(value, value, "value")?;
+            step
+        } else if of {
             self.emit(Op::IteratorStep {
                 dst: value,
                 iterator,
@@ -2510,10 +2722,29 @@ impl<'a, 't> Gen<'a, 't> {
                 exception,
                 scope_depth: outer_depth,
             });
-            self.emit(Op::IteratorClose {
-                iterator,
-                silent: true,
-            });
+            if is_await {
+                // AsyncIteratorClose for a throw: `return` is called and
+                // awaited, but whatever it does, the exception stands.
+                let result = self.temp()?;
+                let missing = self.emit(Op::AsyncIteratorReturn {
+                    dst: result,
+                    iterator,
+                    missing: 0,
+                    silent: true,
+                });
+                let mode = self.temp()?;
+                self.emit(Op::Await {
+                    src: result,
+                    dst: result,
+                    mode,
+                });
+                self.patch_here(missing);
+            } else {
+                self.emit(Op::IteratorClose {
+                    iterator,
+                    silent: true,
+                });
+            }
             self.emit(Op::Throw { src: exception });
             Some(skip)
         } else {
@@ -3461,6 +3692,10 @@ impl<'a, 't> Gen<'a, 't> {
                         self.emit(Op::Undefined { dst: value });
                     }
                 }
+                if self.is_async {
+                    // An async generator yields the awaited value.
+                    self.emit_await(value, value)?;
+                }
                 let mode = self.temp()?;
                 self.emit(Op::Yield {
                     src: value,
@@ -3468,14 +3703,22 @@ impl<'a, 't> Gen<'a, 't> {
                     mode,
                     raw: false,
                 });
-                self.resumption(dst, mode)?;
+                if self.is_async {
+                    self.async_resumption(dst, mode)?;
+                } else {
+                    self.resumption(dst, mode)?;
+                }
             }
             ExpressionKind::Yield {
                 argument,
                 delegate: true,
             } => {
                 let argument = argument.as_deref().expect("yield* has an operand");
-                self.yield_delegate(argument, dst)?;
+                if self.is_async {
+                    self.async_yield_delegate(argument, dst)?;
+                } else {
+                    self.yield_delegate(argument, dst)?;
+                }
             }
             ExpressionKind::Await(argument) => {
                 let value = self.temp()?;

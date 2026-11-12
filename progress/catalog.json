@@ -3265,8 +3265,29 @@
             },
             {
               "label": "Async generators and for await",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "pub(crate) fn async_generator_run"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/async_generator.rs",
+                  "marker": "pub(crate) fn create_async_from_sync_iterator"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn async_generators_and_for_await"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn async_generators_and_their_queues_survive_collection"
+                }
+              ]
             },
             {
               "label": "BigInt arithmetic and literals",

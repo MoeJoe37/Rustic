@@ -380,7 +380,10 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
-                Some(Internal::Wrapped { iterator, next }) => {
+                Some(
+                    Internal::Wrapped { iterator, next }
+                    | Internal::AsyncFromSync { iterator, next },
+                ) => {
                     self.value(*iterator);
                     self.value(*next);
                 }
@@ -449,7 +452,9 @@ fn object_footprint(object: &Object) -> usize {
                 std::mem::size_of::<super::object::Helper>() + 8 * helper.items.len()
             }
             Some(Internal::Generator(generator)) => {
-                std::mem::size_of::<super::object::Generator>() + 8 * generator.registers.len()
+                std::mem::size_of::<super::object::Generator>()
+                    + 8 * generator.registers.len()
+                    + std::mem::size_of::<super::object::AsyncRequest>() * generator.queue.len()
             }
             Some(Internal::Promise(promise)) => {
                 std::mem::size_of::<super::object::PromiseRecord>()

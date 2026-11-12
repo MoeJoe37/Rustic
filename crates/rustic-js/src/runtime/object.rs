@@ -328,6 +328,9 @@ pub(crate) enum Internal {
     /// `[[Iterated]]` of a `%WrapForValidIteratorPrototype%` object from
     /// `Iterator.from`: the iterator and its `next` method.
     Wrapped { iterator: Value, next: Value },
+    /// `%AsyncFromSyncIteratorPrototype%` objects: the sync iterator and
+    /// its `next` method (§27.1.6).
+    AsyncFromSync { iterator: Value, next: Value },
     /// A generator object's suspended frame (§27.5), or an async
     /// function's while it awaits.
     Generator(Box<Generator>),
@@ -442,6 +445,22 @@ pub(crate) enum GeneratorState {
     SuspendedYield,
     Executing,
     Completed,
+    /// An async function or generator suspended in `await`: still
+    /// executing as far as the generator methods are concerned.
+    Awaiting,
+    /// An async generator settling its queue after it finished, waiting
+    /// for the promise of a `return(value)` request (`draining-queue`).
+    AwaitingReturn,
+}
+
+/// One `next`, `throw` or `return` call waiting on an async generator
+/// (an AsyncGeneratorRequest Record, §27.6.3.1): how it resumes, the
+/// value sent in and the intrinsic promise the call returned.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AsyncRequest {
+    pub mode: u8,
+    pub value: Value,
+    pub promise: ObjectId,
 }
 
 /// A generator's frame while it is not running: where it stopped and its
@@ -465,6 +484,10 @@ pub(crate) struct Generator {
     /// An async function's promise; undefined for a generator.
     pub promise: Value,
     pub registers: Box<[Value]>,
+    /// Whether this is an async generator, and its queue of requests;
+    /// the first one is the request being served.
+    pub async_generator: bool,
+    pub queue: std::collections::VecDeque<AsyncRequest>,
 }
 
 impl Generator {
@@ -473,6 +496,11 @@ impl Generator {
         [self.this, self.function, self.new_target, self.promise]
             .into_iter()
             .chain(self.registers.iter().copied())
+            .chain(
+                self.queue
+                    .iter()
+                    .flat_map(|r| [r.value, Value::object(r.promise)]),
+            )
     }
 }
 

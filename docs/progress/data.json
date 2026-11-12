@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "491c32b59217c5fef16d01fc78b303b5b0bf0c4b0fab1e7101133e593a008cbf",
-  "percent": "25.56",
+  "source_fingerprint": "d9bd57a36d9eab768d8c11884ae44bda7f2c756f6982665987c9fd4621bbe436",
+  "percent": "25.74",
   "verified_percent": "21.99",
-  "partial_percent": "3.57",
+  "partial_percent": "3.75",
   "completed": 55,
   "in_progress": 9,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 2,
       "total": 13,
-      "percent": "59.89",
+      "percent": "61.94",
       "verified_percent": "24.61",
-      "partial_percent": "35.28"
+      "partial_percent": "37.33"
     },
     {
       "id": "M5",
@@ -3585,8 +3585,29 @@
             },
             {
               "label": "Async generators and for await",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "pub(crate) fn async_generator_run"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/async_generator.rs",
+                  "marker": "pub(crate) fn create_async_from_sync_iterator"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn async_generators_and_for_await"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn async_generators_and_their_queues_survive_collection"
+                }
+              ]
             },
             {
               "label": "BigInt arithmetic and literals",
@@ -3604,7 +3625,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "50.00",
           "engine_share": "1.09"
         },
         {
@@ -3711,10 +3732,10 @@
       "completed": 2,
       "in_progress": 8,
       "total": 15,
-      "contribution": "5.60",
-      "percent": "56.06",
+      "contribution": "5.78",
+      "percent": "57.89",
       "verified_percent": "21.91",
-      "partial_percent": "34.15"
+      "partial_percent": "35.98"
     },
     {
       "id": "wasm",

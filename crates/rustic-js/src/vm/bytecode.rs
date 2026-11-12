@@ -403,6 +403,36 @@ pub enum Op {
     /// `iterator, iterator + 1 = GetIterator(src)` as a real iterator
     /// object and its `next` method (no array fast path).
     GetIteratorObject { iterator: Reg, src: Reg },
+    /// `iterator, iterator + 1 = GetIterator(src, async)`: the
+    /// `@@asyncIterator` method's result, or the sync iterator wrapped by
+    /// CreateAsyncFromSyncIterator, and its `next` method.
+    GetAsyncIterator { iterator: Reg, src: Reg },
+    /// One step of `yield*` in an async generator: call `next`, `throw`
+    /// or `return` (by `mode`) of `iterator` with `value` into `dst`, not
+    /// awaited yet. A missing `return` jumps to `missing`; a missing
+    /// `throw` calls `return` with no argument into `dst` and jumps to
+    /// `missing` (or throws a TypeError if that is missing too).
+    AsyncDelegate {
+        dst: Reg,
+        iterator: Reg,
+        value: Reg,
+        mode: Reg,
+        missing: u32,
+    },
+    /// Throw a TypeError if `src` is not an object (an iterator result).
+    RequireObject { src: Reg },
+    /// The TypeError of a `yield*` whose async iterator has no `throw`.
+    NoThrowMethod,
+    /// The call half of AsyncIteratorClose: `dst = iterator.return()`,
+    /// to be awaited, then forget the iterator. Jumps to `missing` when
+    /// there is no iterator or no `return` method; when `silent` (the
+    /// close after a throw) also when getting or calling it throws.
+    AsyncIteratorReturn {
+        dst: Reg,
+        iterator: Reg,
+        missing: u32,
+        silent: bool,
+    },
 
     /// Start a for-in over `src`: `state` holds the object (undefined
     /// for null and undefined), `state + 1` an array of its enumerable

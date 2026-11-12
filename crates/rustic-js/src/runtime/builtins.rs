@@ -4,11 +4,12 @@
 //! global object. The full library is JS-05.
 
 mod array;
+pub(crate) mod async_generator;
 mod collections;
 mod date;
 mod error;
 mod function;
-mod generator;
+pub(crate) mod generator;
 mod global;
 mod iterator;
 mod json;
@@ -145,6 +146,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     iterator::install(agent)?;
     generator::install(agent)?;
     promise::install(agent)?;
+    async_generator::install(agent)?;
     reflect::install(agent)?;
 
     // Value properties of the global object (§19.1).

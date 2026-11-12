@@ -554,7 +554,9 @@ impl Agent {
             this,
             home: Value::UNDEFINED,
         })?;
-        let proto = if code.generator {
+        let proto = if code.generator && code.is_async {
+            self.intrinsics.async_generator_function_prototype
+        } else if code.generator {
             self.intrinsics.generator_function_prototype
         } else if code.is_async {
             self.intrinsics.async_function_prototype
@@ -1805,12 +1807,16 @@ impl Agent {
                     let state = frame!().generator;
                     let o = state.as_object().expect("await runs in an async function");
                     t!(crate::runtime::await_value(self, value, o));
-                    let promise = self.async_promise(state).expect("an async function");
+                    // An async generator has no promise of its own: its
+                    // driver settles the promises of its requests.
+                    let promise = self
+                        .async_promise(state)
+                        .map_or(Value::UNDEFINED, Value::object);
                     let frame = self.vm.frames.pop().expect("an async frame");
                     let registers = &self.vm.stack[base..base + usize::from(code.registers)];
                     if let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() {
                         g.registers.copy_from_slice(registers);
-                        g.state = GeneratorState::SuspendedYield;
+                        g.state = GeneratorState::Awaiting;
                         g.pc = pc as u32;
                         g.env = env;
                         g.depth = frame.depth;
@@ -1821,11 +1827,11 @@ impl Agent {
                         self.vm.yielded = true;
                     }
                     if self.vm.frames.len() == floor {
-                        return Ok(Flow::Done(Value::object(promise)));
+                        return Ok(Flow::Done(promise));
                     }
                     let caller = self.vm.frames.last().expect("a caller above the floor");
                     let slot = caller.base as usize + usize::from(frame.ret);
-                    self.vm.stack[slot] = Value::object(promise);
+                    self.vm.stack[slot] = promise;
                     return Ok(Flow::Switch);
                 }
                 Op::AsyncReject { src } => {
@@ -1902,6 +1908,53 @@ impl Agent {
                     let (it, next) = t!(self.get_iterator_object(source));
                     reg!(iterator) = it;
                     reg!(iterator + 1) = next;
+                }
+                Op::GetAsyncIterator { iterator, src } => {
+                    let source = reg!(src);
+                    let (it, next) = t!(self.get_async_iterator(source));
+                    reg!(iterator) = it;
+                    reg!(iterator + 1) = next;
+                }
+                Op::AsyncDelegate {
+                    dst,
+                    iterator,
+                    value,
+                    mode,
+                    missing,
+                } => {
+                    let (it, next) = (reg!(iterator), reg!(iterator + 1));
+                    let (received, mode) = (reg!(value), reg!(mode));
+                    match t!(self.async_delegate_step(it, next, received, mode)) {
+                        AsyncDelegated::Called(result) => reg!(dst) = result,
+                        AsyncDelegated::NoReturn => jump!(missing),
+                        AsyncDelegated::NoThrow(closing) => {
+                            reg!(dst) = closing;
+                            jump!(missing);
+                        }
+                    }
+                }
+                Op::RequireObject { src } => {
+                    if reg!(src).as_object().is_none() {
+                        t!(self.type_error::<()>("iterator result is not an object"));
+                    }
+                }
+                Op::NoThrowMethod => {
+                    t!(self.type_error::<()>("the delegated iterator has no throw method"));
+                }
+                Op::AsyncIteratorReturn {
+                    dst,
+                    iterator,
+                    missing,
+                    silent,
+                } => {
+                    let it = reg!(iterator);
+                    reg!(iterator) = Value::UNDEFINED;
+                    match self.async_iterator_return(it) {
+                        Ok(Some(result)) => reg!(dst) = result,
+                        Ok(None) => jump!(missing),
+                        Err(Abrupt::Throw(_)) if silent => jump!(missing),
+                        Err(e) => t!(Err(e)),
+                    }
                 }
 
                 Op::ForInStart { state, src } => {
@@ -2614,9 +2667,11 @@ impl Agent {
         );
         let f = function.as_object().expect("a generator runs a function");
         let prototype = self.get(f, PropertyKey::String(self.names.prototype))?;
-        let prototype = prototype
-            .as_object()
-            .unwrap_or(self.intrinsics.generator_prototype);
+        let prototype = prototype.as_object().unwrap_or(if code.is_async {
+            self.intrinsics.async_generator_prototype
+        } else {
+            self.intrinsics.generator_prototype
+        });
         let registers: Box<[Value]> =
             self.vm.stack[base..base + usize::from(code.registers)].into();
         self.heap.charge(
@@ -2637,6 +2692,8 @@ impl Agent {
             resume: None,
             promise: Value::UNDEFINED,
             registers,
+            async_generator: code.is_async,
+            queue: std::collections::VecDeque::new(),
         })));
         Ok(Value::object(self.heap.alloc_object(object)?))
     }
@@ -2657,8 +2714,7 @@ impl Agent {
         // the method's receiver and arguments by the caller's registers.
         // Then the body collects at its safe points, so a long-running
         // generator does not grow the heap unchecked.
-        let collectable = std::mem::take(&mut self.vm.native_from_safe_site)
-            && self.vm.native_depth == self.vm.collect_floor + 1;
+        let collectable = self.resume_is_collectable();
         let (value, yielded) = self.resume_frame(o, mode, value, collectable)?;
         if yielded {
             Ok(value)
@@ -2667,12 +2723,242 @@ impl Agent {
         }
     }
 
+    /// Whether the body a generator method resumes may collect at its
+    /// safe points: the method was called from a safe site at the
+    /// collectable level (see [`Agent::generator_resume`]). Call it first
+    /// thing in the method.
+    pub(crate) fn resume_is_collectable(&mut self) -> bool {
+        std::mem::take(&mut self.vm.native_from_safe_site)
+            && self.vm.native_depth == self.vm.collect_floor + 1
+    }
+
+    /// Run `f` with `value` held on the value stack, where the collector
+    /// sees it.
+    pub(crate) fn with_rooted<T>(&mut self, value: Value, f: impl FnOnce(&mut Self) -> T) -> T {
+        let at = self.vm.stack.len();
+        self.vm.stack.push(value);
+        let result = f(self);
+        self.vm.stack.truncate(at);
+        result
+    }
+
     /// Resume an async function suspended in `await` from a promise job
     /// at the host level: with the awaited value, or throwing it.
     pub(crate) fn async_resume(&mut self, o: ObjectId, throw: bool, value: Value) -> JsResult<()> {
         let collectable = self.vm.native_depth == self.vm.collect_floor;
-        self.resume_frame(o, u8::from(throw), value, collectable)
-            .map(drop)
+        let (async_generator, state) = match self.heap.object(o).internal() {
+            Some(Internal::Generator(g)) => (g.async_generator, g.state),
+            _ => unreachable!("an awaiting function or generator"),
+        };
+        if !async_generator {
+            return self
+                .resume_frame(o, u8::from(throw), value, collectable)
+                .map(drop);
+        }
+        if state == GeneratorState::AwaitingReturn {
+            // The value of a `return(value)` request to a finished
+            // generator has settled (the closures of
+            // AsyncGeneratorAwaitReturn, §27.6.3.9).
+            let completion = if throw { Err(value) } else { Ok(value) };
+            self.async_generator_complete_step(o, completion, true)?;
+            return self.async_generator_drain_queue(o);
+        }
+        self.async_generator_run(o, u8::from(throw), value, collectable)
+    }
+
+    /// Run an async generator's body for the request at the head of its
+    /// queue (AsyncGeneratorResume, §27.6.3.6) until it awaits, yields
+    /// with no other request waiting, or finishes. Each `yield` settles
+    /// the head request and serves the next one without suspending
+    /// (AsyncGeneratorYield, §27.6.3.8); the end settles the rest.
+    pub(crate) fn async_generator_run(
+        &mut self,
+        o: ObjectId,
+        mut mode: u8,
+        mut value: Value,
+        collectable: bool,
+    ) -> JsResult<()> {
+        loop {
+            match self.resume_frame(o, mode, value, collectable) {
+                Ok((result, true)) => {
+                    let g = generator_mut(self, o);
+                    if g.state == GeneratorState::Awaiting {
+                        return Ok(());
+                    }
+                    // Executing while the request settles: a `next` from
+                    // a `then` getter only queues.
+                    g.state = GeneratorState::Executing;
+                    let request = g.queue.pop_front().expect("a request being served");
+                    crate::runtime::resolve_promise(self, request.promise, result)?;
+                    let g = generator_mut(self, o);
+                    match g.queue.front() {
+                        Some(next) => (mode, value) = (next.mode, next.value),
+                        None => {
+                            g.state = GeneratorState::SuspendedYield;
+                            return Ok(());
+                        }
+                    }
+                }
+                Ok((result, false)) => {
+                    self.async_generator_complete_step(o, Ok(result), true)?;
+                    return self.async_generator_drain_queue(o);
+                }
+                Err(Abrupt::Throw(error)) => {
+                    self.async_generator_complete_step(o, Err(error), true)?;
+                    return self.async_generator_drain_queue(o);
+                }
+                Err(other) => return Err(other),
+            }
+        }
+    }
+
+    /// Mark a generator finished and drop what its frame held. An async
+    /// generator stays `AwaitingReturn` (draining its queue) until its
+    /// queue is empty.
+    pub(crate) fn finish_generator(&mut self, o: ObjectId) {
+        let g = generator_mut(self, o);
+        g.state = if g.async_generator {
+            GeneratorState::AwaitingReturn
+        } else {
+            GeneratorState::Completed
+        };
+        g.registers = Box::new([]);
+        g.this = Value::UNDEFINED;
+        g.new_target = Value::UNDEFINED;
+    }
+
+    /// AsyncGeneratorCompleteStep (§27.6.3.4): settle the head request
+    /// with a value (as `{value, done}`) or an error.
+    pub(crate) fn async_generator_complete_step(
+        &mut self,
+        o: ObjectId,
+        completion: Result<Value, Value>,
+        done: bool,
+    ) -> JsResult<()> {
+        let g = generator_mut(self, o);
+        // Settling runs script (a `then` getter on the result): the
+        // generator counts as busy meanwhile, so new requests only queue.
+        if g.state == GeneratorState::Completed {
+            g.state = GeneratorState::AwaitingReturn;
+        }
+        let request = g.queue.pop_front().expect("a request to complete");
+        match completion {
+            Ok(value) => {
+                let result = iterator_result(self, value, done)?;
+                crate::runtime::resolve_promise(self, request.promise, result)
+            }
+            Err(error) => {
+                crate::runtime::reject_promise(self, request.promise, error);
+                Ok(())
+            }
+        }
+    }
+
+    /// AsyncGeneratorDrainQueue (§27.6.3.10) of a finished generator:
+    /// `next` requests get `{undefined, done: true}`, `throw` requests
+    /// their error, and a `return` request waits for its value.
+    pub(crate) fn async_generator_drain_queue(&mut self, o: ObjectId) -> JsResult<()> {
+        loop {
+            let g = generator_mut(self, o);
+            let Some(request) = g.queue.front().copied() else {
+                g.state = GeneratorState::Completed;
+                return Ok(());
+            };
+            g.state = GeneratorState::AwaitingReturn;
+            match request.mode {
+                crate::runtime::RESUME_RETURN => return self.async_generator_await_return(o),
+                crate::runtime::RESUME_THROW => {
+                    self.async_generator_complete_step(o, Err(request.value), true)?;
+                }
+                _ => self.async_generator_complete_step(o, Ok(Value::UNDEFINED), true)?,
+            }
+        }
+    }
+
+    /// AsyncGeneratorAwaitReturn (§27.6.3.9): await the value of the
+    /// `return` request at the head of a finished generator's queue; the
+    /// reaction comes back through [`Agent::async_resume`].
+    pub(crate) fn async_generator_await_return(&mut self, o: ObjectId) -> JsResult<()> {
+        let g = generator_mut(self, o);
+        g.state = GeneratorState::AwaitingReturn;
+        let value = g.queue.front().expect("a return request").value;
+        match crate::runtime::await_value(self, value, o) {
+            Ok(()) => Ok(()),
+            Err(Abrupt::Throw(error)) => {
+                self.async_generator_complete_step(o, Err(error), true)?;
+                self.async_generator_drain_queue(o)
+            }
+            Err(other) => Err(other),
+        }
+    }
+
+    /// `GetIterator(value, async)` (§7.4.3): `@@asyncIterator`, or the
+    /// sync iterator wrapped by CreateAsyncFromSyncIterator (§27.1.6.1).
+    fn get_async_iterator(&mut self, source: Value) -> JsResult<(Value, Value)> {
+        let key = PropertyKey::Symbol(self.symbols.async_iterator);
+        let iterator = match self.get_method(source, key)? {
+            Some(method) => self.call(method, source, &[])?,
+            None => {
+                let (iterator, next) = self.get_iterator_object(source)?;
+                crate::runtime::create_async_from_sync_iterator(self, iterator, next)?
+            }
+        };
+        let Some(object) = iterator.as_object() else {
+            return self.type_error("async iterator is not an object");
+        };
+        let next = self.get(object, PropertyKey::String(self.names.next))?;
+        Ok((iterator, next))
+    }
+
+    /// One call of `yield*` in an async generator (§15.5.5 step 7 with
+    /// generatorKind async), before the result is awaited.
+    fn async_delegate_step(
+        &mut self,
+        iterator: Value,
+        next: Value,
+        received: Value,
+        mode: Value,
+    ) -> JsResult<AsyncDelegated> {
+        let mode = mode.as_number().unwrap_or(0.0);
+        if mode == 0.0 {
+            self.vm.safe_site = true;
+            let result = self.call(next, iterator, &[received]);
+            self.vm.safe_site = false;
+            return result.map(AsyncDelegated::Called);
+        }
+        let name = if mode == 1.0 { "throw" } else { "return" };
+        let key = self.heap.key(name)?;
+        match self.get_method(iterator, key)? {
+            Some(method) => {
+                // `method` is unrooted, but nothing uses it after the call.
+                self.vm.safe_site = true;
+                let result = self.call(method, iterator, &[received]);
+                self.vm.safe_site = false;
+                result.map(AsyncDelegated::Called)
+            }
+            None if mode == 1.0 => {
+                // The protocol is broken: close the inner iterator (its
+                // result is awaited by the caller), then report it.
+                match self.async_iterator_return(iterator)? {
+                    Some(result) => Ok(AsyncDelegated::NoThrow(result)),
+                    None => self.type_error("the delegated iterator has no throw method"),
+                }
+            }
+            None => Ok(AsyncDelegated::NoReturn),
+        }
+    }
+
+    /// `iterator.return()` for AsyncIteratorClose, unawaited; `None` when
+    /// there is no iterator or no `return` method.
+    fn async_iterator_return(&mut self, iterator: Value) -> JsResult<Option<Value>> {
+        if iterator == Value::UNDEFINED {
+            return Ok(None);
+        }
+        let key = PropertyKey::String(self.names.return_);
+        let Some(method) = self.get_method(iterator, key)? else {
+            return Ok(None);
+        };
+        self.call(method, iterator, &[]).map(Some)
     }
 
     /// Run the suspended frame of `o` until it yields, awaits or finishes;
@@ -2741,13 +3027,7 @@ impl Agent {
         self.vm.collect_floor = outer_floor;
         let yielded = std::mem::take(&mut self.vm.yielded);
         if !(yielded && result.is_ok()) {
-            if let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() {
-                g.state = GeneratorState::Completed;
-                // Drop what the finished frame held.
-                g.registers = Box::new([]);
-                g.this = Value::UNDEFINED;
-                g.new_target = Value::UNDEFINED;
-            }
+            self.finish_generator(o);
         }
         result.map(|v| (v, yielded))
     }
@@ -2802,6 +3082,8 @@ impl Agent {
             resume: None,
             promise: Value::object(promise),
             registers: vec![Value::UNDEFINED; count].into_boxed_slice(),
+            async_generator: false,
+            queue: std::collections::VecDeque::new(),
         })));
         Ok(Value::object(self.heap.alloc_object(object)?))
     }
@@ -3114,5 +3396,24 @@ fn number_binary(op: BinOp, x: f64, y: f64) -> Value {
         // `in` and `instanceof` need an object on the right; the caller
         // routes them to the slow path, which throws.
         BinOp::In | BinOp::Instanceof => Value::UNDEFINED,
+    }
+}
+
+/// What one `yield*` call on an async iterator did.
+enum AsyncDelegated {
+    /// The method was called; its result is to be awaited.
+    Called(Value),
+    /// There is no `return` method.
+    NoReturn,
+    /// There is no `throw` method; this is the result of closing the
+    /// iterator, to be awaited before the TypeError.
+    NoThrow(Value),
+}
+
+/// The generator record of `o`, which the caller knows is a generator.
+fn generator_mut(agent: &mut Agent, o: ObjectId) -> &mut Generator {
+    match agent.heap.object_mut(o).internal_mut() {
+        Some(Internal::Generator(g)) => g,
+        _ => unreachable!("a generator object"),
     }
 }

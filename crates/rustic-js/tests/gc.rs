@@ -821,3 +821,36 @@ fn awaiting_async_functions_and_queued_jobs_survive_collection() {
     let out = a.evaluate("out").unwrap();
     assert_eq!(a.display(out), "kept!");
 }
+
+#[test]
+fn async_generators_and_their_queues_survive_collection() {
+    let mut a = agent();
+    // The generator awaits a promise only `release` resolves; the
+    // requests queued behind it hold the only references to their values
+    // and promises.
+    a.evaluate(
+        "var out = ''; var release; \
+         async function* g() { var local = { v: 'kept' }; var x = await new Promise(r => { release = r }); \
+             var y = yield local.v + x.v; yield y.v } \
+         var it = g(); it.next().then(r => { out += r.value }); \
+         it.next({ v: '+sent' }).then(r => { out += r.value }); \
+         it.next().then(r => { out += r.done }); it = null; \
+         (async () => { for await (var v of [{ v: '|wrapped' }]) out += v.v })();",
+    )
+    .unwrap();
+    a.collect_garbage(Roots::default());
+    a.run_jobs().unwrap();
+    a.evaluate("release({ v: '!' })").unwrap();
+    for _ in 0..2 {
+        a.evaluate(
+            "var junk = []; for (var i = 0; i < 2000; i++) junk.push({ i: i }); junk = null",
+        )
+        .unwrap();
+        a.collect_garbage(Roots::default());
+    }
+    a.heap.set_gc_stress(true);
+    a.run_jobs().unwrap();
+    a.heap.set_gc_stress(false);
+    let out = a.evaluate("out").unwrap();
+    assert_eq!(a.display(out), "|wrappedkept!+senttrue");
+}

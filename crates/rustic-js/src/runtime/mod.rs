@@ -24,6 +24,8 @@ pub use agent::{
     Abrupt, Agent, ErrorKind, Intrinsics, JsResult, Names, NativeFn, WellKnownSymbols,
 };
 pub use bigint::BigInt;
+pub(crate) use builtins::async_generator::create_async_from_sync_iterator;
+pub(crate) use builtins::generator::{RESUME_RETURN, RESUME_THROW};
 pub(crate) use builtins::iterator_result;
 pub(crate) use builtins::promise::{
     await_value, new_intrinsic_promise, reject_promise, resolve_promise,

@@ -91,14 +91,23 @@ impl Agent {
         f: ObjectId,
         attributes: Attributes,
     ) -> JsResult<Value> {
-        let generator = self
-            .heap
-            .closure(f)
-            .is_some_and(|closure| self.heap.code(closure.code).generator);
+        let (generator, is_async) = match self.heap.closure(f) {
+            Some(closure) => {
+                let code = self.heap.code(closure.code);
+                (code.generator, code.is_async)
+            }
+            None => (false, false),
+        };
         let prototype = if generator {
             // A generator function's `prototype` inherits from
-            // %GeneratorPrototype% and has no `constructor` (§15.5.3).
-            self.new_object_with(Some(self.intrinsics.generator_prototype))?
+            // %GeneratorPrototype% (%AsyncGeneratorPrototype%) and has no
+            // `constructor` (§15.5.3, §15.6.3).
+            let parent = if is_async {
+                self.intrinsics.async_generator_prototype
+            } else {
+                self.intrinsics.generator_prototype
+            };
+            self.new_object_with(Some(parent))?
         } else {
             let prototype = self.new_object()?;
             let constructor = PropertyKey::String(self.names.constructor);

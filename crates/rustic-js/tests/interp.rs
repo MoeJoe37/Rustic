@@ -1825,11 +1825,7 @@ fn arrays_math_symbols_and_dynamic_functions() {
 
 #[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in [
-        "async function* g() {}",
-        "/x/",
-        "async function f() { for await (var x of []); }",
-    ] {
+    for source in ["/x/", "import('m')"] {
         let mut agent = Agent::new().expect("agent");
         assert!(
             matches!(agent.evaluate(source), Err(EvalError::Compile(_))),
@@ -2343,4 +2339,69 @@ fn promises_and_async_functions() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn async_generators_and_for_await() {
+    let cases = [
+        // Requests queue while the body runs and settle in order.
+        (
+            "var out = []; async function* g() { out.push('start'); var x = yield 1; out.push('x' + x); \
+               try { yield await Promise.resolve(2) } finally { out.push('fin') } return 3 } \
+             var it = g(); for (var i = 0; i < 4; i++) it.next(i).then(r => out.push(r.value + ':' + r.done)); \
+             out.push('sync')",
+            "start | sync | x1 | 1:false | fin | 2:false | 3:true | undefined:true",
+        ),
+        // for await over sync iterables awaits each value; over an async
+        // generator it awaits each result.
+        (
+            "var out = []; async function* g() { yield 1; yield 2; return 3 } \
+             (async () => { var s = ''; for await (var v of [1, Promise.resolve(2), 3]) s += v; \
+               for await (var w of g()) s += w; out.push(s) })()",
+            "12312",
+        ),
+        // yield* delegates to async and sync iterables; its value is the
+        // inner return value.
+        (
+            "var out = []; async function* g() { yield 1; yield 2; return 3 } \
+             async function* d() { out.push('r' + (yield* g())); yield* [7, 8] } \
+             (async () => { for await (var v of d()) out.push(v) })()",
+            "1 | 2 | r3 | 7 | 8",
+        ),
+        // return() and throw() on a generator that has not started.
+        (
+            "var out = []; async function* g() { out.push('ran') } \
+             g().return(Promise.resolve(9)).then(r => out.push('ret ' + r.value + r.done)); \
+             g().throw(new Error('boom')).catch(e => out.push('thr ' + e.message)); \
+             g().next.call({}).catch(e => out.push(e.name))",
+            "thr boom | TypeError | ret 9true",
+        ),
+        // Leaving a for await closes the iterator and awaits its return().
+        (
+            "var out = []; async function* g() { try { yield 1; yield 2 } finally { out.push('closed') } } \
+             (async () => { for await (var v of g()) { out.push(v); break } out.push('after') })()",
+            "1 | closed | after",
+        ),
+        // A throw out of the body rejects the request; later ones settle done.
+        (
+            "var out = []; async function* g() { yield 1; throw 'e' } var it = g(); \
+             it.next(); it.next().catch(e => out.push('c' + e)); it.next().then(r => out.push(r.done))",
+            "ce | true",
+        ),
+        (
+            "var out = []; async function* g() {} var p = Object.getPrototypeOf(g); \
+             out.push(Object.getPrototypeOf(g()) === g.prototype, \
+               Object.getPrototypeOf(g.prototype) === p.prototype, p[Symbol.toStringTag], \
+               p.constructor('yield 5')().next() instanceof Promise, \
+               typeof Object.getPrototypeOf(p.prototype)[Symbol.asyncIterator])",
+            "true | true | AsyncGeneratorFunction | true | function",
+        ),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(
+            run_with_jobs(source, "out.join(' | ')"),
+            expected,
+            "{source}"
+        );
+    }
 }

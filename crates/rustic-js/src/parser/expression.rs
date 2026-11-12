@@ -964,6 +964,14 @@ impl Parser<'_> {
                 Ok(expr(kind, span))
             }
             TokenKind::RegExp { body, flags } => {
+                // §22.2.3.1: an invalid pattern is an early error.
+                let parsed_flags = crate::regexp::Flags::parse(flags.encode_utf16())
+                    .expect("the lexer checked the flags");
+                if let Err(e) = crate::regexp::Regex::validate(body, parsed_flags) {
+                    return Err(
+                        self.error(span, format!("invalid regular expression: {}", e.message))
+                    );
+                }
                 let kind = ExpressionKind::RegExp {
                     body: body.clone(),
                     flags: flags.clone(),

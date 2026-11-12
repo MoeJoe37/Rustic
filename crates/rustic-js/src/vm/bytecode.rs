@@ -419,6 +419,9 @@ pub enum Op {
         mode: Reg,
         missing: u32,
     },
+    /// `dst = a new RegExp` from the constants `pattern` and `flags` of a
+    /// literal (RegExpCreate, §13.2.7.3).
+    RegExp { dst: Reg, pattern: u32, flags: u32 },
     /// Throw a TypeError if `src` is not an object (an iterator result).
     RequireObject { src: Reg },
     /// The TypeError of a `yield*` whose async iterator has no `throw`.

@@ -97,10 +97,10 @@ serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
 `rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing with 20 targets (`rustic-fuzz list`): HTML tokenizer, document and
+fuzzing with 21 targets (`rustic-fuzz list`): HTML tokenizer, document and
 fragment parsers; CSS syntax, selectors, cascade, media queries and incremental
 restyling; anonymous flow normalization; paint/raster; PNG, JPEG, GIF and WebP
-decoding; font parsing and shaping; the JavaScript parser, heap and interpreter; and URLs, with seed replay,
+decoding; font parsing and shaping; the JavaScript parser, heap, interpreter and regular expressions; and URLs, with seed replay,
 minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
 campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
 cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a
@@ -155,3 +155,9 @@ agents with a step budget: with inline caches, without them, and with a
 collection at every safe point. The outcomes must agree (out-of-memory
 excepted for the collecting run) and each agent must still evaluate script
 afterwards.
+
+The 21st target, `js-regexp`, reads a flags byte, a pattern and a subject.
+`Regex::validate` must accept exactly the patterns `Regex::new` compiles or
+reports as unsupported, every capture must lie inside the subject, and the
+subject must match the same way stored as Latin-1 and as UTF-16. A poll
+budget cancels exponential patterns.

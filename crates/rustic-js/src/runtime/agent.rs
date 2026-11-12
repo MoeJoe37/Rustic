@@ -204,11 +204,17 @@ pub struct Intrinsics {
     pub async_generator_prototype: ObjectId,
     /// `%AsyncFromSyncIteratorPrototype%`.
     pub async_from_sync_iterator_prototype: ObjectId,
+    /// `%RegExp%`.
+    pub regexp: ObjectId,
+    /// `%RegExp.prototype%`.
+    pub regexp_prototype: ObjectId,
+    /// `%RegExpStringIteratorPrototype%`.
+    pub regexp_string_iterator_prototype: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 33] {
+    pub(crate) fn all(&self) -> [ObjectId; 36] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -243,9 +249,19 @@ impl Intrinsics {
             self.async_generator_function_prototype,
             self.async_generator_prototype,
             self.async_from_sync_iterator_prototype,
+            self.regexp,
+            self.regexp_prototype,
+            self.regexp_string_iterator_prototype,
         ]
     }
 }
+
+/// A compiled pattern kept for reuse: (source, flags, program).
+pub(crate) type RegExpCacheEntry = (
+    Vec<u16>,
+    crate::regexp::Flags,
+    std::rc::Rc<crate::regexp::Regex>,
+);
 
 /// One agent with one realm.
 #[derive(Debug)]
@@ -262,6 +278,9 @@ pub struct Agent {
     pub(crate) global_env: EnvId,
     /// The interpreter's stack and frames.
     pub(crate) vm: VmState,
+    /// Recently compiled patterns, most recent last, so a pattern built
+    /// in a loop is parsed and compiled once.
+    pub(crate) regexp_cache: Vec<RegExpCacheEntry>,
 }
 
 impl Agent {
@@ -312,9 +331,13 @@ impl Agent {
                 async_generator_function_prototype: placeholder,
                 async_generator_prototype: placeholder,
                 async_from_sync_iterator_prototype: placeholder,
+                regexp: placeholder,
+                regexp_prototype: placeholder,
+                regexp_string_iterator_prototype: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
+            regexp_cache: Vec::new(),
         };
         agent.create_intrinsics().map_err(|_| OutOfMemory)?;
         let global = agent.intrinsics.global;
@@ -387,6 +410,9 @@ impl Agent {
             async_generator_function_prototype: object_prototype,
             async_generator_prototype: object_prototype,
             async_from_sync_iterator_prototype: object_prototype,
+            regexp: object_prototype,
+            regexp_prototype: object_prototype,
+            regexp_string_iterator_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

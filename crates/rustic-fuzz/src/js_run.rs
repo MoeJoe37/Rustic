@@ -168,6 +168,14 @@ impl Target for JsRunTarget {
             b"Promise.resolve(",
             b".then(",
             b"out += ",
+            b"/(a|b)*c/g",
+            b"(?<n>",
+            b"\\k<n>",
+            b"(?=",
+            b"(?<!",
+            b"[^",
+            b".exec(",
+            b".replace(",
         ]
     }
 

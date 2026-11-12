@@ -1825,7 +1825,7 @@ fn arrays_math_symbols_and_dynamic_functions() {
 
 #[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in ["/x/", "import('m')"] {
+    for source in ["/\\p{L}/u", "import('m')"] {
         let mut agent = Agent::new().expect("agent");
         assert!(
             matches!(agent.evaluate(source), Err(EvalError::Compile(_))),
@@ -2404,4 +2404,84 @@ fn async_generators_and_for_await() {
             "{source}"
         );
     }
+}
+
+#[test]
+fn regular_expressions() {
+    let cases = [
+        ("/a(b)?c/.exec('xac').join()", "ac,"),
+        (
+            "/(?<y>\\d{4})-(?<m>\\d\\d)/.exec('on 2026-11').groups.m",
+            "11",
+        ),
+        ("'aBc'.replace(/b/i, '[$&]')", "a[B]c"),
+        ("'a1b22c333'.replace(/\\d+/g, m => m.length)", "a1b2c3"),
+        ("'x-y_z'.split(/[-_]/).join('|')", "x|y|z"),
+        ("'one two'.match(/\\w+/g).join()", "one,two"),
+        (
+            "[...'a1b2'.matchAll(/\\d/g)].map(m => m.index).join()",
+            "1,3",
+        ),
+        ("'hello'.search(/l+/)", "2"),
+        ("/^b/m.test('a\\nb')", "true"),
+        ("/a.c/s.test('a\\nc')", "true"),
+        ("var r = /o/g; r.exec('foo'); r.lastIndex", "2"),
+        ("/(?<=\\$)\\d+/.exec('cost $42')[0]", "42"),
+        ("/\\u{1F600}/u.test('\\u{1F600}')", "true"),
+        ("/^.$/u.test('\\u{1F600}')", "true"),
+        ("/^.$/.test('\\u{1F600}')", "false"),
+        ("/[\\p{L}--[a-z]]/v.source", "!!"),
+        ("new RegExp('a+', 'gi').flags", "gi"),
+        ("String(/a\\/b/)", "/a\\/b/"),
+        ("RegExp.prototype.toString.call(/x/y)", "/x/y"),
+        ("/(a)|b/d.exec('b').indices[1]", "undefined"),
+        // Found by Test262: a negated class is closed under case before it
+        // is complemented, `\w` follows modifier groups, `escape` uses
+        // `\x` below 0x100, and RegExps have their own toString tag.
+        ("/[^o]t\\b/i.exec('pilOt soviet').index", "10"),
+        ("/(?i:[^ab])c/.test('Ac')", "false"),
+        ("/(?-i:\\w)/ui.test('\\u017f')", "false"),
+        ("/\\w/ui.test('\\u017f')", "true"),
+        ("RegExp.escape('\\u00a0')", "\\xa0"),
+        ("Object.prototype.toString.call(/x/)", "[object RegExp]"),
+        ("'aaa'.replaceAll('a', 'b')", "bbb"),
+        ("'aaa'.replaceAll(/a/g, '$$')", "$$$"),
+        (
+            "try { 'a'.replaceAll(/a/, '') } catch (e) { e.constructor.name }",
+            "TypeError",
+        ),
+        (
+            "try { new RegExp('(') } catch (e) { e.constructor.name }",
+            "SyntaxError",
+        ),
+    ];
+    for (source, expected) in cases {
+        let got = run(source);
+        if expected == "!!" {
+            assert!(
+                got.starts_with('!'),
+                "{source}: expected an error, got {got}"
+            );
+        } else {
+            assert_eq!(got, expected, "{source}");
+        }
+    }
+}
+
+/// Exponential backtracking has no cap of its own, as in other engines;
+/// the step budget and cancellation reach into the matcher.
+#[test]
+fn runaway_regular_expressions_are_cancellable() {
+    let mut agent = Agent::new().expect("agent");
+    // Each unit of budget covers a slice of matcher steps.
+    agent.set_step_budget(Some(100));
+    assert_eq!(
+        agent.evaluate("/(a+)+b/.test('a'.repeat(40))"),
+        Err(EvalError::Cancelled)
+    );
+    agent.set_step_budget(None);
+    assert_eq!(
+        run_in(&mut agent, "/(a+)+b/.test('a'.repeat(8) + 'b')"),
+        "true"
+    );
 }

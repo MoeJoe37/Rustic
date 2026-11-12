@@ -18,6 +18,7 @@ mod number_object;
 mod object;
 pub(crate) mod promise;
 mod reflect;
+pub(crate) mod regexp;
 mod string_object;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
@@ -148,6 +149,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     promise::install(agent)?;
     async_generator::install(agent)?;
     reflect::install(agent)?;
+    regexp::install(agent)?;
 
     // Value properties of the global object (§19.1).
     let global = i.global;
@@ -418,6 +420,7 @@ pub(crate) fn object_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> J
                 Class::Number => "Number",
                 Class::String => "String",
                 Class::Date => "Date",
+                _ if regexp::is_regexp_object(agent, o) => "RegExp",
                 _ => "Object",
             }
         }

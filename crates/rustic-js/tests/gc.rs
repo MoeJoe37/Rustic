@@ -854,3 +854,29 @@ fn async_generators_and_their_queues_survive_collection() {
     let out = a.evaluate("out").unwrap();
     assert_eq!(a.display(out), "|wrappedkept!+senttrue");
 }
+
+#[test]
+fn regexps_and_their_iterators_survive_collection() {
+    let mut a = agent();
+    // The iterator holds the only references to its RegExp and string;
+    // the RegExp holds its source and flags.
+    a.evaluate(
+        "var it = 'a1b22c333'.matchAll(new RegExp('\\\\d+', 'g')); \
+         var re = new RegExp('(?<w>[a-z])' + 'x?', 'gi'); var first = it.next().value[0];",
+    )
+    .unwrap();
+    for _ in 0..2 {
+        a.evaluate("var junk = []; for (var i = 0; i < 2000; i++) junk.push(/x/g); junk = null")
+            .unwrap();
+        a.collect_garbage(Roots::default());
+    }
+    a.heap.set_gc_stress(true);
+    let out = a
+        .evaluate(
+            "first + [...it].map(m => m[0]).join() + re.source + re.flags + \
+             'XbY'.replace(re, '<$<w>>')",
+        )
+        .unwrap();
+    a.heap.set_gc_stress(false);
+    assert_eq!(a.display(out), "122,333(?<w>[a-z])x?gi<X><b><Y>");
+}

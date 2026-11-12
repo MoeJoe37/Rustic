@@ -9,8 +9,8 @@ garbage collector (see [Garbage collection](#garbage-collection-js-03)).
 JS-04 compiles scripts to bytecode and runs them (see
 [Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
 generators (JS-08 part 1), promises with a job queue and async functions
-(JS-06 part 1) and async generators with `for await` (JS-08 part 2); modules
-and regular expressions do not run yet.
+(JS-06 part 1), async generators with `for await` (JS-08 part 2) and
+regular expressions (JS-08 part 3); modules do not run yet.
 
 ## API
 
@@ -91,8 +91,9 @@ RUSTIC_TEST262_DIR=/path/to/test262 \
   cargo test --release -p rustic-js --test test262 -- --ignored
 ```
 
-At that revision 22,956 of 23,123 files pass (99.3%). All 167 expected
-failures are RegExp pattern early errors (TD-88). 709 files using proposal
+At that revision all 23,123 files pass. The 167 expected failures there
+were RegExp pattern early errors until the pattern parser paid TD-88, so
+the list is empty. 709 files using proposal
 features are skipped and counted separately (TD-89). The gate fails on any new
 failure and on any expected failure that starts passing, so the list stays
 exact. To regenerate it, run
@@ -126,17 +127,18 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 20,966 | 11,599 |
-| Fail | 1,461 | 1,227 |
+| Pass | 21,220 | 13,175 |
+| Fail | 1,207 | 1,547 |
 | Skipped (modules, proposals) | 1,405 | 110 |
-| Pass rate of the files that run | 93.5% | 90.4% |
+| Pass rate of the files that run | 94.6% | 89.5% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
 `Test262:AsyncTestComplete`. That moved about 4,650 `test/language` files
 from skipped to run, most of which needed async generators or `for await`
 (about 4,350); before it, 16,150 of 17,773 run files passed (90.9%), and
-16,723 of 22,427 after it until async generators landed.
+16,723 of 22,427 after it until async generators landed, and 20,966
+until RegExp landed.
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -157,7 +159,7 @@ Date, Error, FinalizationRegistry, Function, GeneratorFunction,
 GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
 prototypes, Iterator, JSON, Map, Math, NativeErrors, Number,
-Object, Reflect, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
+Object, Reflect, RegExp, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
 
@@ -170,8 +172,7 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 
 Most `test/language` failures are not interpreter bugs yet:
 
-- About 440 are dynamic `import()` files (modules, JS-06), and 240 need
-  regular expressions.
+- About 440 are dynamic `import()` files (modules, JS-06).
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
 - Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
@@ -181,8 +182,9 @@ Most `test/language` failures are not interpreter bugs yet:
   and `arguments` properties.
 
 In the built-ins, the failures are mostly proposals not implemented yet
-(about 170 of the 217 `Iterator` failures), or tests that reach for
-`RegExp`, `Proxy`, Temporal, typed arrays or `$262`. Skipped files are never
+(about 170 of the 217 `Iterator` failures), Unicode property escapes
+(about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
+`Proxy`, Temporal, typed arrays or `$262`. Skipped files are never
 counted as passing. Module files join with JS-06 module loading (TD-105).
 
 ## Fuzzing
@@ -195,6 +197,11 @@ stack, that syntax error spans lie inside the source, that a successful parse
 dumps deterministically, and that anything valid in strict mode is valid in
 sloppy mode. Seeds are one snippet per line of
 `crates/rustic-fuzz/corpus/js-parse/`.
+
+The `js-regexp` target reads a flags byte, a pattern and a subject. It
+checks that `Regex::validate` and `Regex::new` agree, that every capture lies
+inside the subject, and that the subject matches the same way stored as
+Latin-1 and as UTF-16; a poll budget cancels exponential patterns.
 
 ## Runtime data model (JS-02)
 
@@ -434,9 +441,48 @@ calls a function value. The design is recorded in
   - Test262: `test/language` went from 16,723 to 20,966 of 22,427 run
     files (93.5%), and the four async iteration directories of
     `test/built-ins` pass except two realm tests.
+- **Regular expressions** (JS-08 part 3, §22.2): `crates/rustic-js/src/regexp/`
+  is the engine and `builtins/regexp.rs` the library.
+  - The pattern parser covers the whole ES2025 grammar: Annex B in sloppy
+    patterns, named groups (duplicates in separate alternatives), lookbehind,
+    `v`-mode class set operations and `\q{}` strings, and modifier groups
+    such as `(?i:…)`. The script parser validates every literal with it,
+    so an invalid pattern is an early SyntaxError (TD-88 paid). Nesting
+    deeper than 256 is a SyntaxError rather than a deep recursion.
+  - Patterns compile to a small instruction list run by a backtracking
+    matcher with explicit choice and trail stacks, so no pattern recurses
+    in Rust. Loops over one character are a single instruction; counted
+    loops keep their counters in registers and stop on empty iterations as
+    §22.2.2.3.1 requires. Lookbehind compiles the same nodes to match
+    backwards.
+  - Case-insensitive matching closes each character class under the
+    spec's `Canonicalize` once, at compile time, from the standard
+    library's case tables: upper case without `u`, and simple case folding
+    with `u` or `v`.
+  - The matcher reads Latin-1 and UTF-16 strings in place, without copying.
+    It polls the step budget and the cancellation token every 16,384
+    steps, so a runaway pattern is stopped like a runaway loop; it can still
+    take exponential time until then (TD-111). Its stacks are capped and
+    overflowing them throws a RangeError.
+  - The agent keeps the last 32 compiled patterns, so `new RegExp(s)` in a
+    loop compiles once.
+  - The library: the constructor with `RegExp.escape`, `exec`, `test`,
+    `toString`, `compile`, the flag getters, `flags`, `source`, the five
+    `Symbol` methods with `lastIndex` and `d`-flag indices, species, and
+    `%RegExpStringIteratorPrototype%`. String `match`, `matchAll`,
+    `replace`, `replaceAll`, `search` and `split` go through them.
+  - Unicode property escapes (`\p{…}`) parse but do not compile yet
+    (TD-110): a literal using one is rejected before the script runs.
+  - Test262: `test/built-ins/RegExp` passes 1,224 of 1,879 files; apart
+    from property escapes the failures need `$262` realms or a `print`
+    global. `test/language` went from 20,966 to 21,220. Four bugs it found
+    are covered by `regular_expressions` in `tests/interp.rs` and fixed: a
+    negated class under `i` was complemented before its case closure,
+    `\w` ignored modifier groups, `RegExp.escape` wrote `\u00a0` for
+    `\xa0`, and `Object.prototype.toString` did not know RegExps.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): modules, regular
-  expression literals and BigInt literals. Built-in constructors
+  anything runs, TD-97): modules, BigInt literals and regular expression
+  literals that use a property escape (TD-110). Built-in constructors
   cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
   (TD-92).
 - **Calls** never recurse in Rust between script functions: frames and
@@ -555,8 +601,8 @@ Part 2 adds the rest of the everyday library, beginning with:
     surrogates are kept.
   - `match`, `matchAll`, `replace`, `replaceAll`, `search` and `split` call an
     object argument's `Symbol.match`/`replace`/`search`/`split` method.
-  - A string pattern for `match`, `matchAll` or `search` needs RegExp
-    (JS-08) and throws a TypeError until then.
+  - A string pattern for `match`, `matchAll` or `search` is made into a
+    RegExp, as the spec says.
   - `normalize` is missing (TD-107).
 - **JSON.** `parse` with a reviver and `stringify` with replacer functions,
   property lists, indentation, `toJSON` and cycle detection.

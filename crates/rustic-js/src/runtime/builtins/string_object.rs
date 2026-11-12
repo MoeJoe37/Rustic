@@ -131,16 +131,7 @@ fn find(haystack: &[u16], needle: &[u16], from: usize) -> Option<usize> {
     (from..=haystack.len() - needle.len()).find(|&i| haystack[i..].starts_with(needle))
 }
 
-/// `IsRegExp(argument)` (§7.2.6): an object whose `Symbol.match` is
-/// truthy. No RegExp objects exist yet to carry `[[RegExpMatcher]]`.
-fn is_regexp(agent: &mut Agent, value: Value) -> JsResult<bool> {
-    let Some(o) = value.as_object() else {
-        return Ok(false);
-    };
-    let key = PropertyKey::Symbol(agent.symbols.match_);
-    let matcher = agent.get(o, key)?;
-    Ok(matcher != Value::UNDEFINED && agent.to_boolean(matcher))
-}
+use super::regexp::is_regexp;
 
 /// A clamped position argument: `ToIntegerOrInfinity` clamped to
 /// [0, length], or `default` when undefined.
@@ -590,10 +581,16 @@ fn delegate(
     }
 }
 
-fn needs_regexp<T>(agent: &mut Agent, name: &str) -> JsResult<T> {
-    agent.type_error(&format!(
-        "String.prototype.{name} with a string pattern needs RegExp, which is not supported yet"
-    ))
+/// `RegExpCreate(pattern, flags)` then `Invoke(rx, symbol, «ToString(this)»)`.
+fn via_regexp(
+    agent: &mut Agent,
+    this: Value,
+    pattern: Value,
+    flags: Option<&str>,
+    symbol: crate::runtime::SymbolId,
+) -> JsResult<Value> {
+    let s = agent.to_string(this)?;
+    super::regexp::create_and_invoke(agent, pattern, flags, symbol, Value::string(s))
 }
 
 fn match_(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
@@ -602,7 +599,7 @@ fn match_(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     if let Some(result) = delegate(agent, arg(args, 0), symbol, &[this])? {
         return Ok(result);
     }
-    needs_regexp(agent, "match")
+    via_regexp(agent, this, arg(args, 0), None, symbol)
 }
 
 fn match_all(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
@@ -622,7 +619,7 @@ fn match_all(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
     if let Some(result) = delegate(agent, regexp, symbol, &[this])? {
         return Ok(result);
     }
-    needs_regexp(agent, "matchAll")
+    via_regexp(agent, this, regexp, Some("g"), symbol)
 }
 
 fn search(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
@@ -631,7 +628,7 @@ fn search(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     if let Some(result) = delegate(agent, arg(args, 0), symbol, &[this])? {
         return Ok(result);
     }
-    needs_regexp(agent, "search")
+    via_regexp(agent, this, arg(args, 0), None, symbol)
 }
 
 /// `GetSubstitution` (§22.1.3.19.1) with no captures.

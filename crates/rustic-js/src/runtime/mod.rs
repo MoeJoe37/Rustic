@@ -30,6 +30,7 @@ pub(crate) use builtins::iterator_result;
 pub(crate) use builtins::promise::{
     await_value, new_intrinsic_promise, reject_promise, resolve_promise,
 };
+pub(crate) use builtins::regexp::regexp_create_literal;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
 pub(crate) use env::{BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT};

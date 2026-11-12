@@ -1933,6 +1933,17 @@ impl Agent {
                         }
                     }
                 }
+                Op::RegExp {
+                    dst,
+                    pattern,
+                    flags,
+                } => {
+                    let (pattern, flags) = (
+                        code.constants[pattern as usize],
+                        code.constants[flags as usize],
+                    );
+                    reg!(dst) = t!(crate::runtime::regexp_create_literal(self, pattern, flags));
+                }
                 Op::RequireObject { src } => {
                     if reg!(src).as_object().is_none() {
                         t!(self.type_error::<()>("iterator result is not an object"));
@@ -2721,6 +2732,17 @@ impl Agent {
         } else {
             iterator_result(self, value, true)
         }
+    }
+
+    /// The cancellation token and the step budget, for a long native
+    /// loop (the RegExp matcher) that polls them itself; it hands the
+    /// budget back with [`Agent::set_steps_left`].
+    pub(crate) fn poll_state(&self) -> (Option<CancellationToken>, Option<u64>) {
+        (self.vm.cancel.clone(), self.vm.steps_left)
+    }
+
+    pub(crate) fn set_steps_left(&mut self, left: Option<u64>) {
+        self.vm.steps_left = left;
     }
 
     /// Whether the body a generator method resumes may collect at its

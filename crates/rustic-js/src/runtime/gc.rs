@@ -382,7 +382,17 @@ impl Marker<'_> {
                 }
                 Some(
                     Internal::Wrapped { iterator, next }
-                    | Internal::AsyncFromSync { iterator, next },
+                    | Internal::AsyncFromSync { iterator, next }
+                    | Internal::RegExp {
+                        source: iterator,
+                        flags: next,
+                        ..
+                    }
+                    | Internal::RegExpStringIterator {
+                        regexp: iterator,
+                        string: next,
+                        ..
+                    },
                 ) => {
                     self.value(*iterator);
                     self.value(*next);
@@ -462,6 +472,7 @@ fn object_footprint(object: &Object) -> usize {
                         * (promise.fulfill_reactions.len() + promise.reject_reactions.len())
             }
             Some(Internal::Captures(values)) => 8 * values.len(),
+            Some(Internal::RegExp { matcher, .. }) => matcher.footprint(),
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()
             }

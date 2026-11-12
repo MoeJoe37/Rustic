@@ -3296,8 +3296,29 @@
             },
             {
               "label": "RegExp engine and literals (TD-88)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/regexp/vm.rs",
+                  "marker": "pub(crate) fn compile"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/regexp.rs",
+                  "marker": "fn builtin_exec"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn regular_expressions()"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn regexps_and_their_iterators_survive_collection"
+                }
+              ]
             },
             {
               "label": "Proxy",

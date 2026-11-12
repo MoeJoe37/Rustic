@@ -19,6 +19,7 @@ pub mod ast;
 mod error;
 mod lexer;
 mod parser;
+pub mod regexp;
 pub mod runtime;
 mod source;
 pub mod test262;

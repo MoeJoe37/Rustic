@@ -3513,8 +3513,22 @@ impl<'a, 't> Gen<'a, 't> {
                 let index = self.push_constant(Value::bigint(id));
                 self.emit(Op::Const { dst, index });
             }
-            ExpressionKind::RegExp { .. } => {
-                return Err(CompileError::Unsupported("regular expressions", e.span));
+            ExpressionKind::RegExp { body, flags } => {
+                // The parser checked the pattern; a valid one that uses
+                // something the matcher lacks is refused here.
+                let parsed = crate::regexp::Flags::parse(flags.encode_utf16())
+                    .expect("the lexer checked the flags");
+                if let Err(error) = crate::regexp::Regex::validate_supported(body, parsed) {
+                    return Err(CompileError::Unsupported(error.message, e.span));
+                }
+                let pattern = self.string(body)?;
+                let flag_units: Vec<u16> = flags.encode_utf16().collect();
+                let flags = self.string(&flag_units)?;
+                self.emit(Op::RegExp {
+                    dst,
+                    pattern,
+                    flags,
+                });
             }
             ExpressionKind::Template(t) => {
                 let first = t.quasis[0].cooked.clone().unwrap_or_default();

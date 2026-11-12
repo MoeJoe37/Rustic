@@ -119,7 +119,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-85 | Deliberate | Fonts | Backend caches, temporary memory and native/advanced font services | Open, M8/M9 |
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
 | TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
-| TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Open, JS-08 |
+| TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Paid |
 | TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, M4 |
 | TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
 | TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Modules and RegExp literals are rejected by the bytecode compiler (generators, async functions and async generators paid) | Open, JS-06/JS-08 |
+| TD-97 | Deliberate | JS | Modules are rejected by the bytecode compiler (generators, async functions, async generators and RegExp literals paid) | Open, JS-06 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
@@ -141,6 +141,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Open, JS-06 |
+| TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
+| TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1264,7 +1266,7 @@ Pay with reviewed locale resources, SA/phrase segmenters, language-specific
 hyphen replacement models and the M9 text conformance suites. Keep licenses,
 source revisions and bounded work/output accounting for each added resource.
 
-### TD-88 — RegExp patterns are not validated at parse time
+### TD-88 — RegExp patterns are not validated at parse time (Paid)
 
 The lexer finds the end of a regular expression literal and checks its flags
 (unknown or repeated flags, `u` with `v`), but the pattern itself is kept as
@@ -1277,6 +1279,10 @@ executes yet, so no invalid pattern can run.
 
 Pay with the RegExp pattern parser of JS-08, used both for early errors and
 for compiling patterns; the gate then fails until the list is emptied.
+
+Paid on 2026-11-12 by JS-08 part 3: the parser validates every literal
+with the pattern grammar (`regexp::Regex::validate`, Annex B included), and
+the expected-failures list is empty.
 
 ### TD-89 — Proposal syntax is unsupported
 
@@ -1375,14 +1381,15 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. Modules and regular expression literals return `CompileError::Unsupported` with a span before any code
-runs, so a script either runs with correct semantics or not at all.
+calls. Modules return `CompileError::Unsupported` with a span before any code
+runs, so a script either runs with correct semantics or not at all. So does
+a regular expression literal that uses a Unicode property escape (TD-110).
 
 Private names, object-literal `super`, tagged templates and optional calls
 were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
 (JS-08 part 1), async functions with promises (JS-06 part 1) and async
-generators with `for await` (JS-08 part 2) were paid the same day. Pay
-modules with JS-06 and RegExp with JS-08. Trigger: the Test262 runner (JS-07).
+generators with `for await` (JS-08 part 2) were paid the same day, and
+RegExp literals (JS-08 part 3) after them. Pay modules with JS-06. Trigger: the Test262 runner (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1538,3 +1545,34 @@ RejectPromise and PerformPromiseThen that the shell batches per
 microtask checkpoint (HTML §8.1.7.3). Trigger: the HTML event loop
 (JS-09 bindings) or the first console that reports page errors.
 
+### TD-110 — RegExp Unicode property escapes cannot run
+
+The pattern parser accepts `\p{…}` and `\P{…}` in `u` and `v` mode and the
+v-mode properties of strings, so such patterns are valid at parse time, but
+the engine carries no Unicode Character Database tables. Compiling one
+fails: a literal is a `CompileError::Unsupported`, and `new RegExp` throws a
+SyntaxError that says so. The Test262 files under
+`built-ins/RegExp/property-escapes` fail for this reason.
+
+Pay with: generated, range-compressed tables for General_Category, Script,
+Script_Extensions and the binary properties of ECMA-262 table 67-69,
+built by a tool from a pinned UCD (as the URL crate pins its IDNA
+data), and the sequence
+properties for `v`. Weigh the size against the binary budget; the
+tables are shared with rustic-text's segmentation data where they overlap.
+Trigger: the first page that fails on a property escape, or JS-08
+closing.
+
+### TD-111 — The RegExp matcher backtracks
+
+`regexp::vm` is a backtracking matcher, as in the other engines, so a
+pattern such as `/(a+)+b/` on a long run of `a`s takes exponential time.
+The choice and trail stacks are capped (`MAX_BACKTRACK`, a RangeError past
+it) so memory stays bounded, and the matcher polls the agent's step budget
+and cancellation token every 16,384 steps, so a page's runaway pattern is
+stopped like a runaway loop. Time is not otherwise bounded.
+
+Pay with: a linear-time fallback (a Pike VM or lazy DFA) for patterns with
+no backreferences or lookarounds, chosen when the backtracker exceeds a
+step count, as V8's experimental engine does. Trigger: a measured slow
+page or a ReDoS report.

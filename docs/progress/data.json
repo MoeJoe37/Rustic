@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d9bd57a36d9eab768d8c11884ae44bda7f2c756f6982665987c9fd4621bbe436",
-  "percent": "25.74",
+  "source_fingerprint": "9aac13a636e1c67fe135a782b6daf6361347901d2462d21c8f071dcfa7a9108d",
+  "percent": "25.92",
   "verified_percent": "21.99",
-  "partial_percent": "3.75",
+  "partial_percent": "3.93",
   "completed": 55,
   "in_progress": 9,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 2,
       "total": 13,
-      "percent": "61.94",
+      "percent": "63.99",
       "verified_percent": "24.61",
-      "partial_percent": "37.33"
+      "partial_percent": "39.38"
     },
     {
       "id": "M5",
@@ -3616,8 +3616,29 @@
             },
             {
               "label": "RegExp engine and literals (TD-88)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/regexp/vm.rs",
+                  "marker": "pub(crate) fn compile"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/regexp.rs",
+                  "marker": "fn builtin_exec"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn regular_expressions()"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn regexps_and_their_iterators_survive_collection"
+                }
+              ]
             },
             {
               "label": "Proxy",
@@ -3625,7 +3646,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "66.66",
           "engine_share": "1.09"
         },
         {
@@ -3732,10 +3753,10 @@
       "completed": 2,
       "in_progress": 8,
       "total": 15,
-      "contribution": "5.78",
-      "percent": "57.89",
+      "contribution": "5.97",
+      "percent": "59.72",
       "verified_percent": "21.91",
-      "partial_percent": "35.98"
+      "partial_percent": "37.81"
     },
     {
       "id": "wasm",

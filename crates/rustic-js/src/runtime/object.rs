@@ -331,6 +331,21 @@ pub(crate) enum Internal {
     /// `%AsyncFromSyncIteratorPrototype%` objects: the sync iterator and
     /// its `next` method (§27.1.6).
     AsyncFromSync { iterator: Value, next: Value },
+    /// A RegExp object's `[[RegExpMatcher]]`, `[[OriginalSource]]` and
+    /// `[[OriginalFlags]]` (strings).
+    RegExp {
+        matcher: std::rc::Rc<crate::regexp::Regex>,
+        source: Value,
+        flags: Value,
+    },
+    /// A `%RegExpStringIteratorPrototype%` object (§22.2.9).
+    RegExpStringIterator {
+        regexp: Value,
+        string: Value,
+        global: bool,
+        unicode: bool,
+        done: bool,
+    },
     /// A generator object's suspended frame (§27.5), or an async
     /// function's while it awaits.
     Generator(Box<Generator>),

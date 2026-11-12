@@ -176,13 +176,69 @@ pub enum Op {
     DeleteProp { dst: Reg, object: Reg, key: Reg },
     /// `CreateDataPropertyOrThrow(object, key, value)` (literals).
     DefineProp { object: Reg, key: Reg, value: Reg },
-    /// Define a getter (`setter == false`) or setter on a literal.
+    /// Define a getter (`setter == false`) or setter: enumerable on a
+    /// literal, not on a class.
     DefineAccessor {
         object: Reg,
         key: Reg,
         function: Reg,
         setter: bool,
+        enumerable: bool,
     },
+    /// Define a class method: a writable, configurable, non-enumerable
+    /// data property.
+    DefineMethod { object: Reg, key: Reg, value: Reg },
+    /// Wire up a class: `proto` becomes a new prototype object, whose
+    /// `constructor` is `ctor` and which `ctor.prototype` names. With
+    /// `derived`, `heritage` (a constructor or null) supplies the
+    /// prototypes of both; anything else throws a TypeError.
+    ClassSetup {
+        ctor: Reg,
+        heritage: Reg,
+        proto: Reg,
+        derived: bool,
+    },
+    /// `dst = src.[[GetPrototypeOf]]()`, or null.
+    GetPrototypeOf { dst: Reg, src: Reg },
+    /// `dst = object[key]` with `this` as the receiver (`super.key`);
+    /// `object` is the home object's prototype.
+    GetSuper {
+        dst: Reg,
+        object: Reg,
+        key: Reg,
+        this: Reg,
+    },
+    /// `object[key] = value` with `this` as the receiver
+    /// (`super.key = value`).
+    SetSuper {
+        object: Reg,
+        key: Reg,
+        value: Reg,
+        this: Reg,
+    },
+    /// `dst = Construct(callee, args, new_target)` (`super(...)`).
+    SuperCall {
+        dst: Reg,
+        callee: Reg,
+        new_target: Reg,
+        args: Reg,
+        argc: u16,
+    },
+    /// `dst = Construct(callee, ...array, new_target)`.
+    SuperCallSpread {
+        dst: Reg,
+        callee: Reg,
+        new_target: Reg,
+        array: Reg,
+    },
+    /// `dst = scope slot` without the TDZ check.
+    GetSlotRaw { dst: Reg, hops: u16, slot: u16 },
+    /// Throw a ReferenceError if `src` is initialized: `super()` ran
+    /// twice.
+    ThrowIfInit { src: Reg },
+    /// Throw a TypeError unless `src` is an object or undefined: the
+    /// result of a derived constructor.
+    DerivedResult { src: Reg },
     /// `dst = {}`
     NewObject { dst: Reg },
     /// `dst = []`
@@ -352,8 +408,35 @@ pub enum FunctionKind {
     Normal,
     /// Arrow functions: lexical `this`, not constructible.
     Arrow,
-    /// Object-literal methods, getters and setters: not constructible.
+    /// Object-literal and class methods, getters and setters: not
+    /// constructible.
     Method,
+    /// The constructor of a class without `extends`: only `new` may
+    /// call it.
+    ClassConstructor,
+    /// The constructor of a class with `extends`: `this` is bound by
+    /// `super()`.
+    DerivedConstructor,
+}
+
+impl FunctionKind {
+    /// Whether `new` accepts a function of this kind.
+    pub fn is_constructor(self) -> bool {
+        matches!(
+            self,
+            FunctionKind::Normal
+                | FunctionKind::ClassConstructor
+                | FunctionKind::DerivedConstructor
+        )
+    }
+
+    /// Whether this is a class constructor, which a plain call rejects.
+    pub fn is_class_constructor(self) -> bool {
+        matches!(
+            self,
+            FunctionKind::ClassConstructor | FunctionKind::DerivedConstructor
+        )
+    }
 }
 
 /// A compiled function.

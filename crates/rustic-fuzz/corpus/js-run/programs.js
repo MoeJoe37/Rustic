@@ -110,3 +110,15 @@ function F() {} var p = F.prototype; p === F.prototype && p.constructor === F
 function F() {} F.x = 1; var o = new F(); F.prototype.y = 2; o.y + F.x + (o instanceof F)
 function F() {} function g(f) { return f.prototype } g(F); F.prototype = {z: 3}; g(F).z + new F().z
 var fs = []; for (var i = 0; i < 50; i++) fs[i] = function () {}; var n = 0; for (var f of fs) { if (f.prototype.constructor === f) n++ } n
+class A { constructor(x) { this.x = x } get d() { return this.x * 2 } m() { return this.x + 1 } static s() { return 's' } } var a = new A(3); a.m() + a.d + A.s()
+class A { constructor(x) { this.x = x } m() { return 'A' + this.x } } class B extends A { constructor(x) { super(x * 2); this.y = 1 } m() { return 'B' + super.m() + this.y } } new B(2).m()
+class A { constructor(...a) { this.n = a.length } } class B extends A {} new B(1, 2, 3).n + (new B() instanceof A)
+class A {} class B extends A { constructor() { var init = () => super(); var get = () => this; init(); this.ok = get() === this } } new B().ok
+class A {} class B extends A { constructor() { this.x = 1; super() } } try { new B() } catch (e) { e.name }
+class A {} try { A() } catch (e) { e.name }
+class A { x = 1; y = this.x + 1; static n = 5; static { this.m = this.n + 1 } } var a = new A(); a.x + a.y + A.n + A.m
+class A { a = 1 } class B extends A { b = this.a + 1; get v() { return super.constructor === A } } var b = new B(); b.a + b.b + b.v
+var k = 'dyn'; class A { [k] = 1; static [k + 's'] = 2; [k + 'm']() { return 3 } } var a = new A(); a.dyn + A.dyns + a.dynm()
+class A { static s() { return 1 } } class B extends A { static s() { return super.s() + 1 } } class C extends B {} C.s() + (C.prototype instanceof A)
+try { class X extends X {} } catch (e) { e.name }
+var t = 0; class P { constructor(i) { this.i = i } get v() { return this.i } } for (var i = 0; i < 100; i++) t += new P(i).v; t

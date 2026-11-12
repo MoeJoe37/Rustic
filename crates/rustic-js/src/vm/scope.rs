@@ -12,9 +12,9 @@ use std::any::TypeId;
 use std::collections::HashMap;
 
 use crate::ast::{
-    Argument, ArrayElement, ArrowBody, ArrowFunction, Expression, ExpressionKind, ForHead, ForInit,
-    Function, MemberProperty, ObjectProperty, Pattern, PatternKind, PropertyKey, Statement,
-    StatementKind, VariableKind,
+    Argument, ArrayElement, ArrowBody, ArrowFunction, Class, ClassElement, Expression,
+    ExpressionKind, ForHead, ForInit, Function, MemberProperty, MethodKind, ObjectProperty,
+    Pattern, PatternKind, PropertyKey, Statement, StatementKind, VariableKind,
 };
 
 /// A scope in a [`ScopeTree`].
@@ -37,12 +37,39 @@ pub(crate) enum BindingKind {
     Arguments,
     /// A named function expression's own name (immutable).
     SelfName,
+    /// `this` of a derived class constructor: uninitialized until
+    /// `super()` returns, and shared with the arrow functions inside.
+    This,
+    /// `new.target` of a function whose arrow functions read it.
+    NewTarget,
+}
+
+/// The binding of a derived constructor's `this`. Reserved words cannot
+/// name script bindings, so these names never collide with one.
+pub(crate) const THIS: &str = "this";
+/// The binding of `new.target` for arrow functions.
+pub(crate) const NEW_TARGET: &str = "new.target";
+/// A class scope's binding of the class constructor itself, from which
+/// `super` finds the parent class and the home objects.
+pub(crate) const CLASS: &str = "super";
+/// A class scope's binding of the function that initializes the instance
+/// fields; `used` only when the class has any. `#` cannot start a script
+/// identifier.
+pub(crate) const FIELD_INIT: &str = "#init";
+
+/// The class-scope binding that keeps the computed key of the instance
+/// field at `index` in the class body from definition to construction.
+pub(crate) fn field_key_name(index: usize) -> String {
+    format!("#key{index}")
 }
 
 impl BindingKind {
     /// Whether reads need a temporal-dead-zone check.
     pub(crate) fn has_tdz(self) -> bool {
-        matches!(self, BindingKind::Let | BindingKind::Const)
+        matches!(
+            self,
+            BindingKind::Let | BindingKind::Const | BindingKind::This
+        )
     }
 }
 
@@ -82,6 +109,9 @@ pub(crate) struct Scope {
     pub bindings: Vec<Binding>,
     /// Strict code.
     pub strict: bool,
+    /// An arrow function's scope: `this` and `new.target` come from
+    /// outside.
+    pub arrow: bool,
 }
 
 impl Scope {
@@ -119,6 +149,8 @@ pub(crate) const ROLE_SELF: u8 = 0;
 pub(crate) const ROLE_BODY: u8 = 1;
 /// A `try` statement's `finally` block.
 pub(crate) const ROLE_FINALLY: u8 = 2;
+/// A class's instance field initializers, which run as one function.
+pub(crate) const ROLE_FIELDS: u8 = 3;
 
 fn node_key<T: 'static>(node: &T, role: u8) -> NodeKey {
     (std::ptr::from_ref(node) as usize, TypeId::of::<T>(), role)
@@ -140,6 +172,7 @@ impl ScopeTree {
         let mut r = Resolver {
             tree: ScopeTree::default(),
             stack: Vec::new(),
+            derived_constructor: false,
         };
         let script = r.open(ScopeKind::Script, None, strict);
         // Top-level declarations are globals, found by name; only block
@@ -167,6 +200,25 @@ impl ScopeTree {
         }
         Resolution::Dynamic
     }
+
+    /// Resolve one of the bindings the compiler makes itself ([`THIS`],
+    /// [`NEW_TARGET`], [`CLASS`]). They are lexical, so a `with` cannot
+    /// hide them; `this` and `new.target` stop at the nearest function
+    /// that is not an arrow function.
+    pub(crate) fn resolve_special(&self, scope: ScopeId, name: &str) -> Option<(ScopeId, usize)> {
+        let mut current = Some(scope);
+        while let Some(id) = current {
+            let s = &self.scopes[id];
+            if let Some(index) = s.find(name) {
+                return Some((id, index));
+            }
+            if s.kind == ScopeKind::Function && !s.arrow && matches!(name, THIS | NEW_TARGET) {
+                return None;
+            }
+            current = s.parent;
+        }
+        None
+    }
 }
 
 /// Where a name lives.
@@ -181,6 +233,8 @@ pub(crate) enum Resolution {
 struct Resolver {
     tree: ScopeTree,
     stack: Vec<ScopeId>,
+    /// The next function body is a derived class constructor.
+    derived_constructor: bool,
 }
 
 impl Resolver {
@@ -202,6 +256,7 @@ impl Resolver {
             function,
             bindings: Vec::new(),
             strict,
+            arrow: false,
         });
         if let Some(key) = key {
             self.tree.by_node.insert(key, id);
@@ -248,6 +303,136 @@ impl Resolver {
             }
             current = s.parent;
         }
+    }
+
+    /// Note a use of a compiler-made binding (see
+    /// [`ScopeTree::resolve_special`]). `new.target` is declared on demand
+    /// in the nearest non-arrow function when an arrow function reads it.
+    fn reference_special(&mut self, name: &'static str) {
+        let from = self.current();
+        let from_function = self.tree.scopes[from].function;
+        let mut current = Some(from);
+        while let Some(id) = current {
+            let s = &self.tree.scopes[id];
+            if let Some(index) = s.find(name) {
+                let crosses = s.function != from_function;
+                let binding = &mut self.tree.scopes[id].bindings[index];
+                binding.used = true;
+                binding.captured |= crosses;
+                return;
+            }
+            if s.kind == ScopeKind::Function && !s.arrow && matches!(name, THIS | NEW_TARGET) {
+                if name == NEW_TARGET && id != from_function {
+                    self.tree.scopes[id].bindings.push(Binding {
+                        name: name.into(),
+                        kind: BindingKind::NewTarget,
+                        captured: true,
+                        used: true,
+                    });
+                }
+                return;
+            }
+            current = s.parent;
+        }
+    }
+
+    /// A class: a scope for its own name and for the binding `super`
+    /// resolves through, then the heritage, keys and member functions.
+    fn class(&mut self, c: &Class) {
+        let scope = self.open(ScopeKind::Block, Some(node_key(c, ROLE_SELF)), true);
+        self.declare(scope, CLASS, BindingKind::Const);
+        if let Some(id) = &c.id {
+            self.declare(scope, &id.name, BindingKind::Const);
+        }
+        if let Some(heritage) = &c.super_class {
+            self.expression(heritage);
+        }
+        self.declare(scope, FIELD_INIT, BindingKind::Const);
+        let mut has_constructor = false;
+        let mut has_instance_fields = false;
+        for (index, element) in c.body.iter().enumerate() {
+            match element {
+                ClassElement::Method {
+                    key,
+                    function,
+                    kind,
+                    ..
+                } => {
+                    self.property_key(key);
+                    if *kind == MethodKind::Constructor {
+                        has_constructor = true;
+                        self.derived_constructor = c.super_class.is_some();
+                    }
+                    self.function(function, false);
+                }
+                ClassElement::Field {
+                    key,
+                    value,
+                    is_static,
+                    ..
+                } => {
+                    self.property_key(key);
+                    if *is_static {
+                        // Each static initializer runs as its own function
+                        // with the class as `this`.
+                        if let Some(value) = value {
+                            self.open(
+                                ScopeKind::Function,
+                                Some(node_key(element, ROLE_SELF)),
+                                true,
+                            );
+                            self.expression(value);
+                            self.stack.pop();
+                        }
+                    } else {
+                        has_instance_fields = true;
+                        if matches!(key, PropertyKey::Computed(_)) {
+                            // Evaluated once, with the class; used at
+                            // every construction.
+                            self.tree.scopes[scope].bindings.push(Binding {
+                                name: field_key_name(index).into(),
+                                kind: BindingKind::Const,
+                                captured: true,
+                                used: true,
+                            });
+                        }
+                    }
+                }
+                ClassElement::StaticBlock(body, _) => {
+                    self.function_body(element, &[], None, body, false, true, None);
+                }
+            }
+        }
+        if has_instance_fields {
+            // The instance initializers run as one function per
+            // construction, reached through the class scope.
+            let index = self.tree.scopes[scope]
+                .find(FIELD_INIT)
+                .expect("declared above");
+            let binding = &mut self.tree.scopes[scope].bindings[index];
+            binding.used = true;
+            binding.captured = true;
+            self.open(ScopeKind::Function, Some(node_key(c, ROLE_FIELDS)), true);
+            for element in &c.body {
+                if let ClassElement::Field {
+                    value: Some(value),
+                    is_static: false,
+                    ..
+                } = element
+                {
+                    self.expression(value);
+                }
+            }
+            self.stack.pop();
+        }
+        if c.super_class.is_some() && !has_constructor {
+            // The default constructor reads the class to find its parent.
+            let index = self.tree.scopes[scope].find(CLASS).expect("declared above");
+            let binding = &mut self.tree.scopes[scope].bindings[index];
+            binding.used = true;
+            binding.captured = true;
+        }
+        self.stack.pop();
     }
 
     /// Capture every binding visible from the current scope (a `with`
@@ -432,7 +617,7 @@ impl Resolver {
                 }
             }
             StatementKind::Function(f) => self.function(f, false),
-            StatementKind::Class(_) => {}
+            StatementKind::Class(c) => self.class(c),
             StatementKind::If {
                 test,
                 consequent,
@@ -616,6 +801,10 @@ impl Resolver {
         self_name: Option<&str>,
     ) {
         let scope = self.open(ScopeKind::Function, Some(node_key(node, ROLE_SELF)), strict);
+        self.tree.scopes[scope].arrow = arrow;
+        if std::mem::take(&mut self.derived_constructor) {
+            self.declare(scope, THIS, BindingKind::This);
+        }
         if let Some(name) = self_name {
             self.declare(scope, name, BindingKind::SelfName);
         }
@@ -662,6 +851,7 @@ impl Resolver {
             function: probe,
             bindings: Vec::new(),
             strict: false,
+            arrow: false,
         });
         self.hoist_vars(probe, body, true);
         let found = self.tree.scopes[probe].find(name).is_some();
@@ -693,6 +883,7 @@ impl Resolver {
             }
             ArrowBody::Expression(e) => {
                 let scope = self.open(ScopeKind::Function, Some(node_key(f, ROLE_SELF)), f.strict);
+                self.tree.scopes[scope].arrow = true;
                 for p in f.params.iter().chain(f.rest.as_ref()) {
                     self.pattern_names(p, &mut |r, n| r.declare(scope, n, BindingKind::Param));
                 }
@@ -718,14 +909,14 @@ impl Resolver {
         while let Some(e) = pending.pop() {
             match &e.kind {
                 ExpressionKind::Identifier(id) => self.reference(&id.name),
-                ExpressionKind::This
-                | ExpressionKind::Null
+                ExpressionKind::This => self.reference_special(THIS),
+                ExpressionKind::NewTarget => self.reference_special(NEW_TARGET),
+                ExpressionKind::Null
                 | ExpressionKind::Boolean(_)
                 | ExpressionKind::Number(_)
                 | ExpressionKind::BigInt(..)
                 | ExpressionKind::String(_)
                 | ExpressionKind::RegExp { .. }
-                | ExpressionKind::NewTarget
                 | ExpressionKind::ImportMeta => {}
                 ExpressionKind::Template(t) => pending.extend(t.expressions.iter()),
                 ExpressionKind::TaggedTemplate { tag, template } => {
@@ -758,7 +949,7 @@ impl Resolver {
                 }
                 ExpressionKind::Function(f) => self.function(f, true),
                 ExpressionKind::Arrow(f) => self.arrow(f),
-                ExpressionKind::Class(_) => {}
+                ExpressionKind::Class(c) => self.class(c),
                 ExpressionKind::Unary { argument, .. } | ExpressionKind::Await(argument) => {
                     pending.push(argument);
                 }
@@ -792,6 +983,8 @@ impl Resolver {
                     pending.push(object);
                 }
                 ExpressionKind::SuperMember(property) => {
+                    self.reference_special(CLASS);
+                    self.reference_special(THIS);
                     if let MemberProperty::Computed(k) = property {
                         pending.push(k);
                     }
@@ -808,6 +1001,9 @@ impl Resolver {
                     pending.push(callee);
                 }
                 ExpressionKind::SuperCall(arguments) => {
+                    self.reference_special(CLASS);
+                    self.reference_special(THIS);
+                    self.reference_special(NEW_TARGET);
                     for a in arguments {
                         match a {
                             Argument::Expression(x) | Argument::Spread(x) => pending.push(x),

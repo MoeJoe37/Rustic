@@ -3070,7 +3070,23 @@
               ]
             },
             {
-              "label": "Classes, super and private names",
+              "label": "Classes: constructors, extends, super, accessors, fields and static blocks",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "fn class_definition"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn class_inheritance"
+                }
+              ]
+            },
+            {
+              "label": "Private names and brand checks",
               "status": "planned",
               "evidence": []
             },

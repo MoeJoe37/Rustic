@@ -15,11 +15,12 @@ use super::bytecode::{
     BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, UnOp, declare,
 };
 use super::scope::{
-    BindingKind, ROLE_BODY, ROLE_FINALLY, Resolution, ScopeId, ScopeKind, ScopeTree,
+    BindingKind, CLASS, FIELD_INIT, NEW_TARGET, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution,
+    ScopeId, ScopeKind, ScopeTree, THIS, field_key_name,
 };
 use crate::ast::{
-    Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Expression,
-    ExpressionKind, ForHead, ForInit, Function, LogicalOp, MemberProperty, MethodKind,
+    Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Class, ClassElement,
+    Expression, ExpressionKind, ForHead, ForInit, Function, LogicalOp, MemberProperty, MethodKind,
     ObjectProperty, Pattern, PatternKind, Program, PropertyKey, Statement, StatementKind, UnaryOp,
     UpdateOp, VariableDeclaration, VariableKind,
 };
@@ -144,6 +145,13 @@ struct Gen<'a, 't> {
     stack_base: usize,
     /// Set by a logical member assignment: the jump that skips its store.
     pending_skip: Option<usize>,
+    /// Where `super.x` starts its lookup in this function: `Some(true)`
+    /// in a static class method (the parent class), `Some(false)` in an
+    /// instance method or constructor (the parent's prototype). Arrow
+    /// functions inherit it.
+    home_static: Option<bool>,
+    /// The value of `home_static` for the next method compiled.
+    next_home: Option<bool>,
 }
 
 impl<'a, 't> Gen<'a, 't> {
@@ -183,6 +191,8 @@ impl<'a, 't> Gen<'a, 't> {
             labels: Vec::new(),
             stack_base,
             pending_skip: None,
+            home_static: None,
+            next_home: None,
         }
     }
 
@@ -197,7 +207,12 @@ impl<'a, 't> Gen<'a, 't> {
         // Always, even after a final `return`: a jump over that statement
         // (`if (x) return`) lands here.
         let r = self.temp()?;
-        self.emit(Op::Undefined { dst: r });
+        if self.kind == FunctionKind::DerivedConstructor {
+            // The result is `this`, which must be bound by now.
+            self.load_this(r)?;
+        } else {
+            self.emit(Op::Undefined { dst: r });
+        }
         self.emit(Op::Return { src: r });
         // Jump targets are `u32`. Nothing has run yet, so a target that
         // wrapped while compiling is rejected here before it can be used.
@@ -556,21 +571,569 @@ impl<'a, 't> Gen<'a, 't> {
                 }
             },
             Resolution::Binding { scope, index } => {
-                if let Some(&r) = self.locals.get(&(scope, index)) {
-                    if r != dst {
-                        self.emit(Op::Move { dst, src: r });
-                    }
-                    if self.binding_kind(scope, index).has_tdz() {
-                        let name = self.atom(name)?;
-                        self.emit(Op::CheckTdz { src: dst, name });
-                    }
-                } else {
-                    let slot = self.slot_of(scope, index);
-                    let hops = self.hops(scope);
-                    self.emit(Op::GetSlot { dst, hops, slot });
-                }
+                self.load_binding_at(scope, index, name, dst)?
             }
         }
+        Ok(())
+    }
+
+    /// Read the binding `index` of `scope` into `dst`, with its TDZ check.
+    fn load_binding_at(
+        &mut self,
+        scope: ScopeId,
+        index: usize,
+        name: &str,
+        dst: Reg,
+    ) -> CResult<()> {
+        if let Some(&r) = self.locals.get(&(scope, index)) {
+            if r != dst {
+                self.emit(Op::Move { dst, src: r });
+            }
+            if self.binding_kind(scope, index).has_tdz() {
+                let name = self.atom(name)?;
+                self.emit(Op::CheckTdz { src: dst, name });
+            }
+        } else {
+            let slot = self.slot_of(scope, index);
+            let hops = self.hops(scope);
+            self.emit(Op::GetSlot { dst, hops, slot });
+        }
+        Ok(())
+    }
+
+    /// `dst = this`. In a derived class constructor and the arrow
+    /// functions inside it, `this` is a binding that `super()` fills.
+    fn load_this(&mut self, dst: Reg) -> CResult<()> {
+        match self.tree.resolve_special(self.scope, THIS) {
+            Some((scope, index)) => self.load_binding_at(scope, index, THIS, dst),
+            None => {
+                self.emit(Op::This { dst });
+                Ok(())
+            }
+        }
+    }
+
+    /// `dst = new.target`. An arrow function reads the binding its
+    /// enclosing function keeps for it.
+    fn load_new_target(&mut self, dst: Reg) -> CResult<()> {
+        if self.kind == FunctionKind::Arrow {
+            if let Some((scope, index)) = self.tree.resolve_special(self.scope, NEW_TARGET) {
+                return self.load_binding_at(scope, index, NEW_TARGET, dst);
+            }
+        }
+        self.emit(Op::NewTarget { dst });
+        Ok(())
+    }
+
+    /// `dst = the enclosing class constructor`.
+    fn load_class(&mut self, dst: Reg, span: Span) -> CResult<()> {
+        match self.tree.resolve_special(self.scope, CLASS) {
+            Some((scope, index)) => self.load_binding_at(scope, index, CLASS, dst),
+            None => Err(CompileError::Unsupported("super outside a class", span)),
+        }
+    }
+
+    /// `dst = the object a `super.x` lookup starts from`: the prototype
+    /// of the home object.
+    fn load_super_base(&mut self, dst: Reg, span: Span) -> CResult<()> {
+        let Some(is_static) = self.home_static else {
+            return Err(CompileError::Unsupported("super outside a class", span));
+        };
+        self.load_class(dst, span)?;
+        if !is_static {
+            self.get_named(dst, dst, "prototype")?;
+        }
+        self.emit(Op::GetPrototypeOf { dst, src: dst });
+        Ok(())
+    }
+
+    /// `dst = the key of a `super` member`.
+    fn super_key(&mut self, property: &MemberProperty, dst: Reg, span: Span) -> CResult<()> {
+        match property {
+            MemberProperty::Name(id) => {
+                let index = self.atom(&id.name)?;
+                self.emit(Op::Const { dst, index });
+                Ok(())
+            }
+            MemberProperty::Computed(k) => self.expr(k, dst),
+            MemberProperty::Private(_) => Err(CompileError::Unsupported("private names", span)),
+        }
+    }
+
+    /// `dst = super.property`, with the receiver left in `this`.
+    fn super_member(
+        &mut self,
+        property: &MemberProperty,
+        dst: Reg,
+        this: Reg,
+        span: Span,
+    ) -> CResult<()> {
+        let mark = self.mark();
+        self.load_this(this)?;
+        let (base, key) = (self.temp()?, self.temp()?);
+        self.super_key(property, key, span)?;
+        self.load_super_base(base, span)?;
+        self.emit(Op::GetSuper {
+            dst,
+            object: base,
+            key,
+            this,
+        });
+        self.release(mark);
+        Ok(())
+    }
+
+    /// `dst = super(arguments)`, which also binds `this`.
+    fn super_call(&mut self, arguments: &[Argument], dst: Reg, span: Span) -> CResult<()> {
+        let Some((this_scope, this_index)) = self.tree.resolve_special(self.scope, THIS) else {
+            return Err(CompileError::Unsupported(
+                "super call outside a derived constructor",
+                span,
+            ));
+        };
+        let mark = self.mark();
+        let (callee, new_target) = (self.temp()?, self.temp()?);
+        self.load_class(callee, span)?;
+        self.emit(Op::GetPrototypeOf {
+            dst: callee,
+            src: callee,
+        });
+        self.load_new_target(new_target)?;
+        if arguments.iter().any(|a| matches!(a, Argument::Spread(_))) {
+            let array = self.arguments_array(arguments)?;
+            self.emit(Op::SuperCallSpread {
+                dst,
+                callee,
+                new_target,
+                array,
+            });
+        } else {
+            let (args, argc) = self.arguments(arguments)?;
+            self.emit(Op::SuperCall {
+                dst,
+                callee,
+                new_target,
+                args,
+                argc,
+            });
+        }
+        // Bind `this`, unless an earlier `super()` already did.
+        let current = self.temp()?;
+        if let Some(&r) = self.locals.get(&(this_scope, this_index)) {
+            self.emit(Op::Move {
+                dst: current,
+                src: r,
+            });
+        } else {
+            let slot = self.slot_of(this_scope, this_index);
+            let hops = self.hops(this_scope);
+            self.emit(Op::GetSlotRaw {
+                dst: current,
+                hops,
+                slot,
+            });
+        }
+        self.emit(Op::ThrowIfInit { src: current });
+        self.store_binding_at(this_scope, this_index, dst)?;
+        self.initialize_fields(dst)?;
+        self.release(mark);
+        Ok(())
+    }
+
+    /// Evaluate a class definition into `dst`.
+    fn class_definition(&mut self, c: &Class, dst: Reg, name_hint: Option<&str>) -> CResult<()> {
+        self.guard()?;
+        let scope = self.tree.scope_of(c).expect("classes are analyzed");
+        let outer_scope = self.scope;
+        let derived = c.super_class.is_some();
+        let name: Box<str> = match (&c.id, name_hint) {
+            (Some(id), _) => id.name.clone(),
+            (None, Some(hint)) => hint.into(),
+            (None, None) => "".into(),
+        };
+        // The class scope: the class's own name stays in its TDZ until
+        // the definition is complete.
+        self.layout_scope(scope)?;
+        self.scope = scope;
+        if let Some(&index) = self.scope_index.get(&scope) {
+            self.emit(Op::PushScope { scope: index });
+            self.depth += 1;
+        }
+        let bindings = self.tree.scopes[scope].bindings.clone();
+        for (i, b) in bindings.iter().enumerate() {
+            if !b.captured && b.kind.has_tdz() {
+                let r = self.locals[&(scope, i)];
+                self.emit(Op::Uninit { dst: r });
+            }
+        }
+        let mark = self.mark();
+        let (heritage, f, proto) = (self.temp()?, self.temp()?, self.temp()?);
+        if let Some(h) = &c.super_class {
+            self.expr(h, heritage)?;
+        }
+        let kind = if derived {
+            FunctionKind::DerivedConstructor
+        } else {
+            FunctionKind::ClassConstructor
+        };
+        let constructor = c.body.iter().find_map(|element| match element {
+            ClassElement::Method {
+                function,
+                kind: MethodKind::Constructor,
+                ..
+            } => Some(function),
+            _ => None,
+        });
+        match constructor {
+            Some(function) => {
+                self.next_home = Some(false);
+                self.function_expression(function, f, Some(&name), kind)?;
+            }
+            None => self.default_constructor(scope, f, &name, kind, c.span)?,
+        }
+        self.emit(Op::ClassSetup {
+            ctor: f,
+            heritage,
+            proto,
+            derived,
+        });
+        let class_index = self.tree.scopes[scope]
+            .find(CLASS)
+            .expect("declared by the resolver");
+        self.store_binding_at(scope, class_index, f)?;
+        // Static fields and blocks run after every method is defined;
+        // their computed keys are evaluated in order with the rest and
+        // wait in registers.
+        let mut static_keys: Vec<Option<Reg>> = vec![None; c.body.len()];
+        for (element_index, element) in c.body.iter().enumerate() {
+            match element {
+                ClassElement::Method {
+                    kind: MethodKind::Constructor,
+                    ..
+                } => {}
+                ClassElement::Method {
+                    key,
+                    function,
+                    kind: method_kind,
+                    is_static,
+                    span,
+                } => {
+                    if matches!(key, PropertyKey::Private(_)) {
+                        return Err(CompileError::Unsupported("private names", *span));
+                    }
+                    let inner = self.mark();
+                    let (k, v) = (self.temp()?, self.temp()?);
+                    let target = if *is_static { f } else { proto };
+                    self.property_key(key, k)?;
+                    let key_name = Self::static_key_name(key);
+                    let hint = match method_kind {
+                        MethodKind::Get => key_name.map(|n| format!("get {n}")),
+                        MethodKind::Set => key_name.map(|n| format!("set {n}")),
+                        _ => key_name,
+                    };
+                    self.next_home = Some(*is_static);
+                    self.function_expression(function, v, hint.as_deref(), FunctionKind::Method)?;
+                    match method_kind {
+                        MethodKind::Get | MethodKind::Set => {
+                            self.emit(Op::DefineAccessor {
+                                object: target,
+                                key: k,
+                                function: v,
+                                setter: *method_kind == MethodKind::Set,
+                                enumerable: false,
+                            });
+                        }
+                        _ => {
+                            self.emit(Op::DefineMethod {
+                                object: target,
+                                key: k,
+                                value: v,
+                            });
+                        }
+                    }
+                    self.release(inner);
+                }
+                ClassElement::Field {
+                    key,
+                    is_static,
+                    span,
+                    ..
+                } => match key {
+                    PropertyKey::Private(_) => {
+                        return Err(CompileError::Unsupported("private names", *span));
+                    }
+                    PropertyKey::Computed(x) => {
+                        let k = self.temp()?;
+                        self.expr(x, k)?;
+                        self.emit(Op::Unary {
+                            op: UnOp::ToPropertyKey,
+                            dst: k,
+                            src: k,
+                        });
+                        if *is_static {
+                            static_keys[element_index] = Some(k);
+                        } else {
+                            let name = field_key_name(element_index);
+                            let index = self.tree.scopes[scope]
+                                .find(&name)
+                                .expect("declared by the resolver");
+                            self.store_binding_at(scope, index, k)?;
+                        }
+                    }
+                    _ => {}
+                },
+                ClassElement::StaticBlock(..) => {}
+            }
+        }
+        let init_index = self.tree.scopes[scope]
+            .find(FIELD_INIT)
+            .expect("declared by the resolver");
+        if self.tree.scopes[scope].bindings[init_index].used {
+            let init = self.temp()?;
+            self.field_initializer(c, scope, init)?;
+            self.store_binding_at(scope, init_index, init)?;
+        }
+        if let Some(id) = &c.id {
+            let index = self.tree.scopes[scope]
+                .find(&id.name)
+                .expect("declared by the resolver");
+            self.store_binding_at(scope, index, f)?;
+        }
+        for (element_index, element) in c.body.iter().enumerate() {
+            match element {
+                ClassElement::Field {
+                    key,
+                    value,
+                    is_static: true,
+                    ..
+                } => {
+                    let inner = self.mark();
+                    let (k, v) = (self.temp()?, self.temp()?);
+                    match static_keys[element_index] {
+                        Some(held) => {
+                            self.emit(Op::Move { dst: k, src: held });
+                        }
+                        None => self.property_key(key, k)?,
+                    }
+                    match value {
+                        Some(value) => {
+                            let function_scope = self
+                                .tree
+                                .scope_of(element)
+                                .expect("static fields are analyzed");
+                            let hint = Self::static_key_name(key);
+                            let code = {
+                                let mut g = self.class_member_gen(function_scope, true);
+                                let r = g.temp()?;
+                                g.layout_scope(function_scope)?;
+                                g.expr_named(value, r, hint.as_deref())?;
+                                g.emit(Op::Return { src: r });
+                                g.finish(0, 0)?
+                            };
+                            self.call_member_code(code, f, v)?;
+                        }
+                        None => {
+                            self.emit(Op::Undefined { dst: v });
+                        }
+                    }
+                    self.emit(Op::DefineProp {
+                        object: f,
+                        key: k,
+                        value: v,
+                    });
+                    self.release(inner);
+                }
+                ClassElement::StaticBlock(body, _) => {
+                    let inner = self.mark();
+                    let function_scope = self
+                        .tree
+                        .scope_of(element)
+                        .expect("static blocks are analyzed");
+                    let code = {
+                        let mut g = self.class_member_gen(function_scope, true);
+                        g.parameters(&[], None)?;
+                        g.function_prologue(body)?;
+                        g.statements(body)?;
+                        g.finish(0, 0)?
+                    };
+                    let v = self.temp()?;
+                    self.call_member_code(code, f, v)?;
+                    self.release(inner);
+                }
+                _ => {}
+            }
+        }
+        self.emit(Op::Move { dst, src: f });
+        self.release(mark);
+        if self.scope_index.contains_key(&scope) {
+            self.emit(Op::PopScope);
+            self.depth -= 1;
+        }
+        self.scope = outer_scope;
+        Ok(())
+    }
+
+    /// A generator for code the class itself needs (field initializers,
+    /// static blocks): a strict method whose `super` starts at the class
+    /// (`is_static`) or at its prototype.
+    fn class_member_gen(&mut self, scope: ScopeId, is_static: bool) -> Gen<'_, 't> {
+        let name = self.agent.names.empty;
+        let mut g = Gen::new(
+            self.agent,
+            self.tree,
+            scope,
+            FunctionKind::Method,
+            true,
+            name,
+            self.stack_base,
+        );
+        g.home_static = Some(is_static);
+        g
+    }
+
+    /// `dst = code.call(this)` for code made by [`Self::class_member_gen`].
+    fn call_member_code(&mut self, code: CodeId, this: Reg, dst: Reg) -> CResult<()> {
+        let index = self.functions.len() as u32;
+        self.functions.push(code);
+        let callee = self.temp()?;
+        self.emit(Op::Closure { dst: callee, index });
+        self.emit(Op::Call {
+            dst,
+            callee,
+            this,
+            args: callee,
+            argc: 0,
+        });
+        Ok(())
+    }
+
+    /// `dst = a function that defines the instance fields of `c` on its
+    /// `this``, in order, each with `CreateDataPropertyOrThrow`.
+    fn field_initializer(&mut self, c: &Class, class_scope: ScopeId, dst: Reg) -> CResult<()> {
+        let function_scope = self
+            .tree
+            .scope_of_role(c, ROLE_FIELDS)
+            .expect("instance fields are analyzed");
+        let code = {
+            let mut g = self.class_member_gen(function_scope, false);
+            g.layout_scope(function_scope)?;
+            let (this, k, v) = (g.temp()?, g.temp()?, g.temp()?);
+            g.emit(Op::This { dst: this });
+            for (element_index, element) in c.body.iter().enumerate() {
+                let ClassElement::Field {
+                    key,
+                    value,
+                    is_static: false,
+                    ..
+                } = element
+                else {
+                    continue;
+                };
+                if matches!(key, PropertyKey::Computed(_)) {
+                    let name = field_key_name(element_index);
+                    let index = g.tree.scopes[class_scope]
+                        .find(&name)
+                        .expect("declared by the resolver");
+                    g.load_binding_at(class_scope, index, &name, k)?;
+                } else {
+                    g.property_key(key, k)?;
+                }
+                match value {
+                    Some(value) => {
+                        let hint = Self::static_key_name(key);
+                        g.expr_named(value, v, hint.as_deref())?;
+                    }
+                    None => {
+                        g.emit(Op::Undefined { dst: v });
+                    }
+                }
+                g.emit(Op::DefineProp {
+                    object: this,
+                    key: k,
+                    value: v,
+                });
+            }
+            g.finish(0, 0)?
+        };
+        let index = self.functions.len() as u32;
+        self.functions.push(code);
+        self.emit(Op::Closure { dst, index });
+        Ok(())
+    }
+
+    /// Run the enclosing class's field initializer, if it has one, on
+    /// the object in `this`.
+    fn initialize_fields(&mut self, this: Reg) -> CResult<()> {
+        let Some((scope, index)) = self.tree.resolve_special(self.scope, FIELD_INIT) else {
+            return Ok(());
+        };
+        if !self.tree.scopes[scope].bindings[index].used {
+            return Ok(());
+        }
+        let mark = self.mark();
+        let (init, result) = (self.temp()?, self.temp()?);
+        self.load_binding_at(scope, index, FIELD_INIT, init)?;
+        self.emit(Op::Call {
+            dst: result,
+            callee: init,
+            this,
+            args: init,
+            argc: 0,
+        });
+        self.release(mark);
+        Ok(())
+    }
+
+    /// The constructor of a class that declares none: empty, or
+    /// `constructor(...args) { super(...args) }` for a derived class.
+    fn default_constructor(
+        &mut self,
+        scope: ScopeId,
+        dst: Reg,
+        name: &str,
+        kind: FunctionKind,
+        span: Span,
+    ) -> CResult<()> {
+        let name = self.atom_id(name)?;
+        let code = {
+            // The code runs in the class scope: it has no scope of its own.
+            let mut g = Gen::new(
+                self.agent,
+                self.tree,
+                scope,
+                kind,
+                true,
+                name,
+                self.stack_base,
+            );
+            if kind == FunctionKind::DerivedConstructor {
+                let (args, callee, new_target, result) =
+                    (g.temp()?, g.temp()?, g.temp()?, g.temp()?);
+                g.emit(Op::Rest { dst: args, from: 0 });
+                g.load_class(callee, span)?;
+                g.emit(Op::GetPrototypeOf {
+                    dst: callee,
+                    src: callee,
+                });
+                g.emit(Op::NewTarget { dst: new_target });
+                g.emit(Op::SuperCallSpread {
+                    dst: result,
+                    callee,
+                    new_target,
+                    array: args,
+                });
+                g.initialize_fields(result)?;
+                g.emit(Op::Return { src: result });
+            } else {
+                let this = g.temp()?;
+                g.emit(Op::This { dst: this });
+                g.initialize_fields(this)?;
+            }
+            g.finish(0, 0)?
+        };
+        let index = self.functions.len() as u32;
+        self.functions.push(code);
+        self.emit(Op::Closure { dst, index });
         Ok(())
     }
 
@@ -729,11 +1292,29 @@ impl<'a, 't> Gen<'a, 't> {
                 self.tree,
                 scope,
                 kind,
-                f.strict || self.strict,
+                f.strict || self.strict || kind.is_class_constructor(),
                 name,
                 self.stack_base,
             );
+            g.home_static = match kind {
+                FunctionKind::Normal => None,
+                _ => self.next_home.take(),
+            };
             g.guard()?;
+            if kind == FunctionKind::ClassConstructor {
+                // Fields are defined before the parameters are bound. The
+                // incoming arguments own the first registers, so work in
+                // the ones above them.
+                // The function's own environment is not entered yet, so
+                // resolve from the scope outside it.
+                g.next_reg = f.params.len() as u32;
+                g.scope = g.tree.scopes[scope].parent.unwrap_or(scope);
+                let this = g.temp()?;
+                g.emit(Op::This { dst: this });
+                g.initialize_fields(this)?;
+                g.scope = scope;
+                g.next_reg = 0;
+            }
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
             g.function_prologue(&f.body)?;
             g.statements(&f.body)?;
@@ -769,6 +1350,7 @@ impl<'a, 't> Gen<'a, 't> {
                 name,
                 self.stack_base,
             );
+            g.home_static = self.home_static;
             g.guard()?;
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
             match &f.body {
@@ -841,6 +1423,11 @@ impl<'a, 't> Gen<'a, 't> {
             if b.used && b.kind == BindingKind::Arguments {
                 let r = self.temp()?;
                 self.emit(Op::Arguments { dst: r });
+                self.store_binding_at(scope, i, r)?;
+            }
+            if b.used && b.kind == BindingKind::NewTarget {
+                let r = self.temp()?;
+                self.emit(Op::NewTarget { dst: r });
                 self.store_binding_at(scope, i, r)?;
             }
             if b.used && b.kind == BindingKind::SelfName {
@@ -921,7 +1508,11 @@ impl<'a, 't> Gen<'a, 't> {
             StatementKind::Variable(d) => self.variable_declaration(d)?,
             StatementKind::Function(_) => {} // hoisted
             StatementKind::Class(c) => {
-                return Err(CompileError::Unsupported("classes", c.span));
+                let r = self.temp()?;
+                self.class_definition(c, r, None)?;
+                if let Some(id) = &c.id {
+                    self.store_binding(&id.name, r, true)?;
+                }
             }
             StatementKind::If {
                 test,
@@ -1006,6 +1597,14 @@ impl<'a, 't> Gen<'a, 't> {
                     None => {
                         self.emit(Op::Undefined { dst: r });
                     }
+                }
+                if self.kind == FunctionKind::DerivedConstructor {
+                    // An object is returned as is; `undefined` means
+                    // `this`; anything else is a TypeError.
+                    self.emit(Op::DerivedResult { src: r });
+                    let done = self.emit(Op::JumpIfNotUndefined { src: r, target: 0 });
+                    self.load_this(r)?;
+                    self.patch_here(done);
                 }
                 self.emit_exit(Exit::Return, Some(r))?;
             }
@@ -1820,6 +2419,21 @@ impl<'a, 't> Gen<'a, 't> {
                 }
                 Ok(())
             }
+            ExpressionKind::SuperMember(property) => {
+                let mark = self.mark();
+                let (this, base, key) = (self.temp()?, self.temp()?, self.temp()?);
+                self.load_this(this)?;
+                self.super_key(property, key, target.span)?;
+                self.load_super_base(base, target.span)?;
+                self.emit(Op::SetSuper {
+                    object: base,
+                    key,
+                    value,
+                    this,
+                });
+                self.release(mark);
+                Ok(())
+            }
             ExpressionKind::Parenthesized(inner) => self.assign_member(inner, value),
             _ => Err(CompileError::Unsupported("assignment target", target.span)),
         }
@@ -1833,6 +2447,9 @@ impl<'a, 't> Gen<'a, 't> {
                 self.function_expression(f, dst, Some(n), FunctionKind::Normal)
             }
             (ExpressionKind::Arrow(f), Some(n)) => self.arrow_expression(f, dst, Some(n)),
+            (ExpressionKind::Class(c), Some(n)) if c.id.is_none() => {
+                self.class_definition(c, dst, Some(n))
+            }
             _ => self.expr(e, dst),
         }
     }
@@ -2103,9 +2720,7 @@ impl<'a, 't> Gen<'a, 't> {
         self.guard()?;
         let mark = self.mark();
         match &e.kind {
-            ExpressionKind::This => {
-                self.emit(Op::This { dst });
-            }
+            ExpressionKind::This => self.load_this(dst)?,
             ExpressionKind::Identifier(id) => {
                 if &*id.name == "undefined"
                     && self.resolve("undefined") == Resolution::Dynamic
@@ -2196,9 +2811,7 @@ impl<'a, 't> Gen<'a, 't> {
                 self.function_expression(f, dst, None, FunctionKind::Normal)?;
             }
             ExpressionKind::Arrow(f) => self.arrow_expression(f, dst, None)?,
-            ExpressionKind::Class(c) => {
-                return Err(CompileError::Unsupported("classes", c.span));
-            }
+            ExpressionKind::Class(c) => self.class_definition(c, dst, None)?,
             ExpressionKind::Unary { op, argument } => self.unary(*op, argument, dst)?,
             ExpressionKind::Update { op, prefix, target } => {
                 self.update(*op, *prefix, target, dst)?
@@ -2258,9 +2871,11 @@ impl<'a, 't> Gen<'a, 't> {
                 }
             }
             ExpressionKind::Member { .. } => self.member_chain(e, dst, None)?,
-            ExpressionKind::SuperMember(_) | ExpressionKind::SuperCall(_) => {
-                return Err(CompileError::Unsupported("super", e.span));
+            ExpressionKind::SuperMember(property) => {
+                let this = self.temp()?;
+                self.super_member(property, dst, this, e.span)?;
             }
+            ExpressionKind::SuperCall(arguments) => self.super_call(arguments, dst, e.span)?,
             ExpressionKind::Call {
                 callee,
                 arguments,
@@ -2299,9 +2914,7 @@ impl<'a, 't> Gen<'a, 't> {
                 }
             }
             ExpressionKind::Parenthesized(inner) => self.expr(inner, dst)?,
-            ExpressionKind::NewTarget => {
-                self.emit(Op::NewTarget { dst });
-            }
+            ExpressionKind::NewTarget => self.load_new_target(dst)?,
             ExpressionKind::ImportMeta | ExpressionKind::ImportCall { .. } => {
                 return Err(CompileError::Unsupported("modules", e.span));
             }
@@ -2432,6 +3045,9 @@ impl<'a, 't> Gen<'a, 't> {
                     }
                 }
                 self.member_link(this, property, f, c.span)?;
+            }
+            ExpressionKind::SuperMember(property) => {
+                self.super_member(property, f, this, c.span)?
             }
             ExpressionKind::Identifier(id) => {
                 self.load_binding(&id.name, f)?;
@@ -2585,6 +3201,7 @@ impl<'a, 't> Gen<'a, 't> {
                                 key: k,
                                 function: v,
                                 setter: *kind == MethodKind::Set,
+                                enumerable: true,
                             });
                         }
                         _ => {
@@ -2946,6 +3563,43 @@ impl<'a, 't> Gen<'a, 't> {
         let mut m = m;
         while let ExpressionKind::Parenthesized(inner) = &m.kind {
             m = inner;
+        }
+        if let ExpressionKind::SuperMember(property) = &m.kind {
+            let (this, base, key) = (self.temp()?, self.temp()?, self.temp()?);
+            self.load_this(this)?;
+            self.super_key(property, key, m.span)?;
+            if read_old && matches!(property, MemberProperty::Computed(_)) {
+                self.emit(Op::Unary {
+                    op: UnOp::ToPropertyKey,
+                    dst: key,
+                    src: key,
+                });
+            }
+            self.load_super_base(base, m.span)?;
+            let old = self.temp()?;
+            if read_old {
+                self.emit(Op::GetSuper {
+                    dst: old,
+                    object: base,
+                    key,
+                    this,
+                });
+            }
+            let out = self.temp()?;
+            self.pending_skip = None;
+            compute(self, old, out)?;
+            let skip = self.pending_skip.take();
+            self.emit(Op::SetSuper {
+                object: base,
+                key,
+                value: out,
+                this,
+            });
+            if let Some(s) = skip {
+                self.patch_here(s);
+            }
+            self.emit(Op::Move { dst, src: out });
+            return Ok(());
         }
         let ExpressionKind::Member {
             object, property, ..

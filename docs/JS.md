@@ -7,8 +7,9 @@ to an abstract syntax tree with source spans. JS-02 adds the runtime data
 model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
 garbage collector (see [Garbage collection](#garbage-collection-js-03)).
 JS-04 compiles scripts to bytecode and runs them (see
-[Bytecode and interpreter](#bytecode-and-interpreter-js-04)); classes,
-generators, async functions, modules and regular expressions do not run yet.
+[Bytecode and interpreter](#bytecode-and-interpreter-js-04)); private
+names, generators, async functions, modules and regular expressions do not
+run yet.
 
 ## API
 
@@ -237,10 +238,21 @@ calls a function value. The design is recorded in
   and sloppy code, `arguments`, `if`/`switch`/loops/labels, `for-in`,
   `for-of` with iterator closing, `try`/`catch`/`finally`, `with`, `delete`,
   `typeof`, `in` and `instanceof`.
+- **Classes.** Declarations and expressions, `extends` (including
+  `extends null` and plain functions), constructors with `super()`, the
+  default constructors, `super.x` reads, writes and calls, methods, getters,
+  setters, statics, computed keys, instance and static fields, and static
+  blocks. A class is a scope holding its own name and the class itself; in a
+  derived constructor `this` is a binding in its temporal dead zone until
+  `super()` returns, shared with the arrow functions inside, so the existing
+  TDZ check gives the required `ReferenceError`. Instance fields are one
+  function per class, run when `this` is bound. `new.target` works in arrow
+  functions the same way.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): classes, `super`, private names, generators, async
-  functions, modules, regular expression literals, tagged templates, optional
-  calls, and BigInt literals. BigInt arithmetic throws a `TypeError`
+  anything runs, TD-97): private names (`#x`), `super` in object literals,
+  generators, async functions, modules, regular expression literals, tagged
+  templates, optional calls, and BigInt literals. Built-in constructors
+  cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
   (TD-92).
 - **Calls** never recurse in Rust between script functions: frames and
   registers live on vectors in the agent. `VmLimits` bounds frames (10,000),

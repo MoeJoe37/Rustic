@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "deac3f3fb23cc30ae5371b6a6a5b0b5746ad13955e214a4c09c50d92607de709",
-  "percent": "23.54",
+  "source_fingerprint": "3bb1120d87f9a0df2e42ed81eda12e477e54e49edcea625fb81159d077f4d3ee",
+  "percent": "23.57",
   "verified_percent": "20.90",
-  "partial_percent": "2.64",
+  "partial_percent": "2.67",
   "completed": 54,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "40.36",
+      "percent": "40.64",
       "verified_percent": "12.30",
-      "partial_percent": "28.06"
+      "partial_percent": "28.34"
     },
     {
       "id": "M5",
@@ -3382,7 +3382,23 @@
               ]
             },
             {
-              "label": "Classes, super and private names",
+              "label": "Classes: constructors, extends, super, accessors, fields and static blocks",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "fn class_definition"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn class_inheritance"
+                }
+              ]
+            },
+            {
+              "label": "Private names and brand checks",
               "status": "planned",
               "evidence": []
             },
@@ -3408,7 +3424,7 @@
               "evidence": []
             }
           ],
-          "credit": "71.42",
+          "credit": "75.00",
           "engine_share": "0.68"
         },
         {
@@ -3506,10 +3522,10 @@
       "completed": 1,
       "in_progress": 5,
       "total": 15,
-      "contribution": "3.59",
-      "percent": "35.94",
+      "contribution": "3.61",
+      "percent": "36.18",
       "verified_percent": "10.95",
-      "partial_percent": "24.99"
+      "partial_percent": "25.23"
     },
     {
       "id": "wasm",

@@ -747,9 +747,292 @@ fn closures_and_their_scopes_stay_small() {
 }
 
 #[test]
+fn classes() {
+    let _report = Report;
+    check(
+        "class A { constructor(x) { this.x = x } get double() { return this.x * 2 } m() { return this.x + 1 } } var a = new A(3); a.m() + a.double",
+        "10",
+    );
+    check(
+        "class A {} typeof A + (new A() instanceof A) + A.name + A.length",
+        "functiontrueA0",
+    );
+    check(
+        "var B = class {}; B.name + (class Named {}).name + typeof new B()",
+        "BNamedobject",
+    );
+    check(
+        "class A { static make() { return new this() } static get tag() { return 'T' } } (A.make() instanceof A) + A.tag",
+        "trueT",
+    );
+    // Methods are not enumerable; the prototype property is read-only.
+    check(
+        "class A { m() {} static s() {} } var k = ''; for (var x in new A()) k += x; for (var y in A) k += y; k",
+        "",
+    );
+    check(
+        "class A {} var p = A.prototype; A.prototype = 1; A.prototype === p && p.constructor === A",
+        "true",
+    );
+    check(
+        "'use strict'; class A {} try { A.prototype = 1 } catch (e) { e.name }",
+        "TypeError",
+    );
+    // A class constructor needs `new`; methods and accessors cannot be constructed.
+    check(
+        "class A {} try { A() } catch (e) { e.name + ': ' + e.message }",
+        "TypeError: Class constructor cannot be invoked without 'new'",
+    );
+    check(
+        "class A { m() {} } try { new (new A().m)() } catch (e) { e.name }",
+        "TypeError",
+    );
+    // Class bodies are strict, and the name is in its TDZ while the class is defined.
+    check(
+        "class A { m() { return this } } var m = new A().m; m() === undefined",
+        "true",
+    );
+    check(
+        "try { class A extends A {} } catch (e) { e.name }",
+        "ReferenceError",
+    );
+    check(
+        "try { new C(); class C {} } catch (e) { e.name }",
+        "ReferenceError",
+    );
+    check(
+        "class A { m() { return A } } var Old = A; A = null; new Old().m() === Old",
+        "true",
+    );
+    check(
+        "class A { m() { A = 1 } } try { new A().m() } catch (e) { e.name }",
+        "TypeError",
+    );
+    // Computed keys, in order, with getters and setters paired.
+    check(
+        "var log = ''; function k(n) { log += n; return n } class A { [k('a')]() { return 1 } static [k('b')]() { return 2 } get [k('c')]() { return 3 } set [k('c')](v) { log += v } } var a = new A(); a.c = 'S'; log + a.a() + A.b() + a.c",
+        "abccS123",
+    );
+    check(
+        "{ class A { m() { return 1 } } var r = new A().m() } typeof A + r",
+        "undefined1",
+    );
+    check(
+        "function f() { return class { m() { return 7 } } } new (f())().m()",
+        "7",
+    );
+}
+
+#[test]
+fn class_inheritance() {
+    let _report = Report;
+    check(
+        "class A { constructor(x) { this.x = x } m() { return 'A' + this.x } } \
+         class B extends A { constructor(x) { super(x * 2); this.y = 1 } m() { return 'B' + super.m() + this.y } } \
+         var b = new B(2); b.m() + (b instanceof A) + (b instanceof B)",
+        "BA41truetrue",
+    );
+    // The default derived constructor passes its arguments on.
+    check(
+        "class A { constructor(...a) { this.n = a.length } } class B extends A {} new B(1, 2, 3).n",
+        "3",
+    );
+    check(
+        "class A { constructor() { this.t = new.target } } class B extends A {} new B().t === B",
+        "true",
+    );
+    // Prototype chains of the constructor and of the prototype.
+    check(
+        "class A { static s() { return 's' } } class B extends A { static s() { return super.s() + 'b' } } B.s()",
+        "sb",
+    );
+    check(
+        "class A {} class B extends A {} (B.prototype instanceof A) + '' + (new B().constructor === B)",
+        "truetrue",
+    );
+    check(
+        "function F() { this.f = 1 } F.prototype.m = function () { return 2 }; class B extends F {} var b = new B(); b.f + b.m()",
+        "3",
+    );
+    check(
+        "class N extends null {} var r = typeof N.prototype; try { new N() } catch (e) { r += e.name } r",
+        "objectTypeError",
+    );
+    check(
+        "try { class B extends 5 {} } catch (e) { e.name }",
+        "TypeError",
+    );
+    check(
+        "function F() {} F.prototype = 3; try { class B extends F {} } catch (e) { e.name }",
+        "TypeError",
+    );
+    check(
+        "var o = {m() {}}; try { class B extends o.m {} } catch (e) { e.name }",
+        "TypeError",
+    );
+    // `this` before `super()`, `super()` twice, and returning without it.
+    check(
+        "class A {} class B extends A { constructor() { this.x = 1; super() } } try { new B() } catch (e) { e.name }",
+        "ReferenceError",
+    );
+    check(
+        "class A {} class B extends A { constructor() { super(); super() } } try { new B() } catch (e) { e.name }",
+        "ReferenceError",
+    );
+    check(
+        "class A {} class B extends A { constructor() {} } try { new B() } catch (e) { e.name }",
+        "ReferenceError",
+    );
+    check(
+        "class A {} class B extends A { constructor() { return {own: 1} } } new B().own",
+        "1",
+    );
+    check(
+        "class A {} class B extends A { constructor() { super(); return 1 } } try { new B() } catch (e) { e.name }",
+        "TypeError",
+    );
+    check(
+        "class A {} class B extends A { constructor() { super(); return } } new B() instanceof B",
+        "true",
+    );
+    check(
+        "class A { constructor() { return 5 } } typeof new A()",
+        "object",
+    );
+    // Arrow functions share `this`, `super` and `new.target` with the constructor.
+    check(
+        "class A { constructor() { this.a = 1 } } \
+         class B extends A { constructor() { var init = () => super(); var get = () => this.a; var nt = () => new.target; init(); this.r = '' + get() + (nt() === B) } } new B().r",
+        "1true",
+    );
+    check(
+        "class A { m() { return 1 } } class B extends A { m() { var f = () => super.m() + 1; return f() } } new B().m()",
+        "2",
+    );
+    check(
+        "function F() { var f = () => new.target; return f() } (new F() === undefined) + '' + (F() === undefined)",
+        "falsetrue",
+    );
+    // Super properties use the home object, not the receiver's class.
+    check(
+        "class A { get v() { return this.w } who() { return 'A' } } class B extends A { get v() { return 'B' + super.v } who() { return 'B' } } \
+         class C extends B { who() { return 'C' + super.who() } } var c = new C(); c.w = 'w'; c.v + c.who()",
+        "BwCB",
+    );
+    check(
+        "class A {} class B extends A { set(v) { super.x = v; return this.x } } new B().set(4)",
+        "4",
+    );
+    check(
+        "class A { get n() { return 5 } set n(v) { this.got = v } } class B extends A { run() { super.n += 2; super.n++; return this.got } } new B().run()",
+        "6",
+    );
+    check(
+        "class A {} class B extends A { run() { [super.a, super['b']] = [1, 2]; return this.a + this.b } } new B().run()",
+        "3",
+    );
+    check(
+        "var o = {m() {}}; try { o.x = class extends Object {} } catch (e) { e.name }",
+        "ReferenceError",
+    );
+    check(
+        "class A { m() { return this.n } } class B extends A { constructor() { super(); this.n = 9 } run() { return super['m']() } } new B().run()",
+        "9",
+    );
+    // Three levels, and an inner class inside a derived constructor.
+    check(
+        "class A { constructor() { this.s = 'a' } } class B extends A { constructor() { super(); this.s += 'b' } } \
+         class C extends B { constructor() { super(); this.s += 'c'; class D extends A {} this.d = new D().s } } var c = new C(); c.s + c.d",
+        "abca",
+    );
+    check(
+        "var n = 0; class A {} for (var i = 0; i < 3000; i++) { class B extends A { constructor() { super(); n++ } } new B() } n",
+        "3000",
+    );
+}
+
+#[test]
+fn class_fields_and_static_blocks() {
+    let _report = Report;
+    check(
+        "class A { x = 1; y = this.x + 1; z; constructor() { this.sum = this.x + this.y } } var a = new A(); a.sum + '' + a.z + ('z' in a)",
+        "3undefinedtrue",
+    );
+    // Fields come before parameter defaults and the constructor body, own and enumerable.
+    check(
+        "class A { x = 1; constructor(v = this.x) { this.v = v } } var k = ''; var a = new A(); for (var n in a) k += n; k + a.v",
+        "xv1",
+    );
+    // In a derived class they are defined when super() returns.
+    check(
+        "var log = ''; class A { a = (log += 'a'); constructor() { log += 'A' } } \
+         class B extends A { b = (log += 'b'); constructor() { log += '<'; super(); log += '>' } } new B(); log",
+        "<aAb>",
+    );
+    check(
+        "class A { a = 1 } class B extends A { b = this.a + 1 } var b = new B(); b.a + b.b",
+        "3",
+    );
+    check(
+        "class A { constructor() { return {given: 1} } } class B extends A { f = 2 } var b = new B(); b.given + b.f",
+        "3",
+    );
+    // Computed keys are evaluated once, in order, when the class is defined.
+    check(
+        "var log = ''; function k(n) { log += n; return n } class A { [k('a')] = 1; static [k('b')] = 2; [k('c')]() {} [k('d')] = 4 } \
+         var x = new A(), y = new A(); log + x.a + A.b + y.d",
+        "abcd124",
+    );
+    // Initializers see the scope around the class and get function names.
+    check(
+        "function make(v) { return class { f = v; g = () => this.f } } var o = new (make(5))(); o.g() + o.f",
+        "10",
+    );
+    check(
+        "class A { f = function () {}; g = () => 1; static h = class {} } var a = new A(); a.f.name + a.g.name + A.h.name",
+        "fgh",
+    );
+    // Fields are defined, not assigned: a setter on the prototype is not called.
+    check(
+        "class A { set x(v) { throw 1 } } class B extends A { x = 2 } new B().x",
+        "2",
+    );
+    check(
+        "class A { m() { return 'm' } } class B extends A { f = super.m() + 1 } new B().f",
+        "m1",
+    );
+    // Static fields and blocks run in order with the class as `this`.
+    check(
+        "class A { static a = 1; static b = this.a + 1; static { this.c = A.b + 1; var local = 9 } static { this.d = typeof local } } \
+         '' + A.a + A.b + A.c + A.d",
+        "123undefined",
+    );
+    check(
+        "class A { static s = 's' } class B extends A { static t = super.s + 't'; static { B.u = new B() instanceof A } } B.t + B.u",
+        "sttrue",
+    );
+    check(
+        "class A { static create = () => new A(); x = 1 } A.create().x",
+        "1",
+    );
+    check("var C = class { static me = this }; C.me === C", "true");
+    check(
+        "class A { static 'quoted key' = 1; 42 = 2; static [1 + 1] = 3 } A['quoted key'] + new A()[42] + A[2]",
+        "6",
+    );
+    // Each construction runs the initializers again.
+    check(
+        "var n = 0; class A { id = ++n; list = [] } var a = new A(), b = new A(); a.id + b.id + (a.list !== b.list)",
+        "4",
+    );
+}
+
+#[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
     for source in [
-        "class A {}",
+        "class A { #x = 1 }",
+        "class A { #p() {} }",
+        "class A { #x; m(o) { return #x in o } }",
         "function* g() {}",
         "async function f() {}",
         "/x/",

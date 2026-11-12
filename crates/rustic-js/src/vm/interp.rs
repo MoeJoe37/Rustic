@@ -299,7 +299,7 @@ impl Agent {
         let Callee::Closure(o) = self.callee(f) else {
             return self.type_error("value is not a constructor");
         };
-        let this = self.construct_this(o)?;
+        let this = self.construct_this(o, f)?;
         self.enter_nested_run()?;
         let floor = self.vm.frames.len();
         let args_at = self.vm.stack.len();
@@ -385,13 +385,79 @@ impl Agent {
         Ok(f)
     }
 
-    /// `OrdinaryCreateFromConstructor(f, "%Object.prototype%")`.
-    fn construct_this(&mut self, f: ObjectId) -> JsResult<Value> {
+    /// Whether `new` accepts `o`.
+    fn is_constructor(&self, o: ObjectId) -> bool {
+        self.heap
+            .closure(o)
+            .is_some_and(|closure| self.heap.code(closure.code).kind.is_constructor())
+    }
+
+    /// The parent constructor a `super()` call constructs.
+    fn super_constructor(&mut self, f: Value) -> JsResult<ObjectId> {
+        match f.as_object().filter(|o| self.is_constructor(*o)) {
+            Some(o) => Ok(o),
+            None => self.type_error("Super constructor is not a constructor"),
+        }
+    }
+
+    /// `ClassDefinitionEvaluation` steps 5 to 14: create the prototype
+    /// object and link constructor and prototype to the heritage (absent
+    /// for a class without `extends`). Returns the prototype object.
+    fn class_setup(&mut self, f: ObjectId, heritage: Option<Value>) -> JsResult<ObjectId> {
+        let prototype_key = PropertyKey::String(self.names.prototype);
+        let (proto_parent, constructor_parent) = match heritage {
+            None => (
+                Some(self.intrinsics.object_prototype),
+                self.intrinsics.function_prototype,
+            ),
+            Some(Value::NULL) => (None, self.intrinsics.function_prototype),
+            Some(value) => {
+                let Some(parent) = value.as_object().filter(|o| self.is_constructor(*o)) else {
+                    return self.type_error("Class extends value is not a constructor or null");
+                };
+                let parent_prototype = self.get(parent, prototype_key)?;
+                let proto_parent = match parent_prototype.as_object() {
+                    Some(o) => Some(o),
+                    None if parent_prototype == Value::NULL => None,
+                    None => {
+                        return self.type_error(
+                            "Class extends value does not have a valid prototype property",
+                        );
+                    }
+                };
+                (proto_parent, parent)
+            }
+        };
+        let proto = self.new_object_with(proto_parent)?;
+        self.set_prototype_of(f, Some(constructor_parent));
+        self.define_property_or_throw(
+            f,
+            prototype_key,
+            PropertyDescriptor::data_with(Value::object(proto), false, false, false),
+        )?;
+        let constructor_key = PropertyKey::String(self.names.constructor);
+        self.define_property_or_throw(
+            proto,
+            constructor_key,
+            PropertyDescriptor::data_with(Value::object(f), true, false, true),
+        )?;
+        Ok(proto)
+    }
+
+    /// `OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%")`.
+    /// A derived class constructor gets no object: `super()` binds its
+    /// `this`.
+    fn construct_this(&mut self, f: ObjectId, new_target: Value) -> JsResult<Value> {
         let closure = self.heap.closure(f).expect("caller checked for a closure");
-        if self.heap.code(closure.code).kind != FunctionKind::Normal {
+        let kind = self.heap.code(closure.code).kind;
+        if !kind.is_constructor() {
             return self.type_error("value is not a constructor");
         }
-        let prototype = self.get(f, PropertyKey::String(self.names.prototype))?;
+        if kind == FunctionKind::DerivedConstructor {
+            return Ok(Value::UNINITIALIZED);
+        }
+        let source = new_target.as_object().unwrap_or(f);
+        let prototype = self.get(source, PropertyKey::String(self.names.prototype))?;
         let prototype = prototype
             .as_object()
             .unwrap_or(self.intrinsics.object_prototype);
@@ -412,6 +478,9 @@ impl Agent {
     ) -> JsResult<()> {
         let closure = self.heap.closure(f).expect("caller checked for a closure");
         let code = self.heap.code(closure.code);
+        if !construct && code.kind.is_class_constructor() {
+            return self.type_error("Class constructor cannot be invoked without 'new'");
+        }
         let this = if code.kind == FunctionKind::Arrow {
             closure.this
         } else if code.strict || this.as_object().is_some() {
@@ -823,6 +892,7 @@ impl Agent {
                     key,
                     function,
                     setter,
+                    enumerable,
                 } => {
                     let (o, k, f) = (reg!(object), reg!(key), reg!(function));
                     let o = o.as_object().expect("literals are objects");
@@ -830,11 +900,136 @@ impl Agent {
                     let desc = PropertyDescriptor {
                         get: (!setter).then_some(f),
                         set: setter.then_some(f),
-                        enumerable: Some(true),
+                        enumerable: Some(enumerable),
                         configurable: Some(true),
                         ..PropertyDescriptor::default()
                     };
                     t!(self.define_property_or_throw(o, key, desc));
+                }
+                Op::DefineMethod { object, key, value } => {
+                    let (o, k, v) = (reg!(object), reg!(key), reg!(value));
+                    let o = o.as_object().expect("class objects are objects");
+                    let key = t!(self.to_property_key(k));
+                    let desc = PropertyDescriptor::data_with(v, true, false, true);
+                    t!(self.define_property_or_throw(o, key, desc));
+                }
+                Op::ClassSetup {
+                    ctor,
+                    heritage,
+                    proto,
+                    derived,
+                } => {
+                    let f = reg!(ctor).as_object().expect("a class constructor");
+                    let heritage = reg!(heritage);
+                    reg!(proto) =
+                        Value::object(t!(self.class_setup(f, derived.then_some(heritage))));
+                }
+                Op::GetPrototypeOf { dst, src } => {
+                    let Some(o) = reg!(src).as_object() else {
+                        t!(self.type_error::<()>("value has no prototype"));
+                        unreachable!("the error returned");
+                    };
+                    reg!(dst) = self.get_prototype_of(o).map_or(Value::NULL, Value::object);
+                }
+                Op::GetSuper {
+                    dst,
+                    object,
+                    key,
+                    this,
+                } => {
+                    let (home, k, this) = (reg!(object), reg!(key), reg!(this));
+                    let Some(home) = home.as_object() else {
+                        t!(self.type_error::<()>("super has no properties: the prototype is null"));
+                        unreachable!("the error returned");
+                    };
+                    let key = t!(self.to_property_key(k));
+                    reg!(dst) = t!(self.get_with_receiver(home, key, this));
+                }
+                Op::SetSuper {
+                    object,
+                    key,
+                    value,
+                    this,
+                } => {
+                    let (home, k, v, this) = (reg!(object), reg!(key), reg!(value), reg!(this));
+                    let Some(home) = home.as_object() else {
+                        t!(self.type_error::<()>("super has no properties: the prototype is null"));
+                        unreachable!("the error returned");
+                    };
+                    let key = t!(self.to_property_key(k));
+                    if !t!(self.set_with_receiver(home, key, v, this)) {
+                        t!(self.type_error::<()>(
+                            "cannot assign to a read-only property through super"
+                        ));
+                    }
+                }
+                Op::SuperCall {
+                    dst,
+                    callee,
+                    new_target,
+                    args,
+                    argc,
+                } => {
+                    t!(self.safepoint());
+                    let (f, nt) = (reg!(callee), reg!(new_target));
+                    let o = t!(self.super_constructor(f));
+                    let this = t!(self.construct_this(o, nt));
+                    let top = self.vm.stack.len();
+                    t!(self.push_closure_frame(
+                        o,
+                        this,
+                        nt,
+                        base + usize::from(args),
+                        usize::from(argc),
+                        dst,
+                        true,
+                        top
+                    ));
+                    let caller = self.vm.frames.len() - 2;
+                    self.vm.frames[caller].pc = pc as u32;
+                    return Ok(Flow::Switch);
+                }
+                Op::SuperCallSpread {
+                    dst,
+                    callee,
+                    new_target,
+                    array,
+                } => {
+                    t!(self.safepoint());
+                    let (f, nt, array) = (reg!(callee), reg!(new_target), reg!(array));
+                    let o = t!(self.super_constructor(f));
+                    let this = t!(self.construct_this(o, nt));
+                    let args_at = self.vm.stack.len();
+                    let argc = self.push_array_elements(array);
+                    if let Err(e) =
+                        self.push_closure_frame(o, this, nt, args_at, argc, dst, true, args_at)
+                    {
+                        self.vm.stack.truncate(args_at);
+                        t!(Err(e));
+                    }
+                    let caller = self.vm.frames.len() - 2;
+                    self.vm.frames[caller].pc = pc as u32;
+                    return Ok(Flow::Switch);
+                }
+                Op::GetSlotRaw { dst, hops, slot } => {
+                    let scope = self.env_outer_n(env, hops);
+                    reg!(dst) = self.env_slot(scope, slot);
+                }
+                Op::ThrowIfInit { src } => {
+                    if reg!(src) != Value::UNINITIALIZED {
+                        t!(Err(self.throw(
+                            ErrorKind::ReferenceError,
+                            "Super constructor may only be called once"
+                        )));
+                    }
+                }
+                Op::DerivedResult { src } => {
+                    let v = reg!(src);
+                    if v != Value::UNDEFINED && v.as_object().is_none() {
+                        t!(self.type_error::<()>(
+                            "Derived constructors may only return an object or undefined"
+                        ));
+                    }
                 }
                 Op::NewObject { dst } => {
                     reg!(dst) = Value::object(t!(self.new_object()));
@@ -1026,7 +1221,7 @@ impl Agent {
                         t!(self.type_error::<()>("value is not a constructor"));
                         unreachable!("the error returned");
                     };
-                    let this = t!(self.construct_this(o));
+                    let this = t!(self.construct_this(o, f));
                     let top = self.vm.stack.len();
                     t!(self.push_closure_frame(
                         o,
@@ -1089,7 +1284,7 @@ impl Agent {
                         t!(self.type_error::<()>("value is not a constructor"));
                         unreachable!("the error returned");
                     };
-                    let this = t!(self.construct_this(o));
+                    let this = t!(self.construct_this(o, f));
                     let args_at = self.vm.stack.len();
                     let argc = self.push_array_elements(array);
                     if let Err(e) =

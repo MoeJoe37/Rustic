@@ -3150,197 +3150,22 @@
           "label": "Core built-ins and collections",
           "size": 8,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Error and native errors, Object, Function.prototype, global functions and primitive wrapper constructors",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/error.rs",
-                  "marker": "fn construct_error"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/object.rs",
-                  "marker": "\"getOwnPropertyDescriptors\""
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/function.rs",
-                  "marker": "fn new_bound_function"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/global.rs",
-                  "marker": "fn parse_int"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn core_built_ins"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins.rs",
+              "marker": "pub(crate) fn install(agent: &mut Agent)"
             },
             {
-              "label": "Array, iterators and array-likes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/array.rs",
-                  "marker": "fn array_species_create"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn core_built_ins()"
             },
             {
-              "label": "Function constructor, Math and Symbol statics",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/math.rs",
-                  "marker": "fn round_half_up"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/mod.rs",
-                  "marker": "fn create_dynamic_function"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
-                }
-              ]
-            },
-            {
-              "label": "String, Number and Boolean prototypes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
-                  "marker": "fn map_case"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/number_object.rs",
-                  "marker": "fn exact_decimal"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn strings_numbers_and_json"
-                }
-              ]
-            },
-            {
-              "label": "JSON",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/json.rs",
-                  "marker": "fn internalize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn strings_numbers_and_json"
-                }
-              ]
-            },
-            {
-              "label": "Map, Set, WeakMap, WeakSet and WeakRef",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/table.rs",
-                  "marker": "pub(crate) struct OrderedTable"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/collections.rs",
-                  "marker": "fn table_iterator_next"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn collections_and_reflect"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn abandoned_map_iterators_stop_holding_tables_after_a_collection"
-                }
-              ]
-            },
-            {
-              "label": "Date",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/date.rs",
-                  "marker": "fn days_from_civil"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn dates"
-                }
-              ]
-            },
-            {
-              "label": "Iterator helpers, Iterator.from and Iterator.concat",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/iterator.rs",
-                  "marker": "fn helper_next"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn iterator_helpers"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn iterator_helpers_keep_their_iterators_and_functions_alive"
-                }
-              ]
-            },
-            {
-              "label": "Direct and indirect eval",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/mod.rs",
-                  "marker": "pub(crate) fn prepare_eval"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/scope.rs",
-                  "marker": "fn direct_eval"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn eval()"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/test262.rs",
+              "marker": "fn test262_built_ins_execution_matches_the_passing_list"
             }
           ]
         },

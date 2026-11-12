@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "75a4ed3d1a4e3ac020fd9e4a9ef06d5073f9a268b01560437f546c7169dbd1b2",
-  "percent": "24.93",
-  "verified_percent": "20.90",
-  "partial_percent": "4.03",
-  "completed": 54,
-  "in_progress": 8,
+  "source_fingerprint": "92c8070b9410f9877c5aedeb967446791c1dd7bd4050b9a3819809d4a350488a",
+  "percent": "25.05",
+  "verified_percent": "21.99",
+  "partial_percent": "3.06",
+  "completed": 55,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -45,11 +45,11 @@
       "id": "M4",
       "label": "ECMAScript runtime",
       "share": "8.90",
-      "completed": 1,
+      "completed": 2,
       "total": 13,
-      "percent": "52.88",
-      "verified_percent": "12.30",
-      "partial_percent": "40.58"
+      "percent": "54.25",
+      "verified_percent": "24.61",
+      "partial_percent": "29.64"
     },
     {
       "id": "M5",
@@ -3464,184 +3464,25 @@
           "label": "Core built-ins and collections",
           "size": 8,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Error and native errors, Object, Function.prototype, global functions and primitive wrapper constructors",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/error.rs",
-                  "marker": "fn construct_error"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/object.rs",
-                  "marker": "\"getOwnPropertyDescriptors\""
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/function.rs",
-                  "marker": "fn new_bound_function"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/global.rs",
-                  "marker": "fn parse_int"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn core_built_ins"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins.rs",
+              "marker": "pub(crate) fn install(agent: &mut Agent)"
             },
             {
-              "label": "Array, iterators and array-likes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/array.rs",
-                  "marker": "fn array_species_create"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn core_built_ins()"
             },
             {
-              "label": "Function constructor, Math and Symbol statics",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/math.rs",
-                  "marker": "fn round_half_up"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/mod.rs",
-                  "marker": "fn create_dynamic_function"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
-                }
-              ]
-            },
-            {
-              "label": "String, Number and Boolean prototypes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
-                  "marker": "fn map_case"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/number_object.rs",
-                  "marker": "fn exact_decimal"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn strings_numbers_and_json"
-                }
-              ]
-            },
-            {
-              "label": "JSON",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/json.rs",
-                  "marker": "fn internalize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn strings_numbers_and_json"
-                }
-              ]
-            },
-            {
-              "label": "Map, Set, WeakMap, WeakSet and WeakRef",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/table.rs",
-                  "marker": "pub(crate) struct OrderedTable"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/collections.rs",
-                  "marker": "fn table_iterator_next"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn collections_and_reflect"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn abandoned_map_iterators_stop_holding_tables_after_a_collection"
-                }
-              ]
-            },
-            {
-              "label": "Date",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/date.rs",
-                  "marker": "fn days_from_civil"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn dates"
-                }
-              ]
-            },
-            {
-              "label": "Iterator helpers, Iterator.from and Iterator.concat",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/iterator.rs",
-                  "marker": "fn helper_next"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn iterator_helpers"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/gc.rs",
-                  "marker": "fn iterator_helpers_keep_their_iterators_and_functions_alive"
-                }
-              ]
-            },
-            {
-              "label": "eval (TD-106)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/test262.rs",
+              "marker": "fn test262_built_ins_execution_matches_the_passing_list"
             }
           ],
-          "credit": "88.88",
+          "credit": "100.00",
           "engine_share": "1.09"
         },
         {
@@ -3775,13 +3616,13 @@
         }
       ],
       "points": 73,
-      "completed": 1,
-      "in_progress": 7,
+      "completed": 2,
+      "in_progress": 6,
       "total": 15,
-      "contribution": "4.98",
-      "percent": "49.82",
-      "verified_percent": "10.95",
-      "partial_percent": "38.87"
+      "contribution": "5.10",
+      "percent": "51.04",
+      "verified_percent": "21.91",
+      "partial_percent": "29.13"
     },
     {
       "id": "wasm",

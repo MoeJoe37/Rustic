@@ -97,9 +97,51 @@ exact. To regenerate it, run
 `cargo run --release -p rustic-js --example test262_parse -- DIR OUT` and
 keep the header lines.
 
-This is parse-phase evidence only. Runtime and resolution phases, and the
-published Test262 results the M4 gate requires, arrive with the runner in
-JS-07. Parse-phase results must not be advertised as ECMAScript support.
+This is parse-phase evidence only and must not be advertised as ECMAScript
+support. What runs is measured by the execution gate below.
+
+### Test262 execution (JS-07)
+
+`rustic_js::test262::execute` runs a file as Test262's `INTERPRETING.md`
+specifies: a fresh agent for each mode, the harness files `assert.js` and
+`sta.js` plus the file's `includes`, then the test, as a sloppy script and
+again with `"use strict";` in front (`onlyStrict`, `noStrict` and `raw`
+honored). A `negative` file must fail in the phase it names with the error it
+names. Every run has a 64 MiB heap and a budget of 5 million safe points
+(loop iterations and calls), so a runaway test fails identically on every
+machine and no wall clock is involved. A panic inside the engine is caught
+and counted as a failure.
+
+```sh
+RUSTIC_TEST262_DIR=/path/to/test262 \
+  cargo test --release -p rustic-js --test test262 -- --ignored
+cargo run --release -p rustic-js --example test262 -- /path/to/test262 \
+  test/language --list results.tsv
+```
+
+The example prints pass, fail and skip counts per directory, and `--list`
+writes the verdict and reason for every file. At the pinned revision, on
+`test/language`:
+
+| | Files |
+| --- | ---: |
+| Pass | 7,708 |
+| Fail | 10,065 |
+| Skipped (modules 817, async, proposals) | 6,059 |
+
+That is 43.4% of the 17,773 files that run, and 32.3% of all 23,832. The
+whole run takes 16 seconds on one core. The files that pass are listed in
+`tests/fixtures/test262_language_passing.txt`, and the gate compares exactly:
+a file that stops passing fails the gate, and so does one that starts passing
+until the list is regenerated with `RUSTIC_TEST262_BLESS=1`. Run the gate in
+release mode on a 64-bit host; the list is not checked on other targets.
+
+Most failures are not interpreter bugs yet. 3,308 files need generators or
+async functions (JS-08), about 5,600 stop at a global that does not exist
+(`Array`, `Object`, `TypeError`, `eval`, `Symbol`, ...; JS-05), and 227 need
+regular expressions. Skipped files are never counted as passing. Only
+`test/language` is run: `test/built-ins` joins with JS-05, and module and
+async files with JS-06 (TD-105).
 
 ## Fuzzing
 

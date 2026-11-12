@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 23.68%** = 20.90% verified complete + 2.78% partial credit. 54/221 capabilities complete, 6 in progress.
+**Overall completion: 23.96%** = 20.90% verified complete + 3.06% partial credit. 54/221 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `999174f157eaa432c7a5ac0f8ca08b108fc29205ea2d5161fdec977f157e18c1`.
+Catalog: `engine-v4`. Source fingerprint: `df9d683c488c26aa215a0af88aa0a504598d583331421b77a9d104075a309730`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `999174f157eaa432c7a5ac0f8ca08b108fc29
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
-| M9 Compatibility expansion | 0/52 | 0.66% | 0.00% | 22.10% |
+| M9 Compatibility expansion | 0/52 | 1.90% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
 | M11 Web platform parity | 0/30 | 0.00% | 0.00% | 14.85% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.91% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `999174f157eaa432c7a5ac0f8ca08b108fc29
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 1/15 | 5 | 37.34% | 10.95% | 10% | 3.73 |
+| JavaScript & GC | 1/15 | 6 | 40.08% | 10.95% | 10% | 4.00 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -209,7 +209,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **planned** `js.intl` — Intl and required Unicode semantics · size 5 · M4 · 0.68% of engine
 - **planned** `js.wasm` — JavaScript/WebAssembly identity, conversions and tracing integration · size 3 · M9 · 0.41% of engine
 - **planned** `js.limits` — Cancellation, stack/heap limits and GC stress · size 3 · M4 · 0.41% of engine
-- **planned** `js.conformance` — Declared full Test262 and runtime correctness gate · size 5 · M9 · 0.68% of engine
+- **in progress 40.00%** `js.conformance` — Declared full Test262 and runtime correctness gate · size 5 · M9 · 0.68% of engine
+  - [x] Test262 runner: metadata, strict and sloppy modes, negative tests, deterministic step and heap limits ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/src/test262.rs))
+  - [x] Exact passing list for test/language at the pinned revision ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs))
+  - [ ] test/built-ins in the gate
+  - [ ] Module and async files, and the $262 host object
+  - [ ] Declared full pass rate with every exception justified
 
 ### WebAssembly
 

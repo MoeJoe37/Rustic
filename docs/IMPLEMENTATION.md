@@ -1182,6 +1182,18 @@ brand check. Object-literal `super` (through the closure's home object),
 tagged templates (one frozen template object per site, kept by the code) and
 optional calls completed the JS-04 syntax.
 
+## JS-07 — Test262 runner (first part)
+
+`rustic_js::test262` now executes tests as well as parsing them: a fresh agent
+per mode, the harness files and includes, strict and sloppy runs, negative
+expectations by phase and error name, and a heap limit plus a step budget per
+run so results do not depend on the machine. `examples/test262.rs` prints
+counts per directory and a verdict per file. At the pinned revision 7,708 of
+the 17,773 `test/language` files that run pass (43.4%), in 16 seconds; the
+passing files are committed as an exact list that the ignored gate test
+compares. Modules, async files and `test/built-ins` are not run yet (TD-105).
+See [JS.md](JS.md#test262-execution-js-07).
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,
@@ -1244,6 +1256,7 @@ lists the next tasks.
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; no collection yet (TD-91), partial BigInt conversions (TD-92); see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
 | JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators, async, modules and RegExp remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
+| JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (7,708 of 17,773 run files); modules, async and built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
 | JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
 
 M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and

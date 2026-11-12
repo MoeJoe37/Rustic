@@ -1,4 +1,4 @@
-//! Test262 parse-phase gate. The suite is not vendored: point
+//! Test262 gates: the parse phase (JS-01) and execution (JS-07). The suite is not vendored: point
 //! `RUSTIC_TEST262_DIR` at a checkout of the revision pinned in
 //! `fixtures/test262_expected_failures.txt` and run
 //! `cargo test --release -p rustic-js --test test262 -- --ignored`.
@@ -9,9 +9,11 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use rustic_js::ParseLimits;
-use rustic_js::test262::run_tree;
+use rustic_js::test262::{RunLimits, execute_tree, run_tree};
 
 const EXPECTED: &str = include_str!("fixtures/test262_expected_failures.txt");
+/// The `test/language` files that pass when executed, without that prefix.
+const PASSING: &str = include_str!("fixtures/test262_language_passing.txt");
 
 fn pinned_revision() -> &'static str {
     EXPECTED
@@ -65,5 +67,83 @@ fn test262_parse_phase_matches_expected_failures() {
         report.passed > 22_000,
         "only {} files passed",
         report.passed
+    );
+}
+
+#[test]
+fn passing_list_is_sorted_and_names_the_same_revision() {
+    let paths: Vec<&str> = PASSING.lines().filter(|l| !l.starts_with('#')).collect();
+    assert!(paths.windows(2).all(|w| w[0] < w[1]));
+    assert!(paths.iter().all(|p| p.ends_with(".js")));
+    let revision = PASSING
+        .lines()
+        .find_map(|line| line.strip_prefix("# Revision: "))
+        .and_then(|rest| rest.split_whitespace().next());
+    assert_eq!(revision, Some(pinned_revision()));
+}
+
+/// Executes `test/language` and compares the files that pass with the
+/// committed list, exactly: a regression and an unrecorded improvement
+/// both fail. `RUSTIC_TEST262_BLESS=1` rewrites the list instead.
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_language_execution_matches_the_passing_list() {
+    let root = PathBuf::from(
+        std::env::var("RUSTIC_TEST262_DIR").expect("RUSTIC_TEST262_DIR names a Test262 checkout"),
+    );
+    let report = execute_tree(&root, "test/language", RunLimits::default())
+        .expect("Test262 tree is readable");
+    let actual: BTreeSet<&str> = report
+        .passed
+        .iter()
+        .map(|p| p.strip_prefix("test/language/").expect("inside the tree"))
+        .collect();
+    if std::env::var_os("RUSTIC_TEST262_BLESS").is_some() {
+        let mut text = format!(
+            "# Test262 test/language files that pass when executed (JS-07).\n\
+             # Revision: {} of https://github.com/tc39/test262\n\
+             # {} pass, {} fail, {} skipped (modules, async, proposals).\n\
+             # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.\n",
+            pinned_revision(),
+            report.passed.len(),
+            report.failed.len(),
+            report.skipped.len()
+        );
+        for path in &actual {
+            text.push_str(path);
+            text.push('\n');
+        }
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/test262_language_passing.txt");
+        std::fs::write(fixture, text).expect("the fixture is writable");
+        return;
+    }
+    let expected: BTreeSet<&str> = PASSING.lines().filter(|l| !l.starts_with('#')).collect();
+    let regressed: Vec<String> = report
+        .failed
+        .iter()
+        .filter_map(|(path, reason)| {
+            let short = path.strip_prefix("test/language/")?;
+            expected
+                .contains(short)
+                .then(|| format!("{short}: {reason}"))
+        })
+        .collect();
+    let missing: Vec<&&str> = expected
+        .difference(&actual)
+        .filter(|p| !regressed.iter().any(|r| r.starts_with(**p)))
+        .collect();
+    let improved: Vec<&&str> = actual.difference(&expected).collect();
+    assert!(
+        regressed.is_empty(),
+        "regressions:\n{}",
+        regressed.join("\n")
+    );
+    assert!(missing.is_empty(), "listed but not run: {missing:?}");
+    assert!(
+        improved.is_empty(),
+        "{} files now pass; bless the list (first: {:?})",
+        improved.len(),
+        improved.iter().take(10).collect::<Vec<_>>()
     );
 }

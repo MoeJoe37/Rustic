@@ -136,6 +136,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
+| TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs only `test/language` | Open, JS-05/JS-06 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1451,3 +1452,16 @@ The second half of this entry is paid: scope environments of compiled code
 share the name list their function's code owns and box the fields only
 function and global records need, so the environment of a closure that
 captures one variable costs 64 bytes instead of 112.
+
+### TD-105 — Test262 runner coverage
+
+The execution runner (JS-07) skips files flagged `module` or `async` (6,059
+of 23,832 in `test/language` together with proposal features), does not
+provide the `$262` host object (`createRealm`, `evalScript`, `detachArrayBuffer`,
+`agent`), and its gate covers `test/language` only. Skipped files are counted
+as skipped, never as passing, so published percentages always state their
+base.
+
+Pay with: `test/built-ins` in the gate as JS-05 lands each library area;
+module and async files when promise jobs and module loading exist (JS-06);
+`$262` with realms (JS-06). Trigger: each of those steps.

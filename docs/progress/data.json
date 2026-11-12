@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "999174f157eaa432c7a5ac0f8ca08b108fc29205ea2d5161fdec977f157e18c1",
-  "percent": "23.68",
+  "source_fingerprint": "df9d683c488c26aa215a0af88aa0a504598d583331421b77a9d104075a309730",
+  "percent": "23.96",
   "verified_percent": "20.90",
-  "partial_percent": "2.78",
+  "partial_percent": "3.06",
   "completed": 54,
-  "in_progress": 6,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -97,9 +97,9 @@
       "share": "22.10",
       "completed": 0,
       "total": 52,
-      "percent": "0.66",
+      "percent": "1.90",
       "verified_percent": "0.00",
-      "partial_percent": "0.66"
+      "partial_percent": "1.90"
     },
     {
       "id": "M10",
@@ -3544,20 +3544,69 @@
           "label": "Declared full Test262 and runtime correctness gate",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Test262 runner: metadata, strict and sloppy modes, negative tests, deterministic step and heap limits",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/test262.rs",
+                  "marker": "pub fn execute_tree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/src/test262.rs",
+                  "marker": "fn negative_tests_need_the_named_error_in_the_named_phase"
+                }
+              ]
+            },
+            {
+              "label": "Exact passing list for test/language at the pinned revision",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/test262.rs",
+                  "marker": "pub struct ExecutionReport"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/test262.rs",
+                  "marker": "fn test262_language_execution_matches_the_passing_list"
+                }
+              ]
+            },
+            {
+              "label": "test/built-ins in the gate",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Module and async files, and the $262 host object",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Declared full pass rate with every exception justified",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "40.00",
           "engine_share": "0.68"
         }
       ],
       "points": 73,
       "completed": 1,
-      "in_progress": 5,
+      "in_progress": 6,
       "total": 15,
-      "contribution": "3.73",
-      "percent": "37.34",
+      "contribution": "4.00",
+      "percent": "40.08",
       "verified_percent": "10.95",
-      "partial_percent": "26.39"
+      "partial_percent": "29.13"
     },
     {
       "id": "wasm",

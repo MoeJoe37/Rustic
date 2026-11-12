@@ -2213,3 +2213,40 @@ fn generators() {
         "5",
     );
 }
+
+#[test]
+fn destructuring_closes_iterators_on_abrupt_completion() {
+    let _report = Report;
+    let iterable = "var log = []; var it = { [Symbol.iterator]() { return this }, \
+         next() { log.push('next'); return { value: 1, done: false } }, \
+         return() { log.push('return'); return {} } };";
+    check(
+        &format!(
+            "{iterable} try {{ var [a = (() => {{ throw 'x' }})()] = it }} catch (e) {{}} log.join()"
+        ),
+        "next,return",
+    );
+    // A target that throws closes it; the original error wins over one
+    // from `return`.
+    check(
+        &format!(
+            "{iterable} it.return = function () {{ throw 'r' }}; \
+                  var o = {{ set p(v) {{ throw 'p' }} }}; try {{ [o.p] = it }} catch (e) {{ e }}"
+        ),
+        "p",
+    );
+    // An error from the iterator itself does not close it.
+    check(
+        "var closed = 0; var it = { [Symbol.iterator]() { return this }, next() { throw 'n' }, \
+         return() { closed++; return {} } }; try { var [a] = it } catch (e) {} closed",
+        "0",
+    );
+    // A generator returning from a `yield` in a default closes it too.
+    check(
+        &format!(
+            "{iterable} function* g() {{ var [a = yield] = [undefined]; var [b, c = yield] = it }} \
+                  var gen = g(); gen.next(); gen.next(); gen.return(); log.join()"
+        ),
+        "next,next,return",
+    );
+}

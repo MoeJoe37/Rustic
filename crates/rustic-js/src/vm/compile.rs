@@ -2812,6 +2812,19 @@ impl<'a, 't> Gen<'a, 't> {
                     src: value,
                 });
                 self.load_bool(done, false);
+                // A throw while binding closes the iterator (a throw from
+                // the iterator itself has cleared it first), and so does a
+                // generator's `return` from a `yield` in a default.
+                let guard_start = self.here();
+                let scope_depth = self.depth;
+                self.push_control(
+                    ControlKind::Iterator {
+                        iterator,
+                        owner: usize::MAX,
+                    },
+                    Vec::new(),
+                    false,
+                );
                 for element in elements {
                     let skip = self.emit(Op::JumpIfTrue {
                         cond: done,
@@ -2854,6 +2867,8 @@ impl<'a, 't> Gen<'a, 't> {
                     self.patch_here(skip);
                     self.bind_pattern(rest, array, init)?;
                 }
+                self.controls.pop();
+                let guard_end = self.here();
                 let finished = self.emit(Op::JumpIfTrue {
                     cond: done,
                     target: 0,
@@ -2862,7 +2877,23 @@ impl<'a, 't> Gen<'a, 't> {
                     iterator,
                     silent: false,
                 });
+                let skip = self.jump();
+                let landing = self.here();
+                let exception = self.temp()?;
+                self.handlers.push(Handler {
+                    start: guard_start,
+                    end: guard_end,
+                    target: landing,
+                    exception,
+                    scope_depth,
+                });
+                self.emit(Op::IteratorClose {
+                    iterator,
+                    silent: true,
+                });
+                self.emit(Op::Throw { src: exception });
                 self.patch_here(finished);
+                self.patch_here(skip);
                 self.release(mark);
                 Ok(())
             }

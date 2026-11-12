@@ -376,7 +376,8 @@ calls a function value. The design is recorded in
     (a conversion, a callback of a native), the body does not collect
     (`generator_bodies_collect_at_their_safe_points`).
   - Test262: with generators, `test/language` went from 13,087 to 16,138 of
-    17,773 files (90.8%), and the built-ins gate gained 268 files, mostly in
+    17,773 files (90.8%; 16,150 once array destructuring closed its iterator
+    on errors, TD-100), and the built-ins gate gained 268 files, mostly in
     `Iterator`; `GeneratorFunction` and `GeneratorPrototype` are gated.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
   anything runs, TD-97): async functions, modules, regular

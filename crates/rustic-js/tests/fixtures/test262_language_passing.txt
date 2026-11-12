@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 16138 pass, 1635 fail, 6059 skipped (modules, async, proposals).
+# 16150 pass, 1623 fail, 6059 skipped (modules, async, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -1212,8 +1212,10 @@ expressions/assignment/S8.12.5_A1.js
 expressions/assignment/S8.12.5_A2.js
 expressions/assignment/assignment-operator-calls-putvalue-lref--rval--1.js
 expressions/assignment/assignment-operator-calls-putvalue-lref--rval-.js
+expressions/assignment/destructuring/default-expr-throws-iterator-return-get-throws.js
 expressions/assignment/destructuring/default-expr-throws-iterator-return-is-not-callable.js
 expressions/assignment/destructuring/obj-prop-__proto__dup.js
+expressions/assignment/destructuring/target-assign-throws-iterator-return-get-throws.js
 expressions/assignment/destructuring/target-assign-throws-iterator-return-is-not-callable.js
 expressions/assignment/dstr/array-elem-init-assignment.js
 expressions/assignment/dstr/array-elem-init-evaluation.js
@@ -1234,6 +1236,8 @@ expressions/assignment/dstr/array-elem-iter-nrml-close-err.js
 expressions/assignment/dstr/array-elem-iter-nrml-close-null.js
 expressions/assignment/dstr/array-elem-iter-nrml-close-skip.js
 expressions/assignment/dstr/array-elem-iter-nrml-close.js
+expressions/assignment/dstr/array-elem-iter-rtrn-close-null.js
+expressions/assignment/dstr/array-elem-iter-rtrn-close.js
 expressions/assignment/dstr/array-elem-iter-thrw-close-skip.js
 expressions/assignment/dstr/array-elem-nested-array-invalid.js
 expressions/assignment/dstr/array-elem-nested-array-null.js
@@ -1281,6 +1285,9 @@ expressions/assignment/dstr/array-elem-trlg-iter-list-nrml-close-err.js
 expressions/assignment/dstr/array-elem-trlg-iter-list-nrml-close-null.js
 expressions/assignment/dstr/array-elem-trlg-iter-list-nrml-close-skip.js
 expressions/assignment/dstr/array-elem-trlg-iter-list-nrml-close.js
+expressions/assignment/dstr/array-elem-trlg-iter-list-rtrn-close-err.js
+expressions/assignment/dstr/array-elem-trlg-iter-list-rtrn-close-null.js
+expressions/assignment/dstr/array-elem-trlg-iter-list-rtrn-close.js
 expressions/assignment/dstr/array-elem-trlg-iter-list-thrw-close-skip.js
 expressions/assignment/dstr/array-elem-trlg-iter-rest-nrml-close-skip.js
 expressions/assignment/dstr/array-elem-trlg-iter-rest-thrw-close-skip.js
@@ -13382,6 +13389,8 @@ statements/for-of/dstr/array-elem-iter-nrml-close-err.js
 statements/for-of/dstr/array-elem-iter-nrml-close-null.js
 statements/for-of/dstr/array-elem-iter-nrml-close-skip.js
 statements/for-of/dstr/array-elem-iter-nrml-close.js
+statements/for-of/dstr/array-elem-iter-rtrn-close-null.js
+statements/for-of/dstr/array-elem-iter-rtrn-close.js
 statements/for-of/dstr/array-elem-iter-thrw-close-skip.js
 statements/for-of/dstr/array-elem-nested-array-invalid.js
 statements/for-of/dstr/array-elem-nested-array-null.js
@@ -13429,6 +13438,9 @@ statements/for-of/dstr/array-elem-trlg-iter-list-nrml-close-err.js
 statements/for-of/dstr/array-elem-trlg-iter-list-nrml-close-null.js
 statements/for-of/dstr/array-elem-trlg-iter-list-nrml-close-skip.js
 statements/for-of/dstr/array-elem-trlg-iter-list-nrml-close.js
+statements/for-of/dstr/array-elem-trlg-iter-list-rtrn-close-err.js
+statements/for-of/dstr/array-elem-trlg-iter-list-rtrn-close-null.js
+statements/for-of/dstr/array-elem-trlg-iter-list-rtrn-close.js
 statements/for-of/dstr/array-elem-trlg-iter-list-thrw-close-skip.js
 statements/for-of/dstr/array-elem-trlg-iter-rest-nrml-close-skip.js
 statements/for-of/dstr/array-elem-trlg-iter-rest-thrw-close-skip.js

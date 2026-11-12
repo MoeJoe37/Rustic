@@ -1881,7 +1881,12 @@ impl Agent {
                             jump!(done);
                         }
                     } else {
-                        match t!(self.iterator_step(it, step)) {
+                        let stepped = self.iterator_step(it, step);
+                        if stepped.is_err() {
+                            // The iterator is done: nothing closes it.
+                            reg!(iterator) = Value::UNDEFINED;
+                        }
+                        match t!(stepped) {
                             Some(value) => reg!(dst) = value,
                             None => {
                                 reg!(iterator) = Value::UNDEFINED;

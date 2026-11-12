@@ -131,7 +131,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-97 | Deliberate | JS | Async functions, modules, RegExp literals and BigInt literals are rejected by the bytecode compiler (generators paid) | Open, JS-06/JS-08 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
-| TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Open, JS-05 |
+| TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
 | TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Open, JS-09 |
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
@@ -1408,15 +1408,19 @@ only; the Annex B hoisting to the function scope is missing.
 Pay with the exotic objects of JS-05. Trigger: a Test262 selection or real
 script that depends on either.
 
-### TD-100 — Destructuring does not close iterators on error
+### TD-100 — Destructuring does not close iterators on error (Paid)
 
 `for-of` closes its iterator on `break`, `return` and throw. Array
-destructuring (`[a, b] = iterable`) closes it after a normal finish, but not
-when evaluating a target or default throws midway.
+destructuring (`[a, b] = iterable`) closed it after a normal finish, but not
+when evaluating a target or default threw midway.
 
-Pay with JS-05's iterator helpers. Trigger: generators (JS-08) make the
-missing `return()` call observable in common code. Generators run since
-2026-11-12, so this is due next.
+Paid on 2026-11-12, once generators made the missing `return()` call
+observable: the binding of an array pattern runs under a handler that closes
+the iterator and rethrows (keeping the original error over one from
+`return`), and under an iterator control so a generator's `return()` from a
+`yield` in a default closes it too. An error from the iterator's own `next`
+or `value` marks it done first, so nothing closes it, as for `for-of`.
+`destructuring_closes_iterators_on_abrupt_completion` covers it.
 
 ### TD-101 — Strings concatenate by copying
 

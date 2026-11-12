@@ -231,6 +231,22 @@ pub enum Op {
         new_target: Reg,
         array: Reg,
     },
+    /// `dst = a fresh private name` described by `constants[name]`.
+    NewPrivateName { dst: Reg, name: u32 },
+    /// `dst = object.#key`, a private field.
+    PrivateGet { dst: Reg, object: Reg, key: Reg },
+    /// `object.#key = value`, a private field that must exist.
+    PrivateSet { object: Reg, key: Reg, value: Reg },
+    /// Add the private field or brand `key` to `object`.
+    PrivateAdd { object: Reg, key: Reg, value: Reg },
+    /// `dst = #key in object`. `key` is a private name the object must
+    /// own, or (for static methods) the class the object must be.
+    PrivateHas { dst: Reg, object: Reg, key: Reg },
+    /// Throw a TypeError unless `object` has the brand, as in
+    /// [`Op::PrivateHas`]: the check before a private method or accessor.
+    PrivateBrand { object: Reg, brand: Reg },
+    /// Throw a TypeError with the message `constants[message]`.
+    TypeError { message: u32 },
     /// `dst = scope slot` without the TDZ check.
     GetSlotRaw { dst: Reg, hops: u16, slot: u16 },
     /// Throw a ReferenceError if `src` is initialized: `super()` ran

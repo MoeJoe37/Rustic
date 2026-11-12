@@ -15,8 +15,9 @@ use super::bytecode::{
     BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, UnOp, declare,
 };
 use super::scope::{
-    BindingKind, CLASS, FIELD_INIT, NEW_TARGET, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution,
-    ScopeId, ScopeKind, ScopeTree, THIS, field_key_name,
+    BRAND, BindingKind, CLASS, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER, PRIVATE_SETTER,
+    PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId, ScopeKind,
+    ScopeTree, THIS, field_key_name, private_name, private_setter_name,
 };
 use crate::ast::{
     Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Class, ClassElement,
@@ -740,6 +741,146 @@ impl<'a, 't> Gen<'a, 't> {
         Ok(())
     }
 
+    // ---- private names -----------------------------------------------
+
+    /// The class scope and binding of the private name `#name`: the
+    /// innermost enclosing class that declares it.
+    fn private_binding(&self, name: &str, span: Span) -> CResult<(ScopeId, usize)> {
+        self.tree
+            .resolve_special(self.scope, &private_name(name))
+            .ok_or(CompileError::Unsupported("undeclared private name", span))
+    }
+
+    /// `dst = the compiler-made binding `name` of the class scope`.
+    fn load_scope_binding(&mut self, scope: ScopeId, name: &str, dst: Reg) -> CResult<()> {
+        let index = self.tree.scopes[scope]
+            .find(name)
+            .expect("declared by the resolver");
+        self.load_binding_at(scope, index, name, dst)
+    }
+
+    /// `dst = what marks the objects a private method or accessor of the
+    /// class at `scope` may be used on`: the class itself for a static
+    /// one, the brand its instances carry otherwise.
+    fn load_brand(&mut self, scope: ScopeId, is_static: bool, dst: Reg) -> CResult<()> {
+        self.load_scope_binding(scope, if is_static { CLASS } else { BRAND }, dst)
+    }
+
+    /// Throw a TypeError unless `object` may use the private methods of
+    /// the class at `scope`.
+    fn private_brand_check(&mut self, scope: ScopeId, is_static: bool, object: Reg) -> CResult<()> {
+        let mark = self.mark();
+        let brand = self.temp()?;
+        self.load_brand(scope, is_static, brand)?;
+        self.emit(Op::PrivateBrand { object, brand });
+        self.release(mark);
+        Ok(())
+    }
+
+    fn throw_type_error(&mut self, message: &str) -> CResult<()> {
+        let message = self.atom(message)?;
+        self.emit(Op::TypeError { message });
+        Ok(())
+    }
+
+    /// `dst = object.#name`. `dst` may be `object`.
+    fn private_get(&mut self, object: Reg, name: &str, dst: Reg, span: Span) -> CResult<()> {
+        let (scope, index) = self.private_binding(name, span)?;
+        let binding = &self.tree.scopes[scope].bindings[index];
+        let (kind, flags) = (binding.kind, binding.flags);
+        let is_static = flags & PRIVATE_STATIC != 0;
+        let binding_name = private_name(name);
+        let mark = self.mark();
+        match kind {
+            BindingKind::PrivateField => {
+                let key = self.temp()?;
+                self.load_binding_at(scope, index, &binding_name, key)?;
+                self.emit(Op::PrivateGet { dst, object, key });
+            }
+            BindingKind::PrivateMethod => {
+                self.private_brand_check(scope, is_static, object)?;
+                self.load_binding_at(scope, index, &binding_name, dst)?;
+            }
+            _ => {
+                self.private_brand_check(scope, is_static, object)?;
+                if flags & PRIVATE_GETTER == 0 {
+                    self.throw_type_error(&format!("#{name} was defined without a getter"))?;
+                } else {
+                    let callee = self.temp()?;
+                    self.load_binding_at(scope, index, &binding_name, callee)?;
+                    self.emit(Op::Call {
+                        dst,
+                        callee,
+                        this: object,
+                        args: callee,
+                        argc: 0,
+                    });
+                }
+            }
+        }
+        self.release(mark);
+        Ok(())
+    }
+
+    /// `object.#name = value`
+    fn private_set(&mut self, object: Reg, name: &str, value: Reg, span: Span) -> CResult<()> {
+        let (scope, index) = self.private_binding(name, span)?;
+        let binding = &self.tree.scopes[scope].bindings[index];
+        let (kind, flags) = (binding.kind, binding.flags);
+        let is_static = flags & PRIVATE_STATIC != 0;
+        let mark = self.mark();
+        match kind {
+            BindingKind::PrivateField => {
+                let key = self.temp()?;
+                self.load_binding_at(scope, index, &private_name(name), key)?;
+                self.emit(Op::PrivateSet { object, key, value });
+            }
+            BindingKind::PrivateMethod => {
+                self.private_brand_check(scope, is_static, object)?;
+                self.throw_type_error(&format!("private method #{name} is not writable"))?;
+            }
+            _ => {
+                self.private_brand_check(scope, is_static, object)?;
+                if flags & PRIVATE_SETTER == 0 {
+                    self.throw_type_error(&format!("#{name} was defined without a setter"))?;
+                } else {
+                    let (callee, argument, result) = (self.temp()?, self.temp()?, self.temp()?);
+                    self.load_scope_binding(scope, &private_setter_name(name), callee)?;
+                    self.emit(Op::Move {
+                        dst: argument,
+                        src: value,
+                    });
+                    self.emit(Op::Call {
+                        dst: result,
+                        callee,
+                        this: object,
+                        args: argument,
+                        argc: 1,
+                    });
+                }
+            }
+        }
+        self.release(mark);
+        Ok(())
+    }
+
+    /// `dst = #name in object`. `dst` may be `object`.
+    fn private_in(&mut self, name: &str, object: Reg, dst: Reg, span: Span) -> CResult<()> {
+        let (scope, index) = self.private_binding(name, span)?;
+        let binding = &self.tree.scopes[scope].bindings[index];
+        let (kind, flags) = (binding.kind, binding.flags);
+        let mark = self.mark();
+        let key = self.temp()?;
+        if kind == BindingKind::PrivateField {
+            self.load_binding_at(scope, index, &private_name(name), key)?;
+        } else {
+            self.load_brand(scope, flags & PRIVATE_STATIC != 0, key)?;
+        }
+        self.emit(Op::PrivateHas { dst, object, key });
+        self.release(mark);
+        Ok(())
+    }
+
     /// Evaluate a class definition into `dst`.
     fn class_definition(&mut self, c: &Class, dst: Reg, name_hint: Option<&str>) -> CResult<()> {
         self.guard()?;
@@ -767,6 +908,18 @@ impl<'a, 't> Gen<'a, 't> {
             }
         }
         let mark = self.mark();
+        // Private names exist before anything in the class runs: one per
+        // private field, and one brand for the instance methods.
+        for (i, b) in bindings.iter().enumerate() {
+            if b.kind == BindingKind::PrivateField || &*b.name == BRAND {
+                let inner = self.mark();
+                let key = self.temp()?;
+                let name = self.atom(&b.name)?;
+                self.emit(Op::NewPrivateName { dst: key, name });
+                self.store_binding_at(scope, i, key)?;
+                self.release(inner);
+            }
+        }
         let (heritage, f, proto) = (self.temp()?, self.temp()?, self.temp()?);
         if let Some(h) = &c.super_class {
             self.expr(h, heritage)?;
@@ -816,21 +969,40 @@ impl<'a, 't> Gen<'a, 't> {
                     function,
                     kind: method_kind,
                     is_static,
-                    span,
+                    ..
                 } => {
-                    if matches!(key, PropertyKey::Private(_)) {
-                        return Err(CompileError::Unsupported("private names", *span));
-                    }
                     let inner = self.mark();
                     let (k, v) = (self.temp()?, self.temp()?);
                     let target = if *is_static { f } else { proto };
-                    self.property_key(key, k)?;
                     let key_name = Self::static_key_name(key);
                     let hint = match method_kind {
                         MethodKind::Get => key_name.map(|n| format!("get {n}")),
                         MethodKind::Set => key_name.map(|n| format!("set {n}")),
                         _ => key_name,
                     };
+                    if let PropertyKey::Private(id) = key {
+                        // A private method is not a property: it waits
+                        // in the class scope for a brand-checked access.
+                        let name = if *method_kind == MethodKind::Set {
+                            private_setter_name(&id.name)
+                        } else {
+                            private_name(&id.name)
+                        };
+                        self.next_home = Some(*is_static);
+                        self.function_expression(
+                            function,
+                            v,
+                            hint.as_deref(),
+                            FunctionKind::Method,
+                        )?;
+                        let index = self.tree.scopes[scope]
+                            .find(&name)
+                            .expect("declared by the resolver");
+                        self.store_binding_at(scope, index, v)?;
+                        self.release(inner);
+                        continue;
+                    }
+                    self.property_key(key, k)?;
                     self.next_home = Some(*is_static);
                     self.function_expression(function, v, hint.as_deref(), FunctionKind::Method)?;
                     match method_kind {
@@ -853,16 +1025,8 @@ impl<'a, 't> Gen<'a, 't> {
                     }
                     self.release(inner);
                 }
-                ClassElement::Field {
-                    key,
-                    is_static,
-                    span,
-                    ..
-                } => match key {
-                    PropertyKey::Private(_) => {
-                        return Err(CompileError::Unsupported("private names", *span));
-                    }
-                    PropertyKey::Computed(x) => {
+                ClassElement::Field { key, is_static, .. } => {
+                    if let PropertyKey::Computed(x) = key {
                         let k = self.temp()?;
                         self.expr(x, k)?;
                         self.emit(Op::Unary {
@@ -880,8 +1044,7 @@ impl<'a, 't> Gen<'a, 't> {
                             self.store_binding_at(scope, index, k)?;
                         }
                     }
-                    _ => {}
-                },
+                }
                 ClassElement::StaticBlock(..) => {}
             }
         }
@@ -909,11 +1072,14 @@ impl<'a, 't> Gen<'a, 't> {
                 } => {
                     let inner = self.mark();
                     let (k, v) = (self.temp()?, self.temp()?);
-                    match static_keys[element_index] {
-                        Some(held) => {
+                    match (static_keys[element_index], key) {
+                        (Some(held), _) => {
                             self.emit(Op::Move { dst: k, src: held });
                         }
-                        None => self.property_key(key, k)?,
+                        (None, PropertyKey::Private(id)) => {
+                            self.load_scope_binding(scope, &private_name(&id.name), k)?;
+                        }
+                        (None, _) => self.property_key(key, k)?,
                     }
                     match value {
                         Some(value) => {
@@ -936,11 +1102,19 @@ impl<'a, 't> Gen<'a, 't> {
                             self.emit(Op::Undefined { dst: v });
                         }
                     }
-                    self.emit(Op::DefineProp {
-                        object: f,
-                        key: k,
-                        value: v,
-                    });
+                    if matches!(key, PropertyKey::Private(_)) {
+                        self.emit(Op::PrivateAdd {
+                            object: f,
+                            key: k,
+                            value: v,
+                        });
+                    } else {
+                        self.emit(Op::DefineProp {
+                            object: f,
+                            key: k,
+                            value: v,
+                        });
+                    }
                     self.release(inner);
                 }
                 ClassElement::StaticBlock(body, _) => {
@@ -1019,6 +1193,16 @@ impl<'a, 't> Gen<'a, 't> {
             g.layout_scope(function_scope)?;
             let (this, k, v) = (g.temp()?, g.temp()?, g.temp()?);
             g.emit(Op::This { dst: this });
+            // The brand comes first: initializers may call private methods.
+            if g.tree.scopes[class_scope].find(BRAND).is_some() {
+                g.load_scope_binding(class_scope, BRAND, k)?;
+                g.emit(Op::Undefined { dst: v });
+                g.emit(Op::PrivateAdd {
+                    object: this,
+                    key: k,
+                    value: v,
+                });
+            }
             for (element_index, element) in c.body.iter().enumerate() {
                 let ClassElement::Field {
                     key,
@@ -1035,6 +1219,8 @@ impl<'a, 't> Gen<'a, 't> {
                         .find(&name)
                         .expect("declared by the resolver");
                     g.load_binding_at(class_scope, index, &name, k)?;
+                } else if let PropertyKey::Private(id) = key {
+                    g.load_scope_binding(class_scope, &private_name(&id.name), k)?;
                 } else {
                     g.property_key(key, k)?;
                 }
@@ -1047,11 +1233,19 @@ impl<'a, 't> Gen<'a, 't> {
                         g.emit(Op::Undefined { dst: v });
                     }
                 }
-                g.emit(Op::DefineProp {
-                    object: this,
-                    key: k,
-                    value: v,
-                });
+                if matches!(key, PropertyKey::Private(_)) {
+                    g.emit(Op::PrivateAdd {
+                        object: this,
+                        key: k,
+                        value: v,
+                    });
+                } else {
+                    g.emit(Op::DefineProp {
+                        object: this,
+                        key: k,
+                        value: v,
+                    });
+                }
             }
             g.finish(0, 0)?
         };
@@ -2413,8 +2607,8 @@ impl<'a, 't> Gen<'a, 't> {
                             value,
                         });
                     }
-                    MemberProperty::Private(_) => {
-                        return Err(CompileError::Unsupported("private names", target.span));
+                    MemberProperty::Private(id) => {
+                        self.private_set(o, &id.name, value, target.span)?;
                     }
                 }
                 Ok(())
@@ -2711,6 +2905,7 @@ impl<'a, 't> Gen<'a, 't> {
     fn static_key_name(key: &PropertyKey) -> Option<String> {
         match key {
             PropertyKey::Identifier(id) => Some(id.name.to_string()),
+            PropertyKey::Private(id) => Some(private_name(&id.name)),
             PropertyKey::String(s, _) => String::from_utf16(s).ok(),
             _ => None,
         }
@@ -2817,8 +3012,9 @@ impl<'a, 't> Gen<'a, 't> {
                 self.update(*op, *prefix, target, dst)?
             }
             ExpressionKind::Binary { .. } => self.binary_chain(e, dst)?,
-            ExpressionKind::PrivateIn { .. } => {
-                return Err(CompileError::Unsupported("private names", e.span));
+            ExpressionKind::PrivateIn { name, right } => {
+                self.expr(right, dst)?;
+                self.private_in(&name.name, dst, dst, e.span)?;
             }
             ExpressionKind::Logical { op, left, right } => {
                 self.expr(left, dst)?;
@@ -3001,7 +3197,7 @@ impl<'a, 't> Gen<'a, 't> {
                 self.release(mark);
                 Ok(())
             }
-            MemberProperty::Private(_) => Err(CompileError::Unsupported("private names", span)),
+            MemberProperty::Private(id) => self.private_get(object, &id.name, dst, span),
         }
     }
 
@@ -3609,6 +3805,22 @@ impl<'a, 't> Gen<'a, 't> {
         };
         let o = self.temp()?;
         self.expr(object, o)?;
+        if let MemberProperty::Private(id) = property {
+            let old = self.temp()?;
+            if read_old {
+                self.private_get(o, &id.name, old, m.span)?;
+            }
+            let out = self.temp()?;
+            self.pending_skip = None;
+            compute(self, old, out)?;
+            let skip = self.pending_skip.take();
+            self.private_set(o, &id.name, out, m.span)?;
+            if let Some(s) = skip {
+                self.patch_here(s);
+            }
+            self.emit(Op::Move { dst, src: out });
+            return Ok(());
+        }
         // A named property goes through cache sites; a computed one keeps
         // its key in a register.
         let name = match property {
@@ -3628,9 +3840,7 @@ impl<'a, 't> Gen<'a, 't> {
                     });
                 }
             }
-            MemberProperty::Private(_) => {
-                return Err(CompileError::Unsupported("private names", m.span));
-            }
+            MemberProperty::Private(_) => unreachable!("handled above"),
         }
         let old = self.temp()?;
         if read_old {

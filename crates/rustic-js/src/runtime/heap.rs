@@ -30,6 +30,9 @@ pub const DEFAULT_HEAP_BYTES: usize = 256 * 1024 * 1024;
 pub struct Symbol {
     /// `[[Description]]`.
     pub description: Option<StringId>,
+    /// A class's private name (`#x`): a property key that reflection
+    /// never lists and that script never holds as a value.
+    pub private: bool,
 }
 
 /// Cells of one type, indexed by `u32`. A freed cell is `None` and its
@@ -291,7 +294,22 @@ impl Heap {
     /// A new unique symbol.
     pub fn alloc_symbol(&mut self, description: Option<StringId>) -> Result<SymbolId, OutOfMemory> {
         self.charge(std::mem::size_of::<Symbol>())?;
-        Ok(SymbolId(self.symbols.alloc(Symbol { description })?))
+        Ok(SymbolId(self.symbols.alloc(Symbol {
+            description,
+            private: false,
+        })?))
+    }
+
+    /// A fresh private name described by `description` (`#x`).
+    pub(crate) fn alloc_private_name(
+        &mut self,
+        description: StringId,
+    ) -> Result<SymbolId, OutOfMemory> {
+        self.charge(std::mem::size_of::<Symbol>())?;
+        Ok(SymbolId(self.symbols.alloc(Symbol {
+            description: Some(description),
+            private: true,
+        })?))
     }
 
     /// A symbol's record.

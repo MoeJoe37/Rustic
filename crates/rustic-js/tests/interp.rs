@@ -1028,16 +1028,140 @@ fn class_fields_and_static_blocks() {
 }
 
 #[test]
+fn private_names() {
+    let _report = Report;
+    // Fields: per instance, initialized in order, hidden from reflection.
+    check(
+        "class A { #x = 1; #y = this.#x + 1; get sum() { return this.#x + this.#y } bump() { this.#x++; this.#y += 10; return this } } \
+         var a = new A(), b = new A(); a.bump(); a.sum + ',' + b.sum",
+        "14,3",
+    );
+    check(
+        "class A { #x = 1; y = 2 } var k = ''; var a = new A(); for (var n in a) k += n; k + ('#x' in a) + a['#x']",
+        "yfalseundefined",
+    );
+    check(
+        "class A { #x; get() { return this.#x } set(v) { this.#x = v; return this } } var a = new A(); a.get() + '' + a.set(4).get()",
+        "undefined4",
+    );
+    // Another class's instances, and plain values, are refused.
+    check(
+        "class A { #x = 1; static read(o) { return o.#x } } A.read({})",
+        "!TypeError: cannot read a private member from an object whose class did not declare it",
+    );
+    check(
+        "class A { #x = 1; static write(o) { o.#x = 2 } } A.write({})",
+        "!TypeError: cannot write a private member to an object whose class did not declare it",
+    );
+    check(
+        "class A { #x = 1; static read(o) { return o.#x } } A.read(1)",
+        "!TypeError: cannot use a private member on a non-object",
+    );
+    check(
+        "class A { #x = 1; static read(o) { return o.#x } } A.read(null)",
+        "!TypeError: cannot use a private member on a non-object",
+    );
+    // Two evaluations of one class body make two unrelated names.
+    check(
+        "function make() { return class { #x = 1; static read(o) { return o.#x } } } var A = make(), B = make(); \
+         var r = A.read(new A()); try { A.read(new B()) } catch (e) { r += '!' } r",
+        "1!",
+    );
+    // `#x in o` tests without throwing.
+    check(
+        "class A { #x; #m() {} static #s() {} static has(o) { return (#x in o) + ',' + (#m in o) + ',' + (#s in o) } } \
+         A.has(new A()) + ' ' + A.has({}) + ' ' + A.has(A)",
+        "true,true,false false,false,false false,false,true",
+    );
+    check(
+        "class A { #x; static has(o) { return #x in o } } A.has(1)",
+        "!TypeError: cannot use 'in' for a private name on a non-object",
+    );
+    // Methods: shared, not writable, brand-checked.
+    check(
+        "class A { #v = 3; #double() { return this.#v * 2 } run() { return this.#double() } same(o) { return this.#double === o.#double } } \
+         var a = new A(); a.run() + ',' + a.same(new A())",
+        "6,true",
+    );
+    check(
+        "class A { #m() {} static call(o) { return o.#m() } } A.call({})",
+        "!TypeError: cannot use a private method on an object whose class did not declare it",
+    );
+    check(
+        "class A { #m() {} set() { this.#m = 1 } } new A().set()",
+        "!TypeError: private method #m is not writable",
+    );
+    check(
+        "class A { #m() { return 1 } name() { return this.#m.name } } new A().name()",
+        "#m",
+    );
+    // Initializers can already call private methods.
+    check(
+        "class A { v = this.#m(); #m() { return 7 } } new A().v",
+        "7",
+    );
+    // Accessors.
+    check(
+        "class A { #v = 1; get #p() { return this.#v } set #p(x) { this.#v = x * 2 } run() { this.#p = 5; this.#p += 1; return this.#p } } new A().run()",
+        "22",
+    );
+    check(
+        "class A { get #p() { return 1 } run() { this.#p = 2 } } new A().run()",
+        "!TypeError: #p was defined without a setter",
+    );
+    check(
+        "class A { set #p(v) {} run() { return this.#p } } new A().run()",
+        "!TypeError: #p was defined without a getter",
+    );
+    // Statics live on the class itself and are not inherited.
+    check(
+        "class A { static #count = 0; static #next() { return ++A.#count } static make() { return A.#next() } } A.make(); A.make()",
+        "2",
+    );
+    check(
+        "class A { static #s = 1; static read() { return this.#s } } class B extends A {} A.read() + ',' + (function () { try { return B.read() } catch (e) { return '!' } })()",
+        "1,!",
+    );
+    check(
+        "class A { static #m() { return 1 } static run() { return this.#m() } } class B extends A {} var r = A.run(); try { B.run() } catch (e) { r += '!' } r",
+        "1!",
+    );
+    // Inheritance: each class adds its own names to the same object.
+    check(
+        "class A { #x = 1; a() { return this.#x } } class B extends A { #x = 2; b() { return this.#x } } var o = new B(); o.a() + ',' + o.b()",
+        "1,2",
+    );
+    check(
+        "class A { constructor(o) { return o } } class B extends A { #x = 1; static has(o) { return #x in o } } \
+         var o = {}; new B(o); var r = '' + B.has(o); try { new B(o) } catch (e) { r += '!' } r",
+        "true!",
+    );
+    // Nested classes and closures see the outer names; inner ones shadow.
+    check(
+        "class A { #x = 1; inner() { var self = this; return class { #y = 2; sum() { return self.#x + this.#y } } } \
+         arrow() { return () => this.#x } } var a = new A(); new (a.inner())().sum() + a.arrow()()",
+        "4",
+    );
+    check(
+        "class A { #x = 'outer'; make() { return class { #x = 'inner'; read(o) { return o.#x } } } } \
+         var a = new A(), I = a.make(), r = new I().read(new I()); try { new I().read(a) } catch (e) { r += '!' } r",
+        "inner!",
+    );
+    // Destructuring and logical assignment reach private targets.
+    check(
+        "class A { #a; #b = null; run() { [this.#a, this.#b] = [1, 2]; ({ x: this.#a } = { x: this.#a + 10 }); this.#b ??= 9; this.#a &&= this.#a + this.#b; return this.#a } } new A().run()",
+        "13",
+    );
+    // An optional chain stops before the private access.
+    check(
+        "class A { #x = 1; static read(o) { return o?.#x } } A.read(null) + ',' + A.read(new A())",
+        "undefined,1",
+    );
+}
+
+#[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in [
-        "class A { #x = 1 }",
-        "class A { #p() {} }",
-        "class A { #x; m(o) { return #x in o } }",
-        "function* g() {}",
-        "async function f() {}",
-        "/x/",
-        "tag`x`",
-    ] {
+    for source in ["function* g() {}", "async function f() {}", "/x/", "tag`x`"] {
         let mut agent = Agent::new().expect("agent");
         assert!(
             matches!(agent.evaluate(source), Err(EvalError::Compile(_))),

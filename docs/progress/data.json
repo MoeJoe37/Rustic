@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "3bb1120d87f9a0df2e42ed81eda12e477e54e49edcea625fb81159d077f4d3ee",
-  "percent": "23.57",
+  "source_fingerprint": "9355b740661fc713d95581c95bd374297f1a9b53b2c72b85eab90dcc33e5d1c6",
+  "percent": "23.65",
   "verified_percent": "20.90",
-  "partial_percent": "2.67",
+  "partial_percent": "2.75",
   "completed": 54,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "40.64",
+      "percent": "41.60",
       "verified_percent": "12.30",
-      "partial_percent": "28.34"
+      "partial_percent": "29.30"
     },
     {
       "id": "M5",
@@ -3399,8 +3399,19 @@
             },
             {
               "label": "Private names and brand checks",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "fn private_brand_check"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn private_names"
+                }
+              ]
             },
             {
               "label": "Lazy function prototypes and shared scope name lists (120-byte closures)",
@@ -3424,7 +3435,7 @@
               "evidence": []
             }
           ],
-          "credit": "75.00",
+          "credit": "87.50",
           "engine_share": "0.68"
         },
         {
@@ -3522,10 +3533,10 @@
       "completed": 1,
       "in_progress": 5,
       "total": 15,
-      "contribution": "3.61",
-      "percent": "36.18",
+      "contribution": "3.70",
+      "percent": "37.04",
       "verified_percent": "10.95",
-      "partial_percent": "25.23"
+      "partial_percent": "26.09"
     },
     {
       "id": "wasm",

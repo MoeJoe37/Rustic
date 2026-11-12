@@ -3087,8 +3087,19 @@
             },
             {
               "label": "Private names and brand checks",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "fn private_brand_check"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn private_names"
+                }
+              ]
             },
             {
               "label": "Lazy function prototypes and shared scope name lists (120-byte closures)",

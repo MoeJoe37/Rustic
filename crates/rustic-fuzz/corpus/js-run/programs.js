@@ -122,3 +122,7 @@ var k = 'dyn'; class A { [k] = 1; static [k + 's'] = 2; [k + 'm']() { return 3 }
 class A { static s() { return 1 } } class B extends A { static s() { return super.s() + 1 } } class C extends B {} C.s() + (C.prototype instanceof A)
 try { class X extends X {} } catch (e) { e.name }
 var t = 0; class P { constructor(i) { this.i = i } get v() { return this.i } } for (var i = 0; i < 100; i++) t += new P(i).v; t
+class A { #x = 1; #y = this.#x + 1; #m() { return this.#x * 2 } get #p() { return this.#y } set #p(v) { this.#y = v } run() { this.#p += this.#m(); this.#x++; return this.#p + this.#x } } var a = new A(); a.run() + a.run()
+class A { #x; static #n = 0; static #s() { return ++A.#n } static has(o) { return (#x in o) + A.#s() } } var r = 0; for (var i = 0; i < 20; i++) r += A.has(i % 2 ? new A() : {}); r
+function make() { return class { #v = 1; static read(o) { try { return o.#v } catch (e) { return -1 } } } } var A = make(), B = make(), t = 0; for (var i = 0; i < 30; i++) t += A.read(i % 3 ? new A() : new B()); t
+class A { #x = 1; a() { return this.#x } } class B extends A { #x = 2; #b() { return this.#x + this.a() } go() { var f = () => this.#b(); return f() } } var s = 0; for (var i = 0; i < 25; i++) s += new B().go(); s

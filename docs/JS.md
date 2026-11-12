@@ -7,9 +7,8 @@ to an abstract syntax tree with source spans. JS-02 adds the runtime data
 model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
 garbage collector (see [Garbage collection](#garbage-collection-js-03)).
 JS-04 compiles scripts to bytecode and runs them (see
-[Bytecode and interpreter](#bytecode-and-interpreter-js-04)); private
-names, generators, async functions, modules and regular expressions do not
-run yet.
+[Bytecode and interpreter](#bytecode-and-interpreter-js-04)); generators,
+async functions, modules and regular expressions do not run yet.
 
 ## API
 
@@ -248,8 +247,20 @@ calls a function value. The design is recorded in
   TDZ check gives the required `ReferenceError`. Instance fields are one
   function per class, run when `this` is bound. `new.target` works in arrow
   functions the same way.
+- **Private names.** `#x` fields, methods, getters and setters, instance
+  and static, and `#x in o`. A private name is a symbol that reflection
+  never reports. A private field is an ordinary shape property keyed by that
+  symbol, so it costs the same 8 bytes as a public field and reads at the
+  same speed (2 million `this.#x = this.#x + 1` calls take 339 ms, the same
+  as with `this.x`). Private methods and accessors are not stored per
+  object: the functions live once in the class scope, and each instance
+  carries one brand (a single private property, added before the fields)
+  that every use checks. Static private methods check that the receiver is
+  the class itself. The compiler resolves each `#x` to the innermost class
+  that declares it, so the kind of access is known when the code is
+  compiled.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): private names (`#x`), `super` in object literals,
+  anything runs, TD-97): `super` in object literals,
   generators, async functions, modules, regular expression literals, tagged
   templates, optional calls, and BigInt literals. Built-in constructors
   cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`

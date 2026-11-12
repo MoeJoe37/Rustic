@@ -11,7 +11,7 @@ use super::object::{
 };
 use super::shape::{Attributes, PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
-use super::value::{Kind, ObjectId, Value};
+use super::value::{Kind, ObjectId, SymbolId, Value};
 
 /// Dense elements may grow past their length by this many holes plus their
 /// length again before the object switches to sparse elements.
@@ -719,8 +719,78 @@ impl Agent {
                 .collect(),
         };
         keys.extend(named.iter().filter(|k| matches!(k, PropertyKey::String(_))));
-        keys.extend(named.iter().filter(|k| matches!(k, PropertyKey::Symbol(_))));
+        // Private names are not properties as far as reflection goes.
+        keys.extend(
+            named
+                .iter()
+                .filter(|k| matches!(k, PropertyKey::Symbol(s) if !self.heap.symbol(*s).private)),
+        );
         keys
+    }
+
+    // ---- private names (§7.3.26 to §7.3.32) -------------------------------
+
+    /// Whether `o` has the private element `name`.
+    pub(crate) fn private_has(&self, o: ObjectId, name: SymbolId) -> bool {
+        self.locate(o, PropertyKey::Symbol(name)).is_some()
+    }
+
+    /// `PrivateFieldAdd`: private elements ignore extensibility, and
+    /// adding one twice is an error.
+    pub(crate) fn private_add(
+        &mut self,
+        o: ObjectId,
+        name: SymbolId,
+        value: Value,
+    ) -> JsResult<()> {
+        if self.private_has(o, name) {
+            return self.type_error("cannot initialize a private member twice on the same object");
+        }
+        self.store(
+            o,
+            PropertyKey::Symbol(name),
+            Stored {
+                first: value,
+                second: Value::UNDEFINED,
+                attributes: Attributes::new(Attributes::WRITABLE),
+            },
+        )
+    }
+
+    /// `PrivateGet` of a field.
+    pub(crate) fn private_get(&mut self, o: ObjectId, name: SymbolId) -> JsResult<Value> {
+        match self.locate(o, PropertyKey::Symbol(name)) {
+            Some(location) => Ok(self
+                .describe(o, location)?
+                .value
+                .unwrap_or(Value::UNDEFINED)),
+            None => self.type_error(
+                "cannot read a private member from an object whose class did not declare it",
+            ),
+        }
+    }
+
+    /// `PrivateSet` of a field.
+    pub(crate) fn private_set(
+        &mut self,
+        o: ObjectId,
+        name: SymbolId,
+        value: Value,
+    ) -> JsResult<()> {
+        if !self.private_has(o, name) {
+            return self.type_error(
+                "cannot write a private member to an object whose class did not declare it",
+            );
+        }
+        self.store(
+            o,
+            PropertyKey::Symbol(name),
+            Stored {
+                first: value,
+                second: Value::UNDEFINED,
+                attributes: Attributes::new(Attributes::WRITABLE),
+            },
+        )
     }
 
     // ---- Array exotic -------------------------------------------------

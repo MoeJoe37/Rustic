@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Private names, `super` in object literals, generators, async functions, modules, RegExp literals, tagged templates and optional calls are rejected by the bytecode compiler | Open, JS-04/JS-06/JS-08 |
+| TD-97 | Deliberate | JS | `super` in object literals, generators, async functions, modules, RegExp literals, tagged templates and optional calls are rejected by the bytecode compiler | Open, JS-04/JS-06/JS-08 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Open, JS-05 |
@@ -1368,15 +1368,15 @@ per heap remains (TD-17).
 ### TD-97 — Syntax the bytecode compiler rejects
 
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
-exceptions and classes (with `extends`, `super`, fields and static blocks).
-Private names (`#x`), `super` in object-literal methods, generators, async
+exceptions and classes (with `extends`, `super`, fields, static blocks and
+private names). `super` in object-literal methods, generators, async
 functions and `for await`, modules, regular expression literals, tagged
 templates, optional calls (`f?.()`) and BigInt literals return
 `CompileError::Unsupported` with a span before any code runs, so a script
 either runs with correct semantics or not at all. There is no `eval`.
 
-Pay private names, object-literal `super`, tagged templates and optional
-calls in JS-04; modules with JS-06; generators, async functions, RegExp and
+Private names were paid on 2026-11-12. Pay object-literal `super`, tagged
+templates and optional calls in JS-04; modules with JS-06; generators, async functions, RegExp and
 BigInt with JS-08. Trigger: the Test262 runner (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)

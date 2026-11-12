@@ -21,7 +21,7 @@ use super::bytecode::{
 };
 use crate::runtime::{
     Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, Class, EnvId, ErrorKind, FLAG_EXTENSIBLE,
-    FLAG_PROTOTYPE, JsResult, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference,
+    FLAG_PROTOTYPE, JsResult, Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference,
     ReferenceBase, ShapeId, StringId, Tracer, Value,
 };
 
@@ -383,6 +383,30 @@ impl Agent {
             )?;
         }
         Ok(f)
+    }
+
+    /// The object and private name of a private field access.
+    fn private_operands(
+        &mut self,
+        object: Value,
+        key: Value,
+    ) -> JsResult<(ObjectId, crate::runtime::SymbolId)> {
+        let Kind::Symbol(name) = key.kind() else {
+            unreachable!("the compiler loads a private name")
+        };
+        match object.as_object() {
+            Some(o) => Ok((o, name)),
+            None => self.type_error("cannot use a private member on a non-object"),
+        }
+    }
+
+    /// Whether `o` carries `brand`: a private name it must own, or the
+    /// class it must be (static private methods).
+    fn has_brand(&self, o: ObjectId, brand: Value) -> bool {
+        match brand.kind() {
+            Kind::Symbol(name) => self.private_has(o, name),
+            _ => brand.as_object() == Some(o),
+        }
     }
 
     /// Whether `new` accepts `o`.
@@ -1010,6 +1034,49 @@ impl Agent {
                     let caller = self.vm.frames.len() - 2;
                     self.vm.frames[caller].pc = pc as u32;
                     return Ok(Flow::Switch);
+                }
+                Op::NewPrivateName { dst, name } => {
+                    let description = self.name_of(code, name);
+                    let symbol = t!(self.heap.alloc_private_name(description));
+                    reg!(dst) = Value::symbol(symbol);
+                }
+                Op::PrivateGet { dst, object, key } => {
+                    let (o, k) = (reg!(object), reg!(key));
+                    let (o, name) = t!(self.private_operands(o, k));
+                    reg!(dst) = t!(self.private_get(o, name));
+                }
+                Op::PrivateSet { object, key, value } => {
+                    let (o, k, v) = (reg!(object), reg!(key), reg!(value));
+                    let (o, name) = t!(self.private_operands(o, k));
+                    t!(self.private_set(o, name, v));
+                }
+                Op::PrivateAdd { object, key, value } => {
+                    let (o, k, v) = (reg!(object), reg!(key), reg!(value));
+                    let (o, name) = t!(self.private_operands(o, k));
+                    t!(self.private_add(o, name, v));
+                }
+                Op::PrivateHas { dst, object, key } => {
+                    let (o, k) = (reg!(object), reg!(key));
+                    let Some(o) = o.as_object() else {
+                        t!(self.type_error::<()>(
+                            "cannot use 'in' for a private name on a non-object"
+                        ));
+                        unreachable!("the error returned");
+                    };
+                    reg!(dst) = Value::boolean(self.has_brand(o, k));
+                }
+                Op::PrivateBrand { object, brand } => {
+                    let (o, b) = (reg!(object), reg!(brand));
+                    if !o.as_object().is_some_and(|o| self.has_brand(o, b)) {
+                        t!(self.type_error::<()>(
+                            "cannot use a private method on an object whose class did not declare it"
+                        ));
+                    }
+                }
+                Op::TypeError { message } => {
+                    let message = self.name_of(code, message);
+                    let text = self.heap.string(message).to_text();
+                    t!(self.type_error::<()>(&text));
                 }
                 Op::GetSlotRaw { dst, hops, slot } => {
                     let scope = self.env_outer_n(env, hops);

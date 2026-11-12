@@ -42,6 +42,31 @@ pub(crate) enum BindingKind {
     This,
     /// `new.target` of a function whose arrow functions read it.
     NewTarget,
+    /// A private field's name (`#x`): the binding holds its private name.
+    PrivateField,
+    /// A private method: the binding holds the function.
+    PrivateMethod,
+    /// A private accessor: the binding holds the getter, and the binding
+    /// [`private_setter_name`] names holds the setter.
+    PrivateAccessor,
+}
+
+/// [`Binding::flags`] of a private element: it is static.
+pub(crate) const PRIVATE_STATIC: u8 = 1;
+/// A private accessor has a getter.
+pub(crate) const PRIVATE_GETTER: u8 = 2;
+/// A private accessor has a setter.
+pub(crate) const PRIVATE_SETTER: u8 = 4;
+
+/// The class-scope binding of the private element `#name`.
+pub(crate) fn private_name(name: &str) -> String {
+    format!("#{name}")
+}
+
+/// The class-scope binding of the setter of the private accessor
+/// `#name`.
+pub(crate) fn private_setter_name(name: &str) -> String {
+    format!("#{name}=")
 }
 
 /// The binding of a derived constructor's `this`. Reserved words cannot
@@ -53,14 +78,17 @@ pub(crate) const NEW_TARGET: &str = "new.target";
 /// `super` finds the parent class and the home objects.
 pub(crate) const CLASS: &str = "super";
 /// A class scope's binding of the function that initializes the instance
-/// fields; `used` only when the class has any. `#` cannot start a script
-/// identifier.
-pub(crate) const FIELD_INIT: &str = "#init";
+/// fields; `used` only when the class has any. `%` cannot appear in a
+/// script identifier or a private name.
+pub(crate) const FIELD_INIT: &str = "%init";
+/// A class scope's binding of the private name every instance gets when
+/// the class has private methods or accessors: their brand.
+pub(crate) const BRAND: &str = "%brand";
 
 /// The class-scope binding that keeps the computed key of the instance
 /// field at `index` in the class body from definition to construction.
 pub(crate) fn field_key_name(index: usize) -> String {
-    format!("#key{index}")
+    format!("%key{index}")
 }
 
 impl BindingKind {
@@ -83,6 +111,8 @@ pub(crate) struct Binding {
     pub captured: bool,
     /// Referenced at all (decides whether `arguments` is materialized).
     pub used: bool,
+    /// `PRIVATE_*` bits of a private element.
+    pub flags: u8,
 }
 
 /// What introduced a scope.
@@ -278,6 +308,7 @@ impl Resolver {
                 kind,
                 captured: false,
                 used: false,
+                flags: 0,
             }),
         }
     }
@@ -308,7 +339,7 @@ impl Resolver {
     /// Note a use of a compiler-made binding (see
     /// [`ScopeTree::resolve_special`]). `new.target` is declared on demand
     /// in the nearest non-arrow function when an arrow function reads it.
-    fn reference_special(&mut self, name: &'static str) {
+    fn reference_special(&mut self, name: &str) {
         let from = self.current();
         let from_function = self.tree.scopes[from].function;
         let mut current = Some(from);
@@ -328,12 +359,98 @@ impl Resolver {
                         kind: BindingKind::NewTarget,
                         captured: true,
                         used: true,
+                        flags: 0,
                     });
                 }
                 return;
             }
             current = s.parent;
         }
+    }
+
+    /// Declare the private names of `c` in its scope. Their bindings are
+    /// read from the class's methods and initializers, so they live in
+    /// the scope's environment. Returns whether instances get a brand.
+    fn declare_private_names(&mut self, scope: ScopeId, c: &Class) -> bool {
+        let mut brand = false;
+        for element in &c.body {
+            let (key, kind, mut flags) = match element {
+                ClassElement::Method {
+                    key,
+                    kind,
+                    is_static,
+                    ..
+                } => {
+                    let (binding, bit) = match kind {
+                        MethodKind::Get => (BindingKind::PrivateAccessor, PRIVATE_GETTER),
+                        MethodKind::Set => (BindingKind::PrivateAccessor, PRIVATE_SETTER),
+                        _ => (BindingKind::PrivateMethod, 0),
+                    };
+                    (key, binding, bit | (u8::from(*is_static) * PRIVATE_STATIC))
+                }
+                ClassElement::Field { key, is_static, .. } => (
+                    key,
+                    BindingKind::PrivateField,
+                    u8::from(*is_static) * PRIVATE_STATIC,
+                ),
+                ClassElement::StaticBlock(..) => continue,
+            };
+            let PropertyKey::Private(id) = key else {
+                continue;
+            };
+            brand |= kind != BindingKind::PrivateField && flags & PRIVATE_STATIC == 0;
+            let name = private_name(&id.name);
+            let bindings = &mut self.tree.scopes[scope].bindings;
+            match bindings.iter_mut().find(|b| *b.name == *name) {
+                // The other half of an accessor pair.
+                Some(existing) => {
+                    existing.flags |= flags;
+                    flags = existing.flags;
+                }
+                None => bindings.push(Binding {
+                    name: name.into(),
+                    kind,
+                    captured: true,
+                    used: true,
+                    flags,
+                }),
+            }
+            if flags & PRIVATE_SETTER != 0 {
+                let setter = private_setter_name(&id.name);
+                if self.tree.scopes[scope].find(&setter).is_none() {
+                    self.tree.scopes[scope].bindings.push(Binding {
+                        name: setter.into(),
+                        kind: BindingKind::Const,
+                        captured: true,
+                        used: true,
+                        flags: 0,
+                    });
+                }
+            }
+        }
+        if brand {
+            self.tree.scopes[scope].bindings.push(Binding {
+                name: BRAND.into(),
+                kind: BindingKind::Const,
+                captured: true,
+                used: true,
+                flags: 0,
+            });
+        }
+        // Static private methods are checked against the class itself.
+        let class_index = self.tree.scopes[scope]
+            .find(CLASS)
+            .expect("declared by the caller");
+        let has_private = self.tree.scopes[scope]
+            .bindings
+            .iter()
+            .any(|b| b.name.starts_with('#'));
+        if has_private {
+            let binding = &mut self.tree.scopes[scope].bindings[class_index];
+            binding.captured = true;
+            binding.used = true;
+        }
+        brand
     }
 
     /// A class: a scope for its own name and for the binding `super`
@@ -349,7 +466,7 @@ impl Resolver {
         }
         self.declare(scope, FIELD_INIT, BindingKind::Const);
         let mut has_constructor = false;
-        let mut has_instance_fields = false;
+        let mut has_instance_fields = self.declare_private_names(scope, c);
         for (index, element) in c.body.iter().enumerate() {
             match element {
                 ClassElement::Method {
@@ -394,6 +511,7 @@ impl Resolver {
                                 kind: BindingKind::Const,
                                 captured: true,
                                 used: true,
+                                flags: 0,
                             });
                         }
                     }

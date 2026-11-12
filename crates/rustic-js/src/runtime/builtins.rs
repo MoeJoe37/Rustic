@@ -3,9 +3,11 @@
 //! wrapper prototypes' brand checks, and the value properties of the
 //! global object. The full library is JS-05.
 
+mod array;
 mod error;
 mod function;
 mod global;
+mod math;
 mod object;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
@@ -132,6 +134,8 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     function::install(agent)?;
     error::install(agent)?;
     global::install(agent)?;
+    array::install(agent)?;
+    math::install(agent)?;
 
     // Value properties of the global object (§19.1).
     let global = i.global;
@@ -155,8 +159,22 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
 /// `for-of`, spread and destructuring need before the rest of the
 /// library exists (JS-05).
 fn install_iterators(agent: &mut Agent) -> JsResult<()> {
+    // `%IteratorPrototype%` (§27.1.2): `[Symbol.iterator]() { return this }`.
     let object_prototype = agent.intrinsics.object_prototype;
-    let prototype = agent.new_object_with(Some(object_prototype))?;
+    let iterator_prototype = agent.new_object_with(Some(object_prototype))?;
+    let self_iterator = agent.new_native_function(return_this, "[Symbol.iterator]", 0)?;
+    agent.define_property_or_throw(
+        iterator_prototype,
+        PropertyKey::Symbol(agent.symbols.iterator),
+        PropertyDescriptor::data_with(Value::object(self_iterator), true, false, true),
+    )?;
+    let prototype = agent.new_object_with(Some(iterator_prototype))?;
+    let tag = agent.string("Array Iterator")?;
+    agent.define_property_or_throw(
+        prototype,
+        PropertyKey::Symbol(agent.symbols.to_string_tag),
+        PropertyDescriptor::data_with(tag, false, false, true),
+    )?;
     let next = agent.new_native_function(iterator_next, "next", 0)?;
     agent.define_property_or_throw(
         prototype,
@@ -187,7 +205,11 @@ fn install_iterators(agent: &mut Agent) -> JsResult<()> {
     Ok(())
 }
 
-fn new_iterator(agent: &mut Agent, target: Value, kind: IteratorKind) -> JsResult<Value> {
+pub(crate) fn new_iterator(
+    agent: &mut Agent,
+    target: Value,
+    kind: IteratorKind,
+) -> JsResult<Value> {
     let prototype = agent.intrinsics.array_iterator_prototype;
     let object = agent.new_object_with(Some(prototype))?;
     agent
@@ -199,6 +221,58 @@ fn new_iterator(agent: &mut Agent, target: Value, kind: IteratorKind) -> JsResul
         kind,
     });
     Ok(Value::object(object))
+}
+
+fn return_this(_: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    Ok(this)
+}
+
+/// Runs `each` on every value that iterating `iterable` with `method`
+/// produces, until it returns `false` (which closes the iterator) or
+/// the iterator is done. When `each` throws, the iterator is closed and
+/// the error wins over anything `return` does (§7.4.11).
+pub(crate) fn iterate(
+    agent: &mut Agent,
+    iterable: Value,
+    method: Value,
+    mut each: impl FnMut(&mut Agent, Value) -> JsResult<bool>,
+) -> JsResult<()> {
+    let iterator = agent.call(method, iterable, &[])?;
+    let Some(object) = iterator.as_object() else {
+        return agent.type_error("iterator is not an object");
+    };
+    let next = agent.get(object, PropertyKey::String(agent.names.next))?;
+    loop {
+        let result = agent.call(next, iterator, &[])?;
+        let Some(result) = result.as_object() else {
+            return agent.type_error("iterator result is not an object");
+        };
+        let done = agent.get(result, PropertyKey::String(agent.names.done))?;
+        if agent.to_boolean(done) {
+            return Ok(());
+        }
+        let value = agent.get(result, PropertyKey::String(agent.names.value))?;
+        match each(agent, value) {
+            Ok(true) => {}
+            Ok(false) => {
+                let key = PropertyKey::String(agent.names.return_);
+                if let Some(close) = agent.get_method(iterator, key)? {
+                    let result = agent.call(close, iterator, &[])?;
+                    if result.as_object().is_none() {
+                        return agent.type_error("iterator result is not an object");
+                    }
+                }
+                return Ok(());
+            }
+            Err(error) => {
+                let key = PropertyKey::String(agent.names.return_);
+                if let Ok(Some(close)) = agent.get_method(iterator, key) {
+                    let _ = agent.call(close, iterator, &[]);
+                }
+                return Err(error);
+            }
+        }
+    }
 }
 
 /// `Array.prototype.values` (§23.1.3.37).
@@ -241,11 +315,20 @@ fn iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value>
     };
     let (value, advance) = match (kind, target.kind()) {
         (_, Kind::Undefined) => (None, 0),
-        (IteratorKind::Array, _) => {
+        (IteratorKind::Array | IteratorKind::ArrayKeys | IteratorKind::ArrayEntries, _) => {
             let array = target.as_object().expect("array iterators walk objects");
             let length = agent.length_of_array_like(array)?;
             if f64::from(index) < length {
-                (Some(agent.get(array, PropertyKey::Index(index))?), 1)
+                let key = Value::number(f64::from(index));
+                let value = match kind {
+                    IteratorKind::ArrayKeys => key,
+                    IteratorKind::ArrayEntries => {
+                        let element = agent.get(array, PropertyKey::Index(index))?;
+                        Value::object(agent.create_array_from_list(&[key, element])?)
+                    }
+                    _ => agent.get(array, PropertyKey::Index(index))?,
+                };
+                (Some(value), 1)
             } else {
                 (None, 0)
             }
@@ -308,7 +391,7 @@ fn object_value_of(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Valu
 }
 
 /// `Object.prototype.toString` (§20.1.3.6).
-fn object_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+pub(crate) fn object_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let builtin = match this.kind() {
         Kind::Undefined => return agent.string("[object Undefined]"),
         Kind::Null => return agent.string("[object Null]"),

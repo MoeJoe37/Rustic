@@ -105,6 +105,11 @@ pub(crate) struct VmState {
     native_new_target: Option<ObjectId>,
     /// The running native function object (the active function).
     native_function: Option<ObjectId>,
+    /// Arrays whose `join` is running, for cycle detection. Natives are
+    /// on the stack while these are set, so no collection sees them.
+    pub(crate) join_stack: Vec<ObjectId>,
+    /// `Math.random` state (xorshift64*); zero until first seeded.
+    pub(crate) random_state: u64,
 }
 
 fn stack_address() -> usize {
@@ -163,6 +168,13 @@ impl Agent {
     /// by every run until it is set again.
     pub fn set_step_budget(&mut self, steps: Option<u64>) {
         self.vm.steps_left = steps;
+    }
+
+    /// Seed `Math.random`, which otherwise seeds itself from the clock
+    /// on first use. Tests and fuzzing use this to be reproducible.
+    pub fn set_random_seed(&mut self, seed: u64) {
+        // xorshift needs a non-zero state.
+        self.vm.random_state = seed | 1;
     }
 
     /// Turn the inline caches of property and global sites off or on.
@@ -2473,7 +2485,7 @@ impl Agent {
 }
 
 /// `Number::exponentiate` (§6.1.6.1.3), where it differs from `powf`.
-fn exponentiate(base: f64, exponent: f64) -> f64 {
+pub(crate) fn exponentiate(base: f64, exponent: f64) -> f64 {
     if exponent.is_nan() {
         return f64::NAN;
     }

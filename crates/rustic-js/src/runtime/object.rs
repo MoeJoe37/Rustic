@@ -260,6 +260,10 @@ pub(crate) struct Closure {
 pub(crate) enum IteratorKind {
     /// The elements of an array-like, by index.
     Array,
+    /// The indices of an array-like.
+    ArrayKeys,
+    /// `[index, element]` pairs of an array-like.
+    ArrayEntries,
     /// The code points of a string.
     String,
 }

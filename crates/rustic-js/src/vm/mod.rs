@@ -15,10 +15,11 @@ use std::fmt;
 pub use bytecode::CodeId;
 pub use compile::CompileError;
 pub use interp::VmLimits;
+pub(crate) use interp::exponentiate;
 
 use crate::ast::Program;
 use crate::parser::{ParseError, ParseLimits, parse_script};
-use crate::runtime::{Abrupt, Agent, Value};
+use crate::runtime::{Abrupt, Agent, JsResult, Value};
 use crate::source::{MAX_SOURCE_UNITS, Source};
 
 /// Why [`Agent::evaluate`] produced no value.
@@ -89,5 +90,62 @@ impl Agent {
             self.compile_script(&program).map_err(EvalError::Compile)?
         };
         Ok(self.run_script(code)?)
+    }
+
+    /// `CreateDynamicFunction` (§20.2.1.1.1) for ordinary functions: the
+    /// `Function` constructor. The parameters and body are parsed as one
+    /// function expression in the global scope; text that closes the
+    /// function early to smuggle in other code parses as something else
+    /// and is a SyntaxError.
+    pub(crate) fn create_dynamic_function(&mut self, params: &str, body: &str) -> JsResult<Value> {
+        use crate::ast::{ExpressionKind, StatementKind};
+        // The function is unnamed so that `anonymous` is not bound inside it;
+        // its `name` is set afterwards.
+        let text = format!("(function ({params}\n) {{\n{body}\n}})");
+        let syntax_error = |agent: &mut Agent, message: &str| {
+            Err(agent.throw(crate::runtime::ErrorKind::SyntaxError, message))
+        };
+        let Ok(source) = Source::from_str_limited(&text, MAX_SOURCE_UNITS) else {
+            return syntax_error(self, "function source too long");
+        };
+        let mut limits = ParseLimits::default();
+        if let Some(token) = self.cancellation() {
+            limits.cancellation = token;
+        }
+        let program = match parse_script(&source, &limits) {
+            Ok(program) => program,
+            Err(ParseError::Cancelled) => return Err(Abrupt::Cancelled),
+            Err(e) => return syntax_error(self, &e.to_string()),
+        };
+        let single_function = match program.body.as_slice() {
+            [statement] => match &statement.kind {
+                StatementKind::Expression { expression, .. } => matches!(
+                    &expression.kind,
+                    ExpressionKind::Parenthesized(inner)
+                        if matches!(inner.kind, ExpressionKind::Function(_))
+                ),
+                _ => false,
+            },
+            _ => false,
+        };
+        if !single_function {
+            return syntax_error(self, "invalid function parameters or body");
+        }
+        let code = match self.compile_script(&program) {
+            Ok(code) => code,
+            Err(CompileError::OutOfMemory) => return Err(Abrupt::OutOfMemory),
+            Err(e) => return syntax_error(self, &format!("{e:?}")),
+        };
+        let f = self.run_script(code)?;
+        if let Some(o) = f.as_object() {
+            let name = crate::runtime::PropertyKey::String(self.names.name);
+            let anonymous = self.string("anonymous")?;
+            self.define_property_or_throw(
+                o,
+                name,
+                crate::runtime::PropertyDescriptor::data_with(anonymous, false, false, true),
+            )?;
+        }
+        Ok(f)
     }
 }

@@ -490,7 +490,8 @@ fn stress_mode_collects_at_every_safe_point_without_losing_held_values() {
     let root = w.doc.root();
     w.doc.append_child(root, list).unwrap();
     let mut held: Vec<ObjectId> = Vec::new();
-    let mut collections = 0;
+    // The agent collected once while it was created.
+    let mut collections = w.agent.heap.collections();
     for i in 0..200 {
         // One "instruction": create an item, wrap it, give it a listener
         // that remembers the previous wrapper; only every tenth item is

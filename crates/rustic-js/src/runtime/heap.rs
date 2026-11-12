@@ -33,6 +33,9 @@ pub struct Symbol {
     /// A class's private name (`#x`): a property key that reflection
     /// never lists and that script never holds as a value.
     pub private: bool,
+    /// In the global symbol registry (`Symbol.for`), under its
+    /// description.
+    pub registered: bool,
 }
 
 /// Cells of one type, indexed by `u32`. A freed cell is `None` and its
@@ -297,6 +300,20 @@ impl Heap {
         Ok(SymbolId(self.symbols.alloc(Symbol {
             description,
             private: false,
+            registered: false,
+        })?))
+    }
+
+    /// A fresh symbol for the global registry, keyed by `key`.
+    pub(crate) fn alloc_registered_symbol(
+        &mut self,
+        key: StringId,
+    ) -> Result<SymbolId, OutOfMemory> {
+        self.charge(std::mem::size_of::<Symbol>())?;
+        Ok(SymbolId(self.symbols.alloc(Symbol {
+            description: Some(key),
+            private: false,
+            registered: true,
         })?))
     }
 
@@ -309,6 +326,7 @@ impl Heap {
         Ok(SymbolId(self.symbols.alloc(Symbol {
             description: Some(description),
             private: true,
+            registered: false,
         })?))
     }
 

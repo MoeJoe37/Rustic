@@ -6,7 +6,8 @@ use super::{Method, arg, install_constructor, install_methods, method, prototype
 use crate::lexer::radix_to_f64;
 use crate::runtime::agent::{Agent, JsResult};
 use crate::runtime::number::is_str_whitespace;
-use crate::runtime::object::{Class, Object};
+use crate::runtime::object::{Class, Object, PropertyDescriptor};
+use crate::runtime::shape::PropertyKey;
 use crate::runtime::value::{Kind, ObjectId, Value};
 
 const GLOBAL_FUNCTIONS: &[Method] = &[
@@ -28,8 +29,101 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     )?;
     install_constructor(agent, "Number", number_constructor, 1, i.number_prototype)?;
     install_constructor(agent, "String", string_constructor, 1, i.string_prototype)?;
-    install_constructor(agent, "Symbol", symbol_constructor, 0, i.symbol_prototype)?;
-    Ok(())
+    let symbol = install_constructor(agent, "Symbol", symbol_constructor, 0, i.symbol_prototype)?;
+    install_symbol_statics(agent, symbol)
+}
+
+const SYMBOL_STATICS: &[Method] = &[method("for", symbol_for, 1), method("keyFor", key_for, 1)];
+
+/// The well-known symbols as properties of `Symbol` (§20.4.2), `for`,
+/// `keyFor` and `Symbol.prototype.description` (§20.4.3.2).
+fn install_symbol_statics(agent: &mut Agent, symbol: ObjectId) -> JsResult<()> {
+    install_methods(agent, symbol, SYMBOL_STATICS)?;
+    let s = agent.symbols;
+    for (name, id) in [
+        ("asyncIterator", s.async_iterator),
+        ("hasInstance", s.has_instance),
+        ("isConcatSpreadable", s.is_concat_spreadable),
+        ("iterator", s.iterator),
+        ("match", s.match_),
+        ("matchAll", s.match_all),
+        ("replace", s.replace),
+        ("search", s.search),
+        ("species", s.species),
+        ("split", s.split),
+        ("toPrimitive", s.to_primitive),
+        ("toStringTag", s.to_string_tag),
+        ("unscopables", s.unscopables),
+    ] {
+        let key = agent.heap.key(name)?;
+        agent.define_property_or_throw(
+            symbol,
+            key,
+            PropertyDescriptor::data_with(Value::symbol(id), false, false, false),
+        )?;
+    }
+    let getter = agent.new_native_function(symbol_description, "get description", 0)?;
+    let key = agent.heap.key("description")?;
+    let prototype = agent.intrinsics.symbol_prototype;
+    agent.define_property_or_throw(
+        prototype,
+        key,
+        PropertyDescriptor::accessor(Value::object(getter), Value::UNDEFINED, false, true),
+    )?;
+    let tag = agent.string("Symbol")?;
+    agent.define_property_or_throw(
+        prototype,
+        PropertyKey::Symbol(agent.symbols.to_string_tag),
+        PropertyDescriptor::data_with(tag, false, false, true),
+    )
+}
+
+/// `Symbol.for(key)` (§20.4.2.2).
+fn symbol_for(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let key = agent.to_string(arg(args, 0))?;
+    let registry = agent.intrinsics.symbol_registry;
+    let property = agent.to_property_key(Value::string(key))?;
+    let found = agent.get(registry, property)?;
+    if found != Value::UNDEFINED {
+        return Ok(found);
+    }
+    let symbol = Value::symbol(agent.heap.alloc_registered_symbol(key)?);
+    agent.create_data_property_or_throw(registry, property, symbol)?;
+    Ok(symbol)
+}
+
+/// `Symbol.keyFor(sym)` (§20.4.2.6).
+fn key_for(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let Kind::Symbol(symbol) = arg(args, 0).kind() else {
+        return agent.type_error("Symbol.keyFor: argument is not a symbol");
+    };
+    let record = agent.heap.symbol(symbol);
+    match (record.registered, record.description) {
+        (true, Some(key)) => Ok(Value::string(key)),
+        _ => Ok(Value::UNDEFINED),
+    }
+}
+
+/// `get Symbol.prototype.description` (§20.4.3.2).
+fn symbol_description(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let symbol = match this.kind() {
+        Kind::Symbol(s) => Some(s),
+        Kind::Object(o) if agent.class(o) == Class::Symbol => {
+            agent.primitive_of(o).and_then(|p| match p.kind() {
+                Kind::Symbol(s) => Some(s),
+                _ => None,
+            })
+        }
+        _ => None,
+    };
+    let Some(symbol) = symbol else {
+        return agent.type_error("Symbol.prototype.description called on a non-symbol");
+    };
+    Ok(agent
+        .heap
+        .symbol(symbol)
+        .description
+        .map_or(Value::UNDEFINED, Value::string))
 }
 
 fn is_finite(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {

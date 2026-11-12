@@ -1330,8 +1330,8 @@ fn core_built_ins() {
         "true,false,true,1",
     );
     check(
-        "var o = {}; Object.setPrototypeOf(o, Array.prototype) === o",
-        "!ReferenceError: Array is not defined",
+        "var o = {}; Object.setPrototypeOf(o, Array.prototype) === o && o instanceof Array",
+        "true",
     );
     check(
         "var p = {}; var o = Object.setPrototypeOf({}, p); (Object.getPrototypeOf(o) === p) + ',' + p.isPrototypeOf(o) + ',' + o.__proto__ === p",
@@ -1352,7 +1352,7 @@ fn core_built_ins() {
         "function P(a, b) { this.s = a + b } var B = P.bind(null, 1); var o = new B(2); o.s + ',' + (o instanceof P) + ',' + (o instanceof B) + ',' + B.name + ',' + B.length",
         "3,true,true,bound P,1",
     );
-    check("Math.max.call", "!ReferenceError: Math is not defined");
+    check("Math.max.call === Function.prototype.call", "true");
     check(
         "(function foo() {}).toString()",
         "function foo() { [native code] }",
@@ -1374,6 +1374,96 @@ fn core_built_ins() {
     check(
         "typeof Symbol() + (Symbol('a') !== Symbol('a'))",
         "symboltrue",
+    );
+}
+
+#[test]
+fn arrays_math_symbols_and_dynamic_functions() {
+    let _report = Report;
+    // Array: callbacks, holes, sorting, copying and species.
+    check(
+        "[10, 9, 1, 100].sort() + '|' + [10, 9, 1, 100].sort(function (a, b) { return a - b })",
+        "1,10,100,9|1,9,10,100",
+    );
+    check(
+        "var s = [{k: 1, v: 'a'}, {k: 0, v: 'b'}, {k: 1, v: 'c'}].sort(function (x, y) { return x.k - y.k }); s.map(function (e) { return e.v }).join('')",
+        "bac",
+    );
+    check(
+        "[3, undefined, , 1].sort().length + ',' + (2 in [3, undefined, , 1].sort()) + (3 in [3, undefined, , 1].sort())",
+        "4,truefalse",
+    );
+    check(
+        "[1, 2, 3, 4].filter(function (x) { return x % 2 }).map(function (x) { return x * 10 }).reduce(function (a, b) { return a + b })",
+        "40",
+    );
+    check(
+        "[1, [2, [3, [4]]]].flat(Infinity).join('') + [1, 2].flatMap(function (x) { return [x, x] }).join('')",
+        "12341122",
+    );
+    check(
+        "var a = [1, 2, 3, 4, 5]; a.splice(1, 2, 'x', 'y', 'z') + '|' + a",
+        "2,3|1,x,y,z,4,5",
+    );
+    check(
+        "[NaN].includes(NaN) + ',' + [NaN].indexOf(NaN) + ',' + [1, 2, 1].lastIndexOf(1) + ',' + [1, 2, 3].at(-1)",
+        "true,-1,2,3",
+    );
+    check(
+        "Array.from('abc').join() + '|' + Array.from({ length: 3 }, function (_, i) { return i * i }) + '|' + [...['a', 'b'].entries()].join(';')",
+        "a,b,c|0,1,4|0,a;1,b",
+    );
+    check("var c = [1]; c.push(c); String(c)", "1,");
+    check(
+        "[5, 1, 4].toSorted() + '|' + [1, 2, 3].with(1, 9) + '|' + [1, 2, 3].toReversed() + '|' + [1, 2, 3].toSpliced(1, 1)",
+        "1,4,5|1,9,3|3,2,1|1,3",
+    );
+    check(
+        "class A extends Array {} var m = new A(); m.push(1, 2); m.length + ',' + (m.map(function (x) { return x }) instanceof A) + ',' + Array.isArray(m)",
+        "2,true,true",
+    );
+    check(
+        "var r; try { new Array(-1) } catch (e) { r = e.name } r + ',' + Array(3).length + ',' + Array.of(7)[0]",
+        "RangeError,3,7",
+    );
+    check(
+        "Object.prototype.toString.call([].keys()) + typeof [][Symbol.iterator]().next",
+        "[object Array Iterator]function",
+    );
+    // Math.
+    check(
+        "Math.max() + ',' + Math.min() + ',' + Math.max(1, NaN, 3) + ',' + (1 / Math.max(-0, 0)) + ',' + (1 / Math.min(0, -0))",
+        "-Infinity,Infinity,NaN,Infinity,-Infinity",
+    );
+    check(
+        "Math.round(2.5) + ',' + Math.round(-2.5) + ',' + Math.round(0.49999999999999994) + ',' + (1 / Math.round(-0.2))",
+        "3,-2,0,-Infinity",
+    );
+    check(
+        "Math.hypot(3, 4) + ',' + Math.clz32(1) + ',' + Math.imul(0xffffffff, 5) + ',' + Math.sign(-3) + ',' + Math.pow(2, 10)",
+        "5,31,-5,-1,1024",
+    );
+    check(
+        "var x = Math.random(); x >= 0 && x < 1 && Math.random() !== x",
+        "true",
+    );
+    // Symbol statics and the registry.
+    check(
+        "Symbol.for('k') === Symbol.for('k') && Symbol.keyFor(Symbol.for('k')) === 'k' && Symbol.keyFor(Symbol('k')) === undefined",
+        "true",
+    );
+    check(
+        "var o = {}; o[Symbol.iterator] = 1; Object.getOwnPropertySymbols(o)[0] === Symbol.iterator && Symbol('d').description === 'd'",
+        "true",
+    );
+    // The Function constructor.
+    check(
+        "var f = new Function('a', 'b', 'return a + b'); f(2, 3) + f.name + f.length",
+        "5anonymous2",
+    );
+    check(
+        "var r = []; ['}); x = 1; (function () {', 'a){}, function('].forEach(function (p) { try { Function(p, '') } catch (e) { r.push(e.name) } }); r + ',' + typeof x",
+        "SyntaxError,SyntaxError,undefined",
     );
 }
 
@@ -1486,7 +1576,7 @@ fn iteration_protocol() {
     );
     check_sym(
         "var it = [7].values(); it.next = function () { return {done: true} }; var n = 0; for (var v of it) n++; n",
-        "!TypeError: value is not iterable",
+        "0",
     );
     check_sym(
         "var o = {[Symbol.hasInstance](v) { return v === 1 }}; (1 instanceof o) + ' ' + (2 instanceof o)",

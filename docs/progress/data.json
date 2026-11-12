@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "ad8524faf1a9ea1e64103c8bbdcf345666bc6c97e86dfef96cca74033ae0aec6",
-  "percent": "24.14",
+  "source_fingerprint": "87f37fe137a1e8ee9dc4861e8df6f492dfd650797218323595d434b503234128",
+  "percent": "24.43",
   "verified_percent": "20.90",
-  "partial_percent": "3.24",
+  "partial_percent": "3.53",
   "completed": 54,
   "in_progress": 8,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "43.99",
+      "percent": "47.21",
       "verified_percent": "12.30",
-      "partial_percent": "31.69"
+      "partial_percent": "34.91"
     },
     {
       "id": "M5",
@@ -3500,11 +3500,43 @@
             },
             {
               "label": "Array, iterators and array-likes",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/array.rs",
+                  "marker": "fn array_species_create"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
+                }
+              ]
             },
             {
-              "label": "String, Number, Boolean and Symbol prototypes, Math",
+              "label": "Function constructor, Math and Symbol statics",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/math.rs",
+                  "marker": "fn round_half_up"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/mod.rs",
+                  "marker": "fn create_dynamic_function"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
+                }
+              ]
+            },
+            {
+              "label": "String, Number and Boolean prototypes",
               "status": "planned",
               "evidence": []
             },
@@ -3519,12 +3551,12 @@
               "evidence": []
             },
             {
-              "label": "Function constructor and eval (TD-106)",
+              "label": "eval (TD-106)",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "16.66",
+          "credit": "42.85",
           "engine_share": "1.09"
         },
         {
@@ -3661,10 +3693,10 @@
       "completed": 1,
       "in_progress": 7,
       "total": 15,
-      "contribution": "4.19",
-      "percent": "41.91",
+      "contribution": "4.47",
+      "percent": "44.78",
       "verified_percent": "10.95",
-      "partial_percent": "30.96"
+      "partial_percent": "33.83"
     },
     {
       "id": "wasm",

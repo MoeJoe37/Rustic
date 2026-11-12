@@ -1,8 +1,8 @@
-//! `Function.prototype` (§20.2.3): `call`, `apply`, `bind`, `toString`
-//! and `[Symbol.hasInstance]`. The `Function` constructor compiles
-//! source text and arrives with the rest of dynamic code (TD-106).
+//! `Function` (§20.2): the constructor, which compiles source text, and
+//! `Function.prototype` with `call`, `apply`, `bind`, `toString` and
+//! `[Symbol.hasInstance]`.
 
-use super::{Method, arg, install_methods, method};
+use super::{Method, arg, install_constructor, install_methods, method};
 use crate::runtime::FLAG_NATIVE_CONSTRUCTOR;
 use crate::runtime::agent::{Agent, JsResult};
 use crate::runtime::object::{Class, Internal, Object, PropertyDescriptor};
@@ -19,6 +19,7 @@ const PROTOTYPE_METHODS: &[Method] = &[
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let prototype = agent.intrinsics.function_prototype;
+    install_constructor(agent, "Function", function_constructor, 1, prototype)?;
     install_methods(agent, prototype, PROTOTYPE_METHODS)?;
     // `Function.prototype[@@hasInstance]` is not writable or configurable
     // (§20.2.3.6).
@@ -29,6 +30,36 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         key,
         PropertyDescriptor::data_with(Value::object(f), false, false, false),
     )
+}
+
+/// `Function(...params, body)` (§20.2.1.1).
+fn function_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let (params, body) = match args.split_last() {
+        None => (&[][..], None),
+        Some((body, params)) => (params, Some(*body)),
+    };
+    let mut parameter_text = Vec::with_capacity(params.len());
+    for &p in params {
+        let s = agent.to_string(p)?;
+        parameter_text.push(agent.heap.string(s).to_text());
+    }
+    let body_text = match body {
+        Some(b) => {
+            let s = agent.to_string(b)?;
+            agent.heap.string(s).to_text()
+        }
+        None => String::new(),
+    };
+    let f = agent.create_dynamic_function(&parameter_text.join(","), &body_text)?;
+    // A subclass's prototype (§20.2.1.1.1 step 23).
+    if let (Some(target), Some(o)) = (agent.new_target(), f.as_object()) {
+        if agent.active_function() != Some(target) {
+            let default = agent.intrinsics.function_prototype;
+            let prototype = super::prototype_from_new_target(agent, default)?;
+            agent.set_prototype_of(o, Some(prototype));
+        }
+    }
+    Ok(f)
 }
 
 /// `Function.prototype.call(thisArg, ...args)` (§20.2.3.3).

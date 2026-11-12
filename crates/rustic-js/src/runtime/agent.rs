@@ -172,11 +172,14 @@ pub struct Intrinsics {
     pub array_values: ObjectId,
     /// `%ArrayIteratorPrototype%.next`.
     pub array_iterator_next: ObjectId,
+    /// The global symbol registry of `Symbol.for`: a null-prototype
+    /// object from keys to symbols, never reachable from script.
+    pub symbol_registry: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 17] {
+    pub(crate) fn all(&self) -> [ObjectId; 18] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -195,6 +198,7 @@ impl Intrinsics {
             self.array_iterator_prototype,
             self.array_values,
             self.array_iterator_next,
+            self.symbol_registry,
         ]
     }
 }
@@ -250,6 +254,7 @@ impl Agent {
                 array_iterator_prototype: placeholder,
                 array_values: placeholder,
                 array_iterator_next: placeholder,
+                symbol_registry: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -259,6 +264,9 @@ impl Agent {
         agent.global_env = agent
             .new_global_environment(global, global)
             .map_err(|_| OutOfMemory)?;
+        // Prototypes with more methods than a shape holds became
+        // dictionaries while they were built; free the shapes they left.
+        agent.collect_garbage(super::Roots::default());
         Ok(agent)
     }
 
@@ -308,6 +316,7 @@ impl Agent {
             array_iterator_prototype: object_prototype,
             array_values: object_prototype,
             array_iterator_next: object_prototype,
+            symbol_registry: self.heap.alloc_object(Object::new(Class::Ordinary, None))?,
         };
         super::builtins::install(self)
     }

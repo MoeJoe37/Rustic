@@ -125,13 +125,13 @@ writes the verdict and reason for every file. At the pinned revision, on
 
 | | Files |
 | --- | ---: |
-| Pass | 10,726 |
-| Fail | 7,047 |
+| Pass | 12,284 |
+| Fail | 5,489 |
 | Skipped (modules 817, async, proposals) | 6,059 |
 
-That is 60.4% of the 17,773 files that run, and 45.0% of all 23,832. The
+That is 69.1% of the 17,773 files that run, and 51.5% of all 23,832. The
 first run passed 7,708 and the interpreter fixes raised that to 7,895 before
-JS-05 part 1 added the core built-ins. The first run it found four interpreter bugs, now fixed and covered
+the JS-05 built-ins (10,726 after part 1). The first run it found four interpreter bugs, now fixed and covered
 by `test262_findings` in `tests/interp.rs`: a `var` inside a block at the top
 of a script was never declared as a global, assignments inside `with` looked
 up their target after computing the value, `x = (function () {})` left the
@@ -144,10 +144,10 @@ a file that stops passing fails the gate, and so does one that starts passing
 until the list is regenerated with `RUSTIC_TEST262_BLESS=1`. Run the gate in
 release mode on a 64-bit host; the list is not checked on other targets.
 
-Most failures are not interpreter bugs yet. About 3,300 files need
-generators or async functions (JS-08), about 1,600 need `Array`, about 550
-need `eval` (TD-106) and about 240 need regular expressions. About 740 fail an
-assertion and are the next place to look for interpreter bugs. Skipped files are never counted as passing. Only
+Most failures are not interpreter bugs yet. About 3,700 files need
+generators or async functions (JS-08), about 780 need `eval` (TD-106) and
+about 240 need regular expressions. Modules, BigInt arithmetic, `Proxy`,
+`Reflect`, typed arrays and collections account for most of the rest. Skipped files are never counted as passing. Only
 `test/language` is run: `test/built-ins` joins with JS-05, and module and
 async files with JS-06 (TD-105).
 
@@ -396,10 +396,40 @@ Part 1 holds what other built-ins and the Test262 harness lean on:
   `toString` uses the `NativeFunction` form for every function.
   - A bound function is a native function that holds its target, its `this`
     and its arguments, and it costs 8 bytes per bound argument.
-  - The `Function` constructor needs dynamic code and is not installed yet
-    (TD-106).
+  - The `Function` constructor parses its parameters and body as one
+    function expression in the global scope. Text that tries to close the
+    function early parses as something else and is a SyntaxError.
 - **Globals.** `isFinite`, `isNaN`, `parseFloat`, `parseInt` (any radix),
   and the `Boolean`, `Number`, `String` and `Symbol` constructors.
+
+Part 2 adds the rest of the everyday library, beginning with:
+
+- **Array.** The constructor with `from`, `of`, `isArray` and
+  `[Symbol.species]`, and every `Array.prototype` method of ES2025
+  (`toSorted`, `with` and the other copying methods included), plus
+  `[Symbol.unscopables]`.
+  - The methods follow the specification through the object internal
+    methods, so they work on array-likes, holes, accessors and subclasses.
+  - `sort` is a stable merge sort. With no comparator, each element's string
+    is computed once.
+  - `flat` keeps its own stack, so deep nesting cannot overflow the native
+    stack.
+  - `join` treats an array that is already being joined as empty, as
+    browsers do, so a cycle ends.
+- **Iterators.** `keys` and `entries` iterators, and `%IteratorPrototype%`
+  with `[Symbol.iterator]`.
+- **Math.** Every function and constant. `Math.random` is xorshift64*,
+  seeded from the clock, and `Agent::set_random_seed` makes it repeatable
+  for tests and fuzzing.
+- **Symbol.** The well-known symbols as properties of `Symbol`, `Symbol.for`
+  and `Symbol.keyFor` with a registry object, and `description`.
+
+Time on the development machine (release): 1 million `push` calls take 300
+ms including the global loop around them (about 120 ns per call). A `map` over
+1 million elements takes 40 ms beyond filling the array. Sorting 200,000
+numbers takes 190 ms with a comparator and 145 ms with the default string
+order. The methods take the generic path through the internal methods. A
+dense-array fast path for `push`, `map` and `sort` is JS-09 work.
 
 A native function can be a constructor, marked by `FLAG_NATIVE_CONSTRUCTOR`.
 `new` calls it with a new target, which the function reads with
@@ -411,4 +441,5 @@ A new agent now holds 83 objects in 17,390 bytes, up from 32 objects in
 Installing the rest of the library lazily is the JS-09 lever if agents per
 page start to matter.
 
-With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%.
+With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
+and with the part 2 pieces above to 69.1%.

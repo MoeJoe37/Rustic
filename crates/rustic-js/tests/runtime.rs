@@ -491,7 +491,7 @@ fn to_primitive_uses_value_of_to_string_and_to_primitive() {
     assert_eq!(text(&a, hint), "default");
     let arr = a.new_array().unwrap();
     let s = a.to_string(Value::object(arr)).unwrap();
-    assert_eq!(a.heap.string(s).to_text(), "[object Array]");
+    assert_eq!(a.heap.string(s).to_text(), "");
 }
 
 #[test]
@@ -552,9 +552,8 @@ fn equality_and_relational_comparison() {
     );
     let arr = a.new_array().unwrap();
     let empty = a.string("").unwrap();
-    // [] == "" through ToPrimitive and Array.prototype.toString arriving
-    // later: here the array becomes "[object Array]".
-    assert!(!a.is_loosely_equal(Value::object(arr), empty).unwrap());
+    // [] == "" through ToPrimitive and Array.prototype.toString.
+    assert!(a.is_loosely_equal(Value::object(arr), empty).unwrap());
     let b = a.string("b").unwrap();
     let ab = a.string("ab").unwrap();
     assert_eq!(a.is_less_than(ab, b, true).unwrap(), Some(true));

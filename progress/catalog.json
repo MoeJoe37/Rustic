@@ -3186,11 +3186,43 @@
             },
             {
               "label": "Array, iterators and array-likes",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/array.rs",
+                  "marker": "fn array_species_create"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
+                }
+              ]
             },
             {
-              "label": "String, Number, Boolean and Symbol prototypes, Math",
+              "label": "Function constructor, Math and Symbol statics",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/math.rs",
+                  "marker": "fn round_half_up"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/mod.rs",
+                  "marker": "fn create_dynamic_function"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn arrays_math_symbols_and_dynamic_functions"
+                }
+              ]
+            },
+            {
+              "label": "String, Number and Boolean prototypes",
               "status": "planned",
               "evidence": []
             },
@@ -3205,7 +3237,7 @@
               "evidence": []
             },
             {
-              "label": "Function constructor and eval (TD-106)",
+              "label": "eval (TD-106)",
               "status": "planned",
               "evidence": []
             }

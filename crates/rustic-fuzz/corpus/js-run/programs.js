@@ -136,3 +136,7 @@ var o = Object.create(null, { a: { value: 1, enumerable: true }, b: { get: funct
 function F(a, b) { this.v = a * b } var G = F.bind(null, 3), s = 0; for (var i = 0; i < 9; i++) s += new G(i).v + F.call({}, i, 2) | 0; s
 var n = 0; for (var i = 0; i < 20; i++) { try { if (i % 3) throw new RangeError('r' + i); n += parseInt('1' + i, 10) } catch (e) { n += e instanceof Error ? e.message.length : -1 } } n
 class E extends TypeError { constructor(m) { super(m); this.k = 2 } } var c = 0; for (var i = 0; i < 9; i++) { try { throw new E(String(i)) } catch (e) { c += e.k + Number(e.message) } } c
+var a = [5, 1, 4, , 2]; a.sort(function (x, y) { return y - x }); a.concat([[1]], 2).flat(Infinity).join('|');
+[1, 2, 3].reduceRight(function (s, x) { return s + x }, '') + Array.from('héllo').length + [..."ab"].entries().next().value;
+Math.max(Math.random(), 2) + Math.hypot(1e300, 1e300) + Math.fround(1.1) + Math.atan2(1, 1);
+new Function('a', 'return a * 2')(21) + Symbol.for('x').description + [].concat.call(1, 2).length;

@@ -60,6 +60,7 @@ fn run(text: &str, mode: Mode) -> Result<String, String> {
     agent.set_inline_caches(mode != Mode::Uncached);
     agent.heap.set_gc_stress(mode == Mode::Collecting);
     agent.set_step_budget(Some(STEPS));
+    agent.set_random_seed(1);
     let outcome = match agent.evaluate(text) {
         Ok(value) => format!("value {}", show(&agent, value)),
         Err(EvalError::Throw(value)) => format!("throw {}", show(&agent, value)),

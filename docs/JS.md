@@ -124,10 +124,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (JS-05 areas) |
 | --- | ---: | ---: |
-| Pass | 12,441 | 9,439 |
-| Fail | 5,332 | 1,126 |
+| Pass | 12,450 | 10,178 |
+| Fail | 5,323 | 997 |
 | Skipped (modules, async, proposals) | 6,059 | 96 |
-| Pass rate of the files that run | 70.0% | 89.3% |
+| Pass rate of the files that run | 70.0% | 91.1% |
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -144,7 +144,7 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
 
 The built-ins gate runs the `test/built-ins` directories of the library areas
 installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
-Error, FinalizationRegistry, Function, JSON, Map, Math, NativeErrors, Number,
+Date, Error, FinalizationRegistry, Function, JSON, Map, Math, NativeErrors, Number,
 Object, Reflect, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
@@ -161,11 +161,11 @@ Most `test/language` failures are not interpreter bugs yet:
 - About 3,700 files need generators or async functions (JS-08).
 - About 780 need `eval` (TD-106).
 - About 240 need regular expressions.
-- Modules, BigInt arithmetic, `Proxy`, `Reflect`, typed arrays and
-  collections account for most of the rest.
+- Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
+  the rest.
 
 In the built-ins, the failures are mostly tests that reach for `RegExp`,
-`Date`, `Proxy`, typed arrays or `$262`. Skipped files are never counted as
+`Proxy`, Temporal, typed arrays or `$262`. Skipped files are never counted as
 passing. Module and async files join with JS-06 (TD-105).
 
 ## Fuzzing
@@ -483,6 +483,22 @@ Part 2 adds the rest of the everyday library, beginning with:
   registrations and collects held values when targets die. Its cleanup
   callback waits for host jobs (JS-06).
 - **Reflect.** All thirteen functions.
+- **Date.** The constructor, `Date.parse`, `Date.UTC`, `Date.now` and every
+  `Date.prototype` method, with Annex B `getYear`, `setYear` and
+  `toGMTString` (`builtins/date.rs`).
+  - The time value sits in the object's primitive slot. Calendar fields come
+    from integer civil-date arithmetic on the day number, so a getter is a
+    few integer divisions and needs no tables.
+  - `Date.parse` reads the Date Time String Format (expanded years included)
+    and the forms `toString` and `toUTCString` write, so every string a Date
+    produces parses back to the same time.
+  - Local time is UTC plus one fixed offset, `Agent::set_time_zone_offset`.
+    There is no time zone database and so no daylight saving time (TD-108).
+    `Agent::set_clock` fixes the current time for tests and fuzzing.
+  - The `toLocale…String` methods return the `toString` forms; Intl is
+    JS-08.
+  - Test262 `test/built-ins/Date`: 595 of 610 files pass. The rest need
+    regular expressions, other realms (`$262`) or Temporal.
 
 Time on the development machine (release): 1 million `push` calls take 300
 ms including the global loop around them (about 120 ns per call). A `map` over

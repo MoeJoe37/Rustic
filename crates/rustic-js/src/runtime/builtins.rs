@@ -5,6 +5,7 @@
 
 mod array;
 mod collections;
+mod date;
 mod error;
 mod function;
 mod global;
@@ -137,6 +138,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     string_object::install(agent)?;
     json::install(agent)?;
     collections::install(agent)?;
+    date::install(agent)?;
     reflect::install(agent)?;
 
     // Value properties of the global object (§19.1).
@@ -407,6 +409,7 @@ pub(crate) fn object_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> J
                 Class::Boolean => "Boolean",
                 Class::Number => "Number",
                 Class::String => "String",
+                Class::Date => "Date",
                 _ => "Object",
             }
         }

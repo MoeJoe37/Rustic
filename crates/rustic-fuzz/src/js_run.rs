@@ -61,6 +61,7 @@ fn run(text: &str, mode: Mode) -> Result<String, String> {
     agent.heap.set_gc_stress(mode == Mode::Collecting);
     agent.set_step_budget(Some(STEPS));
     agent.set_random_seed(1);
+    agent.set_clock(Some(0.0));
     let outcome = match agent.evaluate(text) {
         Ok(value) => format!("value {}", show(&agent, value)),
         Err(EvalError::Throw(value)) => format!("throw {}", show(&agent, value)),

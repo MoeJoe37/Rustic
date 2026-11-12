@@ -106,7 +106,8 @@ fn deleting_or_many_properties_switch_to_a_dictionary_without_losing_order() {
 
 #[test]
 fn the_heap_budget_fails_cleanly() {
-    let mut a = Agent::with_heap_limit(64 * 1024).unwrap();
+    // A new agent with every built-in takes about 71 KiB.
+    let mut a = Agent::with_heap_limit(128 * 1024).unwrap();
     let mut result = Ok(());
     for _ in 0..10_000 {
         if let Err(e) = a.new_object() {

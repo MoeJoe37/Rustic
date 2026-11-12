@@ -139,6 +139,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs `test/language` plus only the JS-05 areas of `test/built-ins` | Open, JS-05/JS-06 |
 | TD-106 | Deliberate | JS | No `eval`, and `Function.prototype.toString` prints every function in the native form | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
+| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1499,4 +1500,20 @@ Pay with: move the normalization tables to `rustic-base` (or a shared
 Unicode crate) so both crates use one copy, then add `normalize`; collation
 and locale casing with Intl (JS-08). Trigger: JS-05 completion or the first
 page that depends on either.
+
+### TD-108 — Date local time is a fixed offset
+
+`Date` computes local time as UTC plus the offset the embedder passes to
+`Agent::set_time_zone_offset` (zero by default). Without a time zone
+database the offset cannot change with daylight saving time or with a
+zone's history, so local fields, `getTimezoneOffset` and parsed local times
+are off by the DST shift for part of the year in most zones, and the
+`toString` forms carry no zone name except for UTC. The engine embeds no
+OS-specific time zone API, so the platform layer has to supply the data.
+
+Pay with: a `LocalTimeZone` hook on the agent that maps a UTC time value
+to an offset (and a local time to its candidate offsets for
+`UTC(t)`, §21.4.1.26), filled by the shell from the OS or from a compact
+TZif reader in `rustic-base`; Intl.DateTimeFormat (JS-08) shares it.
+Trigger: the shell first runs page script, or JS-08.
 

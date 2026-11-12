@@ -47,6 +47,8 @@ pub enum Class {
     Map,
     /// A Set (§24.2).
     Set,
+    /// A Date (`[[DateValue]]` in the primitive slot, §21.4).
+    Date,
 }
 
 /// A complete or partial property descriptor (§6.2.6).

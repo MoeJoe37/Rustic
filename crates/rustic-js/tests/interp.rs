@@ -1535,6 +1535,82 @@ fn collections_and_reflect() {
 }
 
 #[test]
+fn dates() {
+    let _report = Report;
+    check("new Date(0).toISOString()", "1970-01-01T00:00:00.000Z");
+    check(
+        "new Date(2000, 1, 29, 12, 30, 15, 250).toISOString()",
+        "2000-02-29T12:30:15.250Z",
+    );
+    check("Date.UTC(99, 11, 31)", "946598400000");
+    check("new Date(-1).getUTCFullYear()", "1969");
+    check(
+        "new Date(Date.UTC(-1, 0, 1)).toISOString()",
+        "-000001-01-01T00:00:00.000Z",
+    );
+    check("new Date(8.64e15 + 1).getTime()", "NaN");
+    check("String(new Date(NaN))", "Invalid Date");
+    check(
+        "new Date(0).toString()",
+        "Thu Jan 01 1970 00:00:00 GMT+0000 (Coordinated Universal Time)",
+    );
+    check("new Date(0).toUTCString()", "Thu, 01 Jan 1970 00:00:00 GMT");
+    // Every string a Date writes, it reads back.
+    check(
+        "var d = new Date(2024, 6, 4, 5, 6, 7); [d.toString(), d.toUTCString(), d.toISOString()].every(function (s) { return Date.parse(s) === d.getTime() })",
+        "true",
+    );
+    check("Date.parse('2000-01-01T00:00:00.5+01:00')", "946681200500");
+    check("Date.parse('2000-13-01')", "NaN");
+    // Setters convert every argument before looking at the time value.
+    check(
+        "var n = 0; var d = new Date(NaN); d.setHours({ valueOf: function () { n++; return 1 } }, { valueOf: function () { n++; return 2 } }); n",
+        "2",
+    );
+    check(
+        "var d = new Date(0); d.setUTCMonth(13, 31); d.toISOString()",
+        "1971-03-03T00:00:00.000Z",
+    );
+    check(
+        "var d = new Date(NaN); d.setFullYear(2020); d.getTime()",
+        "1577836800000",
+    );
+    check(
+        "new Date(0) + 1",
+        "Thu Jan 01 1970 00:00:00 GMT+0000 (Coordinated Universal Time)1",
+    );
+    check("new Date(5) - 1", "4");
+    check(
+        "JSON.stringify({ d: new Date(0) })",
+        "{\"d\":\"1970-01-01T00:00:00.000Z\"}",
+    );
+    check(
+        "Object.prototype.toString.call(new Date(0))",
+        "[object Date]",
+    );
+    check(
+        "Date.prototype.toGMTString === Date.prototype.toUTCString",
+        "true",
+    );
+    check("new Date(0).getYear()", "70");
+    check("class D extends Date {} new D(0).getTime()", "0");
+}
+
+#[test]
+fn dates_follow_the_embedder_clock_and_offset() {
+    let mut agent = Agent::new().expect("agent");
+    agent.set_clock(Some(86_400_000.5));
+    agent.set_time_zone_offset(180);
+    let v = agent
+        .evaluate("[Date.now(), new Date().getHours(), new Date(0).getTimezoneOffset(), String(new Date(0)), new Date(2000, 0, 1).toISOString(), Date.parse('2000-01-01T00:00')].join()")
+        .expect("runs");
+    assert_eq!(
+        agent.display(v),
+        "86400000,3,-180,Thu Jan 01 1970 03:00:00 GMT+0300,1999-12-31T21:00:00.000Z,946674000000"
+    );
+}
+
+#[test]
 fn arrays_math_symbols_and_dynamic_functions() {
     let _report = Report;
     // Array: callbacks, holes, sorting, copying and species.

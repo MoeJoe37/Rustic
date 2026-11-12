@@ -3285,6 +3285,22 @@
               ]
             },
             {
+              "label": "Date",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/date.rs",
+                  "marker": "fn days_from_civil"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn dates"
+                }
+              ]
+            },
+            {
               "label": "eval (TD-106)",
               "status": "planned",
               "evidence": []

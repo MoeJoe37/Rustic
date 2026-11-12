@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 12441 pass, 5332 fail, 6059 skipped (modules, async, proposals).
+# 12450 pass, 5323 fail, 6059 skipped (modules, async, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1gs.js
 arguments-object/10.5-7-b-2-s.js
@@ -530,6 +530,7 @@ expressions/addition/S11.6.1_A2.1_T1.js
 expressions/addition/S11.6.1_A2.1_T2.js
 expressions/addition/S11.6.1_A2.1_T3.js
 expressions/addition/S11.6.1_A2.2_T1.js
+expressions/addition/S11.6.1_A2.2_T2.js
 expressions/addition/S11.6.1_A2.2_T3.js
 expressions/addition/S11.6.1_A2.3_T1.js
 expressions/addition/S11.6.1_A2.4_T1.js
@@ -3846,6 +3847,7 @@ expressions/class/static-method-length-dflt.js
 expressions/class/static-method-param-dflt-yield.js
 expressions/class/subclass-builtins/subclass-Array.js
 expressions/class/subclass-builtins/subclass-Boolean.js
+expressions/class/subclass-builtins/subclass-Date.js
 expressions/class/subclass-builtins/subclass-Error.js
 expressions/class/subclass-builtins/subclass-EvalError.js
 expressions/class/subclass-builtins/subclass-Function.js
@@ -5347,6 +5349,7 @@ expressions/logical-not/S9.2_A4_T2.js
 expressions/logical-not/S9.2_A4_T4.js
 expressions/logical-not/S9.2_A5_T2.js
 expressions/logical-not/S9.2_A5_T4.js
+expressions/logical-not/S9.2_A6_T2.js
 expressions/logical-not/symbol-logical-not-evaluation.js
 expressions/logical-or/S11.11.2_A2.1_T1.js
 expressions/logical-or/S11.11.2_A2.1_T2.js
@@ -6247,6 +6250,7 @@ expressions/property-accessors/S11.2.1_A3_T2.js
 expressions/property-accessors/S11.2.1_A3_T3.js
 expressions/property-accessors/S11.2.1_A3_T4.js
 expressions/property-accessors/S11.2.1_A3_T5.js
+expressions/property-accessors/S11.2.1_A4_T1.js
 expressions/property-accessors/S11.2.1_A4_T2.js
 expressions/property-accessors/S11.2.1_A4_T3.js
 expressions/property-accessors/S11.2.1_A4_T4.js
@@ -6254,6 +6258,7 @@ expressions/property-accessors/S11.2.1_A4_T5.js
 expressions/property-accessors/S11.2.1_A4_T6.js
 expressions/property-accessors/S11.2.1_A4_T7.js
 expressions/property-accessors/S11.2.1_A4_T8.js
+expressions/property-accessors/S11.2.1_A4_T9.js
 expressions/property-accessors/S8.12.3_A1.js
 expressions/property-accessors/S8.12.3_A2.js
 expressions/property-accessors/S8.12.3_A3.js
@@ -6539,6 +6544,7 @@ expressions/typeof/built-in-ordinary-objects-no-call.js
 expressions/typeof/get-value-ref-err.js
 expressions/typeof/get-value.js
 expressions/typeof/number.js
+expressions/typeof/string.js
 expressions/typeof/symbol.js
 expressions/typeof/undefined.js
 expressions/typeof/unresolvable-reference.js
@@ -9741,6 +9747,7 @@ statements/class/static-method-param-yield.js
 statements/class/strict-mode/with.js
 statements/class/subclass-builtins/subclass-Array.js
 statements/class/subclass-builtins/subclass-Boolean.js
+statements/class/subclass-builtins/subclass-Date.js
 statements/class/subclass-builtins/subclass-Error.js
 statements/class/subclass-builtins/subclass-EvalError.js
 statements/class/subclass-builtins/subclass-Function.js
@@ -9765,6 +9772,8 @@ statements/class/subclass/builtin-objects/Array/regular-subclassing.js
 statements/class/subclass/builtin-objects/Array/super-must-be-called.js
 statements/class/subclass/builtin-objects/Boolean/regular-subclassing.js
 statements/class/subclass/builtin-objects/Boolean/super-must-be-called.js
+statements/class/subclass/builtin-objects/Date/regular-subclassing.js
+statements/class/subclass/builtin-objects/Date/super-must-be-called.js
 statements/class/subclass/builtin-objects/Error/message-property-assignment.js
 statements/class/subclass/builtin-objects/Error/regular-subclassing.js
 statements/class/subclass/builtin-objects/Error/super-must-be-called.js

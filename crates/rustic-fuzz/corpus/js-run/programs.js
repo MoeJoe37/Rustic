@@ -146,3 +146,5 @@ JSON.stringify(JSON.parse('{"a":[1,"x\\u00e9",{"b":null}],"c":true}', function (
 var m = new Map([[1, 2]]); var it = m.keys(); for (var i = 0; i < 50; i++) { m.set('k' + i, i); m.delete(i % 7) } [...it].length + m.size + [...new Set('hello')].join('');
 var s = new Set([1, 2, 3]); s.forEach(function (v) { if (v < 10) s.add(v + 10); s.delete(v - 1) }); [...s.union([9].values ? new Set([9]) : s)].length + Reflect.ownKeys(Object.groupBy(s, String)).length;
 var w = new WeakMap(); var k = []; w.set(k, new Map([[k, w]])); Reflect.apply(Array.prototype.push, k, [1, 2]) + w.get(k).size + String(new WeakRef(k).deref() === k);
+var d = new Date(2024, 1, 29, 23, 59, 59, 999); d.setMonth(d.getMonth() + 13, 31); [d.toISOString(), d.toString(), Date.parse(d.toUTCString()), new Date(Date.UTC(-271821, 3, 20)).getTime()].join();
+var d = new Date(); d.setFullYear(1e6); [d.getTime(), Date.parse('+275760-09-13T00:00:00Z'), Date.parse('Tue Feb 01 2022 10:00 GMT-0130 (x)'), JSON.stringify([new Date(NaN)])].join();

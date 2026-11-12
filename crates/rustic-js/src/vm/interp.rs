@@ -110,6 +110,10 @@ pub(crate) struct VmState {
     pub(crate) join_stack: Vec<ObjectId>,
     /// `Math.random` state (xorshift64*); zero until first seeded.
     pub(crate) random_state: u64,
+    /// A fixed current time for `Date`, or `None` for the system clock.
+    pub(crate) clock: Option<f64>,
+    /// Local time minus UTC, in milliseconds.
+    pub(crate) time_zone_offset_ms: f64,
 }
 
 fn stack_address() -> usize {
@@ -175,6 +179,19 @@ impl Agent {
     pub fn set_random_seed(&mut self, seed: u64) {
         // xorshift needs a non-zero state.
         self.vm.random_state = seed | 1;
+    }
+
+    /// Fix the time `Date` reads as now, in milliseconds since the epoch,
+    /// or return to the system clock with `None`. Tests and fuzzing use
+    /// this to be reproducible.
+    pub fn set_clock(&mut self, now: Option<f64>) {
+        self.vm.clock = now.map(f64::floor);
+    }
+
+    /// Set local time to UTC plus `minutes`. There is no time zone
+    /// database, so the offset is the same all year (TD-108).
+    pub fn set_time_zone_offset(&mut self, minutes: i32) {
+        self.vm.time_zone_offset_ms = f64::from(minutes) * 60_000.0;
     }
 
     /// Turn the inline caches of property and global sites off or on.

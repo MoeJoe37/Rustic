@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "7e5e9bd8b87688e26aef11a5771f9bcbc605d68c847efe1566c9a8439904e3af",
-  "percent": "24.90",
+  "source_fingerprint": "0ce4612ca79c10652088cafe0816653f343a90dce207f5f77e8b2504b4482f5e",
+  "percent": "24.92",
   "verified_percent": "20.90",
-  "partial_percent": "4.00",
+  "partial_percent": "4.02",
   "completed": 54,
   "in_progress": 8,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "52.49",
+      "percent": "52.71",
       "verified_percent": "12.30",
-      "partial_percent": "40.19"
+      "partial_percent": "40.41"
     },
     {
       "id": "M5",
@@ -3599,12 +3599,28 @@
               ]
             },
             {
+              "label": "Date",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/date.rs",
+                  "marker": "fn days_from_civil"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn dates"
+                }
+              ]
+            },
+            {
               "label": "eval (TD-106)",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "85.71",
+          "credit": "87.50",
           "engine_share": "1.09"
         },
         {
@@ -3741,10 +3757,10 @@
       "completed": 1,
       "in_progress": 7,
       "total": 15,
-      "contribution": "4.94",
-      "percent": "49.48",
+      "contribution": "4.96",
+      "percent": "49.67",
       "verified_percent": "10.95",
-      "partial_percent": "38.53"
+      "partial_percent": "38.72"
     },
     {
       "id": "wasm",

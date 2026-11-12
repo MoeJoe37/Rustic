@@ -108,6 +108,7 @@ const BUILT_IN_DIRS: &[&str] = &[
     "Array",
     "ArrayIteratorPrototype",
     "Boolean",
+    "Date",
     "Error",
     "FinalizationRegistry",
     "Function",

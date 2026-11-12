@@ -212,12 +212,26 @@ pub struct Intrinsics {
     pub regexp_string_iterator_prototype: ObjectId,
     /// `%ThrowTypeError%` (§10.2.4.1).
     pub throw_type_error: ObjectId,
+    /// `%ArrayBuffer%`.
+    pub array_buffer: ObjectId,
+    /// `%ArrayBuffer.prototype%`.
+    pub array_buffer_prototype: ObjectId,
+    /// `%DataView.prototype%`.
+    pub data_view_prototype: ObjectId,
+    /// `%TypedArray%`.
+    pub typed_array: ObjectId,
+    /// `%TypedArray.prototype%`.
+    pub typed_array_prototype: ObjectId,
+    /// The typed array constructors, in element kind order.
+    pub typed_array_constructors: [ObjectId; 12],
+    /// Their prototypes, in the same order.
+    pub typed_array_prototypes: [ObjectId; 12],
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 37] {
-        [
+    pub(crate) fn all(&self) -> Vec<ObjectId> {
+        let mut all = vec![
             self.object_prototype,
             self.function_prototype,
             self.array_prototype,
@@ -255,7 +269,15 @@ impl Intrinsics {
             self.regexp_prototype,
             self.regexp_string_iterator_prototype,
             self.throw_type_error,
-        ]
+            self.array_buffer,
+            self.array_buffer_prototype,
+            self.data_view_prototype,
+            self.typed_array,
+            self.typed_array_prototype,
+        ];
+        all.extend(self.typed_array_constructors);
+        all.extend(self.typed_array_prototypes);
+        all
     }
 }
 
@@ -338,6 +360,13 @@ impl Agent {
                 regexp_prototype: placeholder,
                 regexp_string_iterator_prototype: placeholder,
                 throw_type_error: placeholder,
+                array_buffer: placeholder,
+                array_buffer_prototype: placeholder,
+                data_view_prototype: placeholder,
+                typed_array: placeholder,
+                typed_array_prototype: placeholder,
+                typed_array_constructors: [placeholder; 12],
+                typed_array_prototypes: [placeholder; 12],
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -418,6 +447,13 @@ impl Agent {
             regexp_prototype: object_prototype,
             regexp_string_iterator_prototype: object_prototype,
             throw_type_error: object_prototype,
+            array_buffer: object_prototype,
+            array_buffer_prototype: object_prototype,
+            data_view_prototype: object_prototype,
+            typed_array: object_prototype,
+            typed_array_prototype: object_prototype,
+            typed_array_constructors: [object_prototype; 12],
+            typed_array_prototypes: [object_prototype; 12],
         };
         super::builtins::install(self)
     }

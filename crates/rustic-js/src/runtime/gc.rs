@@ -420,6 +420,9 @@ impl Marker<'_> {
                     }
                 }
                 Some(Internal::Arguments { env, .. }) => self.env(*env),
+                Some(Internal::TypedArray { buffer, .. } | Internal::DataView { buffer, .. }) => {
+                    self.value(Value::object(*buffer));
+                }
                 Some(Internal::Bound { target, this, args }) => {
                     self.value(Value::object(*target));
                     self.value(*this);
@@ -429,6 +432,8 @@ impl Marker<'_> {
                 }
                 // The target is weak: cleared after marking if nothing
                 // else reaches it.
+                // Bytes hold no references.
+                Some(Internal::ArrayBuffer(_)) => {}
                 Some(Internal::WeakRef(_)) => self.weak_refs.push(index),
                 Some(Internal::WeakMap(_)) => self.weak_maps.push(index),
                 Some(Internal::Registry { cells, pending }) => {
@@ -464,6 +469,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
             Some(Internal::Arguments { slots, .. }) => 4 * slots.len(),
+            Some(Internal::ArrayBuffer(data)) => data.bytes.as_ref().map_or(0, Vec::len),
             Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Helper(helper)) => {
                 std::mem::size_of::<super::object::Helper>() + 8 * helper.items.len()

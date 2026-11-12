@@ -375,6 +375,7 @@ fn execute_mode(
     let mut agent =
         Agent::with_heap_limit(limits.heap_bytes).map_err(|_| "no memory for an agent")?;
     agent.set_step_budget(Some(limits.steps));
+    install_host_object(&mut agent).map_err(|_| "no memory for $262")?;
     if meta.is_async {
         // `doneprintHandle.js` reports through the host's `print`; keep
         // what it prints on the function itself.
@@ -437,6 +438,34 @@ fn execute_mode(
             }
         }
     }
+}
+
+/// The part of the `$262` host object (INTERPRETING.md) the engine can
+/// provide so far: `global` and `detachArrayBuffer`. Realms, `evalScript`,
+/// `gc` and agents are missing (TD-105), so tests that use them fail.
+fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
+    fn detach(agent: &mut Agent, _: Value, args: &[Value]) -> crate::runtime::JsResult<Value> {
+        let detached = args
+            .first()
+            .and_then(|v| v.as_object())
+            .is_some_and(|buffer| agent.detach_array_buffer(buffer));
+        if !detached {
+            return agent.type_error("$262.detachArrayBuffer: not an ArrayBuffer");
+        }
+        Ok(Value::NULL)
+    }
+    let host = agent.new_object()?;
+    let key = agent.heap.key("detachArrayBuffer")?;
+    agent.define_method(host, key, detach, "detachArrayBuffer", 1)?;
+    let global = agent.intrinsics.global;
+    let key = agent.heap.key("global")?;
+    agent.create_data_property_or_throw(host, key, Value::object(global))?;
+    let key = agent.heap.key("$262")?;
+    agent.define_property_or_throw(
+        global,
+        key,
+        crate::runtime::PropertyDescriptor::data_with(Value::object(host), true, false, true),
+    )
 }
 
 /// What an async test printed through `$DONE`.

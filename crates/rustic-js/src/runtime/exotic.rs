@@ -5,7 +5,7 @@
 //! (§10.4.4) are below.
 
 use super::agent::{Agent, JsResult};
-use super::builtins::proxy;
+use super::builtins::{proxy, typed_array};
 use super::env::EnvId;
 use super::object::{Internal, PropertyDescriptor};
 use super::shape::PropertyKey;
@@ -20,6 +20,7 @@ const MAX_PROXY_DEPTH: u32 = 128;
 enum Exotic {
     Proxy,
     Arguments,
+    TypedArray,
 }
 
 impl Agent {
@@ -27,6 +28,7 @@ impl Agent {
         match self.heap.object(o).internal() {
             Some(Internal::Proxy { .. }) => Exotic::Proxy,
             Some(Internal::Arguments { .. }) => Exotic::Arguments,
+            Some(Internal::TypedArray { .. }) => Exotic::TypedArray,
             _ => unreachable!("only exotic objects carry the exotic flag"),
         }
     }
@@ -55,7 +57,7 @@ impl Agent {
     pub(crate) fn exotic_get_prototype_of(&mut self, o: ObjectId) -> JsResult<Option<ObjectId>> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get_prototype_of(a, o)),
-            Exotic::Arguments => Ok(self.heap.object(o).proto()),
+            Exotic::Arguments | Exotic::TypedArray => Ok(self.heap.object(o).proto()),
         }
     }
 
@@ -66,21 +68,23 @@ impl Agent {
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::set_prototype_of(a, o, proto)),
-            Exotic::Arguments => Ok(self.ordinary_set_prototype_of(o, proto)),
+            Exotic::Arguments | Exotic::TypedArray => Ok(self.ordinary_set_prototype_of(o, proto)),
         }
     }
 
     pub(crate) fn exotic_is_extensible(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::is_extensible(a, o)),
-            Exotic::Arguments => Ok(self.heap.object(o).has_flag(super::object::FLAG_EXTENSIBLE)),
+            Exotic::Arguments | Exotic::TypedArray => {
+                Ok(self.heap.object(o).has_flag(super::object::FLAG_EXTENSIBLE))
+            }
         }
     }
 
     pub(crate) fn exotic_prevent_extensions(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::prevent_extensions(a, o)),
-            Exotic::Arguments => {
+            Exotic::Arguments | Exotic::TypedArray => {
                 self.heap
                     .object_mut(o)
                     .set_flag(super::object::FLAG_EXTENSIBLE, false);
@@ -96,6 +100,7 @@ impl Agent {
     ) -> JsResult<Option<PropertyDescriptor>> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get_own_property(a, o, key)),
+            Exotic::TypedArray => typed_array::get_own_property(self, o, key),
             Exotic::Arguments => {
                 // §10.4.4.1: a mapped index reports the parameter's value.
                 let Some(mut desc) = self.ordinary_get_own_property(o, key)? else {
@@ -117,6 +122,7 @@ impl Agent {
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::define_own_property(a, o, key, desc)),
+            Exotic::TypedArray => typed_array::define_own_property(self, o, key, desc),
             Exotic::Arguments => {
                 // §10.4.4.2.
                 let mapped = self.mapped_parameter(o, key);
@@ -149,6 +155,7 @@ impl Agent {
     pub(crate) fn exotic_has_property(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::has_property(a, o, key)),
+            Exotic::TypedArray => typed_array::has_property(self, o, key),
             Exotic::Arguments => self.has_property_from(o, key, true),
         }
     }
@@ -161,6 +168,7 @@ impl Agent {
     ) -> JsResult<Value> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get(a, o, key, receiver)),
+            Exotic::TypedArray => typed_array::get(self, o, key, receiver),
             Exotic::Arguments => match self.mapped_parameter(o, key) {
                 // §10.4.4.3.
                 Some((env, slot)) => Ok(self.env_slot(env, slot)),
@@ -178,6 +186,7 @@ impl Agent {
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::set(a, o, key, value, receiver)),
+            Exotic::TypedArray => typed_array::set(self, o, key, value, receiver),
             Exotic::Arguments => {
                 // §10.4.4.4: only a write through the object itself
                 // reaches the parameter.
@@ -194,6 +203,7 @@ impl Agent {
     pub(crate) fn exotic_delete(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::delete(a, o, key)),
+            Exotic::TypedArray => typed_array::delete(self, o, key),
             Exotic::Arguments => {
                 // §10.4.4.5.
                 let deleted = self.ordinary_delete(o, key)?;
@@ -208,6 +218,7 @@ impl Agent {
     pub(crate) fn exotic_own_property_keys(&mut self, o: ObjectId) -> JsResult<Vec<PropertyKey>> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::own_property_keys(a, o)),
+            Exotic::TypedArray => Ok(typed_array::own_property_keys(self, o)),
             Exotic::Arguments => Ok(self.ordinary_own_property_keys(o)),
         }
     }

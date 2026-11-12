@@ -51,6 +51,12 @@ pub enum Class {
     Date,
     /// An arguments object (§10.4.4), mapped or not.
     Arguments,
+    /// An ArrayBuffer (§25.1).
+    ArrayBuffer,
+    /// A typed array (§23.2).
+    TypedArray,
+    /// A DataView (§25.3).
+    DataView,
 }
 
 /// A complete or partial property descriptor (§6.2.6).
@@ -365,6 +371,22 @@ pub(crate) enum Internal {
     Arguments {
         env: EnvId,
         slots: Box<[Option<u16>]>,
+    },
+    /// An ArrayBuffer's bytes (§25.1).
+    ArrayBuffer(Box<super::builtins::buffer::BufferData>),
+    /// A typed array's `[[ViewedArrayBuffer]]`, element kind,
+    /// `[[ByteOffset]]` and `[[ArrayLength]]` (`None` tracks the buffer).
+    TypedArray {
+        buffer: ObjectId,
+        kind: super::builtins::buffer::ElementKind,
+        offset: usize,
+        length: Option<usize>,
+    },
+    /// A DataView's buffer, `[[ByteOffset]]` and `[[ByteLength]]`.
+    DataView {
+        buffer: ObjectId,
+        offset: usize,
+        length: Option<usize>,
     },
     /// The values a built-in closure captures (the resolving functions of
     /// a promise, the element functions of `Promise.all`, ...); the

@@ -136,7 +136,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
-| TD-105 | Deliberate | JS | The Test262 runner skips module files, has no `$262` host object and runs `test/language` plus only the JS-05 areas of `test/built-ins` | Open, JS-05/JS-06 |
+| TD-105 | Deliberate | JS | The Test262 runner skips module files, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
@@ -146,6 +146,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, JS-09 |
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
 | TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
+| TD-115 | Deliberate | JS | No `SharedArrayBuffer` or `Atomics`; typed array elements are read through the generic property path | Open, JS-09/M5 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1641,3 +1642,21 @@ rather than own, and they are always `null` rather than the actual caller or
 arguments (which other engines only provide without optimization).
 
 Pay with: nothing planned; revisit only if a site needs the real caller.
+
+### TD-115 — No shared memory, and typed arrays have no fast path
+
+`SharedArrayBuffer` and `Atomics` are not installed. Rustic has one agent per
+heap and no workers yet, so nothing could share a buffer; installing the
+constructors without real sharing would only pretend. About 110 Test262 files
+in the buffer and typed array directories fail for that reason alone. The
+immutable ArrayBuffer proposal (`transferToImmutable`, `sliceToImmutable`,
+`immutable`) is not implemented either.
+
+A typed array element access takes the generic path: `[[Get]]` sees the exotic
+flag, asks `exotic.rs`, and the element is decoded from the buffer's bytes.
+That is correct for every case (detached and resized buffers included) but
+several times slower than an indexed load should be.
+
+Pay with: a shared, reference-counted byte store and `Atomics` when workers
+arrive (M5/M6 storage and workers), and interpreter fast paths for typed array
+loads and stores keyed on the element kind (JS-09, measured first).

@@ -10,8 +10,9 @@ JS-04 compiles scripts to bytecode and runs them (see
 [Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
 generators (JS-08 part 1), promises with a job queue and async functions
 (JS-06 part 1), async generators with `for await` (JS-08 part 2) and
-regular expressions (JS-08 part 3), BigInt (JS-08 part 4) and proxies with
-mapped `arguments` objects (JS-08 part 5); modules do not run yet.
+regular expressions (JS-08 part 3), BigInt (JS-08 part 4), proxies with
+mapped `arguments` objects (JS-08 part 5) and typed arrays (JS-08 part 6);
+modules do not run yet.
 
 ## API
 
@@ -128,10 +129,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,402 | 13,724 |
-| Fail | 1,025 | 1,385 |
+| Pass | 21,465 | 16,629 |
+| Fail | 962 | 1,452 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 95.4% | 90.8% |
+| Pass rate of the files that run | 95.7% | 91.9% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -155,12 +156,12 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
   requires.
 
 The built-ins gate runs the `test/built-ins` directories of the library areas
-installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
+installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, ArrayBuffer, Boolean, DataView,
 Date, Error, FinalizationRegistry, Function, GeneratorFunction,
 GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
 prototypes, BigInt, Iterator, JSON, Map, Math, NativeErrors, Number,
-Object, Proxy, Reflect, RegExp, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
+Object, Proxy, Reflect, RegExp, Set, String, Symbol, TypedArray, TypedArrayConstructors, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
 
@@ -176,15 +177,14 @@ Most `test/language` failures are not interpreter bugs yet:
 - About 440 are dynamic `import()` files (modules, JS-06).
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
-- Modules and typed arrays account for most of
-  the rest. The real assertion failures left are mostly parameter TDZ in
+- Modules account for most of the rest. The real assertion failures left are mostly parameter TDZ in
   defaults (`dflt-params-ref-later`) and function names from computed symbol
   keys.
 
 In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
-Temporal, typed arrays or `$262`. Skipped files are never
+Temporal, `SharedArrayBuffer` or `$262` realms. Skipped files are never
 counted as passing. Module files join with JS-06 module loading (TD-105).
 
 ## Fuzzing
@@ -531,6 +531,35 @@ calls a function value. The design is recorded in
   defaults, rests or patterns get the unmapped object, whose `callee`
   throws. `f.caller` and `f.arguments` are `null` for sloppy functions and
   throw for strict ones (TD-114).
+- **Buffers and typed arrays** (JS-08 part 6, §25.1, §25.3, §23.2,
+  §10.4.5): `ArrayBuffer` (resizable buffers, `slice`, `resize`, `transfer`,
+  `transferToFixedLength`), `DataView` with every accessor, the eleven
+  typed array constructors plus `Float16Array`, `%TypedArray%` with `from`
+  and `of`, and all the prototype methods; `Math.f16round`.
+  - A buffer is one byte vector charged to the heap budget, at most
+    2³¹ − 1 bytes. A request the budget cannot hold is a catchable
+    RangeError, and a buffer that becomes garbage returns its bytes at the
+    next collection (64 MiB of 1 MiB arrays pass through a 4 MiB heap).
+  - A typed array is 72 bytes plus a small boxed record (buffer, kind,
+    offset, length) and stores nothing itself. Elements are little-endian
+    on every target, so results do not depend on the host's byte order.
+  - Indexed access follows the integer-indexed exotic rules: canonical
+    numeric strings such as `"-0"` and `"1.5"` never reach the prototype
+    chain, out-of-range writes do nothing, and a length-tracking view
+    follows its resizable buffer. A detached or out-of-bounds array reads
+    as length 0 and its methods throw.
+  - Binary16 conversion rounds to nearest even and is checked against all
+    65,536 bit patterns.
+  - `Agent::new_array_buffer`, `array_buffer_bytes` and
+    `detach_array_buffer` are the host's side.
+  - Not yet: `SharedArrayBuffer`, `Atomics` and a fast path for element
+    access (TD-115).
+  - Test262: `ArrayBuffer` 181 of 221, `DataView` 503 of 560, `TypedArray`
+    1,437 of 1,453 and `TypedArrayConstructors` 654 of 738; nearly all the
+    failures need `SharedArrayBuffer`, a second realm or the immutable
+    buffer proposal. Six `DataView` files expect a length of 0 from a
+    detached or out-of-bounds view, where the specification (§25.3.4.2)
+    and this engine throw a TypeError.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
   anything runs, TD-97): modules and regular expression
   literals that use a property escape (TD-110).

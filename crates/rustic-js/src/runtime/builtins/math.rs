@@ -40,6 +40,9 @@ unary! {
     expm1 => |x| if x == 0.0 { x } else { x.exp_m1() };
     floor => f64::floor;
     fround => |x| f64::from(x as f32);
+    f16round => |x| {
+        super::buffer::f16_bits_to_f64(super::buffer::f64_to_f16_bits(x))
+    };
     log => f64::ln;
     log1p => |x| if x == 0.0 { x } else { x.ln_1p() };
     log10 => f64::log10;
@@ -72,6 +75,7 @@ const FUNCTIONS: &[Method] = &[
     method("expm1", expm1, 1),
     method("floor", floor, 1),
     method("fround", fround, 1),
+    method("f16round", f16round, 1),
     method("hypot", hypot, 2),
     method("imul", imul, 2),
     method("log", log, 1),

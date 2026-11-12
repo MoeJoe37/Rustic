@@ -3287,8 +3287,57 @@
           "label": "Buffers, typed arrays and memory semantics",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "ArrayBuffer (resizable, transfer), DataView and the element codec on the heap budget",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+                  "marker": "pub(crate) fn allocate_array_buffer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn array_buffers_and_data_views"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn buffers_are_charged_to_the_heap_and_collected"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+                  "marker": "fn binary16_round_trips_and_rounds_to_even"
+                }
+              ]
+            },
+            {
+              "label": "Typed arrays: constructors, methods and integer-indexed exotic objects",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/typed_array.rs",
+                  "marker": "pub(crate) fn numeric_index"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn typed_arrays()"
+                }
+              ]
+            },
+            {
+              "label": "SharedArrayBuffer and Atomics (TD-115)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.intl",

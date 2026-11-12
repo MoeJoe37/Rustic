@@ -1331,6 +1331,19 @@ eager (TD-113); the arguments half of TD-99 is paid. Test262
 Proxy gated: 13,724 of 15,109 (90.8%), Proxy 273 of 310 and Reflect 153 of
 153.
 
+## JS-08 part 6: ArrayBuffer, DataView and typed arrays
+
+`builtins/buffer.rs` holds `ArrayBuffer` (fixed and resizable, `slice`,
+`resize`, `transfer`), `DataView` and the element codec; a buffer's bytes are
+charged to the heap budget and capped at 2³¹ − 1. `builtins/typed_array.rs`
+holds `%TypedArray%`, the twelve constructors (with `Float16Array`), every
+prototype method and the integer-indexed exotic internal methods, dispatched
+through `runtime/exotic.rs`. Elements are little-endian on every target.
+The Test262 runner gained a `$262` with `global` and `detachArrayBuffer`.
+`SharedArrayBuffer`, `Atomics` and element fast paths are TD-115. Test262
+`test/language`: 21,465 of 22,427 run files (95.7%); `test/built-ins` with
+the four buffer directories gated: 16,629 of 18,081 (91.9%).
+
 ## JS-06 part 2: promise rejection tracking
 
 `RejectPromise` and `PerformPromiseThen` record the two

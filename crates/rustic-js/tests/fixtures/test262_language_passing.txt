@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 21402 pass, 1025 fail, 1405 skipped (modules, proposals).
+# 21465 pass, 962 fail, 1405 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -626,6 +626,7 @@ destructuring/binding/syntax/property-list-followed-by-a-single-comma.js
 destructuring/binding/syntax/property-list-single-name-bindings.js
 destructuring/binding/syntax/property-list-with-property-list.js
 destructuring/binding/syntax/recursive-array-and-object-patterns.js
+destructuring/binding/typedarray-backed-by-resizable-buffer.js
 directive-prologue/10.1.1-1-s.js
 directive-prologue/10.1.1-10-s.js
 directive-prologue/10.1.1-11-s.js
@@ -7105,11 +7106,20 @@ expressions/class/static-method-length-dflt.js
 expressions/class/static-method-param-dflt-yield.js
 expressions/class/subclass-builtins/subclass-AggregateError.js
 expressions/class/subclass-builtins/subclass-Array.js
+expressions/class/subclass-builtins/subclass-ArrayBuffer.js
+expressions/class/subclass-builtins/subclass-BigInt64Array.js
+expressions/class/subclass-builtins/subclass-BigUint64Array.js
 expressions/class/subclass-builtins/subclass-Boolean.js
+expressions/class/subclass-builtins/subclass-DataView.js
 expressions/class/subclass-builtins/subclass-Date.js
 expressions/class/subclass-builtins/subclass-Error.js
 expressions/class/subclass-builtins/subclass-EvalError.js
+expressions/class/subclass-builtins/subclass-Float32Array.js
+expressions/class/subclass-builtins/subclass-Float64Array.js
 expressions/class/subclass-builtins/subclass-Function.js
+expressions/class/subclass-builtins/subclass-Int16Array.js
+expressions/class/subclass-builtins/subclass-Int32Array.js
+expressions/class/subclass-builtins/subclass-Int8Array.js
 expressions/class/subclass-builtins/subclass-Map.js
 expressions/class/subclass-builtins/subclass-Number.js
 expressions/class/subclass-builtins/subclass-Object.js
@@ -7122,6 +7132,10 @@ expressions/class/subclass-builtins/subclass-String.js
 expressions/class/subclass-builtins/subclass-SyntaxError.js
 expressions/class/subclass-builtins/subclass-TypeError.js
 expressions/class/subclass-builtins/subclass-URIError.js
+expressions/class/subclass-builtins/subclass-Uint16Array.js
+expressions/class/subclass-builtins/subclass-Uint32Array.js
+expressions/class/subclass-builtins/subclass-Uint8Array.js
+expressions/class/subclass-builtins/subclass-Uint8ClampedArray.js
 expressions/class/subclass-builtins/subclass-WeakMap.js
 expressions/class/subclass-builtins/subclass-WeakRef.js
 expressions/class/subclass-builtins/subclass-WeakSet.js
@@ -11240,6 +11254,9 @@ global-code/invalid-private-names-member-expression-this.js
 global-code/new.target-arrow.js
 global-code/new.target.js
 global-code/return.js
+global-code/script-decl-func-err-non-configurable.js
+global-code/script-decl-func-err-non-extensible.js
+global-code/script-decl-var-err.js
 global-code/super-call-arrow.js
 global-code/super-call.js
 global-code/super-prop-arrow.js
@@ -16858,11 +16875,20 @@ statements/class/strict-mode/arguments-callee.js
 statements/class/strict-mode/with.js
 statements/class/subclass-builtins/subclass-AggregateError.js
 statements/class/subclass-builtins/subclass-Array.js
+statements/class/subclass-builtins/subclass-ArrayBuffer.js
+statements/class/subclass-builtins/subclass-BigInt64Array.js
+statements/class/subclass-builtins/subclass-BigUint64Array.js
 statements/class/subclass-builtins/subclass-Boolean.js
+statements/class/subclass-builtins/subclass-DataView.js
 statements/class/subclass-builtins/subclass-Date.js
 statements/class/subclass-builtins/subclass-Error.js
 statements/class/subclass-builtins/subclass-EvalError.js
+statements/class/subclass-builtins/subclass-Float32Array.js
+statements/class/subclass-builtins/subclass-Float64Array.js
 statements/class/subclass-builtins/subclass-Function.js
+statements/class/subclass-builtins/subclass-Int16Array.js
+statements/class/subclass-builtins/subclass-Int32Array.js
+statements/class/subclass-builtins/subclass-Int8Array.js
 statements/class/subclass-builtins/subclass-Map.js
 statements/class/subclass-builtins/subclass-Number.js
 statements/class/subclass-builtins/subclass-Object.js
@@ -16875,6 +16901,10 @@ statements/class/subclass-builtins/subclass-String.js
 statements/class/subclass-builtins/subclass-SyntaxError.js
 statements/class/subclass-builtins/subclass-TypeError.js
 statements/class/subclass-builtins/subclass-URIError.js
+statements/class/subclass-builtins/subclass-Uint16Array.js
+statements/class/subclass-builtins/subclass-Uint32Array.js
+statements/class/subclass-builtins/subclass-Uint8Array.js
+statements/class/subclass-builtins/subclass-Uint8ClampedArray.js
 statements/class/subclass-builtins/subclass-WeakMap.js
 statements/class/subclass-builtins/subclass-WeakRef.js
 statements/class/subclass-builtins/subclass-WeakSet.js
@@ -16884,8 +16914,12 @@ statements/class/subclass/builtin-objects/Array/contructor-calls-super-single-ar
 statements/class/subclass/builtin-objects/Array/length.js
 statements/class/subclass/builtin-objects/Array/regular-subclassing.js
 statements/class/subclass/builtin-objects/Array/super-must-be-called.js
+statements/class/subclass/builtin-objects/ArrayBuffer/regular-subclassing.js
+statements/class/subclass/builtin-objects/ArrayBuffer/super-must-be-called.js
 statements/class/subclass/builtin-objects/Boolean/regular-subclassing.js
 statements/class/subclass/builtin-objects/Boolean/super-must-be-called.js
+statements/class/subclass/builtin-objects/DataView/regular-subclassing.js
+statements/class/subclass/builtin-objects/DataView/super-must-be-called.js
 statements/class/subclass/builtin-objects/Date/regular-subclassing.js
 statements/class/subclass/builtin-objects/Date/super-must-be-called.js
 statements/class/subclass/builtin-objects/Error/message-property-assignment.js
@@ -16939,10 +16973,13 @@ statements/class/subclass/builtin-objects/String/regular-subclassing.js
 statements/class/subclass/builtin-objects/String/super-must-be-called.js
 statements/class/subclass/builtin-objects/Symbol/new-symbol-with-super-throws.js
 statements/class/subclass/builtin-objects/Symbol/symbol-valid-as-extends-value.js
+statements/class/subclass/builtin-objects/TypedArray/regular-subclassing.js
+statements/class/subclass/builtin-objects/TypedArray/super-must-be-called.js
 statements/class/subclass/builtin-objects/WeakMap/regular-subclassing.js
 statements/class/subclass/builtin-objects/WeakMap/super-must-be-called.js
 statements/class/subclass/builtin-objects/WeakSet/regular-subclassing.js
 statements/class/subclass/builtin-objects/WeakSet/super-must-be-called.js
+statements/class/subclass/builtins.js
 statements/class/subclass/class-definition-evaluation-empty-constructor-heritage-present.js
 statements/class/subclass/class-definition-null-proto-contains-return-override.js
 statements/class/subclass/class-definition-null-proto-missing-return-override.js
@@ -18514,6 +18551,7 @@ statements/for-in/order-enumerable-shadowed.js
 statements/for-in/order-property-added.js
 statements/for-in/order-property-on-prototype.js
 statements/for-in/order-simple-object.js
+statements/for-in/resizable-buffer.js
 statements/for-in/return-from-catch.js
 statements/for-in/return-from-finally.js
 statements/for-in/return-from-try.js
@@ -19123,6 +19161,10 @@ statements/for-of/dstr/var-obj-ptrn-rest-getter.js
 statements/for-of/dstr/var-obj-ptrn-rest-skip-non-enumerable.js
 statements/for-of/dstr/var-obj-ptrn-rest-val-obj.js
 statements/for-of/escaped-of.js
+statements/for-of/float32array-mutate.js
+statements/for-of/float32array.js
+statements/for-of/float64array-mutate.js
+statements/for-of/float64array.js
 statements/for-of/generator-close-via-break.js
 statements/for-of/generator-close-via-continue.js
 statements/for-of/generator-close-via-return.js
@@ -19162,6 +19204,12 @@ statements/for-of/head-var-bound-names-in-stmt.js
 statements/for-of/head-var-bound-names-let.js
 statements/for-of/head-var-init.js
 statements/for-of/head-var-no-expr.js
+statements/for-of/int16array-mutate.js
+statements/for-of/int16array.js
+statements/for-of/int32array-mutate.js
+statements/for-of/int32array.js
+statements/for-of/int8array-mutate.js
+statements/for-of/int8array.js
 statements/for-of/iterator-as-proxy.js
 statements/for-of/iterator-close-non-object.js
 statements/for-of/iterator-close-non-throw-get-method-abrupt.js
@@ -19211,6 +19259,19 @@ statements/for-of/string-bmp.js
 statements/for-of/throw-from-catch.js
 statements/for-of/throw-from-finally.js
 statements/for-of/throw.js
+statements/for-of/typedarray-backed-by-resizable-buffer-grow-before-end.js
+statements/for-of/typedarray-backed-by-resizable-buffer-grow-mid-iteration.js
+statements/for-of/typedarray-backed-by-resizable-buffer-shrink-mid-iteration.js
+statements/for-of/typedarray-backed-by-resizable-buffer-shrink-to-zero-mid-iteration.js
+statements/for-of/typedarray-backed-by-resizable-buffer.js
+statements/for-of/uint16array-mutate.js
+statements/for-of/uint16array.js
+statements/for-of/uint32array-mutate.js
+statements/for-of/uint32array.js
+statements/for-of/uint8array-mutate.js
+statements/for-of/uint8array.js
+statements/for-of/uint8clampedarray-mutate.js
+statements/for-of/uint8clampedarray.js
 statements/for-of/yield-from-catch.js
 statements/for-of/yield-from-finally.js
 statements/for-of/yield-from-try.js
@@ -21217,6 +21278,8 @@ statements/with/scope-var-close.js
 statements/with/scope-var-open.js
 statements/with/set-mutable-binding-binding-deleted-in-get-unscopables-strict-mode.js
 statements/with/set-mutable-binding-binding-deleted-in-get-unscopables.js
+statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain-strict-mode.js
+statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain.js
 statements/with/strict-fn-decl-nested-1.js
 statements/with/strict-fn-decl-nested-2.js
 statements/with/strict-fn-decl.js

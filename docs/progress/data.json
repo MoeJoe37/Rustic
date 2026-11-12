@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "bcac2a0428be6c6409c5287ccc9ca59bf770af9e00e024e146f7ddf731888250",
-  "percent": "26.95",
+  "source_fingerprint": "4029df4a3b0cb6a27ac0eabb71215a5e406f50449b806437b21a8fd9b94e2072",
+  "percent": "27.22",
   "verified_percent": "25.28",
-  "partial_percent": "1.67",
+  "partial_percent": "1.94",
   "completed": 60,
-  "in_progress": 4,
+  "in_progress": 5,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 7,
       "total": 13,
-      "percent": "75.55",
+      "percent": "78.63",
       "verified_percent": "61.53",
-      "partial_percent": "14.02"
+      "partial_percent": "17.10"
     },
     {
       "id": "M5",
@@ -3609,9 +3609,58 @@
           "label": "Buffers, typed arrays and memory semantics",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "ArrayBuffer (resizable, transfer), DataView and the element codec on the heap budget",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+                  "marker": "pub(crate) fn allocate_array_buffer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn array_buffers_and_data_views"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn buffers_are_charged_to_the_heap_and_collected"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+                  "marker": "fn binary16_round_trips_and_rounds_to_even"
+                }
+              ]
+            },
+            {
+              "label": "Typed arrays: constructors, methods and integer-indexed exotic objects",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/typed_array.rs",
+                  "marker": "pub(crate) fn numeric_index"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn typed_arrays()"
+                }
+              ]
+            },
+            {
+              "label": "SharedArrayBuffer and Atomics (TD-115)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "66.66",
           "engine_share": "0.41"
         },
         {
@@ -3706,12 +3755,12 @@
       ],
       "points": 73,
       "completed": 7,
-      "in_progress": 3,
+      "in_progress": 4,
       "total": 15,
-      "contribution": "7.00",
-      "percent": "70.01",
+      "contribution": "7.27",
+      "percent": "72.75",
       "verified_percent": "54.79",
-      "partial_percent": "15.22"
+      "partial_percent": "17.96"
     },
     {
       "id": "wasm",

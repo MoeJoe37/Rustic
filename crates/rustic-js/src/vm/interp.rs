@@ -2295,7 +2295,10 @@ impl Agent {
         }
         // A function's `prototype` slot can hold a not-yet-created marker
         // that only the full lookup understands.
-        if !self.cacheable(o, site.name) || site.name == self.names.prototype {
+        if !self.cacheable(o, site.name)
+            || site.name == self.names.prototype
+            || receiver.has_flag(crate::runtime::FLAG_EXOTIC)
+        {
             return self.get(o, key);
         }
         let (shape, proto) = (receiver.shape.0, receiver.proto_raw());
@@ -2392,7 +2395,10 @@ impl Agent {
                 _ => {}
             }
         }
-        if site.name == self.names.length || self.heap.object(o).has_flag(FLAG_PROTOTYPE) {
+        let flags = self.heap.object(o).flags;
+        if site.name == self.names.length
+            || flags & (FLAG_PROTOTYPE | crate::runtime::FLAG_EXOTIC) != 0
+        {
             return self.set(o, key, value, code.strict);
         }
         if let Some(slot) = self.own_data_slot(o, key, true) {

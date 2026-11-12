@@ -6,6 +6,7 @@
 mod array;
 pub(crate) mod async_generator;
 pub(crate) mod bigint;
+pub(crate) mod buffer;
 mod collections;
 mod date;
 mod error;
@@ -22,6 +23,7 @@ pub(crate) mod proxy;
 mod reflect;
 pub(crate) mod regexp;
 mod string_object;
+pub(crate) mod typed_array;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
 use super::agent::{Agent, JsResult, NativeFn};
@@ -145,6 +147,8 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     async_generator::install(agent)?;
     reflect::install(agent)?;
     proxy::install(agent)?;
+    buffer::install(agent)?;
+    typed_array::install(agent)?;
     regexp::install(agent)?;
 
     // Value properties of the global object (§19.1).
@@ -327,7 +331,18 @@ fn iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value>
         (_, Kind::Undefined) => (None, 0),
         (IteratorKind::Array | IteratorKind::ArrayKeys | IteratorKind::ArrayEntries, _) => {
             let array = target.as_object().expect("array iterators walk objects");
-            let length = agent.length_of_array_like(array)?;
+            let length = match typed_array::view_of(agent, array) {
+                // §23.1.5.1: a typed array is read by its own length.
+                Some(view) => match typed_array::length_of(agent, &view) {
+                    Some(length) => length as f64,
+                    None => {
+                        return agent.type_error(
+                            "the typed array is detached or out of the bounds of its buffer",
+                        );
+                    }
+                },
+                None => agent.length_of_array_like(array)?,
+            };
             if f64::from(index) < length {
                 let key = Value::number(f64::from(index));
                 let value = match kind {

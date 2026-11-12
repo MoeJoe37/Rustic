@@ -2974,3 +2974,331 @@ fn unhandled_rejections_are_reported_to_the_host() {
     let pending = agent.evaluate("new Promise(() => {})").expect("a promise");
     assert_eq!(agent.promise_result(pending.as_object().unwrap()), None);
 }
+
+#[test]
+fn array_buffers_and_data_views() {
+    let _report = Report;
+    check(
+        "var b = new ArrayBuffer(8); b.byteLength + ',' + b.resizable + ',' + b.detached + ',' + ArrayBuffer.isView(new DataView(b))",
+        "8,false,false,true",
+    );
+    check(
+        "var b = new ArrayBuffer(4, { maxByteLength: 8 }); b.resize(6); b.byteLength + ',' + b.maxByteLength + ',' + b.resizable",
+        "6,8,true",
+    );
+    check(
+        "new ArrayBuffer(4, { maxByteLength: 8 }).resize(9)",
+        "!RangeError: ArrayBuffer.prototype.resize: the length exceeds maxByteLength",
+    );
+    check(
+        "new ArrayBuffer(4).resize(2)",
+        "!TypeError: ArrayBuffer.prototype.resize: the buffer is not resizable",
+    );
+    check(
+        "new ArrayBuffer(9, { maxByteLength: 8 })",
+        "!RangeError: ArrayBuffer length exceeds maxByteLength",
+    );
+    check(
+        "new ArrayBuffer(2 ** 40)",
+        "!RangeError: Array buffer allocation failed",
+    );
+    check("new ArrayBuffer(-1)", "!RangeError: index is out of range");
+    check(
+        "ArrayBuffer(1)",
+        "!TypeError: Constructor ArrayBuffer requires 'new'",
+    );
+    check(
+        "var b = new Uint8Array([1, 2, 3, 4]).buffer; var s = b.slice(1, -1); new Uint8Array(s).join() + '|' + s.byteLength",
+        "2,3|2",
+    );
+    check(
+        "var b = new Uint8Array([1, 2, 3]).buffer; var t = b.transfer(5); b.detached + ',' + b.byteLength + ',' + new Uint8Array(t).join()",
+        "true,0,1,2,3,0,0",
+    );
+    check(
+        "var b = new ArrayBuffer(2, { maxByteLength: 4 }); b.transferToFixedLength().resizable + ',' + b.detached + ',' + b.resizable",
+        "false,true,true",
+    );
+    check(
+        "var b = new ArrayBuffer(2); b.transfer(); b.transfer()",
+        "!TypeError: Cannot perform the operation on a detached ArrayBuffer",
+    );
+    check(
+        "var b = new ArrayBuffer(2); b.transfer(); b.slice(0)",
+        "!TypeError: Cannot perform the operation on a detached ArrayBuffer",
+    );
+    check(
+        "Object.prototype.toString.call(new ArrayBuffer(0)) + Object.prototype.toString.call(new DataView(new ArrayBuffer(0)))",
+        "[object ArrayBuffer][object DataView]",
+    );
+    // DataView reads and writes any type at any offset, in either order.
+    check(
+        "var v = new DataView(new ArrayBuffer(16)); v.setUint16(1, 0x1234); v.getUint8(1) + ',' + v.getUint8(2) + ',' + v.getUint16(1, true)",
+        "18,52,13330",
+    );
+    check(
+        "var v = new DataView(new ArrayBuffer(16)); v.setFloat64(3, Math.PI, true); v.getFloat64(3, true) === Math.PI",
+        "true",
+    );
+    check(
+        "var v = new DataView(new ArrayBuffer(16)); v.setInt32(0, -2); v.getUint32(0) + ',' + v.getInt8(3) + ',' + v.getInt16(2)",
+        "4294967294,-2,-2",
+    );
+    check(
+        "var v = new DataView(new ArrayBuffer(16)); v.setBigInt64(8, -5n); v.getBigUint64(8) + ',' + v.getBigInt64(8)",
+        "18446744073709551611,-5",
+    );
+    check(
+        "var v = new DataView(new ArrayBuffer(16)); v.setFloat32(0, 1.1); v.setFloat16(4, 1.1); v.getFloat32(0) + ',' + v.getFloat16(4)",
+        "1.100000023841858,1.099609375",
+    );
+    check(
+        "new DataView(new ArrayBuffer(4)).getUint32(1)",
+        "!RangeError: DataView: the offset is out of range",
+    );
+    check(
+        "new DataView(new ArrayBuffer(4), 5)",
+        "!RangeError: DataView: the offset is outside the buffer",
+    );
+    check(
+        "new DataView(new ArrayBuffer(4), 2, 3)",
+        "!RangeError: DataView: the length is outside the buffer",
+    );
+    check(
+        "new DataView({})",
+        "!TypeError: DataView: the first argument must be an ArrayBuffer",
+    );
+    check(
+        "var v = new DataView(new ArrayBuffer(8), 2, 4); v.byteOffset + ',' + v.byteLength + ',' + (v.buffer instanceof ArrayBuffer)",
+        "2,4,true",
+    );
+    check(
+        "var b = new ArrayBuffer(8, { maxByteLength: 16 }); var v = new DataView(b, 4); b.resize(12); var grown = v.byteLength; b.resize(2); try { v.byteLength } catch (e) { grown + ',' + e.name }",
+        "8,TypeError",
+    );
+    check(
+        "new DataView(new ArrayBuffer(1)).setInt8(0, 1n)",
+        "!TypeError: cannot convert a BigInt to a number",
+    );
+}
+
+#[test]
+fn typed_arrays() {
+    let _report = Report;
+    // Construction from lengths, arrays, iterables, typed arrays and buffers.
+    check(
+        "new Int8Array(3).join() + '|' + new Int8Array([1, 2]).join() + '|' + new Int8Array(new Set([5, 6])).join() + '|' + new Int16Array(new Int8Array([-1])).join()",
+        "0,0,0|1,2|5,6|-1",
+    );
+    check(
+        "var b = new ArrayBuffer(8); var a = new Uint16Array(b, 2, 2); a[0] = 0x0102; new Uint8Array(b).join() + '|' + a.byteOffset + ',' + a.byteLength + ',' + a.length",
+        "0,0,2,1,0,0,0,0|2,4,2",
+    );
+    check(
+        "new Uint16Array(new ArrayBuffer(3))",
+        "!RangeError: the buffer length must be a multiple of the element size",
+    );
+    check(
+        "new Uint16Array(new ArrayBuffer(4), 1)",
+        "!RangeError: the start offset must be a multiple of the element size",
+    );
+    check(
+        "new Uint8Array(new ArrayBuffer(4), 2, 3)",
+        "!RangeError: Invalid typed array length",
+    );
+    check(
+        "new Uint8Array(2 ** 40)",
+        "!RangeError: Invalid typed array length",
+    );
+    check(
+        "Uint8Array(1)",
+        "!TypeError: Constructor Uint8Array requires 'new'",
+    );
+    check(
+        "new BigInt64Array(new Int8Array(1))",
+        "!TypeError: cannot mix BigInt and Number typed arrays",
+    );
+    check(
+        "Object.getPrototypeOf(Int8Array).name + ',' + Int8Array.BYTES_PER_ELEMENT + ',' + Float64Array.prototype.BYTES_PER_ELEMENT + ',' + Int8Array.length",
+        "TypedArray,1,8,3",
+    );
+    check(
+        "new (Object.getPrototypeOf(Int8Array))()",
+        "!TypeError: Abstract class TypedArray not directly constructable",
+    );
+    // Element conversion per kind.
+    check(
+        "new Int8Array([127, 128, -129, 1.9, NaN, '3']).join()",
+        "127,-128,127,1,0,3",
+    );
+    check(
+        "new Uint8ClampedArray([-1, 0.5, 1.5, 2.5, 255.5, 1e9]).join()",
+        "0,0,2,2,255,255",
+    );
+    check(
+        "new Uint32Array([-1, 2 ** 32 + 5]).join() + '|' + new Int32Array([2 ** 31]).join()",
+        "4294967295,5|-2147483648",
+    );
+    check(
+        "new Float32Array([0.1, 1e40, -0]).join() + '|' + Object.is(new Float32Array([-0])[0], -0)",
+        "0.10000000149011612,Infinity,0|true",
+    );
+    check(
+        "new Float16Array([65519, 65520, 1e-8, 0.1]).join()",
+        "65504,Infinity,0,0.0999755859375",
+    );
+    check(
+        "new BigUint64Array([-1n, 2n ** 64n + 3n]).join() + '|' + new BigInt64Array([2n ** 63n]).join()",
+        "18446744073709551615,3|-9223372036854775808",
+    );
+    check(
+        "new BigInt64Array(1)[0] = 1",
+        "!TypeError: cannot convert a Number to a BigInt",
+    );
+    check(
+        "var a = new Uint8Array(1); a[0] = 1n",
+        "!TypeError: cannot convert a BigInt to a number",
+    );
+    // Integer-indexed exotic behavior (§10.4.5).
+    check(
+        "var a = new Uint8Array(2); a[5] = 1; a['-0'] = 2; a[1.5] = 3; a.foo = 4; Object.keys(a).join() + '|' + a[5] + a['-0'] + a[1.5] + a.foo",
+        "0,1,foo|undefinedundefinedundefined4",
+    );
+    check(
+        "var a = new Uint8Array(2); (1 in a) + ',' + (2 in a) + ',' + ('-0' in a) + ',' + delete a[5] + ',' + Reflect.deleteProperty(a, 0)",
+        "true,false,false,true,false",
+    );
+    check(
+        "var a = new Uint8Array(2); Reflect.defineProperty(a, 0, { value: 7 }) + ',' + Reflect.defineProperty(a, 0, { value: 8, writable: false }) + ',' + Reflect.defineProperty(a, 2, { value: 1 }) + ',' + a[0]",
+        "true,false,false,7",
+    );
+    check(
+        "var d = Object.getOwnPropertyDescriptor(new Uint8Array([9]), 0); [d.value, d.writable, d.enumerable, d.configurable].join()",
+        "9,true,true,true",
+    );
+    check(
+        "Object.freeze(new Uint8Array(1))",
+        "!TypeError: cannot redefine property",
+    );
+    check(
+        "var a = new Uint8Array([1]); var o = Object.create(a); o[0] = 5; o[3] = 6; a[0] + ',' + Object.hasOwn(o, 0) + ',' + Object.hasOwn(o, 3)",
+        "1,true,false",
+    );
+    check(
+        "Uint8Array.prototype[0] = 9; Object.prototype[1] = 9; var a = new Uint8Array(1); a[0] + ',' + a[1]",
+        "0,undefined",
+    );
+    // The methods.
+    check(
+        "var a = new Int16Array([5, 1, 4]); [a.at(-1), a.indexOf(1), a.lastIndexOf(9), a.includes(4), a.find(x => x > 4), a.findLastIndex(x => x < 5)].join()",
+        "4,1,-1,true,5,2",
+    );
+    check(
+        "var a = new Float64Array([3, NaN, -0, 0, -Infinity, 1]); a.sort(); a.join() + '|' + Object.is(a[1], -0)",
+        "-Infinity,0,0,1,3,NaN|true",
+    );
+    check(
+        "new Int8Array([3, 1, 2]).sort((x, y) => y - x).join() + '|' + new Int8Array([3, 1, 2]).toSorted().join() + '|' + new Int8Array([1, 2]).toReversed().join()",
+        "3,2,1|1,2,3|2,1",
+    );
+    check(
+        "var a = new Uint8Array([1, 2, 3, 4, 5]); a.copyWithin(0, 3).join() + '|' + a.fill(9, 1, 3).join() + '|' + a.reverse().join()",
+        "4,5,3,4,5|4,9,9,4,5|5,4,9,9,4",
+    );
+    check(
+        "var a = new Uint8Array([1, 2, 3, 4]); a.slice(1, 3).join() + '|' + a.subarray(2).join() + '|' + (a.subarray(1).buffer === a.buffer) + '|' + a.with(0, 9).join() + '|' + a.join('-')",
+        "2,3|3,4|true|9,2,3,4|1-2-3-4",
+    );
+    check(
+        "var a = new Uint8Array(4); a.set([1, 2], 1); a.set(new Uint16Array([258]), 3); a.join()",
+        "0,1,2,2",
+    );
+    check(
+        "new Uint8Array(2).set([1, 2, 3])",
+        "!RangeError: %TypedArray%.prototype.set: the source is too large",
+    );
+    check(
+        "var a = new Uint8Array([1, 2, 3, 4]); a.set(a.subarray(0, 3), 1); a.join()",
+        "1,1,2,3",
+    );
+    check(
+        "var a = new Uint8Array([1, 2, 3]); [a.map(x => x * 2).join(), a.filter(x => x & 1).join(), a.reduce((s, x) => s + x), a.reduceRight((s, x) => s + x, ''), a.every(x => x), a.some(x => x > 3)].join('|')",
+        "2,4,6|1,3|6|321|true|false",
+    );
+    check(
+        "var a = new Uint8Array([1, 2]); [...a.keys()].join() + '|' + [...a.entries()].join(';') + '|' + [...a].join() + '|' + (a[Symbol.iterator] === a.values)",
+        "0,1|0,1;1,2|1,2|true",
+    );
+    check(
+        "Uint8Array.of(1, 2).join() + '|' + Uint8Array.from({ length: 2, 0: 7 }, x => x | 0).join() + '|' + Float32Array.from([1, 2], function (x) { return x * this.k }, { k: 3 }).join()",
+        "1,2|7,0|3,6",
+    );
+    check(
+        "class Sub extends Uint8Array {} var s = new Sub([1, 2]).map(x => x); (s instanceof Sub) + ',' + s.constructor.name",
+        "true,Sub",
+    );
+    check(
+        "Uint8Array.prototype.toString === Array.prototype.toString && String(new Uint8Array([1, 2])) === '1,2'",
+        "true",
+    );
+    check(
+        "Int8Array.prototype.length",
+        "!TypeError: the receiver is not a typed array",
+    );
+    check(
+        "Array.prototype.concat.call([0], new Uint8Array([1])).length + ',' + Array.from(new Uint8Array([1, 2])).join() + ',' + JSON.stringify(new Uint8Array([1, 2]))",
+        "2,1,2,{\"0\":1,\"1\":2}",
+    );
+    // Resizable and detached buffers.
+    check(
+        "var b = new ArrayBuffer(4, { maxByteLength: 8 }); var tracking = new Uint8Array(b); var fixed = new Uint8Array(b, 0, 4); b.resize(8); var grown = tracking.length + ',' + fixed.length; b.resize(2); grown + '|' + tracking.length + ',' + fixed.length + ',' + fixed.byteOffset + ',' + fixed[0]",
+        "8,4|2,0,0,undefined",
+    );
+    check(
+        "var b = new ArrayBuffer(4, { maxByteLength: 8 }); var fixed = new Uint8Array(b, 0, 4); b.resize(2); fixed.join()",
+        "!TypeError: the typed array is detached or out of the bounds of its buffer",
+    );
+    check(
+        "var a = new Uint8Array([1, 2]); a.buffer.transfer(); a.length + ',' + a[0] + ',' + (0 in a) + ',' + Object.keys(a).length",
+        "0,undefined,false,0",
+    );
+    check(
+        "var a = new Uint8Array(4); a.fill({ valueOf() { a.buffer.transfer(); return 1 } })",
+        "!TypeError: the typed array is detached or out of the bounds of its buffer",
+    );
+    check(
+        "var a = new Uint8Array([1, 2, 3]); var it = a[Symbol.iterator](); it.next(); a.buffer.transfer(); it.next()",
+        "!TypeError: the typed array is detached or out of the bounds of its buffer",
+    );
+}
+
+#[test]
+fn buffers_are_charged_to_the_heap_and_collected() {
+    let mut agent = Agent::with_heap_limit(4 * 1024 * 1024).expect("agent");
+    // A buffer over the heap limit is a catchable RangeError.
+    assert_eq!(
+        run_in(
+            &mut agent,
+            "try { new ArrayBuffer(8 * 1024 * 1024) } catch (e) { e.name }"
+        ),
+        "RangeError"
+    );
+    // Buffers that become garbage are freed: 64 MiB in total passes
+    // through a 4 MiB heap.
+    assert_eq!(
+        run_in(
+            &mut agent,
+            "var total = 0; for (var i = 0; i < 64; i++) { var a = new Uint8Array(1024 * 1024); a[i] = 1; total += a[i] } total"
+        ),
+        "64"
+    );
+    agent.heap.set_gc_stress(true);
+    assert_eq!(
+        run_in(
+            &mut agent,
+            "function make() { return new Float64Array(new ArrayBuffer(64), 8, 2) } var v = make(); \
+             var junk = []; for (var i = 0; i < 30; i++) junk.push({}); v[1] = 2.5; v[1] + v.buffer.byteLength"
+        ),
+        "66.5"
+    );
+}

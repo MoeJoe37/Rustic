@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1382" viewBox="0 0 1000 1382" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 26.81%</title>
-<desc id="desc">Weighted engine completion is 26.81%: 25.28% from capabilities verified complete and 1.53% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
+<title id="title">Rustic engine completion: 26.95%</title>
+<desc id="desc">Weighted engine completion is 26.95%: 25.28% from capabilities verified complete and 1.67% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
 <text x="24.00" y="60" fill="#8b949e" font-size="12">60/221 capabilities complete · 4 in progress · 25 subsystems · engine-v4</text>
-<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">26.81%</text>
+<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">26.95%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
-<rect x="24.00" y="76" width="255.23" height="14" rx="4" fill="#388bfd"/>
+<rect x="24.00" y="76" width="256.56" height="14" rx="4" fill="#388bfd"/>
 <rect x="24.00" y="76" width="240.67" height="14" rx="4" fill="#2ea043"/>
 <rect x="24" y="104" width="10" height="10" rx="2" fill="#2ea043"/>
 <text x="40.00" y="113" fill="#c9d1d9" font-size="12">25.28% verified complete</text>
 <rect x="224" y="104" width="10" height="10" rx="2" fill="#388bfd"/>
-<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+1.53% partial credit (verified steps)</text>
+<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+1.67% partial credit (verified steps)</text>
 <rect x="524" y="104" width="10" height="10" rx="2" fill="#30363d"/>
-<text x="540.00" y="113" fill="#c9d1d9" font-size="12">73.19% remaining</text>
+<text x="540.00" y="113" fill="#c9d1d9" font-size="12">73.05% remaining</text>
 <text x="24.00" y="142" fill="#f0f6fc" font-size="14" font-weight="600">Scope map</text>
 <text x="976.00" y="142" fill="#8b949e" font-size="11" text-anchor="end">block width = share of engine · fill = subsystem progress</text>
 <g><title>Foundation: 81.25% of 1% engine weight (0.81 engine points)</title>
@@ -67,9 +67,9 @@
 <rect x="299.58" y="184" width="1" height="16" fill="#30363d"/>
 <text x="300.08" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Paint</text>
 </g>
-<g><title>JavaScript &amp; GC: 68.64% of 10% engine weight (6.86 engine points)</title>
+<g><title>JavaScript &amp; GC: 70.01% of 10% engine weight (7.00 engine points)</title>
 <rect x="320.12" y="150" width="93.20" height="32" rx="3" fill="#21262d"/>
-<rect x="320.12" y="150" width="63.97" height="32" rx="3" fill="#388bfd"/>
+<rect x="320.12" y="150" width="65.25" height="32" rx="3" fill="#388bfd"/>
 <rect x="320.12" y="150" width="51.06" height="32" rx="3" fill="#2ea043"/>
 <rect x="366.22" y="184" width="1" height="4" fill="#30363d"/>
 <text x="366.72" y="198" fill="#8b949e" font-size="10" text-anchor="middle">JS</text>
@@ -181,13 +181,13 @@
 <text x="434.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
 <text x="488.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">7.74%</text>
 </g>
-<g><title>M4 ECMAScript runtime: 74.01% (7/13 capabilities, 8.90% of engine)</title>
+<g><title>M4 ECMAScript runtime: 75.55% (7/13 capabilities, 8.90% of engine)</title>
 <text x="24.00" y="368" fill="#8b949e" font-size="12" font-weight="600">M4</text>
 <text x="60.00" y="368" fill="#c9d1d9" font-size="12">ECMAScript runtime</text>
 <rect x="224.00" y="359" width="150.00" height="10" rx="3" fill="#21262d"/>
-<rect x="224.00" y="359" width="111.02" height="10" rx="3" fill="#388bfd"/>
+<rect x="224.00" y="359" width="113.33" height="10" rx="3" fill="#388bfd"/>
 <rect x="224.00" y="359" width="92.30" height="10" rx="3" fill="#2ea043"/>
-<text x="434.00" y="368" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">74.01%</text>
+<text x="434.00" y="368" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">75.55%</text>
 <text x="488.00" y="368" fill="#8b949e" font-size="11" text-anchor="end">8.90%</text>
 </g>
 <g><title>M5 Scripted documents: 0.00% (0/12 capabilities, 5.29% of engine)</title>
@@ -561,13 +561,13 @@
 </g>
 <text x="976.00" y="767" fill="#c9d1d9" font-size="12" text-anchor="end">2.81</text>
 </g>
-<g><title>JavaScript &amp; GC: 7/15 capabilities complete, 68.64% done, 6.86 of 10 engine points</title>
+<g><title>JavaScript &amp; GC: 7/15 capabilities complete, 70.01% done, 7.00 of 10 engine points</title>
 <text x="32.00" y="797" fill="#f0f6fc" font-size="12">JavaScript &amp; GC</text>
 <text x="236.00" y="797" fill="#8b949e" font-size="12" text-anchor="end">10%</text>
 <rect x="252.00" y="788" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="788" width="137.28" height="10" rx="3" fill="#388bfd"/>
+<rect x="252.00" y="788" width="140.02" height="10" rx="3" fill="#388bfd"/>
 <rect x="252.00" y="788" width="109.58" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="797" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">68.64%</text>
+<text x="504.00" y="797" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">70.01%</text>
 <g><title>Lexer/parser, ASI, early errors and UTF-16: complete, size 5, M4</title>
 <rect x="520.00" y="786" width="24.03" height="14" rx="2" fill="#2ea043"/>
 </g>
@@ -591,9 +591,9 @@
 <g><title>Core built-ins and collections: complete, size 8, M4</title>
 <rect x="686.58" y="786" width="39.64" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Promises, jobs and realms: in progress, size 3, M4, 33.33% verified</title>
+<g><title>Promises, jobs and realms: in progress, size 3, M4, 66.66% verified</title>
 <rect x="728.22" y="786" width="13.62" height="14" rx="2" fill="#30363d"/>
-<rect x="728.22" y="786" width="4.54" height="14" rx="2" fill="#388bfd"/>
+<rect x="728.22" y="786" width="9.08" height="14" rx="2" fill="#388bfd"/>
 <rect x="728.72" y="786.5" width="12.62" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <g><title>Modules and host loading hooks: planned, size 3, M4</title>
@@ -619,7 +619,7 @@
 <rect x="873.97" y="786" width="9.61" height="14" rx="2" fill="#388bfd"/>
 <rect x="874.47" y="786.5" width="23.03" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<text x="976.00" y="797" fill="#c9d1d9" font-size="12" text-anchor="end">6.86</text>
+<text x="976.00" y="797" fill="#c9d1d9" font-size="12" text-anchor="end">7.00</text>
 </g>
 <g><title>WebAssembly: 0/8 capabilities complete, 0.00% done, 0.00 of 3 engine points</title>
 <rect x="24" y="808" width="952" height="30" fill="#161b22"/>
@@ -1141,6 +1141,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 23bf58e5f0e1</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot bcac2a0428be</text>
 </g>
 </svg>

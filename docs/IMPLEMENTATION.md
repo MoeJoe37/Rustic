@@ -1331,6 +1331,15 @@ eager (TD-113); the arguments half of TD-99 is paid. Test262
 Proxy gated: 13,724 of 15,109 (90.8%), Proxy 273 of 310 and Reflect 153 of
 153.
 
+## JS-06 part 2: promise rejection tracking
+
+`RejectPromise` and `PerformPromiseThen` record the two
+`HostPromiseRejectionTracker` operations as events on the agent.
+`Agent::take_rejection_events` hands them to the host at a microtask
+checkpoint; a `reject` whose promise is handled before that is withdrawn, as
+HTML's about-to-be-notified list requires. Events are collector roots until
+taken. TD-109 is paid; firing `unhandledrejection` is M5.
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,

@@ -3144,8 +3144,19 @@
             },
             {
               "label": "Host rejection tracking (TD-109)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/promise.rs",
+                  "marker": "pub fn take_rejection_events"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn unhandled_rejections_are_reported_to_the_host"
+                }
+              ]
             },
             {
               "label": "Realms and $262.createRealm",

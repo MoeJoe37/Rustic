@@ -141,6 +141,8 @@ pub(crate) struct VmState {
     /// The job [`Agent::run_jobs`] is running, kept here so its values
     /// stay rooted.
     pub(crate) running_job: Option<Job>,
+    /// Rejection tracker calls the host has not taken yet (§27.2.1.9).
+    pub(crate) rejections: Vec<crate::runtime::RejectionEvent>,
 }
 
 fn stack_address() -> usize {
@@ -166,6 +168,9 @@ impl VmState {
             for v in job.values() {
                 tracer.value(v);
             }
+        }
+        for event in &self.rejections {
+            tracer.value(Value::object(event.promise));
         }
     }
 }

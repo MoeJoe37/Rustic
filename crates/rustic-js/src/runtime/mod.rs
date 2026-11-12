@@ -29,6 +29,7 @@ pub(crate) use builtins::async_generator::create_async_from_sync_iterator;
 pub(crate) use builtins::bigint::{BigIntBinary, BigIntUnary, SameNumeric, same_numeric_types};
 pub(crate) use builtins::generator::{RESUME_RETURN, RESUME_THROW};
 pub(crate) use builtins::iterator_result;
+pub use builtins::promise::{RejectionEvent, RejectionOperation};
 pub(crate) use builtins::promise::{
     await_value, new_intrinsic_promise, reject_promise, resolve_promise,
 };

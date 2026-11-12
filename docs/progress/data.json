@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "23bf58e5f0e1cbed4050b434bd1518e6dca54df2dafe8ae416c0ed54d41f9473",
-  "percent": "26.81",
+  "source_fingerprint": "bcac2a0428be6c6409c5287ccc9ca59bf770af9e00e024e146f7ddf731888250",
+  "percent": "26.95",
   "verified_percent": "25.28",
-  "partial_percent": "1.53",
+  "partial_percent": "1.67",
   "completed": 60,
   "in_progress": 4,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 7,
       "total": 13,
-      "percent": "74.01",
+      "percent": "75.55",
       "verified_percent": "61.53",
-      "partial_percent": "12.48"
+      "partial_percent": "14.02"
     },
     {
       "id": "M5",
@@ -3460,8 +3460,19 @@
             },
             {
               "label": "Host rejection tracking (TD-109)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/promise.rs",
+                  "marker": "pub fn take_rejection_events"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn unhandled_rejections_are_reported_to_the_host"
+                }
+              ]
             },
             {
               "label": "Realms and $262.createRealm",
@@ -3469,7 +3480,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.41"
         },
         {
@@ -3697,10 +3708,10 @@
       "completed": 7,
       "in_progress": 3,
       "total": 15,
-      "contribution": "6.86",
-      "percent": "68.64",
+      "contribution": "7.00",
+      "percent": "70.01",
       "verified_percent": "54.79",
-      "partial_percent": "13.85"
+      "partial_percent": "15.22"
     },
     {
       "id": "wasm",

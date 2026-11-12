@@ -2930,3 +2930,47 @@ fn proxies_keep_their_target_and_handler_alive() {
     );
     assert_eq!(result, "280");
 }
+
+#[test]
+fn unhandled_rejections_are_reported_to_the_host() {
+    use rustic_js::runtime::RejectionOperation::{Handle, Reject};
+    let mut agent = Agent::new().expect("agent");
+    agent.heap.set_gc_stress(true);
+    // Handled before the checkpoint, or never rejected: nothing to report.
+    run_in(
+        &mut agent,
+        "Promise.reject(1).catch(() => {}); Promise.resolve(2); \
+         (async () => { try { await Promise.reject(3) } catch (e) {} })(); \
+         new Promise((_, reject) => reject(4)).then(null, () => {});",
+    );
+    agent.run_jobs().expect("jobs");
+    assert!(agent.take_rejection_events().is_empty());
+    // Unhandled ones are reported in order, with their reasons.
+    run_in(
+        &mut agent,
+        "var late = Promise.reject('late'); (async () => { throw 'async' })(); \
+         Promise.resolve().then(() => { throw 'then' });",
+    );
+    agent.run_jobs().expect("jobs");
+    let events = agent.take_rejection_events();
+    let reasons: Vec<String> = events
+        .iter()
+        .map(|e| {
+            assert_eq!(e.operation, Reject);
+            let reason = agent.promise_result(e.promise).expect("settled");
+            agent.display(reason)
+        })
+        .collect();
+    assert_eq!(reasons, ["late", "async", "then"]);
+    assert!(agent.take_rejection_events().is_empty());
+    // A handler added after the report is a `handle` for that promise.
+    run_in(&mut agent, "late.catch(() => {}); late.catch(() => {});");
+    agent.run_jobs().expect("jobs");
+    let after = agent.take_rejection_events();
+    assert_eq!(after.len(), 1);
+    assert_eq!(after[0].operation, Handle);
+    assert_eq!(after[0].promise, events[0].promise);
+    // A pending promise has no result.
+    let pending = agent.evaluate("new Promise(() => {})").expect("a promise");
+    assert_eq!(agent.promise_result(pending.as_object().unwrap()), None);
+}

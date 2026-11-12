@@ -185,6 +185,7 @@ fn settle(agent: &mut Agent, promise: ObjectId, value: Value, fulfilled: bool) {
         PromiseState::Rejected
     };
     p.result = value;
+    let unhandled = !fulfilled && !p.handled;
     let fulfill = std::mem::take(&mut p.fulfill_reactions);
     let reject = std::mem::take(&mut p.reject_reactions);
     let reactions = if fulfilled { fulfill } else { reject };
@@ -195,6 +196,31 @@ fn settle(agent: &mut Agent, promise: ObjectId, value: Value, fulfilled: bool) {
             argument: value,
         });
     }
+    if unhandled {
+        // `HostPromiseRejectionTracker(promise, "reject")` (§27.2.1.9).
+        agent.vm.rejections.push(RejectionEvent {
+            operation: RejectionOperation::Reject,
+            promise,
+        });
+    }
+}
+
+/// What happened to a promise, for the host (§27.2.1.9).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RejectionOperation {
+    /// The promise was rejected while it had no handler.
+    Reject,
+    /// A handler was added to a promise the host was already told about.
+    Handle,
+}
+
+/// One call of `HostPromiseRejectionTracker`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RejectionEvent {
+    /// `"reject"` or `"handle"`.
+    pub operation: RejectionOperation,
+    /// The promise.
+    pub promise: ObjectId,
 }
 
 /// The steps of a promise resolve function (§27.2.1.3.2) after its
@@ -504,8 +530,30 @@ fn add_reactions(
             argument: result,
         }),
     }
+    let mut newly_handled = false;
     if let Some(p) = record(agent, promise) {
+        newly_handled = p.state == PromiseState::Rejected && !p.handled;
         p.handled = true;
+    }
+    if newly_handled {
+        // `HostPromiseRejectionTracker(promise, "handle")`. A rejection
+        // the host has not taken yet is withdrawn instead, as HTML's
+        // about-to-be-notified list does, so the list holds at most one
+        // entry per promise that is unhandled or was reported.
+        let pending = agent
+            .vm
+            .rejections
+            .iter()
+            .position(|e| e.promise == promise && e.operation == RejectionOperation::Reject);
+        match pending {
+            Some(at) => {
+                agent.vm.rejections.remove(at);
+            }
+            None => agent.vm.rejections.push(RejectionEvent {
+                operation: RejectionOperation::Handle,
+                promise,
+            }),
+        }
     }
     Ok(())
 }
@@ -573,6 +621,25 @@ fn species_constructor(agent: &mut Agent, o: ObjectId) -> JsResult<Value> {
 // ---- jobs --------------------------------------------------------------------
 
 impl Agent {
+    /// The rejection tracker calls since the last call of this function,
+    /// oldest first: a promise rejected without a handler, or a handler
+    /// added to a promise reported earlier. A rejection that got its
+    /// handler before the host asked is not reported at all. Call it
+    /// after [`Agent::run_jobs`], as a microtask checkpoint does; the
+    /// promises stay alive until then.
+    pub fn take_rejection_events(&mut self) -> Vec<RejectionEvent> {
+        std::mem::take(&mut self.vm.rejections)
+    }
+
+    /// `[[PromiseResult]]` of a settled promise (the reason of a rejected
+    /// one), or `None` if `promise` is pending or not a promise.
+    pub fn promise_result(&self, promise: ObjectId) -> Option<Value> {
+        match self.heap.object(promise).internal() {
+            Some(Internal::Promise(p)) if p.state != PromiseState::Pending => Some(p.result),
+            _ => None,
+        }
+    }
+
     /// Whether promise jobs are waiting.
     pub fn has_pending_jobs(&self) -> bool {
         !self.vm.jobs.is_empty()

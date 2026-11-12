@@ -140,7 +140,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
-| TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Open, JS-06 |
+| TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, JS-09 |
@@ -1543,7 +1543,7 @@ to an offset (and a local time to its candidate offsets for
 TZif reader in `rustic-base`; Intl.DateTimeFormat (JS-08) shares it.
 Trigger: the shell first runs page script, or JS-08.
 
-### TD-109 — Unhandled promise rejections are not reported
+### TD-109 — Unhandled promise rejections are not reported (Paid)
 
 A promise that is rejected with no handler attached stays silent: the
 engine has no HostPromiseRejectionTracker (§27.2.1.9), so neither the
@@ -1558,6 +1558,12 @@ PerformPromiseThen, and a host hook on the agent called from
 RejectPromise and PerformPromiseThen that the shell batches per
 microtask checkpoint (HTML §8.1.7.3). Trigger: the HTML event loop
 (JS-09 bindings) or the first console that reports page errors.
+
+**Paid** by JS-06 part 2: `RejectPromise` and `PerformPromiseThen` record
+`reject` and `handle` events on the agent, the host takes them with
+`Agent::take_rejection_events` at its microtask checkpoint, and a rejection
+handled before then is withdrawn. The events root their promises until taken.
+The HTML events themselves are M5 work.
 
 ### TD-110 — RegExp Unicode property escapes cannot run
 

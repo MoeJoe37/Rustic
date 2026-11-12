@@ -419,7 +419,13 @@ calls a function value. The design is recorded in
     generator does, and returns the promise to the caller. The job
     resumes the frame with the value or throws it. A catch-all handler
     rejects the promise on a throw, and `return` resolves it.
-  - Unhandled rejections are not reported to the host yet (TD-109).
+  - `HostPromiseRejectionTracker` (§27.2.1.9): a promise rejected without
+    a handler, and a handler added to one reported earlier, are recorded as
+    events that the host takes with `Agent::take_rejection_events()` after
+    `run_jobs()`. A rejection handled before the host asks is withdrawn, so
+    `Promise.reject(1).catch(f)` reports nothing. The list keeps its
+    promises alive until it is taken; `Agent::promise_result` gives the
+    reason.
 - **Async generators and `for await`** (§27.6, §14.7.5): `async function*`
   declarations, expressions and methods, `yield*` over async and sync
   iterables, `for await`, `%AsyncGeneratorFunction%`,

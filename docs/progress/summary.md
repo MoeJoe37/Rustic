@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 25.92%** = 21.99% verified complete + 3.93% partial credit. 55/221 capabilities complete, 9 in progress.
+**Overall completion: 26.16%** = 22.68% verified complete + 3.48% partial credit. 56/221 capabilities complete, 8 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `9aac13a636e1c67fe135a782b6daf6361347901d2462d21c8f071dcfa7a9108d`.
+Catalog: `engine-v4`. Source fingerprint: `42d1c9fcd0e3e30f6e4c76e15882c997adf108f9d7763249844007e46bda0f55`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `9aac13a636e1c67fe135a782b6daf63613479
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 2/13 | 63.99% | 24.61% | 8.90% |
+| M4 ECMAScript runtime | 3/13 | 66.64% | 32.30% | 8.90% |
 | M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `9aac13a636e1c67fe135a782b6daf63613479
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 2/15 | 8 | 59.72% | 21.91% | 10% | 5.97 |
+| JavaScript & GC | 3/15 | 7 | 62.08% | 28.76% | 10% | 6.20 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -164,13 +164,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### JavaScript & GC
 
-- **in progress 83.33%** `js.parser` — Lexer/parser, ASI, early errors and UTF-16 · size 5 · M4 · 0.68% of engine
-  - [x] UTF-16 source, lexical grammar and pinned Unicode identifier data ([source](../../crates/rustic-js/src/lexer.rs), [test](../../crates/rustic-js/tests/lexer.rs))
-  - [x] Scripts and modules to a spanned AST with cover grammars, ASI and strict mode ([source](../../crates/rustic-js/src/parser/mod.rs), [test](../../crates/rustic-js/tests/parse.rs))
-  - [x] Early errors for scopes, labels, classes, modules and contextual keywords ([source](../../crates/rustic-js/src/parser/scope.rs), [test](../../crates/rustic-js/tests/parse.rs))
-  - [x] Bounded parsing: depth, stack guard, cancellation and the js-parse fuzz target ([source](../../crates/rustic-fuzz/src/js.rs), [test](../../crates/rustic-js/tests/parse.rs))
-  - [x] Pinned Test262 parse-phase gate with exact expected failures ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs))
-  - [ ] RegExp pattern early errors (TD-88)
+- **complete** `js.parser` — Lexer/parser, ASI, early errors and UTF-16 · size 5 · M4 · 0.68% of engine ([source](../../crates/rustic-js/src/lexer.rs), [test](../../crates/rustic-js/tests/lexer.rs), [source](../../crates/rustic-js/src/parser/mod.rs), [test](../../crates/rustic-js/tests/parse.rs), [source](../../crates/rustic-js/src/parser/scope.rs), [test](../../crates/rustic-js/tests/parse.rs), [source](../../crates/rustic-fuzz/src/js.rs), [test](../../crates/rustic-js/tests/parse.rs), [source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs), [source](../../crates/rustic-js/src/parser/expression.rs), [test](../../crates/rustic-js/tests/parse.rs))
 - **in progress 75.00%** `js.values` — Values, coercions, references and completions · size 3 · M4 · 0.41% of engine
   - [x] 8-byte NaN-boxed values, Latin-1/UTF-16 strings with atoms, Number and BigInt storage ([source](../../crates/rustic-js/src/runtime/value.rs), [test](../../crates/rustic-js/tests/runtime.rs))
   - [x] ToPrimitive, ToNumber, ToString, ToObject, ToPropertyKey, equality and relational comparison ([source](../../crates/rustic-js/src/runtime/convert.rs), [test](../../crates/rustic-js/tests/runtime.rs))
@@ -182,7 +176,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Array and String exotic objects ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/runtime.rs))
   - [ ] Arguments, bound function and Proxy exotic objects
 - **complete** `js.heap` — Rooted traced heap and host-object cycle collection · size 8 · M4 · 1.09% of engine ([source](../../crates/rustic-js/src/runtime/gc.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/shape.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-fuzz/src/js_heap.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/weak.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-bindings/src/heap.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs))
-- **in progress 77.77%** `js.interpreter` — Original interpreter/bytecode and control flow · size 8 · M4 · 1.09% of engine
+- **in progress 88.88%** `js.interpreter` — Original interpreter/bytecode and control flow · size 8 · M4 · 1.09% of engine
   - [x] Scope resolution to registers and environment slots, register bytecode in a collected arena ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Operators, control flow, labels, switch, with, destructuring and template literals ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] for-in and for-of with the iteration protocol and iterator closing ([source](../../crates/rustic-js/src/runtime/builtins.rs), [test](../../crates/rustic-js/tests/interp.rs))
@@ -190,7 +184,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Safe points: cancellation, step budget and collection while running ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [x] Cached, uncached and collecting runs agree under fuzzing ([source](../../crates/rustic-fuzz/src/js_run.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
   - [x] Tagged templates, optional calls and object-literal super ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [ ] Regular expression literals
+  - [x] Regular expression literals ([source](../../crates/rustic-js/src/vm/compile.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [ ] Generators, async functions and modules on the bytecode
 - **in progress 87.50%** `js.functions` — Functions, closures, call/construct and exceptions · size 5 · M4 · 0.68% of engine
   - [x] Function declarations, expressions, arrows, defaults, rest parameters and arguments ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))

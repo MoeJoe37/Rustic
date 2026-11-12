@@ -2606,93 +2606,67 @@
           "label": "Lexer/parser, ASI, early errors and UTF-16",
           "size": 5,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "UTF-16 source, lexical grammar and pinned Unicode identifier data",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/lexer.rs",
-                  "marker": "pub fn next_token"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/lexer.rs",
-                  "marker": "fn numeric_literals_cover_every_radix_separators_and_bigint"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/lexer.rs",
+              "marker": "pub fn next_token"
             },
             {
-              "label": "Scripts and modules to a spanned AST with cover grammars, ASI and strict mode",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/parser/mod.rs",
-                  "marker": "pub fn parse_module"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/parse.rs",
-                  "marker": "fn strict_mode_comes_from_directives_classes_and_modules"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/lexer.rs",
+              "marker": "fn numeric_literals_cover_every_radix_separators_and_bigint"
             },
             {
-              "label": "Early errors for scopes, labels, classes, modules and contextual keywords",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/parser/scope.rs",
-                  "marker": "fn declare_lexical"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/parse.rs",
-                  "marker": "fn early_errors_reject_invalid_programs"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/parser/mod.rs",
+              "marker": "pub fn parse_module"
             },
             {
-              "label": "Bounded parsing: depth, stack guard, cancellation and the js-parse fuzz target",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-fuzz/src/js.rs",
-                  "marker": "impl Target for JsParseTarget"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/parse.rs",
-                  "marker": "fn the_stack_guard_stops_nesting_before_the_depth_limit"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/parse.rs",
+              "marker": "fn strict_mode_comes_from_directives_classes_and_modules"
             },
             {
-              "label": "Pinned Test262 parse-phase gate with exact expected failures",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/test262.rs",
-                  "marker": "pub fn run_tree"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/test262.rs",
-                  "marker": "fn test262_parse_phase_matches_expected_failures"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/parser/scope.rs",
+              "marker": "fn declare_lexical"
             },
             {
-              "label": "RegExp pattern early errors (TD-88)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/parse.rs",
+              "marker": "fn early_errors_reject_invalid_programs"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/js.rs",
+              "marker": "impl Target for JsParseTarget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/parse.rs",
+              "marker": "fn the_stack_guard_stops_nesting_before_the_depth_limit"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/test262.rs",
+              "marker": "pub fn run_tree"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/test262.rs",
+              "marker": "fn test262_parse_phase_matches_expected_failures"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/parser/expression.rs",
+              "marker": "crate::regexp::Regex::validate(body, parsed_flags)"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/parse.rs",
+              "marker": "fn regexp_literals_are_validated_at_parse_time"
             }
           ]
         },
@@ -3008,8 +2982,19 @@
             },
             {
               "label": "Regular expression literals",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "ExpressionKind::RegExp { body, flags } =>"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn regular_expressions()"
+                }
+              ]
             },
             {
               "label": "Generators, async functions and modules on the bytecode",

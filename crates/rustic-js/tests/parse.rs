@@ -255,3 +255,32 @@ fn source_length_is_checked_before_scanning() {
     assert!(Source::from_str_limited("😀😀", 3).is_err());
     assert!(Source::from_utf16(vec![0xD800, 0x61], 2).is_ok());
 }
+
+#[test]
+fn regexp_literals_are_validated_at_parse_time() {
+    // §13.2.7.2: a literal whose pattern or flags are invalid is an early
+    // SyntaxError, so nothing of the script runs (TD-88).
+    for text in [
+        "/(/;",
+        "/a**/;",
+        "/[b-a]/;",
+        "/(?<n>a)(?<n>b)/;",
+        "/\\k<missing>/u;",
+        "/\\u{110000}/u;",
+        "/a/gg;",
+        "/a/uv;",
+        "/(?<=a)+/u;",
+        "/{1}/u;",
+    ] {
+        assert_script_error(text);
+    }
+    for text in [
+        "/(?<n>a)|(?<n>b)/;",
+        "/a{/;",
+        "/[\\p{L}--[a-z]]/v;",
+        "/(?i:a)b/;",
+        "/(?<=a)b/dgimsuy;",
+    ] {
+        assert!(script(text).is_ok(), "{text}");
+    }
+}

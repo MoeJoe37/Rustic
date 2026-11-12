@@ -18,11 +18,14 @@ Device shells, rendering, input, and runtime validation are still planned. See
 **Current stage: M4 JavaScript runtime.** M1–M3 are complete for their declared
 scope: Rustic's own pipeline turns a local HTML file into a PNG through parsing,
 the CSS cascade, block/inline/flex layout, OpenType text, image decoding and a
-CPU rasterizer, with resize/zoom and hit testing. M4 has a complete ECMAScript
-parser; values, the heap and the bytecode interpreter are being built next, with
-memory use and interpreter speed as design constraints
-([plan](docs/ROADMAP.md#memory-and-performance-design)). Nothing executes
-JavaScript yet, and web-page networking and native app hosts are later
+CPU rasterizer, with resize/zoom and hit testing. M4 is in progress: Rustic's
+own ECMAScript parser, garbage-collected heap and bytecode interpreter run
+scripts with classes, generators, promises, async functions, regular
+expressions and the core standard library, designed around memory use and
+interpreter speed ([plan](docs/ROADMAP.md#memory-and-performance-design)); the
+[JavaScript notes](docs/JS.md) list what is still missing and the measured
+Test262 results. Scripts do not run inside documents yet (M5), and web-page
+networking and native app hosts are later
 milestones. See the [implementation ledger](docs/IMPLEMENTATION.md) for precise
 tested contracts.
 
@@ -32,7 +35,7 @@ tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 25.92%** (21.99% verified complete + 3.93% partial credit) — 55/221 capabilities complete and 9 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 63.99% done.
+**Overall engine completion: 26.16%** (22.68% verified complete + 3.48% partial credit) — 56/221 capabilities complete and 8 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 66.64% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -119,7 +122,7 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-paint` | Display lists and paint order |
 | `rustic-raster` | CPU rasterizer and PNG output |
 | `rustic-codecs` | Bounded inflate, PNG, JPEG, GIF and WebP decoders |
-| `rustic-js` | ECMAScript lexer and parser, runtime data model and garbage collector (interpreter in progress) |
+| `rustic-js` | ECMAScript parser, garbage-collected heap, bytecode interpreter and standard library (M4 in progress) |
 | `rustic-bindings` | Node wrappers and the shared DOM/JS garbage collection |
 | `rustic-engine` | Viewport configuration |
 | `rustic-cli` | The `rustic` development tool |

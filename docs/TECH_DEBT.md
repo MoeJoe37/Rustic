@@ -136,8 +136,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
-| TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs only `test/language` | Open, JS-05/JS-06 |
+| TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs `test/language` plus only the JS-05 areas of `test/built-ins` | Open, JS-05/JS-06 |
 | TD-106 | Deliberate | JS | No `eval`, and `Function.prototype.toString` prints every function in the native form | Open, JS-05 |
+| TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1459,11 +1460,13 @@ captures one variable costs 64 bytes instead of 112.
 The execution runner (JS-07) skips files flagged `module` or `async` (6,059
 of 23,832 in `test/language` together with proposal features), does not
 provide the `$262` host object (`createRealm`, `evalScript`, `detachArrayBuffer`,
-`agent`), and its gate covers `test/language` only. Skipped files are counted
+`agent`), and its gate covers `test/language` and the `test/built-ins`
+directories of the library areas installed so far. Skipped files are counted
 as skipped, never as passing, so published percentages always state their
 base.
 
-Pay with: `test/built-ins` in the gate as JS-05 lands each library area;
+Pay with: each further `test/built-ins` directory in the gate as JS-05 lands
+its library area;
 module and async files when promise jobs and module loading exist (JS-06);
 `$262` with realms (JS-06). Trigger: each of those steps.
 
@@ -1483,3 +1486,17 @@ eval with a resolver mode that keeps a function's bindings in environments
 when its body contains a direct `eval` call; a source span per function so
 `toString` can return its text. Trigger: JS-05 part 2 or the first page
 script that needs either.
+
+### TD-107 — No Unicode normalization or locales in String
+
+`String.prototype.normalize` needs the canonical and compatibility
+decomposition and composition data. `rustic-url` already carries NFC data
+for IDNA, but `rustic-js` cannot reach it. `localeCompare` compares code
+points, and `toLocaleUpperCase`/`toLocaleLowerCase` ignore their locale, so
+Turkish and Lithuanian casing are wrong.
+
+Pay with: move the normalization tables to `rustic-base` (or a shared
+Unicode crate) so both crates use one copy, then add `normalize`; collation
+and locale casing with Intl (JS-08). Trigger: JS-05 completion or the first
+page that depends on either.
+

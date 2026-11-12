@@ -1319,7 +1319,7 @@ fn core_built_ins() {
     );
     check(
         "Object.assign({ a: 1 }, { b: 2 }, null, 'xy').b + Object.assign({}, 'xy')[1] + JSON",
-        "!ReferenceError: JSON is not defined",
+        "2y[object JSON]",
     );
     check(
         "var s = Symbol('k'); var o = { [s]: 1, a: 2 }; Object.getOwnPropertyNames(o).length + ',' + Object.getOwnPropertySymbols(o)[0].toString()",
@@ -1374,6 +1374,82 @@ fn core_built_ins() {
     check(
         "typeof Symbol() + (Symbol('a') !== Symbol('a'))",
         "symboltrue",
+    );
+}
+
+#[test]
+fn strings_numbers_and_json() {
+    let _report = Report;
+    // Number formatting rounds the exact value, ties away from zero.
+    check(
+        "(0.5).toFixed(0) + ' ' + (2.5).toFixed(0) + ' ' + (1.005).toFixed(2) + ' ' + (-1.5).toFixed(0) + ' ' + (1e21).toFixed(2)",
+        "1 3 1.00 -2 1e+21",
+    );
+    check(
+        "(123.456).toExponential(2) + ' ' + (0.00012345).toPrecision(2) + ' ' + (12345.6789).toPrecision(3) + ' ' + (0).toPrecision(3)",
+        "1.23e+2 0.00012 1.23e+4 0.00",
+    );
+    check(
+        "(255).toString(16) + ' ' + (-255.5).toString(16) + ' ' + (0.5).toString(2) + ' ' + Number.MAX_SAFE_INTEGER + ' ' + Number.isInteger(5.0)",
+        "ff -ff.8 0.1 9007199254740991 true",
+    );
+    check(
+        "var r; try { (1).toFixed(101) } catch (e) { r = e.name } r + (Number.parseFloat === parseFloat)",
+        "RangeErrortrue",
+    );
+    // String methods work on UTF-16 code units.
+    check(
+        "'abc'.padStart(6, '12') + '|' + '  x '.trim() + '|' + 'a,b,,c'.split(',').length + '|' + 'aaa'.replaceAll('a', '$&$&') + '|' + 'x'.repeat(3)",
+        "121abc|x|4|aaaaaa|xxx",
+    );
+    check(
+        "'abc'.replace('b', function (m, p) { return m.toUpperCase() + p }) + 'straße'.toUpperCase() + 'ΟΔΟΣ'.toLowerCase()",
+        "aB1cSTRASSEοδος",
+    );
+    check(
+        "String.fromCodePoint(0x1F600).length + ',' + '😀'.codePointAt(0) + ',' + [...'a😀'].length + ',' + 'a\\uD800'.isWellFormed() + ',' + 'a\\uD800'.toWellFormed().charCodeAt(1)",
+        "2,128512,2,false,65533",
+    );
+    check(
+        "String.raw`a\\n${1}b` + 'abc'.substring(2, 0) + 'abc'.substr(-2, 1) + 'abcabc'.lastIndexOf('c') + 'abc'.at(-1) + 'abc'.split('').join('-')",
+        "a\\n1babb5ca-b-c",
+    );
+    check(
+        "var r; try { 'x'.repeat(-1) } catch (e) { r = e.name } r + ',' + ''.padEnd(3, '') + ',' + 'abc'.includes('') + 'abc'.startsWith('bc', 1) + 'abc'.endsWith('ab', 2)",
+        "RangeError,,truetruetrue",
+    );
+    check(
+        "var o = {}; o[Symbol.split] = function (s, l) { return 'custom:' + s + l }; 'abc'.split(o, 2)",
+        "custom:abc2",
+    );
+    // JSON.
+    check(
+        "JSON.stringify({ a: [1, { b: 2 }], c: 'x', d: undefined, e: function () {} })",
+        "{\"a\":[1,{\"b\":2}],\"c\":\"x\"}",
+    );
+    check(
+        "JSON.stringify({ a: [1] }, null, 2)",
+        "{\n  \"a\": [\n    1\n  ]\n}",
+    );
+    check(
+        "JSON.stringify([undefined, Symbol()]) + JSON.stringify('\\uD800\\n') + JSON.stringify({ toJSON: function (k) { return 'k=' + k } })",
+        "[null,null]\"\\ud800\\n\"\"k=\"",
+    );
+    check(
+        "JSON.stringify({ a: 1, b: 2, c: 3 }, ['c', 'a']) + JSON.stringify({ a: 5 }, function (k, v) { return typeof v === 'number' ? v * 2 : v })",
+        "{\"c\":3,\"a\":1}{\"a\":10}",
+    );
+    check(
+        "JSON.parse('{\"a\":[1,2,{\"b\":3}]}', function (k, v) { return typeof v === 'number' ? v + 1 : v }).a[2].b",
+        "4",
+    );
+    check(
+        "var r = []; try { JSON.parse(\"{'a':1}\") } catch (e) { r.push(e.name) } var c = {}; c.c = c; try { JSON.stringify(c) } catch (e) { r.push(e.name) } r.join()",
+        "SyntaxError,TypeError",
+    );
+    check(
+        "JSON.parse('['.repeat(50000) + ']'.repeat(50000)).length",
+        "1",
     );
 }
 

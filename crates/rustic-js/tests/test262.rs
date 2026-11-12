@@ -14,6 +14,9 @@ use rustic_js::test262::{RunLimits, execute_tree, run_tree};
 const EXPECTED: &str = include_str!("fixtures/test262_expected_failures.txt");
 /// The `test/language` files that pass when executed, without that prefix.
 const PASSING: &str = include_str!("fixtures/test262_language_passing.txt");
+/// The `test/built-ins` files of [`BUILT_IN_DIRS`] that pass, without
+/// that prefix.
+const BUILT_INS_PASSING: &str = include_str!("fixtures/test262_built_ins_passing.txt");
 
 fn pinned_revision() -> &'static str {
     EXPECTED
@@ -71,15 +74,17 @@ fn test262_parse_phase_matches_expected_failures() {
 }
 
 #[test]
-fn passing_list_is_sorted_and_names_the_same_revision() {
-    let paths: Vec<&str> = PASSING.lines().filter(|l| !l.starts_with('#')).collect();
-    assert!(paths.windows(2).all(|w| w[0] < w[1]));
-    assert!(paths.iter().all(|p| p.ends_with(".js")));
-    let revision = PASSING
-        .lines()
-        .find_map(|line| line.strip_prefix("# Revision: "))
-        .and_then(|rest| rest.split_whitespace().next());
-    assert_eq!(revision, Some(pinned_revision()));
+fn passing_lists_are_sorted_and_name_the_same_revision() {
+    for list in [PASSING, BUILT_INS_PASSING] {
+        let paths: Vec<&str> = list.lines().filter(|l| !l.starts_with('#')).collect();
+        assert!(paths.windows(2).all(|w| w[0] < w[1]));
+        assert!(paths.iter().all(|p| p.ends_with(".js")));
+        let revision = list
+            .lines()
+            .find_map(|line| line.strip_prefix("# Revision: "))
+            .and_then(|rest| rest.split_whitespace().next());
+        assert_eq!(revision, Some(pinned_revision()));
+    }
 }
 
 /// Executes `test/language` and compares the files that pass with the
@@ -88,42 +93,98 @@ fn passing_list_is_sorted_and_names_the_same_revision() {
 #[test]
 #[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
 fn test262_language_execution_matches_the_passing_list() {
+    check_trees(
+        &["test/language"],
+        "test/language/",
+        PASSING,
+        "test262_language_passing.txt",
+        "Test262 test/language files that pass when executed (JS-07).",
+    );
+}
+
+/// The `test/built-ins` directories of the library areas JS-05 has
+/// installed so far. The checkout must include them (see docs/JS.md).
+const BUILT_IN_DIRS: &[&str] = &[
+    "Array",
+    "Boolean",
+    "Error",
+    "Function",
+    "JSON",
+    "Math",
+    "NativeErrors",
+    "Number",
+    "Object",
+    "String",
+    "Symbol",
+    "global",
+    "isFinite",
+    "isNaN",
+    "parseFloat",
+    "parseInt",
+];
+
+/// The same exact comparison for the built-ins JS-05 has installed.
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_built_ins_execution_matches_the_passing_list() {
+    let trees: Vec<String> = BUILT_IN_DIRS
+        .iter()
+        .map(|d| format!("test/built-ins/{d}"))
+        .collect();
+    let trees: Vec<&str> = trees.iter().map(String::as_str).collect();
+    check_trees(
+        &trees,
+        "test/built-ins/",
+        BUILT_INS_PASSING,
+        "test262_built_ins_passing.txt",
+        "Test262 test/built-ins files that pass when executed (JS-05).",
+    );
+}
+
+fn check_trees(trees: &[&str], prefix: &str, passing: &str, fixture: &str, title: &str) {
     let root = PathBuf::from(
         std::env::var("RUSTIC_TEST262_DIR").expect("RUSTIC_TEST262_DIR names a Test262 checkout"),
     );
-    let report = execute_tree(&root, "test/language", RunLimits::default())
-        .expect("Test262 tree is readable");
-    let actual: BTreeSet<&str> = report
-        .passed
+    let mut passed: Vec<String> = Vec::new();
+    let mut failed: Vec<(String, String)> = Vec::new();
+    let mut skipped = 0;
+    for tree in trees {
+        let report =
+            execute_tree(&root, tree, RunLimits::default()).expect("Test262 tree is readable");
+        passed.extend(report.passed.iter().cloned());
+        failed.extend(report.failed.iter().cloned());
+        skipped += report.skipped.len();
+    }
+    let actual: BTreeSet<&str> = passed
         .iter()
-        .map(|p| p.strip_prefix("test/language/").expect("inside the tree"))
+        .map(|p| p.strip_prefix(prefix).expect("inside the tree"))
         .collect();
     if std::env::var_os("RUSTIC_TEST262_BLESS").is_some() {
         let mut text = format!(
-            "# Test262 test/language files that pass when executed (JS-07).\n\
+            "# {title}\n\
              # Revision: {} of https://github.com/tc39/test262\n\
              # {} pass, {} fail, {} skipped (modules, async, proposals).\n\
              # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.\n",
             pinned_revision(),
-            report.passed.len(),
-            report.failed.len(),
-            report.skipped.len()
+            passed.len(),
+            failed.len(),
+            skipped
         );
         for path in &actual {
             text.push_str(path);
             text.push('\n');
         }
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/test262_language_passing.txt");
+            .join("tests/fixtures")
+            .join(fixture);
         std::fs::write(fixture, text).expect("the fixture is writable");
         return;
     }
-    let expected: BTreeSet<&str> = PASSING.lines().filter(|l| !l.starts_with('#')).collect();
-    let regressed: Vec<String> = report
-        .failed
+    let expected: BTreeSet<&str> = passing.lines().filter(|l| !l.starts_with('#')).collect();
+    let regressed: Vec<String> = failed
         .iter()
         .filter_map(|(path, reason)| {
-            let short = path.strip_prefix("test/language/")?;
+            let short = path.strip_prefix(prefix)?;
             expected
                 .contains(short)
                 .then(|| format!("{short}: {reason}"))

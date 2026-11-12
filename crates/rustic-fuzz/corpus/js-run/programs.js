@@ -140,3 +140,6 @@ var a = [5, 1, 4, , 2]; a.sort(function (x, y) { return y - x }); a.concat([[1]]
 [1, 2, 3].reduceRight(function (s, x) { return s + x }, '') + Array.from('héllo').length + [..."ab"].entries().next().value;
 Math.max(Math.random(), 2) + Math.hypot(1e300, 1e300) + Math.fround(1.1) + Math.atan2(1, 1);
 new Function('a', 'return a * 2')(21) + Symbol.for('x').description + [].concat.call(1, 2).length;
+JSON.stringify(JSON.parse('{"a":[1,"x\\u00e9",{"b":null}],"c":true}', function (k, v) { return v }), null, '--');
+(1.005).toFixed(2) + (255).toString(36) + (0.1).toExponential(3) + 'aßc'.toUpperCase().padEnd(8, '*').split('S').length;
+'a-b-c'.replaceAll('-', '$&$`').at(-2) + String.fromCharCode(0xd83d, 0xde00).codePointAt(0) + 'xyz'.substr(1).repeat(2);

@@ -208,6 +208,18 @@ impl Agent {
         Ok(())
     }
 
+    /// A RangeError when a native function recursing on its own (such as
+    /// `JSON.stringify` on nested data) has used up the native stack
+    /// budget of the run it is part of.
+    pub(crate) fn check_native_stack(&mut self) -> JsResult<()> {
+        if !self.vm.frames.is_empty()
+            && stack_address().abs_diff(self.vm.stack_base) > self.vm.limits.max_native_stack_bytes
+        {
+            return Err(self.throw(ErrorKind::RangeError, "Maximum call stack size exceeded"));
+        }
+        Ok(())
+    }
+
     /// Replace the interpreter's limits.
     pub fn set_vm_limits(&mut self, limits: VmLimits) {
         self.vm.limits = limits;

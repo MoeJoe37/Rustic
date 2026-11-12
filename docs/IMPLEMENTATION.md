@@ -1209,8 +1209,11 @@ objects in 17,390 bytes. See [JS.md](JS.md#built-ins-js-05).
 Part 2 so far adds the `Function` constructor (parsed as one function
 expression in the global scope), every `Array` method of ES2025, keys and
 entries iterators with `%IteratorPrototype%`, `Math` with a seedable
-`Math.random`, and the `Symbol` statics with a registry. Test262
-`test/language` now passes 12,284 of 17,773 run files (69.1%).
+`Math.random`, and the `Symbol` statics with a registry. Then the `String`
+methods, `Number` statics and formatting (rounding the exact binary value),
+and `JSON` with parsing on an explicit stack. Test262 `test/language` now
+passes 12,404 of 17,773 run files (69.8%), and the gate also covers the
+`test/built-ins` directories of these areas: 8,375 of 9,467 (88.5%).
 
 ## REN-03 completion: font formats, shaping and text policies
 
@@ -1274,8 +1277,8 @@ lists the next tasks.
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; no collection yet (TD-91), partial BigInt conversions (TD-92); see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
 | JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators, async, modules and RegExp remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
-| JS-05: core built-ins | Part 1 complete: Error and native errors, `Object`, `Function.prototype` with bound functions, global functions and primitive wrapper constructors, native constructors usable with `new`, `extends` and `super`; part 2 so far adds the `Function` constructor, `Array`, `Math` and the `Symbol` statics; String and Number methods, JSON, collections and `eval` remain (TD-106); see [JS.md](JS.md#built-ins-js-05) |
-| JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (12,284 of 17,773 run files with JS-05 so far); modules, async and built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
+| JS-05: core built-ins | Part 1 complete: Error and native errors, `Object`, `Function.prototype` with bound functions, global functions and primitive wrapper constructors, native constructors usable with `new`, `extends` and `super`; part 2 so far adds the `Function` constructor, `Array`, `String`, `Number`, `Math`, `JSON` and the `Symbol` statics; collections, `Reflect`, `Date` and `eval` remain (TD-106, TD-107); see [JS.md](JS.md#built-ins-js-05) |
+| JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (12,404 of 17,773 run files with JS-05 so far, plus 8,375 of 9,467 `test/built-ins` files in the JS-05 areas); modules, async and built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
 | JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
 
 M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and

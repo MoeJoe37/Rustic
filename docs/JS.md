@@ -120,36 +120,52 @@ cargo run --release -p rustic-js --example test262 -- /path/to/test262 \
 ```
 
 The example prints pass, fail and skip counts per directory, and `--list`
-writes the verdict and reason for every file. At the pinned revision, on
-`test/language`:
+writes the verdict and reason for every file. At the pinned revision:
 
-| | Files |
-| --- | ---: |
-| Pass | 12,284 |
-| Fail | 5,489 |
-| Skipped (modules 817, async, proposals) | 6,059 |
+| | `test/language` | `test/built-ins` (JS-05 areas) |
+| --- | ---: | ---: |
+| Pass | 12,404 | 8,375 |
+| Fail | 5,369 | 1,092 |
+| Skipped (modules, async, proposals) | 6,059 | 96 |
+| Pass rate of the files that run | 69.8% | 88.5% |
 
-That is 69.1% of the 17,773 files that run, and 51.5% of all 23,832. The
-first run passed 7,708 and the interpreter fixes raised that to 7,895 before
-the JS-05 built-ins (10,726 after part 1). The first run it found four interpreter bugs, now fixed and covered
-by `test262_findings` in `tests/interp.rs`: a `var` inside a block at the top
-of a script was never declared as a global, assignments inside `with` looked
-up their target after computing the value, `x = (function () {})` left the
-function unnamed, and closures in parameter defaults could see the body's
-`var`s (the body now gets its own scope when the parameters contain
-expressions, as §10.2.11 requires). The
-whole run takes 16 seconds on one core. The files that pass are listed in
-`tests/fixtures/test262_language_passing.txt`, and the gate compares exactly:
-a file that stops passing fails the gate, and so does one that starts passing
-until the list is regenerated with `RUSTIC_TEST262_BLESS=1`. Run the gate in
-release mode on a 64-bit host; the list is not checked on other targets.
+The `test/language` files that pass were 7,708 on the first run, 7,895 after
+four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
+The four bugs are covered by `test262_findings` in `tests/interp.rs`:
 
-Most failures are not interpreter bugs yet. About 3,700 files need
-generators or async functions (JS-08), about 780 need `eval` (TD-106) and
-about 240 need regular expressions. Modules, BigInt arithmetic, `Proxy`,
-`Reflect`, typed arrays and collections account for most of the rest. Skipped files are never counted as passing. Only
-`test/language` is run: `test/built-ins` joins with JS-05, and module and
-async files with JS-06 (TD-105).
+- A `var` inside a block at the top of a script was never declared as a
+  global.
+- Assignments inside `with` looked up their target after computing the
+  value.
+- `x = (function () {})` left the function unnamed.
+- Closures in parameter defaults could see the body's `var`s. The body now
+  gets its own scope when the parameters contain expressions, as §10.2.11
+  requires.
+
+The built-ins gate runs the `test/built-ins` directories of the library areas
+installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
+Error, Function, JSON, Math, NativeErrors, Number, Object, String, Symbol and
+the global functions). A sparse checkout must include them:
+`git sparse-checkout add test/built-ins/Array ...`.
+
+Both runs take about 40 seconds on one core. The files that pass are listed
+in `tests/fixtures/test262_language_passing.txt` and
+`tests/fixtures/test262_built_ins_passing.txt`. The gate compares exactly: a
+file that stops passing fails the gate, and so does one that starts passing
+until the lists are regenerated with `RUSTIC_TEST262_BLESS=1`. Run the gate in
+release mode on a 64-bit host; the lists are not checked on other targets.
+
+Most `test/language` failures are not interpreter bugs yet:
+
+- About 3,700 files need generators or async functions (JS-08).
+- About 780 need `eval` (TD-106).
+- About 240 need regular expressions.
+- Modules, BigInt arithmetic, `Proxy`, `Reflect`, typed arrays and
+  collections account for most of the rest.
+
+In the built-ins, the failures are mostly tests that reach for `RegExp`,
+`Date`, `Proxy`, typed arrays or `$262`. Skipped files are never counted as
+passing. Module and async files join with JS-06 (TD-105).
 
 ## Fuzzing
 
@@ -423,6 +439,32 @@ Part 2 adds the rest of the everyday library, beginning with:
   for tests and fuzzing.
 - **Symbol.** The well-known symbols as properties of `Symbol`, `Symbol.for`
   and `Symbol.keyFor` with a registry object, and `description`.
+- **Number.** The constants, `isFinite`/`isInteger`/`isNaN`/`isSafeInteger`
+  and `toString(radix)`.
+  - `toFixed`, `toExponential` and `toPrecision` round the exact binary value
+    with ties away from zero, as the specification requires. They work from
+    the number's exact decimal expansion, because Rust's formatting rounds
+    ties to even: `(2.5).toFixed(0)` is `"3"`.
+  - Radix strings print as many digits as tell the number apart from its
+    neighbors, as browsers do.
+- **String.** `fromCharCode`, `fromCodePoint`, `raw` and every
+  `String.prototype` method on UTF-16 code units, including `at`, `padStart`,
+  `replaceAll`, `isWellFormed`, `toWellFormed`, `substr` and the
+  `trimLeft`/`trimRight` aliases.
+  - Case mapping uses Rust's Unicode tables over each well-formed stretch, so
+    `ß` uppercases to `SS` and a final sigma lowercases to `ς`. Lone
+    surrogates are kept.
+  - `match`, `matchAll`, `replace`, `replaceAll`, `search` and `split` call an
+    object argument's `Symbol.match`/`replace`/`search`/`split` method.
+  - A string pattern for `match`, `matchAll` or `search` needs RegExp
+    (JS-08) and throws a TypeError until then.
+  - `normalize` is missing (TD-107).
+- **JSON.** `parse` with a reviver and `stringify` with replacer functions,
+  property lists, indentation, `toJSON` and cycle detection.
+  - Parsing and the reviver walk keep their own stacks, so 50,000 nested
+    arrays parse.
+  - `stringify` recurses and throws a RangeError when the run's native stack
+    budget is spent.
 
 Time on the development machine (release): 1 million `push` calls take 300
 ms including the global loop around them (about 120 ns per call). A `map` over
@@ -442,4 +484,4 @@ Installing the rest of the library lazily is the JS-09 lever if agents per
 page start to matter.
 
 With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
-and with the part 2 pieces above to 69.1%.
+and with the part 2 pieces above to 69.8%.

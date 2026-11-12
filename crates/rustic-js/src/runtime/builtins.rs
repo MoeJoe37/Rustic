@@ -7,12 +7,14 @@ mod array;
 mod error;
 mod function;
 mod global;
+mod json;
 mod math;
+mod number_object;
 mod object;
+mod string_object;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
 use super::agent::{Agent, JsResult, NativeFn};
-use super::number::number_to_string;
 use super::object::{Class, Internal, IteratorKind, PropertyDescriptor};
 use super::shape::PropertyKey;
 use super::string::JsStr;
@@ -46,13 +48,6 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
         0,
     )?;
     agent.define_method(i.number_prototype, value_of, number_value_of, "valueOf", 0)?;
-    agent.define_method(
-        i.number_prototype,
-        to_string,
-        number_to_string_method,
-        "toString",
-        1,
-    )?;
     agent.define_method(i.string_prototype, value_of, string_value_of, "valueOf", 0)?;
     agent.define_method(
         i.string_prototype,
@@ -136,6 +131,9 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     global::install(agent)?;
     array::install(agent)?;
     math::install(agent)?;
+    number_object::install(agent)?;
+    string_object::install(agent)?;
+    json::install(agent)?;
 
     // Value properties of the global object (§19.1).
     let global = i.global;
@@ -430,14 +428,6 @@ fn boolean_to_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult
 
 fn number_value_of(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     this_primitive(agent, this, Class::Number, |v| v.as_number().is_some())
-}
-
-fn number_to_string_method(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let n = number_value_of(agent, this, args)?
-        .as_number()
-        .unwrap_or(f64::NAN);
-    // Radixes other than 10 arrive with the Number built-ins (JS-05).
-    agent.string(&number_to_string(n))
 }
 
 fn string_value_of(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {

@@ -3223,13 +3223,40 @@
             },
             {
               "label": "String, Number and Boolean prototypes",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
+                  "marker": "fn map_case"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/number_object.rs",
+                  "marker": "fn exact_decimal"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn strings_numbers_and_json"
+                }
+              ]
             },
             {
               "label": "JSON",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/json.rs",
+                  "marker": "fn internalize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn strings_numbers_and_json"
+                }
+              ]
             },
             {
               "label": "Map, Set, WeakMap, WeakSet and WeakRef",

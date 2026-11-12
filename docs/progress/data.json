@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "87f37fe137a1e8ee9dc4861e8df6f492dfd650797218323595d434b503234128",
-  "percent": "24.43",
+  "source_fingerprint": "ff45f204d7a3f1959341ea64f62098c3e96d2a4462f006e66f2e35934c1aad76",
+  "percent": "24.74",
   "verified_percent": "20.90",
-  "partial_percent": "3.53",
+  "partial_percent": "3.84",
   "completed": 54,
   "in_progress": 8,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "47.21",
+      "percent": "50.73",
       "verified_percent": "12.30",
-      "partial_percent": "34.91"
+      "partial_percent": "38.43"
     },
     {
       "id": "M5",
@@ -3537,13 +3537,40 @@
             },
             {
               "label": "String, Number and Boolean prototypes",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
+                  "marker": "fn map_case"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/number_object.rs",
+                  "marker": "fn exact_decimal"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn strings_numbers_and_json"
+                }
+              ]
             },
             {
               "label": "JSON",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/json.rs",
+                  "marker": "fn internalize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn strings_numbers_and_json"
+                }
+              ]
             },
             {
               "label": "Map, Set, WeakMap, WeakSet and WeakRef",
@@ -3556,7 +3583,7 @@
               "evidence": []
             }
           ],
-          "credit": "42.85",
+          "credit": "71.42",
           "engine_share": "1.09"
         },
         {
@@ -3693,10 +3720,10 @@
       "completed": 1,
       "in_progress": 7,
       "total": 15,
-      "contribution": "4.47",
-      "percent": "44.78",
+      "contribution": "4.79",
+      "percent": "47.91",
       "verified_percent": "10.95",
-      "partial_percent": "33.83"
+      "partial_percent": "36.96"
     },
     {
       "id": "wasm",

@@ -177,11 +177,15 @@ pub struct Intrinsics {
     pub symbol_registry: ObjectId,
     /// `%MapIteratorPrototype%` and `%SetIteratorPrototype%`.
     pub table_iterator_prototypes: [ObjectId; 2],
+    /// `%IteratorHelperPrototype%` and `%WrapForValidIteratorPrototype%`.
+    pub iterator_helper_prototypes: [ObjectId; 2],
+    /// `%Iterator%`.
+    pub iterator: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 20] {
+    pub(crate) fn all(&self) -> [ObjectId; 23] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -203,6 +207,9 @@ impl Intrinsics {
             self.symbol_registry,
             self.table_iterator_prototypes[0],
             self.table_iterator_prototypes[1],
+            self.iterator_helper_prototypes[0],
+            self.iterator_helper_prototypes[1],
+            self.iterator,
         ]
     }
 }
@@ -260,6 +267,8 @@ impl Agent {
                 array_iterator_next: placeholder,
                 symbol_registry: placeholder,
                 table_iterator_prototypes: [placeholder; 2],
+                iterator_helper_prototypes: [placeholder; 2],
+                iterator: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -323,6 +332,8 @@ impl Agent {
             array_iterator_next: object_prototype,
             symbol_registry: self.heap.alloc_object(Object::new(Class::Ordinary, None))?,
             table_iterator_prototypes: [object_prototype; 2],
+            iterator_helper_prototypes: [object_prototype; 2],
+            iterator: object_prototype,
         };
         super::builtins::install(self)
     }

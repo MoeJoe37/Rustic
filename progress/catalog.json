@@ -3301,6 +3301,27 @@
               ]
             },
             {
+              "label": "Iterator helpers, Iterator.from and Iterator.concat",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/iterator.rs",
+                  "marker": "fn helper_next"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn iterator_helpers"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn iterator_helpers_keep_their_iterators_and_functions_alive"
+                }
+              ]
+            },
+            {
               "label": "eval (TD-106)",
               "status": "planned",
               "evidence": []

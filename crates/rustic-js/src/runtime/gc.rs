@@ -375,6 +375,15 @@ impl Marker<'_> {
                     }
                     self.tables.push(index);
                 }
+                Some(Internal::Helper(helper)) => {
+                    for v in helper.values() {
+                        self.value(v);
+                    }
+                }
+                Some(Internal::Wrapped { iterator, next }) => {
+                    self.value(*iterator);
+                    self.value(*next);
+                }
                 Some(Internal::Bound { target, this, args }) => {
                     self.value(Value::object(*target));
                     self.value(*this);
@@ -419,6 +428,9 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
             Some(Internal::Table(table)) => table.footprint(),
+            Some(Internal::Helper(helper)) => {
+                std::mem::size_of::<super::object::Helper>() + 8 * helper.items.len()
+            }
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()
             }

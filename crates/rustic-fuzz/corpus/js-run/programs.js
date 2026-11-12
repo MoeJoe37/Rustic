@@ -148,3 +148,5 @@ var s = new Set([1, 2, 3]); s.forEach(function (v) { if (v < 10) s.add(v + 10); 
 var w = new WeakMap(); var k = []; w.set(k, new Map([[k, w]])); Reflect.apply(Array.prototype.push, k, [1, 2]) + w.get(k).size + String(new WeakRef(k).deref() === k);
 var d = new Date(2024, 1, 29, 23, 59, 59, 999); d.setMonth(d.getMonth() + 13, 31); [d.toISOString(), d.toString(), Date.parse(d.toUTCString()), new Date(Date.UTC(-271821, 3, 20)).getTime()].join();
 var d = new Date(); d.setFullYear(1e6); [d.getTime(), Date.parse('+275760-09-13T00:00:00Z'), Date.parse('Tue Feb 01 2022 10:00 GMT-0130 (x)'), JSON.stringify([new Date(NaN)])].join();
+var h = [1, 2, 3, 4].values().flatMap(function (x) { return [x, -x] }).filter(function (x) { return x > 0 || x < -2 }).map(String); [h.next().value, h.take(2).toArray().join('|'), Iterator.concat([9], new Map([[1, 2]])).drop(1).reduce(function (a, b) { return a + b }, '')].join();
+var src = { n: 0, next: function () { return { value: this.n++, done: this.n > 5 } }, return: function () { return {} } }; var w = Iterator.from(src); [w.some(function (x) { return x > 1 }), w.next().value, w.take(1).return().done].join();

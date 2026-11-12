@@ -112,6 +112,7 @@ const BUILT_IN_DIRS: &[&str] = &[
     "Error",
     "FinalizationRegistry",
     "Function",
+    "Iterator",
     "JSON",
     "Map",
     "MapIteratorPrototype",

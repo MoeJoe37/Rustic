@@ -1597,6 +1597,66 @@ fn dates() {
 }
 
 #[test]
+fn iterator_helpers() {
+    let _report = Report;
+    check(
+        "[1, 2, 3, 4, 5].values().map(function (x, i) { return x * 10 + i }).filter(function (x) { return x % 2 }).toArray().join()",
+        "21,43",
+    );
+    check(
+        "[1, 2, 3].values().flatMap(function (x) { return [x, x] }).drop(1).take(4).toArray().join()",
+        "1,2,2,3",
+    );
+    check(
+        "var it = [1, 2, 3].values(); [it.reduce(function (a, b) { return a + b }), it.toArray().length].join()",
+        "6,0",
+    );
+    check(
+        "[[1, 2].values().some(function (x) { return x > 1 }), [1, 2].values().every(function (x) { return x > 1 }), [1, 2].values().find(function (x) { return x > 1 })].join()",
+        "true,false,2",
+    );
+    // Laziness: nothing is pulled until `next`, and `return` closes the
+    // underlying iterator.
+    check(
+        "var log = []; var src = { i: 0, next: function () { log.push('n'); return { value: this.i++, done: false } }, return: function () { log.push('r'); return {} } }; var h = Iterator.from(src).map(function (x) { return x }); log.push('made'); h.next(); h.next(); h.return(); h.next().done + ':' + log.join('')",
+        "true:madennr",
+    );
+    // A callback that throws closes the underlying iterator.
+    check(
+        "var closed = false; var src = { next: function () { return { value: 1, done: false } }, return: function () { closed = true; return {} }, __proto__: Iterator.prototype }; try { src.forEach(function () { throw 1 }) } catch (e) {} closed",
+        "true",
+    );
+    check(
+        "Iterator.concat([1, 2], new Set([3]), 'ab'.split('')).toArray().join()",
+        "1,2,3,a,b",
+    );
+    check(
+        "try { new Iterator() } catch (e) { e instanceof TypeError }",
+        "true",
+    );
+    check(
+        "class C extends Iterator {} var c = new C(); c instanceof Iterator && Object.getPrototypeOf(C.prototype) === Iterator.prototype",
+        "true",
+    );
+    check(
+        "Object.prototype.toString.call([].values().map(String)) + String(Iterator.prototype[Symbol.toStringTag])",
+        "[object Iterator Helper]Iterator",
+    );
+    check(
+        "var o = Object.create(Iterator.prototype); o.constructor = 1; Object.getOwnPropertyDescriptor(o, 'constructor').value",
+        "1",
+    );
+    check(
+        "try { [].values().take(-1) } catch (e) { e.name }",
+        "RangeError",
+    );
+    check(
+        "var h = [1].values().map(function () { return h.next() }); try { h.next() } catch (e) { e.name }",
+        "TypeError",
+    );
+}
+
+#[test]
 fn dates_follow_the_embedder_clock_and_offset() {
     let mut agent = Agent::new().expect("agent");
     agent.set_clock(Some(86_400_000.5));

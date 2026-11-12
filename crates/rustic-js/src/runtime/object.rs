@@ -323,6 +323,70 @@ pub(crate) enum Internal {
         cells: Vec<RegistryCell>,
         pending: Vec<Value>,
     },
+    /// An iterator helper (§27.1.2.1) or an `Iterator.concat` iterator.
+    Helper(Box<Helper>),
+    /// `[[Iterated]]` of a `%WrapForValidIteratorPrototype%` object from
+    /// `Iterator.from`: the iterator and its `next` method.
+    Wrapped { iterator: Value, next: Value },
+}
+
+/// What an iterator helper does on `next`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HelperKind {
+    Map,
+    Filter,
+    Take,
+    Drop,
+    FlatMap,
+    Concat,
+}
+
+/// `[[GeneratorState]]` of an iterator helper, whose body the
+/// specification writes as an abstract closure run as a generator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HelperState {
+    Start,
+    Yielded,
+    Running,
+    Done,
+}
+
+/// The state of an iterator helper: its generator body unrolled into
+/// fields, so a step is a plain function call.
+#[derive(Clone, Debug)]
+pub(crate) struct Helper {
+    pub kind: HelperKind,
+    pub state: HelperState,
+    /// `[[UnderlyingIterator]]` and its `next` method (undefined for
+    /// `Iterator.concat`).
+    pub iterator: Value,
+    pub next: Value,
+    /// The mapper or predicate.
+    pub function: Value,
+    /// The counter passed to the function; the remaining limit of `take`
+    /// and `drop`; the next item of `Iterator.concat`.
+    pub count: f64,
+    /// The inner iterator of `flatMap` and `Iterator.concat`, undefined
+    /// between inner iterators, and its `next` method.
+    pub inner: Value,
+    pub inner_next: Value,
+    /// `Iterator.concat`: each iterable and its `@@iterator` method.
+    pub items: Box<[Value]>,
+}
+
+impl Helper {
+    /// Every value the helper holds, for the collector.
+    pub(crate) fn values(&self) -> impl Iterator<Item = Value> + '_ {
+        [
+            self.iterator,
+            self.next,
+            self.function,
+            self.inner,
+            self.inner_next,
+        ]
+        .into_iter()
+        .chain(self.items.iter().copied())
+    }
 }
 
 /// The `length` of an Array is writable (cleared by freezing).

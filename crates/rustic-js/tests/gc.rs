@@ -711,3 +711,24 @@ fn abandoned_map_iterators_stop_holding_tables_after_a_collection() {
     let keys = a.evaluate("[...m.keys()].join()").unwrap();
     assert_eq!(a.display(keys), "990,991,992,993,994,995,996,997,998,999");
 }
+
+#[test]
+fn iterator_helpers_keep_their_iterators_and_functions_alive() {
+    let mut a = agent();
+    // Only the helpers reference the arrays, the mapper and the wrapped
+    // iterator; collections between steps must keep all of them.
+    a.evaluate(
+        "var h = [[{ v: 1 }], [{ v: 2 }]].values().flatMap(function (x) { return x.map(function (o) { return { v: o.v * 10 } }) }); \
+         var w = Iterator.from({ i: 0, next: function () { return { value: this.i++, done: this.i > 1 } } }); \
+         var c = Iterator.concat([{ v: 3 }]);",
+    )
+    .unwrap();
+    a.collect_garbage(Roots::default());
+    let first = a.evaluate("h.next().value.v").unwrap();
+    a.collect_garbage(Roots::default());
+    let rest = a
+        .evaluate("[h.next().value.v, h.next().done, w.next().value, w.next().done, c.next().value.v].join()")
+        .unwrap();
+    assert_eq!(a.display(first), "10");
+    assert_eq!(a.display(rest), "20,true,0,true,3");
+}

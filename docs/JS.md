@@ -124,10 +124,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (JS-05 areas) |
 | --- | ---: | ---: |
-| Pass | 12,450 | 10,178 |
-| Fail | 5,323 | 997 |
-| Skipped (modules, async, proposals) | 6,059 | 96 |
-| Pass rate of the files that run | 70.0% | 91.1% |
+| Pass | 12,450 | 10,502 |
+| Fail | 5,323 | 1,351 |
+| Skipped (modules, async, proposals) | 6,059 | 102 |
+| Pass rate of the files that run | 70.0% | 88.6% |
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -144,7 +144,7 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
 
 The built-ins gate runs the `test/built-ins` directories of the library areas
 installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
-Date, Error, FinalizationRegistry, Function, JSON, Map, Math, NativeErrors, Number,
+Date, Error, FinalizationRegistry, Function, Iterator, JSON, Map, Math, NativeErrors, Number,
 Object, Reflect, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
@@ -164,8 +164,9 @@ Most `test/language` failures are not interpreter bugs yet:
 - Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
   the rest.
 
-In the built-ins, the failures are mostly tests that reach for `RegExp`,
-`Proxy`, Temporal, typed arrays or `$262`. Skipped files are never counted as
+In the built-ins, the failures are mostly tests that are written with
+generators, test proposals not implemented yet (of the 361 `Iterator`
+failures, about 180 and 170), or reach for `RegExp`, `Proxy`, Temporal, typed arrays or `$262`. Skipped files are never counted as
 passing. Module and async files join with JS-06 (TD-105).
 
 ## Fuzzing
@@ -499,6 +500,23 @@ Part 2 adds the rest of the everyday library, beginning with:
     JS-08.
   - Test262 `test/built-ins/Date`: 595 of 610 files pass. The rest need
     regular expressions, other realms (`$262`) or Temporal.
+- **Iterator helpers.** The `Iterator` constructor (abstract, for
+  subclasses), `Iterator.from`, `Iterator.concat`, and on
+  `Iterator.prototype`: `map`, `filter`, `take`, `drop`, `flatMap`,
+  `reduce`, `toArray`, `forEach`, `some`, `every`, `find`, with the
+  `constructor` and `@@toStringTag` accessors (`builtins/iterator.rs`).
+  - The specification writes each lazy helper as a generator. Here a helper
+    keeps the generator's variables in one boxed struct (about 80 bytes),
+    and `next` runs one step as a plain function, so a helper needs no frame
+    or stack of its own. A re-entrant `next` sees the running state and
+    throws, as a running generator does.
+  - `return` closes the inner iterator of `flatMap` first, then the
+    underlying one; a throwing callback closes the underlying iterator.
+  - Test262 `test/built-ins/Iterator`: every file that runs without
+    generators passes (317 of 678). Of the rest, about 180 are written with
+    generators (JS-08), about 170 test proposals not implemented yet (`zip`,
+    `zipKeyed`, `chunks`, `windows`, `includes`, `join`), and a few need
+    `$262` or `RegExp`.
 
 Time on the development machine (release): 1 million `push` calls take 300
 ms including the global loop around them (about 120 ns per call). A `map` over

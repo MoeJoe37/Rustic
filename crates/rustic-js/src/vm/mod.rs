@@ -18,8 +18,9 @@ pub use interp::VmLimits;
 pub(crate) use interp::exponentiate;
 
 use crate::ast::Program;
-use crate::parser::{ParseError, ParseLimits, parse_script};
+use crate::parser::{ParseError, ParseLimits, parse_eval, parse_script};
 use crate::runtime::{Abrupt, Agent, JsResult, Value};
+use crate::runtime::{EnvId, ErrorKind, StringId};
 use crate::source::{MAX_SOURCE_UNITS, Source};
 
 /// Why [`Agent::evaluate`] produced no value.
@@ -147,5 +148,126 @@ impl Agent {
             )?;
         }
         Ok(f)
+    }
+
+    /// PerformEval (§19.2.1.1) from its parse on: parse and compile the
+    /// code, then EvalDeclarationInstantiation (§19.2.1.3). `env` is the
+    /// caller's lexical environment; `var_hops` leads from it to the
+    /// variable environment, or is `None` for the global environment.
+    /// Returns the code to run on `env` with the caller's `this`.
+    pub(crate) fn prepare_eval(
+        &mut self,
+        text: StringId,
+        env: EnvId,
+        var_hops: Option<u16>,
+        strict_caller: bool,
+        in_function: bool,
+    ) -> JsResult<CodeId> {
+        let units = self.heap.string(text).units().collect();
+        let syntax_error =
+            |agent: &mut Agent, message: &str| Err(agent.throw(ErrorKind::SyntaxError, message));
+        let Ok(source) = Source::from_utf16(units, MAX_SOURCE_UNITS) else {
+            return syntax_error(self, "eval source too long");
+        };
+        let mut limits = ParseLimits::default();
+        if let Some(token) = self.cancellation() {
+            limits.cancellation = token;
+        }
+        let program = match parse_eval(&source, &limits, strict_caller, in_function) {
+            Ok(program) => program,
+            Err(ParseError::Cancelled) => return Err(Abrupt::Cancelled),
+            Err(e) => return syntax_error(self, &e.to_string()),
+        };
+        let code = match compile::compile_eval(self, &program, var_hops) {
+            Ok(code) => code,
+            Err(CompileError::OutOfMemory) => return Err(Abrupt::OutOfMemory),
+            Err(e) => return syntax_error(self, &format!("{e:?}")),
+        };
+        if program.strict {
+            // Strict eval code keeps its declarations to itself.
+            return Ok(code);
+        }
+        let (function_names, var_names) = compile::eval_var_names(&program);
+        let functions = function_names.len();
+        let mut names = Vec::new();
+        for name in function_names.iter().chain(&var_names) {
+            names.push(self.heap.intern_str(name)?);
+        }
+        drop(program);
+        // Nothing below collects garbage (this runs inside a native call
+        // or an op), so the new code needs no root.
+        let global = self.global_env;
+        let var_env = match var_hops {
+            Some(hops) => self.env_outer_n(env, hops),
+            None => global,
+        };
+        // A var may not hoist past a lexical declaration of the same name
+        // (step 3 for the global environment, step 4 for the rest).
+        if var_env == global {
+            for &name in &names {
+                if self.has_lexical_declaration(global, name) {
+                    return syntax_error(self, "redeclaration of a lexical binding by eval");
+                }
+            }
+        }
+        // Catch parameters are not lexical, so a var may share their name
+        // (§B.3.4). A function's own top-level lexical declarations share
+        // its variable environment here, so it is checked too.
+        let mut at = env;
+        loop {
+            for &name in &names {
+                if self.has_lexical_binding(at, name) {
+                    return syntax_error(self, "redeclaration of a lexical binding by eval");
+                }
+            }
+            if at == var_env {
+                break;
+            }
+            match self.outer_environment(at) {
+                Some(outer) => at = outer,
+                None => break,
+            }
+        }
+        if var_env == global {
+            let object = self.intrinsics.global;
+            for &name in &names[..functions] {
+                if !self.can_declare_global_function(object, name)? {
+                    return Err(self.throw(
+                        ErrorKind::TypeError,
+                        "cannot redefine a global property as a function",
+                    ));
+                }
+            }
+            for &name in &names[functions..] {
+                if !self.can_declare_global_var(object, name)? {
+                    return Err(self.throw(
+                        ErrorKind::TypeError,
+                        "cannot declare a global variable on a non-extensible global object",
+                    ));
+                }
+            }
+            for &name in &names {
+                self.create_global_var_binding(global, name, true)?;
+            }
+        } else {
+            for &name in &names {
+                if !self.has_binding(var_env, name)? {
+                    self.create_mutable_binding(var_env, name, true)?;
+                    self.initialize_binding(var_env, name, Value::UNDEFINED)?;
+                }
+            }
+        }
+        Ok(code)
+    }
+
+    /// `eval(x)` called indirectly (§19.2.1.1 with `direct` false): global
+    /// code with the global `this`.
+    pub(crate) fn indirect_eval(&mut self, x: Value) -> JsResult<Value> {
+        let Some(text) = x.as_string() else {
+            return Ok(x);
+        };
+        let env = self.global_env;
+        let code = self.prepare_eval(text, env, None, false, false)?;
+        self.run_eval(code, env)
     }
 }

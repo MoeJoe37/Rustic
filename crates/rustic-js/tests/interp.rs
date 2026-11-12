@@ -1657,6 +1657,69 @@ fn iterator_helpers() {
 }
 
 #[test]
+fn eval() {
+    let _report = Report;
+    check("eval('1 + 2') + eval(42)", "45");
+    check("function f() { var a = 5; return eval('a * 2') } f()", "10");
+    // Sloppy direct eval adds vars to the calling function, which then
+    // shadow outer names; strict eval keeps them.
+    check(
+        "var y = 1; function g() { eval('var y = 2'); return y } g() + ':' + y",
+        "2:1",
+    );
+    check(
+        "function h() { 'use strict'; eval('var c = 1'); return typeof c } h()",
+        "undefined",
+    );
+    check(
+        "function p() { eval('function inner() { return 9 }'); return inner() } p()",
+        "9",
+    );
+    check(
+        "function a1() { eval('eval(\"var e2 = 4\")'); return e2 } a1() + ':' + typeof e2",
+        "4:undefined",
+    );
+    // Indirect eval is global code.
+    check(
+        "function k() { var z = 1; return (0, eval)('typeof z') } k()",
+        "undefined",
+    );
+    check(
+        "(0, eval)('var gl = 3'); [gl, delete gl, typeof gl].join()",
+        "3,true,undefined",
+    );
+    check("eval('let q = 1; q') + ':' + typeof q", "1:undefined");
+    check(
+        "function m() { return eval('this') } var o = {}; m.call(o) === o",
+        "true",
+    );
+    check(
+        "function a2() { return eval('arguments.length') } a2(1, 2, 3)",
+        "3",
+    );
+    check(
+        "function n() { let v = 1; { eval('var v = 2') } } try { n() } catch (e) { e.name }",
+        "SyntaxError",
+    );
+    // A catch parameter may share a name with an eval var (Annex B).
+    check("try { throw 1 } catch (e) { eval('var e = 2'); e }", "2");
+    check(
+        "try { eval('}') } catch (e) { e instanceof SyntaxError }",
+        "true",
+    );
+    check("var o = { x: 7 }; with (o) { eval('x') }", "7");
+    check(
+        "var o = { eval: function () { return this === o } }; with (o) { eval('1') }",
+        "true",
+    );
+    check(
+        "function cl() { var n = 0; eval('var inc = function () { return ++n }'); inc(); return inc() } cl()",
+        "2",
+    );
+    check("'use strict'; eval('var s = 1'); typeof s", "undefined");
+}
+
+#[test]
 fn dates_follow_the_embedder_clock_and_offset() {
     let mut agent = Agent::new().expect("agent");
     agent.set_clock(Some(86_400_000.5));

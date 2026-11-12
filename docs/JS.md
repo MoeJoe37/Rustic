@@ -124,10 +124,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (JS-05 areas) |
 | --- | ---: | ---: |
-| Pass | 12,450 | 10,502 |
-| Fail | 5,323 | 1,351 |
+| Pass | 13,087 | 10,534 |
+| Fail | 4,686 | 1,319 |
 | Skipped (modules, async, proposals) | 6,059 | 102 |
-| Pass rate of the files that run | 70.0% | 88.6% |
+| Pass rate of the files that run | 73.6% | 88.9% |
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -159,7 +159,8 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 Most `test/language` failures are not interpreter bugs yet:
 
 - About 3,700 files need generators or async functions (JS-08).
-- About 780 need `eval` (TD-106).
+- About 150 `eval-code` files still fail: most declare `arguments` from an
+  `eval` in parameter defaults, or are async.
 - About 240 need regular expressions.
 - Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
   the rest.
@@ -500,6 +501,24 @@ Part 2 adds the rest of the everyday library, beginning with:
     JS-08.
   - Test262 `test/built-ins/Date`: 595 of 610 files pass. The rest need
     regular expressions, other realms (`$262`) or Temporal.
+- **eval.** Direct and indirect `eval` (§19.2.1).
+  - A call of the bare name `eval` compiles to `DirectEval`. When the
+    callee turns out to be `%eval%`, the string is parsed with the caller's
+    strictness, compiled as eval code and run as a new frame on the
+    caller's environment with its `this`; otherwise it is an ordinary call.
+  - The resolver marks every binding visible from a direct `eval` captured,
+    so the eval code finds them by name in environments. A function with a
+    sloppy direct `eval` also keeps an environment for the `var`s the eval
+    may add, and names it does not declare are looked up by name inside it.
+    Functions without a direct `eval` compile exactly as before and pay
+    nothing.
+  - EvalDeclarationInstantiation checks that no `var` hoists past a `let`,
+    `const` or `class` of the same name (a flag on lexical bindings; catch
+    parameters are exempt, Annex B), checks global definability, then
+    creates the bindings as deletable.
+  - Not yet: declaring `arguments` from an `eval` in parameter defaults,
+    which must throw; `super` inside eval code; the separate variable
+    environment of a function whose parameters have expressions.
 - **Iterator helpers.** The `Iterator` constructor (abstract, for
   subclasses), `Iterator.from`, `Iterator.concat`, and on
   `Iterator.prototype`: `map`, `filter`, `take`, `drop`, `flatMap`,

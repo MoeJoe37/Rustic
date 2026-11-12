@@ -3322,9 +3322,25 @@
               ]
             },
             {
-              "label": "eval (TD-106)",
-              "status": "planned",
-              "evidence": []
+              "label": "Direct and indirect eval",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/mod.rs",
+                  "marker": "pub(crate) fn prepare_eval"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/scope.rs",
+                  "marker": "fn direct_eval"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn eval()"
+                }
+              ]
             }
           ]
         },

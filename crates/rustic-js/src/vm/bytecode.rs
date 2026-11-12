@@ -341,6 +341,18 @@ pub enum Op {
         args: Reg,
         argc: u16,
     },
+    /// `dst = eval(args)` where `eval` is the bare identifier: a direct
+    /// eval when `callee` is `%eval%` (§19.2.1.1), otherwise an ordinary
+    /// call whose `this` is in register `callee - 1` (the binding object
+    /// when `eval` was found in a `with`). `var_hops` counts environments
+    /// to the variable environment, or is `u16::MAX` for the global one.
+    DirectEval {
+        dst: Reg,
+        callee: Reg,
+        args: Reg,
+        argc: u16,
+        var_hops: u16,
+    },
     /// `dst = new callee(args)`
     New {
         dst: Reg,

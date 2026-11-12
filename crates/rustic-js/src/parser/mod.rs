@@ -93,6 +93,21 @@ pub fn parse_script(source: &Source, limits: &ParseLimits) -> Result<Program, Pa
     Parser::new(source, limits, false)?.program()
 }
 
+/// Parse `source` as the code of an `eval` (§19.2.1.1): a script that is
+/// strict when the calling code is, and may use `new.target` when the
+/// call is inside a function.
+pub(crate) fn parse_eval(
+    source: &Source,
+    limits: &ParseLimits,
+    strict: bool,
+    new_target: bool,
+) -> Result<Program, ParseError> {
+    let mut parser = Parser::new(source, limits, false)?;
+    parser.ctx.strict = strict;
+    parser.ctx.new_target = new_target;
+    parser.program()
+}
+
 /// Parse `source` as a `Module` (ECMA-262 §16.2): strict, with `import`,
 /// `export` and top-level `await`.
 pub fn parse_module(source: &Source, limits: &ParseLimits) -> Result<Program, ParseError> {

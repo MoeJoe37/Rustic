@@ -19,7 +19,7 @@ use super::bytecode::{
 use super::scope::{
     BRAND, BindingKind, CLASS, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER, PRIVATE_SETTER,
     PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId, ScopeKind,
-    ScopeTree, THIS, field_key_name, private_name, private_setter_name,
+    ScopeTree, THIS, field_key_name, is_direct_eval, private_name, private_setter_name,
 };
 use crate::ast::{
     Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Class, ClassElement,
@@ -27,7 +27,9 @@ use crate::ast::{
     ObjectProperty, Pattern, PatternKind, Program, PropertyKey, Statement, StatementKind, Template,
     UnaryOp, UpdateOp, VariableDeclaration, VariableKind,
 };
-use crate::runtime::{Agent, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory, StringId, Value};
+use crate::runtime::{
+    Agent, BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory, StringId, Value,
+};
 use crate::source::Span;
 
 /// Why a program could not be compiled.
@@ -75,6 +77,70 @@ pub(crate) fn compile_script(agent: &mut Agent, program: &Program) -> CResult<Co
     g.script(&program.body)?;
     g.finish(0, 0)
 }
+
+/// Compile the code of an `eval` (§19.2.1.1). It runs on the caller's
+/// environment with the caller's `this`; its top scope is a function-like
+/// scope without parameters. `var_hops` counts the environments from the
+/// caller's to its variable environment (`None`: the global one), which
+/// a sloppy direct `eval` nested in this code needs.
+pub(crate) fn compile_eval(
+    agent: &mut Agent,
+    program: &Program,
+    var_hops: Option<u16>,
+) -> CResult<CodeId> {
+    let tree = ScopeTree::analyze_eval(&program.body, program.strict);
+    let name = agent.names.empty;
+    let mut g = Gen::new(
+        agent,
+        &tree,
+        0,
+        FunctionKind::Script,
+        program.strict,
+        name,
+        stack_address(),
+    );
+    g.eval = Some(var_hops);
+    g.guard()?;
+    let (params, length) = g.parameters(&[], None)?;
+    let completion = g.temp()?;
+    g.emit(Op::Undefined { dst: completion });
+    g.completion = Some(completion);
+    g.hoist_functions(&program.body, true)?;
+    g.statements(&program.body)?;
+    g.emit(Op::Return { src: completion });
+    g.finish(params, length)
+}
+
+/// The names `eval` code declares in its caller's variable environment
+/// when it is sloppy (§19.2.1.3 steps 8–10): `var` names and top-level
+/// function declarations, each once. Lexical declarations stay in the
+/// code's own scope. Returns the function names, then the other names.
+pub(crate) fn eval_var_names(program: &Program) -> (Vec<String>, Vec<String>) {
+    let mut functions = Vec::new();
+    let mut names = Vec::new();
+    for s in &program.body {
+        match &s.kind {
+            StatementKind::Variable(d) if d.kind == VariableKind::Var => {
+                for decl in &d.declarations {
+                    pattern_names(&decl.target, &mut names);
+                }
+            }
+            StatementKind::Function(f) => {
+                if let Some(id) = &f.id {
+                    functions.push(id.name.to_string());
+                }
+            }
+            _ => collect_nested_vars(s, &mut names),
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    functions.retain(|n| seen.insert(n.clone()));
+    names.retain(|n| seen.insert(n.clone()));
+    (functions, names)
+}
+
+/// The [`Op::DirectEval`] operand for a global variable environment.
+pub(crate) const EVAL_GLOBAL_VARS: u16 = u16::MAX;
 
 /// Where a jump that leaves a control structure goes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -162,6 +228,10 @@ struct Gen<'a, 't> {
     home_object: bool,
     /// The value of `home_object` for the next method compiled.
     next_home_object: bool,
+    /// Compiling the top level of `eval` code: environments from the
+    /// caller's to its variable environment, or `None` when that is the
+    /// global environment (see [`compile_eval`]).
+    eval: Option<Option<u16>>,
 }
 
 impl<'a, 't> Gen<'a, 't> {
@@ -206,6 +276,7 @@ impl<'a, 't> Gen<'a, 't> {
             next_home: None,
             home_object: false,
             next_home_object: false,
+            eval: None,
         }
     }
 
@@ -441,7 +512,8 @@ impl<'a, 't> Gen<'a, 't> {
             if b.captured {
                 let id = self.agent.heap.intern_str(&b.name)?;
                 let flags = match b.kind {
-                    BindingKind::Const => BINDING_STRICT,
+                    BindingKind::Const => BINDING_STRICT | BINDING_LEXICAL,
+                    BindingKind::Let => BINDING_MUTABLE | BINDING_LEXICAL,
                     BindingKind::SelfName => 0,
                     _ => BINDING_MUTABLE,
                 };
@@ -501,7 +573,10 @@ impl<'a, 't> Gen<'a, 't> {
                 let mark = self.mark();
                 let r = self.temp()?;
                 self.function_expression(f, r, None, FunctionKind::Normal)?;
-                if self.kind == FunctionKind::Script && top {
+                if self.kind == FunctionKind::Script
+                    && top
+                    && self.resolve(&id.name) == Resolution::Dynamic
+                {
                     let name = self.atom(&id.name)?;
                     self.emit(Op::SetName { src: r, name });
                 } else {
@@ -532,15 +607,46 @@ impl<'a, 't> Gen<'a, 't> {
 
     /// Whether a `with` body encloses the current scope, so a name no
     /// scope declares may still be a property of the `with` object.
+    /// Whether names not resolved statically are looked up by name from
+    /// the running environment rather than in the global object: under a
+    /// `with`, or where a direct `eval` can declare `var`s.
     fn under_with(&self) -> bool {
         let mut current = Some(self.scope);
         while let Some(id) = current {
-            if self.tree.scopes[id].kind == ScopeKind::With {
+            let s = &self.tree.scopes[id];
+            if s.kind == ScopeKind::With || s.dynamic {
                 return true;
             }
-            current = self.tree.scopes[id].parent;
+            current = s.parent;
         }
         false
+    }
+
+    /// The [`Op::DirectEval`] operand: environments from the current one
+    /// to the variable environment a sloppy `eval` here declares in.
+    fn eval_var_hops(&self) -> u16 {
+        let f = self.tree.scopes[self.scope].function;
+        let s = &self.tree.scopes[f];
+        if s.eval_vars {
+            return self.hops(f);
+        }
+        match (s.kind, self.eval) {
+            // The top of sloppy eval code: past every scope here, then on
+            // from the caller's environment.
+            (ScopeKind::Function, Some(Some(outer))) => {
+                let mut hops = 0u16;
+                let mut current = Some(self.scope);
+                while let Some(id) = current {
+                    if self.tree.scopes[id].has_env() {
+                        hops = hops.saturating_add(1);
+                    }
+                    current = self.tree.scopes[id].parent;
+                }
+                hops.saturating_add(outer).min(EVAL_GLOBAL_VARS - 1)
+            }
+            // Scripts, and strict code, whose eval keeps its vars.
+            _ => EVAL_GLOBAL_VARS,
+        }
     }
 
     /// A cache site for a global name, unless a `with` is in the way or
@@ -1394,7 +1500,13 @@ impl<'a, 't> Gen<'a, 't> {
     fn store_binding(&mut self, name: &str, src: Reg, init: bool) -> CResult<()> {
         match self.resolve(name) {
             Resolution::Dynamic => {
-                if init {
+                if init && self.eval.is_some() {
+                    // Sloppy eval code initializes the binding its
+                    // instantiation made in the caller's variable
+                    // environment.
+                    let name = self.atom(name)?;
+                    self.emit(Op::SetName { src, name });
+                } else if init {
                     let name = self.atom(name)?;
                     self.emit(Op::InitName { src, name });
                 } else if let Some(site) = self.global_site(name)? {
@@ -3306,6 +3418,23 @@ impl<'a, 't> Gen<'a, 't> {
         let this = self.temp()?;
         let f = self.temp()?;
         self.call_target(callee, this, f, &mut exits)?;
+        let spread = arguments.iter().any(|a| matches!(a, Argument::Spread(_)));
+        if !optional && !spread && is_direct_eval(callee) {
+            // The receiver sits just below the callee, where an ordinary
+            // call (`eval` is not `%eval%`) finds it.
+            debug_assert_eq!(f, this + 1);
+            let (args, argc) = self.arguments(arguments)?;
+            let var_hops = self.eval_var_hops();
+            self.emit(Op::DirectEval {
+                dst,
+                callee: f,
+                args,
+                argc,
+                var_hops,
+            });
+            self.release(mark);
+            return Ok(());
+        }
         if optional {
             let j = self.emit(Op::JumpIfNullish { src: f, target: 0 });
             match &mut exits {

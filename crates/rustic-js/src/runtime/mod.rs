@@ -26,7 +26,7 @@ pub use agent::{
 pub use bigint::BigInt;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
-pub(crate) use env::{BINDING_MUTABLE, BINDING_STRICT};
+pub(crate) use env::{BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT};
 pub use env::{EnvId, Environment, FunctionExtra, Reference, ReferenceBase, ThisStatus};
 pub(crate) use gc::Tracer;
 pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};

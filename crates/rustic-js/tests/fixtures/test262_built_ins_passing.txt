@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 10502 pass, 1351 fail, 102 skipped (modules, async, proposals).
+# 10534 pass, 1319 fail, 102 skipped (modules, async, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 Array/15.4.5-1.js
 Array/15.4.5.1-5-1.js
@@ -374,6 +374,7 @@ Array/prototype/every/15.4.4.16-5-3.js
 Array/prototype/every/15.4.4.16-5-4.js
 Array/prototype/every/15.4.4.16-5-5.js
 Array/prototype/every/15.4.4.16-5-6.js
+Array/prototype/every/15.4.4.16-5-7.js
 Array/prototype/every/15.4.4.16-5-9.js
 Array/prototype/every/15.4.4.16-7-1.js
 Array/prototype/every/15.4.4.16-7-2.js
@@ -610,6 +611,7 @@ Array/prototype/filter/15.4.4.20-5-30.js
 Array/prototype/filter/15.4.4.20-5-4.js
 Array/prototype/filter/15.4.4.20-5-5.js
 Array/prototype/filter/15.4.4.20-5-6.js
+Array/prototype/filter/15.4.4.20-5-7.js
 Array/prototype/filter/15.4.4.20-5-9.js
 Array/prototype/filter/15.4.4.20-6-1.js
 Array/prototype/filter/15.4.4.20-6-2.js
@@ -945,6 +947,7 @@ Array/prototype/forEach/15.4.4.18-5-3.js
 Array/prototype/forEach/15.4.4.18-5-4.js
 Array/prototype/forEach/15.4.4.18-5-5.js
 Array/prototype/forEach/15.4.4.18-5-6.js
+Array/prototype/forEach/15.4.4.18-5-7.js
 Array/prototype/forEach/15.4.4.18-5-9.js
 Array/prototype/forEach/15.4.4.18-7-1.js
 Array/prototype/forEach/15.4.4.18-7-2.js
@@ -1319,6 +1322,7 @@ Array/prototype/lastIndexOf/15.4.4.15-2-4.js
 Array/prototype/lastIndexOf/15.4.4.15-2-5.js
 Array/prototype/lastIndexOf/15.4.4.15-2-6.js
 Array/prototype/lastIndexOf/15.4.4.15-2-7.js
+Array/prototype/lastIndexOf/15.4.4.15-2-8.js
 Array/prototype/lastIndexOf/15.4.4.15-2-9.js
 Array/prototype/lastIndexOf/15.4.4.15-3-1.js
 Array/prototype/lastIndexOf/15.4.4.15-3-10.js
@@ -1572,6 +1576,7 @@ Array/prototype/map/15.4.4.19-5-3.js
 Array/prototype/map/15.4.4.19-5-4.js
 Array/prototype/map/15.4.4.19-5-5.js
 Array/prototype/map/15.4.4.19-5-6.js
+Array/prototype/map/15.4.4.19-5-7.js
 Array/prototype/map/15.4.4.19-5-9.js
 Array/prototype/map/15.4.4.19-6-1.js
 Array/prototype/map/15.4.4.19-6-2.js
@@ -2430,6 +2435,7 @@ Array/prototype/some/15.4.4.17-5-3.js
 Array/prototype/some/15.4.4.17-5-4.js
 Array/prototype/some/15.4.4.17-5-5.js
 Array/prototype/some/15.4.4.17-5-6.js
+Array/prototype/some/15.4.4.17-5-7.js
 Array/prototype/some/15.4.4.17-5-9.js
 Array/prototype/some/15.4.4.17-7-1.js
 Array/prototype/some/15.4.4.17-7-2.js
@@ -2839,6 +2845,7 @@ Boolean/S15.6.2.1_A4.js
 Boolean/S15.6.3_A1.js
 Boolean/S15.6.3_A2.js
 Boolean/S15.6.3_A3.js
+Boolean/S9.2_A1_T1.js
 Boolean/S9.2_A2_T1.js
 Boolean/S9.2_A3_T1.js
 Boolean/S9.2_A4_T1.js
@@ -3572,6 +3579,8 @@ Function/15.3.2.1-11-7-s.js
 Function/15.3.2.1-11-8-s.js
 Function/15.3.2.1-11-9-s.js
 Function/15.3.5.4_2-10gs.js
+Function/15.3.5.4_2-12gs.js
+Function/15.3.5.4_2-14gs.js
 Function/15.3.5.4_2-16gs.js
 Function/15.3.5.4_2-18gs.js
 Function/15.3.5.4_2-20gs.js
@@ -3600,6 +3609,7 @@ Function/15.3.5.4_2-51gs.js
 Function/15.3.5.4_2-53gs.js
 Function/15.3.5.4_2-55gs.js
 Function/15.3.5.4_2-56gs.js
+Function/15.3.5.4_2-57gs.js
 Function/15.3.5.4_2-58gs.js
 Function/15.3.5.4_2-59gs.js
 Function/15.3.5.4_2-60gs.js
@@ -3619,6 +3629,7 @@ Function/15.3.5.4_2-72gs.js
 Function/15.3.5.4_2-73gs.js
 Function/15.3.5.4_2-74gs.js
 Function/15.3.5.4_2-75gs.js
+Function/15.3.5.4_2-76gs.js
 Function/15.3.5.4_2-77gs.js
 Function/15.3.5.4_2-78gs.js
 Function/15.3.5.4_2-79gs.js
@@ -3750,6 +3761,7 @@ Function/prototype/apply/S15.3.4.3_A12.js
 Function/prototype/apply/S15.3.4.3_A1_T1.js
 Function/prototype/apply/S15.3.4.3_A1_T2.js
 Function/prototype/apply/S15.3.4.3_A3_T1.js
+Function/prototype/apply/S15.3.4.3_A3_T10.js
 Function/prototype/apply/S15.3.4.3_A3_T2.js
 Function/prototype/apply/S15.3.4.3_A3_T3.js
 Function/prototype/apply/S15.3.4.3_A3_T4.js
@@ -3757,6 +3769,7 @@ Function/prototype/apply/S15.3.4.3_A3_T5.js
 Function/prototype/apply/S15.3.4.3_A3_T6.js
 Function/prototype/apply/S15.3.4.3_A3_T7.js
 Function/prototype/apply/S15.3.4.3_A3_T8.js
+Function/prototype/apply/S15.3.4.3_A3_T9.js
 Function/prototype/apply/S15.3.4.3_A5_T1.js
 Function/prototype/apply/S15.3.4.3_A5_T2.js
 Function/prototype/apply/S15.3.4.3_A5_T3.js
@@ -3888,6 +3901,7 @@ Function/prototype/call/S15.3.4.4_A1_T2.js
 Function/prototype/call/S15.3.4.4_A2_T1.js
 Function/prototype/call/S15.3.4.4_A2_T2.js
 Function/prototype/call/S15.3.4.4_A3_T1.js
+Function/prototype/call/S15.3.4.4_A3_T10.js
 Function/prototype/call/S15.3.4.4_A3_T2.js
 Function/prototype/call/S15.3.4.4_A3_T3.js
 Function/prototype/call/S15.3.4.4_A3_T4.js
@@ -3895,6 +3909,7 @@ Function/prototype/call/S15.3.4.4_A3_T5.js
 Function/prototype/call/S15.3.4.4_A3_T6.js
 Function/prototype/call/S15.3.4.4_A3_T7.js
 Function/prototype/call/S15.3.4.4_A3_T8.js
+Function/prototype/call/S15.3.4.4_A3_T9.js
 Function/prototype/call/S15.3.4.4_A5_T1.js
 Function/prototype/call/S15.3.4.4_A5_T2.js
 Function/prototype/call/S15.3.4.4_A5_T3.js
@@ -7757,6 +7772,7 @@ Object/getOwnPropertyDescriptor/15.2.3.3-4-36.js
 Object/getOwnPropertyDescriptor/15.2.3.3-4-37.js
 Object/getOwnPropertyDescriptor/15.2.3.3-4-38.js
 Object/getOwnPropertyDescriptor/15.2.3.3-4-39.js
+Object/getOwnPropertyDescriptor/15.2.3.3-4-4.js
 Object/getOwnPropertyDescriptor/15.2.3.3-4-40.js
 Object/getOwnPropertyDescriptor/15.2.3.3-4-41.js
 Object/getOwnPropertyDescriptor/15.2.3.3-4-42.js
@@ -9033,6 +9049,7 @@ String/S15.5.1.1_A1_T2.js
 String/S15.5.1.1_A1_T3.js
 String/S15.5.1.1_A1_T4.js
 String/S15.5.1.1_A1_T5.js
+String/S15.5.1.1_A1_T6.js
 String/S15.5.1.1_A1_T7.js
 String/S15.5.1.1_A1_T8.js
 String/S15.5.1.1_A1_T9.js
@@ -9083,6 +9100,7 @@ String/S9.8.1_A7.js
 String/S9.8.1_A8.js
 String/S9.8.1_A9_T1.js
 String/S9.8.1_A9_T2.js
+String/S9.8_A1_T1.js
 String/S9.8_A2_T1.js
 String/S9.8_A3_T1.js
 String/S9.8_A4_T1.js
@@ -9143,6 +9161,7 @@ String/prototype/at/returns-code-unit.js
 String/prototype/at/returns-item-relative-index.js
 String/prototype/at/returns-item.js
 String/prototype/at/returns-undefined-for-out-of-range-index.js
+String/prototype/charAt/S15.5.4.4_A1.1.js
 String/prototype/charAt/S15.5.4.4_A10.js
 String/prototype/charAt/S15.5.4.4_A11.js
 String/prototype/charAt/S15.5.4.4_A1_T1.js
@@ -9172,6 +9191,7 @@ String/prototype/charAt/pos-coerce-err.js
 String/prototype/charAt/pos-coerce-string.js
 String/prototype/charAt/pos-rounding.js
 String/prototype/charAt/this-value-not-obj-coercible.js
+String/prototype/charCodeAt/S15.5.4.5_A1.1.js
 String/prototype/charCodeAt/S15.5.4.5_A10.js
 String/prototype/charCodeAt/S15.5.4.5_A11.js
 String/prototype/charCodeAt/S15.5.4.5_A1_T1.js
@@ -9303,6 +9323,7 @@ String/prototype/indexOf/S15.5.4.7_A2_T2.js
 String/prototype/indexOf/S15.5.4.7_A2_T3.js
 String/prototype/indexOf/S15.5.4.7_A2_T4.js
 String/prototype/indexOf/S15.5.4.7_A3_T1.js
+String/prototype/indexOf/S15.5.4.7_A3_T2.js
 String/prototype/indexOf/S15.5.4.7_A3_T3.js
 String/prototype/indexOf/S15.5.4.7_A4_T1.js
 String/prototype/indexOf/S15.5.4.7_A4_T2.js
@@ -9586,6 +9607,7 @@ String/prototype/split/call-split-void-0-instance-is-thisundefinedisundefinedaun
 String/prototype/split/call-split-without-arguments-and-instance-is-empty-string.js
 String/prototype/split/call-split-x-instance-is-empty-string.js
 String/prototype/split/call-split-x-instance-is-string-hello.js
+String/prototype/split/checking-by-using-eval.js
 String/prototype/split/checking-if-creating-the-string-prototype-split-object-fails.js
 String/prototype/split/checking-if-deleting-the-string-prototype-split-length-property-fails.js
 String/prototype/split/checking-if-enumerating-the-string-prototype-split-length-property-fails.js
@@ -9705,6 +9727,7 @@ String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T11.js
 String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T12.js
 String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T13.js
 String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T2.js
+String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T3.js
 String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T4.js
 String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T5.js
 String/prototype/toLocaleLowerCase/S15.5.4.17_A1_T6.js
@@ -9730,6 +9753,7 @@ String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T11.js
 String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T12.js
 String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T13.js
 String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T2.js
+String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T3.js
 String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T4.js
 String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T5.js
 String/prototype/toLocaleUpperCase/S15.5.4.19_A1_T6.js
@@ -9755,6 +9779,7 @@ String/prototype/toLowerCase/S15.5.4.16_A1_T11.js
 String/prototype/toLowerCase/S15.5.4.16_A1_T12.js
 String/prototype/toLowerCase/S15.5.4.16_A1_T13.js
 String/prototype/toLowerCase/S15.5.4.16_A1_T2.js
+String/prototype/toLowerCase/S15.5.4.16_A1_T3.js
 String/prototype/toLowerCase/S15.5.4.16_A1_T4.js
 String/prototype/toLowerCase/S15.5.4.16_A1_T5.js
 String/prototype/toLowerCase/S15.5.4.16_A1_T6.js
@@ -9788,6 +9813,7 @@ String/prototype/toUpperCase/S15.5.4.18_A1_T11.js
 String/prototype/toUpperCase/S15.5.4.18_A1_T12.js
 String/prototype/toUpperCase/S15.5.4.18_A1_T13.js
 String/prototype/toUpperCase/S15.5.4.18_A1_T2.js
+String/prototype/toUpperCase/S15.5.4.18_A1_T3.js
 String/prototype/toUpperCase/S15.5.4.18_A1_T4.js
 String/prototype/toUpperCase/S15.5.4.18_A1_T5.js
 String/prototype/toUpperCase/S15.5.4.18_A1_T6.js
@@ -10357,10 +10383,16 @@ global/S10.2.3_A1.1_T1.js
 global/S10.2.3_A1.1_T4.js
 global/S10.2.3_A1.2_T1.js
 global/S10.2.3_A1.2_T4.js
+global/S10.2.3_A1.3_T1.js
+global/S10.2.3_A1.3_T4.js
 global/S10.2.3_A2.1_T1.js
 global/S10.2.3_A2.1_T2.js
 global/S10.2.3_A2.1_T3.js
 global/S10.2.3_A2.1_T4.js
+global/S10.2.3_A2.3_T1.js
+global/S10.2.3_A2.3_T2.js
+global/S10.2.3_A2.3_T3.js
+global/S10.2.3_A2.3_T4.js
 global/S15.1_A1_T1.js
 global/S15.1_A1_T2.js
 global/S15.1_A2_T1.js

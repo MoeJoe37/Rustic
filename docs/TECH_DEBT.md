@@ -137,7 +137,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
 | TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs `test/language` plus only the JS-05 areas of `test/built-ins` | Open, JS-05/JS-06 |
-| TD-106 | Deliberate | JS | No `eval`, and `Function.prototype.toString` prints every function in the native form | Open, JS-05 |
+| TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
 
@@ -1471,22 +1471,20 @@ its library area;
 module and async files when promise jobs and module loading exist (JS-06);
 `$262` with realms (JS-06). Trigger: each of those steps.
 
-### TD-106 — No eval, no function source text
+### TD-106 — No function source text (eval part paid)
 
-Direct and indirect `eval` are missing. Direct eval needs the scope
-resolver to keep every variable of a function that calls `eval` in an
-environment rather than a register. About 780 Test262 files fail on `eval`
-alone, and two earlier passes were false ones that now fail. The `Function`
-constructor exists; it compiles in the global scope, which needs none of this.
-`Function.prototype.toString` prints every function in the `NativeFunction`
-form because source text is not kept. The specification allows that only for
-built-in and host functions.
+**eval: Paid** (JS-05 part 2f). Direct and indirect `eval` run: a sloppy
+direct eval makes the calling function's scope dynamic, so names it does not
+declare resolve by name at run time, and the declaration checks of
+EvalDeclarationInstantiation run before any binding is made. About 150
+eval-code Test262 files still fail, mostly the `arguments` in parameter
+defaults rule and async or generator bodies (JS-08).
 
-Pay with: indirect eval on top of the `Function` constructor's path; direct
-eval with a resolver mode that keeps a function's bindings in environments
-when its body contains a direct `eval` call; a source span per function so
-`toString` can return its text. Trigger: JS-05 part 2 or the first page
-script that needs either.
+Still open: `Function.prototype.toString` prints every function in the
+`NativeFunction` form because source text is not kept. The specification
+allows that only for built-in and host functions. Pay with: a source span per
+function so `toString` can return its text. Trigger: the first page script
+or Test262 group that needs it.
 
 ### TD-107 — No Unicode normalization or locales in String
 

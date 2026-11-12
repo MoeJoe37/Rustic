@@ -142,6 +142,14 @@ pub(crate) struct Scope {
     /// An arrow function's scope: `this` and `new.target` come from
     /// outside.
     pub arrow: bool,
+    /// Names not found by the time the resolution leaves this scope are
+    /// looked up by name at run time: a sloppy direct `eval` inside may
+    /// declare a `var` that shadows them, and the top of `eval` code sits
+    /// on environments the compiler never saw.
+    pub dynamic: bool,
+    /// A sloppy direct `eval` inside adds its `var`s to this function
+    /// scope's environment, so the scope always has one.
+    pub eval_vars: bool,
 }
 
 impl Scope {
@@ -150,7 +158,9 @@ impl Scope {
         match self.kind {
             ScopeKind::Script => false,
             ScopeKind::With => true,
-            ScopeKind::Function | ScopeKind::Block => self.bindings.iter().any(|b| b.captured),
+            ScopeKind::Function | ScopeKind::Block => {
+                self.eval_vars || self.bindings.iter().any(|b| b.captured)
+            }
         }
     }
 
@@ -213,6 +223,30 @@ impl ScopeTree {
         r.tree
     }
 
+    /// Analyze the code of an `eval` (§19.2.1.3). Its top scope (0) holds
+    /// the lexical declarations, and in strict code the `var`s too; sloppy
+    /// `var`s and functions go to the caller's variable environment, so
+    /// they and every other name not declared here are looked up by name.
+    /// The scope has no `arguments` of its own and takes `this` from the
+    /// caller, like an arrow function.
+    pub(crate) fn analyze_eval(body: &[Statement], strict: bool) -> ScopeTree {
+        let mut r = Resolver {
+            tree: ScopeTree::default(),
+            stack: Vec::new(),
+            derived_constructor: false,
+        };
+        let top = r.open(ScopeKind::Function, None, strict);
+        r.tree.scopes[top].arrow = true;
+        r.tree.scopes[top].dynamic = true;
+        if strict {
+            r.hoist_vars(top, body, true);
+        }
+        r.declare_lexical(top, body, true);
+        r.statements(body);
+        r.stack.pop();
+        r.tree
+    }
+
     /// Resolve `name` from `scope`: the scope holding it and the binding
     /// index, or `None` for a global or dynamic name. `crosses_with`
     /// reports a `with` scope on the way, which forces a dynamic lookup.
@@ -225,6 +259,9 @@ impl ScopeTree {
             }
             if let Some(index) = s.find(name) {
                 return Resolution::Binding { scope: id, index };
+            }
+            if s.dynamic {
+                return Resolution::Dynamic;
             }
             current = s.parent;
         }
@@ -287,6 +324,8 @@ impl Resolver {
             bindings: Vec::new(),
             strict,
             arrow: false,
+            dynamic: false,
+            eval_vars: false,
         });
         if let Some(key) = key {
             self.tree.by_node.insert(key, id);
@@ -553,6 +592,26 @@ impl Resolver {
         self.stack.pop();
     }
 
+    /// A direct `eval` call here: its code can name every visible binding,
+    /// so they all live in environments; sloppy code can also add `var`s
+    /// to the enclosing function, which makes names that function does not
+    /// declare dynamic inside it.
+    fn direct_eval(&mut self) {
+        self.capture_all_visible();
+        let current = self.current();
+        if self.tree.scopes[current].strict {
+            return;
+        }
+        let f = self.tree.scopes[current].function;
+        let s = &mut self.tree.scopes[f];
+        // A script's vars are globals already; the top of eval code passes
+        // them on to its caller's variable environment.
+        if s.kind == ScopeKind::Function && !s.dynamic {
+            s.dynamic = true;
+            s.eval_vars = true;
+        }
+    }
+
     /// Capture every binding visible from the current scope (a `with`
     /// body can name any of them dynamically).
     fn capture_all_visible(&mut self) {
@@ -560,7 +619,10 @@ impl Resolver {
         while let Some(id) = current {
             for b in &mut self.tree.scopes[id].bindings {
                 b.captured = true;
-                b.used = true;
+                // Script cannot name the compiler's own bindings (`%init`
+                // and the like), and marking them used would make the
+                // compiler build what they stand for.
+                b.used |= !b.name.starts_with('%');
             }
             current = self.tree.scopes[id].parent;
         }
@@ -985,6 +1047,8 @@ impl Resolver {
             bindings: Vec::new(),
             strict: false,
             arrow: false,
+            dynamic: false,
+            eval_vars: false,
         });
         self.hoist_vars(probe, body, true);
         let found = self.tree.scopes[probe].find(name).is_some();
@@ -1123,6 +1187,19 @@ impl Resolver {
                     }
                 }
                 ExpressionKind::Call {
+                    callee,
+                    arguments,
+                    optional: false,
+                } if is_direct_eval(callee) => {
+                    self.direct_eval();
+                    for a in arguments {
+                        match a {
+                            Argument::Expression(x) | Argument::Spread(x) => pending.push(x),
+                        }
+                    }
+                    pending.push(callee);
+                }
+                ExpressionKind::Call {
                     callee, arguments, ..
                 }
                 | ExpressionKind::New { callee, arguments } => {
@@ -1179,4 +1256,10 @@ fn pattern_has_expression(p: &Pattern) -> bool {
                 || rest.as_deref().is_some_and(pattern_has_expression)
         }
     }
+}
+
+/// Whether a call with this callee is a direct `eval` (§13.3.6.1): the
+/// callee is the bare identifier `eval`, not parenthesized.
+pub(crate) fn is_direct_eval(callee: &Expression) -> bool {
+    matches!(&callee.kind, ExpressionKind::Identifier(id) if &*id.name == "eval")
 }

@@ -20,6 +20,14 @@ const GLOBAL_FUNCTIONS: &[Method] = &[
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let i = agent.intrinsics;
     install_methods(agent, i.global, GLOBAL_FUNCTIONS)?;
+    let eval_key = agent.heap.key("eval")?;
+    let eval = agent.new_native_function(eval, "eval", 1)?;
+    agent.define_property_or_throw(
+        i.global,
+        eval_key,
+        PropertyDescriptor::data_with(Value::object(eval), true, false, true),
+    )?;
+    agent.intrinsics.eval = eval;
     install_constructor(
         agent,
         "Boolean",
@@ -31,6 +39,11 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_constructor(agent, "String", string_constructor, 1, i.string_prototype)?;
     let symbol = install_constructor(agent, "Symbol", symbol_constructor, 0, i.symbol_prototype)?;
     install_symbol_statics(agent, symbol)
+}
+
+/// `eval(x)` (§19.2.1) reached as a function value: an indirect eval.
+fn eval(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    agent.indirect_eval(arg(args, 0))
 }
 
 const SYMBOL_STATICS: &[Method] = &[method("for", symbol_for, 1), method("keyFor", key_for, 1)];

@@ -181,11 +181,14 @@ pub struct Intrinsics {
     pub iterator_helper_prototypes: [ObjectId; 2],
     /// `%Iterator%`.
     pub iterator: ObjectId,
+    /// `%eval%`: a call of the bare name `eval` that reaches this function
+    /// is a direct eval.
+    pub eval: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 23] {
+    pub(crate) fn all(&self) -> [ObjectId; 24] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -210,6 +213,7 @@ impl Intrinsics {
             self.iterator_helper_prototypes[0],
             self.iterator_helper_prototypes[1],
             self.iterator,
+            self.eval,
         ]
     }
 }
@@ -269,6 +273,7 @@ impl Agent {
                 table_iterator_prototypes: [placeholder; 2],
                 iterator_helper_prototypes: [placeholder; 2],
                 iterator: placeholder,
+                eval: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -334,6 +339,7 @@ impl Agent {
             table_iterator_prototypes: [object_prototype; 2],
             iterator_helper_prototypes: [object_prototype; 2],
             iterator: object_prototype,
+            eval: object_prototype,
         };
         super::builtins::install(self)
     }

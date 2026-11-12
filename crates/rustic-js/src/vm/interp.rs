@@ -19,6 +19,7 @@ use rustic_base::CancellationToken;
 use super::bytecode::{
     BinOp, CacheKind, CodeId, FunctionCode, FunctionKind, Op, Reg, SiteCache, UnOp, declare,
 };
+use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
     Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, Class, EnvId, ErrorKind, FLAG_EXTENSIBLE,
     FLAG_PROTOTYPE, JsResult, Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference,
@@ -251,6 +252,28 @@ impl Agent {
         let stack_floor = self.vm.stack.len();
         let global = Value::object(self.intrinsics.global);
         let env = self.global_env;
+        self.push_frame_for(
+            code,
+            env,
+            global,
+            Value::UNDEFINED,
+            Value::UNDEFINED,
+            stack_floor,
+            0,
+            0,
+            false,
+            stack_floor,
+        )?;
+        self.run(floor)
+    }
+
+    /// Run indirect `eval` code on `env` with the global `this`, from
+    /// inside a native call.
+    pub(crate) fn run_eval(&mut self, code: CodeId, env: EnvId) -> JsResult<Value> {
+        self.enter_nested_run()?;
+        let floor = self.vm.frames.len();
+        let stack_floor = self.vm.stack.len();
+        let global = Value::object(self.intrinsics.global);
         self.push_frame_for(
             code,
             env,
@@ -1513,6 +1536,78 @@ impl Agent {
                         }
                         Callee::NotCallable => {
                             t!(self.type_error::<()>("value is not a function"));
+                        }
+                    }
+                }
+                Op::DirectEval {
+                    dst,
+                    callee,
+                    args,
+                    argc,
+                    var_hops,
+                } => {
+                    t!(self.safepoint());
+                    let f = reg!(callee);
+                    let args_at = base + usize::from(args);
+                    let argc = usize::from(argc);
+                    if f != Value::object(self.intrinsics.eval) {
+                        // Not the intrinsic: an ordinary call.
+                        let this = reg!(callee - 1);
+                        match self.callee(f) {
+                            Callee::Closure(o) => {
+                                let top = self.vm.stack.len();
+                                t!(self.push_closure_frame(
+                                    o,
+                                    this,
+                                    Value::UNDEFINED,
+                                    args_at,
+                                    argc,
+                                    dst,
+                                    false,
+                                    top
+                                ));
+                                let caller = self.vm.frames.len() - 2;
+                                self.vm.frames[caller].pc = pc as u32;
+                                return Ok(Flow::Switch);
+                            }
+                            Callee::Native(behavior, o) => {
+                                reg!(dst) =
+                                    t!(self.call_native_at(behavior, o, this, args_at, argc));
+                            }
+                            Callee::NotCallable => {
+                                t!(self.type_error::<()>("value is not a function"));
+                            }
+                        }
+                    } else {
+                        let x = if argc == 0 {
+                            Value::UNDEFINED
+                        } else {
+                            self.vm.stack[args_at]
+                        };
+                        match x.as_string() {
+                            None => reg!(dst) = x,
+                            Some(text) => {
+                                let frame = self.vm.frames.last().expect("running");
+                                let (this, function, new_target) =
+                                    (frame.this, frame.function, frame.new_target);
+                                let var_hops = (var_hops != EVAL_GLOBAL_VARS).then_some(var_hops);
+                                let in_function = function != Value::UNDEFINED;
+                                let code_id = t!(self.prepare_eval(
+                                    text,
+                                    env,
+                                    var_hops,
+                                    code.strict,
+                                    in_function
+                                ));
+                                let top = self.vm.stack.len();
+                                t!(self.push_frame_for(
+                                    code_id, env, this, function, new_target, top, 0, dst, false,
+                                    top
+                                ));
+                                let caller = self.vm.frames.len() - 2;
+                                self.vm.frames[caller].pc = pc as u32;
+                                return Ok(Flow::Switch);
+                            }
                         }
                     }
                 }

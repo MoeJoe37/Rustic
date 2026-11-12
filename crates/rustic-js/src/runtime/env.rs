@@ -20,6 +20,7 @@ pub struct EnvId(pub(crate) u32);
 const MUTABLE: u8 = 1;
 const STRICT: u8 = 2;
 const DELETABLE: u8 = 4;
+const LEXICAL: u8 = 8;
 
 /// Names and values of a declarative record.
 #[derive(Clone, Debug, Default)]
@@ -627,7 +628,22 @@ impl Agent {
             .is_some_and(|d| d.configurable == Some(false)))
     }
 
-    /// `CanDeclareGlobalVar(N)`.
+    /// `CanDeclareGlobalFunction(N)` (§9.1.1.4.16).
+    pub fn can_declare_global_function(
+        &mut self,
+        global: ObjectId,
+        name: StringId,
+    ) -> JsResult<bool> {
+        match self.get_own_property(global, PropertyKey::String(name))? {
+            None => Ok(self.is_extensible(global)),
+            Some(desc) => Ok(desc.configurable == Some(true)
+                || (desc.value.is_some()
+                    && desc.writable == Some(true)
+                    && desc.enumerable == Some(true))),
+        }
+    }
+
+    /// `CanDeclareGlobalVar(N)` (§9.1.1.4.15).
     pub fn can_declare_global_var(&mut self, global: ObjectId, name: StringId) -> JsResult<bool> {
         if self.has_own_property(global, PropertyKey::String(name))? {
             return Ok(true);
@@ -795,6 +811,9 @@ impl Environment {
 pub(crate) const BINDING_MUTABLE: u8 = MUTABLE;
 /// Assignment to this immutable binding throws even in sloppy code.
 pub(crate) const BINDING_STRICT: u8 = STRICT;
+/// A `let`, `const` or `class` binding, which a sloppy direct `eval` may
+/// not redeclare with `var` (§19.2.1.3 step 3).
+pub(crate) const BINDING_LEXICAL: u8 = LEXICAL;
 
 impl Agent {
     /// A declarative environment holding `names` in order, every binding
@@ -825,6 +844,16 @@ impl Agent {
             self.heap.charge(8 * record.names.len())?;
         }
         Ok(self.heap.alloc_env(copy)?)
+    }
+
+    /// Whether `env` is a declarative record holding a lexical binding
+    /// named `name` (see [`BINDING_LEXICAL`]).
+    pub(crate) fn has_lexical_binding(&self, env: EnvId, name: StringId) -> bool {
+        self.heap.env(env).declarative().is_some_and(|d| {
+            d.names
+                .iter()
+                .any(|&(n, flags)| n == name && flags & LEXICAL != 0)
+        })
     }
 
     /// The environment `hops` steps out from `env`.

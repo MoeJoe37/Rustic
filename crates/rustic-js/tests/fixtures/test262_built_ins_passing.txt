@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 13175 pass, 1547 fail, 110 skipped (modules, proposals).
+# 13269 pass, 1530 fail, 110 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -2625,6 +2625,7 @@ Array/prototype/sort/S15.4.4.11_A6_T2.js
 Array/prototype/sort/S15.4.4.11_A8.js
 Array/prototype/sort/bug_596_1.js
 Array/prototype/sort/bug_596_2.js
+Array/prototype/sort/call-with-primitive.js
 Array/prototype/sort/comparefn-nonfunction-call-throws.js
 Array/prototype/sort/length.js
 Array/prototype/sort/name.js
@@ -3011,6 +3012,82 @@ AsyncIteratorPrototype/Symbol.asyncIterator/length.js
 AsyncIteratorPrototype/Symbol.asyncIterator/name.js
 AsyncIteratorPrototype/Symbol.asyncIterator/prop-desc.js
 AsyncIteratorPrototype/Symbol.asyncIterator/return-val.js
+BigInt/asIntN/arithmetic.js
+BigInt/asIntN/asIntN.js
+BigInt/asIntN/bigint-tobigint-errors.js
+BigInt/asIntN/bigint-tobigint-toprimitive.js
+BigInt/asIntN/bigint-tobigint-wrapped-values.js
+BigInt/asIntN/bigint-tobigint.js
+BigInt/asIntN/bits-toindex-errors.js
+BigInt/asIntN/bits-toindex-toprimitive.js
+BigInt/asIntN/bits-toindex-wrapped-values.js
+BigInt/asIntN/bits-toindex.js
+BigInt/asIntN/length.js
+BigInt/asIntN/name.js
+BigInt/asIntN/not-a-constructor.js
+BigInt/asIntN/order-of-steps.js
+BigInt/asUintN/arithmetic.js
+BigInt/asUintN/asUintN.js
+BigInt/asUintN/bigint-tobigint-errors.js
+BigInt/asUintN/bigint-tobigint-toprimitive.js
+BigInt/asUintN/bigint-tobigint-wrapped-values.js
+BigInt/asUintN/bigint-tobigint.js
+BigInt/asUintN/bits-toindex-errors.js
+BigInt/asUintN/bits-toindex-toprimitive.js
+BigInt/asUintN/bits-toindex-wrapped-values.js
+BigInt/asUintN/bits-toindex.js
+BigInt/asUintN/length.js
+BigInt/asUintN/name.js
+BigInt/asUintN/not-a-constructor.js
+BigInt/asUintN/order-of-steps.js
+BigInt/call-value-of-when-to-string-present.js
+BigInt/constructor-coercion.js
+BigInt/constructor-empty-string.js
+BigInt/constructor-from-binary-string.js
+BigInt/constructor-from-decimal-string.js
+BigInt/constructor-from-hex-string.js
+BigInt/constructor-from-octal-string.js
+BigInt/constructor-from-string-syntax-errors.js
+BigInt/constructor-integer.js
+BigInt/constructor-trailing-leading-spaces.js
+BigInt/infinity-throws-rangeerror.js
+BigInt/is-a-constructor.js
+BigInt/length.js
+BigInt/name.js
+BigInt/nan-throws-rangeerror.js
+BigInt/negative-infinity-throws.rangeerror.js
+BigInt/non-integer-rangeerror.js
+BigInt/parseInt/nonexistent.js
+BigInt/prop-desc.js
+BigInt/proto.js
+BigInt/prototype/Symbol.toStringTag.js
+BigInt/prototype/constructor.js
+BigInt/prototype/prop-desc.js
+BigInt/prototype/proto.js
+BigInt/prototype/toLocaleString/not-a-constructor.js
+BigInt/prototype/toString/a-z.js
+BigInt/prototype/toString/default-radix.js
+BigInt/prototype/toString/length.js
+BigInt/prototype/toString/name.js
+BigInt/prototype/toString/not-a-constructor.js
+BigInt/prototype/toString/prop-desc.js
+BigInt/prototype/toString/prototype-call.js
+BigInt/prototype/toString/radix-2-to-36.js
+BigInt/prototype/toString/radix-err.js
+BigInt/prototype/toString/radix-tointegerorinfinity-throws-symbol.js
+BigInt/prototype/toString/radix-tointegerorinfinity-throws-toprimitive-or-bigint.js
+BigInt/prototype/toString/string-is-code-units-of-decimal-digits-only.js
+BigInt/prototype/toString/thisbigintvalue-not-valid-throws.js
+BigInt/prototype/valueOf/length.js
+BigInt/prototype/valueOf/name.js
+BigInt/prototype/valueOf/not-a-constructor.js
+BigInt/prototype/valueOf/prop-desc.js
+BigInt/prototype/valueOf/return.js
+BigInt/prototype/valueOf/this-value-invalid-object-throws.js
+BigInt/prototype/valueOf/this-value-invalid-primitive-throws.js
+BigInt/tostring-throws.js
+BigInt/valueof-throws.js
+BigInt/wrapper-object-ordinary-toprimitive.js
 Boolean/S15.6.1.1_A1_T1.js
 Boolean/S15.6.1.1_A1_T2.js
 Boolean/S15.6.1.1_A1_T3.js
@@ -4281,6 +4358,7 @@ Iterator/concat/get-iterator-method-throws.js
 Iterator/concat/get-value-after-done.js
 Iterator/concat/inner-iterator-created-in-order.js
 Iterator/concat/is-function.js
+Iterator/concat/iterable-primitive-wrapper-objects.js
 Iterator/concat/iterator-has-no-return.js
 Iterator/concat/length.js
 Iterator/concat/many-arguments.js
@@ -4841,7 +4919,10 @@ JSON/stringify/space-string-range.js
 JSON/stringify/space-string.js
 JSON/stringify/space-wrong-type.js
 JSON/stringify/value-array-circular.js
+JSON/stringify/value-bigint-order.js
 JSON/stringify/value-bigint-replacer.js
+JSON/stringify/value-bigint-tojson-receiver.js
+JSON/stringify/value-bigint-tojson.js
 JSON/stringify/value-bigint.js
 JSON/stringify/value-boolean-object.js
 JSON/stringify/value-function.js
@@ -5568,6 +5649,7 @@ Number/S9.3_A3_T1.js
 Number/S9.3_A4.1_T1.js
 Number/S9.3_A4.2_T1.js
 Number/S9.3_A5_T1.js
+Number/bigint-conversion.js
 Number/is-a-constructor.js
 Number/isFinite/arg-is-not-number.js
 Number/isFinite/finite-numbers.js
@@ -5901,6 +5983,7 @@ Object/assign/target-is-sealed-existing-data-property.js
 Object/assign/target-is-sealed-property-creation-throws.js
 Object/assign/target-set-not-writable.js
 Object/assign/target-set-user-error.js
+Object/bigint.js
 Object/create/15.2.3.5-0-1.js
 Object/create/15.2.3.5-0-2.js
 Object/create/15.2.3.5-1-1.js
@@ -8916,6 +8999,7 @@ Object/prototype/toLocaleString/not-a-constructor.js
 Object/prototype/toLocaleString/primitive_this_value.js
 Object/prototype/toLocaleString/primitive_this_value_getter.js
 Object/prototype/toString/Object.prototype.toString.call-array.js
+Object/prototype/toString/Object.prototype.toString.call-bigint.js
 Object/prototype/toString/Object.prototype.toString.call-boolean.js
 Object/prototype/toString/Object.prototype.toString.call-date.js
 Object/prototype/toString/Object.prototype.toString.call-error.js
@@ -8936,8 +9020,10 @@ Object/prototype/toString/prop-desc.js
 Object/prototype/toString/symbol-tag-array-builtin.js
 Object/prototype/toString/symbol-tag-generators-builtin.js
 Object/prototype/toString/symbol-tag-map-builtin.js
+Object/prototype/toString/symbol-tag-non-str-bigint.js
 Object/prototype/toString/symbol-tag-non-str-builtin.js
 Object/prototype/toString/symbol-tag-non-str.js
+Object/prototype/toString/symbol-tag-override-bigint.js
 Object/prototype/toString/symbol-tag-override-instances.js
 Object/prototype/toString/symbol-tag-override-primitives.js
 Object/prototype/toString/symbol-tag-promise-builtin.js
@@ -11831,6 +11917,7 @@ String/prototype/isWellFormed/not-a-constructor.js
 String/prototype/isWellFormed/prop-desc.js
 String/prototype/isWellFormed/return-abrupt-from-this.js
 String/prototype/isWellFormed/returns-boolean.js
+String/prototype/isWellFormed/to-string-primitive.js
 String/prototype/isWellFormed/to-string.js
 String/prototype/lastIndexOf/S15.5.4.8_A10.js
 String/prototype/lastIndexOf/S15.5.4.8_A11.js
@@ -11906,6 +11993,7 @@ String/prototype/match/S15.5.4.10_A9.js
 String/prototype/match/cstm-matcher-get-err.js
 String/prototype/match/cstm-matcher-invocation.js
 String/prototype/match/cstm-matcher-is-null.js
+String/prototype/match/cstm-matcher-on-bigint-primitive.js
 String/prototype/match/cstm-matcher-on-boolean-primitive.js
 String/prototype/match/cstm-matcher-on-number-primitive.js
 String/prototype/match/cstm-matcher-on-string-primitive.js
@@ -11918,6 +12006,7 @@ String/prototype/match/not-a-constructor.js
 String/prototype/match/this-val-bool.js
 String/prototype/match/this-val-obj.js
 String/prototype/match/this-value-not-obj-coercible.js
+String/prototype/matchAll/cstm-matchall-on-bigint-primitive.js
 String/prototype/matchAll/cstm-matchall-on-boolean-primitive.js
 String/prototype/matchAll/cstm-matchall-on-number-primitive.js
 String/prototype/matchAll/cstm-matchall-on-string-primitive.js
@@ -12028,6 +12117,7 @@ String/prototype/replace/S15.5.4.11_A7.js
 String/prototype/replace/cstm-replace-get-err.js
 String/prototype/replace/cstm-replace-invocation.js
 String/prototype/replace/cstm-replace-is-null.js
+String/prototype/replace/cstm-replace-on-bigint-primitive.js
 String/prototype/replace/cstm-replace-on-boolean-primitive.js
 String/prototype/replace/cstm-replace-on-number-primitive.js
 String/prototype/replace/cstm-replace-on-string-primitive.js
@@ -12040,6 +12130,7 @@ String/prototype/replace/replaceValue-evaluation-order.js
 String/prototype/replace/this-value-not-obj-coercible.js
 String/prototype/replace/tostring-this-throws-symbol.js
 String/prototype/replace/tostring-this-throws-toprimitive.js
+String/prototype/replaceAll/cstm-replaceall-on-bigint-primitive.js
 String/prototype/replaceAll/cstm-replaceall-on-boolean-primitive.js
 String/prototype/replaceAll/cstm-replaceall-on-number-primitive.js
 String/prototype/replaceAll/cstm-replaceall-on-string-primitive.js
@@ -12116,6 +12207,7 @@ String/prototype/search/S15.5.4.12_A9.js
 String/prototype/search/cstm-search-get-err.js
 String/prototype/search/cstm-search-invocation.js
 String/prototype/search/cstm-search-is-null.js
+String/prototype/search/cstm-search-on-bigint-primitive.js
 String/prototype/search/cstm-search-on-boolean-primitive.js
 String/prototype/search/cstm-search-on-number-primitive.js
 String/prototype/search/cstm-search-on-string-primitive.js
@@ -12241,6 +12333,7 @@ String/prototype/split/checking-string-prototype-split-prototype.js
 String/prototype/split/cstm-split-get-err.js
 String/prototype/split/cstm-split-invocation.js
 String/prototype/split/cstm-split-is-null.js
+String/prototype/split/cstm-split-on-bigint-primitive.js
 String/prototype/split/cstm-split-on-boolean-primitive.js
 String/prototype/split/cstm-split-on-number-primitive.js
 String/prototype/split/cstm-split-on-string-primitive.js
@@ -12470,6 +12563,7 @@ String/prototype/toWellFormed/not-a-constructor.js
 String/prototype/toWellFormed/prop-desc.js
 String/prototype/toWellFormed/return-abrupt-from-this.js
 String/prototype/toWellFormed/returns-well-formed-string.js
+String/prototype/toWellFormed/to-string-primitive.js
 String/prototype/toWellFormed/to-string.js
 String/prototype/trim/15.5.4.20-0-1.js
 String/prototype/trim/15.5.4.20-0-2.js

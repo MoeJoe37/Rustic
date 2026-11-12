@@ -5,6 +5,7 @@
 
 mod array;
 pub(crate) mod async_generator;
+pub(crate) mod bigint;
 mod collections;
 mod date;
 mod error;
@@ -79,14 +80,6 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
         to_primitive,
         PropertyDescriptor::data_with(Value::object(f), false, false, true),
     )?;
-    agent.define_method(i.bigint_prototype, value_of, bigint_value_of, "valueOf", 0)?;
-    agent.define_method(
-        i.bigint_prototype,
-        to_string,
-        bigint_to_string,
-        "toString",
-        0,
-    )?;
     agent.define_method(i.error_prototype, to_string, error_to_string, "toString", 0)?;
 
     // `String.prototype` is a String exotic object for "" (length 0).
@@ -138,6 +131,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     error::install(agent)?;
     global::install(agent)?;
     array::install(agent)?;
+    bigint::install(agent)?;
     math::install(agent)?;
     number_object::install(agent)?;
     string_object::install(agent)?;
@@ -463,18 +457,6 @@ fn symbol_to_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<
     let symbol = symbol_value_of(agent, this, args)?;
     let text = agent.display(symbol);
     agent.string(&text)
-}
-
-fn bigint_value_of(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    this_primitive(agent, this, Class::BigInt, |v| {
-        matches!(v.kind(), Kind::BigInt(_))
-    })
-}
-
-fn bigint_to_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let b = bigint_value_of(agent, this, args)?;
-    let s = agent.to_string(b)?;
-    Ok(Value::string(s))
 }
 
 /// `Error.prototype.toString` (§20.5.3.4).

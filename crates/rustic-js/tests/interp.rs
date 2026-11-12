@@ -2485,3 +2485,140 @@ fn runaway_regular_expressions_are_cancellable() {
         "true"
     );
 }
+
+#[test]
+fn bigint_arithmetic() {
+    let _report = Report;
+    check("2n ** 64n", "18446744073709551616n");
+    check(
+        "(2n ** 64n - 1n) * (2n ** 64n - 1n)",
+        "340282366920938463426481119284349108225n",
+    );
+    check("-7n / 2n", "-3n");
+    check("-7n % 2n", "-1n");
+    check("7n % -2n", "1n");
+    check("10n ** 30n / 10n ** 28n", "100n");
+    check("-(5n)", "-5n");
+    check("~5n", "-6n");
+    check("5n & -2n", "4n");
+    check("5n | -8n", "-3n");
+    check("5n ^ -1n", "-6n");
+    check("1n << 70n", "1180591620717411303424n");
+    check("-5n >> 1n", "-3n");
+    check("1n << -1n", "0n");
+    check("var x = 9007199254740993n; x++; x", "9007199254740994n");
+    check("var x = 0n; --x", "-1n");
+    check("var x = 3n; x **= 3n; x += 1n; x", "28n");
+    check("typeof (1n + 2n)", "bigint");
+    check("1n + '2'", "12");
+    check("`${2n ** 70n}`", "1180591620717411303424");
+    // Mixing types, division by zero and the missing operators throw.
+    check(
+        "1n + 1",
+        "!TypeError: cannot mix BigInt and other types, use explicit conversions",
+    );
+    check("1n / 0n", "!RangeError: BigInt division by zero");
+    check("1n % 0n", "!RangeError: BigInt division by zero");
+    check(
+        "2n ** -1n",
+        "!RangeError: BigInt exponent must not be negative",
+    );
+    check(
+        "1n >>> 0n",
+        "!TypeError: BigInts have no unsigned right shift, use >> instead",
+    );
+    check("+1n", "!TypeError: cannot convert a BigInt to a number");
+    check(
+        "2n ** 2000000n",
+        "!RangeError: Maximum BigInt size exceeded",
+    );
+    check(
+        "1n << 2000000n",
+        "!RangeError: Maximum BigInt size exceeded",
+    );
+    check(
+        "Math.max(1n)",
+        "!TypeError: cannot convert a BigInt to a number",
+    );
+    // Comparison and equality across types are exact.
+    check("2n > 1 && 1 < 2n && 2n == 2 && 2n !== 2", "true");
+    check("9007199254740993n > 9007199254740992", "true");
+    check("0n ? 'yes' : 'no'", "no");
+    check(
+        "[3n, 1n, 2n].sort((a, b) => (a < b ? -1 : 1)).join()",
+        "1,2,3",
+    );
+    check("({ 1n: 'a', 0x10n: 'b' })[16] + ({ 1n: 'a' })['1']", "ba");
+    check("class C { static 2n = 'k' } C[2]", "k");
+}
+
+#[test]
+fn bigint_library_and_conversions() {
+    let _report = Report;
+    check("BigInt(42) + BigInt('0x10') + BigInt(true)", "59n");
+    check("BigInt('  -12  ')", "-12n");
+    check("BigInt('')", "0n");
+    check(
+        "BigInt(1.5)",
+        "!RangeError: the number is not an integer and cannot become a BigInt",
+    );
+    check(
+        "BigInt('1.5')",
+        "!SyntaxError: cannot convert the string to a BigInt",
+    );
+    check(
+        "BigInt(undefined)",
+        "!TypeError: cannot convert undefined or null to a BigInt",
+    );
+    check(
+        "BigInt(Symbol())",
+        "!TypeError: cannot convert a Symbol to a BigInt",
+    );
+    check("new BigInt(1)", "!TypeError: BigInt is not a constructor");
+    check("BigInt({ valueOf() { return 7 } })", "7n");
+    check("BigInt(Number.MAX_SAFE_INTEGER) + 2n", "9007199254740993n");
+    check("BigInt(1e21)", "1000000000000000000000n");
+    check("(255n).toString(16) + (-255n).toString(2)", "ff-11111111");
+    check(
+        "(10n).toString(1)",
+        "!RangeError: radix must be between 2 and 36",
+    );
+    check(
+        "BigInt.prototype.toString.call(1)",
+        "!TypeError: method called on an incompatible receiver",
+    );
+    check("Object(5n) + 1n", "6n");
+    check(
+        "typeof Object(5n) + Object.prototype.toString.call(5n)",
+        "object[object BigInt]",
+    );
+    check("Object(5n).valueOf() === 5n", "true");
+    check("BigInt.asUintN(8, -1n)", "255n");
+    check("BigInt.asIntN(8, 255n)", "-1n");
+    check("BigInt.asIntN(64, 2n ** 63n)", "-9223372036854775808n");
+    check("BigInt.asUintN(64, -1n)", "18446744073709551615n");
+    check("BigInt.asIntN(0, 5n)", "0n");
+    check(
+        "BigInt.asUintN(-1, 5n)",
+        "!RangeError: index is out of range",
+    );
+    check(
+        "BigInt.asUintN(2 ** 53, 5n)",
+        "!RangeError: index is out of range",
+    );
+    check("BigInt.asIntN(2 ** 53 - 1, -5n)", "-5n");
+    check("Number(2n ** 64n)", "18446744073709552000");
+    check("Number(-3n) + parseInt('12n')", "9");
+    check("String(123n) + JSON.stringify({ a: 1 })", "123{\"a\":1}");
+    check(
+        "JSON.stringify(1n)",
+        "!TypeError: JSON.stringify cannot serialize a BigInt",
+    );
+    check(
+        "BigInt.length + BigInt.name + BigInt.asIntN.length",
+        "1BigInt2",
+    );
+    check("1n == '1' && '0x10' == 16n && 1n != '1x'", "true");
+    check("var m = new Map([[1n, 'a']]); m.get(1n)", "a");
+    check("[1n, 2n].includes(2n) && [1n].indexOf(1n) === 0", "true");
+}

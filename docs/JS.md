@@ -10,7 +10,8 @@ JS-04 compiles scripts to bytecode and runs them (see
 [Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
 generators (JS-08 part 1), promises with a job queue and async functions
 (JS-06 part 1), async generators with `for await` (JS-08 part 2) and
-regular expressions (JS-08 part 3); modules do not run yet.
+regular expressions (JS-08 part 3) and BigInt (JS-08 part 4); modules do not
+run yet.
 
 ## API
 
@@ -127,10 +128,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,220 | 13,175 |
-| Fail | 1,207 | 1,547 |
+| Pass | 21,313 | 13,269 |
+| Fail | 1,114 | 1,530 |
 | Skipped (modules, proposals) | 1,405 | 110 |
-| Pass rate of the files that run | 94.6% | 89.5% |
+| Pass rate of the files that run | 95.0% | 89.6% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -158,7 +159,7 @@ installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, Boolean,
 Date, Error, FinalizationRegistry, Function, GeneratorFunction,
 GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
-prototypes, Iterator, JSON, Map, Math, NativeErrors, Number,
+prototypes, BigInt, Iterator, JSON, Map, Math, NativeErrors, Number,
 Object, Reflect, RegExp, Set, String, Symbol, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
@@ -175,7 +176,7 @@ Most `test/language` failures are not interpreter bugs yet:
 - About 440 are dynamic `import()` files (modules, JS-06).
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
-- Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
+- Modules, `Proxy` and typed arrays account for most of
   the rest. The real assertion failures left are mostly parameter TDZ in
   defaults (`dflt-params-ref-later`), function names from computed symbol
   keys, the mapped `arguments` object (TD-99) and the restricted `caller`
@@ -241,8 +242,8 @@ over-committed. Unreachable values are freed by the collector below.
   `@@toPrimitive`, `ToNumber` (the full StringNumericLiteral grammar,
   correctly rounded), `Number::toString` (shortest round-trip digits),
   `ToString`, `ToObject`, `ToPropertyKey`, `SameValue`, `===`, `==` and `<`,
-  including exact BigInt/Number comparison. `ToBigInt` and BigInt arithmetic
-  are not implemented yet (TD-92).
+  including exact BigInt/Number comparison, and `ToBigInt`, `ToBigInt64`,
+  `ToBigUint64` and `ToIndex` (JS-08 part 4).
 - **Environments** (§9.1): declarative, function, object (`with`, honoring
   `@@unscopables`) and global records, with the temporal dead zone stored as
   an internal "uninitialized" value. Reference Records implement `GetValue`,
@@ -480,11 +481,23 @@ calls a function value. The design is recorded in
     negated class under `i` was complemented before its case closure,
     `\w` ignored modifier groups, `RegExp.escape` wrote `\u00a0` for
     `\xa0`, and `Object.prototype.toString` did not know RegExps.
+- **BigInt** (JS-08 part 4, §6.1.6.2, §21.2): literals, literal property
+  keys, every operator, the `BigInt` function with `asIntN` and `asUintN`,
+  and `BigInt.prototype.toString(radix)`, `toLocaleString` and `valueOf`.
+  - A BigInt is a sign and 32-bit limbs in its own arena: 32 bytes plus 4
+    per limb, charged to the heap budget.
+  - Division is Knuth's algorithm D, checked against multiplication over a
+    deterministic sweep of operand sizes. The bitwise operators work on the
+    two's complement form, so `-1n & 255n` is `255n`. `>>` rounds down.
+  - Mixing a BigInt with a Number is a TypeError, as is `>>>` and unary
+    `+`; dividing by `0n` and a negative exponent are RangeErrors.
+  - A result may have at most 2²⁰ bits; past that the operator throws a
+    RangeError before allocating (TD-112).
+  - Test262: `test/built-ins/BigInt` passes 76 of 77 files (the other needs
+    a second realm), and `test/language` went from 21,220 to 21,313.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): modules, BigInt literals and regular expression
-  literals that use a property escape (TD-110). Built-in constructors
-  cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
-  (TD-92).
+  anything runs, TD-97): modules and regular expression
+  literals that use a property escape (TD-110).
 - **Calls** never recurse in Rust between script functions: frames and
   registers live on vectors in the agent. `VmLimits` bounds frames (10,000),
   stack values (2²⁰, 8 bytes each) and script nested through native code

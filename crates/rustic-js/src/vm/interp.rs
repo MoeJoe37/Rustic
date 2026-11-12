@@ -21,10 +21,10 @@ use super::bytecode::{
 };
 use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
-    Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, Class, EnvId, ErrorKind, FLAG_EXTENSIBLE,
-    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, JsResult, Kind, NativeFn, ObjectId,
-    PropertyDescriptor, PropertyKey, Reference, ReferenceBase, ShapeId, StringId, Tracer, Value,
-    iterator_result,
+    Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, BigIntBinary, BigIntUnary, Class, EnvId,
+    ErrorKind, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, JsResult,
+    Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference, ReferenceBase,
+    SameNumeric, ShapeId, StringId, Tracer, Value, iterator_result, same_numeric_types,
 };
 
 /// Bounds on what running script may use beyond the heap.
@@ -3240,7 +3240,7 @@ impl Agent {
             UnOp::ToObject => Value::object(self.to_object(v)?),
             UnOp::BitNot => match self.to_numeric(v)? {
                 Numeric::Number(n) => Value::number(f64::from(!crate::runtime::to_int32(n))),
-                Numeric::BigInt(_) => return self.bigint_unsupported(),
+                Numeric::BigInt(b) => self.bigint_unary(BigIntUnary::Not, &b)?,
             },
             UnOp::ToNumeric => match self.to_numeric(v)? {
                 Numeric::Number(n) => Value::number(n),
@@ -3252,17 +3252,19 @@ impl Agent {
                     UnOp::Inc => n + 1.0,
                     _ => n - 1.0,
                 }),
-                Numeric::BigInt(_) => return self.bigint_unsupported(),
+                Numeric::BigInt(b) => {
+                    let op = match op {
+                        UnOp::Neg => BigIntUnary::Neg,
+                        UnOp::Inc => BigIntUnary::Inc,
+                        _ => BigIntUnary::Dec,
+                    };
+                    self.bigint_unary(op, &b)?
+                }
             },
         })
     }
 
-    fn bigint_unsupported<T>(&mut self) -> JsResult<T> {
-        self.type_error("BigInt arithmetic is not supported yet")
-    }
-
     fn binary(&mut self, op: BinOp, x: Value, y: Value) -> JsResult<Value> {
-        use crate::runtime::Numeric;
         Ok(match op {
             BinOp::StrictEq => Value::boolean(self.is_strictly_equal(x, y)),
             BinOp::StrictNotEq => Value::boolean(!self.is_strictly_equal(x, y)),
@@ -3289,17 +3291,34 @@ impl Agent {
                     let joined = self.heap.string(a).concat(self.heap.string(b));
                     return self.string_from(joined);
                 }
-                match (self.to_numeric(a)?, self.to_numeric(b)?) {
-                    (Numeric::Number(a), Numeric::Number(b)) => Value::number(a + b),
-                    _ => return self.bigint_unsupported(),
+                let a = self.to_numeric(a)?;
+                let b = self.to_numeric(b)?;
+                match same_numeric_types(self, a, b)? {
+                    SameNumeric::Numbers(a, b) => Value::number(a + b),
+                    SameNumeric::BigInts(a, b) => self.bigint_binary(BigIntBinary::Add, &a, &b)?,
                 }
             }
             _ => {
                 let a = self.to_numeric(x)?;
                 let b = self.to_numeric(y)?;
-                match (a, b) {
-                    (Numeric::Number(a), Numeric::Number(b)) => number_binary(op, a, b),
-                    _ => return self.bigint_unsupported(),
+                match same_numeric_types(self, a, b)? {
+                    SameNumeric::Numbers(a, b) => number_binary(op, a, b),
+                    SameNumeric::BigInts(a, b) => {
+                        let op = match op {
+                            BinOp::Sub => BigIntBinary::Sub,
+                            BinOp::Mul => BigIntBinary::Mul,
+                            BinOp::Div => BigIntBinary::Div,
+                            BinOp::Rem => BigIntBinary::Rem,
+                            BinOp::Exp => BigIntBinary::Exp,
+                            BinOp::Shl => BigIntBinary::Shl,
+                            BinOp::Sar => BigIntBinary::Sar,
+                            BinOp::Shr => BigIntBinary::Shr,
+                            BinOp::BitAnd => BigIntBinary::And,
+                            BinOp::BitOr => BigIntBinary::Or,
+                            _ => BigIntBinary::Xor,
+                        };
+                        self.bigint_binary(op, &a, &b)?
+                    }
                 }
             }
         })

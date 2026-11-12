@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "42d1c9fcd0e3e30f6e4c76e15882c997adf108f9d7763249844007e46bda0f55",
-  "percent": "26.16",
-  "verified_percent": "22.68",
-  "partial_percent": "3.48",
-  "completed": 56,
-  "in_progress": 8,
+  "source_fingerprint": "4c46efca6e6af84e832441998e2837ff6d945f33382cd489cf236b03e30c542a",
+  "percent": "26.44",
+  "verified_percent": "23.09",
+  "partial_percent": "3.35",
+  "completed": 57,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -45,11 +45,11 @@
       "id": "M4",
       "label": "ECMAScript runtime",
       "share": "8.90",
-      "completed": 3,
+      "completed": 4,
       "total": 13,
-      "percent": "66.64",
-      "verified_percent": "32.30",
-      "partial_percent": "34.34"
+      "percent": "69.85",
+      "verified_percent": "36.92",
+      "partial_percent": "32.93"
     },
     {
       "id": "M5",
@@ -2979,64 +2979,50 @@
           "label": "Values, coercions, references and completions",
           "size": 3,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "8-byte NaN-boxed values, Latin-1/UTF-16 strings with atoms, Number and BigInt storage",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/value.rs",
-                  "marker": "pub struct Value(u64)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn latin1_strings_take_one_byte_per_code_unit"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/value.rs",
+              "marker": "pub struct Value(u64)"
             },
             {
-              "label": "ToPrimitive, ToNumber, ToString, ToObject, ToPropertyKey, equality and relational comparison",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/convert.rs",
-                  "marker": "pub fn is_loosely_equal"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn equality_and_relational_comparison"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn latin1_strings_take_one_byte_per_code_unit"
             },
             {
-              "label": "Environment records, Reference Records and completion records",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/env.rs",
-                  "marker": "pub fn put_value"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn references_resolve_through_the_chain_to_the_global_object"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/convert.rs",
+              "marker": "pub fn is_loosely_equal"
             },
             {
-              "label": "ToBigInt, ToIndex and the remaining numeric conversions (TD-92)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn equality_and_relational_comparison"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/env.rs",
+              "marker": "pub fn put_value"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn references_resolve_through_the_chain_to_the_global_object"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/bigint.rs",
+              "marker": "pub fn to_bigint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn bigint_library_and_conversions"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.41"
         },
         {
@@ -3596,8 +3582,29 @@
             },
             {
               "label": "BigInt arithmetic and literals",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/bigint.rs",
+                  "marker": "fn div_rem_magnitude"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/bigint.rs",
+                  "marker": "pub(crate) fn bigint_binary"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn bigint_arithmetic"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/src/runtime/bigint.rs",
+                  "marker": "fn long_division_agrees_with_multiplication"
+                }
+              ]
             },
             {
               "label": "RegExp engine and literals (TD-88)",
@@ -3631,7 +3638,7 @@
               "evidence": []
             }
           ],
-          "credit": "66.66",
+          "credit": "83.33",
           "engine_share": "1.09"
         },
         {
@@ -3735,13 +3742,13 @@
         }
       ],
       "points": 73,
-      "completed": 3,
-      "in_progress": 7,
+      "completed": 4,
+      "in_progress": 6,
       "total": 15,
-      "contribution": "6.20",
-      "percent": "62.08",
-      "verified_percent": "28.76",
-      "partial_percent": "33.32"
+      "contribution": "6.49",
+      "percent": "64.93",
+      "verified_percent": "32.87",
+      "partial_percent": "32.06"
     },
     {
       "id": "wasm",

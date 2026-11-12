@@ -3451,11 +3451,12 @@ impl<'a, 't> Gen<'a, 't> {
                 self.emit(Op::Const { dst, index });
             }
             PropertyKey::Number(n, _) => self.load_number(dst, *n),
-            PropertyKey::BigInt(..) => {
-                return Err(CompileError::Unsupported(
-                    "BigInt property keys",
-                    Span::default(),
-                ));
+            PropertyKey::BigInt(radix, digits, span) => {
+                // The key is the BigInt's decimal string (§13.2.5.5).
+                let big = crate::runtime::BigInt::from_digits(digits, *radix, false)
+                    .ok_or(CompileError::Unsupported("BigInt literal", *span))?;
+                let index = self.atom(&big.to_string_radix10())?;
+                self.emit(Op::Const { dst, index });
             }
             PropertyKey::Computed(e) => {
                 self.expr(e, dst)?;

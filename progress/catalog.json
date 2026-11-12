@@ -2675,61 +2675,47 @@
           "label": "Values, coercions, references and completions",
           "size": 3,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "8-byte NaN-boxed values, Latin-1/UTF-16 strings with atoms, Number and BigInt storage",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/value.rs",
-                  "marker": "pub struct Value(u64)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn latin1_strings_take_one_byte_per_code_unit"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/value.rs",
+              "marker": "pub struct Value(u64)"
             },
             {
-              "label": "ToPrimitive, ToNumber, ToString, ToObject, ToPropertyKey, equality and relational comparison",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/convert.rs",
-                  "marker": "pub fn is_loosely_equal"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn equality_and_relational_comparison"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn latin1_strings_take_one_byte_per_code_unit"
             },
             {
-              "label": "Environment records, Reference Records and completion records",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/env.rs",
-                  "marker": "pub fn put_value"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/runtime.rs",
-                  "marker": "fn references_resolve_through_the_chain_to_the_global_object"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/convert.rs",
+              "marker": "pub fn is_loosely_equal"
             },
             {
-              "label": "ToBigInt, ToIndex and the remaining numeric conversions (TD-92)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn equality_and_relational_comparison"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/env.rs",
+              "marker": "pub fn put_value"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/runtime.rs",
+              "marker": "fn references_resolve_through_the_chain_to_the_global_object"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/bigint.rs",
+              "marker": "pub fn to_bigint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn bigint_library_and_conversions"
             }
           ]
         },
@@ -3276,8 +3262,29 @@
             },
             {
               "label": "BigInt arithmetic and literals",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/bigint.rs",
+                  "marker": "fn div_rem_magnitude"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/bigint.rs",
+                  "marker": "pub(crate) fn bigint_binary"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn bigint_arithmetic"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/src/runtime/bigint.rs",
+                  "marker": "fn long_division_agrees_with_multiplication"
+                }
+              ]
             },
             {
               "label": "RegExp engine and literals (TD-88)",

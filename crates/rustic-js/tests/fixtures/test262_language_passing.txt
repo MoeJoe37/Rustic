@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 21220 pass, 1207 fail, 1405 skipped (modules, proposals).
+# 21313 pass, 1114 fail, 1405 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -893,7 +893,11 @@ expressions/addition/S11.6.1_A4_T7.js
 expressions/addition/S11.6.1_A4_T8.js
 expressions/addition/S11.6.1_A4_T9.js
 expressions/addition/bigint-and-number.js
+expressions/addition/bigint-arithmetic.js
 expressions/addition/bigint-errors.js
+expressions/addition/bigint-toprimitive.js
+expressions/addition/bigint-wrapped-values.js
+expressions/addition/coerce-bigint-to-string.js
 expressions/addition/coerce-symbol-to-prim-err.js
 expressions/addition/coerce-symbol-to-prim-invocation.js
 expressions/addition/coerce-symbol-to-prim-return-obj.js
@@ -2888,6 +2892,10 @@ expressions/bitwise-and/S11.10.1_A3_T2.8.js
 expressions/bitwise-and/S11.10.1_A3_T2.9.js
 expressions/bitwise-and/bigint-and-number.js
 expressions/bitwise-and/bigint-errors.js
+expressions/bitwise-and/bigint-non-primitive.js
+expressions/bitwise-and/bigint-toprimitive.js
+expressions/bitwise-and/bigint-wrapped-values.js
+expressions/bitwise-and/bigint.js
 expressions/bitwise-and/order-of-evaluation.js
 expressions/bitwise-not/S11.4.8_A1.js
 expressions/bitwise-not/S11.4.8_A2.1_T1.js
@@ -2903,6 +2911,8 @@ expressions/bitwise-not/S9.5_A2.2_T2.js
 expressions/bitwise-not/S9.5_A2.3_T2.js
 expressions/bitwise-not/S9.5_A3.1_T4.js
 expressions/bitwise-not/S9.5_A3.2_T2.js
+expressions/bitwise-not/bigint-non-primitive.js
+expressions/bitwise-not/bigint.js
 expressions/bitwise-or/S11.10.3_A1.js
 expressions/bitwise-or/S11.10.3_A2.1_T1.js
 expressions/bitwise-or/S11.10.3_A2.1_T2.js
@@ -2928,6 +2938,10 @@ expressions/bitwise-or/S11.10.3_A3_T2.8.js
 expressions/bitwise-or/S11.10.3_A3_T2.9.js
 expressions/bitwise-or/bigint-and-number.js
 expressions/bitwise-or/bigint-errors.js
+expressions/bitwise-or/bigint-non-primitive.js
+expressions/bitwise-or/bigint-toprimitive.js
+expressions/bitwise-or/bigint-wrapped-values.js
+expressions/bitwise-or/bigint.js
 expressions/bitwise-or/order-of-evaluation.js
 expressions/bitwise-xor/S11.10.2_A1.js
 expressions/bitwise-xor/S11.10.2_A2.1_T1.js
@@ -2954,6 +2968,10 @@ expressions/bitwise-xor/S11.10.2_A3_T2.8.js
 expressions/bitwise-xor/S11.10.2_A3_T2.9.js
 expressions/bitwise-xor/bigint-and-number.js
 expressions/bitwise-xor/bigint-errors.js
+expressions/bitwise-xor/bigint-non-primitive.js
+expressions/bitwise-xor/bigint-toprimitive.js
+expressions/bitwise-xor/bigint-wrapped-values.js
+expressions/bitwise-xor/bigint.js
 expressions/bitwise-xor/order-of-evaluation.js
 expressions/call/11.2.3-3_1.js
 expressions/call/11.2.3-3_2.js
@@ -7643,7 +7661,11 @@ expressions/division/S11.5.2_A4_T7.js
 expressions/division/S11.5.2_A4_T8.js
 expressions/division/S11.5.2_A4_T9.js
 expressions/division/bigint-and-number.js
+expressions/division/bigint-arithmetic.js
+expressions/division/bigint-complex-infinity.js
 expressions/division/bigint-errors.js
+expressions/division/bigint-toprimitive.js
+expressions/division/bigint-wrapped-values.js
 expressions/division/line-terminator.js
 expressions/division/no-magic-asi-from-block-eval.js
 expressions/division/no-magic-asi.js
@@ -7678,9 +7700,14 @@ expressions/does-not-equals/S11.9.2_A7.6.js
 expressions/does-not-equals/S11.9.2_A7.7.js
 expressions/does-not-equals/S11.9.2_A7.8.js
 expressions/does-not-equals/S11.9.2_A7.9.js
+expressions/does-not-equals/bigint-and-bigint.js
+expressions/does-not-equals/bigint-and-boolean.js
 expressions/does-not-equals/bigint-and-incomparable-primitive.js
+expressions/does-not-equals/bigint-and-non-finite.js
 expressions/does-not-equals/bigint-and-number-extremes.js
+expressions/does-not-equals/bigint-and-number.js
 expressions/does-not-equals/bigint-and-object.js
+expressions/does-not-equals/bigint-and-string.js
 expressions/dynamic-import/escape-sequence-import.js
 expressions/dynamic-import/import-attributes/2nd-param-yield-ident-invalid.js
 expressions/dynamic-import/syntax/invalid/invalid-assignmenttargettype-syntax-error-1-update-expression.js
@@ -7857,9 +7884,14 @@ expressions/equals/S11.9.1_A7.7.js
 expressions/equals/S11.9.1_A7.8.js
 expressions/equals/S11.9.1_A7.9.js
 expressions/equals/S9.1_A1_T3.js
+expressions/equals/bigint-and-bigint.js
+expressions/equals/bigint-and-boolean.js
 expressions/equals/bigint-and-incomparable-primitive.js
+expressions/equals/bigint-and-non-finite.js
 expressions/equals/bigint-and-number-extremes.js
+expressions/equals/bigint-and-number.js
 expressions/equals/bigint-and-object.js
+expressions/equals/bigint-and-string.js
 expressions/equals/coerce-symbol-to-prim-err.js
 expressions/equals/coerce-symbol-to-prim-invocation.js
 expressions/equals/coerce-symbol-to-prim-return-obj.js
@@ -7892,7 +7924,12 @@ expressions/exponentiation/applying-the-exp-operator_A7.js
 expressions/exponentiation/applying-the-exp-operator_A8.js
 expressions/exponentiation/applying-the-exp-operator_A9.js
 expressions/exponentiation/bigint-and-number.js
+expressions/exponentiation/bigint-arithmetic.js
 expressions/exponentiation/bigint-errors.js
+expressions/exponentiation/bigint-negative-exponent-throws.js
+expressions/exponentiation/bigint-toprimitive.js
+expressions/exponentiation/bigint-wrapped-values.js
+expressions/exponentiation/bigint-zero-base-zero-exponent.js
 expressions/exponentiation/exp-assignment-operator.js
 expressions/exponentiation/exp-operator-evaluation-order.js
 expressions/exponentiation/exp-operator-precedence-unary-expression-semantics.js
@@ -8491,8 +8528,12 @@ expressions/greater-than-or-equal/S11.8.4_A4.6.js
 expressions/greater-than-or-equal/S11.8.4_A4.7.js
 expressions/greater-than-or-equal/S11.8.4_A4.8.js
 expressions/greater-than-or-equal/S11.8.4_A4.9.js
+expressions/greater-than-or-equal/bigint-and-bigint.js
 expressions/greater-than-or-equal/bigint-and-incomparable-string.js
+expressions/greater-than-or-equal/bigint-and-non-finite.js
 expressions/greater-than-or-equal/bigint-and-number-extremes.js
+expressions/greater-than-or-equal/bigint-and-number.js
+expressions/greater-than-or-equal/bigint-and-string.js
 expressions/greater-than/11.8.2-1.js
 expressions/greater-than/11.8.2-2.js
 expressions/greater-than/11.8.2-3.js
@@ -8534,8 +8575,13 @@ expressions/greater-than/S11.8.2_A4.6.js
 expressions/greater-than/S11.8.2_A4.7.js
 expressions/greater-than/S11.8.2_A4.8.js
 expressions/greater-than/S11.8.2_A4.9.js
+expressions/greater-than/bigint-and-bigint.js
+expressions/greater-than/bigint-and-boolean.js
 expressions/greater-than/bigint-and-incomparable-string.js
+expressions/greater-than/bigint-and-non-finite.js
 expressions/greater-than/bigint-and-number-extremes.js
+expressions/greater-than/bigint-and-number.js
+expressions/greater-than/bigint-and-string.js
 expressions/greater-than/bigint-and-symbol.js
 expressions/grouping/S11.1.6_A1.js
 expressions/grouping/S11.1.6_A2_T1.js
@@ -8670,6 +8716,10 @@ expressions/left-shift/S9.5_A3.1_T3.js
 expressions/left-shift/S9.5_A3.2_T1.js
 expressions/left-shift/bigint-and-number.js
 expressions/left-shift/bigint-errors.js
+expressions/left-shift/bigint-non-primitive.js
+expressions/left-shift/bigint-toprimitive.js
+expressions/left-shift/bigint-wrapped-values.js
+expressions/left-shift/bigint.js
 expressions/left-shift/order-of-evaluation.js
 expressions/less-than-or-equal/11.8.3-1.js
 expressions/less-than-or-equal/11.8.3-2.js
@@ -8712,8 +8762,12 @@ expressions/less-than-or-equal/S11.8.3_A4.6.js
 expressions/less-than-or-equal/S11.8.3_A4.7.js
 expressions/less-than-or-equal/S11.8.3_A4.8.js
 expressions/less-than-or-equal/S11.8.3_A4.9.js
+expressions/less-than-or-equal/bigint-and-bigint.js
 expressions/less-than-or-equal/bigint-and-incomparable-string.js
+expressions/less-than-or-equal/bigint-and-non-finite.js
 expressions/less-than-or-equal/bigint-and-number-extremes.js
+expressions/less-than-or-equal/bigint-and-number.js
+expressions/less-than-or-equal/bigint-and-string.js
 expressions/less-than/S11.8.1_A1.js
 expressions/less-than/S11.8.1_A2.1_T1.js
 expressions/less-than/S11.8.1_A2.1_T2.js
@@ -8751,8 +8805,13 @@ expressions/less-than/S11.8.1_A4.6.js
 expressions/less-than/S11.8.1_A4.7.js
 expressions/less-than/S11.8.1_A4.8.js
 expressions/less-than/S11.8.1_A4.9.js
+expressions/less-than/bigint-and-bigint.js
+expressions/less-than/bigint-and-boolean.js
 expressions/less-than/bigint-and-incomparable-string.js
+expressions/less-than/bigint-and-non-finite.js
 expressions/less-than/bigint-and-number-extremes.js
+expressions/less-than/bigint-and-number.js
+expressions/less-than/bigint-and-string.js
 expressions/less-than/bigint-and-symbol.js
 expressions/logical-and/S11.11.1_A1.js
 expressions/logical-and/S11.11.1_A2.1_T1.js
@@ -8866,6 +8925,7 @@ expressions/logical-not/S9.2_A4_T4.js
 expressions/logical-not/S9.2_A5_T2.js
 expressions/logical-not/S9.2_A5_T4.js
 expressions/logical-not/S9.2_A6_T2.js
+expressions/logical-not/bigint.js
 expressions/logical-not/symbol-logical-not-evaluation.js
 expressions/logical-or/S11.11.2_A1.js
 expressions/logical-or/S11.11.2_A2.1_T1.js
@@ -8918,7 +8978,11 @@ expressions/modulus/S11.5.3_A4_T5.js
 expressions/modulus/S11.5.3_A4_T6.js
 expressions/modulus/S11.5.3_A4_T7.js
 expressions/modulus/bigint-and-number.js
+expressions/modulus/bigint-arithmetic.js
 expressions/modulus/bigint-errors.js
+expressions/modulus/bigint-modulo-zero.js
+expressions/modulus/bigint-toprimitive.js
+expressions/modulus/bigint-wrapped-values.js
 expressions/modulus/line-terminator.js
 expressions/modulus/order-of-evaluation.js
 expressions/multiplication/S11.5.1_A1.js
@@ -8955,7 +9019,10 @@ expressions/multiplication/S11.5.1_A4_T6.js
 expressions/multiplication/S11.5.1_A4_T7.js
 expressions/multiplication/S11.5.1_A4_T8.js
 expressions/multiplication/bigint-and-number.js
+expressions/multiplication/bigint-arithmetic.js
 expressions/multiplication/bigint-errors.js
+expressions/multiplication/bigint-toprimitive.js
+expressions/multiplication/bigint-wrapped-values.js
 expressions/multiplication/line-terminator.js
 expressions/multiplication/order-of-evaluation.js
 expressions/new.target/asi.js
@@ -9835,6 +9902,7 @@ expressions/object/identifier-shorthand-static-invalid-strict-mode.js
 expressions/object/identifier-shorthand-yield-invalid-strict-mode.js
 expressions/object/let-non-strict-access.js
 expressions/object/let-non-strict-syntax.js
+expressions/object/literal-property-name-bigint.js
 expressions/object/method-definition/async-await-as-binding-identifier-escaped.js
 expressions/object/method-definition/async-await-as-binding-identifier.js
 expressions/object/method-definition/async-await-as-identifier-reference-escaped.js
@@ -10229,6 +10297,7 @@ expressions/postfix-decrement/S11.3.2_A5_T3.js
 expressions/postfix-decrement/S11.3.2_A6_T3.js
 expressions/postfix-decrement/arguments-nostrict.js
 expressions/postfix-decrement/arguments.js
+expressions/postfix-decrement/bigint.js
 expressions/postfix-decrement/eval-nostrict.js
 expressions/postfix-decrement/eval.js
 expressions/postfix-decrement/line-terminator-carriage-return.js
@@ -10264,6 +10333,7 @@ expressions/postfix-increment/S11.3.1_A5_T3.js
 expressions/postfix-increment/S11.3.1_A6_T3.js
 expressions/postfix-increment/arguments-nostrict.js
 expressions/postfix-increment/arguments.js
+expressions/postfix-increment/bigint.js
 expressions/postfix-increment/eval-nostrict.js
 expressions/postfix-increment/eval.js
 expressions/postfix-increment/line-terminator-carriage-return.js
@@ -10299,6 +10369,7 @@ expressions/prefix-decrement/S11.4.5_A5_T3.js
 expressions/prefix-decrement/S11.4.5_A6_T3.js
 expressions/prefix-decrement/arguments-nostrict.js
 expressions/prefix-decrement/arguments.js
+expressions/prefix-decrement/bigint.js
 expressions/prefix-decrement/eval-nostrict.js
 expressions/prefix-decrement/eval.js
 expressions/prefix-decrement/operator-prefix-decrement-x-calls-putvalue-lhs-newvalue--1.js
@@ -10329,6 +10400,7 @@ expressions/prefix-increment/S11.4.4_A5_T3.js
 expressions/prefix-increment/S11.4.4_A6_T3.js
 expressions/prefix-increment/arguments-nostrict.js
 expressions/prefix-increment/arguments.js
+expressions/prefix-increment/bigint.js
 expressions/prefix-increment/eval-nostrict.js
 expressions/prefix-increment/eval.js
 expressions/prefix-increment/operator-prefix-increment-x-calls-putvalue-lhs-newvalue--1.js
@@ -10393,6 +10465,10 @@ expressions/right-shift/S11.7.2_A5.1_T1.js
 expressions/right-shift/S11.7.2_A5.2_T1.js
 expressions/right-shift/bigint-and-number.js
 expressions/right-shift/bigint-errors.js
+expressions/right-shift/bigint-non-primitive.js
+expressions/right-shift/bigint-toprimitive.js
+expressions/right-shift/bigint-wrapped-values.js
+expressions/right-shift/bigint.js
 expressions/right-shift/order-of-evaluation.js
 expressions/strict-does-not-equals/S11.9.5_A1.js
 expressions/strict-does-not-equals/S11.9.5_A2.1_T1.js
@@ -10416,9 +10492,14 @@ expressions/strict-does-not-equals/S11.9.5_A8_T2.js
 expressions/strict-does-not-equals/S11.9.5_A8_T3.js
 expressions/strict-does-not-equals/S11.9.5_A8_T4.js
 expressions/strict-does-not-equals/S11.9.5_A8_T5.js
+expressions/strict-does-not-equals/bigint-and-bigint.js
+expressions/strict-does-not-equals/bigint-and-boolean.js
 expressions/strict-does-not-equals/bigint-and-incomparable-primitive.js
+expressions/strict-does-not-equals/bigint-and-non-finite.js
 expressions/strict-does-not-equals/bigint-and-number-extremes.js
+expressions/strict-does-not-equals/bigint-and-number.js
 expressions/strict-does-not-equals/bigint-and-object.js
+expressions/strict-does-not-equals/bigint-and-string.js
 expressions/strict-equals/S11.9.4_A1.js
 expressions/strict-equals/S11.9.4_A2.1_T1.js
 expressions/strict-equals/S11.9.4_A2.1_T2.js
@@ -10441,9 +10522,14 @@ expressions/strict-equals/S11.9.4_A8_T2.js
 expressions/strict-equals/S11.9.4_A8_T3.js
 expressions/strict-equals/S11.9.4_A8_T4.js
 expressions/strict-equals/S11.9.4_A8_T5.js
+expressions/strict-equals/bigint-and-bigint.js
+expressions/strict-equals/bigint-and-boolean.js
 expressions/strict-equals/bigint-and-incomparable-primitive.js
+expressions/strict-equals/bigint-and-non-finite.js
 expressions/strict-equals/bigint-and-number-extremes.js
+expressions/strict-equals/bigint-and-number.js
 expressions/strict-equals/bigint-and-object.js
+expressions/strict-equals/bigint-and-string.js
 expressions/subtraction/S11.6.2_A1.js
 expressions/subtraction/S11.6.2_A2.1_T1.js
 expressions/subtraction/S11.6.2_A2.1_T2.js
@@ -10477,7 +10563,10 @@ expressions/subtraction/S11.6.2_A4_T6.js
 expressions/subtraction/S11.6.2_A4_T7.js
 expressions/subtraction/S11.6.2_A4_T8.js
 expressions/subtraction/bigint-and-number.js
+expressions/subtraction/bigint-arithmetic.js
 expressions/subtraction/bigint-errors.js
+expressions/subtraction/bigint-toprimitive.js
+expressions/subtraction/bigint-wrapped-values.js
 expressions/subtraction/order-of-evaluation.js
 expressions/super/call-arg-evaluation-err.js
 expressions/super/call-bind-this-value-twice.js
@@ -10651,6 +10740,7 @@ expressions/this/S11.1.1_A3.1.js
 expressions/this/S11.1.1_A3.2.js
 expressions/this/S11.1.1_A4.1.js
 expressions/this/S11.1.1_A4.2.js
+expressions/typeof/bigint.js
 expressions/typeof/boolean.js
 expressions/typeof/built-in-exotic-objects-no-call.js
 expressions/typeof/built-in-functions.js
@@ -10677,6 +10767,8 @@ expressions/unary-minus/S11.4.7_A3_T4.js
 expressions/unary-minus/S11.4.7_A3_T5.js
 expressions/unary-minus/S11.4.7_A4.1.js
 expressions/unary-minus/S11.4.7_A4.2.js
+expressions/unary-minus/bigint-non-primitive.js
+expressions/unary-minus/bigint.js
 expressions/unary-plus/11.4.6-2-1.js
 expressions/unary-plus/S11.4.6_A1.js
 expressions/unary-plus/S11.4.6_A2.1_T1.js
@@ -11512,6 +11604,7 @@ literals/bigint/numeric-separators/numeric-separator-literal-oil-od-nsl-od.js
 literals/bigint/numeric-separators/numeric-separator-literal-oil-od-nsl-ods.js
 literals/bigint/numeric-separators/numeric-separator-literal-oil-ods-nsl-od.js
 literals/bigint/numeric-separators/numeric-separator-literal-oil-ods-nsl-ods.js
+literals/bigint/numeric-separators/numeric-separator-literal-sign-minus-dds-nsl-dd.js
 literals/bigint/numeric-separators/numeric-separator-literal-unicode-err.js
 literals/bigint/octal-invalid-digit.js
 literals/boolean/S7.8.2_A1_T1.js

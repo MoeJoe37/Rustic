@@ -113,6 +113,7 @@ const BUILT_IN_DIRS: &[&str] = &[
     "AsyncGeneratorFunction",
     "AsyncGeneratorPrototype",
     "AsyncIteratorPrototype",
+    "BigInt",
     "Boolean",
     "Date",
     "Error",

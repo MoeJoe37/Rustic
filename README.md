@@ -35,7 +35,7 @@ tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 26.16%** (22.68% verified complete + 3.48% partial credit) — 56/221 capabilities complete and 8 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 66.64% done.
+**Overall engine completion: 26.44%** (23.09% verified complete + 3.35% partial credit) — 57/221 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 69.85% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

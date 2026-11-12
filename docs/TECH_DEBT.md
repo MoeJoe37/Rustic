@@ -123,7 +123,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, M4 |
 | TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
 | TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
-| TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and other numeric conversions are missing | Open, JS-05/JS-08 |
+| TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and the other numeric conversions are missing | Paid |
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Paid |
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
@@ -143,6 +143,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Open, JS-06 |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
+| TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, JS-09 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1321,7 +1322,7 @@ tails returned to the allocator, and the budget reset to the exact live
 footprint. `tests/gc.rs` and the `js-heap` fuzz target check it. Weak
 references and DOM host-object tracing are TD-96.
 
-### TD-92 — BigInt and number conversions are partial
+### TD-92 — BigInt and number conversions are partial (Paid)
 
 `BigInt` stores sign and magnitude, prints in decimal, and compares with
 BigInts and Numbers exactly, which is what equality, `<` and `ToString` need.
@@ -1334,6 +1335,11 @@ The interpreter (JS-04) throws a `TypeError` for arithmetic on BigInt values
 and rejects BigInt literals at compile time (TD-97).
 
 Pay with the Number built-ins (JS-05) and the BigInt work of JS-08.
+
+**Paid** by JS-08 part 4: `runtime/bigint.rs` implements the arithmetic of
+§6.1.6.2 and `builtins/bigint.rs` the `BigInt` constructor, `ToBigInt`,
+`ToBigInt64`/`ToBigUint64` and `ToIndex`. BigInt literals and literal property
+keys compile. Number radix printing was already paid by JS-05.
 
 ### TD-93 — Bindings are found by name search (Paid)
 
@@ -1576,3 +1582,18 @@ Pay with: a linear-time fallback (a Pike VM or lazy DFA) for patterns with
 no backreferences or lookarounds, chosen when the backtracker exceeds a
 step count, as V8's experimental engine does. Trigger: a measured slow
 page or a ReDoS report.
+
+### TD-112 — BigInt size cap and quadratic arithmetic
+
+A BigInt result may have at most 2²⁰ bits (`MAX_BIGINT_BITS`, 128 KiB of
+limbs); a larger one throws the RangeError other engines throw at their own,
+larger limits (2³⁰ bits in V8). Multiplication and division are the schoolbook
+algorithms and decimal conversion is quadratic, and none of them reaches a
+safe point, so the cap is what bounds the time one operator can take: about a
+second for a worst-case multiplication at the limit. Sizes are checked before
+any limb is allocated, and every result is charged to the heap budget.
+
+Pay with: Karatsuba (and Toom-3 if measured) multiplication, a
+divide-and-conquer radix conversion, polling the step budget inside long
+operations, and then raising the cap. Trigger: a page or benchmark that needs
+integers above 2²⁰ bits, or a measured hot spot in BigInt arithmetic (JS-09).

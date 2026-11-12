@@ -1249,6 +1249,22 @@ from inside it (TD-100 paid). Test262:
 `test/built-ins` files (90.5%) with `GeneratorFunction` and
 `GeneratorPrototype` gated.
 
+## JS-06 part 1: promises, jobs and async functions
+
+`Promise` with `then`, `catch`, `finally`, `resolve`, `reject`, `try`,
+`withResolvers` and the four combinators, `AggregateError`, and `async`
+functions, arrows and methods run. Settled promises queue reaction jobs on
+the agent; the embedder drains them with `Agent::run_jobs`. Internal
+reactions (an `await`, or `then` on an intrinsic promise) allocate no
+resolving function objects. An async function shares the generator
+machinery: `await` saves the frame into its state object and the reaction
+job resumes it. The Test262 runner now runs async tests through
+`doneprintHandle.js`, which moved about 4,650 `test/language` files from
+skipped to run: 16,723 of 22,427 run files pass (74.6%; most failures are
+async generators and `for await`), and 11,487 of 12,713 `test/built-ins`
+files (90.4%) with `Promise`, `AsyncFunction` and `AggregateError` gated.
+Unhandled rejections are not reported to the host yet (TD-109).
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,
@@ -1310,9 +1326,9 @@ lists the next tasks.
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; no collection yet (TD-91), partial BigInt conversions (TD-92); see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
-| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators run (JS-08 part 1); async, modules and RegExp remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
+| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators (JS-08 part 1) and async functions (JS-06 part 1) run; async generators, modules and RegExp remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
 | JS-05: core built-ins | Part 1 complete: Error and native errors, `Object`, `Function.prototype` with bound functions, global functions and primitive wrapper constructors, native constructors usable with `new`, `extends` and `super`; part 2 so far adds the `Function` constructor, `Array`, `String`, `Number`, `Math`, `JSON`, `Map`, `Set`, the weak collections, `Reflect`, `Date`, the iterator helpers, `eval` and the `Symbol` statics; function source text remains (TD-106, TD-107); see [JS.md](JS.md#built-ins-js-05) |
-| JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (16,150 of 17,773 run files with JS-05 and generators so far, plus 10,802 of 11,937 `test/built-ins` files in the gated areas); modules, async and built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
+| JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (16,723 of 22,427 run files with JS-05, generators and async tests so far, plus 11,487 of 12,713 `test/built-ins` files in the gated areas); modules and the remaining built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
 | JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
 
 M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and

@@ -11,7 +11,7 @@
 //! and afterwards every agent still evaluates script and stays within its
 //! heap budget.
 use crate::Target;
-use rustic_js::runtime::{Agent, Kind, Roots, Value};
+use rustic_js::runtime::{Abrupt, Agent, Kind, Roots, Value};
 use rustic_js::{EvalError, VmLimits};
 
 pub(crate) struct JsRunTarget;
@@ -70,6 +70,22 @@ fn run(text: &str, mode: Mode) -> Result<String, String> {
         Err(EvalError::OutOfMemory) => "oom".into(),
         Err(EvalError::Cancelled) => "cancelled".into(),
     };
+    // Promise jobs the script queued run after it, as a host would run
+    // them; a program records what they did in the global `out`.
+    let outcome = if outcome == "oom" {
+        outcome
+    } else {
+        match agent.run_jobs() {
+            Ok(()) => match agent.evaluate("typeof out === 'undefined' ? '' : String(out)") {
+                Ok(value) => format!("{outcome}; out {}", show(&agent, value)),
+                Err(EvalError::OutOfMemory) => format!("{outcome}; oom"),
+                Err(_) => format!("{outcome}; out unreadable"),
+            },
+            Err(Abrupt::Throw(value)) => format!("{outcome}; job throw {}", show(&agent, value)),
+            Err(Abrupt::OutOfMemory) => format!("{outcome}; oom"),
+            Err(Abrupt::Cancelled) => format!("{outcome}; job cancelled"),
+        }
+    };
     // The agent must survive whatever the script did.
     agent.heap.set_gc_stress(false);
     agent.set_step_budget(Some(STEPS));
@@ -82,7 +98,7 @@ fn run(text: &str, mode: Mode) -> Result<String, String> {
     }
     match agent.evaluate("1 + 1") {
         Ok(v) if v.as_number() == Some(2.0) => {}
-        Err(EvalError::OutOfMemory) if outcome == "oom" => {}
+        Err(EvalError::OutOfMemory) if outcome.ends_with("oom") => {}
         other => {
             return Err(format!(
                 "agent unusable after a run that ended with {outcome}: {other:?}"
@@ -147,6 +163,11 @@ impl Target for JsRunTarget {
             b"-0",
             b"++",
             b"+= ",
+            b"async ",
+            b"await ",
+            b"Promise.resolve(",
+            b".then(",
+            b"out += ",
         ]
     }
 
@@ -160,7 +181,7 @@ impl Target for JsRunTarget {
             ));
         }
         let collecting = run(&text, Mode::Collecting)?;
-        if cached != collecting && cached != "oom" && collecting != "oom" {
+        if cached != collecting && !cached.ends_with("oom") && !collecting.ends_with("oom") {
             return Err(format!(
                 "collecting at every safe point changes the result: {cached:?} normally, {collecting:?} collecting"
             ));

@@ -25,6 +25,10 @@ fn main() {
     let mut agent = Agent::new().expect("a default heap fits its intrinsics");
     let start = Instant::now();
     let result = agent.evaluate(&source);
+    // A microtask checkpoint: run the promise jobs the script queued.
+    if let Err(error) = agent.run_jobs() {
+        println!("jobs: {error:?}");
+    }
     let elapsed = start.elapsed();
     match result {
         Ok(value) => println!("{}", agent.display(value)),

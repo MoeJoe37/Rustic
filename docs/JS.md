@@ -8,8 +8,9 @@ model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
 garbage collector (see [Garbage collection](#garbage-collection-js-03)).
 JS-04 compiles scripts to bytecode and runs them (see
 [Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
-generators (JS-08 part 1); async functions, modules and regular expressions
-do not run yet.
+generators (JS-08 part 1), promises with a job queue and async functions
+(JS-06 part 1); async generators, modules and regular expressions do not
+run yet.
 
 ## API
 
@@ -123,12 +124,18 @@ cargo run --release -p rustic-js --example test262 -- /path/to/test262 \
 The example prints pass, fail and skip counts per directory, and `--list`
 writes the verdict and reason for every file. At the pinned revision:
 
-| | `test/language` | `test/built-ins` (JS-05 areas) |
+| | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 13,087 | 10,534 |
-| Fail | 4,686 | 1,319 |
-| Skipped (modules, async, proposals) | 6,059 | 102 |
-| Pass rate of the files that run | 73.6% | 88.9% |
+| Pass | 16,723 | 11,487 |
+| Fail | 5,704 | 1,226 |
+| Skipped (modules, proposals) | 1,405 | 101 |
+| Pass rate of the files that run | 74.6% | 90.4% |
+
+Async tests run since promises landed: after the script the runner drains
+the job queue, and the test passes when `$DONE` printed
+`Test262:AsyncTestComplete`. That moved about 4,650 `test/language` files
+from skipped to run, most of which need async generators or `for await`
+(about 4,350); before it, 16,150 of 17,773 run files passed (90.9%).
 
 The `test/language` files that pass were 7,708 on the first run, 7,895 after
 four interpreter bugs it found were fixed, and 10,726 after JS-05 part 1.
@@ -160,8 +167,9 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 
 Most `test/language` failures are not interpreter bugs yet:
 
-- About 590 files need async functions (JS-08).
-- About 240 need regular expressions.
+- About 3,780 files need async generators and 570 `for await` (JS-08).
+- About 410 are module files reached through async ones, and 240 need
+  regular expressions.
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
 - Modules, BigInt arithmetic, `Proxy` and typed arrays account for most of
@@ -173,7 +181,7 @@ Most `test/language` failures are not interpreter bugs yet:
 In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), or tests that reach for
 `RegExp`, `Proxy`, Temporal, typed arrays or `$262`. Skipped files are never
-counted as passing. Module and async files join with JS-06 (TD-105).
+counted as passing. Module files join with JS-06 module loading (TD-105).
 
 ## Fuzzing
 
@@ -379,8 +387,32 @@ calls a function value. The design is recorded in
     17,773 files (90.8%; 16,150 once array destructuring closed its iterator
     on errors, TD-100), and the built-ins gate gained 268 files, mostly in
     `Iterator`; `GeneratorFunction` and `GeneratorPrototype` are gated.
+- **Promises and async functions** (§27.2, §27.7): `Promise` with `then`,
+  `catch`, `finally` and the statics `resolve`, `reject`, `all`,
+  `allSettled`, `any`, `race`, `withResolvers` and `try`;
+  `AggregateError`; `async` functions, arrows and methods with `await`,
+  and `%AsyncFunction%` (`builtins/promise.rs`).
+  - Jobs wait in a queue on the agent. The host runs them with
+    `Agent::run_jobs()`, a microtask checkpoint; `js_run` and the Test262
+    runner call it after the script. Jobs run at the host level, so their
+    script collects at its safe points like any other.
+  - A promise is an ordinary object with a boxed record: state, result
+    and its reactions (40 bytes each). A promise made by `%Promise%` for
+    `then` or an async function has no resolving function objects, since
+    nothing can reach them; a job settles it directly. They are created
+    only where script sees them: the executor of `new Promise`, a
+    thenable's `then`, `withResolvers`, subclass constructors and the
+    combinators' element functions (built-in closures whose few captured
+    values sit in one boxed slice).
+  - An async function starts like any call; its first op creates the
+    promise and a state object. `await` attaches a reaction that refers
+    to that state object (no closures), saves the registers as a
+    generator does, and returns the promise to the caller. The job
+    resumes the frame with the value or throws it. A catch-all handler
+    rejects the promise on a throw, and `return` resolves it.
+  - Unhandled rejections are not reported to the host yet (TD-109).
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): async functions, modules, regular
+  anything runs, TD-97): async generators, `for await`, modules, regular
   expression literals and BigInt literals. Built-in constructors
   cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
   (TD-92).

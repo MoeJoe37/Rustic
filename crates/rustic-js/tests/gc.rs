@@ -794,3 +794,30 @@ fn generator_bodies_collect_at_their_safe_points() {
     // The generator body ran without collecting.
     assert!(a.heap.collections() - before < 10);
 }
+
+#[test]
+fn awaiting_async_functions_and_queued_jobs_survive_collection() {
+    let mut a = agent();
+    // The suspended frame is reachable only through the pending promise's
+    // reaction, which only the stored resolve function reaches.
+    a.evaluate(
+        "var out = ''; var release; \
+         (async function () { var local = { v: 'kept' }; var x = await new Promise(r => { release = r }); \
+             out = local.v + x.v })(); \
+         Promise.resolve({ v: 'queued' }).then(o => { out += o.v });",
+    )
+    .unwrap();
+    a.collect_garbage(Roots::default());
+    a.run_jobs().unwrap();
+    a.evaluate("release({ v: '!' })").unwrap();
+    for _ in 0..2 {
+        a.evaluate(
+            "var junk = []; for (var i = 0; i < 2000; i++) junk.push({ i: i }); junk = null",
+        )
+        .unwrap();
+        a.collect_garbage(Roots::default());
+    }
+    a.run_jobs().unwrap();
+    let out = a.evaluate("out").unwrap();
+    assert_eq!(a.display(out), "kept!");
+}

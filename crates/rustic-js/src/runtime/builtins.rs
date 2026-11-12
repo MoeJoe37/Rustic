@@ -15,6 +15,7 @@ mod json;
 mod math;
 mod number_object;
 mod object;
+pub(crate) mod promise;
 mod reflect;
 mod string_object;
 
@@ -143,6 +144,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     date::install(agent)?;
     iterator::install(agent)?;
     generator::install(agent)?;
+    promise::install(agent)?;
     reflect::install(agent)?;
 
     // Value properties of the global object (§19.1).

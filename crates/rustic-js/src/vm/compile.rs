@@ -234,6 +234,8 @@ struct Gen<'a, 't> {
     eval: Option<Option<u16>>,
     /// Compiling a generator function's body.
     generator: bool,
+    /// Compiling an async function's body.
+    is_async: bool,
 }
 
 impl<'a, 't> Gen<'a, 't> {
@@ -280,6 +282,7 @@ impl<'a, 't> Gen<'a, 't> {
             next_home_object: false,
             eval: None,
             generator: false,
+            is_async: false,
         }
     }
 
@@ -301,6 +304,19 @@ impl<'a, 't> Gen<'a, 't> {
             self.emit(Op::Undefined { dst: r });
         }
         self.emit(Op::Return { src: r });
+        if self.is_async {
+            // Everything after `AsyncStart` rejects the promise on a throw.
+            let landing = self.here();
+            let exception = self.temp()?;
+            self.handlers.push(Handler {
+                start: 1,
+                end: landing,
+                target: landing,
+                exception,
+                scope_depth: 0,
+            });
+            self.emit(Op::AsyncReject { src: exception });
+        }
         // Jump targets are `u32`. Nothing has run yet, so a target that
         // wrapped while compiling is rejected here before it can be used.
         u32::try_from(self.ops.len()).map_err(|_| CompileError::TooLarge)?;
@@ -318,6 +334,7 @@ impl<'a, 't> Gen<'a, 't> {
             strict: self.strict,
             kind: self.kind,
             generator: self.generator,
+            is_async: self.is_async,
             sites: self.sites.into_boxed_slice(),
             templates: self.templates.into_boxed_slice(),
         };
@@ -568,8 +585,8 @@ impl<'a, 't> Gen<'a, 't> {
         for s in body {
             if let StatementKind::Function(f) = &s.kind {
                 let Some(id) = &f.id else { continue };
-                if f.is_async {
-                    return Err(CompileError::Unsupported("async functions", f.span));
+                if f.is_async && f.is_generator {
+                    return Err(CompileError::Unsupported("async generators", f.span));
                 }
                 let mark = self.mark();
                 let r = self.temp()?;
@@ -1631,8 +1648,8 @@ impl<'a, 't> Gen<'a, 't> {
         name_hint: Option<&str>,
         kind: FunctionKind,
     ) -> CResult<()> {
-        if f.is_async {
-            return Err(CompileError::Unsupported("async functions", f.span));
+        if f.is_async && f.is_generator {
+            return Err(CompileError::Unsupported("async generators", f.span));
         }
         let scope = self.tree.scope_of(f).expect("functions are analyzed");
         let name = match (&f.id, name_hint) {
@@ -1656,7 +1673,11 @@ impl<'a, 't> Gen<'a, 't> {
             };
             g.home_object = std::mem::take(&mut self.next_home_object);
             g.generator = f.is_generator;
+            g.is_async = f.is_async;
             g.guard()?;
+            if g.is_async {
+                g.emit(Op::AsyncStart);
+            }
             if kind == FunctionKind::ClassConstructor {
                 // Fields are defined before the parameters are bound. The
                 // incoming arguments own the first registers, so work in
@@ -1692,9 +1713,6 @@ impl<'a, 't> Gen<'a, 't> {
         dst: Reg,
         name_hint: Option<&str>,
     ) -> CResult<()> {
-        if f.is_async {
-            return Err(CompileError::Unsupported("async functions", f.span));
-        }
         let scope = self.tree.scope_of(f).expect("arrows are analyzed");
         let name = match name_hint {
             Some(hint) => self.atom_id(hint)?,
@@ -1712,7 +1730,11 @@ impl<'a, 't> Gen<'a, 't> {
             );
             g.home_static = self.home_static;
             g.home_object = self.home_object;
+            g.is_async = f.is_async;
             g.guard()?;
+            if g.is_async {
+                g.emit(Op::AsyncStart);
+            }
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
             match &f.body {
                 ArrowBody::Block(body) => {
@@ -3455,8 +3477,16 @@ impl<'a, 't> Gen<'a, 't> {
                 let argument = argument.as_deref().expect("yield* has an operand");
                 self.yield_delegate(argument, dst)?;
             }
-            ExpressionKind::Await(_) => {
-                return Err(CompileError::Unsupported("async functions", e.span));
+            ExpressionKind::Await(argument) => {
+                let value = self.temp()?;
+                self.expr(argument, value)?;
+                let mode = self.temp()?;
+                self.emit(Op::Await {
+                    src: value,
+                    dst,
+                    mode,
+                });
+                self.resumption(dst, mode)?;
             }
         }
         self.release(mark);

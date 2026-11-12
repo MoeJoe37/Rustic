@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "fb5d8eb8d2afe8fa479a58132316975e885068cd040763654db8aeeb69dadc6f",
-  "percent": "25.27",
+  "source_fingerprint": "491c32b59217c5fef16d01fc78b303b5b0bf0c4b0fab1e7101133e593a008cbf",
+  "percent": "25.56",
   "verified_percent": "21.99",
-  "partial_percent": "3.28",
+  "partial_percent": "3.57",
   "completed": 55,
-  "in_progress": 8,
+  "in_progress": 9,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 2,
       "total": 13,
-      "percent": "56.71",
+      "percent": "59.89",
       "verified_percent": "24.61",
-      "partial_percent": "32.10"
+      "partial_percent": "35.28"
     },
     {
       "id": "M5",
@@ -3490,9 +3490,42 @@
           "label": "Promises, jobs and realms",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Promise, reaction jobs and the job queue",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/promise.rs",
+                  "marker": "pub fn run_jobs"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn promises_and_async_functions"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn awaiting_async_functions_and_queued_jobs_survive_collection"
+                }
+              ]
+            },
+            {
+              "label": "Host rejection tracking (TD-109)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Realms and $262.createRealm",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.41"
         },
         {
@@ -3535,7 +3568,23 @@
               ]
             },
             {
-              "label": "Async functions, await and for await",
+              "label": "Async functions and await",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn async_resume"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn promises_and_async_functions"
+                }
+              ]
+            },
+            {
+              "label": "Async generators and for await",
               "status": "planned",
               "evidence": []
             },
@@ -3555,7 +3604,7 @@
               "evidence": []
             }
           ],
-          "credit": "20.00",
+          "credit": "33.33",
           "engine_share": "1.09"
         },
         {
@@ -3660,12 +3709,12 @@
       ],
       "points": 73,
       "completed": 2,
-      "in_progress": 7,
+      "in_progress": 8,
       "total": 15,
-      "contribution": "5.32",
-      "percent": "53.23",
+      "contribution": "5.60",
+      "percent": "56.06",
       "verified_percent": "21.91",
-      "partial_percent": "31.32"
+      "partial_percent": "34.15"
     },
     {
       "id": "wasm",

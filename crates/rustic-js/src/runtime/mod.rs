@@ -25,6 +25,9 @@ pub use agent::{
 };
 pub use bigint::BigInt;
 pub(crate) use builtins::iterator_result;
+pub(crate) use builtins::promise::{
+    await_value, new_intrinsic_promise, reject_promise, resolve_promise,
+};
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
 pub(crate) use env::{BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT};
@@ -40,7 +43,7 @@ pub use number::{
 pub use object::{Class, PropertyDescriptor};
 pub(crate) use object::{
     Closure, Extra, FLAG_CLOSURE, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR, FLAG_PROTOTYPE,
-    Generator, GeneratorState, Internal, Object,
+    Generator, GeneratorState, Internal, Job, Object,
 };
 pub(crate) use shape::ShapeId;
 pub use shape::{Attributes, MAX_SHAPE_PROPERTIES, PropertyKey};

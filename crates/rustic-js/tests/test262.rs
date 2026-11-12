@@ -105,8 +105,10 @@ fn test262_language_execution_matches_the_passing_list() {
 /// The `test/built-ins` directories of the library areas JS-05 has
 /// installed so far. The checkout must include them (see docs/JS.md).
 const BUILT_IN_DIRS: &[&str] = &[
+    "AggregateError",
     "Array",
     "ArrayIteratorPrototype",
+    "AsyncFunction",
     "Boolean",
     "Date",
     "Error",
@@ -122,6 +124,7 @@ const BUILT_IN_DIRS: &[&str] = &[
     "NativeErrors",
     "Number",
     "Object",
+    "Promise",
     "Reflect",
     "Set",
     "SetIteratorPrototype",
@@ -178,7 +181,7 @@ fn check_trees(trees: &[&str], prefix: &str, passing: &str, fixture: &str, title
         let mut text = format!(
             "# {title}\n\
              # Revision: {} of https://github.com/tc39/test262\n\
-             # {} pass, {} fail, {} skipped (modules, async, proposals).\n\
+             # {} pass, {} fail, {} skipped (modules, proposals).\n\
              # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.\n",
             pinned_revision(),
             passed.len(),

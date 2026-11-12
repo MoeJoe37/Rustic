@@ -328,8 +328,111 @@ pub(crate) enum Internal {
     /// `[[Iterated]]` of a `%WrapForValidIteratorPrototype%` object from
     /// `Iterator.from`: the iterator and its `next` method.
     Wrapped { iterator: Value, next: Value },
-    /// A generator object's suspended frame (§27.5).
+    /// A generator object's suspended frame (§27.5), or an async
+    /// function's while it awaits.
     Generator(Box<Generator>),
+    /// A promise's internal slots (§27.2.6).
+    Promise(Box<PromiseRecord>),
+    /// The values a built-in closure captures (the resolving functions of
+    /// a promise, the element functions of `Promise.all`, ...); the
+    /// behavior knows what each position means.
+    Captures(Box<[Value]>),
+}
+
+/// `[[PromiseState]]`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PromiseState {
+    Pending,
+    Fulfilled,
+    Rejected,
+}
+
+/// A PromiseReaction Record (§27.2.1.2) with its capability.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Reaction {
+    /// The handler: a function, undefined (pass the value on), or for an
+    /// `await` the suspended async function's state object.
+    pub handler: Value,
+    /// The reaction resumes an `await` rather than calling `handler`.
+    pub awaiting: bool,
+    /// The capability's promise, or undefined for none. When `resolve`
+    /// is undefined the promise is an intrinsic promise that nothing else
+    /// can settle, and the job settles it directly.
+    pub promise: Value,
+    pub resolve: Value,
+    pub reject: Value,
+}
+
+impl Reaction {
+    pub(crate) fn values(&self) -> [Value; 4] {
+        [self.handler, self.promise, self.resolve, self.reject]
+    }
+}
+
+/// A promise's state and pending reactions.
+#[derive(Clone, Debug)]
+pub(crate) struct PromiseRecord {
+    pub state: PromiseState,
+    /// `[[PromiseResult]]`: undefined while pending.
+    pub result: Value,
+    pub fulfill_reactions: Vec<Reaction>,
+    pub reject_reactions: Vec<Reaction>,
+    /// `[[PromiseIsHandled]]`.
+    pub handled: bool,
+}
+
+impl PromiseRecord {
+    pub(crate) fn values(&self) -> impl Iterator<Item = Value> + '_ {
+        std::iter::once(self.result).chain(
+            self.fulfill_reactions
+                .iter()
+                .chain(&self.reject_reactions)
+                .flat_map(Reaction::values),
+        )
+    }
+}
+
+/// A job waiting in the agent's queue (§9.5).
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Job {
+    /// `NewPromiseReactionJob`: run `reaction` with `argument`.
+    Reaction {
+        reaction: Reaction,
+        fulfilled: bool,
+        argument: Value,
+    },
+    /// `NewPromiseResolveThenableJob`: call `then` on `thenable` with
+    /// fresh resolving functions of `promise`.
+    ResolveThenable {
+        promise: Value,
+        thenable: Value,
+        then: Value,
+    },
+}
+
+impl Job {
+    pub(crate) fn values(&self) -> [Value; 6] {
+        match *self {
+            Job::Reaction {
+                reaction, argument, ..
+            } => {
+                let [a, b, c, d] = reaction.values();
+                [a, b, c, d, argument, Value::UNDEFINED]
+            }
+            Job::ResolveThenable {
+                promise,
+                thenable,
+                then,
+            } => [
+                promise,
+                thenable,
+                then,
+                Value::UNDEFINED,
+                Value::UNDEFINED,
+                Value::UNDEFINED,
+            ],
+        }
+    }
 }
 
 /// `[[GeneratorState]]`.
@@ -359,13 +462,15 @@ pub(crate) struct Generator {
     /// Where a resumption writes the value sent in and how it was sent
     /// (the `dst` and `mode` of the `yield`); `None` before the start.
     pub resume: Option<(u16, u16)>,
+    /// An async function's promise; undefined for a generator.
+    pub promise: Value,
     pub registers: Box<[Value]>,
 }
 
 impl Generator {
     /// Every value the generator holds, for the collector.
     pub(crate) fn values(&self) -> impl Iterator<Item = Value> + '_ {
-        [self.this, self.function, self.new_target]
+        [self.this, self.function, self.new_target, self.promise]
             .into_iter()
             .chain(self.registers.iter().copied())
     }

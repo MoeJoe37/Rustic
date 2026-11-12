@@ -364,6 +364,17 @@ pub enum Op {
     Return { src: Reg },
     /// Throw `src`.
     Throw { src: Reg },
+    /// The first op of an async function: create its promise and the
+    /// state object its frame is suspended in at each `await`.
+    AsyncStart,
+    /// `dst = await src`: suspend until the promise for `src` settles,
+    /// returning the function's promise to the caller. On resumption
+    /// `dst` receives the value and `mode` is 0 (fulfilled) or 1
+    /// (rejected: throw it).
+    Await { src: Reg, dst: Reg, mode: Reg },
+    /// The catch-all handler of an async function: reject its promise
+    /// with `src` and return the promise.
+    AsyncReject { src: Reg },
     /// The end of a generator function's parameter and declaration
     /// instantiation: create the generator object, suspend the frame in
     /// it and return the object to the caller.
@@ -533,6 +544,8 @@ pub struct FunctionCode {
     pub kind: FunctionKind,
     /// A generator function: a call returns a generator object.
     pub generator: bool,
+    /// An async function: a call returns a promise.
+    pub is_async: bool,
     /// Named property access sites with their inline caches.
     pub sites: Box<[NamedSite]>,
     /// Tagged template sites.

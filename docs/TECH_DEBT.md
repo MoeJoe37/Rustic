@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Async functions, modules, RegExp literals and BigInt literals are rejected by the bytecode compiler (generators paid) | Open, JS-06/JS-08 |
+| TD-97 | Deliberate | JS | Async generators, `for await`, modules and RegExp literals are rejected by the bytecode compiler (generators and async functions paid) | Open, JS-06/JS-08 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | `arguments` is always unmapped and an ordinary object; Annex B function-in-block semantics are missing | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
@@ -136,10 +136,11 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
-| TD-105 | Deliberate | JS | The Test262 runner skips module and async files, has no `$262` host object and runs `test/language` plus only the JS-05 areas of `test/built-ins` | Open, JS-05/JS-06 |
+| TD-105 | Deliberate | JS | The Test262 runner skips module files, has no `$262` host object and runs `test/language` plus only the JS-05 areas of `test/built-ins` | Open, JS-05/JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
+| TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Open, JS-06 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1374,16 +1375,15 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. Async functions and `for await`, modules, regular expression
-literals and BigInt literals return `CompileError::Unsupported` with a span
-before any code runs, so a script either runs with correct semantics or not
-at all.
+calls. Async generators and `for await`, modules and regular expression
+literals return `CompileError::Unsupported` with a span before any code
+runs, so a script either runs with correct semantics or not at all.
 
 Private names, object-literal `super`, tagged templates and optional calls
-were paid on 2026-11-12, which ends the JS-04 share; `eval` and generators
-(JS-08 part 1) were paid the same day. Pay modules with JS-06; async
-functions, RegExp and BigInt with JS-08. Trigger: the Test262 runner
-(JS-07).
+were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
+(JS-08 part 1) and async functions with promises (JS-06 part 1) were paid
+the same day. Pay modules with JS-06; async generators, `for await` and
+RegExp with JS-08. Trigger: the Test262 runner (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1465,8 +1465,9 @@ captures one variable costs 64 bytes instead of 112.
 
 ### TD-105 — Test262 runner coverage
 
-The execution runner (JS-07) skips files flagged `module` or `async` (6,059
-of 23,832 in `test/language` together with proposal features), does not
+The execution runner (JS-07) skips files flagged `module` (1,405 of 23,832
+in `test/language` together with proposal features; async files run since
+JS-06 part 1), does not
 provide the `$262` host object (`createRealm`, `evalScript`, `detachArrayBuffer`,
 `agent`), and its gate covers `test/language` and the `test/built-ins`
 directories of the library areas installed so far. Skipped files are counted
@@ -1475,7 +1476,7 @@ base.
 
 Pay with: each further `test/built-ins` directory in the gate as JS-05 lands
 its library area;
-module and async files when promise jobs and module loading exist (JS-06);
+module files when module loading exists (JS-06);
 `$262` with realms (JS-06). Trigger: each of those steps.
 
 ### TD-106 — No function source text (eval part paid)
@@ -1521,4 +1522,20 @@ to an offset (and a local time to its candidate offsets for
 `UTC(t)`, §21.4.1.26), filled by the shell from the OS or from a compact
 TZif reader in `rustic-base`; Intl.DateTimeFormat (JS-08) shares it.
 Trigger: the shell first runs page script, or JS-08.
+
+### TD-109 — Unhandled promise rejections are not reported
+
+A promise that is rejected with no handler attached stays silent: the
+engine has no HostPromiseRejectionTracker (§27.2.1.9), so neither the
+`reject` nor the later `handle` operation reaches the embedder. A page's
+`unhandledrejection` and `rejectionhandled` events, and the console warning
+other engines print, therefore cannot fire. Promise semantics are
+otherwise unaffected; the `PromiseRecord` already knows whether it has
+reactions, so the missing piece is the notification only.
+
+Pay with: an `is_handled` flag on `PromiseRecord`, set by
+PerformPromiseThen, and a host hook on the agent called from
+RejectPromise and PerformPromiseThen that the shell batches per
+microtask checkpoint (HTML §8.1.7.3). Trigger: the HTML event loop
+(JS-09 bindings) or the first console that reports page errors.
 

@@ -16,9 +16,11 @@
 //! strict mode unless its flags say otherwise. A `negative` expectation
 //! must fail in the named phase with the named error. Every run has a
 //! heap limit and a step budget ([`RunLimits`]), so a runaway test fails
-//! the same way on every machine instead of timing out. Module and async
-//! tests are skipped until modules and promises exist (JS-06), and are
-//! counted as skipped, never as passed. [`execute_tree`] runs a directory
+//! the same way on every machine instead of timing out. After the test the
+//! promise jobs run; an `async` test passes when it prints
+//! `Test262:AsyncTestComplete` through `$DONE`. Module tests are skipped
+//! until module loading exists (JS-06), and are counted as skipped, never
+//! as passed. [`execute_tree`] runs a directory
 //! of a checkout.
 
 use std::io;
@@ -30,6 +32,7 @@ use crate::{EvalError, ParseError, ParseLimits, Source, parse_module, parse_scri
 /// Proposal features the parser does not implement yet (TD-89). Files
 /// using them are skipped and counted separately, never passed.
 pub const UNSUPPORTED_FEATURES: &[&str] = &[
+    "await-dictionary",
     "decorators",
     "explicit-resource-management",
     "import-defer",
@@ -330,8 +333,6 @@ pub fn skip_reason(meta: &Metadata) -> Option<&'static str> {
         Some("proposal")
     } else if meta.module {
         Some("module")
-    } else if meta.is_async {
-        Some("async")
     } else {
         None
     }
@@ -374,9 +375,22 @@ fn execute_mode(
     let mut agent =
         Agent::with_heap_limit(limits.heap_bytes).map_err(|_| "no memory for an agent")?;
     agent.set_step_budget(Some(limits.steps));
+    if meta.is_async {
+        // `doneprintHandle.js` reports through the host's `print`; keep
+        // what it prints on the function itself.
+        // A string, not an array: tests may put setters on
+        // `Array.prototype`.
+        let print = "var print = function (message) { print.out += String(message) + '\\n' }; \
+             print.out = '';";
+        if let Err(error) = agent.evaluate(print) {
+            return Err(format!("print: {}", describe(&mut agent, &error)));
+        }
+    }
     if !meta.raw {
+        let done = meta.is_async.then_some("doneprintHandle.js");
         let names = ["assert.js", "sta.js"]
             .into_iter()
+            .chain(done)
             .chain(meta.includes.iter().map(String::as_str));
         for name in names {
             let source = harness
@@ -395,7 +409,13 @@ fn execute_mode(
         text
     };
     let result = agent.evaluate(source);
+    // A microtask checkpoint after the script, as a host runs one.
+    let result = match result {
+        Ok(v) => agent.run_jobs().map(|()| v).map_err(EvalError::from),
+        Err(e) => Err(e),
+    };
     match (&meta.negative, result) {
+        (None, Ok(_)) if meta.is_async => async_outcome(&mut agent),
         (None, Ok(_)) => Ok(()),
         (None, Err(error)) => Err(describe(&mut agent, &error)),
         (Some(negative), Ok(_)) => Err(format!("ran, but must throw {}", negative.error)),
@@ -416,6 +436,24 @@ fn execute_mode(
                 ))
             }
         }
+    }
+}
+
+/// What an async test printed through `$DONE`.
+fn async_outcome(agent: &mut Agent) -> Result<(), String> {
+    let printed = match agent.evaluate("print.out") {
+        Ok(v) => agent.display(v),
+        Err(error) => return Err(describe(agent, &error)),
+    };
+    if printed.lines().any(|l| l == "Test262:AsyncTestComplete") {
+        return Ok(());
+    }
+    match printed
+        .lines()
+        .find_map(|l| l.strip_prefix("Test262:AsyncTestFailure:"))
+    {
+        Some(failure) => Err(format!("async failure: {failure}")),
+        None => Err("the async test never called $DONE".to_owned()),
     }
 }
 
@@ -549,6 +587,10 @@ mod tests {
              Test262Error.prototype.toString = function () { return 'Test262Error: ' + this.message };",
         ),
         ("helper.js", "var helped = 7;"),
+        (
+            "doneprintHandle.js",
+            "function $DONE(error) { print(error ? 'Test262:AsyncTestFailure:' + error : 'Test262:AsyncTestComplete') }",
+        ),
     ];
 
     fn verdict(text: &str) -> Verdict {
@@ -648,9 +690,20 @@ mod tests {
             verdict("/*---\nflags: [module]\n---*/\n1;"),
             Verdict::Skip("module")
         );
+        // Async tests finish through `$DONE` once the jobs have run.
+        assert_eq!(
+            verdict(
+                "/*---\nflags: [async]\n---*/\nPromise.resolve(1).then(function () { $DONE() });"
+            ),
+            Verdict::Pass
+        );
+        assert_eq!(
+            verdict("/*---\nflags: [async]\n---*/\nPromise.reject('no').catch($DONE);"),
+            Verdict::Fail("sloppy: async failure: no".into())
+        );
         assert_eq!(
             verdict("/*---\nflags: [async]\n---*/\n1;"),
-            Verdict::Skip("async")
+            Verdict::Fail("sloppy: the async test never called $DONE".into())
         );
         assert_eq!(
             verdict("/*---\nfeatures: [decorators]\n---*/\n1;"),

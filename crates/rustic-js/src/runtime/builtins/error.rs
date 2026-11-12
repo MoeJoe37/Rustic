@@ -48,7 +48,69 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         let f = install_constructor(agent, name, behavior, 1, prototype)?;
         agent.set_prototype_of(f, Some(error));
     }
+
+    // AggregateError (§20.5.7).
+    let prototype = agent.new_object_with(Some(i.error_prototype))?;
+    let name_key = PropertyKey::String(agent.names.name);
+    let value = Value::string(agent.heap.intern_str("AggregateError")?);
+    agent.define_property_or_throw(
+        prototype,
+        name_key,
+        PropertyDescriptor::data_with(value, true, false, true),
+    )?;
+    let message = PropertyKey::String(agent.names.message);
+    let empty = Value::string(agent.names.empty);
+    agent.define_property_or_throw(
+        prototype,
+        message,
+        PropertyDescriptor::data_with(empty, true, false, true),
+    )?;
+    let f = install_constructor(agent, "AggregateError", aggregate_error, 2, prototype)?;
+    agent.set_prototype_of(f, Some(error));
+    agent.intrinsics.aggregate_error_prototype = prototype;
     Ok(())
+}
+
+/// `AggregateError(errors, message, options)` (§20.5.7.1.1).
+fn aggregate_error(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let default = agent.intrinsics.aggregate_error_prototype;
+    let o = construct_error(agent, default, &[arg(args, 1), arg(args, 2)])?;
+    let iterable = arg(args, 0);
+    let key = PropertyKey::Symbol(agent.symbols.iterator);
+    let Some(method) = agent.get_method(iterable, key)? else {
+        return agent.type_error("AggregateError errors are not iterable");
+    };
+    let mut errors = Vec::new();
+    super::iterate(agent, iterable, method, |_, v| {
+        errors.push(v);
+        Ok(true)
+    })?;
+    // The list is rooted by nothing while it grows, but nothing collects
+    // inside a native call.
+    let array = agent.create_array_from_list(&errors)?;
+    let errors_key = agent.heap.key("errors")?;
+    let o_id = o.as_object().expect("an error object");
+    agent.define_property_or_throw(
+        o_id,
+        errors_key,
+        PropertyDescriptor::data_with(Value::object(array), true, false, true),
+    )?;
+    Ok(o)
+}
+
+/// An AggregateError with `errors` (for `Promise.any`).
+pub(crate) fn new_aggregate_error(agent: &mut Agent, errors: Value) -> JsResult<Value> {
+    let prototype = agent.intrinsics.aggregate_error_prototype;
+    let o = agent
+        .heap
+        .alloc_object(Object::new(Class::Error, Some(prototype)))?;
+    let errors_key = agent.heap.key("errors")?;
+    agent.define_property_or_throw(
+        o,
+        errors_key,
+        PropertyDescriptor::data_with(errors, true, false, true),
+    )?;
+    Ok(Value::object(o))
 }
 
 /// The prototype a native error constructor uses: `name`'s, found

@@ -189,11 +189,19 @@ pub struct Intrinsics {
     pub generator_function_prototype: ObjectId,
     /// `%GeneratorPrototype%` (`%GeneratorFunction.prototype.prototype%`).
     pub generator_prototype: ObjectId,
+    /// `%Promise%`.
+    pub promise: ObjectId,
+    /// `%Promise.prototype%`.
+    pub promise_prototype: ObjectId,
+    /// `%AggregateError.prototype%`.
+    pub aggregate_error_prototype: ObjectId,
+    /// `%AsyncFunction.prototype%`, the prototype of async functions.
+    pub async_function_prototype: ObjectId,
 }
 
 impl Intrinsics {
     /// Every intrinsic, for the collector's roots.
-    pub(crate) fn all(&self) -> [ObjectId; 26] {
+    pub(crate) fn all(&self) -> [ObjectId; 30] {
         [
             self.object_prototype,
             self.function_prototype,
@@ -221,6 +229,10 @@ impl Intrinsics {
             self.eval,
             self.generator_function_prototype,
             self.generator_prototype,
+            self.promise,
+            self.promise_prototype,
+            self.aggregate_error_prototype,
+            self.async_function_prototype,
         ]
     }
 }
@@ -283,6 +295,10 @@ impl Agent {
                 eval: placeholder,
                 generator_function_prototype: placeholder,
                 generator_prototype: placeholder,
+                promise: placeholder,
+                promise_prototype: placeholder,
+                aggregate_error_prototype: placeholder,
+                async_function_prototype: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -351,6 +367,10 @@ impl Agent {
             eval: object_prototype,
             generator_function_prototype: object_prototype,
             generator_prototype: object_prototype,
+            promise: object_prototype,
+            promise_prototype: object_prototype,
+            aggregate_error_prototype: object_prototype,
+            async_function_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

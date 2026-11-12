@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 25.27%** = 21.99% verified complete + 3.28% partial credit. 55/221 capabilities complete, 8 in progress.
+**Overall completion: 25.56%** = 21.99% verified complete + 3.57% partial credit. 55/221 capabilities complete, 9 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `fb5d8eb8d2afe8fa479a58132316975e885068cd040763654db8aeeb69dadc6f`.
+Catalog: `engine-v4`. Source fingerprint: `491c32b59217c5fef16d01fc78b303b5b0bf0c4b0fab1e7101133e593a008cbf`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `fb5d8eb8d2afe8fa479a58132316975e88506
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 2/13 | 56.71% | 24.61% | 8.90% |
+| M4 ECMAScript runtime | 2/13 | 59.89% | 24.61% | 8.90% |
 | M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `fb5d8eb8d2afe8fa479a58132316975e88506
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 2/15 | 7 | 53.23% | 21.91% | 10% | 5.32 |
+| JavaScript & GC | 2/15 | 8 | 56.06% | 21.91% | 10% | 5.60 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -202,11 +202,15 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Lazy function prototypes and shared scope name lists (120-byte closures) ([source](../../crates/rustic-js/src/runtime/internal.rs), [test](../../crates/rustic-js/tests/interp.rs))
   - [ ] Mapped arguments objects
 - **complete** `js.builtins` — Core built-ins and collections · size 8 · M4 · 1.09% of engine ([source](../../crates/rustic-js/src/runtime/builtins.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/test262.rs))
-- **planned** `js.jobs` — Promises, jobs and realms · size 3 · M4 · 0.41% of engine
+- **in progress 33.33%** `js.jobs` — Promises, jobs and realms · size 3 · M4 · 0.41% of engine
+  - [x] Promise, reaction jobs and the job queue ([source](../../crates/rustic-js/src/runtime/builtins/promise.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
+  - [ ] Host rejection tracking (TD-109)
+  - [ ] Realms and $262.createRealm
 - **planned** `js.modules` — Modules and host loading hooks · size 3 · M4 · 0.41% of engine
-- **in progress 20.00%** `js.advanced` — BigInt, RegExp, proxies, generators and async · size 8 · M4 · 1.09% of engine
+- **in progress 33.33%** `js.advanced` — BigInt, RegExp, proxies, generators and async · size 8 · M4 · 1.09% of engine
   - [x] Generators, yield* and %GeneratorFunction% ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
-  - [ ] Async functions, await and for await
+  - [x] Async functions and await ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
+  - [ ] Async generators and for await
   - [ ] BigInt arithmetic and literals
   - [ ] RegExp engine and literals (TD-88)
   - [ ] Proxy

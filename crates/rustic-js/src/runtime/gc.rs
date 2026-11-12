@@ -391,6 +391,16 @@ impl Marker<'_> {
                     self.code(generator.code);
                     self.env(generator.env);
                 }
+                Some(Internal::Promise(promise)) => {
+                    for v in promise.values() {
+                        self.value(v);
+                    }
+                }
+                Some(Internal::Captures(values)) => {
+                    for &v in values.iter() {
+                        self.value(v);
+                    }
+                }
                 Some(Internal::Bound { target, this, args }) => {
                     self.value(Value::object(*target));
                     self.value(*this);
@@ -441,6 +451,12 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::Generator(generator)) => {
                 std::mem::size_of::<super::object::Generator>() + 8 * generator.registers.len()
             }
+            Some(Internal::Promise(promise)) => {
+                std::mem::size_of::<super::object::PromiseRecord>()
+                    + std::mem::size_of::<super::object::Reaction>()
+                        * (promise.fulfill_reactions.len() + promise.reject_reactions.len())
+            }
+            Some(Internal::Captures(values)) => 8 * values.len(),
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()
             }

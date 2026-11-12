@@ -1825,7 +1825,11 @@ fn arrays_math_symbols_and_dynamic_functions() {
 
 #[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in ["async function f() {}", "/x/", "({ async *m() {} })"] {
+    for source in [
+        "async function* g() {}",
+        "/x/",
+        "async function f() { for await (var x of []); }",
+    ] {
         let mut agent = Agent::new().expect("agent");
         assert!(
             matches!(agent.evaluate(source), Err(EvalError::Compile(_))),
@@ -2249,4 +2253,94 @@ fn destructuring_closes_iterators_on_abrupt_completion() {
         ),
         "next,next,return",
     );
+}
+
+/// Run `source`, then the promise jobs it queued, then show `probe`.
+fn run_with_jobs(source: &str, probe: &str) -> String {
+    let mut agent = Agent::new().expect("agent");
+    let first = run_in(&mut agent, source);
+    if first.starts_with('!') {
+        return first;
+    }
+    if let Err(e) = agent.run_jobs() {
+        return format!("!!jobs {e:?}");
+    }
+    run_in(&mut agent, probe)
+}
+
+#[test]
+fn promises_and_async_functions() {
+    let cases = [
+        (
+            "var log = ''; Promise.resolve(1).then(v => { log += 'a' + v }); log += 'sync;'",
+            "sync;a1",
+        ),
+        // Reactions run in order, one job per step of a chain.
+        (
+            "var log = ''; var p = Promise.resolve(); \
+             p.then(() => { log += 1 }).then(() => { log += 3 }); p.then(() => { log += 2 }).then(() => { log += 4 })",
+            "1234",
+        ),
+        (
+            "var log = ''; new Promise((res, rej) => rej('e')).catch(e => { log += 'c' + e }).finally(() => { log += 'f' })",
+            "cef",
+        ),
+        // A thenable is adopted through a job, and resolving twice does nothing.
+        (
+            "var log = ''; new Promise(res => { res({ then(f) { f(7) } }); res(8) }).then(v => { log += v })",
+            "7",
+        ),
+        (
+            "var log = ''; var p = new Promise(r => r()); var q = p.then(() => q); q.catch(e => { log += e.name })",
+            "TypeError",
+        ),
+        (
+            "var log = ''; async function f(x) { var y = await x; log += 'f' + y; \
+               try { await Promise.reject('boom') } catch (e) { log += 'c' + e } return y * 2 } \
+             f(5).then(v => { log += 'r' + v }); log += 's'",
+            "sf5cboomr10",
+        ),
+        // The body runs synchronously up to the first await.
+        (
+            "var log = ''; async function g() { log += 'in'; await null; log += 'after' } g(); log += 'out'",
+            "inoutafter",
+        ),
+        (
+            "var log = ''; (async () => { throw new Error('x') })().catch(e => { log += e.message }); \
+             (async function () { return { then(r) { r('t') } } })().then(v => { log += v })",
+            "xt",
+        ),
+        (
+            "var log = ''; Promise.all([1, Promise.resolve(2), (async () => 3)()]).then(v => { log += v }); \
+             Promise.allSettled([1, Promise.reject(9)]).then(v => { log += ';' + v.map(r => r.status + (r.value || r.reason)) }); \
+             Promise.any([Promise.reject(1), Promise.reject(2)]).catch(e => { log += ';' + e.name + e.errors }); \
+             Promise.race([new Promise(() => {}), 4]).then(v => { log += ';race' + v })",
+            "1,2,3;fulfilled1,rejected9;AggregateError1,2;race4",
+        ),
+        (
+            "var log = ''; var { promise, resolve } = Promise.withResolvers(); promise.then(v => { log += v }); resolve('w'); \
+             Promise.try(() => { throw 'tr' }).catch(e => { log += e })",
+            "wtr",
+        ),
+        (
+            "var log = ''; class P extends Promise {} var p = P.resolve(1).then(v => v); \
+             log += (p instanceof P) + ':' + (Object.getPrototypeOf(async function () {}).constructor.name)",
+            "true:AsyncFunction",
+        ),
+        (
+            "var log = ''; async function m() { for (var i = 0; i < 3; i++) { var v = await i; log += v } } m(); \
+             var o = { async x() { return this === o } }; o.x().then(v => { log += v })",
+            "0true12",
+        ),
+    ];
+    let mut failures = Vec::new();
+    for (source, expected) in cases {
+        let actual = run_with_jobs(source, "log");
+        if actual != expected {
+            failures.push(format!(
+                "{source}\n    expected: {expected}\n    actual:   {actual}"
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

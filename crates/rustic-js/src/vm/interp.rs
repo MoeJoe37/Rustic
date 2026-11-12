@@ -22,7 +22,7 @@ use super::bytecode::{
 use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
     Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, Class, EnvId, ErrorKind, FLAG_EXTENSIBLE,
-    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, JsResult, Kind, NativeFn, ObjectId,
+    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, JsResult, Kind, NativeFn, ObjectId,
     PropertyDescriptor, PropertyKey, Reference, ReferenceBase, ShapeId, StringId, Tracer, Value,
     iterator_result,
 };
@@ -84,6 +84,9 @@ struct Frame {
     new_target: Value,
     /// The generator object whose body this frame runs, or undefined.
     generator: Value,
+    /// The frame was resumed from a generator object (it is the first
+    /// frame of its run), so a `yield` or `await` ends that run.
+    resumed: bool,
 }
 
 /// The interpreter's state in an agent.
@@ -130,6 +133,11 @@ pub(crate) struct VmState {
     pub(crate) time_zone_offset_ms: f64,
     /// Set by a `yield` that ended a run, as opposed to a `return`.
     yielded: bool,
+    /// Promise jobs waiting to run (§9.5), oldest first.
+    pub(crate) jobs: std::collections::VecDeque<Job>,
+    /// The job [`Agent::run_jobs`] is running, kept here so its values
+    /// stay rooted.
+    pub(crate) running_job: Option<Job>,
 }
 
 fn stack_address() -> usize {
@@ -150,6 +158,11 @@ impl VmState {
             tracer.value(frame.function);
             tracer.value(frame.new_target);
             tracer.value(frame.generator);
+        }
+        for job in self.jobs.iter().chain(&self.running_job) {
+            for v in job.values() {
+                tracer.value(v);
+            }
         }
     }
 }
@@ -543,6 +556,8 @@ impl Agent {
         })?;
         let proto = if code.generator {
             self.intrinsics.generator_function_prototype
+        } else if code.is_async {
+            self.intrinsics.async_function_prototype
         } else {
             self.intrinsics.function_prototype
         };
@@ -567,7 +582,7 @@ impl Agent {
             name_key,
             PropertyDescriptor::data_with(Value::string(code.name), false, false, true),
         )?;
-        if code.kind == FunctionKind::Normal || code.generator {
+        if (code.kind == FunctionKind::Normal && !code.is_async) || code.generator {
             // The object itself is created on first use (see
             // `realize_function_prototype`); most functions never need it.
             let prototype_key = PropertyKey::String(self.names.prototype);
@@ -631,7 +646,7 @@ impl Agent {
     fn is_constructor(&self, o: ObjectId) -> bool {
         self.heap.closure(o).is_some_and(|closure| {
             let code = self.heap.code(closure.code);
-            code.kind.is_constructor() && !code.generator
+            code.kind.is_constructor() && !code.generator && !code.is_async
         }) || self.native_constructor(Value::object(o)).is_some()
     }
 
@@ -694,7 +709,7 @@ impl Agent {
         let closure = self.heap.closure(f).expect("caller checked for a closure");
         let code = self.heap.code(closure.code);
         let kind = code.kind;
-        if !kind.is_constructor() || code.generator {
+        if !kind.is_constructor() || code.generator || code.is_async {
             return self.type_error("value is not a constructor");
         }
         if kind == FunctionKind::DerivedConstructor {
@@ -790,6 +805,7 @@ impl Agent {
             function,
             new_target,
             generator: Value::UNDEFINED,
+            resumed: false,
         });
         Ok(())
     }
@@ -1756,6 +1772,14 @@ impl Agent {
                 }
                 Op::Return { src } => {
                     let mut value = reg!(src);
+                    let state = frame!().generator;
+                    if let Some(promise) = self.async_promise(state) {
+                        // An async function settles its promise and
+                        // returns it.
+                        t!(crate::runtime::resolve_promise(self, promise, value));
+                        self.complete_generator(state);
+                        value = Value::object(promise);
+                    }
                     let frame = self.vm.frames.pop().expect("a frame to return from");
                     self.vm.stack.truncate(frame.floor as usize);
                     if frame.construct && value.as_object().is_none() {
@@ -1771,6 +1795,54 @@ impl Agent {
                 }
                 Op::Throw { src } => {
                     t!(Err(Abrupt::Throw(reg!(src))));
+                }
+                Op::AsyncStart => {
+                    let state = t!(self.async_create(code));
+                    frame!().generator = state;
+                }
+                Op::Await { src, dst, mode } => {
+                    let value = reg!(src);
+                    let state = frame!().generator;
+                    let o = state.as_object().expect("await runs in an async function");
+                    t!(crate::runtime::await_value(self, value, o));
+                    let promise = self.async_promise(state).expect("an async function");
+                    let frame = self.vm.frames.pop().expect("an async frame");
+                    let registers = &self.vm.stack[base..base + usize::from(code.registers)];
+                    if let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() {
+                        g.registers.copy_from_slice(registers);
+                        g.state = GeneratorState::SuspendedYield;
+                        g.pc = pc as u32;
+                        g.env = env;
+                        g.depth = frame.depth;
+                        g.resume = Some((dst, mode));
+                    }
+                    self.vm.stack.truncate(frame.floor as usize);
+                    if frame.resumed {
+                        self.vm.yielded = true;
+                    }
+                    if self.vm.frames.len() == floor {
+                        return Ok(Flow::Done(Value::object(promise)));
+                    }
+                    let caller = self.vm.frames.last().expect("a caller above the floor");
+                    let slot = caller.base as usize + usize::from(frame.ret);
+                    self.vm.stack[slot] = Value::object(promise);
+                    return Ok(Flow::Switch);
+                }
+                Op::AsyncReject { src } => {
+                    let reason = reg!(src);
+                    let state = frame!().generator;
+                    let promise = self.async_promise(state).expect("an async function");
+                    crate::runtime::reject_promise(self, promise, reason);
+                    self.complete_generator(state);
+                    let frame = self.vm.frames.pop().expect("an async frame");
+                    self.vm.stack.truncate(frame.floor as usize);
+                    if self.vm.frames.len() == floor {
+                        return Ok(Flow::Done(Value::object(promise)));
+                    }
+                    let caller = self.vm.frames.last().expect("a caller above the floor");
+                    let slot = caller.base as usize + usize::from(frame.ret);
+                    self.vm.stack[slot] = Value::object(promise);
+                    return Ok(Flow::Switch);
                 }
                 Op::GeneratorStart => {
                     let generator = t!(self.generator_create(code, base, pc, env));
@@ -2563,6 +2635,7 @@ impl Agent {
             function,
             new_target,
             resume: None,
+            promise: Value::UNDEFINED,
             registers,
         })));
         Ok(Value::object(self.heap.alloc_object(object)?))
@@ -2578,6 +2651,40 @@ impl Agent {
         mode: u8,
         value: Value,
     ) -> JsResult<Value> {
+        // When the generator method that resumed this run was called from
+        // a safe site at the collectable level, nothing on the Rust stack
+        // holds unrooted values: the generator is rooted by its frame, and
+        // the method's receiver and arguments by the caller's registers.
+        // Then the body collects at its safe points, so a long-running
+        // generator does not grow the heap unchecked.
+        let collectable = std::mem::take(&mut self.vm.native_from_safe_site)
+            && self.vm.native_depth == self.vm.collect_floor + 1;
+        let (value, yielded) = self.resume_frame(o, mode, value, collectable)?;
+        if yielded {
+            Ok(value)
+        } else {
+            iterator_result(self, value, true)
+        }
+    }
+
+    /// Resume an async function suspended in `await` from a promise job
+    /// at the host level: with the awaited value, or throwing it.
+    pub(crate) fn async_resume(&mut self, o: ObjectId, throw: bool, value: Value) -> JsResult<()> {
+        let collectable = self.vm.native_depth == self.vm.collect_floor;
+        self.resume_frame(o, u8::from(throw), value, collectable)
+            .map(drop)
+    }
+
+    /// Run the suspended frame of `o` until it yields, awaits or finishes;
+    /// returns the value that ended the run and whether it was a `yield`
+    /// or `await` (the frame is suspended again) rather than the end.
+    fn resume_frame(
+        &mut self,
+        o: ObjectId,
+        mode: u8,
+        value: Value,
+        collectable: bool,
+    ) -> JsResult<(Value, bool)> {
         self.enter_nested_run()?;
         let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() else {
             unreachable!("the caller validated the generator");
@@ -2622,16 +2729,9 @@ impl Agent {
             function,
             new_target,
             generator: Value::object(o),
+            resumed: true,
         });
-        // When the generator method that resumed this run was called from
-        // a safe site at the collectable level, nothing on the Rust stack
-        // holds unrooted values: the generator is rooted by its frame, and
-        // the method's receiver and arguments by the caller's registers.
-        // Then the body collects at its safe points, so a long-running
-        // generator does not grow the heap unchecked.
         let outer_floor = self.vm.collect_floor;
-        let collectable = std::mem::take(&mut self.vm.native_from_safe_site)
-            && self.vm.native_depth == outer_floor + 1;
         self.vm.native_depth += 1;
         if collectable {
             self.vm.collect_floor = self.vm.native_depth;
@@ -2649,11 +2749,61 @@ impl Agent {
                 g.new_target = Value::UNDEFINED;
             }
         }
-        match result {
-            Ok(v) if yielded => Ok(v),
-            Ok(v) => iterator_result(self, v, true),
-            Err(e) => Err(e),
+        result.map(|v| (v, yielded))
+    }
+
+    /// The promise of the async function whose state object is
+    /// `generator`, if it is one.
+    fn async_promise(&self, generator: Value) -> Option<ObjectId> {
+        let o = generator.as_object()?;
+        match self.heap.object(o).internal() {
+            Some(Internal::Generator(g)) => g.promise.as_object(),
+            _ => None,
         }
+    }
+
+    fn complete_generator(&mut self, generator: Value) {
+        if let Some(o) = generator.as_object() {
+            if let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() {
+                g.state = GeneratorState::Completed;
+                g.registers = Box::new([]);
+            }
+        }
+    }
+
+    /// Start an async function (§27.7.5.1): its promise and a state
+    /// object to suspend the frame in at each `await`.
+    fn async_create(&mut self, code: &FunctionCode) -> JsResult<Value> {
+        let promise = crate::runtime::new_intrinsic_promise(self)?;
+        let frame = self.vm.frames.last().expect("an async frame");
+        let (code_id, env, this, function, new_target) = (
+            frame.code_id,
+            frame.env,
+            frame.this,
+            frame.function,
+            frame.new_target,
+        );
+        let count = usize::from(code.registers);
+        self.heap.charge(
+            std::mem::size_of::<crate::runtime::Extra>()
+                + std::mem::size_of::<Generator>()
+                + 8 * count,
+        )?;
+        let mut object = crate::runtime::Object::new(Class::Ordinary, None);
+        object.extra_mut().internal = Some(Internal::Generator(Box::new(Generator {
+            state: GeneratorState::Executing,
+            code: code_id,
+            pc: 0,
+            env,
+            depth: 0,
+            this,
+            function,
+            new_target,
+            resume: None,
+            promise: Value::object(promise),
+            registers: vec![Value::UNDEFINED; count].into_boxed_slice(),
+        })));
+        Ok(Value::object(self.heap.alloc_object(object)?))
     }
 
     /// `GetIterator(value, sync)` as a real iterator record.

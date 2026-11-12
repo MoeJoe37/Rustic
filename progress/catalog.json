@@ -3174,8 +3174,41 @@
           "label": "Promises, jobs and realms",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Promise, reaction jobs and the job queue",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/promise.rs",
+                  "marker": "pub fn run_jobs"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn promises_and_async_functions"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/gc.rs",
+                  "marker": "fn awaiting_async_functions_and_queued_jobs_survive_collection"
+                }
+              ]
+            },
+            {
+              "label": "Host rejection tracking (TD-109)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Realms and $262.createRealm",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.modules",
@@ -3215,7 +3248,23 @@
               ]
             },
             {
-              "label": "Async functions, await and for await",
+              "label": "Async functions and await",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn async_resume"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn promises_and_async_functions"
+                }
+              ]
+            },
+            {
+              "label": "Async generators and for await",
               "status": "planned",
               "evidence": []
             },

@@ -259,10 +259,19 @@ calls a function value. The design is recorded in
   the class itself. The compiler resolves each `#x` to the innermost class
   that declares it, so the kind of access is known when the code is
   compiled.
+- **`super` in object literals.** A method, getter or setter of an object
+  literal remembers the literal as its home object (a field every closure
+  already has), and `super.x` starts at that object's prototype. Arrow
+  functions take the home of the function that creates them.
+- **Tagged templates and optional calls.** A tag receives the site's
+  template object: a frozen array of the cooked strings with a frozen `raw`
+  array, built on first use and then kept by the compiled code, so every
+  evaluation of one site passes the same object and allocates nothing.
+  `f?.()`, `o.m?.()` and `(o?.m)()` short-circuit without evaluating their
+  arguments and keep the receiver.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): `super` in object literals,
-  generators, async functions, modules, regular expression literals, tagged
-  templates, optional calls, and BigInt literals. Built-in constructors
+  anything runs, TD-97): generators, async functions, modules, regular
+  expression literals and BigInt literals. Built-in constructors
   cannot be extended until they exist (JS-05). BigInt arithmetic throws a `TypeError`
   (TD-92).
 - **Calls** never recurse in Rust between script functions: frames and

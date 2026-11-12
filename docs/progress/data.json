@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "9355b740661fc713d95581c95bd374297f1a9b53b2c72b85eab90dcc33e5d1c6",
-  "percent": "23.65",
+  "source_fingerprint": "999174f157eaa432c7a5ac0f8ca08b108fc29205ea2d5161fdec977f157e18c1",
+  "percent": "23.68",
   "verified_percent": "20.90",
-  "partial_percent": "2.75",
+  "partial_percent": "2.78",
   "completed": 54,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 1,
       "total": 13,
-      "percent": "41.60",
+      "percent": "41.94",
       "verified_percent": "12.30",
-      "partial_percent": "29.30"
+      "partial_percent": "29.64"
     },
     {
       "id": "M5",
@@ -3296,7 +3296,28 @@
               ]
             },
             {
-              "label": "Tagged templates, optional calls and regular expression literals",
+              "label": "Tagged templates, optional calls and object-literal super",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "fn tagged_template"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn tagged_templates"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn super_in_object_literals"
+                }
+              ]
+            },
+            {
+              "label": "Regular expression literals",
               "status": "planned",
               "evidence": []
             },
@@ -3306,7 +3327,7 @@
               "evidence": []
             }
           ],
-          "credit": "75.00",
+          "credit": "77.77",
           "engine_share": "1.09"
         },
         {
@@ -3533,10 +3554,10 @@
       "completed": 1,
       "in_progress": 5,
       "total": 15,
-      "contribution": "3.70",
-      "percent": "37.04",
+      "contribution": "3.73",
+      "percent": "37.34",
       "verified_percent": "10.95",
-      "partial_percent": "26.09"
+      "partial_percent": "26.39"
     },
     {
       "id": "wasm",

@@ -276,6 +276,11 @@ pub enum Op {
     Closure { dst: Reg, index: u32 },
     /// Set the closure's `[[HomeObject]]` for `super` lookups.
     SetHome { function: Reg, home: Reg },
+    /// `dst = the template object of `templates[site]``: the frozen
+    /// array of strings a tag function receives, made once per site.
+    TemplateObject { dst: Reg, site: u32 },
+    /// `dst = the `[[HomeObject]]` of the running function`.
+    Home { dst: Reg },
     /// `dst = the arguments object`
     Arguments { dst: Reg },
     /// `dst = the rest parameters as an array`
@@ -484,6 +489,22 @@ pub struct FunctionCode {
     pub kind: FunctionKind,
     /// Named property access sites with their inline caches.
     pub sites: Box<[NamedSite]>,
+    /// Tagged template sites.
+    pub templates: Box<[TemplateSite]>,
+}
+
+/// A tagged template site: its strings and, once it has run, its
+/// template object.
+#[derive(Debug)]
+pub struct TemplateSite {
+    /// `constants[first .. first + count]` are the cooked strings
+    /// (`undefined` for an invalid escape) and the next `count` the raw
+    /// ones.
+    pub first: u32,
+    /// The number of strings.
+    pub count: u32,
+    /// The template object, or `undefined` before the first use.
+    pub object: Cell<Value>,
 }
 
 /// What an access site remembers about its last lookup.
@@ -548,6 +569,7 @@ impl FunctionCode {
             + self.scopes.iter().map(|s| 16 + s.len() * 8).sum::<usize>()
             + self.handlers.len() * std::mem::size_of::<Handler>()
             + self.sites.len() * std::mem::size_of::<NamedSite>()
+            + self.templates.len() * std::mem::size_of::<TemplateSite>()
     }
 
     /// Report every heap reference the code holds. Shapes remembered by
@@ -568,6 +590,9 @@ impl FunctionCode {
         tracer.string(self.name);
         for site in self.sites.iter() {
             tracer.string(site.name);
+        }
+        for site in self.templates.iter() {
+            tracer.value(site.object.get());
         }
     }
 }

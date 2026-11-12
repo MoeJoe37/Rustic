@@ -1160,8 +1160,82 @@ fn private_names() {
 }
 
 #[test]
+fn super_in_object_literals() {
+    let _report = Report;
+    check(
+        "var p = { m() { return 'p' + this.v }, get g() { return 'G' + this.v }, set s(x) { this.w = x } }; \
+         var o = { __proto__: p, v: 1, m() { return super.m() + '!' }, get g() { return super.g + '?' }, set s(x) { super.s = x * 2 }, \
+         a() { return (() => () => super.m())()() }, ['c' + 1]() { return super['m']() } }; \
+         o.s = 4; o.m() + o.g + o.w + o.a() + o.c1()",
+        "p1!G1?8p1p1",
+    );
+    // The lookup starts at the home object's prototype, not the receiver's.
+    check(
+        "var a = { x: 'a' }, b = { __proto__: a, x: 'b', m() { return super.x } }, c = { __proto__: b, x: 'c' }; c.m() + ({ x: 'd', m: b.m }).m()",
+        "aa",
+    );
+    check(
+        "var o = { m() { return super.x } }; '' + o.m()",
+        "undefined",
+    );
+    check(
+        "var o = { __proto__: null, m() { return super.x } }; o.m()",
+        "!TypeError: super has no properties: the prototype is null",
+    );
+    // A class inside a method has its own home.
+    check(
+        "var o = { __proto__: { v: 1 }, m() { class A { v() { return 2 } } class B extends A { v() { return super.v() + 10 } } return new B().v() + super.v } }; o.m()",
+        "13",
+    );
+}
+
+#[test]
+fn optional_calls() {
+    let _report = Report;
+    check(
+        "var o = { v: 2, f() { return this.v } }, u; '' + o.f?.() + o.g?.() + u?.f() + u?.f?.()[1] + (o?.f)() + o?.['f']()",
+        "2undefinedundefinedundefined22",
+    );
+    // A short circuit skips the arguments too.
+    check("var n = 0, u = null; u?.(n++); u?.f(n++); n", "0");
+    check("var f = 1; f?.()", "!TypeError: value is not a function");
+    check("var u; (u?.f)()", "!TypeError: value is not a function");
+}
+
+#[test]
+fn tagged_templates() {
+    let _report = Report;
+    check(
+        "function tag(s, a, b) { return s.length + s[0] + a + s[1] + b + s[2] + '|' + s.raw[0] + '|' + s.raw.length } tag`x\\t${1}y${2}z`",
+        "3x\t1y2z|x\\t|3",
+    );
+    // One template object per site, shared by every evaluation of it.
+    check(
+        "function id(s) { return s } function f() { return id`a${1}b` } var a = f(), b = f(); (a === b) + ',' + (id`a${1}b` === a)",
+        "true,false",
+    );
+    // The tag keeps its receiver; an invalid escape is `undefined` cooked.
+    check(
+        "var o = { v: 7, t(s, x) { return this.v + s[0] + x } }; o.t`k${1}` + (function (s) { return s[0] === undefined ? s.raw[0] : 'bad' })`\\u{g}`",
+        "7k1\\u{g}",
+    );
+    // Both arrays are frozen and `raw` is not enumerable.
+    check(
+        "'use strict'; function id(s) { return s } var s = id`a`, r = ''; try { s[0] = 1 } catch (e) { r += 1 } try { s.raw[0] = 1 } catch (e) { r += 2 } \
+         try { s.x = 1 } catch (e) { r += 3 } for (var n in s) r += n; r + s[0] + s.raw[0]",
+        "1230aa",
+    );
+    // A tag may return anything, and the result may be tagged again.
+    check(
+        "function f(s) { return function (t, v) { return s[0] + t[0] + v } } f`a``b${3}`",
+        "ab3",
+    );
+    check("var t = 1; t`x`", "!TypeError: value is not a function");
+}
+
+#[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in ["function* g() {}", "async function f() {}", "/x/", "tag`x`"] {
+    for source in ["function* g() {}", "async function f() {}", "/x/"] {
         let mut agent = Agent::new().expect("agent");
         assert!(
             matches!(agent.evaluate(source), Err(EvalError::Compile(_))),

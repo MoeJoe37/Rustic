@@ -2986,7 +2986,28 @@
               ]
             },
             {
-              "label": "Tagged templates, optional calls and regular expression literals",
+              "label": "Tagged templates, optional calls and object-literal super",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/compile.rs",
+                  "marker": "fn tagged_template"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn tagged_templates"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn super_in_object_literals"
+                }
+              ]
+            },
+            {
+              "label": "Regular expression literals",
               "status": "planned",
               "evidence": []
             },

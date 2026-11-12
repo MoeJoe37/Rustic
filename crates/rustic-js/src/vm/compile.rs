@@ -8,11 +8,13 @@
 //! source cannot overflow the Rust stack. The AST is not kept: once a
 //! script is compiled, only bytecode remains.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::bytecode::{
-    BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, UnOp, declare,
+    BinOp, CodeId, FunctionCode, FunctionKind, Handler, NamedSite, Op, Reg, TemplateSite, UnOp,
+    declare,
 };
 use super::scope::{
     BRAND, BindingKind, CLASS, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER, PRIVATE_SETTER,
@@ -22,8 +24,8 @@ use super::scope::{
 use crate::ast::{
     Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Class, ClassElement,
     Expression, ExpressionKind, ForHead, ForInit, Function, LogicalOp, MemberProperty, MethodKind,
-    ObjectProperty, Pattern, PatternKind, Program, PropertyKey, Statement, StatementKind, UnaryOp,
-    UpdateOp, VariableDeclaration, VariableKind,
+    ObjectProperty, Pattern, PatternKind, Program, PropertyKey, Statement, StatementKind, Template,
+    UnaryOp, UpdateOp, VariableDeclaration, VariableKind,
 };
 use crate::runtime::{Agent, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory, StringId, Value};
 use crate::source::Span;
@@ -127,6 +129,7 @@ struct Gen<'a, 't> {
     scope_index: HashMap<ScopeId, u32>,
     handlers: Vec<Handler>,
     sites: Vec<NamedSite>,
+    templates: Vec<TemplateSite>,
     /// Registers of uncaptured bindings.
     locals: HashMap<(ScopeId, usize), Reg>,
     next_reg: u32,
@@ -153,6 +156,12 @@ struct Gen<'a, 't> {
     home_static: Option<bool>,
     /// The value of `home_static` for the next method compiled.
     next_home: Option<bool>,
+    /// This function is a method of an object literal (or an arrow
+    /// function inside one): `super.x` starts at the prototype of the
+    /// function's `[[HomeObject]]`.
+    home_object: bool,
+    /// The value of `home_object` for the next method compiled.
+    next_home_object: bool,
 }
 
 impl<'a, 't> Gen<'a, 't> {
@@ -178,6 +187,7 @@ impl<'a, 't> Gen<'a, 't> {
             scope_index: HashMap::new(),
             handlers: Vec::new(),
             sites: Vec::new(),
+            templates: Vec::new(),
             locals: HashMap::new(),
             next_reg: 0,
             max_reg: 0,
@@ -194,6 +204,8 @@ impl<'a, 't> Gen<'a, 't> {
             pending_skip: None,
             home_static: None,
             next_home: None,
+            home_object: false,
+            next_home_object: false,
         }
     }
 
@@ -232,6 +244,7 @@ impl<'a, 't> Gen<'a, 't> {
             strict: self.strict,
             kind: self.kind,
             sites: self.sites.into_boxed_slice(),
+            templates: self.templates.into_boxed_slice(),
         };
         Ok(self.agent.heap.alloc_code(code)?)
     }
@@ -638,7 +651,12 @@ impl<'a, 't> Gen<'a, 't> {
     /// of the home object.
     fn load_super_base(&mut self, dst: Reg, span: Span) -> CResult<()> {
         let Some(is_static) = self.home_static else {
-            return Err(CompileError::Unsupported("super outside a class", span));
+            if self.home_object {
+                self.emit(Op::Home { dst });
+                self.emit(Op::GetPrototypeOf { dst, src: dst });
+                return Ok(());
+            }
+            return Err(CompileError::Unsupported("super outside a method", span));
         };
         self.load_class(dst, span)?;
         if !is_static {
@@ -1494,6 +1512,7 @@ impl<'a, 't> Gen<'a, 't> {
                 FunctionKind::Normal => None,
                 _ => self.next_home.take(),
             };
+            g.home_object = std::mem::take(&mut self.next_home_object);
             g.guard()?;
             if kind == FunctionKind::ClassConstructor {
                 // Fields are defined before the parameters are bound. The
@@ -1545,6 +1564,7 @@ impl<'a, 't> Gen<'a, 't> {
                 self.stack_base,
             );
             g.home_static = self.home_static;
+            g.home_object = self.home_object;
             g.guard()?;
             let (params, length) = g.parameters(&f.params, f.rest.as_ref())?;
             match &f.body {
@@ -2980,8 +3000,8 @@ impl<'a, 't> Gen<'a, 't> {
                     }
                 }
             }
-            ExpressionKind::TaggedTemplate { .. } => {
-                return Err(CompileError::Unsupported("tagged templates", e.span));
+            ExpressionKind::TaggedTemplate { tag, template } => {
+                self.tagged_template(tag, template, dst)?;
             }
             ExpressionKind::Array(elements) => {
                 let array = self.temp()?;
@@ -3212,56 +3232,7 @@ impl<'a, 't> Gen<'a, 't> {
         let mark = self.mark();
         let this = self.temp()?;
         let f = self.temp()?;
-        // Unwrap parentheses only for the receiver rule: `(a.b)()` keeps
-        // `this`.
-        let mut c = callee;
-        while let ExpressionKind::Parenthesized(inner) = &c.kind {
-            c = inner;
-        }
-        match &c.kind {
-            ExpressionKind::Member {
-                object,
-                property,
-                optional: member_optional,
-            } => {
-                match &mut exits {
-                    Some(x) => self.chain_expr(object, this, x)?,
-                    None => self.expr(object, this)?,
-                }
-                if *member_optional {
-                    let j = self.emit(Op::JumpIfNullish {
-                        src: this,
-                        target: 0,
-                    });
-                    match &mut exits {
-                        Some(x) => x.push(j),
-                        None => {
-                            return Err(CompileError::Unsupported("optional chain", c.span));
-                        }
-                    }
-                }
-                self.member_link(this, property, f, c.span)?;
-            }
-            ExpressionKind::SuperMember(property) => {
-                self.super_member(property, f, this, c.span)?
-            }
-            ExpressionKind::Identifier(id) => {
-                self.load_binding(&id.name, f)?;
-                if self.resolve(&id.name) == Resolution::Dynamic && self.under_with() {
-                    let name = self.atom(&id.name)?;
-                    self.emit(Op::WithBase { dst: this, name });
-                } else {
-                    self.emit(Op::Undefined { dst: this });
-                }
-            }
-            _ => {
-                match &mut exits {
-                    Some(x) => self.chain_expr(callee, f, x)?,
-                    None => self.expr(callee, f)?,
-                }
-                self.emit(Op::Undefined { dst: this });
-            }
-        }
+        self.call_target(callee, this, f, &mut exits)?;
         if optional {
             let j = self.emit(Op::JumpIfNullish { src: f, target: 0 });
             match &mut exits {
@@ -3288,6 +3259,144 @@ impl<'a, 't> Gen<'a, 't> {
             });
         }
         self.release(mark);
+        Ok(())
+    }
+
+    /// `` dst = tag`template` ``: the tag is called with the site's
+    /// template object and the substitution values.
+    fn tagged_template(&mut self, tag: &Expression, template: &Template, dst: Reg) -> CResult<()> {
+        let mark = self.mark();
+        let (this, f) = (self.temp()?, self.temp()?);
+        self.call_target(tag, this, f, &mut None)?;
+        let first = u32::try_from(self.constants.len()).map_err(|_| CompileError::TooLarge)?;
+        for quasi in &template.quasis {
+            let value = match &quasi.cooked {
+                Some(units) => {
+                    Value::string(self.agent.heap.alloc_string(JsStr::from_units(units))?)
+                }
+                None => Value::UNDEFINED,
+            };
+            self.push_constant(value);
+        }
+        for quasi in &template.quasis {
+            let id = self
+                .agent
+                .heap
+                .alloc_string(JsStr::from_units(&quasi.raw))?;
+            self.push_constant(Value::string(id));
+        }
+        let site = u32::try_from(self.templates.len()).map_err(|_| CompileError::TooLarge)?;
+        self.templates.push(TemplateSite {
+            first,
+            count: template.quasis.len() as u32,
+            object: Cell::new(Value::UNDEFINED),
+        });
+        let argc =
+            u16::try_from(template.expressions.len() + 1).map_err(|_| CompileError::TooLarge)?;
+        let args = self.temps(usize::from(argc))?;
+        self.emit(Op::TemplateObject { dst: args, site });
+        for (i, x) in template.expressions.iter().enumerate() {
+            self.expr(x, args + 1 + i as Reg)?;
+        }
+        self.emit(Op::Call {
+            dst,
+            callee: f,
+            this,
+            args,
+            argc,
+        });
+        self.release(mark);
+        Ok(())
+    }
+
+    /// Evaluate the function a call invokes into `f` and its receiver
+    /// into `this`.
+    fn call_target(
+        &mut self,
+        callee: &Expression,
+        this: Reg,
+        f: Reg,
+        exits: &mut Option<&mut Vec<usize>>,
+    ) -> CResult<()> {
+        // Unwrap parentheses only for the receiver rule: `(a.b)()` keeps
+        // `this`.
+        let mut c = callee;
+        while let ExpressionKind::Parenthesized(inner) = &c.kind {
+            c = inner;
+        }
+        match &c.kind {
+            ExpressionKind::Member {
+                object,
+                property,
+                optional: member_optional,
+            } => {
+                match exits {
+                    Some(x) => self.chain_expr(object, this, x)?,
+                    None => self.expr(object, this)?,
+                }
+                if *member_optional {
+                    let j = self.emit(Op::JumpIfNullish {
+                        src: this,
+                        target: 0,
+                    });
+                    match exits {
+                        Some(x) => x.push(j),
+                        None => {
+                            return Err(CompileError::Unsupported("optional chain", c.span));
+                        }
+                    }
+                }
+                self.member_link(this, property, f, c.span)?;
+            }
+            ExpressionKind::SuperMember(property) => {
+                self.super_member(property, f, this, c.span)?
+            }
+            // `(a?.b)()`: the chain ends inside the parentheses, and the
+            // call still gets `a` as its receiver.
+            ExpressionKind::OptionalChain(inner)
+                if matches!(inner.kind, ExpressionKind::Member { .. }) =>
+            {
+                let ExpressionKind::Member {
+                    object,
+                    property,
+                    optional: member_optional,
+                } = &inner.kind
+                else {
+                    unreachable!("matched above")
+                };
+                let mut ends = Vec::new();
+                self.chain_expr(object, this, &mut ends)?;
+                if *member_optional {
+                    ends.push(self.emit(Op::JumpIfNullish {
+                        src: this,
+                        target: 0,
+                    }));
+                }
+                self.member_link(this, property, f, c.span)?;
+                let done = self.jump();
+                for j in ends {
+                    self.patch_here(j);
+                }
+                self.emit(Op::Undefined { dst: f });
+                self.patch_here(done);
+            }
+            ExpressionKind::Identifier(id) => {
+                self.load_binding(&id.name, f)?;
+                if self.resolve(&id.name) == Resolution::Dynamic && self.under_with() {
+                    let name = self.atom(&id.name)?;
+                    self.emit(Op::WithBase { dst: this, name });
+                } else {
+                    self.emit(Op::Undefined { dst: this });
+                }
+            }
+            _ => {
+                match exits {
+                    Some(x) => self.chain_expr(callee, f, x)?,
+                    None => self.expr(callee, f)?,
+                }
+                self.emit(Op::Undefined { dst: this });
+            }
+        }
         Ok(())
     }
 
@@ -3389,7 +3498,12 @@ impl<'a, 't> Gen<'a, 't> {
                         MethodKind::Set => name.map(|n| format!("set {n}")),
                         _ => name,
                     };
+                    self.next_home_object = true;
                     self.function_expression(function, v, hint.as_deref(), FunctionKind::Method)?;
+                    self.emit(Op::SetHome {
+                        function: v,
+                        home: object,
+                    });
                     match kind {
                         MethodKind::Get | MethodKind::Set => {
                             self.emit(Op::DefineAccessor {
@@ -3401,10 +3515,6 @@ impl<'a, 't> Gen<'a, 't> {
                             });
                         }
                         _ => {
-                            self.emit(Op::SetHome {
-                                function: v,
-                                home: object,
-                            });
                             self.emit(Op::DefineProp {
                                 object,
                                 key: k,

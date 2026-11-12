@@ -385,6 +385,29 @@ impl Agent {
         Ok(f)
     }
 
+    /// `GetTemplateObject`: the frozen array of cooked strings with its
+    /// frozen `raw` array.
+    fn template_object(&mut self, cooked: &[Value], raw: &[Value]) -> JsResult<ObjectId> {
+        use crate::runtime::IntegrityLevel;
+        let raw = self.create_array_from_list(raw)?;
+        self.set_integrity_level(raw, IntegrityLevel::Frozen)?;
+        let template = self.create_array_from_list(cooked)?;
+        let key = PropertyKey::String(self.heap.intern_str("raw")?);
+        self.define_property_or_throw(
+            template,
+            key,
+            PropertyDescriptor {
+                value: Some(Value::object(raw)),
+                writable: Some(false),
+                enumerable: Some(false),
+                configurable: Some(false),
+                ..Default::default()
+            },
+        )?;
+        self.set_integrity_level(template, IntegrityLevel::Frozen)?;
+        Ok(template)
+    }
+
     /// The object and private name of a private field access.
     fn private_operands(
         &mut self,
@@ -1129,9 +1152,40 @@ impl Agent {
                     t!(self.copy_data_properties(target, source, &skip));
                 }
                 Op::Closure { dst, index } => {
-                    let this = frame!().this;
+                    let (this, running) = (frame!().this, frame!().function);
                     let f = t!(self.new_closure(code.functions[index as usize], env, this));
+                    // An arrow function uses the `super` of its maker.
+                    let home = running
+                        .as_object()
+                        .and_then(|o| self.heap.closure(o))
+                        .map_or(Value::UNDEFINED, |c| c.home);
+                    let arrow =
+                        self.heap.code(code.functions[index as usize]).kind == FunctionKind::Arrow;
+                    if arrow && home != Value::UNDEFINED {
+                        if let Some(closure) = self.heap.closure_mut(f) {
+                            closure.home = home;
+                        }
+                    }
                     reg!(dst) = Value::object(f);
+                }
+                Op::TemplateObject { dst, site } => {
+                    let entry = &code.templates[site as usize];
+                    let mut object = entry.object.get();
+                    if object == Value::UNDEFINED {
+                        let (first, count) = (entry.first as usize, entry.count as usize);
+                        let cooked = &code.constants[first..first + count];
+                        let raw = &code.constants[first + count..first + 2 * count];
+                        object = Value::object(t!(self.template_object(cooked, raw)));
+                        code.templates[site as usize].object.set(object);
+                    }
+                    reg!(dst) = object;
+                }
+                Op::Home { dst } => {
+                    let running = frame!().function;
+                    reg!(dst) = running
+                        .as_object()
+                        .and_then(|o| self.heap.closure(o))
+                        .map_or(Value::UNDEFINED, |c| c.home);
                 }
                 Op::SetHome { function, home } => {
                     let (f, home) = (reg!(function), reg!(home));

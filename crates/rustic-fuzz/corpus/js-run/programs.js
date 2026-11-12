@@ -126,3 +126,7 @@ class A { #x = 1; #y = this.#x + 1; #m() { return this.#x * 2 } get #p() { retur
 class A { #x; static #n = 0; static #s() { return ++A.#n } static has(o) { return (#x in o) + A.#s() } } var r = 0; for (var i = 0; i < 20; i++) r += A.has(i % 2 ? new A() : {}); r
 function make() { return class { #v = 1; static read(o) { try { return o.#v } catch (e) { return -1 } } } } var A = make(), B = make(), t = 0; for (var i = 0; i < 30; i++) t += A.read(i % 3 ? new A() : new B()); t
 class A { #x = 1; a() { return this.#x } } class B extends A { #x = 2; #b() { return this.#x + this.a() } go() { var f = () => this.#b(); return f() } } var s = 0; for (var i = 0; i < 25; i++) s += new B().go(); s
+function tag(s, a) { return s.raw[0] + s[1] + a + s.length } var r = ''; for (var i = 0; i < 12; i++) r += tag`a${i}b`; r
+var seen = []; function id(s) { seen.push(s); return s } for (var i = 0; i < 9; i++) id`x${i}y`; var same = 0; for (var s of seen) same += s === seen[0]; same
+var p = { m(n) { return n + this.k } }; var o = { __proto__: p, k: 1, m(n) { return super.m(n) * 2 }, a(n) { return (() => super.m(n))() } }; var t = 0; for (var i = 0; i < 20; i++) t += o.m(i) + o.a(i); t
+var o = { f(n) { return n } }, u, t = 0; for (var i = 0; i < 20; i++) t += (i % 2 ? o : u)?.f?.(i) ?? -1; t

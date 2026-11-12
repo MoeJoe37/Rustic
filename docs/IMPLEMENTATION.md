@@ -1178,7 +1178,9 @@ static blocks compile onto the same bytecode with a handful of new
 instructions. Private names (`#x` fields, methods, accessors, statics and
 `#x in o`) are symbols hidden from reflection: fields are ordinary shape
 properties, and methods live once in the class scope behind a per-instance
-brand check.
+brand check. Object-literal `super` (through the closure's home object),
+tagged templates (one frozen template object per site, kept by the code) and
+optional calls completed the JS-04 syntax.
 
 ## REN-03 completion: font formats, shaping and text policies
 
@@ -1241,7 +1243,7 @@ lists the next tasks.
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; no collection yet (TD-91), partial BigInt conversions (TD-92); see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
-| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names run; generators, async, modules, RegExp and tagged templates remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
+| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators, async, modules and RegExp remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
 | JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
 
 M1's catalog scope is complete (28/28). DOC-04c added node kinds, cloning and

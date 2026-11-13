@@ -246,7 +246,7 @@ fn utc(agent: &Agent, t: f64) -> f64 {
 }
 
 /// The current time value.
-fn now(agent: &Agent) -> f64 {
+pub(crate) fn now(agent: &Agent) -> f64 {
     if let Some(t) = agent.vm.clock {
         return t;
     }

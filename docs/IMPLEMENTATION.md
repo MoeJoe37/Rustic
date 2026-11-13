@@ -1344,6 +1344,17 @@ The Test262 runner gained a `$262` with `global` and `detachArrayBuffer`.
 `test/language`: 21,465 of 22,427 run files (95.7%); `test/built-ins` with
 the four buffer directories gated: 16,629 of 18,081 (91.9%).
 
+## JS-08 part 7: SharedArrayBuffer and Atomics
+
+`builtins/buffer.rs` adds `SharedArrayBuffer` (fixed and growable, `slice`,
+`grow`) as the buffer record with a `shared` flag, and `builtins/atomics.rs`
+the `Atomics` object with every operation, `wait`, `waitAsync` and `notify`.
+Sharing is within one agent (TD-115): `wait` throws unless
+`Agent::set_can_block`, then only times out; `waitAsync` waiters are woken by
+`notify` or by `Agent::expire_waiters`. Test262 `test/language`: 21,467 of
+22,427 run files (95.7%); `test/built-ins` with `Atomics` and
+`SharedArrayBuffer` gated: 17,109 of 18,574 (92.1%).
+
 ## JS-06 part 2: promise rejection tracking
 
 `RejectPromise` and `PerformPromiseThen` record the two

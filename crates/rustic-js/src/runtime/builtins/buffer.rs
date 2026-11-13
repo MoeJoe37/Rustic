@@ -23,8 +23,10 @@ pub(crate) const MAX_BUFFER_BYTES: usize = i32::MAX as usize;
 pub(crate) struct BufferData {
     /// The bytes; `None` once detached.
     pub bytes: Option<Vec<u8>>,
-    /// `[[ArrayBufferMaxByteLength]]` of a resizable buffer.
+    /// `[[ArrayBufferMaxByteLength]]` of a resizable or growable buffer.
     pub max: Option<usize>,
+    /// A SharedArrayBuffer: never detached, and it only grows.
+    pub shared: bool,
 }
 
 /// The element type of a typed array or a DataView accessor.
@@ -249,6 +251,26 @@ impl Agent {
         length: usize,
         max: Option<usize>,
     ) -> JsResult<ObjectId> {
+        self.allocate_buffer(prototype, length, max, false)
+    }
+
+    /// `AllocateSharedArrayBuffer` (§25.2.2.1).
+    fn allocate_shared_array_buffer(
+        &mut self,
+        prototype: ObjectId,
+        length: usize,
+        max: Option<usize>,
+    ) -> JsResult<ObjectId> {
+        self.allocate_buffer(prototype, length, max, true)
+    }
+
+    fn allocate_buffer(
+        &mut self,
+        prototype: ObjectId,
+        length: usize,
+        max: Option<usize>,
+        shared: bool,
+    ) -> JsResult<ObjectId> {
         if length > MAX_BUFFER_BYTES
             || max.is_some_and(|m| m > MAX_BUFFER_BYTES)
             || self
@@ -262,8 +284,22 @@ impl Agent {
         object.extra_mut().internal = Some(Internal::ArrayBuffer(Box::new(BufferData {
             bytes: Some(vec![0; length]),
             max,
+            shared,
         })));
         Ok(self.heap.alloc_object(object)?)
+    }
+
+    /// A new `SharedArrayBuffer` of `length` zero bytes. Its memory is
+    /// shared between the typed arrays and views of this agent only:
+    /// there is no other agent to share it with yet (TD-115).
+    pub fn new_shared_array_buffer(&mut self, length: usize) -> JsResult<ObjectId> {
+        let prototype = self.intrinsics.shared_array_buffer_prototype;
+        self.allocate_shared_array_buffer(prototype, length, None)
+    }
+
+    /// Whether `o` is a SharedArrayBuffer (`IsSharedArrayBuffer`).
+    pub fn is_shared_array_buffer(&self, o: ObjectId) -> bool {
+        self.buffer_data(o).is_some_and(|data| data.shared)
     }
 
     /// A new `ArrayBuffer` of `length` zero bytes.
@@ -273,9 +309,10 @@ impl Agent {
     }
 
     /// `DetachArrayBuffer` (§25.1.3.5): hosts detach a buffer they
-    /// transfer. Returns whether `buffer` is an ArrayBuffer.
+    /// transfer. Returns whether `buffer` is an ArrayBuffer; a
+    /// SharedArrayBuffer cannot be detached.
     pub fn detach_array_buffer(&mut self, buffer: ObjectId) -> bool {
-        match self.buffer_data_mut(buffer) {
+        match self.buffer_data_mut(buffer).filter(|data| !data.shared) {
             Some(data) => {
                 // A detached resizable buffer still reports `resizable`.
                 data.bytes = None;
@@ -314,6 +351,35 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     getter(agent, prototype, "resizable", buffer_resizable)?;
     getter(agent, prototype, "detached", buffer_detached)?;
     to_string_tag(agent, prototype, "ArrayBuffer")?;
+
+    let shared_prototype = agent.new_object_with(Some(object_prototype))?;
+    agent.intrinsics.shared_array_buffer_prototype = shared_prototype;
+    let shared = install_constructor(
+        agent,
+        "SharedArrayBuffer",
+        shared_constructor,
+        1,
+        shared_prototype,
+    )?;
+    agent.intrinsics.shared_array_buffer = shared;
+    species_getter(agent, shared)?;
+    install_methods(
+        agent,
+        shared_prototype,
+        &[
+            method("grow", shared_grow, 1),
+            method("slice", shared_slice, 2),
+        ],
+    )?;
+    getter(agent, shared_prototype, "byteLength", shared_byte_length)?;
+    getter(agent, shared_prototype, "growable", shared_growable)?;
+    getter(
+        agent,
+        shared_prototype,
+        "maxByteLength",
+        shared_max_byte_length,
+    )?;
+    to_string_tag(agent, shared_prototype, "SharedArrayBuffer")?;
 
     let view_prototype = agent.new_object_with(Some(object_prototype))?;
     agent.intrinsics.data_view_prototype = view_prototype;
@@ -398,8 +464,21 @@ pub(super) fn to_byte_index(agent: &mut Agent, value: Value) -> JsResult<usize> 
 
 /// `ArrayBuffer(length, options)` (§25.1.4.1).
 fn buffer_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    construct_buffer(agent, args, false)
+}
+
+/// `SharedArrayBuffer(length, options)` (§25.2.3.1).
+fn shared_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    construct_buffer(agent, args, true)
+}
+
+fn construct_buffer(agent: &mut Agent, args: &[Value], shared: bool) -> JsResult<Value> {
     if agent.new_target().is_none() {
-        return agent.type_error("Constructor ArrayBuffer requires 'new'");
+        return agent.type_error(if shared {
+            "Constructor SharedArrayBuffer requires 'new'"
+        } else {
+            "Constructor ArrayBuffer requires 'new'"
+        });
     }
     let length = agent.to_index(arg(args, 0))?;
     // `GetArrayBufferMaxByteLengthOption`.
@@ -422,7 +501,11 @@ fn buffer_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
             "ArrayBuffer length exceeds maxByteLength",
         ));
     }
-    let default = agent.intrinsics.array_buffer_prototype;
+    let default = if shared {
+        agent.intrinsics.shared_array_buffer_prototype
+    } else {
+        agent.intrinsics.array_buffer_prototype
+    };
     let prototype = prototype_from_new_target(agent, default)?;
     let too_big = |n: u64| usize::try_from(n).map_or(true, |n| n > MAX_BUFFER_BYTES);
     if too_big(length) || max.is_some_and(too_big) {
@@ -430,7 +513,7 @@ fn buffer_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
     }
     // Both were just checked to fit.
     let buffer =
-        agent.allocate_array_buffer(prototype, length as usize, max.map(|m| m as usize))?;
+        agent.allocate_buffer(prototype, length as usize, max.map(|m| m as usize), shared)?;
     Ok(Value::object(buffer))
 }
 
@@ -445,9 +528,12 @@ fn buffer_is_view(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value
     Ok(Value::boolean(is_view))
 }
 
-/// The receiver as an ArrayBuffer.
+/// The receiver as an ArrayBuffer (not a SharedArrayBuffer).
 fn this_buffer(agent: &mut Agent, this: Value, method: &str) -> JsResult<ObjectId> {
-    match this.as_object().filter(|o| agent.buffer_data(*o).is_some()) {
+    match this
+        .as_object()
+        .filter(|o| agent.buffer_data(*o).is_some_and(|data| !data.shared))
+    {
         Some(o) => Ok(o),
         None => agent.type_error(&format!(
             "ArrayBuffer.prototype.{method} called on an incompatible receiver"
@@ -526,7 +612,7 @@ fn buffer_slice(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
     )?;
     let Some(new) = created
         .as_object()
-        .filter(|o| agent.buffer_data(*o).is_some())
+        .filter(|o| agent.buffer_data(*o).is_some_and(|data| !data.shared))
     else {
         return agent.type_error("the species constructor did not return an ArrayBuffer");
     };
@@ -626,6 +712,111 @@ fn buffer_transfer(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<V
 
 fn buffer_transfer_fixed(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     copy_and_detach(agent, this, args, false, "transferToFixedLength")
+}
+
+// ---- SharedArrayBuffer (§25.2) ------------------------------------------------
+
+/// The receiver as a SharedArrayBuffer.
+fn this_shared(agent: &mut Agent, this: Value, method: &str) -> JsResult<ObjectId> {
+    match this
+        .as_object()
+        .filter(|o| agent.is_shared_array_buffer(*o))
+    {
+        Some(o) => Ok(o),
+        None => agent.type_error(&format!(
+            "SharedArrayBuffer.prototype.{method} called on an incompatible receiver"
+        )),
+    }
+}
+
+fn shared_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let buffer = this_shared(agent, this, "byteLength")?;
+    Ok(Value::number(agent.buffer_len(buffer).unwrap_or(0) as f64))
+}
+
+fn shared_growable(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let buffer = this_shared(agent, this, "growable")?;
+    let data = agent.buffer_data(buffer).expect("checked above");
+    Ok(Value::boolean(data.max.is_some()))
+}
+
+fn shared_max_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let buffer = this_shared(agent, this, "maxByteLength")?;
+    let data = agent.buffer_data(buffer).expect("checked above");
+    let length = data
+        .max
+        .unwrap_or_else(|| data.bytes.as_ref().map_or(0, Vec::len));
+    Ok(Value::number(length as f64))
+}
+
+/// `SharedArrayBuffer.prototype.grow(newLength)` (§25.2.5.3): a shared
+/// buffer never shrinks.
+fn shared_grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let buffer = this_shared(agent, this, "grow")?;
+    let Some(max) = agent.buffer_data(buffer).and_then(|d| d.max) else {
+        return agent.type_error("SharedArrayBuffer.prototype.grow: the buffer is not growable");
+    };
+    let new_length = agent.to_index(arg(args, 0))?;
+    let old_length = agent
+        .buffer_len(buffer)
+        .expect("shared buffers stay attached");
+    let new_length = match usize::try_from(new_length) {
+        Ok(n) if n <= max && n >= old_length => n,
+        _ => {
+            return Err(agent.throw(
+                ErrorKind::RangeError,
+                "SharedArrayBuffer.prototype.grow: the length is below the current length or above maxByteLength",
+            ));
+        }
+    };
+    if agent.heap.charge(new_length - old_length).is_err() {
+        return Err(agent.throw(ErrorKind::RangeError, "Array buffer allocation failed"));
+    }
+    agent
+        .buffer_data_mut(buffer)
+        .and_then(|d| d.bytes.as_mut())
+        .expect("shared buffers stay attached")
+        .resize(new_length, 0);
+    Ok(Value::UNDEFINED)
+}
+
+/// `SharedArrayBuffer.prototype.slice(start, end)` (§25.2.5.6).
+fn shared_slice(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let buffer = this_shared(agent, this, "slice")?;
+    let length = agent
+        .buffer_len(buffer)
+        .expect("shared buffers stay attached");
+    let first = clamp_relative(agent, arg(args, 0), length, 0)?;
+    let last = clamp_relative(agent, arg(args, 1), length, length)?;
+    let new_length = last.saturating_sub(first);
+    let default = agent.intrinsics.shared_array_buffer;
+    let constructor = species_constructor(agent, buffer, default)?;
+    let created = agent.construct(
+        Value::object(constructor),
+        &[Value::number(new_length as f64)],
+    )?;
+    let Some(new) = created
+        .as_object()
+        .filter(|o| agent.is_shared_array_buffer(*o))
+    else {
+        return agent.type_error("the species constructor did not return a SharedArrayBuffer");
+    };
+    if new == buffer {
+        return agent.type_error("the species constructor returned the same SharedArrayBuffer");
+    }
+    let created_length = agent.buffer_len(new).expect("shared buffers stay attached");
+    if created_length < new_length {
+        return agent.type_error("the species constructor returned a smaller SharedArrayBuffer");
+    }
+    if first < last {
+        let source = agent.array_buffer_bytes(buffer).expect("attached")[first..last].to_vec();
+        let target = agent
+            .buffer_data_mut(new)
+            .and_then(|d| d.bytes.as_mut())
+            .expect("attached");
+        target[..source.len()].copy_from_slice(&source);
+    }
+    Ok(created)
 }
 
 // ---- DataView (§25.3) ---------------------------------------------------------

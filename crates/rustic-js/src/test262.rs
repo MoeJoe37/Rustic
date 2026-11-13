@@ -61,6 +61,9 @@ pub struct Metadata {
     pub includes: Vec<String>,
     /// `negative:`: the phase that must fail and the error's name.
     pub negative: Option<Negative>,
+    /// `flags: [CanBlockIsFalse]`: the agent may not block in
+    /// `Atomics.wait`.
+    pub cannot_block: bool,
 }
 
 /// When a negative test must fail.
@@ -118,6 +121,7 @@ pub fn metadata(text: &str) -> Option<Metadata> {
                     "noStrict" => meta.no_strict = true,
                     "raw" => meta.raw = true,
                     "async" => meta.is_async = true,
+                    "CanBlockIsFalse" => meta.cannot_block = true,
                     _ => {}
                 }
             }
@@ -375,6 +379,9 @@ fn execute_mode(
     let mut agent =
         Agent::with_heap_limit(limits.heap_bytes).map_err(|_| "no memory for an agent")?;
     agent.set_step_budget(Some(limits.steps));
+    // The main agent of a Test262 host may block in `Atomics.wait`
+    // unless the test asks for one that may not.
+    agent.set_can_block(!meta.cannot_block);
     install_host_object(&mut agent).map_err(|_| "no memory for $262")?;
     if meta.is_async {
         // `doneprintHandle.js` reports through the host's `print`; keep
@@ -412,7 +419,7 @@ fn execute_mode(
     let result = agent.evaluate(source);
     // A microtask checkpoint after the script, as a host runs one.
     let result = match result {
-        Ok(v) => agent.run_jobs().map(|()| v).map_err(EvalError::from),
+        Ok(v) => settle(&mut agent).map(|()| v).map_err(EvalError::from),
         Err(e) => Err(e),
     };
     match (&meta.negative, result) {
@@ -438,6 +445,17 @@ fn execute_mode(
             }
         }
     }
+}
+
+/// Run the promise jobs, then let time pass for each pending
+/// `Atomics.waitAsync` timeout in turn, as a host's timer tasks would.
+fn settle(agent: &mut Agent) -> crate::runtime::JsResult<()> {
+    agent.run_jobs()?;
+    while let Some(deadline) = agent.next_waiter_deadline() {
+        agent.expire_waiters(deadline)?;
+        agent.run_jobs()?;
+    }
+    Ok(())
 }
 
 /// The part of the `$262` host object (INTERPRETING.md) the engine can

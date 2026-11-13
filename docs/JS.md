@@ -129,10 +129,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,465 | 16,629 |
-| Fail | 962 | 1,452 |
+| Pass | 21,467 | 17,109 |
+| Fail | 960 | 1,465 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 95.7% | 91.9% |
+| Pass rate of the files that run | 95.7% | 92.1% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -156,12 +156,12 @@ The four bugs are covered by `test262_findings` in `tests/interp.rs`:
   requires.
 
 The built-ins gate runs the `test/built-ins` directories of the library areas
-installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, ArrayBuffer, Boolean, DataView,
+installed so far (`BUILT_IN_DIRS` in `tests/test262.rs`: Array, ArrayBuffer, Atomics, Boolean, DataView,
 Date, Error, FinalizationRegistry, Function, GeneratorFunction,
 GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
 prototypes, BigInt, Iterator, JSON, Map, Math, NativeErrors, Number,
-Object, Proxy, Reflect, RegExp, Set, String, Symbol, TypedArray, TypedArrayConstructors, WeakMap, WeakRef, WeakSet, the
+Object, Proxy, Reflect, RegExp, Set, SharedArrayBuffer, String, Symbol, TypedArray, TypedArrayConstructors, WeakMap, WeakRef, WeakSet, the
 iterator prototypes and the global functions). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
 
@@ -184,7 +184,7 @@ Most `test/language` failures are not interpreter bugs yet:
 In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
-Temporal, `SharedArrayBuffer` or `$262` realms. Skipped files are never
+Temporal, `$262.agent` (112 `Atomics` files) or `$262` realms. Skipped files are never
 counted as passing. Module files join with JS-06 module loading (TD-105).
 
 ## Fuzzing
@@ -552,14 +552,43 @@ calls a function value. The design is recorded in
     65,536 bit patterns.
   - `Agent::new_array_buffer`, `array_buffer_bytes` and
     `detach_array_buffer` are the host's side.
-  - Not yet: `SharedArrayBuffer`, `Atomics` and a fast path for element
-    access (TD-115).
-  - Test262: `ArrayBuffer` 181 of 221, `DataView` 503 of 560, `TypedArray`
-    1,437 of 1,453 and `TypedArrayConstructors` 654 of 738; nearly all the
-    failures need `SharedArrayBuffer`, a second realm or the immutable
-    buffer proposal. Six `DataView` files expect a length of 0 from a
+  - Not yet: a fast path for element access (TD-115).
+  - Test262: `ArrayBuffer` 193 of 221, `DataView` 541 of 560, `TypedArray`
+    1,445 of 1,453 and `TypedArrayConstructors` 712 of 738; nearly all the
+    failures need a second realm or the immutable buffer proposal. Six `DataView` files expect a length of 0 from a
     detached or out-of-bounds view, where the specification (§25.3.4.2)
     and this engine throw a TypeError.
+- **SharedArrayBuffer and Atomics** (JS-08 part 7):
+  - `SharedArrayBuffer` (§25.2) with `byteLength`, `slice`, growable
+    buffers (`maxByteLength`, `growable`, `grow`) and species. It is the
+    buffer record of `ArrayBuffer` with a `shared` flag: it cannot be
+    detached, it only grows, and each kind rejects the other's methods.
+    Typed arrays and `DataView` take either.
+  - `Atomics` (§25.4): `load`, `store`, `add`, `sub`, `and`, `or`, `xor`,
+    `exchange`, `compareExchange`, `isLockFree`, `pause`, `wait`,
+    `waitAsync` and `notify`, on integer typed arrays over either kind of
+    buffer. Conversions run before the access is revalidated, arithmetic
+    wraps in the element type, and `compareExchange` compares raw
+    elements.
+  - An agent runs on one thread and no other agent can reach its memory
+    yet (workers are M9), so the operations are atomic by construction and
+    a shared buffer is shared between this agent's views only (TD-115).
+    `Atomics.wait` therefore cannot be woken. By default it throws a
+    TypeError, as on a browser's main thread; after
+    `Agent::set_can_block(true)` a finite wait returns `"timed-out"`
+    (moving a fixed clock forward) and an infinite one is cancelled.
+    `Atomics.waitAsync` promises are woken by `Atomics.notify` in the same
+    agent, oldest first, or time out when the host calls
+    `Agent::expire_waiters` (`next_waiter_deadline` says when); pending
+    waiters are collector roots.
+  - A host decides whether script sees `SharedArrayBuffer` at all: the web
+    requires cross-origin isolation (M6/M7 policy), which the bindings
+    will enforce by removing the global.
+  - Test262: `SharedArrayBuffer` 103 of 104 (the other needs a realm) and
+    `Atomics` 268 of 389; 112 of the failures need `$262.agent` (other
+    agents sharing the buffer) and 9 the immutable buffer proposal. The
+    runner honors `CanBlockIsFalse` and expires `waitAsync` timeouts after
+    the job queue drains.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
   anything runs, TD-97): modules and regular expression
   literals that use a property escape (TD-110).
@@ -656,7 +685,8 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (105,954). The test compares a fresh report with the committed file on
+  (110,671; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
 - **Runner.** `cargo run --release -p rustic-js --example js_bench` runs

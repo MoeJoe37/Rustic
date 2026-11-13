@@ -3287,55 +3287,62 @@
           "label": "Buffers, typed arrays and memory semantics",
           "size": 3,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "ArrayBuffer (resizable, transfer), DataView and the element codec on the heap budget",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
-                  "marker": "pub(crate) fn allocate_array_buffer"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn array_buffers_and_data_views"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn buffers_are_charged_to_the_heap_and_collected"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
-                  "marker": "fn binary16_round_trips_and_rounds_to_even"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+              "marker": "pub(crate) fn allocate_array_buffer"
             },
             {
-              "label": "Typed arrays: constructors, methods and integer-indexed exotic objects",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/typed_array.rs",
-                  "marker": "pub(crate) fn numeric_index"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn typed_arrays()"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn array_buffers_and_data_views"
             },
             {
-              "label": "SharedArrayBuffer and Atomics (TD-115)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn buffers_are_charged_to_the_heap_and_collected"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+              "marker": "fn binary16_round_trips_and_rounds_to_even"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/typed_array.rs",
+              "marker": "pub(crate) fn numeric_index"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn typed_arrays()"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/atomics.rs",
+              "marker": "fn read_modify_write"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/buffer.rs",
+              "marker": "fn shared_grow"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn shared_array_buffers"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn atomics_wait_and_notify"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/gc.rs",
+              "marker": "fn pending_wait_async_promises_and_their_buffers_survive_collection"
             }
           ]
         },

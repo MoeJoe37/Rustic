@@ -218,6 +218,10 @@ pub struct Intrinsics {
     pub array_buffer_prototype: ObjectId,
     /// `%DataView.prototype%`.
     pub data_view_prototype: ObjectId,
+    /// `%SharedArrayBuffer%`.
+    pub shared_array_buffer: ObjectId,
+    /// `%SharedArrayBuffer.prototype%`.
+    pub shared_array_buffer_prototype: ObjectId,
     /// `%TypedArray%`.
     pub typed_array: ObjectId,
     /// `%TypedArray.prototype%`.
@@ -272,6 +276,8 @@ impl Intrinsics {
             self.array_buffer,
             self.array_buffer_prototype,
             self.data_view_prototype,
+            self.shared_array_buffer,
+            self.shared_array_buffer_prototype,
             self.typed_array,
             self.typed_array_prototype,
         ];
@@ -363,6 +369,8 @@ impl Agent {
                 array_buffer: placeholder,
                 array_buffer_prototype: placeholder,
                 data_view_prototype: placeholder,
+                shared_array_buffer: placeholder,
+                shared_array_buffer_prototype: placeholder,
                 typed_array: placeholder,
                 typed_array_prototype: placeholder,
                 typed_array_constructors: [placeholder; 12],
@@ -450,6 +458,8 @@ impl Agent {
             array_buffer: object_prototype,
             array_buffer_prototype: object_prototype,
             data_view_prototype: object_prototype,
+            shared_array_buffer: object_prototype,
+            shared_array_buffer_prototype: object_prototype,
             typed_array: object_prototype,
             typed_array_prototype: object_prototype,
             typed_array_constructors: [object_prototype; 12],

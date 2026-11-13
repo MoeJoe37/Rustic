@@ -880,3 +880,21 @@ fn regexps_and_their_iterators_survive_collection() {
     a.heap.set_gc_stress(false);
     assert_eq!(a.display(out), "122,333(?<w>[a-z])x?gi<X><b><Y>");
 }
+
+#[test]
+fn pending_wait_async_promises_and_their_buffers_survive_collection() {
+    let mut a = agent();
+    a.heap.set_gc_stress(true);
+    a.evaluate(
+        "var out = ''; (function () { var view = new Int32Array(new SharedArrayBuffer(8));
+         Atomics.waitAsync(view, 0, 0).value.then(v => { out = v + view.length }); })();
+         globalThis.wake = function () {};",
+    )
+    .expect("runs");
+    a.collect_garbage(Roots::default());
+    // Only the waiter list holds the promise and the buffer now.
+    assert_eq!(a.expire_waiters(f64::INFINITY), Ok(1));
+    a.run_jobs().expect("jobs run");
+    let out = a.evaluate("out").expect("runs");
+    assert_eq!(a.display(out), "timed-out2");
+}

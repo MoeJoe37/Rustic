@@ -146,7 +146,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, `perf.interpreter` (M12) |
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
 | TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
-| TD-115 | Deliberate | JS | No `SharedArrayBuffer` or `Atomics`; typed array elements are read through the generic property path | Open, JS-09/M5 |
+| TD-115 | Deliberate | JS | A `SharedArrayBuffer` is shared within one agent only (no cross-agent byte store until workers); typed array elements are read through the generic property path | Open, M9 workers / `perf.interpreter` |
 | TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -1659,12 +1659,16 @@ arguments (which other engines only provide without optimization).
 
 Pay with: nothing planned; revisit only if a site needs the real caller.
 
-### TD-115 — No shared memory, and typed arrays have no fast path
+### TD-115 — Shared memory stays inside one agent, and typed arrays have no fast path
 
-`SharedArrayBuffer` and `Atomics` are not installed. Rustic has one agent per
-heap and no workers yet, so nothing could share a buffer; installing the
-constructors without real sharing would only pretend. About 110 Test262 files
-in the buffer and typed array directories fail for that reason alone. The
+`SharedArrayBuffer` and `Atomics` are installed since JS-08 part 7 with their
+full single-agent semantics (see [JS.md](JS.md)). What is still missing is the
+sharing itself: Rustic has one agent per heap and no workers yet, so a shared
+buffer's bytes are a `Vec<u8>` owned by one heap, `Atomics.wait` can never be
+woken, and the 112 Test262 `Atomics` files that start other agents through
+`$262.agent` fail. The earlier form of this entry held the constructors back
+for that reason; they are installed now because their behavior inside one
+agent is fully specified and testable, and the host decides exposure. The
 immutable ArrayBuffer proposal (`transferToImmutable`, `sliceToImmutable`,
 `immutable`) is not implemented either.
 
@@ -1673,9 +1677,10 @@ flag, asks `exotic.rs`, and the element is decoded from the buffer's bytes.
 That is correct for every case (detached and resized buffers included) but
 several times slower than an indexed load should be.
 
-Pay with: a shared, reference-counted byte store and `Atomics` when workers
-arrive (M5/M6 storage and workers), and interpreter fast paths for typed array
-loads and stores keyed on the element kind (JS-09, measured first).
+Pay with: a shared, reference-counted byte store with real atomic accesses
+and a waiter list shared between agents when workers arrive
+(`storage.workers`, M9), and interpreter fast paths for typed array loads and
+stores keyed on the element kind (`perf.interpreter`, M12).
 
 ### TD-116 — A rope's flat copy is charged late
 

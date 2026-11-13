@@ -143,6 +143,10 @@ pub(crate) struct VmState {
     pub(crate) running_job: Option<Job>,
     /// Rejection tracker calls the host has not taken yet (§27.2.1.9).
     pub(crate) rejections: Vec<crate::runtime::RejectionEvent>,
+    /// Whether `Atomics.wait` may block this agent (`AgentCanSuspend`).
+    pub(crate) can_block: bool,
+    /// `Atomics.waitAsync` promises that have not settled, oldest first.
+    pub(crate) waiters: Vec<crate::runtime::Waiter>,
 }
 
 fn stack_address() -> usize {
@@ -171,6 +175,10 @@ impl VmState {
         }
         for event in &self.rejections {
             tracer.value(Value::object(event.promise));
+        }
+        for waiter in &self.waiters {
+            tracer.value(Value::object(waiter.buffer));
+            tracer.value(Value::object(waiter.promise));
         }
     }
 }

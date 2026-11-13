@@ -3302,3 +3302,183 @@ fn buffers_are_charged_to_the_heap_and_collected() {
         "66.5"
     );
 }
+
+#[test]
+fn shared_array_buffers() {
+    let _report = Report;
+    check(
+        "var s = new SharedArrayBuffer(8); [s.byteLength, s.growable, s.maxByteLength, Object.prototype.toString.call(s), s instanceof ArrayBuffer].join()",
+        "8,false,8,[object SharedArrayBuffer],false",
+    );
+    check(
+        "SharedArrayBuffer(1)",
+        "!TypeError: Constructor SharedArrayBuffer requires 'new'",
+    );
+    // Views of one buffer see the same bytes.
+    check(
+        "var s = new SharedArrayBuffer(8); var a = new Int32Array(s), b = new Uint8Array(s); a[1] = 0x01020304; b.join() + '|' + new DataView(s).getInt32(4, true)",
+        "0,0,0,0,4,3,2,1|16909060",
+    );
+    // A growable buffer only grows, and length-tracking views follow it.
+    check(
+        "var s = new SharedArrayBuffer(4, {maxByteLength: 16}); var a = new Uint8Array(s); s.grow(12); [s.byteLength, s.growable, s.maxByteLength, a.length].join()",
+        "12,true,16,12",
+    );
+    check(
+        "var s = new SharedArrayBuffer(4, {maxByteLength: 16}); s.grow(2)",
+        "!RangeError: SharedArrayBuffer.prototype.grow: the length is below the current length or above maxByteLength",
+    );
+    check(
+        "new SharedArrayBuffer(4).grow(8)",
+        "!TypeError: SharedArrayBuffer.prototype.grow: the buffer is not growable",
+    );
+    check(
+        "var s = new SharedArrayBuffer(8); new Uint8Array(s).set([1, 2, 3, 4, 5, 6, 7, 8]); var t = s.slice(2, -2); [t instanceof SharedArrayBuffer, t.byteLength, new Uint8Array(t).join('')].join()",
+        "true,4,3456",
+    );
+    // The two buffer kinds do not accept each other's methods.
+    check(
+        "ArrayBuffer.prototype.slice.call(new SharedArrayBuffer(4))",
+        "!TypeError: ArrayBuffer.prototype.slice called on an incompatible receiver",
+    );
+    check(
+        "SharedArrayBuffer.prototype.slice.call(new ArrayBuffer(4))",
+        "!TypeError: SharedArrayBuffer.prototype.slice called on an incompatible receiver",
+    );
+    check(
+        "Object.getOwnPropertyDescriptor(SharedArrayBuffer.prototype, 'byteLength').get.call(new ArrayBuffer(4))",
+        "!TypeError: SharedArrayBuffer.prototype.byteLength called on an incompatible receiver",
+    );
+    check(
+        "new SharedArrayBuffer(2 ** 40)",
+        "!RangeError: Array buffer allocation failed",
+    );
+}
+
+#[test]
+fn atomics() {
+    let _report = Report;
+    check(
+        "var a = new Int32Array(new SharedArrayBuffer(16)); [Atomics.store(a, 0, 5), Atomics.add(a, 0, 3), Atomics.sub(a, 0, 1), Atomics.and(a, 0, 6), Atomics.or(a, 0, 9), Atomics.xor(a, 0, 3), Atomics.exchange(a, 0, 40), Atomics.load(a, 0)].join()",
+        "5,5,8,7,6,15,12,40",
+    );
+    // Arithmetic wraps in the element type; the old value comes back.
+    check(
+        "var a = new Uint8Array(4); Atomics.store(a, 0, 250); [Atomics.add(a, 0, 10), a[0], Atomics.sub(a, 0, 6), a[0]].join()",
+        "250,4,4,254",
+    );
+    check(
+        "var a = new Int8Array(2); [Atomics.store(a, 0, 300), a[0], Atomics.store(a, 1, -0), 1 / Atomics.store(a, 1, -0), Atomics.store(a, 1, 3.9)].join()",
+        "300,44,0,Infinity,3",
+    );
+    check(
+        "var a = new Int16Array(2); a[0] = -1; [Atomics.compareExchange(a, 0, 65535, 7), a[0], Atomics.compareExchange(a, 0, 1, 9), a[0]].join()",
+        "-1,7,7,7",
+    );
+    check(
+        "var a = new BigInt64Array(new SharedArrayBuffer(16)); [Atomics.store(a, 0, 2n ** 64n + 5n), a[0], Atomics.add(a, 0, -6n), a[0], typeof Atomics.load(a, 1)].join()",
+        "18446744073709551621,5,5,-1,bigint",
+    );
+    check(
+        "Atomics.store(new BigInt64Array(1), 0, 1)",
+        "!TypeError: cannot convert a Number to a BigInt",
+    );
+    // Only integer element types, and only valid indices.
+    for array in [
+        "new Float64Array(1)",
+        "new Uint8ClampedArray(1)",
+        "[0]",
+        "{}",
+    ] {
+        check(
+            &format!("Atomics.load({array}, 0)"),
+            "!TypeError: Atomics operations need an integer typed array",
+        );
+    }
+    check(
+        "Atomics.load(new Int32Array(2), 2)",
+        "!RangeError: the index is out of range",
+    );
+    check(
+        "Atomics.add(new Int32Array(2), -1, 0)",
+        "!RangeError: index is out of range",
+    );
+    // A conversion that shrinks the buffer is caught before the write.
+    check(
+        "var b = new ArrayBuffer(8, {maxByteLength: 8}); var a = new Int32Array(b); Atomics.store(a, 1, {valueOf() { b.resize(4); return 1 }})",
+        "!RangeError: the index is out of range",
+    );
+    check(
+        "[1, 2, 3, 4, 8, 16].map(n => Atomics.isLockFree(n)).join() + Object.prototype.toString.call(Atomics) + typeof Atomics.pause()",
+        "true,true,false,true,true,false[object Atomics]undefined",
+    );
+    check(
+        "Atomics.pause(1.5)",
+        "!TypeError: Atomics.pause: the iteration count must be an integer",
+    );
+}
+
+#[test]
+fn atomics_wait_and_notify() {
+    let _report = Report;
+    // The default agent may not block, like a browser's main thread.
+    check(
+        "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10)",
+        "!TypeError: Atomics.wait cannot block this agent",
+    );
+    check(
+        "Atomics.wait(new Int32Array(4), 0, 0, 10)",
+        "!TypeError: Atomics.wait needs a typed array on a SharedArrayBuffer",
+    );
+    check(
+        "Atomics.wait(new Int16Array(new SharedArrayBuffer(4)), 0, 0, 10)",
+        "!TypeError: Atomics.wait and notify need an Int32Array or a BigInt64Array",
+    );
+    check(
+        "var a = new Int32Array(new SharedArrayBuffer(8)); [Atomics.notify(a, 0), Atomics.notify(new Int32Array(2), 0, 1)].join()",
+        "0,0",
+    );
+    // An agent that may block: nothing can wake it, so a wait times out,
+    // and the fixed clock shows the time that passed.
+    let mut agent = Agent::new().expect("agent");
+    agent.set_can_block(true);
+    agent.set_clock(Some(1000.0));
+    assert_eq!(
+        run_in(
+            &mut agent,
+            "var a = new Int32Array(new SharedArrayBuffer(8)); [Atomics.wait(a, 0, 1, 10), Atomics.wait(a, 0, 0, 250), Date.now(), Atomics.wait(a, 0, 0, -5)].join()"
+        ),
+        "not-equal,timed-out,1250,timed-out"
+    );
+    // A wait nothing can end is cancelled instead of hanging.
+    assert_eq!(
+        agent.evaluate("Atomics.wait(a, 0, 0)"),
+        Err(EvalError::Cancelled)
+    );
+
+    // waitAsync: woken by notify in the same agent, oldest first, or
+    // timed out by the host.
+    let mut agent = Agent::new().expect("agent");
+    agent.set_clock(Some(0.0));
+    assert_eq!(
+        run_in(
+            &mut agent,
+            "var a = new Int32Array(new SharedArrayBuffer(8)); var log = [];
+             var r0 = Atomics.waitAsync(a, 0, 5), r1 = Atomics.waitAsync(a, 0, 0, 0);
+             var w1 = Atomics.waitAsync(a, 0, 0), w2 = Atomics.waitAsync(a, 0, 0, 100), w3 = Atomics.waitAsync(a, 1, 0, 50);
+             w1.value.then(v => log.push('w1 ' + v)); w2.value.then(v => log.push('w2 ' + v)); w3.value.then(v => log.push('w3 ' + v));
+             [r0.async, r0.value, r1.async, r1.value, w1.async, w1.value instanceof Promise, Atomics.notify(a, 0, 1)].join()"
+        ),
+        "false,not-equal,false,timed-out,true,true,1"
+    );
+    agent.run_jobs().expect("jobs run");
+    assert_eq!(run_in(&mut agent, "log.join()"), "w1 ok");
+    assert_eq!(agent.next_waiter_deadline(), Some(50.0));
+    assert_eq!(agent.expire_waiters(60.0), Ok(1));
+    agent.run_jobs().expect("jobs run");
+    assert_eq!(run_in(&mut agent, "log.join()"), "w1 ok,w3 timed-out");
+    assert_eq!(run_in(&mut agent, "Atomics.notify(a, 0)"), "1");
+    agent.run_jobs().expect("jobs run");
+    assert_eq!(run_in(&mut agent, "log.join()"), "w1 ok,w3 timed-out,w2 ok");
+    assert_eq!(agent.next_waiter_deadline(), None);
+}

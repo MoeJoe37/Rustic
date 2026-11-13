@@ -26,6 +26,7 @@ pub use agent::{
 };
 pub use bigint::{BigInt, MAX_BITS as MAX_BIGINT_BITS};
 pub(crate) use builtins::async_generator::create_async_from_sync_iterator;
+pub(crate) use builtins::atomics::Waiter;
 pub(crate) use builtins::bigint::{BigIntBinary, BigIntUnary, SameNumeric, same_numeric_types};
 pub(crate) use builtins::generator::{RESUME_RETURN, RESUME_THROW};
 pub(crate) use builtins::iterator_result;

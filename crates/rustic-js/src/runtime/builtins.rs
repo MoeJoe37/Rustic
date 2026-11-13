@@ -5,6 +5,7 @@
 
 mod array;
 pub(crate) mod async_generator;
+pub(crate) mod atomics;
 pub(crate) mod bigint;
 pub(crate) mod buffer;
 mod collections;
@@ -149,6 +150,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     proxy::install(agent)?;
     buffer::install(agent)?;
     typed_array::install(agent)?;
+    atomics::install(agent)?;
     regexp::install(agent)?;
 
     // Value properties of the global object (§19.1).

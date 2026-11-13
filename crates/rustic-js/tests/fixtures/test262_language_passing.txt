@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 21465 pass, 962 fail, 1405 skipped (modules, proposals).
+# 21467 pass, 960 fail, 1405 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -7128,6 +7128,7 @@ expressions/class/subclass-builtins/subclass-RangeError.js
 expressions/class/subclass-builtins/subclass-ReferenceError.js
 expressions/class/subclass-builtins/subclass-RegExp.js
 expressions/class/subclass-builtins/subclass-Set.js
+expressions/class/subclass-builtins/subclass-SharedArrayBuffer.js
 expressions/class/subclass-builtins/subclass-String.js
 expressions/class/subclass-builtins/subclass-SyntaxError.js
 expressions/class/subclass-builtins/subclass-TypeError.js
@@ -16897,6 +16898,7 @@ statements/class/subclass-builtins/subclass-RangeError.js
 statements/class/subclass-builtins/subclass-ReferenceError.js
 statements/class/subclass-builtins/subclass-RegExp.js
 statements/class/subclass-builtins/subclass-Set.js
+statements/class/subclass-builtins/subclass-SharedArrayBuffer.js
 statements/class/subclass-builtins/subclass-String.js
 statements/class/subclass-builtins/subclass-SyntaxError.js
 statements/class/subclass-builtins/subclass-TypeError.js

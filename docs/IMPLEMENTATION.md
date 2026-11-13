@@ -1459,3 +1459,12 @@ M3's declared rendering scope is complete (REN sections above, with open debt in
 the ledger). M4 has started with JS-01, the ECMAScript lexer and parser. All
 project crates remain safe Rust and unpublished; the only third-party Rust
 crates are the reviewed font adapters of ADR 0014.
+
+## JS-06 — Static module records and graph resolution
+
+The Module parser now feeds a static record and a host-loaded dependency graph.
+Resolution preserves binding identity through re-exports, distinguishes missing
+from ambiguous exports and terminates on cycles. The loader checks graph size,
+total source length, resolution work and cancellation. The host supplies source
+and decides request identity and import attribute policy. See [JS.md](JS.md#static-module-loading-js-06).
+The bytecode execution and module conformance gaps are recorded in TD-97/105.

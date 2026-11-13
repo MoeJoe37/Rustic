@@ -255,6 +255,29 @@ pub struct Pattern {
     pub span: Span,
 }
 
+impl Pattern {
+    pub(crate) fn bound_identifiers<'a>(&'a self, out: &mut Vec<&'a Identifier>) {
+        let mut stack = vec![self];
+        let start = out.len();
+        while let Some(p) = stack.pop() {
+            match &p.kind {
+                PatternKind::Identifier(id) => out.push(id),
+                PatternKind::Member(_) => {}
+                PatternKind::Object { properties, rest } => {
+                    stack.extend(rest.as_deref());
+                    stack.extend(properties.iter().rev().map(|prop| &prop.value));
+                }
+                PatternKind::Array { elements, rest } => {
+                    stack.extend(rest.as_deref());
+                    stack.extend(elements.iter().rev().flatten());
+                }
+                PatternKind::Assignment { target, .. } => stack.push(target),
+            }
+        }
+        out[start..].sort_by_key(|id| id.span.start);
+    }
+}
+
 /// The kinds of patterns.
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {

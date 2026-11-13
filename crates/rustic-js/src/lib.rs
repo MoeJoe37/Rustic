@@ -18,6 +18,7 @@
 pub mod ast;
 mod error;
 mod lexer;
+pub mod module;
 mod parser;
 pub mod regexp;
 pub mod runtime;

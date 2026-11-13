@@ -1407,7 +1407,10 @@ Private names, object-literal `super`, tagged templates and optional calls
 were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
 (JS-08 part 1), async functions with promises (JS-06 part 1) and async
 generators with `for await` (JS-08 part 2) were paid the same day, and
-RegExp literals (JS-08 part 3) after them. Pay modules with JS-06. Trigger: the Test262 runner (JS-07).
+RegExp literals (JS-08 part 3) after them. JS-06 now loads and validates static dependency graphs through host callbacks.
+Pay the remaining debt with module environments and live bindings, namespace
+objects, bytecode evaluation, top-level await and dynamic imports. Trigger:
+the module Test262 gate (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 

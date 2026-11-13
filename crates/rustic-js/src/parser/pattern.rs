@@ -420,24 +420,9 @@ impl Parser<'_> {
 
     /// The names a pattern binds, in source order.
     pub(super) fn bound_names(pattern: &Pattern, out: &mut Vec<(Box<str>, Span)>) {
-        let mut stack = vec![pattern];
-        let start = out.len();
-        while let Some(p) = stack.pop() {
-            match &p.kind {
-                PatternKind::Identifier(id) => out.push((id.name.clone(), id.span)),
-                PatternKind::Member(_) => {}
-                PatternKind::Object { properties, rest } => {
-                    stack.extend(rest.as_deref());
-                    stack.extend(properties.iter().rev().map(|prop| &prop.value));
-                }
-                PatternKind::Array { elements, rest } => {
-                    stack.extend(rest.as_deref());
-                    stack.extend(elements.iter().rev().flatten());
-                }
-                PatternKind::Assignment { target, .. } => stack.push(target),
-            }
-        }
-        out[start..].sort_by_key(|(_, span)| span.start);
+        let mut names = Vec::new();
+        pattern.bound_identifiers(&mut names);
+        out.extend(names.into_iter().map(|id| (id.name.clone(), id.span)));
     }
 
     /// Bound names of a parameter list.

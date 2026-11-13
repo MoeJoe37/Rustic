@@ -641,6 +641,34 @@ requires the same outcome each time and a usable agent afterwards. Its first
 runs found a loop that could not be cancelled and a function that ran off the
 end of its code; both are fixed and kept as seeds or regressions.
 
+## Static module loading (JS-06)
+
+[`ModuleRecord`](../crates/rustic-js/src/module.rs) derives the static
+linker inputs from the Module grammar. Requests preserve exact UTF-16
+specifiers and treat attribute order as immaterial. The record retains the
+first occurrence of each request, local import names, explicit exports and
+star re-exports. Re-exported imports resolve to their defining binding or
+namespace.
+
+[`ModuleGraph`](../crates/rustic-js/src/module/graph.rs) calls the host to
+resolve each specifier against the importing module's opaque key and to
+supply source for each unique resolved key. The host owns any I/O, module
+identity and import attribute policy. A graph is returned only after all
+static requests have been loaded and named imports and re-exports validated.
+
+Export discovery and resolution follow [ECMA-262 §16.2.1.7][modules] with
+iterative traversal. A cycle terminates, two routes to the same binding
+agree, and different bindings under the same star-export name are ambiguous.
+Bare star exports do not forward the default export. The API checks module
+count, total UTF-16 source size, resolution work and cancellation. The
+source callback supplies an already constructed source buffer.
+
+Module environments, live bindings, namespace objects, evaluation, top-level
+await and dynamic imports remain tracked under TD-97 and TD-105. Run the
+static graph regressions with `cargo test --locked -p rustic-js --test module`.
+
+[modules]: https://262.ecma-international.org/17.0/index.html#sec-source-text-module-records
+
 ## Limits and performance gate (JS-09)
 
 `tests/limits.rs` is the gate. It holds the limits, the string rope

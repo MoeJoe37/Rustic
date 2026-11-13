@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "f372dbfec2767b5398015a1d1576783cf2d255dd929ce113dd977b7addbcbc99",
-  "percent": "27.70",
+  "source_fingerprint": "eda0afa1979efd085cd0195f266188f4c5b20f0164724ccf7c2ccc4315cce8ec",
+  "percent": "27.84",
   "verified_percent": "25.69",
-  "partial_percent": "2.01",
+  "partial_percent": "2.15",
   "completed": 61,
-  "in_progress": 5,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 8,
       "total": 13,
-      "percent": "84.01",
+      "percent": "85.55",
       "verified_percent": "66.15",
-      "partial_percent": "17.86"
+      "partial_percent": "19.40"
     },
     {
       "id": "M5",
@@ -3488,9 +3488,45 @@
           "label": "Modules and host loading hooks",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Static module records and bounded host-loaded dependency and export resolution",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module.rs",
+                  "marker": "pub struct ModuleRecord"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module/graph.rs",
+                  "marker": "pub struct ModuleGraph"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "static_graph_resolves_cycles_and_same_binding_diamonds"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "static_graph_enforces_host_policy_and_exact_budgets"
+                }
+              ]
+            },
+            {
+              "label": "Module environments, live bindings, namespace objects and bytecode evaluation",
+              "status": "planned"
+            },
+            {
+              "label": "Top-level await, dynamic imports and the module Test262 gate",
+              "status": "planned"
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.41"
         },
         {
@@ -3869,12 +3905,12 @@
       ],
       "points": 73,
       "completed": 8,
-      "in_progress": 4,
+      "in_progress": 5,
       "total": 15,
-      "contribution": "7.75",
-      "percent": "77.54",
+      "contribution": "7.89",
+      "percent": "78.91",
       "verified_percent": "58.90",
-      "partial_percent": "18.64"
+      "partial_percent": "20.01"
     },
     {
       "id": "wasm",

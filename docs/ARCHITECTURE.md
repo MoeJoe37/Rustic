@@ -220,6 +220,11 @@ policy pipeline; neither grants cross-origin or native authority. The uBO port
 is a separately licensed application using these APIs. See [EXTENSIONS.md](EXTENSIONS.md)
 for package/permission, lifecycle, filter-data and update boundaries.
 
+Static module loading takes explicit host callbacks for request resolution and
+source provision. The frontend validates the dependency graph and binding
+targets before evaluation. The host owns module identity, import attribute
+policy and any I/O. See [static module loading](JS.md#static-module-loading-js-06).
+
 A document agent owns DOM mutation and JavaScript execution on one thread.
 Rust async tasks may perform I/O off-thread; they post completions to the owning
 agent, never execute page callbacks directly. The coordinator schedules task

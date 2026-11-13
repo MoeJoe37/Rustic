@@ -3170,8 +3170,44 @@
           "label": "Modules and host loading hooks",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Static module records and bounded host-loaded dependency and export resolution",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module.rs",
+                  "marker": "pub struct ModuleRecord"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module/graph.rs",
+                  "marker": "pub struct ModuleGraph"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "static_graph_resolves_cycles_and_same_binding_diamonds"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "static_graph_enforces_host_policy_and_exact_budgets"
+                }
+              ]
+            },
+            {
+              "label": "Module environments, live bindings, namespace objects and bytecode evaluation",
+              "status": "planned"
+            },
+            {
+              "label": "Top-level await, dynamic imports and the module Test262 gate",
+              "status": "planned"
+            }
+          ]
         },
         {
           "id": "js.advanced",

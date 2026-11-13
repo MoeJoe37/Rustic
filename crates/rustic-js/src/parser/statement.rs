@@ -1,6 +1,8 @@
 //! Statements, declarations, functions, classes and modules (ECMA-262
 //! §14–§16).
 
+use std::collections::HashSet;
+
 use super::expression::is_reserved_word;
 use super::scope::{PrivateKind, ScopeKind};
 use super::{Context, PResult, Parser};
@@ -1379,6 +1381,7 @@ impl Parser<'_> {
         }
         self.advance()?;
         self.expect(Punct::LBrace)?;
+        let mut keys = HashSet::new();
         while !self.at(Punct::RBrace) {
             let start = self.token.span.start;
             let token = self.advance()?;
@@ -1387,7 +1390,7 @@ impl Parser<'_> {
                 TokenKind::String { value, .. } => value,
                 _ => return Err(self.error(token.span, "expected an attribute key")),
             };
-            if attributes.iter().any(|a: &ImportAttribute| a.key == key) {
+            if !keys.insert(key.clone()) {
                 return Err(self.error(token.span, "duplicate import attribute"));
             }
             self.expect(Punct::Colon)?;

@@ -3360,8 +3360,115 @@
           "label": "Cancellation, stack/heap limits and GC stress",
           "size": 3,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Frame, stack and heap limits, cancellation and the step budget",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/vm/interp.rs",
+                  "marker": "fn enter_nested_run"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn deep_recursion_throws_a_catchable_range_error_at_the_frame_limit"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn heap_exhaustion_ends_the_run_and_leaves_a_usable_agent"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn endless_loops_stop_on_cancellation_and_on_the_step_budget"
+                }
+              ]
+            },
+            {
+              "label": "String ropes: appending is linear, with a late-charge bound (TD-116)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/heap.rs",
+                  "marker": "pub fn concat"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn appending_in_a_loop_allocates_linearly"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn a_rope_too_large_to_copy_stays_a_rope_through_a_collection"
+                }
+              ]
+            },
+            {
+              "label": "Benchmark corpus with deterministic gates: checksums, cache and GC-stress independence, no quadratic workload",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/benchmarks/framework_diff.js",
+                  "marker": "function run(n)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn corpus_results_do_not_depend_on_caches_or_collection"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn no_workload_is_quadratic_in_its_input"
+                }
+              ]
+            },
+            {
+              "label": "Committed heap-size report",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/tests/fixtures/heap_report.txt",
+                  "marker": "empty object:"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn the_heap_report_matches_the_committed_one"
+                }
+              ]
+            },
+            {
+              "label": "Benchmark runner and recorded x86-64 results",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/examples/js_bench.rs",
+                  "marker": "fn run_once"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn the_corpus_fits_a_small_heap"
+                }
+              ]
+            },
+            {
+              "label": "Recorded results on a native ARM64 machine",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "js.conformance",

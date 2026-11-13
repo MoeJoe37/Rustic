@@ -212,6 +212,13 @@ impl Agent {
         self.vm.steps_left = steps;
     }
 
+    /// Safe points left in the budget of [`Agent::set_step_budget`], if
+    /// one is set: the difference across a run counts its loop back
+    /// edges and calls.
+    pub fn step_budget(&self) -> Option<u64> {
+        self.vm.steps_left
+    }
+
     /// Seed `Math.random`, which otherwise seeds itself from the clock
     /// on first use. Tests and fuzzing use this to be reproducible.
     pub fn set_random_seed(&mut self, seed: u64) {
@@ -912,6 +919,15 @@ impl Agent {
         }
         if self.vm.native_depth == self.vm.collect_floor && self.should_collect() {
             self.collect_garbage(crate::runtime::Roots::default());
+        }
+        // Ropes flattened since the last allocation are charged late.
+        if self.heap.over_limit() {
+            if self.vm.native_depth == self.vm.collect_floor {
+                self.collect_garbage(crate::runtime::Roots::default());
+            }
+            if self.heap.over_limit() {
+                return Err(Abrupt::OutOfMemory);
+            }
         }
         Ok(())
     }
@@ -2126,6 +2142,11 @@ impl Agent {
             {
                 return Ok(self.heap.object(global).slots[cache.slot as usize]);
             }
+            CacheKind::GlobalDictionary if cache.epoch == self.cache_epoch() => {
+                if let Some(stored) = self.global_dictionary_entry(cache.slot, site.name, false) {
+                    return Ok(stored);
+                }
+            }
             _ => {}
         }
         if let Some(slot) = self.global_lexical_slot(site.name) {
@@ -2154,6 +2175,17 @@ impl Agent {
             }
             return Ok(self.heap.object(global).slots[slot as usize]);
         }
+        if let Some(slot) = self.global_dictionary_slot(site.name) {
+            if let Some(value) = self.global_dictionary_entry(slot, site.name, false) {
+                site.cache.set(SiteCache {
+                    kind: CacheKind::GlobalDictionary,
+                    epoch: self.cache_epoch(),
+                    slot,
+                    ..SiteCache::default()
+                });
+                return Ok(value);
+            }
+        }
         if !self.has_property(global, key)? {
             return Err(self.not_defined_error(site.name));
         }
@@ -2181,6 +2213,12 @@ impl Agent {
                     object.slots[cache.slot as usize] = value;
                     return Ok(());
                 }
+            }
+            CacheKind::GlobalDictionary
+                if cache.epoch == self.cache_epoch()
+                    && self.set_global_dictionary_entry(cache.slot, site.name, value) =>
+            {
+                return Ok(());
             }
             _ => {}
         }
@@ -2211,9 +2249,77 @@ impl Agent {
                 return Ok(());
             }
         }
+        if self.global_lexical_slot(site.name).is_none() {
+            if let Some(slot) = self.global_dictionary_slot(site.name) {
+                if self.set_global_dictionary_entry(slot, site.name, value) {
+                    site.cache.set(SiteCache {
+                        kind: CacheKind::GlobalDictionary,
+                        epoch: self.cache_epoch(),
+                        slot,
+                        ..SiteCache::default()
+                    });
+                    return Ok(());
+                }
+            }
+        }
         let env = self.global_env;
         let reference = self.resolve_binding(env, site.name, code.strict)?;
         self.put_value(&reference, value)
+    }
+
+    /// Where a dictionary-mode global object keeps `name`, if it does.
+    /// Dictionary entries keep their position until the dictionary is
+    /// compacted, and a cached position is rechecked on every use.
+    fn global_dictionary_slot(&self, name: StringId) -> Option<u32> {
+        let global = self.heap.object(self.intrinsics.global);
+        if global.has_flag(crate::runtime::FLAG_EXOTIC) {
+            return None;
+        }
+        global
+            .dictionary()?
+            .index
+            .get(&PropertyKey::String(name))
+            .copied()
+    }
+
+    /// The value of the global object's dictionary entry `slot` if it is
+    /// still a data property called `name` (and writable, for a write).
+    fn global_dictionary_entry(&self, slot: u32, name: StringId, writable: bool) -> Option<Value> {
+        use crate::runtime::Attributes;
+        let dictionary = self.heap.object(self.intrinsics.global).dictionary()?;
+        let (key, stored) = dictionary.entries.get(slot as usize)?.as_ref()?;
+        if *key != PropertyKey::String(name)
+            || stored.attributes.is_accessor()
+            || (writable && !stored.attributes.has(Attributes::WRITABLE))
+        {
+            return None;
+        }
+        Some(stored.first)
+    }
+
+    /// Write `value` to the global object's dictionary entry `slot` if
+    /// [`Self::global_dictionary_entry`] accepts it for a write.
+    fn set_global_dictionary_entry(&mut self, slot: u32, name: StringId, value: Value) -> bool {
+        if self.global_dictionary_entry(slot, name, true).is_none() {
+            return false;
+        }
+        let global = self.heap.object_mut(self.intrinsics.global);
+        if global.has_flag(FLAG_PROTOTYPE) {
+            return false;
+        }
+        let entry = global
+            .extra_mut()
+            .dictionary
+            .as_mut()
+            .and_then(|d| d.entries.get_mut(slot as usize))
+            .and_then(Option::as_mut);
+        match entry {
+            Some((_, stored)) => {
+                stored.first = value;
+                true
+            }
+            None => false,
+        }
     }
 
     fn declare_global(&mut self, name: StringId, kind: u8) -> JsResult<()> {
@@ -2647,6 +2753,33 @@ impl Agent {
             return Ok((Value::UNDEFINED, Value::object(empty)));
         }
         let object = self.to_object(source)?;
+        // The usual case: nothing on the prototype chain is enumerable,
+        // so the keys are the object's own and none can be shadowed.
+        if !self.is_exotic(object) {
+            let mut above = self.heap.object(object).proto();
+            while let Some(o) = above {
+                if !self.adds_no_for_in_keys(o) {
+                    break;
+                }
+                above = self.heap.object(o).proto();
+            }
+            if above.is_none() {
+                let mut keys = Vec::new();
+                for key in self.ordinary_own_property_keys(object) {
+                    if matches!(key, PropertyKey::Symbol(_)) {
+                        continue;
+                    }
+                    let enumerable = self
+                        .get_own_property(object, key)?
+                        .is_some_and(|d| d.enumerable == Some(true));
+                    if enumerable {
+                        keys.push(self.key_to_value(key)?);
+                    }
+                }
+                let keys = self.create_array_from_list(&keys)?;
+                return Ok((Value::object(object), Value::object(keys)));
+            }
+        }
         let mut keys = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let mut current = Some(object);
@@ -3350,8 +3483,7 @@ impl Agent {
                 if a.as_string().is_some() || b.as_string().is_some() {
                     let a = self.to_string(a)?;
                     let b = self.to_string(b)?;
-                    let joined = self.heap.string(a).concat(self.heap.string(b));
-                    return self.string_from(joined);
+                    return Ok(Value::string(self.heap.concat(a, b)?));
                 }
                 let a = self.to_numeric(a)?;
                 let b = self.to_numeric(b)?;

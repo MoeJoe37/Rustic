@@ -42,8 +42,9 @@ fn main() {
         Err(other) => println!("error: {other}"),
     }
     eprintln!(
-        "{elapsed:?}; heap {} bytes, {} objects, {} collections",
+        "{elapsed:?}; heap {} bytes (peak {}), {} objects, {} collections",
         agent.heap.bytes_used(),
+        agent.heap.peak_bytes(),
         agent.heap.object_count(),
         agent.heap.collections()
     );

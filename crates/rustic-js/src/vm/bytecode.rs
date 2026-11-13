@@ -623,6 +623,10 @@ pub enum CacheKind {
     Add,
     /// A global lexical binding at position `slot`; never stale.
     GlobalLexical,
+    /// A data property of a dictionary-mode global object at entry
+    /// `slot`. The entry is checked against the name on every use, so it
+    /// cannot go stale within an epoch.
+    GlobalDictionary,
 }
 
 /// The one-entry inline cache of a [`NamedSite`].

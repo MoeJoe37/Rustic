@@ -217,6 +217,20 @@ impl ShapeTable {
         self.get(id).slot_count
     }
 
+    /// Whether any property of the chain satisfies `test`, without
+    /// building the property list.
+    pub fn any(&self, id: ShapeId, mut test: impl FnMut(PropertyKey, Attributes) -> bool) -> bool {
+        let mut current = id;
+        while let Some(parent) = self.get(current).parent {
+            let shape = self.get(current);
+            if test(shape.key, shape.attributes) {
+                return true;
+            }
+            current = parent;
+        }
+        false
+    }
+
     /// Every property of the chain in insertion order.
     pub fn properties(&self, id: ShapeId) -> Vec<(PropertyKey, Slot)> {
         let mut out = Vec::with_capacity(self.get(id).property_count as usize);

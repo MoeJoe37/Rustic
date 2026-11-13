@@ -126,16 +126,16 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and the other numeric conversions are missing | Paid |
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Paid |
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
-| TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, JS-09 |
+| TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, `perf.gc` (M12); measured by JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 | TD-97 | Deliberate | JS | Modules are rejected by the bytecode compiler (generators, async functions, async generators and RegExp literals paid) | Open, JS-06 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
-| TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Open, JS-09 |
-| TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, JS-09 |
-| TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, JS-09 |
-| TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, JS-09 |
+| TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Paid |
+| TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
+| TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
+| TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
 | TD-105 | Deliberate | JS | The Test262 runner skips module files, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
@@ -143,10 +143,11 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
-| TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, JS-09 |
+| TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, `perf.interpreter` (M12) |
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
 | TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
 | TD-115 | Deliberate | JS | No `SharedArrayBuffer` or `Atomics`; typed array elements are read through the generic property path | Open, JS-09/M5 |
+| TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1377,6 +1378,14 @@ corpus, then add incremental marking (worklist budget per step with a write
 barrier) or a nursery if the PERFORMANCE.md budget is missed. Trigger: a
 measured pause over budget.
 
+**Measured by JS-09.** On the corpus the longest pause is about 0.17 ms per
+MiB of live heap (15 ms at 94 MiB in `json_tree`, 0.2 to 1.3 ms for the
+workloads that keep under 10 MiB live). That meets the 5 ms target up to
+roughly 30 MiB of live data and misses it above, so the trigger has fired
+for large heaps. Incremental marking with a write barrier is the catalog's
+`perf.gc` (M12); it needs its own ADR, as the roadmap's collection design
+says.
+
 ### TD-96 — No weak references or DOM host tracing yet (Paid)
 
 The first part of JS-03 had strong edges only. Paid by its second part: weak
@@ -1450,6 +1459,13 @@ it every time, which is quadratic in the final length.
 
 Watch for: JS-09's benchmark corpus. Pay with ropes or an append buffer for
 the single-owner case if a workload shows it.
+
+**Paid by JS-09.** The `strings` workload showed it (and showed that
+`charCodeAt` and its siblings copied the string on every call). A
+concatenation of 256 units or more is now a rope, flattened on first read
+and by the collector; `appending_in_a_loop_allocates_linearly` and
+`no_workload_is_quadratic_in_its_input` hold it. The late charge of the flat
+copy is TD-116.
 
 ### TD-102 — Interpreter stacks are outside the heap budget
 
@@ -1660,3 +1676,21 @@ several times slower than an indexed load should be.
 Pay with: a shared, reference-counted byte store and `Atomics` when workers
 arrive (M5/M6 storage and workers), and interpreter fast paths for typed array
 loads and stores keyed on the element kind (JS-09, measured first).
+
+### TD-116 — A rope's flat copy is charged late
+
+`Heap::string` flattens a rope behind `&self` (a `OnceCell`), because 141
+call sites read strings through a shared borrow. It therefore cannot charge
+the budget or fail. Instead the bytes are counted in `Heap::bytes_used` at
+once, `Heap::concat` refuses a rope whose flat copy would not fit when it is
+made, and the next allocation or interpreter safe point fails with
+`OutOfMemory` if the heap is over its limit. Between those points a script
+can hold more than its limit: straight-line code that reads several large
+ropes made while the heap was emptier. Each such copy is at most the limit,
+and none survives the next safe point without the run ending.
+
+Pay with: a fallible `Heap::flatten(&mut self)` at the places that read
+units, leaving `Heap::string` for strings known to be flat. Trigger: a host
+that needs the limit to hold between safe points (a hard per-renderer cap in
+M7), or a fuzz finding that reaches the overshoot.
+

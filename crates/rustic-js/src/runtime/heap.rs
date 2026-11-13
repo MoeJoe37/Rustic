@@ -3,6 +3,7 @@
 //! is in `gc.rs` (JS-03); freed cells go on a free list so live indices
 //! never move.
 
+use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::hash::{BuildHasher, RandomState};
 use std::rc::Rc;
@@ -80,6 +81,11 @@ impl<T> Arena<T> {
             .expect("use of a collected heap cell")
     }
 
+    /// The cell at `index` if it is live.
+    pub(crate) fn try_get(&self, index: u32) -> Option<&T> {
+        self.cells.get(index as usize).and_then(Option::as_ref)
+    }
+
     pub(crate) fn get_mut(&mut self, index: u32) -> &mut T {
         self.cells[index as usize]
             .as_mut()
@@ -143,7 +149,15 @@ impl<T> Arena<T> {
 /// One agent's heap.
 #[derive(Debug)]
 pub struct Heap {
-    pub(crate) strings: Arena<JsStr>,
+    /// String contents. An empty cell is a rope that has not been
+    /// flattened yet: its halves are in `ropes`.
+    pub(crate) strings: Arena<OnceCell<JsStr>>,
+    /// The halves of ropes by string index. An entry whose cell has been
+    /// flattened is stale and goes at the next collection.
+    pub(crate) ropes: HashMap<u32, Rope>,
+    /// Bytes of ropes flattened since the last collection. Flattening
+    /// happens behind `&self`, so it cannot charge the budget itself.
+    rope_bytes: Cell<usize>,
     /// Interned strings by content hash; collisions chain through
     /// `atom_next`.
     pub(crate) atoms: HashMap<u64, StringId>,
@@ -173,13 +187,47 @@ pub struct Heap {
     /// an object's prototype is replaced: what an inline cache learned
     /// by walking a prototype chain holds only within one value of this.
     pub(crate) proto_epoch: u32,
+    /// The most bytes ever charged at once.
+    peak_bytes: usize,
+    /// Every byte ever charged, freed or not.
+    allocated_bytes: u64,
+    /// A monotonic clock in nanoseconds for timing collections, if the
+    /// embedder wants pauses measured.
+    pub(crate) gc_clock: Option<fn() -> u64>,
+    pub(crate) gc_pause_nanos: u64,
+    pub(crate) gc_pause_max_nanos: u64,
 }
+
+/// The two halves of a concatenation that has not been copied yet.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Rope {
+    left: StringId,
+    right: StringId,
+    /// Length in code units.
+    len: u32,
+    /// Whether some part holds a unit above 255.
+    wide: bool,
+}
+
+/// Budget charge for a rope's halves, on top of its string cell.
+pub(crate) const ROPE_BYTES: usize = 40;
+
+/// Concatenations shorter than this many units are copied at once: a
+/// rope would cost more than the copy.
+const ROPE_MIN_UNITS: usize = 256;
 
 impl Heap {
     /// A heap that may hold `limit` bytes.
     pub fn new(limit: usize) -> Self {
         Self {
             strings: Arena::default(),
+            ropes: HashMap::new(),
+            rope_bytes: Cell::new(0),
+            peak_bytes: 0,
+            allocated_bytes: 0,
+            gc_clock: None,
+            gc_pause_nanos: 0,
+            gc_pause_max_nanos: 0,
             atoms: HashMap::new(),
             atom_next: HashMap::new(),
             interned: BitSet::default(),
@@ -202,7 +250,52 @@ impl Heap {
 
     /// Bytes charged so far.
     pub fn bytes_used(&self) -> usize {
-        self.budget.used()
+        self.budget.used().saturating_add(self.rope_bytes.get())
+    }
+
+    /// The most bytes charged at any one time so far.
+    pub fn peak_bytes(&self) -> usize {
+        self.peak_bytes.max(self.bytes_used())
+    }
+
+    /// Every byte charged so far, whether or not it was freed since: a
+    /// deterministic measure of allocation work.
+    pub fn allocated_bytes(&self) -> u64 {
+        self.allocated_bytes
+            .saturating_add(self.rope_bytes.get() as u64)
+    }
+
+    /// Time collections with `clock`, a monotonic clock in nanoseconds,
+    /// or stop timing them with `None`. Nothing is timed by default, so
+    /// runs stay deterministic.
+    pub fn set_gc_clock(&mut self, clock: Option<fn() -> u64>) {
+        self.gc_clock = clock;
+    }
+
+    /// Total time spent in collections while a clock was set, in
+    /// nanoseconds.
+    pub fn gc_pause_nanos(&self) -> u64 {
+        self.gc_pause_nanos
+    }
+
+    /// The longest single collection while a clock was set, in
+    /// nanoseconds.
+    pub fn gc_pause_max_nanos(&self) -> u64 {
+        self.gc_pause_max_nanos
+    }
+
+    /// Whether flattened ropes have pushed the heap past its limit. The
+    /// interpreter checks this at its safe points.
+    pub(crate) fn over_limit(&self) -> bool {
+        self.bytes_used() > self.budget.limit()
+    }
+
+    /// The budget was reset to the live footprint by a collection.
+    pub(crate) fn settle_after_collection(&mut self) {
+        self.allocated_bytes = self
+            .allocated_bytes
+            .saturating_add(self.rope_bytes.get() as u64);
+        self.rope_bytes.set(0);
     }
 
     /// The byte limit.
@@ -212,7 +305,22 @@ impl Heap {
 
     /// Charge `bytes` against the budget.
     pub(crate) fn charge(&mut self, bytes: usize) -> Result<(), OutOfMemory> {
-        self.budget.charge(bytes).map_err(|_| OutOfMemory)
+        let pending = self.rope_bytes.get();
+        if pending != 0
+            && self
+                .bytes_used()
+                .checked_add(bytes)
+                .is_none_or(|total| total > self.budget.limit())
+        {
+            return Err(OutOfMemory);
+        }
+        self.budget.charge(bytes).map_err(|_| OutOfMemory)?;
+        self.allocated_bytes = self.allocated_bytes.saturating_add(bytes as u64);
+        let used = self.budget.used().saturating_add(pending);
+        if used > self.peak_bytes {
+            self.peak_bytes = used;
+        }
+        Ok(())
     }
 
     // ---- strings ----------------------------------------------------
@@ -220,7 +328,125 @@ impl Heap {
     /// Store a new string.
     pub fn alloc_string(&mut self, s: JsStr) -> Result<StringId, OutOfMemory> {
         self.charge(std::mem::size_of::<JsStr>() + s.storage_bytes())?;
-        Ok(StringId(self.strings.alloc(s)?))
+        Ok(StringId(self.strings.alloc(OnceCell::from(s))?))
+    }
+
+    /// The concatenation of two strings. A long result is a rope: its
+    /// units are copied only when something first reads them, so
+    /// appending in a loop is linear in the final length.
+    pub fn concat(&mut self, a: StringId, b: StringId) -> Result<StringId, OutOfMemory> {
+        let (left_len, right_len) = (self.string_len(a), self.string_len(b));
+        if left_len == 0 {
+            return Ok(b);
+        }
+        if right_len == 0 {
+            return Ok(a);
+        }
+        let total = left_len.checked_add(right_len).ok_or(OutOfMemory)?;
+        if total < ROPE_MIN_UNITS {
+            let joined = self.string(a).concat(self.string(b));
+            return self.alloc_string(joined);
+        }
+        let len = u32::try_from(total).map_err(|_| OutOfMemory)?;
+        let wide = self.string_is_wide(a) || self.string_is_wide(b);
+        // The flat copy is made behind `&self` and cannot fail, so there
+        // must be room for it now.
+        let flat_bytes = if wide {
+            total.checked_mul(2).ok_or(OutOfMemory)?
+        } else {
+            total
+        };
+        if self
+            .bytes_used()
+            .checked_add(flat_bytes)
+            .is_none_or(|needed| needed > self.budget.limit())
+        {
+            return Err(OutOfMemory);
+        }
+        self.charge(std::mem::size_of::<JsStr>() + ROPE_BYTES)?;
+        let id = self.strings.alloc(OnceCell::new())?;
+        self.ropes.insert(
+            id,
+            Rope {
+                left: a,
+                right: b,
+                len,
+                wide,
+            },
+        );
+        Ok(StringId(id))
+    }
+
+    /// The length of a string in code units, without flattening a rope.
+    pub fn string_len(&self, id: StringId) -> usize {
+        match self.strings.get(id.0).get() {
+            Some(flat) => flat.len(),
+            None => self.ropes[&id.0].len as usize,
+        }
+    }
+
+    fn string_is_wide(&self, id: StringId) -> bool {
+        match self.strings.get(id.0).get() {
+            Some(flat) => matches!(flat, JsStr::Utf16(_)),
+            None => self.ropes[&id.0].wide,
+        }
+    }
+
+    /// The halves of a rope that has not been flattened, for the
+    /// collector.
+    pub(crate) fn rope_halves(&self, id: StringId) -> Option<(StringId, StringId)> {
+        if self.strings.get(id.0).get().is_some() {
+            return None;
+        }
+        self.ropes.get(&id.0).map(|rope| (rope.left, rope.right))
+    }
+
+    /// Whether the flat copy of rope `id` fits what is left of the
+    /// budget with room to spare.
+    pub(crate) fn rope_fits(&self, id: StringId) -> bool {
+        let Some(rope) = self.ropes.get(&id.0) else {
+            return false;
+        };
+        let bytes = (rope.len as usize) << usize::from(rope.wide);
+        let room = self.budget.limit().saturating_sub(self.bytes_used());
+        bytes <= room / 2
+    }
+
+    /// Copy a rope's leaves, left to right, without recursion: a string
+    /// built by appending is a chain as deep as it has parts.
+    fn flatten(&self, id: StringId) -> JsStr {
+        let rope = self.ropes[&id.0];
+        let mut narrow: Vec<u8> = Vec::new();
+        let mut units: Vec<u16> = Vec::new();
+        if rope.wide {
+            units.reserve_exact(rope.len as usize);
+        } else {
+            narrow.reserve_exact(rope.len as usize);
+        }
+        let mut pending = vec![rope.right, rope.left];
+        while let Some(part) = pending.pop() {
+            match self.strings.get(part.0).get() {
+                Some(JsStr::Latin1(bytes)) if rope.wide => {
+                    units.extend(bytes.iter().map(|&b| u16::from(b)));
+                }
+                Some(JsStr::Latin1(bytes)) => narrow.extend_from_slice(bytes),
+                // A rope with a wide part is itself wide.
+                Some(JsStr::Utf16(wide)) => units.extend_from_slice(wide),
+                None => {
+                    let inner = self.ropes[&part.0];
+                    pending.push(inner.right);
+                    pending.push(inner.left);
+                }
+            }
+        }
+        let flat = if rope.wide {
+            JsStr::Utf16(units.into())
+        } else {
+            JsStr::Latin1(narrow.into())
+        };
+        self.rope_bytes
+            .set(self.rope_bytes.get().saturating_add(flat.storage_bytes()));
+        flat
     }
 
     /// Store a string from Rust text.
@@ -230,7 +456,7 @@ impl Heap {
 
     /// The contents of a string.
     pub fn string(&self, id: StringId) -> &JsStr {
-        self.strings.get(id.0)
+        self.strings.get(id.0).get_or_init(|| self.flatten(id))
     }
 
     pub(crate) fn content_hash(&self, s: &JsStr) -> u64 {
@@ -436,6 +662,14 @@ impl Heap {
     /// Live compiled functions.
     pub fn code_count(&self) -> usize {
         self.codes.live()
+    }
+
+    /// The bytes charged for live compiled functions and the number of
+    /// instructions they hold.
+    pub fn code_stats(&self) -> (usize, usize) {
+        self.codes.iter().fold((0, 0), |(bytes, ops), (_, code)| {
+            (bytes + code.code_bytes(), ops + code.ops.len())
+        })
     }
 
     /// Live shapes, the root included.

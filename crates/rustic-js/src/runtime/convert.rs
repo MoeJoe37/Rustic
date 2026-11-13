@@ -124,7 +124,7 @@ impl Agent {
             Kind::Undefined | Kind::Null | Kind::Uninitialized => false,
             Kind::Boolean(b) => b,
             Kind::Number(n) => !(n == 0.0 || n.is_nan()),
-            Kind::String(s) => !self.heap.string(s).is_empty(),
+            Kind::String(s) => self.heap.string_len(s) != 0,
             Kind::Symbol(_) | Kind::Object(_) => true,
             Kind::BigInt(b) => !self.heap.bigint(b).is_zero(),
         }
@@ -192,7 +192,7 @@ impl Agent {
         object.extra_mut().primitive = Some(value);
         let o = self.heap.alloc_object(object)?;
         if let Some(s) = value.as_string() {
-            let length = self.heap.string(s).len() as f64;
+            let length = self.heap.string_len(s) as f64;
             let key = PropertyKey::String(self.names.length);
             self.define_property_or_throw(
                 o,

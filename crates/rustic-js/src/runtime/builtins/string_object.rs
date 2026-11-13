@@ -11,7 +11,7 @@ use crate::runtime::agent::{Agent, JsResult};
 use crate::runtime::number::{is_str_whitespace, to_integer_or_infinity, to_length, to_uint32};
 use crate::runtime::object::PropertyDescriptor;
 use crate::runtime::shape::PropertyKey;
-use crate::runtime::value::Value;
+use crate::runtime::value::{StringId, Value};
 use crate::runtime::{ErrorKind, JsStr};
 
 const STATIC_METHODS: &[Method] = &[
@@ -256,41 +256,66 @@ fn raw(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 
 // ---- access -----------------------------------------------------------------
 
-fn at(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let s = this_units(agent, this)?;
-    let n = to_integer(agent, arg(args, 0))?;
-    let k = if n >= 0.0 { n } else { s.len() as f64 + n };
-    if k < 0.0 || k >= s.len() as f64 {
-        return Ok(Value::UNDEFINED);
+/// `this` as a string without copying its units: the index accessors
+/// are called in loops over long strings.
+fn this_string(agent: &mut Agent, this: Value) -> JsResult<StringId> {
+    let this = agent.require_object_coercible(this)?;
+    agent.to_string(this)
+}
+
+/// The units at `index` and after it, if `index` is in range.
+fn units_at(agent: &Agent, s: StringId, index: f64) -> Option<(u16, Option<u16>)> {
+    let string = agent.heap.string(s);
+    if index < 0.0 || index >= string.len() as f64 {
+        return None;
     }
-    make(agent, &[s[k as usize]])
+    // In range, so the index is exact.
+    let index = index as usize;
+    Some((string.unit(index)?, string.unit(index + 1)))
+}
+
+fn at(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let s = this_string(agent, this)?;
+    let n = to_integer(agent, arg(args, 0))?;
+    let k = if n >= 0.0 {
+        n
+    } else {
+        agent.heap.string_len(s) as f64 + n
+    };
+    match units_at(agent, s, k) {
+        Some((unit, _)) => make(agent, &[unit]),
+        None => Ok(Value::UNDEFINED),
+    }
 }
 
 fn char_at(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let s = this_units(agent, this)?;
+    let s = this_string(agent, this)?;
     let n = to_integer(agent, arg(args, 0))?;
-    if n < 0.0 || n >= s.len() as f64 {
-        return Ok(Value::string(agent.names.empty));
+    match units_at(agent, s, n) {
+        Some((unit, _)) => make(agent, &[unit]),
+        None => Ok(Value::string(agent.names.empty)),
     }
-    make(agent, &[s[n as usize]])
 }
 
 fn char_code_at(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let s = this_units(agent, this)?;
+    let s = this_string(agent, this)?;
     let n = to_integer(agent, arg(args, 0))?;
-    if n < 0.0 || n >= s.len() as f64 {
-        return Ok(Value::NAN);
-    }
-    Ok(Value::number(f64::from(s[n as usize])))
+    Ok(units_at(agent, s, n).map_or(Value::NAN, |(unit, _)| Value::number(f64::from(unit))))
 }
 
 fn code_point_at(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let s = this_units(agent, this)?;
+    let s = this_string(agent, this)?;
     let n = to_integer(agent, arg(args, 0))?;
-    if n < 0.0 || n >= s.len() as f64 {
+    let Some((first, second)) = units_at(agent, s, n) else {
         return Ok(Value::UNDEFINED);
-    }
-    Ok(Value::number(f64::from(code_point(&s, n as usize).0)))
+    };
+    let pair = [first, second.unwrap_or(0)];
+    let units = if second.is_some() {
+        &pair[..]
+    } else {
+        &pair[..1]
+    };
+    Ok(Value::number(f64::from(code_point(units, 0).0)))
 }
 
 fn concat(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {

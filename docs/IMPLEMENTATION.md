@@ -1353,6 +1353,22 @@ checkpoint; a `reject` whose promise is handled before that is withdrawn, as
 HTML's about-to-be-notified list requires. Events are collector roots until
 taken. TD-109 is paid; firing `unhandledrejection` is M5.
 
+## JS-09: limits and performance gate
+
+`tests/limits.rs` gates the frame, stack and heap limits, cancellation and
+the step budget; the eight workloads of `benchmarks/` with pinned checksums
+that do not depend on inline caches or on a collection at every safe point,
+and whose work less than 2.5-folds when the input doubles; and the committed
+heap-size report (`tests/fixtures/heap_report.txt`). `examples/js_bench.rs`
+reports median and p95 time, peak heap, collections and pauses. Long
+concatenations are ropes flattened on first read and by the collector
+(TD-101 paid, TD-116 opened); the string index accessors no longer copy the
+string; top-level `var` globals are cached by dictionary entry; and `for-in`
+skips prototypes that contribute no keys. Recorded x86-64 results are in
+[JS.md](JS.md#limits-and-performance-gate-js-09). Native ARM64 timings are
+not recorded: the sandbox has no ARM64 host. Collection pauses pass the 5 ms
+target up to about 30 MiB of live heap (TD-95, `perf.gc`).
+
 ## REN-03 completion: font formats, shaping and text policies
 
 Reviewed HarfRust/Skrifa/Wuff adapters add CFF/CFF2 and WOFF1/2, GSUB/GPOS/kern,

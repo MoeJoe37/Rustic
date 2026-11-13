@@ -594,7 +594,8 @@ shared by all closures of a function.
 
 Time on the development machine (x86-64, release build, best of five,
 `cargo run --release -p rustic-js --example js_run -- file.js`). These are
-first measurements, not a gate; JS-09 adds the benchmark corpus.
+first measurements from before JS-09, kept as history; the global loop is
+about six times faster since (see the JS-09 section below).
 
 | Script | Time |
 | --- | --- |
@@ -610,6 +611,94 @@ and collecting at every safe point) with a 2 MiB heap and a step budget, and
 requires the same outcome each time and a usable agent afterwards. Its first
 runs found a loop that could not be cancelled and a function that ran off the
 end of its code; both are fixed and kept as seeds or regressions.
+
+## Limits and performance gate (JS-09)
+
+`tests/limits.rs` is the gate. It holds the limits, the string rope
+contract, the benchmark corpus and the heap-size report.
+
+- **Limits.** Deep recursion throws a `RangeError` that script can catch, at
+  exactly `VmLimits::max_frames`, and the stack is usable afterwards; the
+  register stack is bounded the same way. A request that could never fit
+  (`'x'.repeat(1e9)`, `new ArrayBuffer(1e9)`) is a catchable `RangeError`.
+  Running out of the heap budget ends the run with
+  `EvalError::OutOfMemory`, which script cannot catch: a `catch` block that
+  needs memory to run cannot be relied on, so the host gets the error and
+  the agent runs again once the garbage is collected. Endless loops,
+  runaway recursion, generators and regular expressions stop on the
+  cancellation token and on the step budget (`Agent::step_budget` reads what
+  is left).
+- **Ropes.** `Heap::concat` makes a rope when the result has 256 code units
+  or more: the two halves are recorded and nothing is copied until
+  something reads the units (`Heap::string`), so appending in a loop is
+  linear (TD-101 paid). `Heap::string_len` answers `length` without a copy.
+  A collection flattens every rope the program still holds, if the copy
+  fits half of the free budget, and frees the chain behind it; a rope too
+  large to copy (a string doubled onto itself) stays a rope. The copy is
+  made behind `&self`, so it is charged late: the bytes count in
+  `Heap::bytes_used` at once, a rope is refused when it is made unless its
+  copy fits, and the next allocation or safe point fails if the heap is
+  over its limit (TD-116).
+- **Benchmark corpus.** `benchmarks/*.js`, eight original workloads, each a
+  `run(n)` that returns a checksum: property access at one and at four
+  shapes, calls and recursion, closure creation, string building, array
+  push/iterate/sort, allocation churn, a JSON-like tree and a DOM-free
+  "framework diff" loop. The tests pin each checksum (an independent model
+  of the arithmetic workloads gives the same numbers), require the same
+  result and the same number of safe points with inline caches off and
+  with a collection at every safe point, and require that doubling `n`
+  less than 2.5-folds both the safe points passed and the bytes allocated
+  (`Heap::allocated_bytes`), so no workload is quadratic. Each also fits an
+  8 MiB heap.
+- **Heap-size report.** `tests/fixtures/heap_report.txt` lists the bytes
+  charged for an empty object (72), an object with four properties (104), a
+  dense array of 1,000 numbers (8,074), 1,000-character Latin-1 and UTF-16
+  strings (1,025 and 2,025), closures (120, and 184 with one captured
+  variable), a symbol, compiled code (232 bytes for an empty function and
+  26 per instruction with its tables) and a new agent with the library
+  (105,954). The test compares a fresh report with the committed file on
+  64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
+  line that grows needs an explanation in the same change.
+- **Runner.** `cargo run --release -p rustic-js --example js_bench` runs
+  each workload in a fresh agent (21 runs of `run(200000)` by default) and
+  prints median and 95th-percentile time, peak heap
+  (`Heap::peak_bytes`), collections and the total and longest collection
+  pause (`Heap::set_gc_clock` times collections only when the host asks).
+
+Results on the development machine (x86-64, Intel Core i7-13650HX, Linux
+7.3, rustc 1.99.1, release build, one performance core):
+
+| Workload | Median ms | p95 ms | Peak heap KiB | Collections | Total pause ms | Longest pause ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| `alloc_churn` | 107.73 | 108.79 | 1,197 | 46 | 9.99 | 0.26 |
+| `arrays` | 214.84 | 219.64 | 6,411 | 2 | 0.89 | 0.66 |
+| `calls` | 31.90 | 32.08 | 108 | 0 | 0.00 | 0.00 |
+| `closures` | 58.57 | 59.03 | 1,131 | 35 | 6.32 | 0.21 |
+| `framework_diff` | 679.93 | 682.75 | 1,308 | 248 | 46.50 | 0.30 |
+| `json_tree` | 438.33 | 448.98 | 95,963 | 7 | 32.63 | 15.46 |
+| `property_access` | 18.20 | 18.26 | 108 | 0 | 0.00 | 0.00 |
+| `strings` | 113.66 | 116.07 | 8,309 | 30 | 15.43 | 1.34 |
+
+What the corpus found, all fixed in the same change:
+
+- `charAt`, `charCodeAt`, `codePointAt` and `at` copied the whole string on
+  every call, so a loop over a string was quadratic.
+- Appending to a string copied it every time (TD-101).
+- A `var` at the top level was never cached, because the global object is
+  in dictionary mode and caches were keyed on shapes. A global site now
+  remembers the dictionary entry and checks its name on every use: a read
+  went from 75 ns to 9 ns and a write from 280 ns to 18 ns.
+- `for-in` built a set of seen keys and walked every prototype's keys. When
+  no prototype has an enumerable or indexed property, which is the usual
+  case, the keys are the object's own.
+
+What it measured and left open: collection is stop-the-world, and the
+longest pause grows with the live heap, about 0.17 ms per MiB
+(`json_tree`, 15 ms at 94 MiB). That is over the 5 ms target of
+[PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) above roughly 30 MiB of
+live data, which is the measured trigger of TD-95; incremental marking is
+`perf.gc` (M12). Timings on a native ARM64 machine are not recorded yet:
+this sandbox has no ARM64 host, and emulated timing is not evidence.
 
 ## Built-ins (JS-05)
 
@@ -761,7 +850,8 @@ ms including the global loop around them (about 120 ns per call). A `map` over
 1 million elements takes 40 ms beyond filling the array. Sorting 200,000
 numbers takes 190 ms with a comparator and 145 ms with the default string
 order. The methods take the generic path through the internal methods. A
-dense-array fast path for `push`, `map` and `sort` is JS-09 work.
+dense-array fast path for `push`, `map` and `sort` is `perf.interpreter` (M12)
+work; the JS-09 `arrays` workload is its baseline.
 
 A native function can be a constructor, marked by `FLAG_NATIVE_CONSTRUCTOR`.
 `new` calls it with a new target, which the function reads with
@@ -770,8 +860,8 @@ A native function can be a constructor, marked by `FLAG_NATIVE_CONSTRUCTOR`.
 
 A new agent now holds 83 objects in 17,390 bytes, up from 32 objects in
 6,477 bytes before JS-05. Most of the growth is native function objects.
-Installing the rest of the library lazily is the JS-09 lever if agents per
-page start to matter.
+Installing the rest of the library lazily is the lever if agents per page
+start to matter (`perf.startup`, M12); the JS-09 heap report tracks the size.
 
 With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
 and with the part 2 pieces above to 70.0%. Eval took it to 73.6% and

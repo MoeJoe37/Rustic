@@ -1,0 +1,16 @@
+# Bytes the engine charges for representative values (64-bit targets).
+# Regenerate with RUSTIC_HEAP_REPORT_BLESS=1; explain any line that grows.
+empty object: 72
+object with four properties: 104
+dense array of 1,000 small numbers: 8074
+Latin-1 string of 1,000 characters: 1025
+UTF-16 string of 1,000 characters: 2025
+concatenation of two 500-character strings: 1025
+closure capturing nothing: 120
+closure capturing one variable: 184
+symbol: 12
+fractional number in an array slot: 0
+compiled empty function: 232
+instructions in an empty function: 3
+bytes per instruction, tables included (x100): 2600
+agent with the standard library: 105954

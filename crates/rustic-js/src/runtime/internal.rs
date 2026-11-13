@@ -884,6 +884,31 @@ impl Agent {
         keys
     }
 
+    /// Whether for-in over an heir of `o` sees nothing of it: an ordinary
+    /// object with no indexed property and no enumerable string-keyed
+    /// one. True of the built-in prototypes unless script adds to them.
+    pub(crate) fn adds_no_for_in_keys(&self, o: ObjectId) -> bool {
+        if self.is_exotic(o) {
+            return false;
+        }
+        let object = self.heap.object(o);
+        if !object.elements.is_empty() || object.sparse().is_some() || object.class == Class::String
+        {
+            return false;
+        }
+        let visible = |key: PropertyKey, attributes: Attributes| {
+            matches!(key, PropertyKey::String(_)) && attributes.has(Attributes::ENUMERABLE)
+        };
+        match object.dictionary() {
+            Some(dictionary) => !dictionary
+                .entries
+                .iter()
+                .flatten()
+                .any(|(key, stored)| visible(*key, stored.attributes)),
+            None => !self.heap.shapes.any(object.shape, visible),
+        }
+    }
+
     // ---- private names (§7.3.26 to §7.3.32) -------------------------------
 
     /// Whether `o` has the private element `name`.
@@ -1070,10 +1095,10 @@ impl Agent {
         let start = match value.kind() {
             Kind::Object(o) => o,
             Kind::String(s) => {
-                let string = self.heap.string(s);
                 if key == self.length_key() {
-                    return Ok(Value::number(string.len() as f64));
+                    return Ok(Value::number(self.heap.string_len(s) as f64));
                 }
+                let string = self.heap.string(s);
                 if let PropertyKey::Index(i) = key {
                     if let Some(unit) = string.unit(i as usize) {
                         return Ok(Value::string(

@@ -19,7 +19,7 @@
 
 use super::agent::Agent;
 use super::env::EnvId;
-use super::heap::{ATOM_BYTES, Heap, OutOfMemory, Symbol};
+use super::heap::{ATOM_BYTES, Heap, OutOfMemory, ROPE_BYTES, Symbol};
 use super::object::{Closure, Internal, Object};
 use super::shape::{PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
@@ -263,7 +263,31 @@ impl Tracer for Marker<'_> {
     }
 
     fn string(&mut self, id: StringId) {
-        self.marks.strings.insert(id.0);
+        if !self.marks.strings.insert(id.0) {
+            return;
+        }
+        // A rope keeps its halves alive until it is flattened. Chains of
+        // appends are deep, so walk them with a list, not recursion.
+        let Some((left, right)) = self.heap.rope_halves(id) else {
+            return;
+        };
+        // A rope reached from outside a rope is one the program still
+        // holds. Its chain usually costs far more than its text, so copy
+        // the text now and let the sweep free the chain; unless the copy
+        // would not fit (a string doubled onto itself is a small rope).
+        if self.heap.rope_fits(id) {
+            let _ = self.heap.string(id);
+            return;
+        }
+        let mut pending = vec![left, right];
+        while let Some(part) = pending.pop() {
+            if self.marks.strings.insert(part.0) {
+                if let Some((left, right)) = self.heap.rope_halves(part) {
+                    pending.push(left);
+                    pending.push(right);
+                }
+            }
+        }
     }
 
     fn env(&mut self, id: EnvId) {
@@ -500,7 +524,9 @@ fn live_footprint(heap: &Heap) -> usize {
     let strings: usize = heap
         .strings
         .iter()
-        .map(|(_, s)| std::mem::size_of::<JsStr>() + s.storage_bytes())
+        .map(|(_, s)| {
+            std::mem::size_of::<JsStr>() + s.get().map_or(ROPE_BYTES, JsStr::storage_bytes)
+        })
         .sum();
     let atoms = (heap.atoms.len() + heap.atom_next.len()) * ATOM_BYTES;
     let symbols = heap.symbols.live() * std::mem::size_of::<Symbol>();
@@ -564,6 +590,7 @@ impl Agent {
     /// `host` adds its own roots, reports the edges of each reachable host
     /// object, and learns which host objects were collected.
     pub fn collect_garbage_with(&mut self, roots: Roots<'_>, host: &mut dyn HostTracer) -> GcStats {
+        let started = self.heap.gc_clock.map(|clock| clock());
         let heap = &self.heap;
         let mut marker = Marker {
             heap,
@@ -688,6 +715,17 @@ impl Agent {
         };
         heap.closures.sweep(&marks.closures);
         sweep_atoms(heap, &marks.strings);
+        // Ropes that died or were flattened no longer need their halves.
+        let strings = &heap.strings;
+        heap.ropes.retain(|&index, _| {
+            strings
+                .try_get(index)
+                .is_some_and(|cell| cell.get().is_none())
+        });
+        if heap.ropes.capacity() > 2 * heap.ropes.len() + 64 {
+            heap.ropes.shrink_to_fit();
+        }
+        heap.settle_after_collection();
         let live = live_footprint(heap);
         // Charges between collections are estimates of the same costs, so
         // the budget restarts from the exact live footprint.
@@ -699,6 +737,11 @@ impl Agent {
         }
         heap.gc_threshold = next_threshold(heap.bytes_used(), heap.byte_limit());
         heap.collections += 1;
+        if let (Some(clock), Some(started)) = (heap.gc_clock, started) {
+            let pause = clock().saturating_sub(started);
+            heap.gc_pause_nanos = heap.gc_pause_nanos.saturating_add(pause);
+            heap.gc_pause_max_nanos = heap.gc_pause_max_nanos.max(pause);
+        }
         for data in finalized {
             host.finalize(data);
         }

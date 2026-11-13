@@ -89,6 +89,17 @@ measurements that keep them honest:
 Measure on native x64 and ARM64; the emulated 32-bit and big-endian tiers check
 correctness only, never timing.
 
+**Status (JS-09).** The heap-size report, the corpus and its runner exist and
+are gated by `crates/rustic-js/tests/limits.rs`; [JS.md](JS.md#limits-and-performance-gate-js-09)
+has the recorded x86-64 results. Against the initial targets: no workload is
+quadratic (a test doubles the input and bounds the growth of steps and of
+bytes allocated); stress mode changes no result; the longest collection pause
+is about 0.17 ms per MiB of live heap, so it meets the 5 ms target up to
+roughly 30 MiB live and misses it above (TD-95, paid by `perf.gc`). Still
+open: the ARM64 run on a native machine, and the comparison against V8,
+SpiderMonkey and JavaScriptCore, which belongs to the cross-engine harness
+below (PERF-01).
+
 ## Cross-engine gates
 
 These are the measurements behind the M12 [performance-leadership gate](ROADMAP.md#15-m12--performance-leadership).

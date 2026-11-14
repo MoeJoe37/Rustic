@@ -751,7 +751,7 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (110,671; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  (110,864; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
   installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
@@ -866,7 +866,12 @@ Part 2 adds the rest of the everyday library, beginning with:
     object argument's `Symbol.match`/`replace`/`search`/`split` method.
   - A string pattern for `match`, `matchAll` or `search` is made into a
     RegExp, as the spec says.
-  - `normalize` is missing (TD-107).
+  - `normalize` implements NFC, NFD, NFKC and NFKD with pinned Unicode
+    17.0.0 data shared with the URL engine. Lone surrogates retain their
+    UTF-16 code units and separate combining runs. The method bounds
+    decomposition workspace and result length using the agent's available
+    heap budget. Its native method and atom add 193 bytes to the measured
+    fresh agent. Locale-dependent comparison and case mapping remain in TD-107.
 - **JSON.** `parse` with a reviver and `stringify` with replacer functions,
   property lists, indentation, `toJSON` and cycle detection.
   - Parsing and the reviver walk keep their own stacks, so 50,000 nested

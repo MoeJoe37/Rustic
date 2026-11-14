@@ -6,6 +6,8 @@
 //! `Symbol.match`/`replace`/`search`/`split` method when one is given;
 //! creating a regular expression from a string waits for RegExp (JS-08).
 
+use rustic_base::unicode::{NormalizationForm, normalize_utf16};
+
 use super::{Method, arg, install_methods, method};
 use crate::runtime::agent::{Agent, JsResult};
 use crate::runtime::number::{is_str_whitespace, to_integer_or_infinity, to_length, to_uint32};
@@ -34,6 +36,7 @@ const PROTOTYPE_METHODS: &[Method] = &[
     method("localeCompare", locale_compare, 1),
     method("match", match_, 1),
     method("matchAll", match_all, 1),
+    method("normalize", normalize, 0),
     method("padEnd", pad_end, 1),
     method("padStart", pad_start, 1),
     method("repeat", repeat, 1),
@@ -417,6 +420,49 @@ fn ends_with(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
     let search = search_units(agent, arg(args, 0), "endsWith")?;
     let end = position(agent, arg(args, 1), s.len(), s.len())?;
     Ok(Value::boolean(s[..end].ends_with(&search)))
+}
+
+/// String.prototype.normalize (§22.1.3.15).
+fn normalize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let this = agent.require_object_coercible(this)?;
+    let string = agent.to_string(this)?;
+    let argument = arg(args, 0);
+    let form = if argument == Value::UNDEFINED {
+        NormalizationForm::Nfc
+    } else {
+        let form = agent.to_string(argument)?;
+        let form = agent.heap.string(form);
+        if form.units().eq("NFC".encode_utf16()) {
+            NormalizationForm::Nfc
+        } else if form.units().eq("NFD".encode_utf16()) {
+            NormalizationForm::Nfd
+        } else if form.units().eq("NFKC".encode_utf16()) {
+            NormalizationForm::Nfkc
+        } else if form.units().eq("NFKD".encode_utf16()) {
+            NormalizationForm::Nfkd
+        } else {
+            return range_error(agent, "invalid normalization form");
+        }
+    };
+    let input = agent.heap.string(string);
+    if input.units().all(|unit| unit < 0x80) {
+        return Ok(Value::string(string));
+    }
+    let room = agent
+        .heap
+        .byte_limit()
+        .saturating_sub(agent.heap.bytes_used());
+    // Four bytes per decomposed code point, with room for a stable-sort
+    // buffer, vector growth, and the UTF-16 output.
+    let max_decomposed = room / 16;
+    let max_result = (room / 2).min(MAX_STRING_LENGTH as usize);
+    let Some(output) = normalize_utf16(input.units(), form, max_decomposed, max_result) else {
+        return range_error(agent, "Invalid string length");
+    };
+    if input.units().eq(output.iter().copied()) {
+        return Ok(Value::string(string));
+    }
+    agent.string_from(JsStr::from_units(&output))
 }
 
 /// `String.prototype.localeCompare` (§22.1.3.12) without a locale: code

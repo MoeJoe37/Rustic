@@ -67,7 +67,7 @@ pub(super) fn check_label(label: &[char], decoded: bool) -> Result<(), IdnaError
 /// RFC 5892 Appendix A.1 (ZWNJ) and A.2 (ZWJ).
 fn satisfies_context_j(label: &[char], index: usize) -> bool {
     use JoiningType::*;
-    if index > 0 && normalize::combining_class(label[index - 1]) == VIRAMA_COMBINING_CLASS {
+    if index > 0 && normalize::combining_class(label[index - 1].into()) == VIRAMA_COMBINING_CLASS {
         return true;
     }
     if label[index] == ZERO_WIDTH_JOINER {

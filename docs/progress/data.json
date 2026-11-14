@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "6d117942c1ba39999060a94a7f69187767f414ba83b89952348b04fd1869d1f2",
-  "percent": "27.98",
+  "source_fingerprint": "aec0053fc41fa2cf3ab177d9c76316f48225eaa38e7cda60d995ebe1aaf143d8",
+  "percent": "28.21",
   "verified_percent": "25.69",
-  "partial_percent": "2.29",
+  "partial_percent": "2.52",
   "completed": 61,
-  "in_progress": 6,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 8,
       "total": 13,
-      "percent": "87.09",
+      "percent": "89.65",
       "verified_percent": "66.15",
-      "partial_percent": "20.94"
+      "partial_percent": "23.50"
     },
     {
       "id": "M5",
@@ -3733,9 +3733,40 @@
           "label": "Intl and required Unicode semantics",
           "size": 5,
           "milestone": "M4",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Unicode normalization forms, shared data and exact UTF-16 handling",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-base/src/unicode/normalize.rs",
+                  "marker": "pub fn normalize_utf16"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
+                  "marker": "fn normalize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "normalize_preserves_utf16_and_uses_all_four_unicode_forms"
+                }
+              ]
+            },
+            {
+              "label": "Locale identifiers, negotiation and locale-sensitive string operations",
+              "status": "planned"
+            },
+            {
+              "label": "Intl services, locale data and Test262 Intl evidence",
+              "status": "planned"
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.68"
         },
         {
@@ -3927,12 +3958,12 @@
       ],
       "points": 73,
       "completed": 8,
-      "in_progress": 5,
+      "in_progress": 6,
       "total": 15,
-      "contribution": "8.02",
-      "percent": "80.28",
+      "contribution": "8.25",
+      "percent": "82.57",
       "verified_percent": "58.90",
-      "partial_percent": "21.38"
+      "partial_percent": "23.67"
     },
     {
       "id": "wasm",

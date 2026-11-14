@@ -19,7 +19,8 @@
     "nfc_checks": 37671
   },
   "outputs": {
-    "crates/rustic-url/src/idna/tables.rs": "042e5b299e3b692aa6aa5f403ff7e06c9b00b81423ec141f2c9de0d25ecd0ba1",
+    "crates/rustic-base/src/unicode/tables.rs": "d41184a6ff28d02d55c38277c4b29224a0c686acf3895182586ab195ee750930",
+    "crates/rustic-url/src/idna/tables.rs": "d66fa74c90bb5451a109f812569854b17d182bbab6511886a54f29531a98b612",
     "crates/rustic-url/tests/fixtures/idna_cases.rs": "c974dfe4f7c99cd3da70e0745a68cba050b80eb70839971d90972fbfbbf6e6d8",
     "crates/rustic-url/tests/fixtures/nfc_cases.rs": "cdacad23a9fdee225589621dab46b52b742dcee85c0ff3655c4b3cdf6041e87d",
     "crates/rustic-url/tests/fixtures/toascii_cases.rs": "2db2438ab6676afa7028c40008c7c8808352b3beb34816f9aec6e76b15a24086"
@@ -61,6 +62,7 @@
   "tables": {
     "bidi_runs": 1252,
     "combining_class_runs": 403,
+    "compatibility_decompositions": 3849,
     "compositions": 961,
     "decompositions": 2081,
     "idna_mapping_bytes": 12976,

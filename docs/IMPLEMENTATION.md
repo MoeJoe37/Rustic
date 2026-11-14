@@ -1489,3 +1489,13 @@ The pinned `test/language` module selection has 382 passes, 314 failures
 and 121 proposal skips, with zero engine panics reported. The failures cover
 top-level await, dynamic import and fixtures with import attributes.
 See [JS.md](JS.md#static-module-loading-js-06) and TD-97/105.
+
+## JS-08 — Unicode string normalization
+
+`String.prototype.normalize` implements all four Unicode forms over
+UTF-16 code units. It preserves lone surrogates, checks coercion order and
+invalid forms, and limits the decomposition workspace. The original IDNA
+NFC implementation and canonical Unicode data moved to `rustic-base` so
+both consumers share them. The pinned Test262 normalization selection
+passes all 14 files. The heap report records a 193-byte increase for the
+new method and its property name. Locale support remains in TD-107/108.

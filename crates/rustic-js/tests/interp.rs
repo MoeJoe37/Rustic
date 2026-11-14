@@ -3482,3 +3482,30 @@ fn atomics_wait_and_notify() {
     assert_eq!(run_in(&mut agent, "log.join()"), "w1 ok,w3 timed-out,w2 ok");
     assert_eq!(agent.next_waiter_deadline(), None);
 }
+
+#[test]
+fn normalize_preserves_utf16_and_uses_all_four_unicode_forms() {
+    let mut agent = Agent::new().unwrap();
+    let result = agent
+        .evaluate(
+            r#"
+        let log = '';
+        let receiver = { toString() { log += 'r'; return '\u212B'; } };
+        let form = { toString() { log += 'f'; return 'NFD'; } };
+        let valid = String.prototype.normalize.call(receiver, form) === 'A\u030A'
+            && log === 'rf'
+            && 'e\u0301'.normalize() === '\u00e9'
+            && '\u00e9'.normalize('NFD') === 'e\u0301'
+            && '\uFB01'.normalize('NFKC') === 'fi'
+            && '\uFB01\u00e9'.normalize('NFKD') === 'fie\u0301'
+            && '\uD800\u0301\uDC00e\u0301\u{1f600}'.normalize() === '\uD800\u0301\uDC00é\u{1f600}';
+        let bad = false, receiverError = false;
+        try { 'a'.normalize('nfc'); } catch (e) { bad = e instanceof RangeError; }
+        try { String.prototype.normalize.call(null, form); }
+        catch (e) { receiverError = e instanceof TypeError; }
+        valid && bad && receiverError && log === 'rf';
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, Value::TRUE);
+}

@@ -3409,8 +3409,39 @@
           "label": "Intl and required Unicode semantics",
           "size": 5,
           "milestone": "M4",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Unicode normalization forms, shared data and exact UTF-16 handling",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-base/src/unicode/normalize.rs",
+                  "marker": "pub fn normalize_utf16"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
+                  "marker": "fn normalize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "normalize_preserves_utf16_and_uses_all_four_unicode_forms"
+                }
+              ]
+            },
+            {
+              "label": "Locale identifiers, negotiation and locale-sensitive string operations",
+              "status": "planned"
+            },
+            {
+              "label": "Intl services, locale data and Test262 Intl evidence",
+              "status": "planned"
+            }
+          ]
         },
         {
           "id": "js.wasm",

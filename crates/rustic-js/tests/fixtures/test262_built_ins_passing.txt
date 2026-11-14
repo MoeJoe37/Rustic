@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17109 pass, 1465 fail, 111 skipped (modules, proposals).
+# 17119 pass, 1455 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -13711,8 +13711,18 @@ String/prototype/matchAll/regexp-prototype-matchAll-invocation.js
 String/prototype/matchAll/regexp-prototype-matchAll-throws.js
 String/prototype/matchAll/this-val-non-obj-coercible.js
 String/prototype/matchAll/toString-this-val.js
+String/prototype/normalize/form-is-not-valid-throws.js
+String/prototype/normalize/length.js
+String/prototype/normalize/name.js
+String/prototype/normalize/normalize.js
+String/prototype/normalize/not-a-constructor.js
 String/prototype/normalize/return-abrupt-from-form-as-symbol.js
+String/prototype/normalize/return-abrupt-from-form.js
 String/prototype/normalize/return-abrupt-from-this-as-symbol.js
+String/prototype/normalize/return-abrupt-from-this.js
+String/prototype/normalize/return-normalized-string-from-coerced-form.js
+String/prototype/normalize/return-normalized-string-using-default-parameter.js
+String/prototype/normalize/return-normalized-string.js
 String/prototype/normalize/this-is-null-throws.js
 String/prototype/normalize/this-is-undefined-throws.js
 String/prototype/padEnd/exception-fill-string-symbol.js

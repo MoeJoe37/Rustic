@@ -138,7 +138,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
 | TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
-| TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
+| TD-107 | Deliberate | JS | `localeCompare` and locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
@@ -1536,18 +1536,17 @@ allows that only for built-in and host functions. Pay with: a source span per
 function so `toString` can return its text. Trigger: the first page script
 or Test262 group that needs it.
 
-### TD-107 — No Unicode normalization or locales in String
+### TD-107 — Locale-sensitive comparison and case mapping
 
-`String.prototype.normalize` needs the canonical and compatibility
-decomposition and composition data. `rustic-url` already carries NFC data
-for IDNA, but `rustic-js` cannot reach it. `localeCompare` compares code
-points, and `toLocaleUpperCase`/`toLocaleLowerCase` ignore their locale, so
-Turkish and Lithuanian casing are wrong.
+`String.prototype.normalize` is implemented for all four forms. IDNA and
+JavaScript share the canonical tables and normalization code in
+`rustic-base`. JavaScript also uses compatibility mappings and preserves
+lone surrogates.
 
-Pay with: move the normalization tables to `rustic-base` (or a shared
-Unicode crate) so both crates use one copy, then add `normalize`; collation
-and locale casing with Intl (JS-08). Trigger: JS-05 completion or the first
-page that depends on either.
+`localeCompare` compares code points, and
+`toLocaleUpperCase`/`toLocaleLowerCase` ignore their locale. Pay with
+collation and locale casing in Intl (JS-08). Trigger: locale-sensitive
+string conformance or the first page that depends on it.
 
 ### TD-108 — Date local time is a fixed offset
 

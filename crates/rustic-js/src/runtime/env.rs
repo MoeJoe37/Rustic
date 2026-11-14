@@ -77,7 +77,13 @@ pub(crate) type ImportBinding = (u16, NamespaceBinding);
 
 /// Internal import table of a module environment.
 #[derive(Clone, Debug, Default)]
-pub struct ModuleImports(Box<[ImportBinding]>);
+pub struct ModuleImports(Option<Box<ModuleLinkage>>);
+
+#[derive(Clone, Debug, Default)]
+struct ModuleLinkage {
+    imports: Box<[ImportBinding]>,
+    referrer: Option<super::value::StringId>,
+}
 
 /// An environment record.
 #[derive(Clone, Debug)]
@@ -145,8 +151,13 @@ impl Environment {
                 imports,
             } => {
                 tracer.env(*outer);
-                for &(_, target) in imports.0.iter() {
-                    target.trace(tracer);
+                if let Some(linkage) = &imports.0 {
+                    if let Some(referrer) = linkage.referrer {
+                        tracer.value(Value::string(referrer));
+                    }
+                    for &(_, target) in &linkage.imports {
+                        target.trace(tracer);
+                    }
                 }
                 record
             }
@@ -209,7 +220,10 @@ impl Environment {
             Environment::Object { .. } => 0,
         };
         let boxed = match self {
-            Environment::Module { imports, .. } => std::mem::size_of_val(imports.0.as_ref()),
+            Environment::Module { imports, .. } => imports.0.as_ref().map_or(0, |linkage| {
+                std::mem::size_of::<ModuleLinkage>()
+                    + std::mem::size_of_val(linkage.imports.as_ref())
+            }),
             Environment::Function { .. } => std::mem::size_of::<FunctionExtra>(),
             Environment::Global { .. } => std::mem::size_of::<Vec<StringId>>(),
             _ => 0,
@@ -921,19 +935,53 @@ impl Agent {
         })?)
     }
 
+    pub(crate) fn set_module_referrer(
+        &mut self,
+        env: EnvId,
+        referrer: super::value::StringId,
+    ) -> JsResult<()> {
+        self.module_linkage_mut(env)?.referrer = Some(referrer);
+        Ok(())
+    }
+
+    pub(crate) fn module_referrer(&self, mut env: EnvId) -> Option<super::value::StringId> {
+        loop {
+            if let Environment::Module { imports, .. } = self.env(env) {
+                return imports.0.as_ref().and_then(|linkage| linkage.referrer);
+            }
+            env = self.outer_environment(env)?;
+        }
+    }
+
     pub(crate) fn set_module_imports(
         &mut self,
         env: EnvId,
         mut imports: Vec<ImportBinding>,
     ) -> JsResult<()> {
+        if imports.is_empty() {
+            return Ok(());
+        }
         imports.sort_unstable_by_key(|&(local, _)| local);
         self.heap
             .charge(std::mem::size_of_val(imports.as_slice()))?;
-        let Environment::Module { imports: slots, .. } = self.heap.env_mut(env) else {
-            unreachable!("imports belong to a module environment");
-        };
-        slots.0 = imports.into_boxed_slice();
+        self.module_linkage_mut(env)?.imports = imports.into_boxed_slice();
         Ok(())
+    }
+
+    fn module_linkage_mut(&mut self, env: EnvId) -> JsResult<&mut ModuleLinkage> {
+        if matches!(
+            self.env(env),
+            Environment::Module {
+                imports: ModuleImports(None),
+                ..
+            }
+        ) {
+            self.heap.charge(std::mem::size_of::<ModuleLinkage>())?;
+        }
+        let Environment::Module { imports, .. } = self.heap.env_mut(env) else {
+            unreachable!("linkage belongs to a module environment");
+        };
+        Ok(imports.0.get_or_insert_with(Box::default))
     }
 
     /// A copy of a scope environment with the same outer environment and
@@ -985,11 +1033,11 @@ impl Agent {
         let Environment::Module { imports, .. } = environment else {
             unreachable!("imported bindings belong to a module");
         };
+        let imports = &imports.0.as_ref().expect("linked module").imports;
         let import = imports
-            .0
             .binary_search_by_key(&index, |&(local, _)| usize::from(local))
             .expect("all imports are linked before module evaluation");
-        self.namespace_binding_value(imports.0[import].1)
+        self.namespace_binding_value(imports[import].1)
     }
 
     pub(crate) fn namespace_binding_value(&self, binding: NamespaceBinding) -> Value {

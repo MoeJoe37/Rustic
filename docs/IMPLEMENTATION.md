@@ -1537,3 +1537,12 @@ JSON is parsed before evaluation and shared by all importers of the same key.
 Text preserves its UTF-16 units. The pinned module gate gains 24 passes from
 data fixtures and rejected attribute requests, reaching 647 of 696 executed
 files. Byte imports need immutable ArrayBuffer support and remain in TD-105.
+
+## JS-06 — Host-driven dynamic imports
+
+The compiler emits an import instruction that converts the request and queues
+an explicit host job. Module referrers are retained with live environments,
+and the import promise waits for the loaded module's completion promise.
+The Test262 fixture host reuses pending and evaluated instances across graphs.
+The pinned gates gain 44 module passes and 444 script passes. The five
+remaining module failures require byte fixtures with immutable buffers.

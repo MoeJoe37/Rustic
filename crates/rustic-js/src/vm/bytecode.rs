@@ -126,6 +126,8 @@ pub enum Op {
     GetSlot { dst: Reg, hops: u16, slot: u16 },
     /// Get the module's import.meta, allocating it on its first access.
     ImportMeta { dst: Reg, hops: u16, slot: u16 },
+    /// Convert a specifier and options, then queue a host import request.
+    ImportCall { dst: Reg, source: Reg, options: Reg },
     /// Store into a scope slot, checking the TDZ and mutability.
     SetSlot { src: Reg, hops: u16, slot: u16 },
     /// Initialize a scope slot (declarations; no checks).

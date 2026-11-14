@@ -3866,8 +3866,22 @@ impl<'a, 't> Gen<'a, 't> {
                     slot,
                 });
             }
-            ExpressionKind::ImportCall { .. } => {
-                return Err(CompileError::Unsupported("dynamic import", e.span));
+            ExpressionKind::ImportCall { source, options } => {
+                let specifier = self.temp()?;
+                self.expr(source, specifier)?;
+                let options_register = self.temp()?;
+                if let Some(options) = options {
+                    self.expr(options, options_register)?;
+                } else {
+                    self.emit(Op::Undefined {
+                        dst: options_register,
+                    });
+                }
+                self.emit(Op::ImportCall {
+                    dst,
+                    source: specifier,
+                    options: options_register,
+                });
             }
             ExpressionKind::Yield {
                 argument,

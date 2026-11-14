@@ -2847,146 +2847,112 @@
           "label": "Original interpreter/bytecode and control flow",
           "size": 8,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Scope resolution to registers and environment slots, register bytecode in a collected arena",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "pub(crate) fn compile_script"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn variables_and_scopes"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "pub(crate) fn compile_script"
             },
             {
-              "label": "Operators, control flow, labels, switch, with, destructuring and template literals",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn dispatch"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn control_flow"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn variables_and_scopes"
             },
             {
-              "label": "for-in and for-of with the iteration protocol and iterator closing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins.rs",
-                  "marker": "fn install_iterators"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn iteration_protocol"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn dispatch"
             },
             {
-              "label": "Inline caches for own, inherited, added and global properties",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn get_named"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn inline_caches_follow_prototype_changes"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn control_flow"
             },
             {
-              "label": "Safe points: cancellation, step budget and collection while running",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn safepoint"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn cancellation_stops_an_endless_loop"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins.rs",
+              "marker": "fn install_iterators"
             },
             {
-              "label": "Cached, uncached and collecting runs agree under fuzzing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-fuzz/src/js_run.rs",
-                  "marker": "impl Target for JsRunTarget"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-fuzz/tests/harness.rs",
-                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn iteration_protocol"
             },
             {
-              "label": "Tagged templates, optional calls and object-literal super",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "fn tagged_template"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn tagged_templates"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn super_in_object_literals"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn get_named"
             },
             {
-              "label": "Regular expression literals",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "ExpressionKind::RegExp { body, flags } =>"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn regular_expressions()"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn inline_caches_follow_prototype_changes"
             },
             {
-              "label": "Generators, async functions and modules on the bytecode",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn safepoint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn cancellation_stops_an_endless_loop"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/js_run.rs",
+              "marker": "impl Target for JsRunTarget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-fuzz/tests/harness.rs",
+              "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "fn tagged_template"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn tagged_templates"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn super_in_object_literals"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "ExpressionKind::RegExp { body, flags } =>"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn regular_expressions()"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/dynamic.rs",
+              "marker": "fn queue_dynamic_import"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "fn dynamic_import_preserves_referrer_attributes_and_pending_evaluation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn generators()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn promises_and_async_functions"
             }
           ]
         },

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "1d0b0f39a1e94915639f6518f651528fbea6f893f0466e4e2c5e3a2aff004d11",
-  "percent": "28.21",
-  "verified_percent": "25.69",
-  "partial_percent": "2.52",
-  "completed": 61,
-  "in_progress": 7,
+  "source_fingerprint": "70736821632abbec603571576d0aeb717d57787ab9ce582a5fb9fb10d4467f9e",
+  "percent": "28.33",
+  "verified_percent": "26.79",
+  "partial_percent": "1.54",
+  "completed": 62,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -45,11 +45,11 @@
       "id": "M4",
       "label": "ECMAScript runtime",
       "share": "8.90",
-      "completed": 8,
+      "completed": 9,
       "total": 13,
-      "percent": "89.65",
-      "verified_percent": "66.15",
-      "partial_percent": "23.50"
+      "percent": "91.02",
+      "verified_percent": "78.46",
+      "partial_percent": "12.56"
     },
     {
       "id": "M5",
@@ -3157,149 +3157,115 @@
           "label": "Original interpreter/bytecode and control flow",
           "size": 8,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Scope resolution to registers and environment slots, register bytecode in a collected arena",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "pub(crate) fn compile_script"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn variables_and_scopes"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "pub(crate) fn compile_script"
             },
             {
-              "label": "Operators, control flow, labels, switch, with, destructuring and template literals",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn dispatch"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn control_flow"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn variables_and_scopes"
             },
             {
-              "label": "for-in and for-of with the iteration protocol and iterator closing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins.rs",
-                  "marker": "fn install_iterators"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn iteration_protocol"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn dispatch"
             },
             {
-              "label": "Inline caches for own, inherited, added and global properties",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn get_named"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn inline_caches_follow_prototype_changes"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn control_flow"
             },
             {
-              "label": "Safe points: cancellation, step budget and collection while running",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn safepoint"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn cancellation_stops_an_endless_loop"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins.rs",
+              "marker": "fn install_iterators"
             },
             {
-              "label": "Cached, uncached and collecting runs agree under fuzzing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-fuzz/src/js_run.rs",
-                  "marker": "impl Target for JsRunTarget"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-fuzz/tests/harness.rs",
-                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn iteration_protocol"
             },
             {
-              "label": "Tagged templates, optional calls and object-literal super",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "fn tagged_template"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn tagged_templates"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn super_in_object_literals"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn get_named"
             },
             {
-              "label": "Regular expression literals",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/compile.rs",
-                  "marker": "ExpressionKind::RegExp { body, flags } =>"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn regular_expressions()"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn inline_caches_follow_prototype_changes"
             },
             {
-              "label": "Generators, async functions and modules on the bytecode",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn safepoint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn cancellation_stops_an_endless_loop"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/js_run.rs",
+              "marker": "impl Target for JsRunTarget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-fuzz/tests/harness.rs",
+              "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "fn tagged_template"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn tagged_templates"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn super_in_object_literals"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/compile.rs",
+              "marker": "ExpressionKind::RegExp { body, flags } =>"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn regular_expressions()"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/dynamic.rs",
+              "marker": "fn queue_dynamic_import"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "fn dynamic_import_preserves_referrer_attributes_and_pending_evaluation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn generators()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn promises_and_async_functions"
             }
           ],
-          "credit": "88.88",
+          "credit": "100.00",
           "engine_share": "1.09"
         },
         {
@@ -3967,13 +3933,13 @@
         }
       ],
       "points": 73,
-      "completed": 8,
-      "in_progress": 6,
+      "completed": 9,
+      "in_progress": 5,
       "total": 15,
-      "contribution": "8.25",
-      "percent": "82.57",
-      "verified_percent": "58.90",
-      "partial_percent": "23.67"
+      "contribution": "8.37",
+      "percent": "83.78",
+      "verified_percent": "69.86",
+      "partial_percent": "13.92"
     },
     {
       "id": "wasm",

@@ -363,6 +363,8 @@ pub(crate) enum Internal {
     Promise(Box<PromiseRecord>),
     /// Suspended evaluation state for a graph of source text modules.
     ModuleEvaluation(Box<crate::module::AsyncModuleGraph>),
+    /// The specifier and attributes of a queued dynamic import.
+    ImportRequest(Box<crate::module::ImportJob>),
     /// A Proxy exotic object (§10.5): `[[ProxyTarget]]` and
     /// `[[ProxyHandler]]`, both `None` once revoked.
     Proxy {
@@ -377,7 +379,7 @@ pub(crate) enum Internal {
         slots: Box<[Option<u16>]>,
     },
     /// Export keys in UTF-16 order and their live bindings.
-    ModuleNamespace(Box<[(PropertyKey, NamespaceBinding)]>),
+    ModuleNamespace(Box<[(PropertyKey, NamespaceBinding)]>, EnvId),
     /// An ArrayBuffer's bytes (§25.1).
     ArrayBuffer(Box<super::builtins::buffer::BufferData>),
     /// A typed array's `[[ViewedArrayBuffer]]`, element kind,
@@ -444,6 +446,7 @@ pub(crate) enum ReactionKind {
     Call,
     Await,
     Module(u32),
+    Import,
 }
 
 impl Reaction {
@@ -478,6 +481,12 @@ impl PromiseRecord {
 /// A job waiting in the agent's queue (§9.5).
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Job {
+    /// A validated import request awaiting the host's loader.
+    Import {
+        promise: Value,
+        request: Value,
+        referrer: Value,
+    },
     /// `NewPromiseReactionJob`: run `reaction` with `argument`.
     Reaction {
         reaction: Reaction,
@@ -496,6 +505,18 @@ pub(crate) enum Job {
 impl Job {
     pub(crate) fn values(&self) -> [Value; 6] {
         match *self {
+            Job::Import {
+                promise,
+                request,
+                referrer,
+            } => [
+                promise,
+                request,
+                referrer,
+                Value::UNDEFINED,
+                Value::UNDEFINED,
+                Value::UNDEFINED,
+            ],
             Job::Reaction {
                 reaction, argument, ..
             } => {

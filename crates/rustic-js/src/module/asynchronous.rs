@@ -19,6 +19,7 @@ struct Evaluation {
     parents: Vec<usize>,
     order: Option<usize>,
     failed: bool,
+    completion: Option<ObjectId>,
 }
 
 #[derive(Clone, Debug)]
@@ -33,6 +34,9 @@ impl AsyncModuleGraph {
         tracer.value(Value::object(self.completion));
         for entry in &self.entries {
             entry.module.trace(tracer);
+            if let Some(completion) = entry.completion {
+                tracer.value(Value::object(completion));
+            }
         }
     }
 
@@ -61,6 +65,7 @@ impl Agent {
         graph: &ModuleGraph<K>,
         limits: &GraphLimits,
         start: usize,
+        observer: Option<impl FnMut(&mut Self, usize, ObjectId, ObjectId) -> JsResult<()>>,
     ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
         let completion = new_intrinsic_promise(self)?;
         let namespace = self.vm.modules[start].namespace;
@@ -78,6 +83,7 @@ impl Agent {
                 parents: Vec::new(),
                 order: None,
                 failed: false,
+                completion: None,
             })
             .collect();
         let evaluation = AsyncModuleGraph {
@@ -95,6 +101,27 @@ impl Agent {
                 Ok(()) => {
                     if agent.async_modules(state).entries[0].order.is_none() {
                         resolve_promise(agent, completion, Value::UNDEFINED)?;
+                    }
+                    if let Some(mut observer) = observer {
+                        for index in 0..graph.module_count() {
+                            let entries = &agent.async_modules(state).entries;
+                            let namespace = entries[index].module.namespace;
+                            let root = entries[index].cycle_root;
+                            let promise = if root == 0 {
+                                completion
+                            } else if let Some(promise) = entries[root].completion {
+                                promise
+                            } else {
+                                let promise = new_intrinsic_promise(agent)?;
+                                let entry = &mut agent.async_modules(state).entries[root];
+                                entry.completion = Some(promise);
+                                if entry.order.is_none() {
+                                    resolve_promise(agent, promise, Value::UNDEFINED)?;
+                                }
+                                promise
+                            };
+                            observer(agent, index, namespace, promise)?;
+                        }
                     }
                 }
                 Err(ModuleEvalError::Runtime(Abrupt::Throw(reason))) => {
@@ -166,14 +193,38 @@ impl Agent {
                 continue;
             }
 
+            if let Some(promise) = self.async_modules(state).entries[index]
+                .module
+                .prior_completion
+            {
+                match self.promise_rejected(promise) {
+                    Some(true) => {
+                        return Err(Abrupt::Throw(
+                            self.promise_result(promise).expect("settled dependency"),
+                        )
+                        .into());
+                    }
+                    Some(false) => {}
+                    None => {
+                        self.async_modules(state).entries[index].order = Some(next_order);
+                        next_order += 1;
+                        watch_module(
+                            self,
+                            promise,
+                            state,
+                            u32::try_from(index).map_err(|_| Abrupt::OutOfMemory)?,
+                        )?;
+                    }
+                }
+            }
             let entry = &mut self.async_modules(state).entries[index];
             let pending = entry.pending;
-            let has_await = entry.module.has_await;
-            if has_await || pending != 0 {
+            let new = entry.module.prior_completion.is_none();
+            if new && (entry.module.has_await || pending != 0) {
                 entry.order = Some(next_order);
                 next_order += 1;
             }
-            if pending == 0 {
+            if new && pending == 0 {
                 self.run_module_body(state, index)?;
             }
             let entries = &mut self.async_modules(state).entries;
@@ -275,8 +326,12 @@ impl Agent {
     fn complete_module(&mut self, state: ObjectId, index: usize) -> JsResult<()> {
         let graph = self.async_modules(state);
         graph.entries[index].order = None;
-        if index == 0 {
-            let completion = graph.completion;
+        let completion = if index == 0 {
+            Some(graph.completion)
+        } else {
+            graph.entries[index].completion
+        };
+        if let Some(completion) = completion {
             resolve_promise(self, completion, Value::UNDEFINED)?;
         }
         Ok(())
@@ -285,18 +340,21 @@ impl Agent {
     fn reject_module_ancestors(&mut self, state: ObjectId, index: usize, reason: Value) {
         let graph = self.async_modules(state);
         let mut pending = vec![index];
-        let mut reject = false;
+        let mut completions = Vec::new();
         while let Some(child) = pending.pop() {
             let entry = &mut graph.entries[child];
             if std::mem::replace(&mut entry.failed, true) {
                 continue;
             }
             entry.order = None;
-            reject |= child == 0;
+            if child == 0 {
+                completions.push(graph.completion);
+            } else if let Some(completion) = entry.completion {
+                completions.push(completion);
+            }
             pending.extend(entry.parents.iter().copied());
         }
-        if reject {
-            let completion = graph.completion;
+        for completion in completions {
             reject_promise(self, completion, reason);
         }
     }

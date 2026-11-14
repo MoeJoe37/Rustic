@@ -97,6 +97,7 @@ pub(crate) struct VmState {
     stack: Vec<Value>,
     /// Environments, namespaces and code of graphs currently being evaluated.
     pub(crate) modules: Vec<crate::module::ModuleInstance>,
+    pub(crate) import_loader: crate::module::ImportLoader,
     frames: Vec<Frame>,
     /// Native calls and nested runs in progress.
     native_depth: u32,
@@ -1043,6 +1044,14 @@ impl Agent {
                         self.set_env_slot(module, slot, value);
                     }
                     reg!(dst) = value;
+                }
+                Op::ImportCall {
+                    dst,
+                    source,
+                    options,
+                } => {
+                    t!(self.safepoint());
+                    reg!(dst) = t!(self.queue_dynamic_import(env, reg!(source), reg!(options)));
                 }
                 Op::SetSlot { src, hops, slot } => {
                     let scope = self.env_outer_n(env, hops);

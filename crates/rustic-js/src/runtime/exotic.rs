@@ -32,7 +32,7 @@ impl Agent {
             Some(Internal::Proxy { .. }) => Exotic::Proxy,
             Some(Internal::Arguments { .. }) => Exotic::Arguments,
             Some(Internal::TypedArray { .. }) => Exotic::TypedArray,
-            Some(Internal::ModuleNamespace(_)) => Exotic::ModuleNamespace,
+            Some(Internal::ModuleNamespace(..)) => Exotic::ModuleNamespace,
             _ => unreachable!("only exotic objects carry the exotic flag"),
         }
     }
@@ -277,9 +277,12 @@ impl Agent {
 
     // ---- module namespace objects (§10.4.6) ----------------------------
 
-    pub(crate) fn new_module_namespace(&mut self) -> JsResult<ObjectId> {
+    pub(crate) fn new_module_namespace(
+        &mut self,
+        env: crate::runtime::EnvId,
+    ) -> JsResult<ObjectId> {
         let mut object = Object::new(Class::ModuleNamespace, None);
-        object.extra_mut().internal = Some(Internal::ModuleNamespace(Box::default()));
+        object.extra_mut().internal = Some(Internal::ModuleNamespace(Box::default(), env));
         let namespace = self.heap.alloc_object(object)?;
         let tag = self.string("Module")?;
         let key = PropertyKey::Symbol(self.symbols.to_string_tag);
@@ -301,7 +304,7 @@ impl Agent {
     ) -> JsResult<()> {
         self.heap
             .charge(std::mem::size_of_val(exports.as_slice()))?;
-        let Some(Internal::ModuleNamespace(entries)) =
+        let Some(Internal::ModuleNamespace(entries, _)) =
             self.heap.object_mut(namespace).internal_mut()
         else {
             unreachable!("export entries belong to a module namespace");
@@ -311,11 +314,21 @@ impl Agent {
     }
 
     fn namespace_exports(&self, namespace: ObjectId) -> &[(PropertyKey, NamespaceBinding)] {
-        let Some(Internal::ModuleNamespace(entries)) = self.heap.object(namespace).internal()
+        let Some(Internal::ModuleNamespace(entries, _)) = self.heap.object(namespace).internal()
         else {
             unreachable!("export entries belong to a module namespace");
         };
         entries
+    }
+
+    pub(crate) fn module_namespace_environment(
+        &self,
+        namespace: ObjectId,
+    ) -> crate::runtime::EnvId {
+        let Some(Internal::ModuleNamespace(_, env)) = self.heap.object(namespace).internal() else {
+            unreachable!("only module namespaces can be reused");
+        };
+        *env
     }
 
     fn namespace_binding(&self, namespace: ObjectId, key: PropertyKey) -> Option<NamespaceBinding> {

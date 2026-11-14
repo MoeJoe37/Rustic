@@ -74,6 +74,7 @@ pub(crate) struct ModuleInstance {
     pub(crate) initialize: CodeId,
     pub(crate) body: CodeId,
     pub(crate) has_await: bool,
+    pub(crate) prior_completion: Option<ObjectId>,
 }
 
 impl ModuleInstance {
@@ -82,6 +83,9 @@ impl ModuleInstance {
         tracer.value(Value::object(self.namespace));
         tracer.code(self.initialize);
         tracer.code(self.body);
+        if let Some(completion) = self.prior_completion {
+            tracer.value(Value::object(completion));
+        }
     }
 }
 
@@ -115,7 +119,7 @@ impl Agent {
     {
         let start = self.vm.modules.len();
         let result = self
-            .link_modules(graph, limits, start, metadata, false)
+            .link_modules(graph, limits, start, metadata, false, |_| None, |_, _| None)
             .and_then(|()| self.run_sync_modules(graph, limits, start));
         self.vm.modules.truncate(start);
         result
@@ -129,14 +133,57 @@ impl Agent {
         graph: &ModuleGraph<K>,
         limits: &GraphLimits,
     ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
+        self.start_module_evaluation_with_referrers(graph, limits, |_| None)
+    }
+
+    /// Start evaluating a graph whose modules have host identifiers for
+    /// dynamic import resolution. The identifiers are traced with their
+    /// environments and remain available to exported functions.
+    pub fn start_module_evaluation_with_referrers<K: Clone + Eq + Hash>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+        referrer: impl FnMut(&K) -> Option<JsStr>,
+    ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
+        self.start_observed_module_evaluation(
+            graph,
+            limits,
+            referrer,
+            |_, _| None,
+            None::<fn(&mut Self, usize, ObjectId, ObjectId) -> crate::runtime::JsResult<()>>,
+        )
+    }
+
+    pub(crate) fn start_observed_module_evaluation<K: Clone + Eq + Hash>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+        referrer: impl FnMut(&K) -> Option<JsStr>,
+        reuse: impl FnMut(&Self, &K) -> Option<(ObjectId, ObjectId)>,
+        observer: Option<
+            impl FnMut(&mut Self, usize, ObjectId, ObjectId) -> crate::runtime::JsResult<()>,
+        >,
+    ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
         let start = self.vm.modules.len();
         let result = self
-            .link_modules(graph, limits, start, |_| std::iter::empty(), true)
-            .and_then(|()| self.run_async_modules(graph, limits, start));
+            .link_modules(
+                graph,
+                limits,
+                start,
+                |_| std::iter::empty(),
+                true,
+                referrer,
+                reuse,
+            )
+            .and_then(|()| self.run_async_modules(graph, limits, start, observer));
         self.vm.modules.truncate(start);
         result
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the loader supplies distinct metadata, identity and cache hooks"
+    )]
     fn link_modules<K, I>(
         &mut self,
         graph: &ModuleGraph<K>,
@@ -144,6 +191,8 @@ impl Agent {
         start: usize,
         mut metadata: impl FnMut(&K) -> I,
         allow_await: bool,
+        mut referrer: impl FnMut(&K) -> Option<JsStr>,
+        mut reuse: impl FnMut(&Self, &K) -> Option<(ObjectId, ObjectId)>,
     ) -> Result<(), ModuleEvalError>
     where
         K: Clone + Eq + Hash,
@@ -158,6 +207,7 @@ impl Agent {
         for index in 0..count {
             self.check_module_cancellation(limits)?;
             let (key, record) = graph.module(index).expect("loaded module");
+            let cached = reuse(self, key);
             let ModuleCode {
                 initialize,
                 body,
@@ -174,48 +224,59 @@ impl Agent {
                 module: index,
                 error,
             })?;
-            let env = self.new_module_environment(&bindings)?;
-            let namespace = self.new_module_namespace()?;
-            if let Some(data) = graph.data(index) {
-                let value = match data {
-                    ModuleSource::Json(source) => {
-                        match crate::runtime::parse_json_units(self, source.units()) {
-                            Ok(value) => value,
-                            Err(Abrupt::Throw(_)) => {
-                                return Err(ModuleEvalError::InvalidJson { module: index });
+            let (env, namespace) = match cached {
+                Some((namespace, _)) => (self.module_namespace_environment(namespace), namespace),
+                None => {
+                    let env = self.new_module_environment(&bindings)?;
+                    (env, self.new_module_namespace(env)?)
+                }
+            };
+            if cached.is_none() {
+                if let Some(referrer) = referrer(key) {
+                    let referrer = self.heap.alloc_string(referrer)?;
+                    self.set_module_referrer(env, referrer)?;
+                }
+                if let Some(data) = graph.data(index) {
+                    let value = match data {
+                        ModuleSource::Json(source) => {
+                            match crate::runtime::parse_json_units(self, source.units()) {
+                                Ok(value) => value,
+                                Err(Abrupt::Throw(_)) => {
+                                    return Err(ModuleEvalError::InvalidJson { module: index });
+                                }
+                                Err(other) => return Err(other.into()),
                             }
-                            Err(other) => return Err(other.into()),
                         }
+                        ModuleSource::Text(source) => {
+                            self.string_from(JsStr::from_units(source.units()))?
+                        }
+                        ModuleSource::JavaScript(_) => {
+                            unreachable!("only synthetic module data is stored")
+                        }
+                    };
+                    let name = self.heap.intern_str(DEFAULT_EXPORT)?;
+                    let slot = bindings
+                        .iter()
+                        .position(|&(binding, _)| binding == name)
+                        .expect("synthetic default binding");
+                    self.set_env_slot(
+                        env,
+                        u16::try_from(slot).expect("compiler bounds slot count"),
+                        value,
+                    );
+                }
+                if let Some(slot) = metadata_slot {
+                    let mut properties = metadata(key).into_iter().peekable();
+                    if properties.peek().is_some() {
+                        let meta = self.new_object_with(None)?;
+                        for (name, value) in properties {
+                            super::graph::spend(limits, &mut remaining)?;
+                            let key = self.heap.key_for(&name)?;
+                            let value = self.string_from(value)?;
+                            self.create_data_property_or_throw(meta, key, value)?;
+                        }
+                        self.set_env_slot(env, slot, Value::object(meta));
                     }
-                    ModuleSource::Text(source) => {
-                        self.string_from(JsStr::from_units(source.units()))?
-                    }
-                    ModuleSource::JavaScript(_) => {
-                        unreachable!("only synthetic module data is stored")
-                    }
-                };
-                let name = self.heap.intern_str(DEFAULT_EXPORT)?;
-                let slot = bindings
-                    .iter()
-                    .position(|&(binding, _)| binding == name)
-                    .expect("synthetic default binding");
-                self.set_env_slot(
-                    env,
-                    u16::try_from(slot).expect("compiler bounds slot count"),
-                    value,
-                );
-            }
-            if let Some(slot) = metadata_slot {
-                let mut properties = metadata(key).into_iter().peekable();
-                if properties.peek().is_some() {
-                    let meta = self.new_object_with(None)?;
-                    for (name, value) in properties {
-                        super::graph::spend(limits, &mut remaining)?;
-                        let key = self.heap.key_for(&name)?;
-                        let value = self.string_from(value)?;
-                        self.create_data_property_or_throw(meta, key, value)?;
-                    }
-                    self.set_env_slot(env, slot, Value::object(meta));
                 }
             }
             slots.push(
@@ -236,6 +297,7 @@ impl Agent {
                 initialize,
                 body,
                 has_await,
+                prior_completion: cached.map(|(_, completion)| completion),
             });
         }
 
@@ -245,6 +307,9 @@ impl Agent {
             self.check_module_cancellation(limits)?;
             let (_, record) = graph.module(index).expect("loaded module");
             let current = self.vm.modules[start + index];
+            if current.prior_completion.is_some() {
+                continue;
+            }
             let mut imports: Vec<ImportBinding> = Vec::new();
             for entry in record.imports() {
                 super::graph::spend(limits, &mut remaining)?;
@@ -285,6 +350,9 @@ impl Agent {
         for index in 0..count {
             self.check_module_cancellation(limits)?;
             let module = self.vm.modules[start + index];
+            if module.prior_completion.is_some() {
+                continue;
+            }
             self.run_in_environment(module.initialize, module.env, Value::UNDEFINED)?;
         }
         Ok(())

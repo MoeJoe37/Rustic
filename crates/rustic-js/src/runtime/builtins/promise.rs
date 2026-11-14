@@ -593,6 +593,22 @@ pub(crate) fn watch_module(
     add_reactions(agent, promise, reaction, reaction)
 }
 
+pub(crate) fn watch_import(
+    agent: &mut Agent,
+    completion: ObjectId,
+    promise: ObjectId,
+    namespace: ObjectId,
+) -> JsResult<()> {
+    let reaction = Reaction {
+        handler: Value::object(namespace),
+        kind: crate::runtime::object::ReactionKind::Import,
+        promise: Value::object(promise),
+        resolve: Value::UNDEFINED,
+        reject: Value::UNDEFINED,
+    };
+    add_reactions(agent, completion, reaction, reaction)
+}
+
 /// A new intrinsic promise and its resolving operations, for an async
 /// function.
 pub(crate) fn new_intrinsic_promise(agent: &mut Agent) -> JsResult<ObjectId> {
@@ -678,6 +694,13 @@ impl Agent {
     /// only running out of memory or being cancelled does.
     pub fn run_jobs(&mut self) -> JsResult<()> {
         while let Some(job) = self.vm.jobs.pop_front() {
+            if self
+                .cancellation()
+                .is_some_and(|token| token.is_cancelled())
+            {
+                self.vm.jobs.push_front(job);
+                return Err(Abrupt::Cancelled);
+            }
             self.vm.running_job = Some(job);
             let result = self.run_job(job);
             self.vm.running_job = None;
@@ -691,6 +714,15 @@ impl Agent {
 
     fn run_job(&mut self, job: Job) -> JsResult<()> {
         match job {
+            Job::Import {
+                promise,
+                request,
+                referrer,
+            } => self.run_import_job(
+                promise.as_object().expect("import promise"),
+                request.as_object().expect("import request"),
+                referrer.as_string(),
+            ),
             Job::Reaction {
                 reaction,
                 fulfilled,
@@ -714,6 +746,14 @@ impl Agent {
                             fulfilled,
                             argument,
                         );
+                    }
+                    ReactionKind::Import => {
+                        let promise = reaction.promise.as_object().expect("import promise");
+                        if fulfilled {
+                            return resolve_promise(self, promise, reaction.handler);
+                        }
+                        reject_promise(self, promise, argument);
+                        return Ok(());
                     }
                 }
                 let result = if reaction.handler == Value::UNDEFINED {

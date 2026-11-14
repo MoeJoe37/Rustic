@@ -1825,13 +1825,11 @@ fn arrays_math_symbols_and_dynamic_functions() {
 
 #[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in ["/\\p{L}/u", "import('m')"] {
-        let mut agent = Agent::new().expect("agent");
-        assert!(
-            matches!(agent.evaluate(source), Err(EvalError::Compile(_))),
-            "{source}"
-        );
-    }
+    let mut agent = Agent::new().expect("agent");
+    assert!(matches!(
+        agent.evaluate("/\\p{L}/u"),
+        Err(EvalError::Compile(_))
+    ));
 }
 
 /// An agent with a global `Symbol` holding the well-known symbols, which

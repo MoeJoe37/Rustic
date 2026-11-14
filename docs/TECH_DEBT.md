@@ -1399,9 +1399,9 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. The asynchronous module evaluator runs top-level await. Dynamic
-imports still fail at compile time, and the synchronous module entry point
-rejects graphs that contain top-level await before any module body runs. A regular
+calls. The asynchronous module evaluator runs top-level await and dynamic
+imports. The synchronous entry point rejects graphs containing top-level
+await before any module body runs. A regular
 expression literal that uses a Unicode property escape also fails explicitly
 (TD-110).
 
@@ -1413,9 +1413,8 @@ RegExp literals (JS-08 part 3) after them. JS-06 now loads and validates static 
 Module environments, live bindings, namespace objects and synchronous bytecode
 evaluation are implemented in JS-06. Each module now lazily creates its own
 `import.meta` object when the host supplies no properties. A host can provide
-string metadata when it instantiates the graph. Pay the remaining execution
-debt with dynamic imports. Trigger: the module Test262 gate
-(JS-07).
+string metadata when it instantiates the graph. The dynamic import portion
+is paid. Remaining byte module coverage is tracked under TD-105.
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1513,14 +1512,13 @@ captures one variable costs 64 bytes instead of 112.
 The script runner preserves its exact passing lists for `test/language`
 and the installed areas of `test/built-ins`. The separate module runner
 (JS-07) pins pass, fail and skip verdicts for the 817 files flagged
-`module` in `test/language`. Of the 696 executed, 647 pass. Dynamic imports
-account for 44 failures and byte imports requiring immutable ArrayBuffer
-account for five.
+`module` in `test/language`. Of the 696 executed, 691 pass. Byte imports requiring
+immutable ArrayBuffer account for the five failures.
 The remaining 121 use proposal features. See the
 [Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
 and reproduction commands.
 
-Pay with the dynamic import hooks in JS-06, byte fixtures, and `$262` with
+Pay with byte fixtures and `$262` with
 realms, collection and test agents. `$262.evalScript` now runs UTF-16
 script source against the current global environment. Extend the built-in gate
 when new library areas land. Trigger on each implementation.

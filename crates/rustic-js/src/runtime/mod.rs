@@ -33,7 +33,7 @@ pub(crate) use builtins::iterator_result;
 pub(crate) use builtins::json::parse_json_units;
 pub use builtins::promise::{RejectionEvent, RejectionOperation};
 pub(crate) use builtins::promise::{
-    await_value, new_intrinsic_promise, reject_promise, resolve_promise, watch_module,
+    await_value, new_intrinsic_promise, reject_promise, resolve_promise, watch_import, watch_module,
 };
 pub(crate) use builtins::regexp::regexp_create_literal;
 pub use completion::Completion;

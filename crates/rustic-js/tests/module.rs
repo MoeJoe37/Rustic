@@ -654,3 +654,61 @@ fn invalid_json_is_rejected_before_a_module_body_runs() {
     );
     assert_eq!(agent.evaluate("'ran' in globalThis"), Ok(Value::FALSE));
 }
+
+#[test]
+fn dynamic_import_preserves_referrer_attributes_and_pending_evaluation() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, JsStr, Value};
+    use std::rc::Rc;
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[(
+            "entry",
+            "export function run() { return import('dep', { with: { z: '2', a: '1' } }) }",
+        )],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.set_dynamic_import_loader(Some(Rc::new(|agent, referrer, request| {
+        assert_eq!(referrer.unwrap().to_text(), "entry");
+        assert_eq!(request.specifier(), units("dep"));
+        assert_eq!(
+            request.attributes(),
+            &[(units("a"), units("1")), (units("z"), units("2"))]
+        );
+        let limits = GraphLimits::default();
+        let target = load(
+            &[(
+                "entry",
+                "await new Promise(r => globalThis.release = r); export const answer = 42;",
+            )],
+            &limits,
+        )
+        .unwrap();
+        Ok(agent.start_module_evaluation(&target, &limits).unwrap())
+    })));
+    let (namespace, _) = agent
+        .start_module_evaluation_with_referrers(&graph, &limits, |key| Some(JsStr::from_text(key)))
+        .unwrap();
+    let key = agent.heap.key("run").unwrap();
+    let function = agent.get(namespace, key).unwrap();
+    let root = agent.root(function).unwrap();
+    let import = agent
+        .call_from_host(function, Value::UNDEFINED, &[])
+        .unwrap();
+    let import_root = agent.root(import).unwrap();
+    let promise = import.as_object().unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(promise), None);
+    agent.evaluate("release()").unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(promise), Some(false));
+    let namespace = agent.promise_result(promise).unwrap().as_object().unwrap();
+    let answer = agent.heap.key("answer").unwrap();
+    assert_eq!(agent.get(namespace, answer), Ok(Value::number(42.0)));
+    assert!(agent.unroot(root));
+    assert!(agent.unroot(import_root));
+}

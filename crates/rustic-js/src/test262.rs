@@ -347,6 +347,16 @@ pub fn skip_reason(meta: &Metadata) -> Option<&'static str> {
 
 /// Run `text` in every mode its metadata requires.
 pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits) -> Verdict {
+    execute_script(text, meta, harness, limits, None)
+}
+
+fn execute_script(
+    text: &str,
+    meta: &Metadata,
+    harness: &Harness,
+    limits: RunLimits,
+    fixture: Option<(&Path, &Path)>,
+) -> Verdict {
     if let Some(reason) = skip_reason(meta) {
         return Verdict::Skip(reason);
     }
@@ -363,7 +373,13 @@ pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits
     }
     for (mode, strict) in modes {
         let run = std::panic::catch_unwind(|| {
-            execute_mode(text, meta, harness, limits, TestMode::Script { strict })
+            execute_mode(
+                text,
+                meta,
+                harness,
+                limits,
+                TestMode::Script { strict, fixture },
+            )
         });
         match run {
             Ok(Ok(())) => {}
@@ -376,8 +392,14 @@ pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits
 
 #[derive(Clone, Copy)]
 enum TestMode<'a> {
-    Script { strict: bool },
-    Module { path: &'a Path, root: &'a Path },
+    Script {
+        strict: bool,
+        fixture: Option<(&'a Path, &'a Path)>,
+    },
+    Module {
+        path: &'a Path,
+        root: &'a Path,
+    },
 }
 
 #[derive(Debug)]
@@ -407,48 +429,28 @@ fn execute_module(
     // Distinguish a syntax error in the test itself from a failed import.
     parse_module(&entry, &limits.parse).map_err(EvalError::Parse)?;
     let entry_key = (path.to_owned(), FixtureKind::JavaScript);
-    let graph = ModuleGraph::load_sources(
-        entry_key.clone(),
-        &limits,
-        |(referrer, _), request| resolve_fixture(root, referrer, request),
-        |key| {
-            if *key == entry_key {
-                return Ok(ModuleSource::JavaScript(entry.clone()));
+    let graph =
+        load_fixture_graph(root, entry_key.clone(), &limits, Some(entry)).map_err(|error| {
+            match error {
+                GraphError::UnresolvedExport { .. } | GraphError::Parse(ParseError::Syntax(_)) => {
+                    TestError::Resolution(format!("{error:?}"))
+                }
+                GraphError::Host(ref reason) if reason == UNSUPPORTED_ATTRIBUTES => {
+                    TestError::Resolution(reason.clone())
+                }
+                other => TestError::Host(format!("{other:?}")),
             }
-            // Graph limits count code units. Each code unit takes at most
-            // three UTF-8 bytes in a well-formed file.
-            let max_bytes = 3 * limits.max_source_units;
-            let mut source = String::new();
-            std::fs::File::open(&key.0)
-                .and_then(|file| file.take(max_bytes as u64 + 1).read_to_string(&mut source))
-                .map_err(|error| format!("read module fixture: {error}"))?;
-            if source.len() > max_bytes {
-                return Err("module is too large".into());
-            }
-            let source = parse_source(&source).map_err(str::to_owned)?;
-            Ok(match key.1 {
-                FixtureKind::JavaScript => ModuleSource::JavaScript(source),
-                FixtureKind::Json => ModuleSource::Json(source),
-                FixtureKind::Text => ModuleSource::Text(source),
-            })
-        },
-    )
-    .map_err(|error| match error {
-        GraphError::UnresolvedExport { .. } | GraphError::Parse(ParseError::Syntax(_)) => {
-            TestError::Resolution(format!("{error:?}"))
-        }
-        GraphError::Host(ref reason) if reason == UNSUPPORTED_ATTRIBUTES => {
-            TestError::Resolution(reason.clone())
-        }
-        other => TestError::Host(format!("{other:?}")),
-    })?;
-    let (_, completion) = agent
-        .start_module_evaluation(&graph, &limits)
-        .map_err(|error| match error {
+        })?;
+    let cache = install_fixture_loader(agent, root, path);
+    let (namespace, completion) =
+        evaluate_fixture_graph(agent, &graph, &limits, &cache).map_err(|error| match error {
             ModuleEvalError::Runtime(abrupt) => TestError::Runtime(abrupt.into()),
             ModuleEvalError::InvalidJson { .. } => TestError::Resolution(error.to_string()),
             other => TestError::Host(other.to_string()),
         })?;
+    if !cache.borrow().contains_key(&entry_key) {
+        cache_fixture(agent, &cache, entry_key, namespace, completion).map_err(EvalError::from)?;
+    }
     let root = agent
         .root(Value::object(completion))
         .map_err(|_| EvalError::OutOfMemory)?;
@@ -466,6 +468,148 @@ fn execute_module(
     agent.unroot(root);
     settled.map_err(EvalError::from)?;
     result
+}
+
+type FixtureKey = (PathBuf, FixtureKind);
+type FixtureCache = std::rc::Rc<
+    std::cell::RefCell<
+        std::collections::HashMap<FixtureKey, (crate::runtime::HostRoot, crate::runtime::HostRoot)>,
+    >,
+>;
+
+fn fixture_referrer(key: &FixtureKey) -> Option<crate::runtime::JsStr> {
+    key.0.to_str().map(crate::runtime::JsStr::from_text)
+}
+
+fn load_fixture_graph(
+    root: &Path,
+    entry: FixtureKey,
+    limits: &GraphLimits,
+    input: Option<Source>,
+) -> Result<ModuleGraph<FixtureKey>, GraphError<String>> {
+    ModuleGraph::load_sources(
+        entry.clone(),
+        limits,
+        |(referrer, _), request| resolve_fixture(root, referrer, request),
+        |key| {
+            if *key == entry {
+                if let Some(input) = &input {
+                    return Ok(ModuleSource::JavaScript(input.clone()));
+                }
+            }
+            let max_bytes = 3 * limits.max_source_units;
+            let mut source = String::new();
+            std::fs::File::open(&key.0)
+                .and_then(|file| file.take(max_bytes as u64 + 1).read_to_string(&mut source))
+                .map_err(|error| format!("read module fixture: {error}"))?;
+            if source.len() > max_bytes {
+                return Err("module is too large".into());
+            }
+            let source = Source::from_str_limited(&source, limits.max_source_units)
+                .map_err(|error| error.to_string())?;
+            Ok(match key.1 {
+                FixtureKind::JavaScript => ModuleSource::JavaScript(source),
+                FixtureKind::Json => ModuleSource::Json(source),
+                FixtureKind::Text => ModuleSource::Text(source),
+            })
+        },
+    )
+}
+
+fn cache_fixture(
+    agent: &mut Agent,
+    cache: &FixtureCache,
+    key: FixtureKey,
+    namespace: crate::runtime::ObjectId,
+    completion: crate::runtime::ObjectId,
+) -> JsResult<()> {
+    let namespace = agent.root(Value::object(namespace))?;
+    match agent.root(Value::object(completion)) {
+        Ok(completion) => {
+            cache.borrow_mut().insert(key, (namespace, completion));
+            Ok(())
+        }
+        Err(error) => {
+            agent.unroot(namespace);
+            Err(error.into())
+        }
+    }
+}
+
+fn evaluate_fixture_graph(
+    agent: &mut Agent,
+    graph: &ModuleGraph<FixtureKey>,
+    limits: &GraphLimits,
+    cache: &FixtureCache,
+) -> Result<(crate::runtime::ObjectId, crate::runtime::ObjectId), ModuleEvalError> {
+    agent.start_observed_module_evaluation(
+        graph,
+        limits,
+        fixture_referrer,
+        |agent, key| {
+            let &(namespace, completion) = cache.borrow().get(key)?;
+            let object = |root| agent.rooted(root).and_then(Value::as_object);
+            Some((object(namespace)?, object(completion)?))
+        },
+        Some(|agent: &mut Agent, index, namespace, completion| {
+            let (key, _) = graph.module(index).expect("evaluated fixture");
+            if cache.borrow().contains_key(key) {
+                return Ok(());
+            }
+            if cache.borrow().len() >= limits.max_modules {
+                return Err(agent.throw(ErrorKind::RangeError, "module cache limit exceeded"));
+            }
+            cache_fixture(agent, cache, key.clone(), namespace, completion)
+        }),
+    )
+}
+
+fn install_fixture_loader(agent: &mut Agent, root: &Path, path: &Path) -> FixtureCache {
+    let cache = FixtureCache::default();
+    let loaded = cache.clone();
+    let root = root.to_owned();
+    let path = path.to_owned();
+    agent.set_dynamic_import_loader(Some(std::rc::Rc::new(move |agent, referrer, request| {
+        let referrer = referrer.map(|value| PathBuf::from(value.to_text()));
+        let key = resolve_fixture(&root, referrer.as_deref().unwrap_or(&path), request)
+            .map_err(|error| agent.throw(ErrorKind::TypeError, &error))?;
+        if let Some(&(namespace, completion)) = loaded.borrow().get(&key) {
+            let object = |root| {
+                agent
+                    .rooted(root)
+                    .and_then(Value::as_object)
+                    .expect("cached module")
+            };
+            return Ok((object(namespace), object(completion)));
+        }
+        let limits = GraphLimits::default();
+        if loaded.borrow().len() >= limits.max_modules {
+            return Err(agent.throw(ErrorKind::RangeError, "module cache limit exceeded"));
+        }
+        let graph = load_fixture_graph(&root, key.clone(), &limits, None).map_err(|error| {
+            let kind = match error {
+                GraphError::Parse(_) | GraphError::UnresolvedExport { .. } => {
+                    ErrorKind::SyntaxError
+                }
+                _ => ErrorKind::TypeError,
+            };
+            agent.throw(kind, &format!("{error:?}"))
+        })?;
+        let (namespace, completion) = evaluate_fixture_graph(agent, &graph, &limits, &loaded)
+            .map_err(|error| match error {
+                ModuleEvalError::Runtime(abrupt) => abrupt,
+                ModuleEvalError::Compile {
+                    error: CompileError::OutOfMemory,
+                    ..
+                } => Abrupt::OutOfMemory,
+                other => agent.throw(ErrorKind::SyntaxError, &other.to_string()),
+            })?;
+        if !loaded.borrow().contains_key(&key) {
+            cache_fixture(agent, &loaded, key, namespace, completion)?;
+        }
+        Ok((namespace, completion))
+    })));
+    cache
 }
 
 const UNSUPPORTED_ATTRIBUTES: &str = "unsupported Test262 module attributes";
@@ -537,6 +681,13 @@ fn execute_mode(
     // unless the test asks for one that may not.
     agent.set_can_block(!meta.cannot_block);
     install_host_object(&mut agent).map_err(|_| "no memory for $262")?;
+    if let TestMode::Script {
+        fixture: Some((path, root)),
+        ..
+    } = mode
+    {
+        install_fixture_loader(&mut agent, root, path);
+    }
     if meta.is_async {
         // `doneprintHandle.js` reports through the host's `print`; keep
         // what it prints on the function itself.
@@ -564,10 +715,10 @@ fn execute_mode(
         }
     }
     let result = match mode {
-        TestMode::Script { strict: true } => agent
+        TestMode::Script { strict: true, .. } => agent
             .evaluate(&format!("\"use strict\";\n{text}"))
             .map_err(TestError::from),
-        TestMode::Script { strict: false } => agent.evaluate(text).map_err(TestError::from),
+        TestMode::Script { strict: false, .. } => agent.evaluate(text).map_err(TestError::from),
         TestMode::Module { path, root } => execute_module(&mut agent, text, path, root),
     };
     // A microtask checkpoint after evaluation, as a host runs one.
@@ -806,7 +957,7 @@ fn execute_tree_with(
             .collect();
         let relative = relative.join("/");
         let verdict = if !modules_only {
-            execute(&text, &meta, &harness, limits)
+            execute_script(&text, &meta, &harness, limits, Some((path, &root)))
         } else if meta.unsupported() {
             Verdict::Skip("proposal")
         } else {

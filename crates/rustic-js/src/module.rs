@@ -3,9 +3,12 @@
 use std::collections::HashMap;
 
 mod asynchronous;
+mod dynamic;
 mod evaluate;
 mod graph;
 pub(crate) use asynchronous::AsyncModuleGraph;
+pub use dynamic::DynamicImport;
+pub(crate) use dynamic::{ImportJob, ImportLoader};
 pub use evaluate::ModuleEvalError;
 pub(crate) use evaluate::ModuleInstance;
 pub use graph::{
@@ -27,6 +30,14 @@ pub struct ModuleRequest {
 }
 
 impl ModuleRequest {
+    pub(super) fn dynamic(specifier: Vec<u16>, mut attributes: Vec<(Vec<u16>, Vec<u16>)>) -> Self {
+        attributes.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        Self {
+            specifier,
+            attributes,
+        }
+    }
+
     /// The specifier as written, before host resolution.
     pub fn specifier(&self) -> &[u16] {
         &self.specifier

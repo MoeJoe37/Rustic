@@ -49,3 +49,12 @@ lexical reads, key ordering, property descriptors, and reachability under GC
 stress. Async regressions add sibling execution, resumption after host-driven
 promise resolution and rejection across cycles. Revisit instance lifetime when
 host-driven dynamic imports can reuse previously loaded modules.
+
+## Dynamic import
+
+Dynamic imports queue a host loader job. The job traces its promise, request
+and referrer until it runs. The fixture host caches namespaces and cycle
+completion promises using host roots for the lifetime of each test agent.
+A namespace keeps its environment alive even when it has no local exports.
+The loader reuses that environment and waits on its existing completion
+promise when a later graph includes the same module.

@@ -383,7 +383,7 @@ impl Marker<'_> {
                 self.value(primitive);
             }
             match &extra.internal {
-                None => {}
+                None | Some(Internal::ImportRequest(_)) => {}
                 Some(Internal::Host(data)) => self.hosts.push(*data),
                 Some(Internal::Iterator { target, kind, .. }) => {
                     self.value(*target);
@@ -445,7 +445,8 @@ impl Marker<'_> {
                     }
                 }
                 Some(Internal::Arguments { env, .. }) => self.env(*env),
-                Some(Internal::ModuleNamespace(exports)) => {
+                Some(Internal::ModuleNamespace(exports, env)) => {
+                    self.env(*env);
                     for &(key, binding) in exports.iter() {
                         if let PropertyKey::String(name) = key {
                             self.string(name);
@@ -502,7 +503,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
             Some(Internal::Arguments { slots, .. }) => 4 * slots.len(),
-            Some(Internal::ModuleNamespace(exports)) => std::mem::size_of_val(exports.as_ref()),
+            Some(Internal::ModuleNamespace(exports, _)) => std::mem::size_of_val(exports.as_ref()),
             Some(Internal::ArrayBuffer(data)) => data.bytes.as_ref().map_or(0, Vec::len),
             Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Helper(helper)) => {
@@ -519,6 +520,7 @@ fn object_footprint(object: &Object) -> usize {
                         * (promise.fulfill_reactions.len() + promise.reject_reactions.len())
             }
             Some(Internal::ModuleEvaluation(graph)) => graph.footprint(),
+            Some(Internal::ImportRequest(request)) => request.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
             Some(Internal::RegExp { matcher, .. }) => matcher.footprint(),
             Some(Internal::Registry { cells, pending }) => {

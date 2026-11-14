@@ -129,10 +129,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,476 | 17,119 |
-| Fail | 951 | 1,455 |
+| Pass | 21,920 | 17,119 |
+| Fail | 507 | 1,455 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 95.8% | 92.2% |
+| Pass rate of the files that run | 97.7% | 92.2% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -174,7 +174,6 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 
 Most `test/language` failures are not interpreter bugs yet:
 
-- About 440 are dynamic `import()` files (modules, JS-06).
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
 - Modules account for most of the rest. The real assertion failures left are mostly parameter TDZ in
@@ -695,16 +694,21 @@ budget and the agent heap budget.
 promise. Top-level `await` and `for await` use the existing promise jobs and
 suspended frames. An asynchronous dependency delays its importers while
 independent siblings can run immediately. The host drives microtask checkpoints
-and roots the returned handles across collection. Dynamic imports remain open
-under TD-97.
+and roots the returned handles across collection.
+
+`import()` converts the specifier and options in the calling VM, then queues
+the request for the explicit host loader. It resolves to the namespace only
+after evaluation completes. The Test262 host caches evaluated and in-flight
+modules by canonical fixture path and type. It reuses their live bindings
+and completion promises across overlapping graphs.
 
 The Test262 module runner selects files flagged `module`, reads relative
 JavaScript, JSON and text fixtures within the checkout, and distinguishes parse, resolution
 and runtime failures. It uses the same harness, heap and step budgets as
 the script runner. At revision `48221d7c1f7745dc13e420a2e850a248c0b2afb4`,
-817 module files were selected. Of the 696 executed, 647 passed and 49
-failed. The remaining 121 were skipped for proposal features. Dynamic imports
-account for 44 failures and byte imports for five. All verdicts are pinned in
+817 module files were selected. Of the 696 executed, 691 passed and five
+failed. The remaining 121 were skipped for proposal features. The five failures
+require byte imports with immutable ArrayBuffers. All verdicts are pinned in
 `tests/fixtures/test262_modules.txt`.
 
 `ModuleGraph::load_sources` accepts JSON and text as synthetic modules with a

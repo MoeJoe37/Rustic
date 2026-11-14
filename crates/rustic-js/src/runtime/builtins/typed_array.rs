@@ -119,7 +119,7 @@ fn element_set(agent: &mut Agent, view: &View, n: f64, value: Value) -> JsResult
     let bits = agent.element_bits(view.kind, value)?;
     if let Some(index) = valid_index(agent, view, n) {
         let size = view.kind.size();
-        agent.buffer_write(view.buffer, view.offset + index * size, size, bits);
+        agent.buffer_write(view.buffer, view.offset + index * size, size, bits)?;
     }
     Ok(())
 }
@@ -139,7 +139,10 @@ pub(crate) fn get_own_property(
         return Ok(None);
     }
     let value = element_get(agent, &view, n)?;
-    Ok(Some(PropertyDescriptor::data(value)))
+    let writable = !agent.buffer_is_immutable(view.buffer);
+    Ok(Some(PropertyDescriptor::data_with(
+        value, writable, true, writable,
+    )))
 }
 
 pub(crate) fn has_property(agent: &mut Agent, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
@@ -160,6 +163,18 @@ pub(crate) fn define_own_property(
         return agent.ordinary_define_own_property(o, key, desc);
     };
     let view = view_of(agent, o).expect("a typed array");
+    if agent.buffer_is_immutable(view.buffer) {
+        let Some(current) = get_own_property(agent, o, key)? else {
+            return Ok(false);
+        };
+        return Ok(desc.configurable != Some(true)
+            && desc.enumerable != Some(false)
+            && desc.writable != Some(true)
+            && !desc.is_accessor()
+            && desc.value.is_none_or(|value| {
+                agent.same_value(value, current.value.expect("data descriptor"))
+            }));
+    }
     if valid_index(agent, &view, n).is_none()
         || desc.configurable == Some(false)
         || desc.enumerable == Some(false)
@@ -198,6 +213,9 @@ pub(crate) fn set(
         return agent.set_from(o, key, value, receiver, true);
     };
     let view = view_of(agent, o).expect("a typed array");
+    if agent.buffer_is_immutable(view.buffer) {
+        return Ok(false);
+    }
     if receiver == Value::object(o) {
         element_set(agent, &view, n, value)?;
         return Ok(true);
@@ -265,6 +283,25 @@ fn allocate(agent: &mut Agent, prototype: ObjectId, view: View) -> JsResult<Obje
         length: view.length,
     });
     Ok(agent.heap.alloc_object(object)?)
+}
+
+impl Agent {
+    pub(crate) fn immutable_byte_array(&mut self, bytes: &[u8]) -> JsResult<Value> {
+        let buffer = self.immutable_bytes_buffer(bytes)?;
+        let kind = ElementKind::Uint8;
+        let prototype = self.intrinsics.typed_array_prototypes[kind.index()];
+        let array = allocate(
+            self,
+            prototype,
+            View {
+                buffer,
+                kind,
+                offset: 0,
+                length: Some(bytes.len()),
+            },
+        )?;
+        Ok(Value::object(array))
+    }
 }
 
 /// A new typed array of `length` zero elements with its own buffer
@@ -494,7 +531,7 @@ fn copy_elements(
                 target.offset + (target_at + i) * target_size,
                 target_size,
                 u64::from_le_bytes(raw),
-            );
+            )?;
         }
         return Ok(());
     }
@@ -515,7 +552,7 @@ fn copy_elements(
             target.offset + (target_at + i) * target_size,
             target_size,
             bits,
-        );
+        )?;
     }
     Ok(())
 }
@@ -808,6 +845,7 @@ fn at(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 
 fn copy_within(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let (_, view, length) = validate(agent, this)?;
+    agent.require_mutable_buffer(view.buffer)?;
     let to = clamp_relative(agent, arg(args, 0), length, 0)?;
     let from = clamp_relative(agent, arg(args, 1), length, 0)?;
     let end = clamp_relative(agent, arg(args, 2), length, length)?;
@@ -917,6 +955,7 @@ fn find_last_index(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<V
 
 fn fill(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let (_, view, length) = validate(agent, this)?;
+    agent.require_mutable_buffer(view.buffer)?;
     let bits = agent.element_bits(view.kind, arg(args, 0))?;
     let start = clamp_relative(agent, arg(args, 1), length, 0)?;
     let end = clamp_relative(agent, arg(args, 2), length, length)?;
@@ -925,7 +964,7 @@ fn fill(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     };
     let size = view.kind.size();
     for k in start..end.min(length) {
-        agent.buffer_write(view.buffer, view.offset + k * size, size, bits);
+        agent.buffer_write(view.buffer, view.offset + k * size, size, bits)?;
     }
     Ok(this)
 }
@@ -1146,14 +1185,15 @@ fn reduce_right(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
 
 fn reverse(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let (_, view, length) = validate(agent, this)?;
+    agent.require_mutable_buffer(view.buffer)?;
     let size = view.kind.size();
     let at = |k: usize| view.offset + k * size;
     for lower in 0..length / 2 {
         let upper = length - 1 - lower;
         let a = agent.buffer_read(view.buffer, at(lower), size);
         let b = agent.buffer_read(view.buffer, at(upper), size);
-        agent.buffer_write(view.buffer, at(lower), size, b);
-        agent.buffer_write(view.buffer, at(upper), size, a);
+        agent.buffer_write(view.buffer, at(lower), size, b)?;
+        agent.buffer_write(view.buffer, at(upper), size, a)?;
     }
     Ok(this)
 }
@@ -1166,6 +1206,7 @@ fn set_method(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value>
     if offset < 0.0 {
         return range_error(agent, "%TypedArray%.prototype.set: the offset is negative");
     }
+    agent.require_mutable_buffer(view.buffer)?;
     let Some(target_length) = length_of(agent, &view) else {
         return agent.type_error("the typed array is detached or out of the bounds of its buffer");
     };
@@ -1235,7 +1276,7 @@ fn slice(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             let bytes = (count * size).min(target_length * size);
             for i in 0..bytes {
                 let byte = agent.buffer_read(view.buffer, view.offset + start * size + i, 1);
-                agent.buffer_write(target_view.buffer, target_view.offset + i, 1, byte);
+                agent.buffer_write(target_view.buffer, target_view.offset + i, 1, byte)?;
             }
         } else {
             for (n, k) in (start..end).enumerate() {
@@ -1332,7 +1373,8 @@ fn sorted_values(
 
 fn sort(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let compare = comparator(agent, args, "sort")?;
-    let (o, _, length) = validate(agent, this)?;
+    let (o, view, length) = validate(agent, this)?;
+    agent.require_mutable_buffer(view.buffer)?;
     let sorted = sorted_values(agent, o, length, compare)?;
     for (k, value) in sorted.into_iter().enumerate() {
         // A comparator may have shrunk the array; such writes do nothing.

@@ -1414,7 +1414,7 @@ Module environments, live bindings, namespace objects and synchronous bytecode
 evaluation are implemented in JS-06. Each module now lazily creates its own
 `import.meta` object when the host supplies no properties. A host can provide
 string metadata when it instantiates the graph. The dynamic import portion
-is paid. Remaining byte module coverage is tracked under TD-105.
+is paid. Remaining host conformance is tracked under TD-105.
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1512,13 +1512,12 @@ captures one variable costs 64 bytes instead of 112.
 The script runner preserves its exact passing lists for `test/language`
 and the installed areas of `test/built-ins`. The separate module runner
 (JS-07) pins pass, fail and skip verdicts for the 817 files flagged
-`module` in `test/language`. Of the 696 executed, 691 pass. Byte imports requiring
-immutable ArrayBuffer account for the five failures.
+`module` in `test/language`. All 696 executed files pass.
 The remaining 121 use proposal features. See the
 [Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
 and reproduction commands.
 
-Pay with byte fixtures and `$262` with
+Pay with `$262` support for
 realms, collection and test agents. `$262.evalScript` now runs UTF-16
 script source against the current global environment. Extend the built-in gate
 when new library areas land. Trigger on each implementation.

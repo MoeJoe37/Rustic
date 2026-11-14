@@ -1546,3 +1546,12 @@ and the import promise waits for the loaded module's completion promise.
 The Test262 fixture host reuses pending and evaluated instances across graphs.
 The pinned gates gain 44 module passes and 444 script passes. The five
 remaining module failures require byte fixtures with immutable buffers.
+
+## JS-06 — Byte modules
+
+Byte sources export a Uint8Array backed by immutable storage. Aliases cannot
+write or detach the buffer through indexed properties, typed array methods,
+DataView, Atomics or transfer. The ArrayBuffer immutable accessor increases
+the standard-library heap report by 286 bytes. The module gate passes all 696
+executed files, with 121 proposal skips. The immutable accessor also adds
+four passing built-in cases.

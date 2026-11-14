@@ -3136,74 +3136,77 @@
           "label": "Modules and host loading hooks",
           "size": 3,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Static module records and bounded host-loaded dependency and export resolution",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/module.rs",
-                  "marker": "pub struct ModuleRecord"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/module/graph.rs",
-                  "marker": "pub struct ModuleGraph"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/module.rs",
-                  "marker": "static_graph_resolves_cycles_and_same_binding_diamonds"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/module.rs",
-                  "marker": "static_graph_enforces_host_policy_and_exact_budgets"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/module.rs",
+              "marker": "pub struct ModuleRecord"
             },
             {
-              "label": "Module environments, live bindings, namespace objects and bytecode evaluation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/module/evaluate.rs",
-                  "marker": "pub fn evaluate_module_graph"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/exotic.rs",
-                  "marker": "fn namespace_value"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/module.rs",
-                  "marker": "modules_share_live_bindings_and_evaluate_each_dependency_once"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/module.rs",
-                  "marker": "cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/module/evaluate.rs",
-                  "marker": "pub fn evaluate_module_graph_with_metadata"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/module.rs",
-                  "marker": "import_meta_metadata_obeys_the_graph_work_limit"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/graph.rs",
+              "marker": "pub struct ModuleGraph"
             },
             {
-              "label": "Top-level await, dynamic imports and the module Test262 gate",
-              "status": "planned"
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "static_graph_resolves_cycles_and_same_binding_diamonds"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "static_graph_enforces_host_policy_and_exact_budgets"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/evaluate.rs",
+              "marker": "pub fn evaluate_module_graph"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/exotic.rs",
+              "marker": "fn namespace_value"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "modules_share_live_bindings_and_evaluate_each_dependency_once"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/evaluate.rs",
+              "marker": "pub fn evaluate_module_graph_with_metadata"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "import_meta_metadata_obeys_the_graph_work_limit"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/evaluate.rs",
+              "marker": "pub fn start_module_evaluation"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/module/dynamic.rs",
+              "marker": "pub fn set_dynamic_import_loader"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/module.rs",
+              "marker": "fn byte_modules_expose_read_only_shared_data"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/fixtures/test262_modules.txt",
+              "marker": "696 pass, 0 fail, 121 skipped"
             }
           ]
         },

@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17119 pass, 1455 fail, 111 skipped (modules, proposals).
+# 17123 pass, 1451 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -3061,6 +3061,10 @@ ArrayBuffer/prototype/detached/this-has-no-arraybufferdata-internal.js
 ArrayBuffer/prototype/detached/this-is-not-object.js
 ArrayBuffer/prototype/detached/this-is-sharedarraybuffer-resizable.js
 ArrayBuffer/prototype/detached/this-is-sharedarraybuffer.js
+ArrayBuffer/prototype/immutable/prop-desc.js
+ArrayBuffer/prototype/immutable/this-has-no-arraybufferdata-internal.js
+ArrayBuffer/prototype/immutable/this-is-not-object.js
+ArrayBuffer/prototype/immutable/this-is-sharedarraybuffer.js
 ArrayBuffer/prototype/maxByteLength/detached-buffer.js
 ArrayBuffer/prototype/maxByteLength/invoked-as-accessor.js
 ArrayBuffer/prototype/maxByteLength/invoked-as-func.js

@@ -1,6 +1,6 @@
 # Test262 test/language files flagged module (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 691 pass, 5 fail, 121 skipped (proposals).
+# 696 pass, 0 fail, 121 skipped (proposals).
 # Regenerate with the example command in docs/JS.md.
 comments/hashbang/module.js	pass
 eval-code/direct/export.js	pass
@@ -100,11 +100,11 @@ import/import-attributes/text-javascript.js	pass
 import/import-attributes/text-self.js	pass
 import/import-attributes/text-string.js	pass
 import/import-attributes/text-via-namespace.js	pass
-import/import-bytes/bytes-from-empty.js	fail
-import/import-bytes/bytes-from-js.js	fail
-import/import-bytes/bytes-from-json.js	fail
-import/import-bytes/bytes-from-png.js	fail
-import/import-bytes/bytes-from-txt.js	fail
+import/import-bytes/bytes-from-empty.js	pass
+import/import-bytes/bytes-from-js.js	pass
+import/import-bytes/bytes-from-json.js	pass
+import/import-bytes/bytes-from-png.js	pass
+import/import-bytes/bytes-from-txt.js	pass
 import/import-defer/deferred-namespace-object/exotic-object-behavior.js	skip
 import/import-defer/deferred-namespace-object/identity.js	skip
 import/import-defer/deferred-namespace-object/json-module.js	skip

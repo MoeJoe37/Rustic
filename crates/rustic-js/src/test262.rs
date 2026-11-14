@@ -497,6 +497,19 @@ fn load_fixture_graph(
                     return Ok(ModuleSource::JavaScript(input.clone()));
                 }
             }
+            if key.1 == FixtureKind::Bytes {
+                let mut bytes = Vec::new();
+                std::fs::File::open(&key.0)
+                    .and_then(|file| {
+                        file.take(limits.max_source_units as u64 + 1)
+                            .read_to_end(&mut bytes)
+                    })
+                    .map_err(|error| format!("read module fixture: {error}"))?;
+                if bytes.len() > limits.max_source_units {
+                    return Err("module is too large".into());
+                }
+                return Ok(ModuleSource::Bytes(bytes));
+            }
             let max_bytes = 3 * limits.max_source_units;
             let mut source = String::new();
             std::fs::File::open(&key.0)
@@ -511,6 +524,7 @@ fn load_fixture_graph(
                 FixtureKind::JavaScript => ModuleSource::JavaScript(source),
                 FixtureKind::Json => ModuleSource::Json(source),
                 FixtureKind::Text => ModuleSource::Text(source),
+                FixtureKind::Bytes => unreachable!("byte fixtures use raw input"),
             })
         },
     )
@@ -619,6 +633,7 @@ enum FixtureKind {
     JavaScript,
     Json,
     Text,
+    Bytes,
 }
 
 fn resolve_fixture(
@@ -633,6 +648,8 @@ fn resolve_fixture(
                 FixtureKind::Json
             } else if value.iter().copied().eq("text".encode_utf16()) {
                 FixtureKind::Text
+            } else if value.iter().copied().eq("bytes".encode_utf16()) {
+                FixtureKind::Bytes
             } else {
                 return Err(UNSUPPORTED_ATTRIBUTES.into());
             }

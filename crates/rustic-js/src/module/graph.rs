@@ -12,12 +12,15 @@ pub enum ModuleSource {
     Json(Source),
     /// Uninterpreted UTF-16 text for a synthetic default export.
     Text(Source),
+    /// Raw bytes for a synthetic immutable Uint8Array default export.
+    Bytes(Vec<u8>),
 }
 
 impl ModuleSource {
     fn len(&self) -> usize {
         match self {
             Self::JavaScript(source) | Self::Json(source) | Self::Text(source) => source.len(),
+            Self::Bytes(bytes) => bytes.len(),
         }
     }
 }

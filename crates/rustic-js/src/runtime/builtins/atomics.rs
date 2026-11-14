@@ -152,7 +152,7 @@ fn read_modify_write(
     let size = view.kind.size();
     let old = agent.buffer_read(view.buffer, at, size);
     // `buffer_write` keeps the low `size` bytes, which is the wrap.
-    agent.buffer_write(view.buffer, at, size, op(old, operand));
+    agent.buffer_write(view.buffer, at, size, op(old, operand))?;
     agent.element_value(view.kind, old)
 }
 
@@ -184,6 +184,7 @@ fn exchange(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 /// bytes, so `expected` wraps the way a stored value would.
 fn compare_exchange(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let view = validate(agent, arg(args, 0), false)?;
+    agent.require_mutable_buffer(view.buffer)?;
     let at = access(agent, &view, arg(args, 1))?;
     let (_, expected) = operand(agent, view.kind, arg(args, 2))?;
     let (_, replacement) = operand(agent, view.kind, arg(args, 3))?;
@@ -196,7 +197,7 @@ fn compare_exchange(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Val
     };
     let old = agent.buffer_read(view.buffer, at, size);
     if old == expected & mask {
-        agent.buffer_write(view.buffer, at, size, replacement);
+        agent.buffer_write(view.buffer, at, size, replacement)?;
     }
     agent.element_value(view.kind, old)
 }
@@ -222,7 +223,7 @@ fn store(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let at = access(agent, &view, arg(args, 1))?;
     let (value, bits) = operand(agent, view.kind, arg(args, 2))?;
     revalidate(agent, &view, at)?;
-    agent.buffer_write(view.buffer, at, view.kind.size(), bits);
+    agent.buffer_write(view.buffer, at, view.kind.size(), bits)?;
     Ok(value)
 }
 

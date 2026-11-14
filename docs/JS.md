@@ -129,8 +129,8 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,920 | 17,119 |
-| Fail | 507 | 1,455 |
+| Pass | 21,920 | 17,123 |
+| Fail | 507 | 1,451 |
 | Skipped (modules, proposals) | 1,405 | 111 |
 | Pass rate of the files that run | 97.7% | 92.2% |
 
@@ -703,17 +703,16 @@ modules by canonical fixture path and type. It reuses their live bindings
 and completion promises across overlapping graphs.
 
 The Test262 module runner selects files flagged `module`, reads relative
-JavaScript, JSON and text fixtures within the checkout, and distinguishes parse, resolution
+JavaScript, JSON, text and byte fixtures within the checkout, and distinguishes parse, resolution
 and runtime failures. It uses the same harness, heap and step budgets as
 the script runner. At revision `48221d7c1f7745dc13e420a2e850a248c0b2afb4`,
-817 module files were selected. Of the 696 executed, 691 passed and five
-failed. The remaining 121 were skipped for proposal features. The five failures
-require byte imports with immutable ArrayBuffers. All verdicts are pinned in
+817 module files were selected. Of the 696 executed, all 696 passed. The remaining 121 were skipped for proposal features. All verdicts are pinned in
 `tests/fixtures/test262_modules.txt`.
 
-`ModuleGraph::load_sources` accepts JSON and text as synthetic modules with a
+`ModuleGraph::load_sources` accepts JSON, text and bytes as synthetic modules with a
 single default export. JSON uses the engine's JSON parser and invalid input
-fails before any module body executes. Text becomes an exact UTF-16 string.
+fails before any module body executes. Text becomes an exact UTF-16 string. Byte imports produce a Uint8Array
+backed by an immutable ArrayBuffer.
 Every import of the same resolved key shares the same binding and value.
 
 ```sh
@@ -774,7 +773,7 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (110,864; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  (111,150; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
   installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.

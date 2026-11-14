@@ -250,6 +250,7 @@ impl Agent {
                         ModuleSource::Text(source) => {
                             self.string_from(JsStr::from_units(source.units()))?
                         }
+                        ModuleSource::Bytes(bytes) => self.immutable_byte_array(bytes)?,
                         ModuleSource::JavaScript(_) => {
                             unreachable!("only synthetic module data is stored")
                         }

@@ -712,3 +712,44 @@ fn dynamic_import_preserves_referrer_attributes_and_pending_evaluation() {
     assert!(agent.unroot(root));
     assert!(agent.unroot(import_root));
 }
+
+#[test]
+fn byte_modules_expose_read_only_shared_data() {
+    use rustic_js::module::{GraphLimits, ModuleGraph, ModuleSource};
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = ModuleGraph::load_sources(
+        "entry",
+        &limits,
+        |_, _| Ok::<_, ()>("bytes"),
+        |key| Ok(if *key == "entry" {
+            ModuleSource::JavaScript(Source::from_str_limited(r#"
+                import view from 'bytes' with { type: 'bytes' };
+                import * as ns from 'bytes' with { type: 'bytes' };
+                const buffer = view.buffer;
+                const alias = new Uint8Array(buffer);
+                const data = new DataView(buffer);
+                const rejected = f => { try { f(); return false } catch (e) { return e instanceof TypeError } };
+                export const valid = ns.default === view && buffer.immutable
+                    && !Reflect.set(alias, '0', 1)
+                    && !Reflect.defineProperty(alias, '0', { value: 1 })
+                    && rejected(() => data.setUint8(0, 1))
+                    && rejected(() => alias.copyWithin(0, 1))
+                    && rejected(() => alias.fill(1))
+                    && rejected(() => alias.reverse())
+                    && rejected(() => alias.set([1]))
+                    && rejected(() => Atomics.store(alias, 0, 1))
+                    && rejected(() => buffer.transfer())
+                    && alias[0] === 255 && alias[1] === 128;
+            "#, 8_192).unwrap())
+        } else {
+            ModuleSource::Bytes(vec![255, 128])
+        }),
+    ).unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let key = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, key), Ok(Value::TRUE));
+}

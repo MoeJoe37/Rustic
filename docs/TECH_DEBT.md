@@ -1544,10 +1544,10 @@ JavaScript share the canonical tables and normalization code in
 `rustic-base`. JavaScript also uses compatibility mappings and preserves
 lone surrogates.
 
-`localeCompare` compares code points, and
-`toLocaleUpperCase`/`toLocaleLowerCase` ignore their locale. Pay with
-collation and locale casing in Intl (JS-08). Trigger: locale-sensitive
-string conformance or the first page that depends on it.
+`Intl.getCanonicalLocales` canonicalizes locale lists. Locale casing applies
+Azerbaijani, Lithuanian and Turkish rules, using default Unicode casing
+for other languages. `localeCompare` still compares code points. Pay with
+locale negotiation and collation in Intl (JS-08).
 
 ### TD-108 — Date local time is a fixed offset
 

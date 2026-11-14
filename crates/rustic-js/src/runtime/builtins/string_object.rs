@@ -48,8 +48,8 @@ const PROTOTYPE_METHODS: &[Method] = &[
     method("startsWith", starts_with, 1),
     method("substr", substr, 2),
     method("substring", substring, 2),
-    method("toLocaleLowerCase", to_lower_case, 0),
-    method("toLocaleUpperCase", to_upper_case, 0),
+    method("toLocaleLowerCase", to_locale_lower_case, 0),
+    method("toLocaleUpperCase", to_locale_upper_case, 0),
     method("toLowerCase", to_lower_case, 0),
     method("toUpperCase", to_upper_case, 0),
     method("toWellFormed", to_well_formed, 0),
@@ -631,6 +631,18 @@ fn to_lower_case(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value>
 fn to_upper_case(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let s = this_units(agent, this)?;
     make(agent, &map_case(&s, true))
+}
+
+fn to_locale_lower_case(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let units = this_units(agent, this)?;
+    let units = super::intl::locale_case_input(agent, units, arg(args, 0), false)?;
+    make(agent, &map_case(&units, false))
+}
+
+fn to_locale_upper_case(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let units = this_units(agent, this)?;
+    let units = super::intl::locale_case_input(agent, units, arg(args, 0), true)?;
+    make(agent, &map_case(&units, true))
 }
 
 // ---- regular-expression entry points ------------------------------------------

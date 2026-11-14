@@ -1832,6 +1832,26 @@ fn unsupported_syntax_is_reported_not_miscompiled() {
     ));
 }
 
+#[test]
+fn intl_canonicalizes_locale_lists_and_tailors_case() {
+    let mut agent = Agent::new().unwrap();
+    let script = r#"
+        const tags = Intl.getCanonicalLocales(['DE-de', 'de-DE', 'iw-IL', 'hy-SU',
+                     'sl-rozaj-biske-1994', 'EN-u-NU-LATN-CA-GREGORY', 'sh']);
+        let invalid;
+        try { 'I'.toLocaleLowerCase(['tr', 'en--US']); } catch (e) { invalid = e instanceof RangeError }
+        const tailored = 'I\u0325\u0307'.toLocaleLowerCase('tr') === 'i\u0325'
+            && 'I'.toLocaleLowerCase('az') === '\u0131'
+            && 'i'.toLocaleUpperCase('tr') === '\u0130'
+            && 'I\u0301'.toLocaleLowerCase('lt') === 'i\u0307\u0301'
+            && 'i\u0307'.toLocaleUpperCase('lt') === 'I'
+            && ('I\uD800').toLocaleLowerCase('tr').charCodeAt(1) === 0xD800;
+        tags.join('|') === 'de-DE|he-IL|hy-AM|sl-1994-biske-rozaj|en-u-ca-gregory-nu-latn|sr-Latn'
+            && invalid && tailored;
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}
+
 /// An agent with a global `Symbol` holding the well-known symbols, which
 /// the library (JS-05) will provide for real.
 fn agent_with_symbols() -> Agent {

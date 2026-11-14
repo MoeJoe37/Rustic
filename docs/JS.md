@@ -773,7 +773,7 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (111,150; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  (111,649; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
   installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
@@ -991,3 +991,32 @@ start to matter (`perf.startup`, M12); the JS-09 heap report tracks the size.
 With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
 and with the part 2 pieces above to 70.0%. Eval took it to 73.6% and
 generators to 90.8%.
+
+## Intl locale identifiers and casing (JS-08)
+
+`Intl.getCanonicalLocales` validates and deduplicates locale lists in request
+order. The parser implements Unicode BCP 47 locale identifiers, canonical
+casing and ordering, CLDR language, region and extension aliases, and
+likely-region selection for deprecated territories. Locale-sensitive case
+conversion applies the Unicode special casing rules for Azerbaijani,
+Lithuanian and Turkish while preserving lone UTF-16 surrogates.
+
+The pinned Intl selection covers `Intl/getCanonicalLocales` and both
+`String.prototype.toLocale*Case` directories. It passes 46 of 47 files.
+The remaining case requires `Intl.Locale`. Locale negotiation for Intl
+services and locale-sensitive collation remain open under TD-107.
+
+The data generator takes `supplementalMetadata.xml`, `likelySubtags.xml` and the
+listed `bcp47/` XML files from [CLDR release 48], plus Unicode 17.0.0
+`PropList.txt`. The script verifies their SHA-256 digests and checks the
+generated Rust with the pinned formatter. The [Unicode license notice]
+covers the generated tables.
+
+[CLDR release 48]: https://github.com/unicode-org/cldr/tree/release-48/common
+[Unicode license notice]: ../crates/rustic-js/data/CLDR-LICENSE.txt
+
+```sh
+python3 tools/generate_js_locale_data.py /path/to/pinned/locale-inputs --check
+RUSTIC_TEST262_DIR=/path/to/test262 cargo test --locked --release -p rustic-js \
+  --test test262 test262_locale_identifiers_and_case_mapping -- --ignored
+```

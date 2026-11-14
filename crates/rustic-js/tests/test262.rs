@@ -19,6 +19,7 @@ const PASSING: &str = include_str!("fixtures/test262_language_passing.txt");
 const BUILT_INS_PASSING: &str = include_str!("fixtures/test262_built_ins_passing.txt");
 
 const MODULE_VERDICTS: &str = include_str!("fixtures/test262_modules.txt");
+const INTL_PASSING: &str = include_str!("fixtures/test262_intl_passing.txt");
 
 fn pinned_revision() -> &'static str {
     EXPECTED
@@ -228,6 +229,22 @@ fn test262_built_ins_execution_matches_the_passing_list() {
         BUILT_INS_PASSING,
         "test262_built_ins_passing.txt",
         "Test262 test/built-ins files that pass when executed (JS-05).",
+    );
+}
+
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
+    check_trees(
+        &[
+            "test/intl402/Intl/getCanonicalLocales",
+            "test/intl402/String/prototype/toLocaleLowerCase",
+            "test/intl402/String/prototype/toLocaleUpperCase",
+        ],
+        "test/intl402/",
+        INTL_PASSING,
+        "test262_intl_passing.txt",
+        "Test262 Intl locale identifiers and casing (JS-08).",
     );
 }
 

@@ -1555,3 +1555,11 @@ DataView, Atomics or transfer. The ArrayBuffer immutable accessor increases
 the standard-library heap report by 286 bytes. The module gate passes all 696
 executed files, with 121 proposal skips. The immutable accessor also adds
 four passing built-in cases.
+
+## JS-08 — Locale identifiers and language-sensitive case conversion
+
+`Intl.getCanonicalLocales` uses bounded locale-list traversal and pinned
+CLDR 48 alias data. String casing applies Unicode special rules for Azerbaijani,
+Lithuanian and Turkish. The selected Intl test262 gate passes 46 of 47 files.
+The `Intl` object and its initial method add 499 bytes to the agent heap report.
+Locale objects, locale negotiation and locale services remain open.

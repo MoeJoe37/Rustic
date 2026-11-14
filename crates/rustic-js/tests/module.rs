@@ -462,3 +462,72 @@ fn import_meta_is_lazy_and_distinct_for_each_module() {
     let valid = agent.heap.key("valid").unwrap();
     assert_eq!(agent.get(namespace, valid), Ok(Value::TRUE));
 }
+
+#[test]
+fn import_meta_uses_host_metadata_for_each_module() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, JsStr, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            (
+                "entry",
+                r#"
+                import { read } from 'dep';
+                import 'unused';
+                export const valid = read() === 'dep'
+                    && import.meta.url === 'entry'
+                    && Object.getPrototypeOf(import.meta) === null
+                    && Object.getOwnPropertyDescriptor(import.meta, 'url').enumerable;
+            "#,
+            ),
+            ("dep", "export function read() { return import.meta.url; }"),
+            ("unused", "export const value = 1;"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let mut visited = Vec::new();
+    let namespace = agent
+        .evaluate_module_graph_with_metadata(&graph, &limits, |key| {
+            visited.push(key.clone());
+            vec![
+                (JsStr::from_text("url"), JsStr::from_text("superseded")),
+                (JsStr::from_text("url"), JsStr::from_text(key)),
+            ]
+        })
+        .unwrap();
+    assert_eq!(visited, ["entry", "dep"]);
+    let valid = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, valid), Ok(Value::TRUE));
+}
+
+#[test]
+fn import_meta_metadata_obeys_the_graph_work_limit() {
+    use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError};
+    use rustic_js::runtime::{Agent, JsStr};
+
+    let graph = load(&[("entry", "import.meta;")], &GraphLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    let mut limits = GraphLimits {
+        max_resolution_steps: 2,
+        ..GraphLimits::default()
+    };
+    let properties = |_: &String| {
+        ["first", "second"].map(|name| (JsStr::from_text(name), JsStr::from_text("value")))
+    };
+    assert_eq!(
+        agent.evaluate_module_graph_with_metadata(&graph, &limits, properties),
+        Err(ModuleEvalError::Graph(GraphError::ResolutionLimit))
+    );
+    // Two metadata entries plus the entry module's export-name visit.
+    limits.max_resolution_steps = 3;
+    assert!(
+        agent
+            .evaluate_module_graph_with_metadata(&graph, &limits, properties)
+            .is_ok()
+    );
+}

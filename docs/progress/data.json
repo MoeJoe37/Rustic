@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "7ebf1f61d84b04674d96c00a7cb56f82682783052ad8e1df79ee9fc2da6c8f2f",
+  "source_fingerprint": "6b6dc9c53ce01a6b93edfa7ee565b92942d091a3ed77663952ea6daf27f16bc1",
   "percent": "28.21",
   "verified_percent": "25.69",
   "partial_percent": "2.52",
@@ -3540,6 +3540,16 @@
                   "kind": "test",
                   "path": "crates/rustic-js/tests/module.rs",
                   "marker": "cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module/evaluate.rs",
+                  "marker": "pub fn evaluate_module_graph_with_metadata"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "import_meta_metadata_obeys_the_graph_work_limit"
                 }
               ]
             },

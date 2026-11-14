@@ -77,18 +77,41 @@ impl Agent {
         graph: &ModuleGraph<K>,
         limits: &GraphLimits,
     ) -> Result<ObjectId, ModuleEvalError> {
+        self.evaluate_module_graph_with_metadata(graph, limits, |_| std::iter::empty())
+    }
+
+    /// Evaluate a static graph with host-provided `import.meta` string properties.
+    /// During instantiation, the callback receives the opaque key of each
+    /// module whose source references `import.meta`. Later properties replace
+    /// earlier ones with the same key. Each property consumes one resolution
+    /// step and its heap storage is charged to the agent.
+    pub fn evaluate_module_graph_with_metadata<K, I>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+        metadata: impl FnMut(&K) -> I,
+    ) -> Result<ObjectId, ModuleEvalError>
+    where
+        K: Clone + Eq + Hash,
+        I: IntoIterator<Item = (JsStr, JsStr)>,
+    {
         let start = self.vm.modules.len();
-        let result = self.evaluate_modules(graph, limits, start);
+        let result = self.evaluate_modules(graph, limits, start, metadata);
         self.vm.modules.truncate(start);
         result
     }
 
-    fn evaluate_modules<K: Clone + Eq + Hash>(
+    fn evaluate_modules<K, I>(
         &mut self,
         graph: &ModuleGraph<K>,
         limits: &GraphLimits,
         start: usize,
-    ) -> Result<ObjectId, ModuleEvalError> {
+        mut metadata: impl FnMut(&K) -> I,
+    ) -> Result<ObjectId, ModuleEvalError>
+    where
+        K: Clone + Eq + Hash,
+        I: IntoIterator<Item = (JsStr, JsStr)>,
+    {
         let count = graph.module_count();
         if count > limits.max_modules || graph.source_units() > limits.max_source_units {
             return Err(GraphError::GraphLimit.into());
@@ -97,11 +120,12 @@ impl Agent {
         let mut slots = Vec::with_capacity(count);
         for index in 0..count {
             self.check_module_cancellation(limits)?;
-            let (_, record) = graph.module(index).expect("loaded module");
+            let (key, record) = graph.module(index).expect("loaded module");
             let ModuleCode {
                 initialize,
                 body,
                 bindings,
+                metadata_slot,
             } = compile_module(self, record.program()).map_err(|error| {
                 ModuleEvalError::Compile {
                     module: index,
@@ -110,6 +134,19 @@ impl Agent {
             })?;
             let env = self.new_module_environment(&bindings)?;
             let namespace = self.new_module_namespace()?;
+            if let Some(slot) = metadata_slot {
+                let mut properties = metadata(key).into_iter().peekable();
+                if properties.peek().is_some() {
+                    let meta = self.new_object_with(None)?;
+                    for (name, value) in properties {
+                        super::graph::spend(limits, &mut remaining)?;
+                        let key = self.heap.key_for(&name)?;
+                        let value = self.string_from(value)?;
+                        self.create_data_property_or_throw(meta, key, value)?;
+                    }
+                    self.set_env_slot(env, slot, Value::object(meta));
+                }
+            }
             slots.push(
                 bindings
                     .iter()

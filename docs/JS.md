@@ -684,10 +684,13 @@ live data descriptors. Ambiguous star exports are omitted. Import slots and
 namespace properties trace their targets through garbage collection, and the
 host may keep a namespace alive with `Agent::root`. See [ADR 0019](adr/0019-static-module-evaluation.md).
 
-A module creates its null-prototype `import.meta` object on first access and
-shares it with its nested functions. The standalone evaluator provides an
-empty object that script can extend. Host-specific metadata, top-level await
-and dynamic imports remain open under TD-97.
+A module shares its null-prototype `import.meta` object with nested functions.
+By default, the evaluator creates the empty object on first access.
+`Agent::evaluate_module_graph_with_metadata` loads host-provided UTF-16 string
+properties during instantiation for modules that reference `import.meta`.
+The host receives each module's opaque key. Properties use the graph work
+budget and the agent heap budget. Top-level await and dynamic imports remain
+open under TD-97.
 
 The Test262 module runner selects files flagged `module`, reads relative
 JavaScript fixtures within the checkout, and distinguishes parse, resolution

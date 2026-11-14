@@ -3222,6 +3222,16 @@
                   "kind": "test",
                   "path": "crates/rustic-js/tests/module.rs",
                   "marker": "cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module/evaluate.rs",
+                  "marker": "pub fn evaluate_module_graph_with_metadata"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "import_meta_metadata_obeys_the_graph_work_limit"
                 }
               ]
             },

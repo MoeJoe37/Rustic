@@ -91,6 +91,7 @@ pub(crate) struct ModuleCode {
     pub(crate) initialize: CodeId,
     pub(crate) body: CodeId,
     pub(crate) bindings: Rc<Vec<(StringId, u8)>>,
+    pub(crate) metadata_slot: Option<u16>,
 }
 
 pub(crate) fn compile_module(agent: &mut Agent, program: &Program) -> CResult<ModuleCode> {
@@ -100,6 +101,9 @@ pub(crate) fn compile_module(agent: &mut Agent, program: &Program) -> CResult<Mo
     let mut init = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
     init.layout_scope(0)?;
     let bindings = Rc::clone(&init.scopes[0]);
+    let metadata_slot = tree.scopes[0]
+        .find(IMPORT_META)
+        .map(|index| init.slot_of(0, index));
     let undefined = init.temp()?;
     init.emit(Op::Undefined { dst: undefined });
     for (index, binding) in tree.scopes[0].bindings.iter().enumerate() {
@@ -130,6 +134,7 @@ pub(crate) fn compile_module(agent: &mut Agent, program: &Program) -> CResult<Mo
         initialize,
         body: body.finish(0, 0)?,
         bindings,
+        metadata_slot,
     })
 }
 

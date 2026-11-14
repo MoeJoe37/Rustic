@@ -1512,3 +1512,12 @@ attributes, including replacement of configurable accessors. See
 [JS.md](JS.md#test262-execution-js-07) and TD-105 for the pinned results and
 remaining hooks. The language gate adds nine passing cases, reaching 21,476
 of 22,427 executed files. Built-in and module verdicts are unchanged.
+
+## JS-06 — Host-provided module metadata
+
+The standalone graph evaluator can accept UTF-16 string properties keyed by
+the host's module identity. Each module that references `import.meta` sees its
+own metadata object, shared with nested functions and retained by the traced
+module environment. Each supplied property consumes graph work and heap
+storage. The default evaluator retains its lazy empty object. See
+[JS.md](JS.md#static-module-loading-js-06).

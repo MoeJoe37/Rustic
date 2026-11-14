@@ -1411,8 +1411,10 @@ generators with `for await` (JS-08 part 2) were paid the same day, and
 RegExp literals (JS-08 part 3) after them. JS-06 now loads and validates static dependency graphs through host callbacks.
 Module environments, live bindings, namespace objects and synchronous bytecode
 evaluation are implemented in JS-06. Each module now lazily creates its own
-`import.meta` object. Pay the remaining debt with top-level await, dynamic
-imports and host-provided metadata. Trigger: the module Test262 gate (JS-07).
+`import.meta` object when the host supplies no properties. A host can provide
+string metadata when it instantiates the graph. Pay the remaining execution
+debt with top-level await and dynamic imports. Trigger: the module Test262 gate
+(JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 

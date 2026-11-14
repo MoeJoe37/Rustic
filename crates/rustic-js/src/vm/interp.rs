@@ -22,10 +22,11 @@ use super::bytecode::{
 };
 use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
-    Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, BigIntBinary, BigIntUnary, Class, EnvId,
-    ErrorKind, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, JsResult,
-    Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference, ReferenceBase,
-    SameNumeric, ShapeId, StringId, Tracer, Value, iterator_result, same_numeric_types,
+    Abrupt, Agent, BINDING_IMPORT, BINDING_MUTABLE, BINDING_STRICT, BigIntBinary, BigIntUnary,
+    Class, EnvId, ErrorKind, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Generator, GeneratorState, Internal,
+    Job, JsResult, Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference,
+    ReferenceBase, SameNumeric, ShapeId, StringId, Tracer, Value, iterator_result,
+    same_numeric_types,
 };
 
 /// Bounds on what running script may use beyond the heap.
@@ -94,6 +95,8 @@ struct Frame {
 #[derive(Debug, Default)]
 pub(crate) struct VmState {
     stack: Vec<Value>,
+    /// Environments, namespaces and code of graphs currently being evaluated.
+    pub(crate) modules: Vec<crate::module::ModuleInstance>,
     frames: Vec<Frame>,
     /// Native calls and nested runs in progress.
     native_depth: u32,
@@ -159,6 +162,12 @@ impl VmState {
     pub(crate) fn trace(&self, tracer: &mut impl Tracer) {
         for &v in &self.stack {
             tracer.value(v);
+        }
+        for module in &self.modules {
+            tracer.env(module.env);
+            tracer.value(Value::object(module.namespace));
+            tracer.code(module.initialize);
+            tracer.code(module.body);
         }
         for frame in &self.frames {
             tracer.code(frame.code_id);
@@ -300,37 +309,28 @@ impl Agent {
     /// collects garbage at its safe points: every handle the caller keeps
     /// across this call must be rooted ([`Agent::root`]).
     pub fn run_script(&mut self, code: CodeId) -> JsResult<Value> {
-        self.enter_nested_run()?;
-        let floor = self.vm.frames.len();
-        let stack_floor = self.vm.stack.len();
-        let global = Value::object(self.intrinsics.global);
-        let env = self.global_env;
-        self.push_frame_for(
-            code,
-            env,
-            global,
-            Value::UNDEFINED,
-            Value::UNDEFINED,
-            stack_floor,
-            0,
-            0,
-            false,
-            stack_floor,
-        )?;
-        self.run(floor)
+        self.run_in_environment(code, self.global_env, Value::object(self.intrinsics.global))
     }
 
     /// Run indirect `eval` code on `env` with the global `this`, from
     /// inside a native call.
     pub(crate) fn run_eval(&mut self, code: CodeId, env: EnvId) -> JsResult<Value> {
+        self.run_in_environment(code, env, Value::object(self.intrinsics.global))
+    }
+
+    pub(crate) fn run_in_environment(
+        &mut self,
+        code: CodeId,
+        env: EnvId,
+        this: Value,
+    ) -> JsResult<Value> {
         self.enter_nested_run()?;
         let floor = self.vm.frames.len();
         let stack_floor = self.vm.stack.len();
-        let global = Value::object(self.intrinsics.global);
         self.push_frame_for(
             code,
             env,
-            global,
+            this,
             Value::UNDEFINED,
             Value::UNDEFINED,
             stack_floor,
@@ -1041,6 +1041,9 @@ impl Agent {
                 Op::SetSlot { src, hops, slot } => {
                     let scope = self.env_outer_n(env, hops);
                     let (name, flags) = self.env_slot_binding(scope, slot);
+                    if flags & BINDING_IMPORT != 0 {
+                        t!(self.type_error::<()>("assignment to an imported binding"));
+                    }
                     if self.env_slot(scope, slot) == Value::UNINITIALIZED {
                         t!(Err(self.tdz_error(name)));
                     }

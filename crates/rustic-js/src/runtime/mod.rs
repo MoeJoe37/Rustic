@@ -37,7 +37,9 @@ pub(crate) use builtins::promise::{
 pub(crate) use builtins::regexp::regexp_create_literal;
 pub use completion::Completion;
 pub use convert::{Numeric, PreferredType, string_to_bigint};
-pub(crate) use env::{BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT};
+pub(crate) use env::{
+    BINDING_IMPORT, BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT, ImportBinding,
+};
 pub use env::{EnvId, Environment, FunctionExtra, Reference, ReferenceBase, ThisStatus};
 pub(crate) use gc::Tracer;
 pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};
@@ -50,7 +52,7 @@ pub use number::{
 pub use object::{Class, PropertyDescriptor};
 pub(crate) use object::{
     Closure, Extra, FLAG_CLOSURE, FLAG_EXOTIC, FLAG_EXTENSIBLE, FLAG_NATIVE_CONSTRUCTOR,
-    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, Object,
+    FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, NamespaceBinding, Object,
 };
 pub(crate) use shape::ShapeId;
 pub use shape::{Attributes, MAX_SHAPE_PROPERTIES, PropertyKey};

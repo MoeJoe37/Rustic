@@ -3201,7 +3201,29 @@
             },
             {
               "label": "Module environments, live bindings, namespace objects and bytecode evaluation",
-              "status": "planned"
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module/evaluate.rs",
+                  "marker": "pub fn evaluate_module_graph"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/exotic.rs",
+                  "marker": "fn namespace_value"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "modules_share_live_bindings_and_evaluate_each_dependency_once"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz"
+                }
+              ]
             },
             {
               "label": "Top-level await, dynamic imports and the module Test262 gate",

@@ -1441,7 +1441,7 @@ lists the next tasks.
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; collection came with JS-03 and BigInt conversions with JS-08 part 4; see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
-| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators (JS-08 parts 1 and 2), async functions (JS-06 part 1) and regular expressions (JS-08 part 3) run; modules remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
+| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators (JS-08 parts 1 and 2), async functions (JS-06 part 1) and regular expressions (JS-08 part 3) run; static modules run, with asynchronous module execution remaining (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
 | JS-05: core built-ins | Part 1 complete: Error and native errors, `Object`, `Function.prototype` with bound functions, global functions and primitive wrapper constructors, native constructors usable with `new`, `extends` and `super`; part 2 so far adds the `Function` constructor, `Array`, `String`, `Number`, `Math`, `JSON`, `Map`, `Set`, the weak collections, `Reflect`, `Date`, the iterator helpers, `eval` and the `Symbol` statics; function source text remains (TD-106, TD-107); see [JS.md](JS.md#built-ins-js-05) |
 | JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (20,966 of 22,427 run files with JS-05, generators, async functions and async generators so far, plus 11,599 of 12,826 `test/built-ins` files in the gated areas); modules and the remaining built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
 | JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
@@ -1467,4 +1467,15 @@ Resolution preserves binding identity through re-exports, distinguishes missing
 from ambiguous exports and terminates on cycles. The loader checks graph size,
 total source length, resolution work and cancellation. The host supplies source
 and decides request identity and import attribute policy. See [JS.md](JS.md#static-module-loading-js-06).
-The bytecode execution and module conformance gaps are recorded in TD-97/105.
+## JS-06 — Synchronous module evaluation
+
+`Agent::evaluate_module_graph` compiles each record into an instantiation
+entry point and an evaluation body. A traced module environment holds
+declarations and direct live imports. The graph initializes functions and
+`var` before running bodies in depth-first dependency order. Namespace
+exotic objects expose the resolved exports, including later binding updates.
+The focused regressions check cycles, lexical TDZ, namespace identity and
+property semantics, garbage collection, and rejection before script side
+effects when top-level await cannot compile. Asynchronous evaluation,
+dynamic imports, `import.meta` and the module conformance gate remain in
+TD-97 and TD-105.

@@ -9,7 +9,7 @@
 use std::rc::Rc;
 
 use super::agent::{Agent, ErrorKind, JsResult};
-use super::object::PropertyDescriptor;
+use super::object::{NamespaceBinding, PropertyDescriptor};
 use super::shape::PropertyKey;
 use super::value::{ObjectId, StringId, Value};
 
@@ -21,6 +21,7 @@ const MUTABLE: u8 = 1;
 const STRICT: u8 = 2;
 const DELETABLE: u8 = 4;
 const LEXICAL: u8 = 8;
+const IMPORT: u8 = 16;
 
 /// Names and values of a declarative record.
 #[derive(Clone, Debug, Default)]
@@ -71,6 +72,13 @@ pub struct FunctionExtra {
     pub new_target: Value,
 }
 
+/// An import slot and its directly resolved binding. Imports never point to imports.
+pub(crate) type ImportBinding = (u16, NamespaceBinding);
+
+/// Internal import table of a module environment.
+#[derive(Clone, Debug, Default)]
+pub struct ModuleImports(Box<[ImportBinding]>);
+
 /// An environment record.
 #[derive(Clone, Debug)]
 pub enum Environment {
@@ -80,6 +88,15 @@ pub enum Environment {
         outer: Option<EnvId>,
         /// Bindings.
         record: Declarative,
+    },
+    /// A source text module's local and imported bindings.
+    Module {
+        /// The realm's global environment.
+        outer: EnvId,
+        /// Declaration slots, including slots reserved for imports.
+        record: Declarative,
+        /// The sorted table of live import targets.
+        imports: ModuleImports,
     },
     /// A function's top-level scope.
     Function {
@@ -120,6 +137,17 @@ impl Environment {
         let record = match self {
             Environment::Declarative { outer, record } => {
                 tracer.env_opt(*outer);
+                record
+            }
+            Environment::Module {
+                outer,
+                record,
+                imports,
+            } => {
+                tracer.env(*outer);
+                for &(_, target) in imports.0.iter() {
+                    target.trace(tracer);
+                }
                 record
             }
             Environment::Function {
@@ -168,6 +196,7 @@ impl Environment {
         // belongs to compiled code, which is charged for it there.
         let bindings = match self {
             Environment::Declarative { record, .. }
+            | Environment::Module { record, .. }
             | Environment::Function { record, .. }
             | Environment::Global { record, .. } => {
                 let per_binding = if Rc::strong_count(&record.names) == 1 {
@@ -180,6 +209,7 @@ impl Environment {
             Environment::Object { .. } => 0,
         };
         let boxed = match self {
+            Environment::Module { imports, .. } => std::mem::size_of_val(imports.0.as_ref()),
             Environment::Function { .. } => std::mem::size_of::<FunctionExtra>(),
             Environment::Global { .. } => std::mem::size_of::<Vec<StringId>>(),
             _ => 0,
@@ -192,6 +222,7 @@ impl Environment {
             Environment::Declarative { outer, .. }
             | Environment::Function { outer, .. }
             | Environment::Object { outer, .. } => *outer,
+            Environment::Module { outer, .. } => Some(*outer),
             Environment::Global { .. } => None,
         }
     }
@@ -199,6 +230,7 @@ impl Environment {
     fn declarative(&self) -> Option<&Declarative> {
         match self {
             Environment::Declarative { record, .. }
+            | Environment::Module { record, .. }
             | Environment::Function { record, .. }
             | Environment::Global { record, .. } => Some(record),
             Environment::Object { .. } => None,
@@ -208,6 +240,7 @@ impl Environment {
     fn declarative_mut(&mut self) -> Option<&mut Declarative> {
         match self {
             Environment::Declarative { record, .. }
+            | Environment::Module { record, .. }
             | Environment::Function { record, .. }
             | Environment::Global { record, .. } => Some(record),
             Environment::Object { .. } => None,
@@ -403,7 +436,11 @@ impl Agent {
         let in_record = self.env(env).declarative().and_then(|d| d.find(name));
         match (in_record, self.env(env).clone_shallow()) {
             (Some(at), _) => {
-                self.declarative_mut(env).values[at] = value;
+                let record = self.declarative_mut(env);
+                if record.names[at].1 & IMPORT != 0 {
+                    return self.type_error("cannot initialize an imported binding");
+                }
+                record.values[at] = value;
                 Ok(())
             }
             (None, Shallow::Global { object }) => {
@@ -450,6 +487,9 @@ impl Agent {
             .expect("found in a declarative record");
         let flags = record.names[at].1;
         let strict = strict || flags & STRICT != 0;
+        if flags & IMPORT != 0 {
+            return self.type_error("assignment to an imported binding");
+        }
         if record.values[at] == Value::UNINITIALIZED {
             return Err(self.reference_error_for(name, "cannot be accessed before initialization"));
         }
@@ -476,7 +516,7 @@ impl Agent {
         }
         match self.env(env).declarative().and_then(|d| d.find(name)) {
             Some(at) => {
-                let value = self.env(env).declarative().expect("found above").values[at];
+                let value = self.binding_value_at(env, at);
                 if value == Value::UNINITIALIZED {
                     return Err(
                         self.reference_error_for(name, "cannot be accessed before initialization")
@@ -545,7 +585,7 @@ impl Agent {
     pub fn has_this_binding(&self, env: EnvId) -> bool {
         match self.env(env) {
             Environment::Function { extra, .. } => extra.this != ThisStatus::Lexical,
-            Environment::Global { .. } => true,
+            Environment::Global { .. } | Environment::Module { .. } => true,
             _ => false,
         }
     }
@@ -570,6 +610,7 @@ impl Agent {
         let status = match self.env(env) {
             Environment::Function { extra, .. } => extra.this,
             Environment::Global { this, .. } => return Ok(Value::object(*this)),
+            Environment::Module { .. } => return Ok(Value::UNDEFINED),
             _ => ThisStatus::Lexical,
         };
         match status {
@@ -795,7 +836,9 @@ enum Shallow {
 impl Environment {
     fn clone_shallow(&self) -> Shallow {
         match self {
-            Environment::Declarative { .. } | Environment::Function { .. } => Shallow::Declarative,
+            Environment::Declarative { .. }
+            | Environment::Function { .. }
+            | Environment::Module { .. } => Shallow::Declarative,
             Environment::Object { object, with, .. } => Shallow::Object {
                 object: *object,
                 with: *with,
@@ -811,6 +854,7 @@ impl Environment {
 pub(crate) const BINDING_MUTABLE: u8 = MUTABLE;
 /// Assignment to this immutable binding throws even in sloppy code.
 pub(crate) const BINDING_STRICT: u8 = STRICT;
+pub(crate) const BINDING_IMPORT: u8 = IMPORT;
 /// A `let`, `const` or `class` binding, which a sloppy direct `eval` may
 /// not redeclare with `var` (§19.2.1.3 step 3).
 pub(crate) const BINDING_LEXICAL: u8 = LEXICAL;
@@ -833,6 +877,36 @@ impl Agent {
         Ok(self
             .heap
             .alloc_env(Environment::Declarative { outer, record })?)
+    }
+
+    pub(crate) fn new_module_environment(
+        &mut self,
+        names: &Rc<Vec<(StringId, u8)>>,
+    ) -> JsResult<EnvId> {
+        self.heap.charge(8 * names.len())?;
+        Ok(self.heap.alloc_env(Environment::Module {
+            outer: self.global_env,
+            record: Declarative {
+                names: Rc::clone(names),
+                values: vec![Value::UNINITIALIZED; names.len()],
+            },
+            imports: ModuleImports::default(),
+        })?)
+    }
+
+    pub(crate) fn set_module_imports(
+        &mut self,
+        env: EnvId,
+        mut imports: Vec<ImportBinding>,
+    ) -> JsResult<()> {
+        imports.sort_unstable_by_key(|&(local, _)| local);
+        self.heap
+            .charge(std::mem::size_of_val(imports.as_slice()))?;
+        let Environment::Module { imports: slots, .. } = self.heap.env_mut(env) else {
+            unreachable!("imports belong to a module environment");
+        };
+        slots.0 = imports.into_boxed_slice();
+        Ok(())
     }
 
     /// A copy of a scope environment with the same outer environment and
@@ -870,11 +944,37 @@ impl Agent {
 
     /// The value in a compiled scope's slot (`UNINITIALIZED` in the TDZ).
     pub(crate) fn env_slot(&self, env: EnvId, slot: u16) -> Value {
-        self.heap
-            .env(env)
+        self.binding_value_at(env, usize::from(slot))
+    }
+
+    fn binding_value_at(&self, env: EnvId, index: usize) -> Value {
+        let environment = self.env(env);
+        let record = environment
             .declarative()
-            .expect("compiled scopes are declarative")
-            .values[slot as usize]
+            .expect("compiled scopes are declarative");
+        if record.names[index].1 & IMPORT == 0 {
+            return record.values[index];
+        }
+        let Environment::Module { imports, .. } = environment else {
+            unreachable!("imported bindings belong to a module");
+        };
+        let import = imports
+            .0
+            .binary_search_by_key(&index, |&(local, _)| usize::from(local))
+            .expect("all imports are linked before module evaluation");
+        self.namespace_binding_value(imports.0[import].1)
+    }
+
+    pub(crate) fn namespace_binding_value(&self, binding: NamespaceBinding) -> Value {
+        match binding {
+            NamespaceBinding::Local(env, slot) => {
+                self.env(env)
+                    .declarative()
+                    .expect("a module's declaration record")
+                    .values[usize::from(slot)]
+            }
+            NamespaceBinding::Namespace(object) => Value::object(object),
+        }
     }
 
     /// The name and flags of a compiled scope's slot.
@@ -925,6 +1025,8 @@ impl Agent {
 
     /// Store into a compiled scope's slot without checks.
     pub(crate) fn set_env_slot(&mut self, env: EnvId, slot: u16, value: Value) {
-        self.declarative_mut(env).values[slot as usize] = value;
+        let record = self.declarative_mut(env);
+        debug_assert_eq!(record.names[usize::from(slot)].1 & IMPORT, 0);
+        record.values[usize::from(slot)] = value;
     }
 }

@@ -663,9 +663,22 @@ Bare star exports do not forward the default export. The API checks module
 count, total UTF-16 source size, resolution work and cancellation. The
 source callback supplies an already constructed source buffer.
 
-Module environments, live bindings, namespace objects, evaluation, top-level
-await and dynamic imports remain tracked under TD-97 and TD-105. Run the
-static graph regressions with `cargo test --locked -p rustic-js --test module`.
+`Agent::evaluate_module_graph` compiles and links a fresh synchronous graph
+instance and returns the entry module's namespace. Linking connects import
+slots directly to the defining bindings. Every environment is created before
+execution, and function declarations and `var` bindings are initialized before
+any body runs. The VM then executes each dependency once in depth-first request
+order, including cyclic graphs. Lexical bindings stay in their temporal dead
+zone until their declarations run.
+
+Namespaces have null prototypes and expose UTF-16-sorted export names through
+live data descriptors. Ambiguous star exports are omitted. Import slots and
+namespace properties trace their targets through garbage collection, and the
+host may keep a namespace alive with `Agent::root`. See [ADR 0019](adr/0019-static-module-evaluation.md).
+
+Top-level await, dynamic imports, `import.meta`, and the Test262 module gate
+remain open under TD-97 and TD-105. Run the static graph and evaluation
+regressions with `cargo test --locked -p rustic-js --test module`.
 
 [modules]: https://262.ecma-international.org/17.0/index.html#sec-source-text-module-records
 

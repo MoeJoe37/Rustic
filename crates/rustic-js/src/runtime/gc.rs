@@ -444,6 +444,14 @@ impl Marker<'_> {
                     }
                 }
                 Some(Internal::Arguments { env, .. }) => self.env(*env),
+                Some(Internal::ModuleNamespace(exports)) => {
+                    for &(key, binding) in exports.iter() {
+                        if let PropertyKey::String(name) = key {
+                            self.string(name);
+                        }
+                        binding.trace(self);
+                    }
+                }
                 Some(Internal::TypedArray { buffer, .. } | Internal::DataView { buffer, .. }) => {
                     self.value(Value::object(*buffer));
                 }
@@ -493,6 +501,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::WeakMap(entries)) => WEAK_ENTRY_BYTES * entries.len(),
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
             Some(Internal::Arguments { slots, .. }) => 4 * slots.len(),
+            Some(Internal::ModuleNamespace(exports)) => std::mem::size_of_val(exports.as_ref()),
             Some(Internal::ArrayBuffer(data)) => data.bytes.as_ref().map_or(0, Vec::len),
             Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Helper(helper)) => {

@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "eda0afa1979efd085cd0195f266188f4c5b20f0164724ccf7c2ccc4315cce8ec",
-  "percent": "27.84",
+  "source_fingerprint": "1cf0856688e5e4ecaf704cbcc3b0de270ac65e26d780f7cd40ef04d867f74fd3",
+  "percent": "27.98",
   "verified_percent": "25.69",
-  "partial_percent": "2.15",
+  "partial_percent": "2.29",
   "completed": 61,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 8,
       "total": 13,
-      "percent": "85.55",
+      "percent": "87.09",
       "verified_percent": "66.15",
-      "partial_percent": "19.40"
+      "partial_percent": "20.94"
     },
     {
       "id": "M5",
@@ -3519,14 +3519,36 @@
             },
             {
               "label": "Module environments, live bindings, namespace objects and bytecode evaluation",
-              "status": "planned"
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/module/evaluate.rs",
+                  "marker": "pub fn evaluate_module_graph"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/exotic.rs",
+                  "marker": "fn namespace_value"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "modules_share_live_bindings_and_evaluate_each_dependency_once"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/module.rs",
+                  "marker": "cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz"
+                }
+              ]
             },
             {
               "label": "Top-level await, dynamic imports and the module Test262 gate",
               "status": "planned"
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.41"
         },
         {
@@ -3907,10 +3929,10 @@
       "completed": 8,
       "in_progress": 5,
       "total": 15,
-      "contribution": "7.89",
-      "percent": "78.91",
+      "contribution": "8.02",
+      "percent": "80.28",
       "verified_percent": "58.90",
-      "partial_percent": "20.01"
+      "partial_percent": "21.38"
     },
     {
       "id": "wasm",

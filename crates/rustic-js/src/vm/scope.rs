@@ -12,9 +12,10 @@ use std::any::TypeId;
 use std::collections::HashMap;
 
 use crate::ast::{
-    Argument, ArrayElement, ArrowBody, ArrowFunction, Class, ClassElement, Expression,
-    ExpressionKind, ForHead, ForInit, Function, MemberProperty, MethodKind, ObjectProperty,
-    Pattern, PatternKind, PropertyKey, Statement, StatementKind, VariableKind,
+    Argument, ArrayElement, ArrowBody, ArrowFunction, Class, ClassElement, DefaultExport,
+    ExportDeclaration, Expression, ExpressionKind, ForHead, ForInit, Function, ImportSpecifier,
+    MemberProperty, MethodKind, ObjectProperty, Pattern, PatternKind, PropertyKey, Statement,
+    StatementKind, VariableKind,
 };
 
 /// A scope in a [`ScopeTree`].
@@ -31,6 +32,8 @@ pub(crate) enum BindingKind {
     Let,
     /// `const`.
     Const,
+    /// An immutable live binding to an export in another module.
+    Import,
     /// A catch parameter.
     Catch,
     /// The implicit `arguments` object.
@@ -72,6 +75,8 @@ pub(crate) fn private_setter_name(name: &str) -> String {
 /// The binding of a derived constructor's `this`. Reserved words cannot
 /// name script bindings, so these names never collide with one.
 pub(crate) const THIS: &str = "this";
+/// A module's anonymous default export binding.
+pub(crate) const DEFAULT_EXPORT: &str = "%default";
 /// The binding of `new.target` for arrow functions.
 pub(crate) const NEW_TARGET: &str = "new.target";
 /// A class scope's binding of the class constructor itself, from which
@@ -121,6 +126,8 @@ pub(crate) enum ScopeKind {
     /// The top level of a script: its declarations are globals, found by
     /// name.
     Script,
+    /// The top level of a source text module.
+    Module,
     /// A function's parameters and top-level declarations.
     Function,
     /// A block, loop head, switch or catch clause.
@@ -160,7 +167,7 @@ impl Scope {
     pub(crate) fn has_env(&self) -> bool {
         match self.kind {
             ScopeKind::Script => false,
-            ScopeKind::With => true,
+            ScopeKind::With | ScopeKind::Module => true,
             ScopeKind::Function | ScopeKind::Block => {
                 self.eval_vars || self.bindings.iter().any(|b| b.captured)
             }
@@ -223,6 +230,52 @@ impl ScopeTree {
         r.statements(body);
         r.stack.pop();
         debug_assert_eq!(script, 0);
+        r.tree
+    }
+
+    /// Module declarations are all shared between instantiation and evaluation.
+    pub(crate) fn analyze_module(body: &[Statement]) -> ScopeTree {
+        let mut r = Resolver {
+            tree: ScopeTree::default(),
+            stack: Vec::new(),
+            derived_constructor: false,
+        };
+        let top = r.open(ScopeKind::Module, None, true);
+        r.declare(top, THIS, BindingKind::Const);
+        for statement in body {
+            match &statement.kind {
+                StatementKind::Import(declaration) => {
+                    for specifier in &declaration.specifiers {
+                        let (local, kind) = match specifier {
+                            ImportSpecifier::Default(local)
+                            | ImportSpecifier::Named { local, .. } => (local, BindingKind::Import),
+                            ImportSpecifier::Namespace(local) => (local, BindingKind::Const),
+                        };
+                        r.declare(top, &local.name, kind);
+                    }
+                }
+                StatementKind::Export(ExportDeclaration::Default(default)) => {
+                    let (name, kind) = match default {
+                        DefaultExport::Function(f) => (f.id.as_ref(), BindingKind::Let),
+                        DefaultExport::Class(c) => (c.id.as_ref(), BindingKind::Let),
+                        DefaultExport::Expression(_) => (None, BindingKind::Const),
+                    };
+                    r.declare(top, name.map_or(DEFAULT_EXPORT, |id| &id.name), kind);
+                }
+                _ => {
+                    let declaration = match &statement.kind {
+                        StatementKind::Export(ExportDeclaration::Declaration(inner)) => inner,
+                        _ => statement,
+                    };
+                    r.hoist_vars_in(top, declaration, false);
+                    r.declare_lexical(top, std::slice::from_ref(declaration), false);
+                }
+            }
+        }
+        for binding in &mut r.tree.scopes[top].bindings {
+            binding.captured = true;
+        }
+        r.statements(body);
         r.tree
     }
 
@@ -316,7 +369,7 @@ impl Resolver {
         let parent = self.stack.last().copied();
         let id = self.tree.scopes.len();
         let function = match kind {
-            ScopeKind::Script | ScopeKind::Function => id,
+            ScopeKind::Script | ScopeKind::Function | ScopeKind::Module => id,
             _ => self.tree.scopes[parent.expect("blocks have a parent")].function,
         };
         let strict = strict || parent.is_some_and(|p| self.tree.scopes[p].strict);
@@ -939,6 +992,12 @@ impl Resolver {
                     self.block(s, ROLE_FINALLY, f);
                 }
             }
+            StatementKind::Export(ExportDeclaration::Declaration(inner)) => self.statement(inner),
+            StatementKind::Export(ExportDeclaration::Default(default)) => match default {
+                DefaultExport::Function(f) => self.function(f, false),
+                DefaultExport::Class(c) => self.class(c),
+                DefaultExport::Expression(e) => self.expression(e),
+            },
             StatementKind::Import(_) | StatementKind::Export(_) => {}
         }
     }

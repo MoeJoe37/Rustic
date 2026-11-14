@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
+mod evaluate;
 mod graph;
+pub use evaluate::ModuleEvalError;
+pub(crate) use evaluate::ModuleInstance;
 pub use graph::{GraphError, GraphLimits, ModuleGraph, ResolvedBinding, ResolvedExport};
 
 use crate::ast::{

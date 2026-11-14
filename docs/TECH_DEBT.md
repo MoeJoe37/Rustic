@@ -1399,18 +1399,20 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. Modules return `CompileError::Unsupported` with a span before any code
-runs, so a script either runs with correct semantics or not at all. So does
-a regular expression literal that uses a Unicode property escape (TD-110).
+calls. The synchronous module compiler rejects top-level await, `import.meta`
+and dynamic imports with a source span before any module body runs. A regular
+expression literal that uses a Unicode property escape also fails explicitly
+(TD-110).
 
 Private names, object-literal `super`, tagged templates and optional calls
 were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
 (JS-08 part 1), async functions with promises (JS-06 part 1) and async
 generators with `for await` (JS-08 part 2) were paid the same day, and
 RegExp literals (JS-08 part 3) after them. JS-06 now loads and validates static dependency graphs through host callbacks.
-Pay the remaining debt with module environments and live bindings, namespace
-objects, bytecode evaluation, top-level await and dynamic imports. Trigger:
-the module Test262 gate (JS-07).
+Module environments, live bindings, namespace objects and synchronous bytecode
+evaluation are implemented in JS-06. Pay the remaining debt with top-level
+await, dynamic imports and host-provided `import.meta`. Trigger: the module
+Test262 gate (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 

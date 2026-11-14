@@ -264,3 +264,169 @@ fn static_graph_enforces_host_policy_and_exact_budgets() {
     limits.parse.cancellation.cancel();
     assert!(matches!(load(&files, &limits), Err(GraphError::Cancelled)));
 }
+
+#[test]
+fn modules_share_live_bindings_and_evaluate_each_dependency_once() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Roots, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            (
+                "entry",
+                r#"
+                import { count, bump } from "middle";
+                import { ns } from "middle";
+                import * as again from "base";
+                export { ns as library };
+                export const before = count;
+                export function advance() {
+                    bump();
+                    return eval("count") + ns.count;
+                }
+                export const sameNamespace = ns === again;
+                export const order = globalThis.order;
+                export const moduleThis = (() => this)();
+                export const numeric = Reflect.ownKeys(ns).slice(0, 2).join(',');
+                export const traits = Object.getPrototypeOf(ns) === null
+                    && Object.prototype.toString.call(ns) === '[object Module]'
+                    && !Object.isExtensible(ns) && !Reflect.set(ns, "count", 9)
+                    && !Reflect.deleteProperty(ns, "count")
+                    && Reflect.defineProperty(ns, "count", { value: count })
+                    && !Reflect.defineProperty(ns, "count", { writable: false });
+                try { count = 10; } catch (e) { globalThis.immutable = e instanceof TypeError; }
+                "#,
+            ),
+            (
+                "middle",
+                r#"
+                export * from "base";
+                export * as ns from "base";
+                globalThis.order += "m";
+                "#,
+            ),
+            (
+                "base",
+                r#"
+                globalThis.order = (globalThis.order || "") + "b";
+                export let count = 1;
+                export { count as "2", count as "10" };
+                export function bump() { count++; }
+                "#,
+            ),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let root = agent.root(Value::object(namespace)).unwrap();
+
+    let read = |agent: &mut Agent, name| {
+        let key = agent.heap.key(name).unwrap();
+        agent.get(namespace, key).unwrap()
+    };
+    assert_eq!(read(&mut agent, "before").as_number(), Some(1.0));
+    assert_eq!(read(&mut agent, "sameNamespace"), Value::TRUE);
+    assert_eq!(read(&mut agent, "moduleThis"), Value::UNDEFINED);
+    assert_eq!(read(&mut agent, "traits"), Value::TRUE);
+    for (name, expected) in [("order", "bm"), ("numeric", "10,2")] {
+        let value = read(&mut agent, name);
+        assert_eq!(
+            agent.heap.string(value.as_string().unwrap()).to_text(),
+            expected
+        );
+    }
+    assert_eq!(agent.evaluate("immutable").unwrap(), Value::TRUE);
+    assert_eq!(
+        agent
+            .evaluate("typeof before")
+            .unwrap()
+            .as_string()
+            .map(|s| agent.heap.string(s).to_text())
+            .as_deref(),
+        Some("undefined")
+    );
+
+    agent.collect_garbage(Roots::default());
+    let advance = read(&mut agent, "advance");
+    assert_eq!(
+        agent
+            .call_from_host(advance, Value::UNDEFINED, &[])
+            .unwrap()
+            .as_number(),
+        Some(4.0)
+    );
+    let library = read(&mut agent, "library").as_object().unwrap();
+    let count = agent.heap.key("count").unwrap();
+    assert_eq!(agent.get(library, count).unwrap().as_number(), Some(2.0));
+    assert!(agent.unroot(root));
+}
+
+#[test]
+fn cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz() {
+    use rustic_js::module::{GraphLimits, ModuleEvalError};
+    use rustic_js::runtime::{Abrupt, Agent};
+
+    let limits = GraphLimits::default();
+    let mut agent = Agent::new().unwrap();
+    for (body, throws) in [
+        (
+            "import f, { pending } from 'entry'; export const result = f() + (pending === undefined);",
+            false,
+        ),
+        (
+            "import { lex } from 'entry'; export const result = lex;",
+            true,
+        ),
+    ] {
+        let graph = load(
+            &[
+                ("entry", "export { result } from 'dep'; export default function () { return 8; } export var pending = 2; export let lex = 9;"),
+                ("dep", body),
+            ],
+            &limits,
+        )
+        .unwrap();
+        match agent.evaluate_module_graph(&graph, &limits) {
+            Ok(namespace) if !throws => {
+                let key = agent.heap.key("result").unwrap();
+                assert_eq!(agent.get(namespace, key).unwrap().as_number(), Some(9.0));
+            }
+            Err(ModuleEvalError::Runtime(Abrupt::Throw(error))) if throws => {
+                let key = agent.heap.key("name").unwrap();
+                let name = agent.get_v(error, key).unwrap().as_string().unwrap();
+                assert_eq!(agent.heap.string(name).to_text(), "ReferenceError");
+            }
+            other => panic!("unexpected result {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn modules_reject_unsupported_execution_before_running_dependencies() {
+    use rustic_js::module::{GraphLimits, ModuleEvalError};
+    use rustic_js::runtime::Agent;
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            ("entry", "import 'dep'; await 1;"),
+            ("dep", "globalThis.ran = true;"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    assert!(matches!(
+        agent.evaluate_module_graph(&graph, &limits),
+        Err(ModuleEvalError::Compile { module: 0, .. })
+    ));
+    let value = agent.evaluate("typeof ran").unwrap();
+    assert_eq!(
+        agent.heap.string(value.as_string().unwrap()).to_text(),
+        "undefined"
+    );
+}

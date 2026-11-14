@@ -57,6 +57,8 @@ pub enum Class {
     TypedArray,
     /// A DataView (§25.3).
     DataView,
+    /// A module namespace exotic object (§10.4.6).
+    ModuleNamespace,
 }
 
 /// A complete or partial property descriptor (§6.2.6).
@@ -372,6 +374,8 @@ pub(crate) enum Internal {
         env: EnvId,
         slots: Box<[Option<u16>]>,
     },
+    /// Export keys in UTF-16 order and their live bindings.
+    ModuleNamespace(Box<[(PropertyKey, NamespaceBinding)]>),
     /// An ArrayBuffer's bytes (§25.1).
     ArrayBuffer(Box<super::builtins::buffer::BufferData>),
     /// A typed array's `[[ViewedArrayBuffer]]`, element kind,
@@ -392,6 +396,22 @@ pub(crate) enum Internal {
     /// a promise, the element functions of `Promise.all`, ...); the
     /// behavior knows what each position means.
     Captures(Box<[Value]>),
+}
+
+/// A module namespace property points to a declaration slot or a namespace.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum NamespaceBinding {
+    Local(EnvId, u16),
+    Namespace(ObjectId),
+}
+
+impl NamespaceBinding {
+    pub(crate) fn trace(self, tracer: &mut impl super::gc::Tracer) {
+        match self {
+            Self::Local(env, _) => tracer.env(env),
+            Self::Namespace(module) => tracer.value(Value::object(module)),
+        }
+    }
 }
 
 /// `[[PromiseState]]`.

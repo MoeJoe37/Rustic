@@ -85,6 +85,7 @@ pub enum ResolvedExport {
 /// specifiers, enforce import attributes, and provide source.
 pub struct ModuleGraph<K> {
     modules: Vec<Node<K>>,
+    source_units: usize,
 }
 
 struct Node<K> {
@@ -124,9 +125,9 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
     ) -> Result<Self, GraphError<E>> {
         let mut graph = Self {
             modules: Vec::new(),
+            source_units: 0,
         };
-        let mut source_units = 0;
-        graph.add(entry.clone(), limits, &mut source_units, &mut source)?;
+        graph.add(entry.clone(), limits, &mut source)?;
         let mut indexes = HashMap::from([(entry, 0)]);
         let mut index = 0;
         while index < graph.modules.len() {
@@ -141,7 +142,7 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
                     target
                 } else {
                     let target = graph.modules.len();
-                    graph.add(key.clone(), limits, &mut source_units, &mut source)?;
+                    graph.add(key.clone(), limits, &mut source)?;
                     indexes.insert(key, target);
                     target
                 };
@@ -158,7 +159,6 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         &mut self,
         key: K,
         limits: &GraphLimits,
-        source_units: &mut usize,
         source: &mut impl FnMut(&K) -> Result<Source, E>,
     ) -> Result<(), GraphError<E>> {
         check(limits)?;
@@ -166,7 +166,8 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
             return Err(GraphError::GraphLimit);
         }
         let input = source(&key).map_err(GraphError::Host)?;
-        *source_units = source_units
+        self.source_units = self
+            .source_units
             .checked_add(input.len())
             .filter(|total| *total <= limits.max_source_units)
             .ok_or(GraphError::GraphLimit)?;
@@ -176,6 +177,18 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         })?;
         self.modules.push(Node::new(key, record));
         Ok(())
+    }
+
+    pub(super) fn dependencies(&self, index: usize) -> &[usize] {
+        &self.modules[index].dependencies
+    }
+
+    pub(super) fn module_count(&self) -> usize {
+        self.modules.len()
+    }
+
+    pub(super) fn source_units(&self) -> usize {
+        self.source_units
     }
 
     /// The module record at the given index, where zero is the entry module.
@@ -202,11 +215,20 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         limits: &GraphLimits,
     ) -> Result<Vec<Vec<u16>>, GraphError<std::convert::Infallible>> {
         let mut remaining = limits.max_resolution_steps;
+        self.collect_exported_names(index, limits, &mut remaining)
+    }
+
+    pub(super) fn collect_exported_names(
+        &self,
+        index: usize,
+        limits: &GraphLimits,
+        remaining: &mut usize,
+    ) -> Result<Vec<Vec<u16>>, GraphError<std::convert::Infallible>> {
         let mut seen = HashSet::new();
         let mut names = HashSet::new();
         let mut pending = vec![index];
         while let Some(module) = pending.pop() {
-            spend(limits, &mut remaining)?;
+            spend(limits, remaining)?;
             if !seen.insert(module) {
                 continue;
             }
@@ -214,13 +236,13 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
                 continue;
             };
             for entry in node.record.exports() {
-                spend(limits, &mut remaining)?;
+                spend(limits, remaining)?;
                 if module == index || !is_default(&entry.name) {
                     names.insert(entry.name.as_slice());
                 }
             }
             for request in node.record.star_exports().iter().rev() {
-                spend(limits, &mut remaining)?;
+                spend(limits, remaining)?;
                 pending.push(node.dependencies[request.index()]);
             }
         }
@@ -277,7 +299,7 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         Ok(())
     }
 
-    fn resolve<E>(
+    pub(super) fn resolve<E>(
         &self,
         index: usize,
         name: &[u16],
@@ -343,7 +365,7 @@ fn check<E>(limits: &GraphLimits) -> Result<(), GraphError<E>> {
         .map_err(|_| GraphError::Cancelled)
 }
 
-fn spend<E>(limits: &GraphLimits, remaining: &mut usize) -> Result<(), GraphError<E>> {
+pub(super) fn spend<E>(limits: &GraphLimits, remaining: &mut usize) -> Result<(), GraphError<E>> {
     check(limits)?;
     *remaining = remaining
         .checked_sub(1)

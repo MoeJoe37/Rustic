@@ -14,8 +14,10 @@ use std::fmt;
 
 pub use bytecode::CodeId;
 pub use compile::CompileError;
+pub(crate) use compile::{ModuleCode, compile_module};
 pub use interp::VmLimits;
 pub(crate) use interp::exponentiate;
+pub(crate) use scope::DEFAULT_EXPORT;
 
 use crate::ast::Program;
 use crate::parser::{ParseError, ParseLimits, parse_eval, parse_script};

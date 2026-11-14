@@ -17,18 +17,20 @@ use super::bytecode::{
     UNMAPPED_PARAMETER, UnOp, declare,
 };
 use super::scope::{
-    BRAND, BindingKind, CLASS, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER, PRIVATE_SETTER,
-    PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId, ScopeKind,
-    ScopeTree, THIS, field_key_name, is_direct_eval, private_name, private_setter_name,
+    BRAND, BindingKind, CLASS, DEFAULT_EXPORT, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER,
+    PRIVATE_SETTER, PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId,
+    ScopeKind, ScopeTree, THIS, field_key_name, is_direct_eval, private_name, private_setter_name,
 };
 use crate::ast::{
     Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Class, ClassElement,
-    Expression, ExpressionKind, ForHead, ForInit, Function, LogicalOp, MemberProperty, MethodKind,
-    ObjectProperty, Pattern, PatternKind, Program, PropertyKey, Statement, StatementKind, Template,
-    UnaryOp, UpdateOp, VariableDeclaration, VariableKind,
+    DefaultExport, ExportDeclaration, Expression, ExpressionKind, ForHead, ForInit, Function,
+    LogicalOp, MemberProperty, MethodKind, ObjectProperty, Pattern, PatternKind, Program,
+    PropertyKey, Statement, StatementKind, Template, UnaryOp, UpdateOp, VariableDeclaration,
+    VariableKind,
 };
 use crate::runtime::{
-    Agent, BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory, StringId, Value,
+    Agent, BINDING_IMPORT, BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory,
+    StringId, Value,
 };
 use crate::source::Span;
 
@@ -63,6 +65,12 @@ fn stack_address() -> usize {
 
 /// Compile a parsed script.
 pub(crate) fn compile_script(agent: &mut Agent, program: &Program) -> CResult<CodeId> {
+    if program.kind != crate::ast::ProgramKind::Script {
+        return Err(CompileError::Unsupported(
+            "module passed to script compiler",
+            program.span,
+        ));
+    }
     let tree = ScopeTree::analyze_script(&program.body, program.strict);
     let name = agent.names.empty;
     let mut g = Gen::new(
@@ -76,6 +84,53 @@ pub(crate) fn compile_script(agent: &mut Agent, program: &Program) -> CResult<Co
     );
     g.script(&program.body)?;
     g.finish(0, 0)
+}
+
+/// The two entry points and shared environment layout for a source text module.
+pub(crate) struct ModuleCode {
+    pub(crate) initialize: CodeId,
+    pub(crate) body: CodeId,
+    pub(crate) bindings: Rc<Vec<(StringId, u8)>>,
+}
+
+pub(crate) fn compile_module(agent: &mut Agent, program: &Program) -> CResult<ModuleCode> {
+    let tree = ScopeTree::analyze_module(&program.body);
+    let name = agent.names.empty;
+    let stack = stack_address();
+    let mut init = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
+    init.layout_scope(0)?;
+    let bindings = Rc::clone(&init.scopes[0]);
+    let undefined = init.temp()?;
+    init.emit(Op::Undefined { dst: undefined });
+    for (index, binding) in tree.scopes[0].bindings.iter().enumerate() {
+        if binding.kind == BindingKind::Var || &*binding.name == THIS {
+            init.store_binding_at(0, index, undefined)?;
+        }
+    }
+    for statement in &program.body {
+        let declaration = match &statement.kind {
+            StatementKind::Export(ExportDeclaration::Declaration(inner)) => inner,
+            StatementKind::Export(ExportDeclaration::Default(DefaultExport::Function(f))) => {
+                let name = f.id.as_ref().map_or(DEFAULT_EXPORT, |id| &id.name);
+                let mark = init.mark();
+                let register = init.temp()?;
+                init.function_expression(f, register, Some("default"), FunctionKind::Normal)?;
+                init.store_binding(name, register, true)?;
+                init.release(mark);
+                continue;
+            }
+            _ => statement,
+        };
+        init.hoist_functions(std::slice::from_ref(declaration), true)?;
+    }
+    let initialize = init.finish(0, 0)?;
+    let mut body = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
+    body.statements(&program.body)?;
+    Ok(ModuleCode {
+        initialize,
+        body: body.finish(0, 0)?,
+        bindings,
+    })
 }
 
 /// Compile the code of an `eval` (§19.2.1.1). It runs on the caller's
@@ -546,12 +601,16 @@ impl<'a, 't> Gen<'a, 't> {
         if s.kind == ScopeKind::Script || s.kind == ScopeKind::With {
             return Ok(());
         }
+        if s.bindings.iter().filter(|binding| binding.captured).count() > usize::from(u16::MAX) {
+            return Err(CompileError::TooLarge);
+        }
         let mut names = Vec::new();
         for (i, b) in s.bindings.iter().enumerate() {
             if b.captured {
                 let id = self.agent.heap.intern_str(&b.name)?;
                 let flags = match b.kind {
                     BindingKind::Const => BINDING_STRICT | BINDING_LEXICAL,
+                    BindingKind::Import => BINDING_STRICT | BINDING_LEXICAL | BINDING_IMPORT,
                     BindingKind::Let => BINDING_MUTABLE | BINDING_LEXICAL,
                     BindingKind::SelfName => 0,
                     _ => BINDING_MUTABLE,
@@ -2342,9 +2401,22 @@ impl<'a, 't> Gen<'a, 't> {
                 handler,
                 finalizer,
             } => self.try_statement(s, labels, block, handler.as_ref(), finalizer.as_deref())?,
-            StatementKind::Import(_) | StatementKind::Export(_) => {
-                return Err(CompileError::Unsupported("modules", s.span));
-            }
+            StatementKind::Import(_) => {}
+            StatementKind::Export(declaration) => match declaration {
+                ExportDeclaration::Declaration(inner) => self.statement(inner)?,
+                ExportDeclaration::Default(DefaultExport::Class(class)) => {
+                    let value = self.temp()?;
+                    self.class_definition(class, value, Some("default"))?;
+                    let name = class.id.as_ref().map_or(DEFAULT_EXPORT, |id| &id.name);
+                    self.store_binding(name, value, true)?;
+                }
+                ExportDeclaration::Default(DefaultExport::Expression(expression)) => {
+                    let value = self.temp()?;
+                    self.expr_named(expression, value, Some("default"))?;
+                    self.store_binding(DEFAULT_EXPORT, value, true)?;
+                }
+                _ => {}
+            },
         }
         self.release(mark);
         Ok(())
@@ -2612,6 +2684,9 @@ impl<'a, 't> Gen<'a, 't> {
     ) -> CResult<()> {
         let of = kind != ForKind::In;
         let is_await = kind == ForKind::AwaitOf;
+        if is_await && !self.is_async {
+            return Err(CompileError::Unsupported("top-level for await", s.span));
+        }
         let scope = self.tree.scope_of(s).expect("for-in/of is analyzed");
         // The right side sees the loop's lexical names in their TDZ; this
         // engine evaluates it outside the loop scope (TDZ violations there
@@ -3761,6 +3836,9 @@ impl<'a, 't> Gen<'a, 't> {
                 }
             }
             ExpressionKind::Await(argument) => {
+                if !self.is_async {
+                    return Err(CompileError::Unsupported("top-level await", e.span));
+                }
                 let value = self.temp()?;
                 self.expr(argument, value)?;
                 let mode = self.temp()?;

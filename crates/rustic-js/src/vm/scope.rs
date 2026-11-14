@@ -77,6 +77,8 @@ pub(crate) fn private_setter_name(name: &str) -> String {
 pub(crate) const THIS: &str = "this";
 /// A module's anonymous default export binding.
 pub(crate) const DEFAULT_EXPORT: &str = "%default";
+/// The lazy per-module import.meta object.
+pub(crate) const IMPORT_META: &str = "%import.meta";
 /// The binding of `new.target` for arrow functions.
 pub(crate) const NEW_TARGET: &str = "new.target";
 /// A class scope's binding of the class constructor itself, from which
@@ -1204,8 +1206,15 @@ impl Resolver {
                 | ExpressionKind::Number(_)
                 | ExpressionKind::BigInt(..)
                 | ExpressionKind::String(_)
-                | ExpressionKind::RegExp { .. }
-                | ExpressionKind::ImportMeta => {}
+                | ExpressionKind::RegExp { .. } => {}
+                ExpressionKind::ImportMeta => {
+                    if self.tree.scopes[0].kind == ScopeKind::Module
+                        && self.tree.scopes[0].find(IMPORT_META).is_none()
+                    {
+                        self.declare(0, IMPORT_META, BindingKind::Const);
+                        self.tree.scopes[0].bindings.last_mut().unwrap().captured = true;
+                    }
+                }
                 ExpressionKind::Template(t) => pending.extend(t.expressions.iter()),
                 ExpressionKind::TaggedTemplate { tag, template } => {
                     pending.push(tag);

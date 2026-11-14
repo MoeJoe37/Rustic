@@ -18,14 +18,14 @@
 //! heap limit and a step budget ([`RunLimits`]), so a runaway test fails
 //! the same way on every machine instead of timing out. After the test the
 //! promise jobs run; an `async` test passes when it prints
-//! `Test262:AsyncTestComplete` through `$DONE`. Module tests are skipped
-//! until module loading exists (JS-06), and are counted as skipped, never
-//! as passed. [`execute_tree`] runs a directory
-//! of a checkout.
+//! `Test262:AsyncTestComplete` through `$DONE`. [`execute_tree`] runs script
+//! tests from a checkout. [`execute_module_tree`] selects module tests and
+//! loads their static dependencies within the checkout.
 
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
+use crate::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph, ModuleRequest};
 use crate::runtime::{Agent, PropertyKey, Value};
 use crate::{EvalError, ParseError, ParseLimits, Source, parse_module, parse_script};
 
@@ -359,7 +359,9 @@ pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits
         }
     }
     for (mode, strict) in modes {
-        let run = std::panic::catch_unwind(|| execute_mode(text, meta, harness, limits, strict));
+        let run = std::panic::catch_unwind(|| {
+            execute_mode(text, meta, harness, limits, TestMode::Script { strict })
+        });
         match run {
             Ok(Ok(())) => {}
             Ok(Err(reason)) => return Verdict::Fail(format!("{mode}: {reason}")),
@@ -369,12 +371,115 @@ pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits
     Verdict::Pass
 }
 
+#[derive(Clone, Copy)]
+enum TestMode<'a> {
+    Script { strict: bool },
+    Module { path: &'a Path, root: &'a Path },
+}
+
+#[derive(Debug)]
+enum TestError {
+    Runtime(EvalError),
+    Resolution(String),
+    Host(String),
+}
+
+impl From<EvalError> for TestError {
+    fn from(error: EvalError) -> Self {
+        Self::Runtime(error)
+    }
+}
+
+fn execute_module(
+    agent: &mut Agent,
+    text: &str,
+    path: &Path,
+    root: &Path,
+) -> Result<Value, TestError> {
+    let limits = GraphLimits::default();
+    let parse_source = |text: &str| {
+        Source::from_str_limited(text, limits.max_source_units).map_err(|_| "module is too large")
+    };
+    let entry = parse_source(text).map_err(|error| TestError::Host(error.to_owned()))?;
+    // Distinguish a syntax error in the test itself from a failed import.
+    parse_module(&entry, &limits.parse).map_err(EvalError::Parse)?;
+    let graph = ModuleGraph::load(
+        path.to_owned(),
+        &limits,
+        |referrer, request| resolve_fixture(root, referrer, request),
+        |key| {
+            if key == path {
+                return Ok(entry.clone());
+            }
+            // Graph limits count code units. Each code unit takes at most
+            // three UTF-8 bytes in a well-formed file.
+            let max_bytes = 3 * limits.max_source_units;
+            let mut source = String::new();
+            std::fs::File::open(key)
+                .and_then(|file| file.take(max_bytes as u64 + 1).read_to_string(&mut source))
+                .map_err(|error| format!("read module fixture: {error}"))?;
+            if source.len() > max_bytes {
+                return Err("module is too large".into());
+            }
+            parse_source(&source).map_err(str::to_owned)
+        },
+    )
+    .map_err(|error| match error {
+        GraphError::UnresolvedExport { .. } | GraphError::Parse(ParseError::Syntax(_)) => {
+            TestError::Resolution(format!("{error:?}"))
+        }
+        other => TestError::Host(format!("{other:?}")),
+    })?;
+    agent
+        .evaluate_module_graph(&graph, &limits)
+        .map(Value::object)
+        .map_err(|error| match error {
+            ModuleEvalError::Runtime(abrupt) => TestError::Runtime(abrupt.into()),
+            other => TestError::Host(other.to_string()),
+        })
+}
+
+fn resolve_fixture(
+    root: &Path,
+    referrer: &Path,
+    request: &ModuleRequest,
+) -> Result<PathBuf, String> {
+    if !request.attributes().is_empty() {
+        return Err("this Test262 host loads source text module fixtures".into());
+    }
+    let specifier = String::from_utf16(request.specifier())
+        .map_err(|_| "module specifier is not valid UTF-16")?;
+    let relative = specifier
+        .strip_prefix("./")
+        .ok_or("expected a relative module specifier")?;
+    let relative = Path::new(relative);
+    if relative
+        .extension()
+        .is_none_or(|extension| extension != "js")
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err("expected a JavaScript fixture inside the checkout".into());
+    }
+    let path = referrer
+        .parent()
+        .ok_or("module has no containing directory")?
+        .join(relative)
+        .canonicalize()
+        .map_err(|error| format!("locate module fixture: {error}"))?;
+    if path.strip_prefix(root).is_err() || !path.is_file() {
+        return Err("module fixture is outside the checkout or is not a regular file".into());
+    }
+    Ok(path)
+}
+
 fn execute_mode(
     text: &str,
     meta: &Metadata,
     harness: &Harness,
     limits: RunLimits,
-    strict: bool,
+    mode: TestMode<'_>,
 ) -> Result<(), String> {
     let mut agent =
         Agent::with_heap_limit(limits.heap_bytes).map_err(|_| "no memory for an agent")?;
@@ -409,36 +514,45 @@ fn execute_mode(
             }
         }
     }
-    let full;
-    let source = if strict {
-        full = format!("\"use strict\";\n{text}");
-        &full
-    } else {
-        text
+    let result = match mode {
+        TestMode::Script { strict: true } => agent
+            .evaluate(&format!("\"use strict\";\n{text}"))
+            .map_err(TestError::from),
+        TestMode::Script { strict: false } => agent.evaluate(text).map_err(TestError::from),
+        TestMode::Module { path, root } => execute_module(&mut agent, text, path, root),
     };
-    let result = agent.evaluate(source);
-    // A microtask checkpoint after the script, as a host runs one.
-    let result = match result {
-        Ok(v) => settle(&mut agent).map(|()| v).map_err(EvalError::from),
-        Err(e) => Err(e),
+    // A microtask checkpoint after evaluation, as a host runs one.
+    let result = result.and_then(|v| {
+        settle(&mut agent)
+            .map(|()| v)
+            .map_err(|error| TestError::Runtime(error.into()))
+    });
+    let reason = |agent: &mut Agent, error: &TestError| match error {
+        TestError::Runtime(error) => describe(agent, error),
+        TestError::Resolution(error) | TestError::Host(error) => error.clone(),
     };
     match (&meta.negative, result) {
         (None, Ok(_)) if meta.is_async => async_outcome(&mut agent),
         (None, Ok(_)) => Ok(()),
-        (None, Err(error)) => Err(describe(&mut agent, &error)),
+        (None, Err(error)) => Err(reason(&mut agent, &error)),
         (Some(negative), Ok(_)) => Err(format!("ran, but must throw {}", negative.error)),
         (Some(negative), Err(error)) => {
             let (phase, name) = match &error {
-                EvalError::Parse(ParseError::Syntax(_)) => (Phase::Parse, "SyntaxError".to_owned()),
-                EvalError::Throw(value) => (Phase::Runtime, error_name(&mut agent, *value)),
-                _ => return Err(describe(&mut agent, &error)),
+                TestError::Runtime(EvalError::Parse(ParseError::Syntax(_))) => {
+                    (Phase::Parse, "SyntaxError".to_owned())
+                }
+                TestError::Runtime(EvalError::Throw(value)) => {
+                    (Phase::Runtime, error_name(&mut agent, *value))
+                }
+                TestError::Resolution(_) => (Phase::Resolution, "SyntaxError".to_owned()),
+                _ => return Err(reason(&mut agent, &error)),
             };
             if phase == negative.phase && name == negative.error {
                 Ok(())
             } else {
                 Err(format!(
                     "{}, but must throw {} in the {:?} phase",
-                    describe(&mut agent, &error),
+                    reason(&mut agent, &error),
                     negative.error,
                     negative.phase
                 ))
@@ -564,23 +678,74 @@ pub fn execute_tree(
     directory: &str,
     limits: RunLimits,
 ) -> io::Result<ExecutionReport> {
-    let harness = Harness::load(root)?;
+    execute_tree_with(root, directory, limits, false)
+}
+
+/// Run only tests flagged `module`, with a local static-module host.
+pub fn execute_module_tree(
+    root: &Path,
+    directory: &str,
+    limits: RunLimits,
+) -> io::Result<ExecutionReport> {
+    execute_tree_with(root, directory, limits, true)
+}
+
+fn execute_tree_with(
+    root: &Path,
+    directory: &str,
+    limits: RunLimits,
+    modules_only: bool,
+) -> io::Result<ExecutionReport> {
+    let root = root.canonicalize()?;
+    let harness = Harness::load(&root)?;
     let mut files = Vec::new();
     walk(&root.join(directory), &mut files)?;
     let mut report = ExecutionReport::default();
     for path in &files {
-        let text = std::fs::read_to_string(path)?;
+        let canonical = if modules_only {
+            let canonical = path.canonicalize()?;
+            if canonical.strip_prefix(&root).is_err() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "module test is outside the checkout",
+                ));
+            }
+            Some(canonical)
+        } else {
+            None
+        };
+        let text = std::fs::read_to_string(canonical.as_ref().unwrap_or(path))?;
         let Some(meta) = metadata(&text) else {
             continue;
         };
+        if modules_only && !meta.module {
+            continue;
+        }
         let relative: Vec<String> = path
-            .strip_prefix(root)
+            .strip_prefix(&root)
             .unwrap_or(path)
             .components()
             .map(|c| c.as_os_str().to_string_lossy().into_owned())
             .collect();
         let relative = relative.join("/");
-        match execute(&text, &meta, &harness, limits) {
+        let verdict = if !modules_only {
+            execute(&text, &meta, &harness, limits)
+        } else if meta.unsupported() {
+            Verdict::Skip("proposal")
+        } else {
+            let mode = TestMode::Module {
+                path: canonical
+                    .as_deref()
+                    .expect("module paths were canonicalized"),
+                root: &root,
+            };
+            match std::panic::catch_unwind(|| execute_mode(&text, &meta, &harness, limits, mode)) {
+                Ok(Ok(())) => Verdict::Pass,
+                Ok(Err(reason)) => Verdict::Fail(format!("module: {reason}")),
+                Err(_) => Verdict::Fail("module: the engine panicked".into()),
+            }
+        };
+        match verdict {
             Verdict::Pass => report.passed.push(relative),
             Verdict::Fail(reason) => report.failed.push((relative, reason)),
             Verdict::Skip(reason) => report.skipped.push((relative, reason)),

@@ -430,3 +430,35 @@ fn modules_reject_unsupported_execution_before_running_dependencies() {
         "undefined"
     );
 }
+
+#[test]
+fn import_meta_is_lazy_and_distinct_for_each_module() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            (
+                "entry",
+                r#"
+                import { metadata } from "dep";
+                export function own() { return import.meta; }
+                own().label = "entry";
+                export const valid = own() === import.meta
+                    && metadata() !== own()
+                    && Object.getPrototypeOf(own()) === null
+                    && metadata().label === undefined;
+            "#,
+            ),
+            ("dep", "export function metadata() { return import.meta; }"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let valid = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, valid), Ok(Value::TRUE));
+}

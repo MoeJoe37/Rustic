@@ -124,6 +124,8 @@ pub enum Op {
 
     /// `dst = scope slot`, `hops` scopes out, with a TDZ check.
     GetSlot { dst: Reg, hops: u16, slot: u16 },
+    /// Get the module's import.meta, allocating it on its first access.
+    ImportMeta { dst: Reg, hops: u16, slot: u16 },
     /// Store into a scope slot, checking the TDZ and mutability.
     SetSlot { src: Reg, hops: u16, slot: u16 },
     /// Initialize a scope slot (declarations; no checks).

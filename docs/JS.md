@@ -185,7 +185,9 @@ In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
 Temporal, `$262.agent` (112 `Atomics` files) or `$262` realms. Skipped files are never
-counted as passing. Module files join with JS-06 module loading (TD-105).
+counted as passing. The script gate continues to report module files as
+skipped. Their execution classifications are recorded by the separate module
+gate below.
 
 ## Fuzzing
 
@@ -676,9 +678,32 @@ live data descriptors. Ambiguous star exports are omitted. Import slots and
 namespace properties trace their targets through garbage collection, and the
 host may keep a namespace alive with `Agent::root`. See [ADR 0019](adr/0019-static-module-evaluation.md).
 
-Top-level await, dynamic imports, `import.meta`, and the Test262 module gate
-remain open under TD-97 and TD-105. Run the static graph and evaluation
-regressions with `cargo test --locked -p rustic-js --test module`.
+A module creates its null-prototype `import.meta` object on first access and
+shares it with its nested functions. The standalone evaluator provides an
+empty object that script can extend. Host-specific metadata, top-level await
+and dynamic imports remain open under TD-97.
+
+The Test262 module runner selects files flagged `module`, reads relative
+JavaScript fixtures within the checkout, and distinguishes parse, resolution
+and runtime failures. It uses the same harness, heap and step budgets as
+the script runner. At revision `48221d7c1f7745dc13e420a2e850a248c0b2afb4`,
+817 module files were selected. Of the 696 executed, 382 passed and 314
+failed. The remaining 121 were skipped for proposal features. The failures
+require top-level await (245), dynamic import (39), or a fixture loader for
+import attributes (30). All verdicts are pinned in
+`tests/fixtures/test262_modules.txt`.
+
+```sh
+cargo test --locked -p rustic-js --test module
+RUSTIC_TEST262_DIR=/absolute/path/to/test262 \
+  cargo test --locked --release -p rustic-js --test test262 test262_module_execution -- --ignored
+cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 \
+  test/language --modules --list module-verdicts.tsv
+```
+
+To update the fixture after a verified change, strip the `test/language/`
+prefix and retain the first word of each verdict. Keep the counts, revision
+and tracked limitations current.
 
 [modules]: https://262.ecma-international.org/17.0/index.html#sec-source-text-module-records
 

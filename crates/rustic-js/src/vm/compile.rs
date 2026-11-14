@@ -17,7 +17,7 @@ use super::bytecode::{
     UNMAPPED_PARAMETER, UnOp, declare,
 };
 use super::scope::{
-    BRAND, BindingKind, CLASS, DEFAULT_EXPORT, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER,
+    BRAND, BindingKind, CLASS, DEFAULT_EXPORT, FIELD_INIT, IMPORT_META, NEW_TARGET, PRIVATE_GETTER,
     PRIVATE_SETTER, PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId,
     ScopeKind, ScopeTree, THIS, field_key_name, is_direct_eval, private_name, private_setter_name,
 };
@@ -3793,8 +3793,23 @@ impl<'a, 't> Gen<'a, 't> {
             }
             ExpressionKind::Parenthesized(inner) => self.expr(inner, dst)?,
             ExpressionKind::NewTarget => self.load_new_target(dst)?,
-            ExpressionKind::ImportMeta | ExpressionKind::ImportCall { .. } => {
-                return Err(CompileError::Unsupported("modules", e.span));
+            ExpressionKind::ImportMeta => {
+                let index =
+                    self.tree.scopes[0]
+                        .find(IMPORT_META)
+                        .ok_or(CompileError::Unsupported(
+                            "import.meta outside a module",
+                            e.span,
+                        ))?;
+                let slot = self.slot_of(0, index);
+                self.emit(Op::ImportMeta {
+                    dst,
+                    hops: self.hops(0),
+                    slot,
+                });
+            }
+            ExpressionKind::ImportCall { .. } => {
+                return Err(CompileError::Unsupported("dynamic import", e.span));
             }
             ExpressionKind::Yield {
                 argument,

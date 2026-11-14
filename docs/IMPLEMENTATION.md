@@ -1479,3 +1479,13 @@ property semantics, garbage collection, and rejection before script side
 effects when top-level await cannot compile. Asynchronous evaluation,
 dynamic imports, `import.meta` and the module conformance gate remain in
 TD-97 and TD-105.
+
+## JS-07 — Static module Test262 baseline
+
+The standalone evaluator creates a lazy per-module `import.meta` object.
+The Test262 runner loads relative source text fixtures from the checkout and
+records module verdicts separately from the existing script baselines.
+The pinned `test/language` module selection has 382 passes, 314 failures
+and 121 proposal skips, with zero engine panics reported. The failures cover
+top-level await, dynamic import and fixtures with import attributes.
+See [JS.md](JS.md#static-module-loading-js-06) and TD-97/105.

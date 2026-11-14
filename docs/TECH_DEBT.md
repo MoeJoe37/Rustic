@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, `perf.gc` (M12); measured by JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Modules are rejected by the bytecode compiler (generators, async functions, async generators and RegExp literals paid) | Open, JS-06 |
+| TD-97 | Deliberate | JS | Asynchronous module execution, dynamic imports and host-provided module metadata remain open | Open, JS-06 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
@@ -136,7 +136,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
-| TD-105 | Deliberate | JS | The Test262 runner skips module files, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
+| TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
@@ -1399,8 +1399,8 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. The synchronous module compiler rejects top-level await, `import.meta`
-and dynamic imports with a source span before any module body runs. A regular
+calls. The synchronous module compiler rejects top-level await and dynamic
+imports with a source span before any module body runs. A regular
 expression literal that uses a Unicode property escape also fails explicitly
 (TD-110).
 
@@ -1410,9 +1410,9 @@ were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
 generators with `for await` (JS-08 part 2) were paid the same day, and
 RegExp literals (JS-08 part 3) after them. JS-06 now loads and validates static dependency graphs through host callbacks.
 Module environments, live bindings, namespace objects and synchronous bytecode
-evaluation are implemented in JS-06. Pay the remaining debt with top-level
-await, dynamic imports and host-provided `import.meta`. Trigger: the module
-Test262 gate (JS-07).
+evaluation are implemented in JS-06. Each module now lazily creates its own
+`import.meta` object. Pay the remaining debt with top-level await, dynamic
+imports and host-provided metadata. Trigger: the module Test262 gate (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1507,19 +1507,19 @@ captures one variable costs 64 bytes instead of 112.
 
 ### TD-105 — Test262 runner coverage
 
-The execution runner (JS-07) skips files flagged `module` (1,405 of 23,832
-in `test/language` together with proposal features; async files run since
-JS-06 part 1), does not
-provide the `$262` host object (`createRealm`, `evalScript`, `detachArrayBuffer`,
-`agent`), and its gate covers `test/language` and the `test/built-ins`
-directories of the library areas installed so far. Skipped files are counted
-as skipped, never as passing, so published percentages always state their
-base.
+The script runner preserves its exact passing lists for `test/language`
+and the installed areas of `test/built-ins`. The separate module runner
+(JS-07) pins pass, fail and skip verdicts for the 817 files flagged
+`module` in `test/language`. Of the 696 executed, 382 pass. Top-level
+await, dynamic imports and loading fixtures with import attributes account
+for the other 314. The remaining 121 use proposal features. See the
+[Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
+and reproduction commands.
 
-Pay with: each further `test/built-ins` directory in the gate as JS-05 lands
-its library area;
-module files when module loading exists (JS-06);
-`$262` with realms (JS-06). Trigger: each of those steps.
+Pay with the asynchronous module execution and import hooks in JS-06,
+fixture support where a test requires import attributes, and `$262` with
+realms, `evalScript`, collection and test agents. Extend the built-in gate
+when new library areas land. Trigger on each implementation.
 
 ### TD-106 — No function source text (eval part paid)
 

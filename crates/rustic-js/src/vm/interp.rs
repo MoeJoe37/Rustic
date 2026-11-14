@@ -1038,6 +1038,15 @@ impl Agent {
                     }
                     reg!(dst) = value;
                 }
+                Op::ImportMeta { dst, hops, slot } => {
+                    let module = self.env_outer_n(env, hops);
+                    let mut value = self.env_slot(module, slot);
+                    if value == Value::UNINITIALIZED {
+                        value = Value::object(t!(self.new_object_with(None)));
+                        self.set_env_slot(module, slot, value);
+                    }
+                    reg!(dst) = value;
+                }
                 Op::SetSlot { src, hops, slot } => {
                     let scope = self.env_outer_n(env, hops);
                     let (name, flags) = self.env_slot_binding(scope, slot);

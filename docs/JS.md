@@ -1030,3 +1030,19 @@ python3 tools/generate_js_locale_data.py /path/to/pinned/locale-inputs --check
 RUSTIC_TEST262_DIR=/path/to/test262 cargo test --locked --release -p rustic-js \
   --test test262 test262_locale_identifiers_and_case_mapping -- --ignored
 ```
+
+## Intl list formatting (JS-08)
+
+`Intl.ListFormat` implements `format`, `formatToParts`, `resolvedOptions`
+and `supportedLocalesOf` with the nine CLDR 48 type/style combinations.
+Locale lookup strips extensions for matching, walks parent tags and uses
+`en-US` as Rustic's deterministic default. The best-fit option also
+tries likely subtags when lookup fails. The formatter resolves inherited
+CLDR templates at generation time and walks the parts in linear time.
+It preserves each string's UTF-16 code units and closes the iterator when
+it encounters a non-string element.
+
+The combined pinned Intl selection passes 313 of 318 files, including
+80 of 81 ListFormat cases. The ListFormat constructor's cross-realm
+prototype case depends on realms. Context-dependent conjunctions and
+specialized best-fit matching remain open under TD-117.

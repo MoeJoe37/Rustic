@@ -3567,3 +3567,29 @@ fn intl_locale_keeps_its_tag_alive_and_supplies_locale_preferences() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_list_format_preserves_utf16_and_closes_invalid_iterables() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        const locale = new Intl.Locale('es-ES-u-nu-latn');
+        const formatter = new Intl.ListFormat(locale, {type: 'unit', style: 'short'});
+        const parts = formatter.formatToParts((function* () { yield '\uD800'; yield 'dos'; })());
+        let closed = false;
+        let invalid = false;
+        const values = (function* () {
+            try { yield 'good'; yield {}; } finally { closed = true; }
+        })();
+        try { formatter.format(values); } catch (error) { invalid = error instanceof TypeError; }
+        const supported = Intl.ListFormat.supportedLocalesOf([locale, 'zxx'], {localeMatcher: 'lookup'});
+        invalid && closed && formatter.resolvedOptions().locale === 'es-ES'
+            && supported.join(',') === 'es-ES-u-nu-latn'
+            && formatter.format(['uno', 'dos', 'tres']) === 'uno, dos, tres'
+            && parts.length === 3 && parts[0].type === 'element'
+            && parts[0].value.charCodeAt(0) === 0xD800
+            && parts[1].type === 'literal' && parts[1].value === ' y '
+            && parts[2].value === 'dos';
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

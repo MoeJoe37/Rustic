@@ -305,6 +305,13 @@ impl IteratorKind {
 pub(crate) enum Internal {
     /// Canonical Unicode locale identifier of an Intl.Locale.
     Locale(StringId),
+    /// The resolved locale and template set for Intl.ListFormat.
+    ListFormat {
+        locale: &'static str,
+        group: usize,
+        kind: usize,
+        style: usize,
+    },
     /// A built-in iterator: what it walks and the next position.
     /// `target` is undefined once the iterator is exhausted.
     Iterator {

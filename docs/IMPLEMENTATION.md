@@ -1574,3 +1574,14 @@ retain the tag and locale-list coercion reads the internal slot. The
 constructor, prototype, accessors and methods increase the 64-bit standard
 library heap report by 5,978 bytes. Realms, service negotiation, collation
 and the Intl service constructors remain open.
+
+## JS-08 — Intl.ListFormat and locale lookup
+
+`Intl.ListFormat` uses generated CLDR 48 templates and a shared locale
+matcher. It exposes formatted strings, parts, resolved options and supported
+locale filtering. The focused tests exercise option handling, iterator
+closing and preservation of lone surrogates. The pinned Test262 selection
+passes 313 of 318 Intl files, including 80 of 81 ListFormat files. The
+constructor, prototype and methods increase the standard-library heap
+report by 1,237 bytes. TD-117 records the remaining list-formatting and
+best-fit limits.

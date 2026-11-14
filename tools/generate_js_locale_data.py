@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import json
 import subprocess
 import xml.etree.ElementTree as ET
 from io import BytesIO
@@ -105,6 +106,83 @@ def main_and_collation(directory, supplemental):
     return numbers, result
 
 
+def list_patterns(directory, supplemental):
+    patterns = {}
+    locales = set()
+    parents = {}
+    for table in supplemental.findall("parentLocales"):
+        if "component" in table.attrib:
+            continue
+        for entry in table.findall("parentLocale"):
+            parent = entry.attrib["parent"].replace("_", "-")
+            parents.update({tag.replace("_", "-"): parent for tag in entry.attrib["locales"].split()})
+    with ZipFile(BytesIO(read(directory, "core.zip"))) as archive:
+        for path in archive.namelist():
+            if not path.startswith("common/main/") or not path.endswith(".xml"):
+                continue
+            root = ET.fromstring(archive.read(path))
+            tag = path.rpartition("/")[2].removesuffix(".xml").replace("_", "-")
+            locales.add(tag)
+            values = {}
+            for pattern in root.findall("listPatterns/listPattern"):
+                kind = pattern.get("type", "standard")
+                for entry in pattern.findall("listPatternPart"):
+                    if entry.get("alt") is None and entry.text not in ("↑↑↑", "∅∅∅"):
+                        template = entry.text
+                        if (template.count("{0}") != 1 or template.count("{1}") != 1
+                                or template.index("{0}") > template.index("{1}")):
+                            raise ValueError(f"unsupported list template in {tag}: {template!r}")
+                        values[kind, entry.attrib["type"]] = template
+            if values:
+                patterns[tag] = values
+
+    root_aliases = {
+        "or-narrow": "or-short", "or-short": "or",
+        "standard-narrow": "standard-short", "standard-short": "standard",
+        "unit": "unit-short", "unit-narrow": "unit-short", "unit-short": "standard",
+    }
+
+    def resolve(tag, kind, part):
+        while True:
+            candidate = tag
+            while True:
+                value = patterns.get(candidate, {}).get((kind, part))
+                if value is not None:
+                    return value
+                if candidate == "root":
+                    break
+                candidate = parents.get(candidate, candidate.rpartition("-")[0] or "root")
+            # Root's local aliases restart lookup at the requested locale.
+            kind = root_aliases[kind]
+
+    def rust_string(value):
+        return json.dumps(value, ensure_ascii=False).replace("\u200b", r"\u{200b}")
+
+    table = []
+    groups = {}
+    # Include data-inheriting locales so a request can resolve to that locale
+    # even when its templates are identical to its parent.
+    for tag in sorted(locales - {"root", "zxx"}):
+        group = tuple(
+            resolve(tag, base + suffix, part)
+            for base in ("standard", "or", "unit")
+            for suffix in ("", "-short", "-narrow")
+            for part in ("2", "start", "middle", "end")
+        )
+        number = groups.setdefault(group, len(groups))
+        table.append((tag, number))
+    lines = ["pub(super) const LIST_LOCALES: &[(&str, usize)] = &["]
+    lines.extend(f'    ("{tag}", {number}),' for tag, number in table)
+    lines.extend(("];", "", "pub(super) const LIST_PATTERNS: &[[[&str; 4]; 9]] = &["))
+    for group in groups:
+        lines.append("    [")
+        for index in range(0, len(group), 4):
+            entries = ", ".join(rust_string(value) for value in group[index:index + 4])
+            lines.append(f"        [{entries}],")
+        lines.append("    ],")
+    return [*lines, "];", ""]
+
+
 def preference_data(directory):
     supplemental = ET.fromstring(read(directory, "supplemental/supplementalData.xml"))
     calendars = {}
@@ -162,6 +240,7 @@ def preference_data(directory):
     lines.append("pub(super) const SCRIPT_DIRECTIONS: &[(&str, &str)] = &[")
     lines.extend(f'    ("{key}", "{value}"),' for key, value in sorted(directions.items()))
     lines.extend(("];", ""))
+    lines.extend(list_patterns(directory, supplemental))
     return lines
 
 

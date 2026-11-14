@@ -7,9 +7,11 @@ use crate::runtime::{Agent, ErrorKind, JsResult, PropertyDescriptor, PropertyKey
 
 mod case;
 mod data;
+mod list_format;
 mod locale;
 mod locale_info;
 mod locale_object;
+mod matching;
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let intl = agent.new_object()?;
@@ -19,6 +21,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         &[method("getCanonicalLocales", get_canonical_locales, 1)],
     )?;
     locale_object::install(agent, intl)?;
+    list_format::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(

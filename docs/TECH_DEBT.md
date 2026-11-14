@@ -148,6 +148,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
 | TD-115 | Deliberate | JS | A `SharedArrayBuffer` is shared within one agent only (no cross-agent byte store until workers); typed array elements are read through the generic property path | Open, M9 workers / `perf.interpreter` |
 | TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
+| TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1705,3 +1706,17 @@ units, leaving `Heap::string` for strings known to be flat. Trigger: a host
 that needs the limit to hold between safe points (a hard per-renderer cap in
 M7), or a fuzz finding that reaches the overshoot.
 
+
+### TD-117 — List formatting context and best-fit locale matching
+
+CLDR list templates are installed for all locale data in the pinned CLDR 48
+main archive. Their selection uses locale, type, style and list length.
+Language rules that inspect an adjacent string remain open, including
+Spanish conjunction and Hebrew separator changes. Best fit shares the
+prefix matcher and tries likely-subtag expansion when a prefix is absent.
+It has no language-distance table or configurable embedder default.
+
+Pay with contextual template selection for the affected languages and a
+bounded locale-distance matcher shared by Intl services. Trigger when
+implementing the next service that needs these rules or adding a conformance
+case for a contextual form.

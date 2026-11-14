@@ -239,13 +239,14 @@ fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
         &[
             "test/intl402/Intl/getCanonicalLocales",
             "test/intl402/Locale",
+            "test/intl402/ListFormat",
             "test/intl402/String/prototype/toLocaleLowerCase",
             "test/intl402/String/prototype/toLocaleUpperCase",
         ],
         "test/intl402/",
         INTL_PASSING,
         "test262_intl_passing.txt",
-        "Test262 Intl locale identifiers, Locale objects and casing (JS-08).",
+        "Test262 Intl locale identifiers, Locale objects, list formatting and casing (JS-08).",
     );
 }
 

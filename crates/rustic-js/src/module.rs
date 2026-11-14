@@ -2,8 +2,10 @@
 
 use std::collections::HashMap;
 
+mod asynchronous;
 mod evaluate;
 mod graph;
+pub(crate) use asynchronous::AsyncModuleGraph;
 pub use evaluate::ModuleEvalError;
 pub(crate) use evaluate::ModuleInstance;
 pub use graph::{GraphError, GraphLimits, ModuleGraph, ResolvedBinding, ResolvedExport};

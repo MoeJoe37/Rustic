@@ -433,6 +433,7 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
+                Some(Internal::ModuleEvaluation(graph)) => graph.trace(self),
                 Some(Internal::Captures(values)) => {
                     for &v in values.iter() {
                         self.value(v);
@@ -517,6 +518,7 @@ fn object_footprint(object: &Object) -> usize {
                     + std::mem::size_of::<super::object::Reaction>()
                         * (promise.fulfill_reactions.len() + promise.reject_reactions.len())
             }
+            Some(Internal::ModuleEvaluation(graph)) => graph.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
             Some(Internal::RegExp { matcher, .. }) => matcher.footprint(),
             Some(Internal::Registry { cells, pending }) => {

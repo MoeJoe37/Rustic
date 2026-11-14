@@ -185,6 +185,7 @@ impl Scope {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ScopeTree {
     pub scopes: Vec<Scope>,
+    pub(crate) top_level_await: Option<crate::Span>,
     /// AST node (address and type) → the scope it introduces.
     by_node: HashMap<NodeKey, ScopeId>,
 }
@@ -914,6 +915,9 @@ impl Resolver {
             | StatementKind::ForOf {
                 left, right, body, ..
             } => {
+                if matches!(s.kind, StatementKind::ForOf { is_await: true, .. }) {
+                    self.record_top_level_await(s.span);
+                }
                 self.expression(right);
                 let scope = self.open(ScopeKind::Block, Some(node_key(s, ROLE_SELF)), false);
                 match left {
@@ -1192,6 +1196,17 @@ impl Resolver {
         }
     }
 
+    fn record_top_level_await(&mut self, span: crate::Span) {
+        if self.tree.scopes[0].kind == ScopeKind::Module
+            && self
+                .stack
+                .iter()
+                .all(|&id| self.tree.scopes[id].kind != ScopeKind::Function)
+        {
+            self.tree.top_level_await.get_or_insert(span);
+        }
+    }
+
     fn expression(&mut self, e: &Expression) {
         // Left-nested chains can be very deep: walk their spine with an
         // explicit stack.
@@ -1247,7 +1262,11 @@ impl Resolver {
                 ExpressionKind::Function(f) => self.function(f, true),
                 ExpressionKind::Arrow(f) => self.arrow(f),
                 ExpressionKind::Class(c) => self.class(c),
-                ExpressionKind::Unary { argument, .. } | ExpressionKind::Await(argument) => {
+                ExpressionKind::Await(argument) => {
+                    self.record_top_level_await(e.span);
+                    pending.push(argument);
+                }
+                ExpressionKind::Unary { argument, .. } => {
                     pending.push(argument);
                 }
                 ExpressionKind::Update { target, .. } => self.pattern(target),

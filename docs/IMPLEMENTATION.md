@@ -1521,3 +1521,11 @@ own metadata object, shared with nested functions and retained by the traced
 module environment. Each supplied property consumes graph work and heap
 storage. The default evaluator retains its lazy empty object. See
 [JS.md](JS.md#static-module-loading-js-06).
+
+## JS-06 — Top-level await in static graphs
+
+The asynchronous module entry point links the complete graph before execution.
+It tracks cycles and pending dependencies with iterative traversal and resumes
+module bodies through the existing promise queue. The pinned module gate gains
+241 passes, reaching 623 of 696 executed files with 121 proposal skips.
+Dynamic import and import-attribute fixtures remain open under TD-97/105.

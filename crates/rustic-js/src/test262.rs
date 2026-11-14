@@ -431,13 +431,29 @@ fn execute_module(
         }
         other => TestError::Host(format!("{other:?}")),
     })?;
-    agent
-        .evaluate_module_graph(&graph, &limits)
-        .map(Value::object)
+    let (_, completion) = agent
+        .start_module_evaluation(&graph, &limits)
         .map_err(|error| match error {
             ModuleEvalError::Runtime(abrupt) => TestError::Runtime(abrupt.into()),
             other => TestError::Host(other.to_string()),
-        })
+        })?;
+    let root = agent
+        .root(Value::object(completion))
+        .map_err(|_| EvalError::OutOfMemory)?;
+    let settled = settle(agent);
+    let result = match agent.promise_rejected(completion) {
+        Some(false) => Ok(Value::UNDEFINED),
+        Some(true) => Err(EvalError::Throw(
+            agent.promise_result(completion).expect("rejection reason"),
+        )
+        .into()),
+        None => Err(TestError::Host(
+            "module evaluation is still pending after jobs ran".into(),
+        )),
+    };
+    agent.unroot(root);
+    settled.map_err(EvalError::from)?;
+    result
 }
 
 fn resolve_fixture(
@@ -523,11 +539,14 @@ fn execute_mode(
         TestMode::Module { path, root } => execute_module(&mut agent, text, path, root),
     };
     // A microtask checkpoint after evaluation, as a host runs one.
-    let result = result.and_then(|v| {
-        settle(&mut agent)
-            .map(|()| v)
-            .map_err(|error| TestError::Runtime(error.into()))
-    });
+    let result = match mode {
+        TestMode::Module { .. } => result,
+        TestMode::Script { .. } => result.and_then(|v| {
+            settle(&mut agent)
+                .map(|()| v)
+                .map_err(|error| TestError::Runtime(error.into()))
+        }),
+    };
     let reason = |agent: &mut Agent, error: &TestError| match error {
         TestError::Runtime(error) => describe(agent, error),
         TestError::Resolution(error) | TestError::Host(error) => error.clone(),

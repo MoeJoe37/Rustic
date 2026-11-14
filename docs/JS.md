@@ -689,17 +689,23 @@ By default, the evaluator creates the empty object on first access.
 `Agent::evaluate_module_graph_with_metadata` loads host-provided UTF-16 string
 properties during instantiation for modules that reference `import.meta`.
 The host receives each module's opaque key. Properties use the graph work
-budget and the agent heap budget. Top-level await and dynamic imports remain
-open under TD-97.
+budget and the agent heap budget.
+
+`Agent::start_module_evaluation` returns the entry namespace and a completion
+promise. Top-level `await` and `for await` use the existing promise jobs and
+suspended frames. An asynchronous dependency delays its importers while
+independent siblings can run immediately. The host drives microtask checkpoints
+and roots the returned handles across collection. Dynamic imports remain open
+under TD-97.
 
 The Test262 module runner selects files flagged `module`, reads relative
 JavaScript fixtures within the checkout, and distinguishes parse, resolution
 and runtime failures. It uses the same harness, heap and step budgets as
 the script runner. At revision `48221d7c1f7745dc13e420a2e850a248c0b2afb4`,
-817 module files were selected. Of the 696 executed, 382 passed and 314
-failed. The remaining 121 were skipped for proposal features. The failures
-require top-level await (245), dynamic import (39), or a fixture loader for
-import attributes (30). All verdicts are pinned in
+817 module files were selected. Of the 696 executed, 623 passed and 73
+failed. The remaining 121 were skipped for proposal features. Top-level await
+added 241 passes. The remaining failures require dynamic imports or fixture
+support for import attributes. All verdicts are pinned in
 `tests/fixtures/test262_modules.txt`.
 
 ```sh

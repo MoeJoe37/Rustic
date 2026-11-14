@@ -1399,8 +1399,9 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. The synchronous module compiler rejects top-level await and dynamic
-imports with a source span before any module body runs. A regular
+calls. The asynchronous module evaluator runs top-level await. Dynamic
+imports still fail at compile time, and the synchronous module entry point
+rejects graphs that contain top-level await before any module body runs. A regular
 expression literal that uses a Unicode property escape also fails explicitly
 (TD-110).
 
@@ -1413,7 +1414,7 @@ Module environments, live bindings, namespace objects and synchronous bytecode
 evaluation are implemented in JS-06. Each module now lazily creates its own
 `import.meta` object when the host supplies no properties. A host can provide
 string metadata when it instantiates the graph. Pay the remaining execution
-debt with top-level await and dynamic imports. Trigger: the module Test262 gate
+debt with dynamic imports. Trigger: the module Test262 gate
 (JS-07).
 
 ### TD-98 — Eager function prototypes (Paid)
@@ -1512,13 +1513,13 @@ captures one variable costs 64 bytes instead of 112.
 The script runner preserves its exact passing lists for `test/language`
 and the installed areas of `test/built-ins`. The separate module runner
 (JS-07) pins pass, fail and skip verdicts for the 817 files flagged
-`module` in `test/language`. Of the 696 executed, 382 pass. Top-level
-await, dynamic imports and loading fixtures with import attributes account
-for the other 314. The remaining 121 use proposal features. See the
+`module` in `test/language`. Of the 696 executed, 623 pass. Dynamic imports
+and loading fixtures with import attributes account for the other 73.
+The remaining 121 use proposal features. See the
 [Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
 and reproduction commands.
 
-Pay with the asynchronous module execution and import hooks in JS-06,
+Pay with the dynamic import hooks in JS-06,
 fixture support where a test requires import attributes, and `$262` with
 realms, collection and test agents. `$262.evalScript` now runs UTF-16
 script source against the current global environment. Extend the built-in gate

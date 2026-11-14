@@ -432,6 +432,64 @@ fn modules_reject_unsupported_execution_before_running_dependencies() {
 }
 
 #[test]
+fn top_level_await_allows_siblings_and_delays_importers() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Roots, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(&[
+        ("entry", "import { value } from 'async'; import 'sibling'; export const result = value; log += 'entry ';"),
+        ("async", "log += 'async '; await new Promise(r => globalThis.release = r); export const value = 42;"),
+        ("sibling", "log += 'sibling ';"),
+    ], &limits).unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate("var log = ''").unwrap();
+    let (namespace, completion) = agent.start_module_evaluation(&graph, &limits).unwrap();
+    let namespace_root = agent.root(Value::object(namespace)).unwrap();
+    let completion_root = agent.root(Value::object(completion)).unwrap();
+    agent.collect_garbage(Roots::default());
+    let log = agent.evaluate("log").unwrap();
+    assert_eq!(
+        agent.heap.string(log.as_string().unwrap()).to_text(),
+        "async sibling "
+    );
+    assert_eq!(agent.promise_rejected(completion), None);
+    agent.evaluate("release()").unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(completion), Some(false));
+    let result = agent.heap.key("result").unwrap();
+    assert_eq!(agent.get(namespace, result), Ok(Value::number(42.0)));
+    assert!(agent.unroot(namespace_root));
+    assert!(agent.unroot(completion_root));
+}
+
+#[test]
+fn top_level_await_rejects_cyclic_importers_without_running_their_bodies() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            ("entry", "import 'a'; var never; globalThis.ran = true;"),
+            ("a", "import 'b';"),
+            ("b", "import 'a'; await Promise.reject(71);"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    let (_, completion) = agent.start_module_evaluation(&graph, &limits).unwrap();
+    let root = agent.root(Value::object(completion)).unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(completion), Some(true));
+    assert_eq!(agent.promise_result(completion), Some(Value::number(71.0)));
+    assert_eq!(agent.evaluate("'ran' in globalThis"), Ok(Value::FALSE));
+    assert!(agent.unroot(root));
+}
+
+#[test]
 fn import_meta_is_lazy_and_distinct_for_each_module() {
     use rustic_js::module::GraphLimits;
     use rustic_js::runtime::{Agent, Value};

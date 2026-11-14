@@ -361,6 +361,8 @@ pub(crate) enum Internal {
     Generator(Box<Generator>),
     /// A promise's internal slots (§27.2.6).
     Promise(Box<PromiseRecord>),
+    /// Suspended evaluation state for a graph of source text modules.
+    ModuleEvaluation(Box<crate::module::AsyncModuleGraph>),
     /// A Proxy exotic object (§10.5): `[[ProxyTarget]]` and
     /// `[[ProxyHandler]]`, both `None` once revoked.
     Proxy {
@@ -428,14 +430,20 @@ pub(crate) struct Reaction {
     /// The handler: a function, undefined (pass the value on), or for an
     /// `await` the suspended async function's state object.
     pub handler: Value,
-    /// The reaction resumes an `await` rather than calling `handler`.
-    pub awaiting: bool,
+    pub kind: ReactionKind,
     /// The capability's promise, or undefined for none. When `resolve`
     /// is undefined the promise is an intrinsic promise that nothing else
     /// can settle, and the job settles it directly.
     pub promise: Value,
     pub resolve: Value,
     pub reject: Value,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ReactionKind {
+    Call,
+    Await,
+    Module(u32),
 }
 
 impl Reaction {

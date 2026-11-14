@@ -92,10 +92,23 @@ pub(crate) struct ModuleCode {
     pub(crate) body: CodeId,
     pub(crate) bindings: Rc<Vec<(StringId, u8)>>,
     pub(crate) metadata_slot: Option<u16>,
+    pub(crate) has_await: bool,
 }
 
-pub(crate) fn compile_module(agent: &mut Agent, program: &Program) -> CResult<ModuleCode> {
+pub(crate) fn compile_module(
+    agent: &mut Agent,
+    program: &Program,
+    allow_await: bool,
+) -> CResult<ModuleCode> {
     let tree = ScopeTree::analyze_module(&program.body);
+    if let Some(span) = tree.top_level_await {
+        if !allow_await {
+            return Err(CompileError::Unsupported(
+                "top-level await in synchronous evaluation",
+                span,
+            ));
+        }
+    }
     let name = agent.names.empty;
     let stack = stack_address();
     let mut init = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
@@ -129,12 +142,18 @@ pub(crate) fn compile_module(agent: &mut Agent, program: &Program) -> CResult<Mo
     }
     let initialize = init.finish(0, 0)?;
     let mut body = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
+    let has_await = tree.top_level_await.is_some();
+    if has_await {
+        body.is_async = true;
+        body.emit(Op::AsyncStart);
+    }
     body.statements(&program.body)?;
     Ok(ModuleCode {
         initialize,
         body: body.finish(0, 0)?,
         bindings,
         metadata_slot,
+        has_await,
     })
 }
 

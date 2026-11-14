@@ -1,7 +1,7 @@
 # 0019 — Traced environments for static modules
 
 Date 2026-11-14
-Status accepted for synchronous evaluation
+Status accepted for static graphs with synchronous or asynchronous evaluation
 
 ## Context
 
@@ -27,6 +27,13 @@ The host loads the graph through explicit callbacks. Each standalone evaluation
 creates fresh instances for its graph, and each body runs at most once within
 that evaluation. The unpublished entry point provides no ambient I/O.
 
+The asynchronous entry point returns the entry namespace and a completion
+promise. An iterative depth-first traversal identifies cyclic components and
+records pending dependencies. Module bodies with top-level await use the VM's
+existing async frames. Promise reactions own a traced heap record for the graph
+while a body is suspended. A reaction propagates rejection through waiting
+importers or runs newly available bodies in evaluation order.
+
 ## Alternatives considered
 
 Copying imported values into local slots would leave stale values after
@@ -39,5 +46,6 @@ graphs.
 
 The module regressions cover shared live values, initialization order, cyclic
 lexical reads, key ordering, property descriptors, and reachability under GC
-stress. Revisit instance lifetime and evaluation state when asynchronous
-module execution and host-driven dynamic imports land.
+stress. Async regressions add sibling execution, resumption after host-driven
+promise resolution and rejection across cycles. Revisit instance lifetime when
+host-driven dynamic imports can reuse previously loaded modules.

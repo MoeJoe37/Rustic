@@ -488,7 +488,7 @@ pub(super) fn perform_then(
     };
     let fulfill = Reaction {
         handler: callable(agent, on_fulfilled),
-        awaiting: false,
+        kind: crate::runtime::object::ReactionKind::Call,
         promise: promise_value,
         resolve,
         reject,
@@ -569,7 +569,23 @@ pub(crate) fn await_value(agent: &mut Agent, value: Value, state: ObjectId) -> J
         .expect("PromiseResolve returns a promise");
     let reaction = Reaction {
         handler: Value::object(state),
-        awaiting: true,
+        kind: crate::runtime::object::ReactionKind::Await,
+        promise: Value::UNDEFINED,
+        resolve: Value::UNDEFINED,
+        reject: Value::UNDEFINED,
+    };
+    add_reactions(agent, promise, reaction, reaction)
+}
+
+pub(crate) fn watch_module(
+    agent: &mut Agent,
+    promise: ObjectId,
+    graph: ObjectId,
+    index: u32,
+) -> JsResult<()> {
+    let reaction = Reaction {
+        handler: Value::object(graph),
+        kind: crate::runtime::object::ReactionKind::Module(index),
         promise: Value::UNDEFINED,
         resolve: Value::UNDEFINED,
         reject: Value::UNDEFINED,
@@ -640,6 +656,16 @@ impl Agent {
         }
     }
 
+    /// Whether the settled promise rejected, or `None` while pending.
+    pub fn promise_rejected(&self, promise: ObjectId) -> Option<bool> {
+        match self.heap.object(promise).internal() {
+            Some(Internal::Promise(p)) if p.state != PromiseState::Pending => {
+                Some(p.state == PromiseState::Rejected)
+            }
+            _ => None,
+        }
+    }
+
     /// Whether promise jobs are waiting.
     pub fn has_pending_jobs(&self) -> bool {
         !self.vm.jobs.is_empty()
@@ -670,12 +696,25 @@ impl Agent {
                 fulfilled,
                 argument,
             } => {
-                if reaction.awaiting {
-                    let state = reaction
-                        .handler
-                        .as_object()
-                        .expect("an async function state");
-                    return self.async_resume(state, !fulfilled, argument);
+                use crate::runtime::object::ReactionKind;
+                match reaction.kind {
+                    ReactionKind::Call => {}
+                    ReactionKind::Await => {
+                        let state = reaction
+                            .handler
+                            .as_object()
+                            .expect("an async function state");
+                        return self.async_resume(state, !fulfilled, argument);
+                    }
+                    ReactionKind::Module(index) => {
+                        let graph = reaction.handler.as_object().expect("an async module graph");
+                        return self.resume_module_evaluation(
+                            graph,
+                            index as usize,
+                            fulfilled,
+                            argument,
+                        );
+                    }
                 }
                 let result = if reaction.handler == Value::UNDEFINED {
                     if fulfilled {

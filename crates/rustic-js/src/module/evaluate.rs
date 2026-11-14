@@ -65,6 +65,16 @@ pub(crate) struct ModuleInstance {
     pub(crate) namespace: ObjectId,
     pub(crate) initialize: CodeId,
     pub(crate) body: CodeId,
+    pub(crate) has_await: bool,
+}
+
+impl ModuleInstance {
+    pub(crate) fn trace(self, tracer: &mut impl crate::runtime::Tracer) {
+        tracer.env(self.env);
+        tracer.value(Value::object(self.namespace));
+        tracer.code(self.initialize);
+        tracer.code(self.body);
+    }
 }
 
 impl Agent {
@@ -96,18 +106,37 @@ impl Agent {
         I: IntoIterator<Item = (JsStr, JsStr)>,
     {
         let start = self.vm.modules.len();
-        let result = self.evaluate_modules(graph, limits, start, metadata);
+        let result = self
+            .link_modules(graph, limits, start, metadata, false)
+            .and_then(|()| self.run_sync_modules(graph, limits, start));
         self.vm.modules.truncate(start);
         result
     }
 
-    fn evaluate_modules<K, I>(
+    /// Start evaluating a host-loaded graph and return its namespace and a
+    /// completion promise. Run jobs at host microtask checkpoints. Root both
+    /// handles if they must survive collection between calls.
+    pub fn start_module_evaluation<K: Clone + Eq + Hash>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+    ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
+        let start = self.vm.modules.len();
+        let result = self
+            .link_modules(graph, limits, start, |_| std::iter::empty(), true)
+            .and_then(|()| self.run_async_modules(graph, limits, start));
+        self.vm.modules.truncate(start);
+        result
+    }
+
+    fn link_modules<K, I>(
         &mut self,
         graph: &ModuleGraph<K>,
         limits: &GraphLimits,
         start: usize,
         mut metadata: impl FnMut(&K) -> I,
-    ) -> Result<ObjectId, ModuleEvalError>
+        allow_await: bool,
+    ) -> Result<(), ModuleEvalError>
     where
         K: Clone + Eq + Hash,
         I: IntoIterator<Item = (JsStr, JsStr)>,
@@ -126,7 +155,8 @@ impl Agent {
                 body,
                 bindings,
                 metadata_slot,
-            } = compile_module(self, record.program()).map_err(|error| {
+                has_await,
+            } = compile_module(self, record.program(), allow_await).map_err(|error| {
                 ModuleEvalError::Compile {
                     module: index,
                     error,
@@ -164,6 +194,7 @@ impl Agent {
                 namespace,
                 initialize,
                 body,
+                has_await,
             });
         }
 
@@ -210,17 +241,24 @@ impl Agent {
             }
             self.set_namespace_exports(current.namespace, exports)?;
         }
-
         for index in 0..count {
             self.check_module_cancellation(limits)?;
             let module = self.vm.modules[start + index];
             self.run_in_environment(module.initialize, module.env, Value::UNDEFINED)?;
         }
+        Ok(())
+    }
 
+    fn run_sync_modules<K: Clone + Eq + Hash>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+        start: usize,
+    ) -> Result<ObjectId, ModuleEvalError> {
         // Explicit DFS frames preserve request order and avoid Rust
         // recursion. Mark modules on entry so back edges in cycles are skipped.
         let mut stack = vec![(0, 0)];
-        let mut entered = vec![false; count];
+        let mut entered = vec![false; graph.module_count()];
         entered[0] = true;
         while let Some((index, next)) = stack.last_mut() {
             self.check_module_cancellation(limits)?;
@@ -238,7 +276,10 @@ impl Agent {
         Ok(self.vm.modules[start].namespace)
     }
 
-    fn check_module_cancellation(&self, limits: &GraphLimits) -> Result<(), ModuleEvalError> {
+    pub(super) fn check_module_cancellation(
+        &self,
+        limits: &GraphLimits,
+    ) -> Result<(), ModuleEvalError> {
         limits
             .parse
             .cancellation

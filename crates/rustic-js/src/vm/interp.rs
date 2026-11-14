@@ -164,10 +164,7 @@ impl VmState {
             tracer.value(v);
         }
         for module in &self.modules {
-            tracer.env(module.env);
-            tracer.value(Value::object(module.namespace));
-            tracer.code(module.initialize);
-            tracer.code(module.body);
+            module.trace(tracer);
         }
         for frame in &self.frames {
             tracer.code(frame.code_id);

@@ -223,7 +223,10 @@ for package/permission, lifecycle, filter-data and update boundaries.
 Static module loading takes explicit host callbacks for request resolution and
 source provision. The frontend validates the dependency graph and binding
 targets before evaluation. The host owns module identity, import attribute
-policy and any I/O. See [static module loading](JS.md#static-module-loading-js-06).
+policy and any I/O. Evaluating a static graph creates one traced environment
+and namespace per module and runs dependencies in request order. Import slots
+hold direct references to the defining environment and binding, or to a
+namespace. See [static module loading](JS.md#static-module-loading-js-06).
 
 A document agent owns DOM mutation and JavaScript execution on one thread.
 Rust async tasks may perform I/O off-thread; they post completions to the owning

@@ -90,7 +90,7 @@ to refresh generated README assets and dispatch CI for its bot commit.
 | Job | Environment | Checks |
 | --- | --- | --- |
 | `Quality` | Ubuntu 24.04, pinned toolchain | rustfmt, Clippy with denied warnings, rustdoc with denied warnings |
-| `Test (platform)` | Linux x64/ARM64 (Ubuntu 24.04), Windows x64 (2022)/ARM64 (11), macOS ARM64/x64 (15); pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run |
+| `Test (platform)` | Linux x64/ARM64 (Ubuntu 24.04), Windows x64 (2022)/ARM64 (11), macOS ARM64/x64 (15); pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run; JS-09 benchmark results in the Linux ARM64 job summary |
 | `Emulated test (target)` | Ubuntu 24.04 with cross linkers and QEMU user mode | All-target tests and CLI smoke run for 32-bit ARM, 32-bit x86, RISC-V 64 and big-endian s390x |
 | `Cross-check (target)` | Ubuntu 24.04 | `cargo check --all-targets` for ARMv6, musl ARM64/x64, Windows ARM64 (gnullvm) and 32-bit, POWER, LoongArch and FreeBSD |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |

@@ -488,7 +488,7 @@ pub(super) fn perform_then(
     };
     let fulfill = Reaction {
         handler: callable(agent, on_fulfilled),
-        awaiting: false,
+        kind: crate::runtime::object::ReactionKind::Call,
         promise: promise_value,
         resolve,
         reject,
@@ -569,12 +569,44 @@ pub(crate) fn await_value(agent: &mut Agent, value: Value, state: ObjectId) -> J
         .expect("PromiseResolve returns a promise");
     let reaction = Reaction {
         handler: Value::object(state),
-        awaiting: true,
+        kind: crate::runtime::object::ReactionKind::Await,
         promise: Value::UNDEFINED,
         resolve: Value::UNDEFINED,
         reject: Value::UNDEFINED,
     };
     add_reactions(agent, promise, reaction, reaction)
+}
+
+pub(crate) fn watch_module(
+    agent: &mut Agent,
+    promise: ObjectId,
+    graph: ObjectId,
+    index: u32,
+) -> JsResult<()> {
+    let reaction = Reaction {
+        handler: Value::object(graph),
+        kind: crate::runtime::object::ReactionKind::Module(index),
+        promise: Value::UNDEFINED,
+        resolve: Value::UNDEFINED,
+        reject: Value::UNDEFINED,
+    };
+    add_reactions(agent, promise, reaction, reaction)
+}
+
+pub(crate) fn watch_import(
+    agent: &mut Agent,
+    completion: ObjectId,
+    promise: ObjectId,
+    namespace: ObjectId,
+) -> JsResult<()> {
+    let reaction = Reaction {
+        handler: Value::object(namespace),
+        kind: crate::runtime::object::ReactionKind::Import,
+        promise: Value::object(promise),
+        resolve: Value::UNDEFINED,
+        reject: Value::UNDEFINED,
+    };
+    add_reactions(agent, completion, reaction, reaction)
 }
 
 /// A new intrinsic promise and its resolving operations, for an async
@@ -640,6 +672,16 @@ impl Agent {
         }
     }
 
+    /// Whether the settled promise rejected, or `None` while pending.
+    pub fn promise_rejected(&self, promise: ObjectId) -> Option<bool> {
+        match self.heap.object(promise).internal() {
+            Some(Internal::Promise(p)) if p.state != PromiseState::Pending => {
+                Some(p.state == PromiseState::Rejected)
+            }
+            _ => None,
+        }
+    }
+
     /// Whether promise jobs are waiting.
     pub fn has_pending_jobs(&self) -> bool {
         !self.vm.jobs.is_empty()
@@ -652,6 +694,13 @@ impl Agent {
     /// only running out of memory or being cancelled does.
     pub fn run_jobs(&mut self) -> JsResult<()> {
         while let Some(job) = self.vm.jobs.pop_front() {
+            if self
+                .cancellation()
+                .is_some_and(|token| token.is_cancelled())
+            {
+                self.vm.jobs.push_front(job);
+                return Err(Abrupt::Cancelled);
+            }
             self.vm.running_job = Some(job);
             let result = self.run_job(job);
             self.vm.running_job = None;
@@ -665,17 +714,47 @@ impl Agent {
 
     fn run_job(&mut self, job: Job) -> JsResult<()> {
         match job {
+            Job::Import {
+                promise,
+                request,
+                referrer,
+            } => self.run_import_job(
+                promise.as_object().expect("import promise"),
+                request.as_object().expect("import request"),
+                referrer.as_string(),
+            ),
             Job::Reaction {
                 reaction,
                 fulfilled,
                 argument,
             } => {
-                if reaction.awaiting {
-                    let state = reaction
-                        .handler
-                        .as_object()
-                        .expect("an async function state");
-                    return self.async_resume(state, !fulfilled, argument);
+                use crate::runtime::object::ReactionKind;
+                match reaction.kind {
+                    ReactionKind::Call => {}
+                    ReactionKind::Await => {
+                        let state = reaction
+                            .handler
+                            .as_object()
+                            .expect("an async function state");
+                        return self.async_resume(state, !fulfilled, argument);
+                    }
+                    ReactionKind::Module(index) => {
+                        let graph = reaction.handler.as_object().expect("an async module graph");
+                        return self.resume_module_evaluation(
+                            graph,
+                            index as usize,
+                            fulfilled,
+                            argument,
+                        );
+                    }
+                    ReactionKind::Import => {
+                        let promise = reaction.promise.as_object().expect("import promise");
+                        if fulfilled {
+                            return resolve_promise(self, promise, reaction.handler);
+                        }
+                        reject_promise(self, promise, argument);
+                        return Ok(());
+                    }
                 }
                 let result = if reaction.handler == Value::UNDEFINED {
                     if fulfilled {

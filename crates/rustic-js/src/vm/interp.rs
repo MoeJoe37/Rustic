@@ -22,10 +22,11 @@ use super::bytecode::{
 };
 use super::compile::EVAL_GLOBAL_VARS;
 use crate::runtime::{
-    Abrupt, Agent, BINDING_MUTABLE, BINDING_STRICT, BigIntBinary, BigIntUnary, Class, EnvId,
-    ErrorKind, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Generator, GeneratorState, Internal, Job, JsResult,
-    Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference, ReferenceBase,
-    SameNumeric, ShapeId, StringId, Tracer, Value, iterator_result, same_numeric_types,
+    Abrupt, Agent, BINDING_IMPORT, BINDING_MUTABLE, BINDING_STRICT, BigIntBinary, BigIntUnary,
+    Class, EnvId, ErrorKind, FLAG_EXTENSIBLE, FLAG_PROTOTYPE, Generator, GeneratorState, Internal,
+    Job, JsResult, Kind, NativeFn, ObjectId, PropertyDescriptor, PropertyKey, Reference,
+    ReferenceBase, SameNumeric, ShapeId, StringId, Tracer, Value, iterator_result,
+    same_numeric_types,
 };
 
 /// Bounds on what running script may use beyond the heap.
@@ -94,6 +95,9 @@ struct Frame {
 #[derive(Debug, Default)]
 pub(crate) struct VmState {
     stack: Vec<Value>,
+    /// Environments, namespaces and code of graphs currently being evaluated.
+    pub(crate) modules: Vec<crate::module::ModuleInstance>,
+    pub(crate) import_loader: crate::module::ImportLoader,
     frames: Vec<Frame>,
     /// Native calls and nested runs in progress.
     native_depth: u32,
@@ -159,6 +163,9 @@ impl VmState {
     pub(crate) fn trace(&self, tracer: &mut impl Tracer) {
         for &v in &self.stack {
             tracer.value(v);
+        }
+        for module in &self.modules {
+            module.trace(tracer);
         }
         for frame in &self.frames {
             tracer.code(frame.code_id);
@@ -300,37 +307,28 @@ impl Agent {
     /// collects garbage at its safe points: every handle the caller keeps
     /// across this call must be rooted ([`Agent::root`]).
     pub fn run_script(&mut self, code: CodeId) -> JsResult<Value> {
-        self.enter_nested_run()?;
-        let floor = self.vm.frames.len();
-        let stack_floor = self.vm.stack.len();
-        let global = Value::object(self.intrinsics.global);
-        let env = self.global_env;
-        self.push_frame_for(
-            code,
-            env,
-            global,
-            Value::UNDEFINED,
-            Value::UNDEFINED,
-            stack_floor,
-            0,
-            0,
-            false,
-            stack_floor,
-        )?;
-        self.run(floor)
+        self.run_in_environment(code, self.global_env, Value::object(self.intrinsics.global))
     }
 
     /// Run indirect `eval` code on `env` with the global `this`, from
     /// inside a native call.
     pub(crate) fn run_eval(&mut self, code: CodeId, env: EnvId) -> JsResult<Value> {
+        self.run_in_environment(code, env, Value::object(self.intrinsics.global))
+    }
+
+    pub(crate) fn run_in_environment(
+        &mut self,
+        code: CodeId,
+        env: EnvId,
+        this: Value,
+    ) -> JsResult<Value> {
         self.enter_nested_run()?;
         let floor = self.vm.frames.len();
         let stack_floor = self.vm.stack.len();
-        let global = Value::object(self.intrinsics.global);
         self.push_frame_for(
             code,
             env,
-            global,
+            this,
             Value::UNDEFINED,
             Value::UNDEFINED,
             stack_floor,
@@ -911,6 +909,23 @@ impl Agent {
     /// Poll for cancellation, and collect if the heap asks for it and no
     /// native code is on the stack.
     fn safepoint(&mut self) -> JsResult<()> {
+        self.check_native_work()?;
+        if self.vm.native_depth == self.vm.collect_floor && self.should_collect() {
+            self.collect_garbage(crate::runtime::Roots::default());
+        }
+        // Ropes flattened since the last allocation are charged late.
+        if self.heap.over_limit() {
+            if self.vm.native_depth == self.vm.collect_floor {
+                self.collect_garbage(crate::runtime::Roots::default());
+            }
+            if self.heap.over_limit() {
+                return Err(Abrupt::OutOfMemory);
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn check_native_work(&mut self) -> JsResult<()> {
         if self
             .vm
             .cancel
@@ -924,18 +939,6 @@ impl Agent {
                 return Err(Abrupt::Cancelled);
             }
             *left -= 1;
-        }
-        if self.vm.native_depth == self.vm.collect_floor && self.should_collect() {
-            self.collect_garbage(crate::runtime::Roots::default());
-        }
-        // Ropes flattened since the last allocation are charged late.
-        if self.heap.over_limit() {
-            if self.vm.native_depth == self.vm.collect_floor {
-                self.collect_garbage(crate::runtime::Roots::default());
-            }
-            if self.heap.over_limit() {
-                return Err(Abrupt::OutOfMemory);
-            }
         }
         Ok(())
     }
@@ -1038,9 +1041,29 @@ impl Agent {
                     }
                     reg!(dst) = value;
                 }
+                Op::ImportMeta { dst, hops, slot } => {
+                    let module = self.env_outer_n(env, hops);
+                    let mut value = self.env_slot(module, slot);
+                    if value == Value::UNINITIALIZED {
+                        value = Value::object(t!(self.new_object_with(None)));
+                        self.set_env_slot(module, slot, value);
+                    }
+                    reg!(dst) = value;
+                }
+                Op::ImportCall {
+                    dst,
+                    source,
+                    options,
+                } => {
+                    t!(self.safepoint());
+                    reg!(dst) = t!(self.queue_dynamic_import(env, reg!(source), reg!(options)));
+                }
                 Op::SetSlot { src, hops, slot } => {
                     let scope = self.env_outer_n(env, hops);
                     let (name, flags) = self.env_slot_binding(scope, slot);
+                    if flags & BINDING_IMPORT != 0 {
+                        t!(self.type_error::<()>("assignment to an imported binding"));
+                    }
                     if self.env_slot(scope, slot) == Value::UNINITIALIZED {
                         t!(Err(self.tdz_error(name)));
                     }
@@ -1125,9 +1148,23 @@ impl Agent {
                     let value = reg!(src);
                     t!(self.set_global(code, site, value));
                 }
+                Op::CheckGlobal { name, kind } => {
+                    let name = self.name_of(code, name);
+                    t!(self.check_global_declaration(name, kind));
+                }
+                Op::CheckGlobalVarName { name } => {
+                    let name = self.name_of(code, name);
+                    if self.has_lexical_declaration(self.global_env, name) {
+                        t!(Err(self.redeclaration(name)));
+                    }
+                }
                 Op::DeclareGlobal { name, kind } => {
                     let name = self.name_of(code, name);
                     t!(self.declare_global(name, kind));
+                }
+                Op::InitGlobalFunction { src, name } => {
+                    let name = self.name_of(code, name);
+                    t!(self.create_global_function_binding(self.global_env, name, reg!(src)));
                 }
                 Op::InitName { src, name } => {
                     let name = self.name_of(code, name);
@@ -2330,23 +2367,36 @@ impl Agent {
         }
     }
 
-    fn declare_global(&mut self, name: StringId, kind: u8) -> JsResult<()> {
+    fn check_global_declaration(&mut self, name: StringId, kind: u8) -> JsResult<()> {
         let env = self.global_env;
         let global = self.intrinsics.global;
-        if kind == declare::VAR {
-            if self.has_lexical_declaration(env, name) {
-                return Err(self.redeclaration(name));
+        match kind {
+            declare::VAR => {
+                if !self.can_declare_global_var(global, name)? {
+                    return self.type_error("cannot declare a global variable");
+                }
             }
-            if !self.can_declare_global_var(global, name)? {
-                return self.type_error("cannot declare a global variable");
+            declare::FUNCTION => {
+                if !self.can_declare_global_function(global, name)? {
+                    return self.type_error("cannot declare a global function");
+                }
             }
-            return self.create_global_var_binding(env, name, false);
+            _ => {
+                if self.has_lexical_declaration(env, name)
+                    || self.has_var_declaration(env, name)
+                    || self.has_restricted_global_property(env, name)?
+                {
+                    return Err(self.redeclaration(name));
+                }
+            }
         }
-        if self.has_lexical_declaration(env, name)
-            || self.has_var_declaration(env, name)
-            || self.has_restricted_global_property(env, name)?
-        {
-            return Err(self.redeclaration(name));
+        Ok(())
+    }
+
+    fn declare_global(&mut self, name: StringId, kind: u8) -> JsResult<()> {
+        let env = self.global_env;
+        if kind == declare::VAR {
+            return self.create_global_var_binding(env, name, false);
         }
         self.vm.lexical_generation = self.vm.lexical_generation.wrapping_add(1);
         if kind == declare::CONST {

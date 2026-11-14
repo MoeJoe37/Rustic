@@ -128,7 +128,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, `perf.gc` (M12); measured by JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Modules are rejected by the bytecode compiler (generators, async functions, async generators and RegExp literals paid) | Open, JS-06 |
+| TD-97 | Deliberate | JS | Asynchronous module execution, dynamic imports and host-provided module metadata remain open | Open, JS-06 |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
 | TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, JS-05 |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
@@ -136,9 +136,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
-| TD-105 | Deliberate | JS | The Test262 runner skips module files, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
+| TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
-| TD-107 | Deliberate | JS | `String.prototype.normalize` is missing, and `localeCompare` and the locale case methods ignore locales | Open, JS-05/JS-08 |
+| TD-107 | Deliberate | JS | `localeCompare` and locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
@@ -1399,18 +1399,22 @@ per heap remains (TD-17).
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
 private names), object-literal `super`, tagged templates and optional
-calls. Modules return `CompileError::Unsupported` with a span before any code
-runs, so a script either runs with correct semantics or not at all. So does
-a regular expression literal that uses a Unicode property escape (TD-110).
+calls. The asynchronous module evaluator runs top-level await and dynamic
+imports. The synchronous entry point rejects graphs containing top-level
+await before any module body runs. A regular
+expression literal that uses a Unicode property escape also fails explicitly
+(TD-110).
 
 Private names, object-literal `super`, tagged templates and optional calls
 were paid on 2026-11-12, which ends the JS-04 share; `eval`, generators
 (JS-08 part 1), async functions with promises (JS-06 part 1) and async
 generators with `for await` (JS-08 part 2) were paid the same day, and
 RegExp literals (JS-08 part 3) after them. JS-06 now loads and validates static dependency graphs through host callbacks.
-Pay the remaining debt with module environments and live bindings, namespace
-objects, bytecode evaluation, top-level await and dynamic imports. Trigger:
-the module Test262 gate (JS-07).
+Module environments, live bindings, namespace objects and synchronous bytecode
+evaluation are implemented in JS-06. Each module now lazily creates its own
+`import.meta` object when the host supplies no properties. A host can provide
+string metadata when it instantiates the graph. The dynamic import portion
+is paid. Remaining host conformance is tracked under TD-105.
 
 ### TD-98 — Eager function prototypes (Paid)
 
@@ -1505,19 +1509,18 @@ captures one variable costs 64 bytes instead of 112.
 
 ### TD-105 — Test262 runner coverage
 
-The execution runner (JS-07) skips files flagged `module` (1,405 of 23,832
-in `test/language` together with proposal features; async files run since
-JS-06 part 1), does not
-provide the `$262` host object (`createRealm`, `evalScript`, `detachArrayBuffer`,
-`agent`), and its gate covers `test/language` and the `test/built-ins`
-directories of the library areas installed so far. Skipped files are counted
-as skipped, never as passing, so published percentages always state their
-base.
+The script runner preserves its exact passing lists for `test/language`
+and the installed areas of `test/built-ins`. The separate module runner
+(JS-07) pins pass, fail and skip verdicts for the 817 files flagged
+`module` in `test/language`. All 696 executed files pass.
+The remaining 121 use proposal features. See the
+[Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
+and reproduction commands.
 
-Pay with: each further `test/built-ins` directory in the gate as JS-05 lands
-its library area;
-module files when module loading exists (JS-06);
-`$262` with realms (JS-06). Trigger: each of those steps.
+Pay with `$262` support for
+realms, collection and test agents. `$262.evalScript` now runs UTF-16
+script source against the current global environment. Extend the built-in gate
+when new library areas land. Trigger on each implementation.
 
 ### TD-106 — No function source text (eval part paid)
 
@@ -1534,18 +1537,17 @@ allows that only for built-in and host functions. Pay with: a source span per
 function so `toString` can return its text. Trigger: the first page script
 or Test262 group that needs it.
 
-### TD-107 — No Unicode normalization or locales in String
+### TD-107 — Locale-sensitive comparison and case mapping
 
-`String.prototype.normalize` needs the canonical and compatibility
-decomposition and composition data. `rustic-url` already carries NFC data
-for IDNA, but `rustic-js` cannot reach it. `localeCompare` compares code
-points, and `toLocaleUpperCase`/`toLocaleLowerCase` ignore their locale, so
-Turkish and Lithuanian casing are wrong.
+`String.prototype.normalize` is implemented for all four forms. IDNA and
+JavaScript share the canonical tables and normalization code in
+`rustic-base`. JavaScript also uses compatibility mappings and preserves
+lone surrogates.
 
-Pay with: move the normalization tables to `rustic-base` (or a shared
-Unicode crate) so both crates use one copy, then add `normalize`; collation
-and locale casing with Intl (JS-08). Trigger: JS-05 completion or the first
-page that depends on either.
+`Intl.getCanonicalLocales` canonicalizes locale lists. Locale casing applies
+Azerbaijani, Lithuanian and Turkish rules, using default Unicode casing
+for other languages. `localeCompare` still compares code points. Pay with
+locale negotiation and collation in Intl (JS-08).
 
 ### TD-108 — Date local time is a fixed offset
 

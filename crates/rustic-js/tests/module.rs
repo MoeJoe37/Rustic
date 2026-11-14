@@ -264,3 +264,492 @@ fn static_graph_enforces_host_policy_and_exact_budgets() {
     limits.parse.cancellation.cancel();
     assert!(matches!(load(&files, &limits), Err(GraphError::Cancelled)));
 }
+
+#[test]
+fn modules_share_live_bindings_and_evaluate_each_dependency_once() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Roots, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            (
+                "entry",
+                r#"
+                import { count, bump } from "middle";
+                import { ns } from "middle";
+                import * as again from "base";
+                export { ns as library };
+                export const before = count;
+                export function advance() {
+                    bump();
+                    return eval("count") + ns.count;
+                }
+                export const sameNamespace = ns === again;
+                export const order = globalThis.order;
+                export const moduleThis = (() => this)();
+                export const numeric = Reflect.ownKeys(ns).slice(0, 2).join(',');
+                export const traits = Object.getPrototypeOf(ns) === null
+                    && Object.prototype.toString.call(ns) === '[object Module]'
+                    && !Object.isExtensible(ns) && !Reflect.set(ns, "count", 9)
+                    && !Reflect.deleteProperty(ns, "count")
+                    && Reflect.defineProperty(ns, "count", { value: count })
+                    && !Reflect.defineProperty(ns, "count", { writable: false });
+                try { count = 10; } catch (e) { globalThis.immutable = e instanceof TypeError; }
+                "#,
+            ),
+            (
+                "middle",
+                r#"
+                export * from "base";
+                export * as ns from "base";
+                globalThis.order += "m";
+                "#,
+            ),
+            (
+                "base",
+                r#"
+                globalThis.order = (globalThis.order || "") + "b";
+                export let count = 1;
+                export { count as "2", count as "10" };
+                export function bump() { count++; }
+                "#,
+            ),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let root = agent.root(Value::object(namespace)).unwrap();
+
+    let read = |agent: &mut Agent, name| {
+        let key = agent.heap.key(name).unwrap();
+        agent.get(namespace, key).unwrap()
+    };
+    assert_eq!(read(&mut agent, "before").as_number(), Some(1.0));
+    assert_eq!(read(&mut agent, "sameNamespace"), Value::TRUE);
+    assert_eq!(read(&mut agent, "moduleThis"), Value::UNDEFINED);
+    assert_eq!(read(&mut agent, "traits"), Value::TRUE);
+    for (name, expected) in [("order", "bm"), ("numeric", "10,2")] {
+        let value = read(&mut agent, name);
+        assert_eq!(
+            agent.heap.string(value.as_string().unwrap()).to_text(),
+            expected
+        );
+    }
+    assert_eq!(agent.evaluate("immutable").unwrap(), Value::TRUE);
+    assert_eq!(
+        agent
+            .evaluate("typeof before")
+            .unwrap()
+            .as_string()
+            .map(|s| agent.heap.string(s).to_text())
+            .as_deref(),
+        Some("undefined")
+    );
+
+    agent.collect_garbage(Roots::default());
+    let advance = read(&mut agent, "advance");
+    assert_eq!(
+        agent
+            .call_from_host(advance, Value::UNDEFINED, &[])
+            .unwrap()
+            .as_number(),
+        Some(4.0)
+    );
+    let library = read(&mut agent, "library").as_object().unwrap();
+    let count = agent.heap.key("count").unwrap();
+    assert_eq!(agent.get(library, count).unwrap().as_number(), Some(2.0));
+    assert!(agent.unroot(root));
+}
+
+#[test]
+fn cyclic_modules_hoist_functions_and_vars_but_preserve_lexical_tdz() {
+    use rustic_js::module::{GraphLimits, ModuleEvalError};
+    use rustic_js::runtime::{Abrupt, Agent};
+
+    let limits = GraphLimits::default();
+    let mut agent = Agent::new().unwrap();
+    for (body, throws) in [
+        (
+            "import f, { pending } from 'entry'; export const result = f() + (pending === undefined);",
+            false,
+        ),
+        (
+            "import { lex } from 'entry'; export const result = lex;",
+            true,
+        ),
+    ] {
+        let graph = load(
+            &[
+                ("entry", "export { result } from 'dep'; export default function () { return 8; } export var pending = 2; export let lex = 9;"),
+                ("dep", body),
+            ],
+            &limits,
+        )
+        .unwrap();
+        match agent.evaluate_module_graph(&graph, &limits) {
+            Ok(namespace) if !throws => {
+                let key = agent.heap.key("result").unwrap();
+                assert_eq!(agent.get(namespace, key).unwrap().as_number(), Some(9.0));
+            }
+            Err(ModuleEvalError::Runtime(Abrupt::Throw(error))) if throws => {
+                let key = agent.heap.key("name").unwrap();
+                let name = agent.get_v(error, key).unwrap().as_string().unwrap();
+                assert_eq!(agent.heap.string(name).to_text(), "ReferenceError");
+            }
+            other => panic!("unexpected result {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn modules_reject_unsupported_execution_before_running_dependencies() {
+    use rustic_js::module::{GraphLimits, ModuleEvalError};
+    use rustic_js::runtime::Agent;
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            ("entry", "import 'dep'; await 1;"),
+            ("dep", "globalThis.ran = true;"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    assert!(matches!(
+        agent.evaluate_module_graph(&graph, &limits),
+        Err(ModuleEvalError::Compile { module: 0, .. })
+    ));
+    let value = agent.evaluate("typeof ran").unwrap();
+    assert_eq!(
+        agent.heap.string(value.as_string().unwrap()).to_text(),
+        "undefined"
+    );
+}
+
+#[test]
+fn top_level_await_allows_siblings_and_delays_importers() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Roots, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(&[
+        ("entry", "import { value } from 'async'; import 'sibling'; export const result = value; log += 'entry ';"),
+        ("async", "log += 'async '; await new Promise(r => globalThis.release = r); export const value = 42;"),
+        ("sibling", "log += 'sibling ';"),
+    ], &limits).unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate("var log = ''").unwrap();
+    let (namespace, completion) = agent.start_module_evaluation(&graph, &limits).unwrap();
+    let namespace_root = agent.root(Value::object(namespace)).unwrap();
+    let completion_root = agent.root(Value::object(completion)).unwrap();
+    agent.collect_garbage(Roots::default());
+    let log = agent.evaluate("log").unwrap();
+    assert_eq!(
+        agent.heap.string(log.as_string().unwrap()).to_text(),
+        "async sibling "
+    );
+    assert_eq!(agent.promise_rejected(completion), None);
+    agent.evaluate("release()").unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(completion), Some(false));
+    let result = agent.heap.key("result").unwrap();
+    assert_eq!(agent.get(namespace, result), Ok(Value::number(42.0)));
+    assert!(agent.unroot(namespace_root));
+    assert!(agent.unroot(completion_root));
+}
+
+#[test]
+fn top_level_await_rejects_cyclic_importers_without_running_their_bodies() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            ("entry", "import 'a'; var never; globalThis.ran = true;"),
+            ("a", "import 'b';"),
+            ("b", "import 'a'; await Promise.reject(71);"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    let (_, completion) = agent.start_module_evaluation(&graph, &limits).unwrap();
+    let root = agent.root(Value::object(completion)).unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(completion), Some(true));
+    assert_eq!(agent.promise_result(completion), Some(Value::number(71.0)));
+    assert_eq!(agent.evaluate("'ran' in globalThis"), Ok(Value::FALSE));
+    assert!(agent.unroot(root));
+}
+
+#[test]
+fn import_meta_is_lazy_and_distinct_for_each_module() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            (
+                "entry",
+                r#"
+                import { metadata } from "dep";
+                export function own() { return import.meta; }
+                own().label = "entry";
+                export const valid = own() === import.meta
+                    && metadata() !== own()
+                    && Object.getPrototypeOf(own()) === null
+                    && metadata().label === undefined;
+            "#,
+            ),
+            ("dep", "export function metadata() { return import.meta; }"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let valid = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, valid), Ok(Value::TRUE));
+}
+
+#[test]
+fn import_meta_uses_host_metadata_for_each_module() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, JsStr, Value};
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[
+            (
+                "entry",
+                r#"
+                import { read } from 'dep';
+                import 'unused';
+                export const valid = read() === 'dep'
+                    && import.meta.url === 'entry'
+                    && Object.getPrototypeOf(import.meta) === null
+                    && Object.getOwnPropertyDescriptor(import.meta, 'url').enumerable;
+            "#,
+            ),
+            ("dep", "export function read() { return import.meta.url; }"),
+            ("unused", "export const value = 1;"),
+        ],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let mut visited = Vec::new();
+    let namespace = agent
+        .evaluate_module_graph_with_metadata(&graph, &limits, |key| {
+            visited.push(key.clone());
+            vec![
+                (JsStr::from_text("url"), JsStr::from_text("superseded")),
+                (JsStr::from_text("url"), JsStr::from_text(key)),
+            ]
+        })
+        .unwrap();
+    assert_eq!(visited, ["entry", "dep"]);
+    let valid = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, valid), Ok(Value::TRUE));
+}
+
+#[test]
+fn import_meta_metadata_obeys_the_graph_work_limit() {
+    use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError};
+    use rustic_js::runtime::{Agent, JsStr};
+
+    let graph = load(&[("entry", "import.meta;")], &GraphLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    let mut limits = GraphLimits {
+        max_resolution_steps: 2,
+        ..GraphLimits::default()
+    };
+    let properties = |_: &String| {
+        ["first", "second"].map(|name| (JsStr::from_text(name), JsStr::from_text("value")))
+    };
+    assert_eq!(
+        agent.evaluate_module_graph_with_metadata(&graph, &limits, properties),
+        Err(ModuleEvalError::Graph(GraphError::ResolutionLimit))
+    );
+    // Two metadata entries plus the entry module's export-name visit.
+    limits.max_resolution_steps = 3;
+    assert!(
+        agent
+            .evaluate_module_graph_with_metadata(&graph, &limits, properties)
+            .is_ok()
+    );
+}
+
+#[test]
+fn synthetic_modules_export_data_with_shared_identity() {
+    use rustic_js::module::{GraphLimits, ModuleGraph, ModuleSource};
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let source = |text: &str| Source::from_str_limited(text, 1_024).unwrap();
+    let graph = ModuleGraph::load_sources(
+        "entry".to_owned(),
+        &limits,
+        |_, request| String::from_utf16(request.specifier()).map_err(|_| "invalid specifier"),
+        |key| match key.as_str() {
+            "entry" => Ok(ModuleSource::JavaScript(source(
+                r#"
+                import a from 'json' with { type: 'json' };
+                import * as b from 'json' with { type: 'json' };
+                import text from 'text' with { type: 'text' };
+                export const valid = a === b.default && a.x === 42
+                    && Object.keys(b).join() === 'default'
+                    && text.length === 1 && text.charCodeAt(0) === 0xD800;
+            "#,
+            ))),
+            "json" => Ok(ModuleSource::Json(source(r#"{"x":42}"#))),
+            "text" => Ok(ModuleSource::Text(
+                Source::from_utf16(vec![0xD800], 1).unwrap(),
+            )),
+            _ => Err("missing fixture"),
+        },
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let key = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, key), Ok(Value::TRUE));
+}
+
+#[test]
+fn invalid_json_is_rejected_before_a_module_body_runs() {
+    use rustic_js::module::{GraphLimits, ModuleEvalError, ModuleGraph, ModuleSource};
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = ModuleGraph::load_sources(
+        "entry",
+        &limits,
+        |_, _| Ok::<_, ()>("json"),
+        |key| {
+            let source = |text| Source::from_str_limited(text, 128).unwrap();
+            Ok(if *key == "entry" {
+                ModuleSource::JavaScript(source("import 'json'; globalThis.ran = true;"))
+            } else {
+                ModuleSource::Json(source("{ invalid }"))
+            })
+        },
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    assert_eq!(
+        agent.start_module_evaluation(&graph, &limits),
+        Err(ModuleEvalError::InvalidJson { module: 1 })
+    );
+    assert_eq!(agent.evaluate("'ran' in globalThis"), Ok(Value::FALSE));
+}
+
+#[test]
+fn dynamic_import_preserves_referrer_attributes_and_pending_evaluation() {
+    use rustic_js::module::GraphLimits;
+    use rustic_js::runtime::{Agent, JsStr, Value};
+    use std::rc::Rc;
+
+    let limits = GraphLimits::default();
+    let graph = load(
+        &[(
+            "entry",
+            "export function run() { return import('dep', { with: { z: '2', a: '1' } }) }",
+        )],
+        &limits,
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.set_dynamic_import_loader(Some(Rc::new(|agent, referrer, request| {
+        assert_eq!(referrer.unwrap().to_text(), "entry");
+        assert_eq!(request.specifier(), units("dep"));
+        assert_eq!(
+            request.attributes(),
+            &[(units("a"), units("1")), (units("z"), units("2"))]
+        );
+        let limits = GraphLimits::default();
+        let target = load(
+            &[(
+                "entry",
+                "await new Promise(r => globalThis.release = r); export const answer = 42;",
+            )],
+            &limits,
+        )
+        .unwrap();
+        Ok(agent.start_module_evaluation(&target, &limits).unwrap())
+    })));
+    let (namespace, _) = agent
+        .start_module_evaluation_with_referrers(&graph, &limits, |key| Some(JsStr::from_text(key)))
+        .unwrap();
+    let key = agent.heap.key("run").unwrap();
+    let function = agent.get(namespace, key).unwrap();
+    let root = agent.root(function).unwrap();
+    let import = agent
+        .call_from_host(function, Value::UNDEFINED, &[])
+        .unwrap();
+    let import_root = agent.root(import).unwrap();
+    let promise = import.as_object().unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(promise), None);
+    agent.evaluate("release()").unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.promise_rejected(promise), Some(false));
+    let namespace = agent.promise_result(promise).unwrap().as_object().unwrap();
+    let answer = agent.heap.key("answer").unwrap();
+    assert_eq!(agent.get(namespace, answer), Ok(Value::number(42.0)));
+    assert!(agent.unroot(root));
+    assert!(agent.unroot(import_root));
+}
+
+#[test]
+fn byte_modules_expose_read_only_shared_data() {
+    use rustic_js::module::{GraphLimits, ModuleGraph, ModuleSource};
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = ModuleGraph::load_sources(
+        "entry",
+        &limits,
+        |_, _| Ok::<_, ()>("bytes"),
+        |key| Ok(if *key == "entry" {
+            ModuleSource::JavaScript(Source::from_str_limited(r#"
+                import view from 'bytes' with { type: 'bytes' };
+                import * as ns from 'bytes' with { type: 'bytes' };
+                const buffer = view.buffer;
+                const alias = new Uint8Array(buffer);
+                const data = new DataView(buffer);
+                const rejected = f => { try { f(); return false } catch (e) { return e instanceof TypeError } };
+                export const valid = ns.default === view && buffer.immutable
+                    && !Reflect.set(alias, '0', 1)
+                    && !Reflect.defineProperty(alias, '0', { value: 1 })
+                    && rejected(() => data.setUint8(0, 1))
+                    && rejected(() => alias.copyWithin(0, 1))
+                    && rejected(() => alias.fill(1))
+                    && rejected(() => alias.reverse())
+                    && rejected(() => alias.set([1]))
+                    && rejected(() => Atomics.store(alias, 0, 1))
+                    && rejected(() => buffer.transfer())
+                    && alias[0] === 255 && alias[1] === 128;
+            "#, 8_192).unwrap())
+        } else {
+            ModuleSource::Bytes(vec![255, 128])
+        }),
+    ).unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let key = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, key), Ok(Value::TRUE));
+}

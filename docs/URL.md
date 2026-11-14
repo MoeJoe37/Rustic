@@ -208,10 +208,11 @@ the empty-result and forbidden-domain-code-point checks afterwards, then the
 IPv4 "ends in a number" rule, so full-width digits can still form an IPv4 host.
 
 `src/idna/tables.rs` is generated, never hand-edited. It holds the IDNA mapping
-status runs, canonical decompositions and primary composites with
-Full_Composition_Exclusion applied, combining classes, General_Category=Mark,
-Bidi_Class (with `@missing` defaults) and the Joining_Type values ContextJ uses.
-Lookups are binary searches over sorted runs; Hangul uses the algorithmic
+status runs, General_Category=Mark, Bidi_Class (with `@missing` defaults)
+and the Joining_Type values ContextJ uses. The same generator writes
+canonical decompositions, compositions and combining classes in
+`rustic-base/src/unicode/tables.rs`, shared with JavaScript normalization.
+Lookups are binary searches over sorted runs. Hangul uses the algorithmic
 mapping. The inputs are Unicode 17.0.0 files from
 [unicode-org/unicodetools 63aff0ca8dea894a057d04e7aef7ae1241757680](https://github.com/unicode-org/unicodetools/tree/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data)
 (a mirror of `unicode.org/Public`) plus WPT's `url/resources/toascii.json` at

@@ -5,11 +5,11 @@
 //! Every file outside the expected failures must pass, and every expected
 //! failure must still fail, so the list never goes stale.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use rustic_js::ParseLimits;
-use rustic_js::test262::{RunLimits, execute_tree, run_tree};
+use rustic_js::test262::{RunLimits, execute_module_tree, execute_tree, run_tree};
 
 const EXPECTED: &str = include_str!("fixtures/test262_expected_failures.txt");
 /// The `test/language` files that pass when executed, without that prefix.
@@ -17,6 +17,9 @@ const PASSING: &str = include_str!("fixtures/test262_language_passing.txt");
 /// The `test/built-ins` files of [`BUILT_IN_DIRS`] that pass, without
 /// that prefix.
 const BUILT_INS_PASSING: &str = include_str!("fixtures/test262_built_ins_passing.txt");
+
+const MODULE_VERDICTS: &str = include_str!("fixtures/test262_modules.txt");
+const INTL_PASSING: &str = include_str!("fixtures/test262_intl_passing.txt");
 
 fn pinned_revision() -> &'static str {
     EXPECTED
@@ -85,6 +88,62 @@ fn passing_lists_are_sorted_and_name_the_same_revision() {
             .and_then(|rest| rest.split_whitespace().next());
         assert_eq!(revision, Some(pinned_revision()));
     }
+}
+
+#[test]
+fn module_verdicts_are_sorted_unique_and_pinned() {
+    let revision = MODULE_VERDICTS
+        .lines()
+        .find_map(|line| line.strip_prefix("# Revision: "))
+        .and_then(|rest| rest.split_whitespace().next());
+    assert_eq!(revision, Some(pinned_revision()));
+    let entries: Vec<_> = module_expectations().collect();
+    assert!(entries.windows(2).all(|pair| pair[0].0 < pair[1].0));
+    assert!(entries.iter().all(
+        |(path, verdict)| path.ends_with(".js") && matches!(*verdict, "pass" | "fail" | "skip")
+    ));
+}
+
+fn module_expectations() -> impl Iterator<Item = (&'static str, &'static str)> {
+    MODULE_VERDICTS
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.split_once('\t').expect("path and verdict"))
+}
+
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_module_execution_matches_classifications() {
+    let root = PathBuf::from(
+        std::env::var("RUSTIC_TEST262_DIR").expect("RUSTIC_TEST262_DIR names a Test262 checkout"),
+    );
+    let report = execute_module_tree(&root, "test/language", RunLimits::default())
+        .expect("Test262 module tree is readable");
+    let actual = report
+        .passed
+        .iter()
+        .map(|path| (path, "pass"))
+        .chain(report.failed.iter().map(|(path, _)| (path, "fail")))
+        .chain(report.skipped.iter().map(|(path, _)| (path, "skip")))
+        .map(|(path, verdict)| (path.strip_prefix("test/language/").unwrap(), verdict))
+        .collect::<BTreeMap<_, _>>();
+    let expected = module_expectations().collect::<BTreeMap<_, _>>();
+    let mut changes: Vec<_> = expected
+        .iter()
+        .filter(|(path, verdict)| actual.get(*path) != Some(*verdict))
+        .map(|(path, verdict)| format!("{path}: expected {verdict}, got {:?}", actual.get(path)))
+        .collect();
+    changes.extend(
+        actual
+            .keys()
+            .filter(|path| !expected.contains_key(*path))
+            .map(|path| format!("unexpected selection: {path}")),
+    );
+    assert!(
+        changes.is_empty(),
+        "module verdicts changed:\n{}",
+        changes.join("\n")
+    );
 }
 
 /// Executes `test/language` and compares the files that pass with the
@@ -170,6 +229,22 @@ fn test262_built_ins_execution_matches_the_passing_list() {
         BUILT_INS_PASSING,
         "test262_built_ins_passing.txt",
         "Test262 test/built-ins files that pass when executed (JS-05).",
+    );
+}
+
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
+    check_trees(
+        &[
+            "test/intl402/Intl/getCanonicalLocales",
+            "test/intl402/String/prototype/toLocaleLowerCase",
+            "test/intl402/String/prototype/toLocaleUpperCase",
+        ],
+        "test/intl402/",
+        INTL_PASSING,
+        "test262_intl_passing.txt",
+        "Test262 Intl locale identifiers and casing (JS-08).",
     );
 }
 

@@ -2,12 +2,22 @@
 
 use std::collections::HashMap;
 
+mod asynchronous;
+mod dynamic;
+mod evaluate;
 mod graph;
-pub use graph::{GraphError, GraphLimits, ModuleGraph, ResolvedBinding, ResolvedExport};
+pub(crate) use asynchronous::AsyncModuleGraph;
+pub use dynamic::DynamicImport;
+pub(crate) use dynamic::{ImportJob, ImportLoader};
+pub use evaluate::ModuleEvalError;
+pub(crate) use evaluate::ModuleInstance;
+pub use graph::{
+    GraphError, GraphLimits, ModuleGraph, ModuleSource, ResolvedBinding, ResolvedExport,
+};
 
 use crate::ast::{
     DefaultExport, ExportDeclaration, Identifier, ImportAttribute, ImportSpecifier,
-    ModuleExportName, Program, Statement, StatementKind,
+    ModuleExportName, Program, ProgramKind, Statement, StatementKind,
 };
 use crate::{ParseError, ParseLimits, Source, Span, parse_module};
 
@@ -20,6 +30,14 @@ pub struct ModuleRequest {
 }
 
 impl ModuleRequest {
+    pub(super) fn dynamic(specifier: Vec<u16>, mut attributes: Vec<(Vec<u16>, Vec<u16>)>) -> Self {
+        attributes.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        Self {
+            specifier,
+            attributes,
+        }
+    }
+
     /// The specifier as written, before host resolution.
     pub fn specifier(&self) -> &[u16] {
         &self.specifier
@@ -101,6 +119,24 @@ pub struct ModuleRecord {
 }
 
 impl ModuleRecord {
+    fn synthetic_default() -> Self {
+        Self {
+            program: Program {
+                kind: ProgramKind::Module,
+                body: Vec::new(),
+                strict: true,
+                span: Span::default(),
+            },
+            requests: Vec::new(),
+            imports: Vec::new(),
+            exports: vec![ExportEntry {
+                name: default_name(),
+                target: ExportTarget::Default,
+            }],
+            star_exports: Vec::new(),
+        }
+    }
+
     /// Parse module source and derive the static linker inputs.
     pub fn parse(source: &Source, limits: &ParseLimits) -> Result<Self, ParseError> {
         let program = parse_module(source, limits)?;

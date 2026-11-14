@@ -57,6 +57,8 @@ pub enum Class {
     TypedArray,
     /// A DataView (§25.3).
     DataView,
+    /// A module namespace exotic object (§10.4.6).
+    ModuleNamespace,
 }
 
 /// A complete or partial property descriptor (§6.2.6).
@@ -359,6 +361,10 @@ pub(crate) enum Internal {
     Generator(Box<Generator>),
     /// A promise's internal slots (§27.2.6).
     Promise(Box<PromiseRecord>),
+    /// Suspended evaluation state for a graph of source text modules.
+    ModuleEvaluation(Box<crate::module::AsyncModuleGraph>),
+    /// The specifier and attributes of a queued dynamic import.
+    ImportRequest(Box<crate::module::ImportJob>),
     /// A Proxy exotic object (§10.5): `[[ProxyTarget]]` and
     /// `[[ProxyHandler]]`, both `None` once revoked.
     Proxy {
@@ -372,6 +378,8 @@ pub(crate) enum Internal {
         env: EnvId,
         slots: Box<[Option<u16>]>,
     },
+    /// Export keys in UTF-16 order and their live bindings.
+    ModuleNamespace(Box<[(PropertyKey, NamespaceBinding)]>, EnvId),
     /// An ArrayBuffer's bytes (§25.1).
     ArrayBuffer(Box<super::builtins::buffer::BufferData>),
     /// A typed array's `[[ViewedArrayBuffer]]`, element kind,
@@ -394,6 +402,22 @@ pub(crate) enum Internal {
     Captures(Box<[Value]>),
 }
 
+/// A module namespace property points to a declaration slot or a namespace.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum NamespaceBinding {
+    Local(EnvId, u16),
+    Namespace(ObjectId),
+}
+
+impl NamespaceBinding {
+    pub(crate) fn trace(self, tracer: &mut impl super::gc::Tracer) {
+        match self {
+            Self::Local(env, _) => tracer.env(env),
+            Self::Namespace(module) => tracer.value(Value::object(module)),
+        }
+    }
+}
+
 /// `[[PromiseState]]`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PromiseState {
@@ -408,14 +432,21 @@ pub(crate) struct Reaction {
     /// The handler: a function, undefined (pass the value on), or for an
     /// `await` the suspended async function's state object.
     pub handler: Value,
-    /// The reaction resumes an `await` rather than calling `handler`.
-    pub awaiting: bool,
+    pub kind: ReactionKind,
     /// The capability's promise, or undefined for none. When `resolve`
     /// is undefined the promise is an intrinsic promise that nothing else
     /// can settle, and the job settles it directly.
     pub promise: Value,
     pub resolve: Value,
     pub reject: Value,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ReactionKind {
+    Call,
+    Await,
+    Module(u32),
+    Import,
 }
 
 impl Reaction {
@@ -450,6 +481,12 @@ impl PromiseRecord {
 /// A job waiting in the agent's queue (§9.5).
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Job {
+    /// A validated import request awaiting the host's loader.
+    Import {
+        promise: Value,
+        request: Value,
+        referrer: Value,
+    },
     /// `NewPromiseReactionJob`: run `reaction` with `argument`.
     Reaction {
         reaction: Reaction,
@@ -468,6 +505,18 @@ pub(crate) enum Job {
 impl Job {
     pub(crate) fn values(&self) -> [Value; 6] {
         match *self {
+            Job::Import {
+                promise,
+                request,
+                referrer,
+            } => [
+                promise,
+                request,
+                referrer,
+                Value::UNDEFINED,
+                Value::UNDEFINED,
+                Value::UNDEFINED,
+            ],
             Job::Reaction {
                 reaction, argument, ..
             } => {

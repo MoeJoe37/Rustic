@@ -1441,7 +1441,7 @@ lists the next tasks.
 | TD-32: targeted `:has()` and state invalidation | Complete: anchors within the relative selectors' reach and their preceding siblings, subtrees under changed `lang`/`dir`/`disabled`/`contenteditable`, `dir=auto` roots and form-group controls; `css.invalidation` is complete. A pragma language change and states in nested `:has()` ancestor positions still restyle everything |
 | JS-01: lexer, parser, early errors, strict mode, ASI and UTF-16 | Complete for parsing: scripts and modules to a spanned AST, 22,956/23,123 Test262 parse-phase files at a pinned revision (RegExp pattern early errors remain, TD-88; proposals skipped, TD-89), bounded depth/stack/cancellation and the `js-parse` fuzz target; see [JS.md](JS.md) |
 | JS-02: values, coercions, references, completions, strings, shapes and object internal methods | Complete for the data model: 8-byte values, budgeted `u32` arenas, Latin-1 strings and atoms, shared shapes with dictionary fallback, dense/sparse elements, ordinary/Array/String internal methods, conversions and comparisons, environments and references; collection came with JS-03 and BigInt conversions with JS-08 part 4; see [JS.md](JS.md#runtime-data-model-js-02) and ADR 0015 |
-| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators (JS-08 parts 1 and 2), async functions (JS-06 part 1) and regular expressions (JS-08 part 3) run; modules remain (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
+| JS-04: bytecode compiler and interpreter | First part complete: scope resolution, register bytecode, functions, closures, calls/`new`, exceptions, iteration, limits, cancellation, inline caches and the `js-run` fuzz target; classes with private names, object-literal `super`, tagged templates and optional calls run; generators (JS-08 parts 1 and 2), async functions (JS-06 part 1) and regular expressions (JS-08 part 3) run; static modules run, with asynchronous module execution remaining (TD-97, TD-99..104); see [JS.md](JS.md#bytecode-and-interpreter-js-04) and ADR 0017 |
 | JS-05: core built-ins | Part 1 complete: Error and native errors, `Object`, `Function.prototype` with bound functions, global functions and primitive wrapper constructors, native constructors usable with `new`, `extends` and `super`; part 2 so far adds the `Function` constructor, `Array`, `String`, `Number`, `Math`, `JSON`, `Map`, `Set`, the weak collections, `Reflect`, `Date`, the iterator helpers, `eval` and the `Symbol` statics; function source text remains (TD-106, TD-107); see [JS.md](JS.md#built-ins-js-05) |
 | JS-07: Test262 runner | First part complete: execution with modes, negative tests and deterministic limits, exact passing list for `test/language` (20,966 of 22,427 run files with JS-05, generators, async functions and async generators so far, plus 11,599 of 12,826 `test/built-ins` files in the gated areas); modules and the remaining built-ins remain (TD-105); see [JS.md](JS.md#test262-execution-js-07) |
 | JS-03: heap, roots and collection | Complete: nonmoving mark/sweep with side mark bits, free lists, collected shapes and atoms, exact budget return, generation-checked host roots, safe-point policy and stress mode, weak references with ephemerons, host-object tracing, the shared DOM/JS collection in `rustic-bindings` and the `js-heap` fuzz target; native safe points (TD-94) and incremental marking (TD-95) remain; see [JS.md](JS.md) |
@@ -1467,4 +1467,99 @@ Resolution preserves binding identity through re-exports, distinguishes missing
 from ambiguous exports and terminates on cycles. The loader checks graph size,
 total source length, resolution work and cancellation. The host supplies source
 and decides request identity and import attribute policy. See [JS.md](JS.md#static-module-loading-js-06).
-The bytecode execution and module conformance gaps are recorded in TD-97/105.
+## JS-06 — Synchronous module evaluation
+
+`Agent::evaluate_module_graph` compiles each record into an instantiation
+entry point and an evaluation body. A traced module environment holds
+declarations and direct live imports. The graph initializes functions and
+`var` before running bodies in depth-first dependency order. Namespace
+exotic objects expose the resolved exports, including later binding updates.
+The focused regressions check cycles, lexical TDZ, namespace identity and
+property semantics, garbage collection, and rejection before script side
+effects when top-level await cannot compile. Asynchronous evaluation,
+dynamic imports, `import.meta` and the module conformance gate remain in
+TD-97 and TD-105.
+
+## JS-07 — Static module Test262 baseline
+
+The standalone evaluator creates a lazy per-module `import.meta` object.
+The Test262 runner loads relative source text fixtures from the checkout and
+records module verdicts separately from the existing script baselines.
+The pinned `test/language` module selection has 382 passes, 314 failures
+and 121 proposal skips, with zero engine panics reported. The failures cover
+top-level await, dynamic import and fixtures with import attributes.
+See [JS.md](JS.md#static-module-loading-js-06) and TD-97/105.
+
+## JS-08 — Unicode string normalization
+
+`String.prototype.normalize` implements all four Unicode forms over
+UTF-16 code units. It preserves lone surrogates, checks coercion order and
+invalid forms, and limits the decomposition workspace. The original IDNA
+NFC implementation and canonical Unicode data moved to `rustic-base` so
+both consumers share them. The pinned Test262 normalization selection
+passes all 14 files. The heap report records a 193-byte increase for the
+new method and its property name. Locale support remains in TD-107/108.
+
+## JS-07 — Test262 script evaluation in the current global environment
+
+`$262.evalScript` executes UTF-16 source through the regular script compiler
+and returns its completion value or throws its exception. It uses the global
+environment and the active run's limits. Global declaration instantiation
+checks all lexical, function and `var` names before creating bindings, so
+a failed declaration leaves the existing environment intact. Function
+declarations install the winning closure with the specified property
+attributes, including replacement of configurable accessors. See
+[JS.md](JS.md#test262-execution-js-07) and TD-105 for the pinned results and
+remaining hooks. The language gate adds nine passing cases, reaching 21,476
+of 22,427 executed files. Built-in and module verdicts are unchanged.
+
+## JS-06 — Host-provided module metadata
+
+The standalone graph evaluator can accept UTF-16 string properties keyed by
+the host's module identity. Each module that references `import.meta` sees its
+own metadata object, shared with nested functions and retained by the traced
+module environment. Each supplied property consumes graph work and heap
+storage. The default evaluator retains its lazy empty object. See
+[JS.md](JS.md#static-module-loading-js-06).
+
+## JS-06 — Top-level await in static graphs
+
+The asynchronous module entry point links the complete graph before execution.
+It tracks cycles and pending dependencies with iterative traversal and resumes
+module bodies through the existing promise queue. The pinned module gate gains
+241 passes, reaching 623 of 696 executed files with 121 proposal skips.
+Dynamic import and import-attribute fixtures remain open under TD-97/105.
+
+## JS-06 — Synthetic JSON and text modules
+
+Explicit host loaders can supply JSON and text data as default-only modules.
+JSON is parsed before evaluation and shared by all importers of the same key.
+Text preserves its UTF-16 units. The pinned module gate gains 24 passes from
+data fixtures and rejected attribute requests, reaching 647 of 696 executed
+files. Byte imports need immutable ArrayBuffer support and remain in TD-105.
+
+## JS-06 — Host-driven dynamic imports
+
+The compiler emits an import instruction that converts the request and queues
+an explicit host job. Module referrers are retained with live environments,
+and the import promise waits for the loaded module's completion promise.
+The Test262 fixture host reuses pending and evaluated instances across graphs.
+The pinned gates gain 44 module passes and 444 script passes. The five
+remaining module failures require byte fixtures with immutable buffers.
+
+## JS-06 — Byte modules
+
+Byte sources export a Uint8Array backed by immutable storage. Aliases cannot
+write or detach the buffer through indexed properties, typed array methods,
+DataView, Atomics or transfer. The ArrayBuffer immutable accessor increases
+the standard-library heap report by 286 bytes. The module gate passes all 696
+executed files, with 121 proposal skips. The immutable accessor also adds
+four passing built-in cases.
+
+## JS-08 — Locale identifiers and language-sensitive case conversion
+
+`Intl.getCanonicalLocales` uses bounded locale-list traversal and pinned
+CLDR 48 alias data. String casing applies Unicode special rules for Azerbaijani,
+Lithuanian and Turkish. The selected Intl test262 gate passes 46 of 47 files.
+The `Intl` object and its initial method add 499 bytes to the agent heap report.
+Locale objects, locale negotiation and locale services remain open.

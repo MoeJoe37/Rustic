@@ -27,6 +27,8 @@ instead of rewriting the history of a decision.
 | [0017](0017-js-bytecode-interpreter.md) | Register bytecode compiled per function, frames on agent stacks instead of Rust recursion, safe points, shape-and-epoch inline caches | Accepted for JS-04 |
 | [0018](0018-parity-and-performance-leadership.md) | Feature parity with Blink/Gecko/WebKit through a pinned inventory, performance leadership gates against all three, milestones M11–M13, `engine-v4` catalog | Accepted scope update; implementation pending |
 
+| [0019](0019-static-module-evaluation.md) | Traced environments, import slots and namespaces for source text modules | Accepted for synchronous evaluation |
+
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.
 Changes to public API stability, native/unsafe boundaries, runtime replacement,

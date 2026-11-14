@@ -27,6 +27,8 @@ pub(crate) struct BufferData {
     pub max: Option<usize>,
     /// A SharedArrayBuffer: never detached, and it only grows.
     pub shared: bool,
+    /// Whether the byte storage can be written or detached.
+    pub immutable: bool,
 }
 
 /// The element type of a typed array or a DataView accessor.
@@ -235,12 +237,42 @@ impl Agent {
 
     /// Write the low `size` bytes of `bits` at `at`, little-endian. The
     /// caller has checked the range.
-    pub(crate) fn buffer_write(&mut self, o: ObjectId, at: usize, size: usize, bits: u64) {
+    pub(crate) fn buffer_write(
+        &mut self,
+        o: ObjectId,
+        at: usize,
+        size: usize,
+        bits: u64,
+    ) -> JsResult<()> {
+        self.require_mutable_buffer(o)?;
         let bytes = self
             .buffer_data_mut(o)
             .and_then(|d| d.bytes.as_mut())
             .expect("an attached buffer");
         bytes[at..at + size].copy_from_slice(&bits.to_le_bytes()[..size]);
+        Ok(())
+    }
+
+    pub(crate) fn buffer_is_immutable(&self, buffer: ObjectId) -> bool {
+        self.buffer_data(buffer).is_some_and(|data| data.immutable)
+    }
+
+    pub(crate) fn require_mutable_buffer(&mut self, buffer: ObjectId) -> JsResult<()> {
+        if self.buffer_is_immutable(buffer) {
+            return self.type_error("ArrayBuffer is immutable");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn immutable_bytes_buffer(&mut self, bytes: &[u8]) -> JsResult<ObjectId> {
+        let buffer = self.new_array_buffer(bytes.len())?;
+        let data = self.buffer_data_mut(buffer).expect("new buffer");
+        data.bytes
+            .as_mut()
+            .expect("attached buffer")
+            .copy_from_slice(bytes);
+        data.immutable = true;
+        Ok(buffer)
     }
 
     /// `AllocateArrayBuffer` (§25.1.3.1): a zeroed buffer, or a RangeError
@@ -285,6 +317,7 @@ impl Agent {
             bytes: Some(vec![0; length]),
             max,
             shared,
+            immutable: false,
         })));
         Ok(self.heap.alloc_object(object)?)
     }
@@ -312,7 +345,10 @@ impl Agent {
     /// transfer. Returns whether `buffer` is an ArrayBuffer; a
     /// SharedArrayBuffer cannot be detached.
     pub fn detach_array_buffer(&mut self, buffer: ObjectId) -> bool {
-        match self.buffer_data_mut(buffer).filter(|data| !data.shared) {
+        match self
+            .buffer_data_mut(buffer)
+            .filter(|data| !data.shared && !data.immutable)
+        {
             Some(data) => {
                 // A detached resizable buffer still reports `resizable`.
                 data.bytes = None;
@@ -350,6 +386,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     getter(agent, prototype, "maxByteLength", buffer_max_byte_length)?;
     getter(agent, prototype, "resizable", buffer_resizable)?;
     getter(agent, prototype, "detached", buffer_detached)?;
+    getter(agent, prototype, "immutable", buffer_immutable)?;
     to_string_tag(agent, prototype, "ArrayBuffer")?;
 
     let shared_prototype = agent.new_object_with(Some(object_prototype))?;
@@ -568,6 +605,11 @@ fn buffer_detached(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Valu
     Ok(Value::boolean(agent.buffer_len(buffer).is_none()))
 }
 
+fn buffer_immutable(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let buffer = this_buffer(agent, this, "immutable")?;
+    Ok(Value::boolean(agent.buffer_is_immutable(buffer)))
+}
+
 fn detached_error<T>(agent: &mut Agent) -> JsResult<T> {
     agent.type_error("Cannot perform the operation on a detached ArrayBuffer")
 }
@@ -622,6 +664,7 @@ fn buffer_slice(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
     if new == buffer {
         return agent.type_error("the species constructor returned the same ArrayBuffer");
     }
+    agent.require_mutable_buffer(new)?;
     if created_length < new_length {
         return agent.type_error("the species constructor returned a smaller ArrayBuffer");
     }
@@ -681,6 +724,7 @@ fn copy_and_detach(
     method: &str,
 ) -> JsResult<Value> {
     let buffer = this_buffer(agent, this, method)?;
+    agent.require_mutable_buffer(buffer)?;
     let requested = arg(args, 0);
     let new_length = if requested == Value::UNDEFINED {
         agent.buffer_len(buffer)
@@ -995,7 +1039,7 @@ fn set_view_value(
     if !little {
         bits = (bits << (64 - 8 * size)).swap_bytes();
     }
-    agent.buffer_write(buffer, at, size, bits);
+    agent.buffer_write(buffer, at, size, bits)?;
     Ok(Value::UNDEFINED)
 }
 

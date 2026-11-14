@@ -18,6 +18,7 @@ mod id;
 mod redact;
 mod revision;
 mod source;
+pub mod unicode;
 
 pub use budget::{Budget, BudgetError};
 pub use cancellation::{CancellationToken, Cancelled};

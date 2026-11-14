@@ -1,7 +1,7 @@
 //! Run a directory of a Test262 checkout and print the totals:
 //!
 //! ```text
-//! cargo run --release -p rustic-js --example test262 -- CHECKOUT [DIRECTORY] [--list FILE]
+//! cargo run --release -p rustic-js --example test262 -- CHECKOUT [DIRECTORY] [--modules] [--list FILE]
 //! ```
 //!
 //! `DIRECTORY` defaults to `test/language`. `--list FILE` writes one line
@@ -11,25 +11,33 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use rustic_js::test262::{RunLimits, execute_tree};
+use rustic_js::test262::{RunLimits, execute_module_tree, execute_tree};
 
 fn main() {
     let mut positional = Vec::new();
     let mut list = None;
+    let mut modules = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--list" {
             list = args.next();
+        } else if arg == "--modules" {
+            modules = true;
         } else {
             positional.push(arg);
         }
     }
     let Some(root) = positional.first() else {
-        eprintln!("usage: test262 CHECKOUT [DIRECTORY] [--list FILE]");
+        eprintln!("usage: test262 CHECKOUT [DIRECTORY] [--modules] [--list FILE]");
         std::process::exit(2);
     };
     let directory = positional.get(1).map_or("test/language", String::as_str);
-    let report = match execute_tree(&PathBuf::from(root), directory, RunLimits::default()) {
+    let run = if modules {
+        execute_module_tree
+    } else {
+        execute_tree
+    };
+    let report = match run(&PathBuf::from(root), directory, RunLimits::default()) {
         Ok(report) => report,
         Err(error) => {
             eprintln!("{root}: {error}");

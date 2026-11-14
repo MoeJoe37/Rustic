@@ -14,8 +14,9 @@ mod error;
 mod function;
 pub(crate) mod generator;
 mod global;
+mod intl;
 mod iterator;
-mod json;
+pub(crate) mod json;
 mod math;
 mod number_object;
 mod object;
@@ -152,6 +153,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
     typed_array::install(agent)?;
     atomics::install(agent)?;
     regexp::install(agent)?;
+    intl::install(agent)?;
 
     // Value properties of the global object (§19.1).
     let global = i.global;

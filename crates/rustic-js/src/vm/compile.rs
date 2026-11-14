@@ -9,7 +9,7 @@
 //! script is compiled, only bytecode remains.
 
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::bytecode::{
@@ -17,18 +17,20 @@ use super::bytecode::{
     UNMAPPED_PARAMETER, UnOp, declare,
 };
 use super::scope::{
-    BRAND, BindingKind, CLASS, FIELD_INIT, NEW_TARGET, PRIVATE_GETTER, PRIVATE_SETTER,
-    PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId, ScopeKind,
-    ScopeTree, THIS, field_key_name, is_direct_eval, private_name, private_setter_name,
+    BRAND, BindingKind, CLASS, DEFAULT_EXPORT, FIELD_INIT, IMPORT_META, NEW_TARGET, PRIVATE_GETTER,
+    PRIVATE_SETTER, PRIVATE_STATIC, ROLE_BODY, ROLE_FIELDS, ROLE_FINALLY, Resolution, ScopeId,
+    ScopeKind, ScopeTree, THIS, field_key_name, is_direct_eval, private_name, private_setter_name,
 };
 use crate::ast::{
     Argument, ArrayElement, ArrowBody, ArrowFunction, AssignOp, BinaryOp, Class, ClassElement,
-    Expression, ExpressionKind, ForHead, ForInit, Function, LogicalOp, MemberProperty, MethodKind,
-    ObjectProperty, Pattern, PatternKind, Program, PropertyKey, Statement, StatementKind, Template,
-    UnaryOp, UpdateOp, VariableDeclaration, VariableKind,
+    DefaultExport, ExportDeclaration, Expression, ExpressionKind, ForHead, ForInit, Function,
+    LogicalOp, MemberProperty, MethodKind, ObjectProperty, Pattern, PatternKind, Program,
+    PropertyKey, Statement, StatementKind, Template, UnaryOp, UpdateOp, VariableDeclaration,
+    VariableKind,
 };
 use crate::runtime::{
-    Agent, BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory, StringId, Value,
+    Agent, BINDING_IMPORT, BINDING_LEXICAL, BINDING_MUTABLE, BINDING_STRICT, JsStr, OutOfMemory,
+    StringId, Value,
 };
 use crate::source::Span;
 
@@ -63,6 +65,12 @@ fn stack_address() -> usize {
 
 /// Compile a parsed script.
 pub(crate) fn compile_script(agent: &mut Agent, program: &Program) -> CResult<CodeId> {
+    if program.kind != crate::ast::ProgramKind::Script {
+        return Err(CompileError::Unsupported(
+            "module passed to script compiler",
+            program.span,
+        ));
+    }
     let tree = ScopeTree::analyze_script(&program.body, program.strict);
     let name = agent.names.empty;
     let mut g = Gen::new(
@@ -76,6 +84,78 @@ pub(crate) fn compile_script(agent: &mut Agent, program: &Program) -> CResult<Co
     );
     g.script(&program.body)?;
     g.finish(0, 0)
+}
+
+/// The two entry points and shared environment layout for a source text module.
+pub(crate) struct ModuleCode {
+    pub(crate) initialize: CodeId,
+    pub(crate) body: CodeId,
+    pub(crate) bindings: Rc<Vec<(StringId, u8)>>,
+    pub(crate) metadata_slot: Option<u16>,
+    pub(crate) has_await: bool,
+}
+
+pub(crate) fn compile_module(
+    agent: &mut Agent,
+    program: &Program,
+    allow_await: bool,
+    synthetic_default: bool,
+) -> CResult<ModuleCode> {
+    let tree = ScopeTree::analyze_module(&program.body, synthetic_default);
+    if let Some(span) = tree.top_level_await {
+        if !allow_await {
+            return Err(CompileError::Unsupported(
+                "top-level await in synchronous evaluation",
+                span,
+            ));
+        }
+    }
+    let name = agent.names.empty;
+    let stack = stack_address();
+    let mut init = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
+    init.layout_scope(0)?;
+    let bindings = Rc::clone(&init.scopes[0]);
+    let metadata_slot = tree.scopes[0]
+        .find(IMPORT_META)
+        .map(|index| init.slot_of(0, index));
+    let undefined = init.temp()?;
+    init.emit(Op::Undefined { dst: undefined });
+    for (index, binding) in tree.scopes[0].bindings.iter().enumerate() {
+        if binding.kind == BindingKind::Var || &*binding.name == THIS {
+            init.store_binding_at(0, index, undefined)?;
+        }
+    }
+    for statement in &program.body {
+        let declaration = match &statement.kind {
+            StatementKind::Export(ExportDeclaration::Declaration(inner)) => inner,
+            StatementKind::Export(ExportDeclaration::Default(DefaultExport::Function(f))) => {
+                let name = f.id.as_ref().map_or(DEFAULT_EXPORT, |id| &id.name);
+                let mark = init.mark();
+                let register = init.temp()?;
+                init.function_expression(f, register, Some("default"), FunctionKind::Normal)?;
+                init.store_binding(name, register, true)?;
+                init.release(mark);
+                continue;
+            }
+            _ => statement,
+        };
+        init.hoist_functions(std::slice::from_ref(declaration), true)?;
+    }
+    let initialize = init.finish(0, 0)?;
+    let mut body = Gen::new(agent, &tree, 0, FunctionKind::Script, true, name, stack);
+    let has_await = tree.top_level_await.is_some();
+    if has_await {
+        body.is_async = true;
+        body.emit(Op::AsyncStart);
+    }
+    body.statements(&program.body)?;
+    Ok(ModuleCode {
+        initialize,
+        body: body.finish(0, 0)?,
+        bindings,
+        metadata_slot,
+        has_await,
+    })
 }
 
 /// Compile the code of an `eval` (§19.2.1.1). It runs on the caller's
@@ -546,12 +626,16 @@ impl<'a, 't> Gen<'a, 't> {
         if s.kind == ScopeKind::Script || s.kind == ScopeKind::With {
             return Ok(());
         }
+        if s.bindings.iter().filter(|binding| binding.captured).count() > usize::from(u16::MAX) {
+            return Err(CompileError::TooLarge);
+        }
         let mut names = Vec::new();
         for (i, b) in s.bindings.iter().enumerate() {
             if b.captured {
                 let id = self.agent.heap.intern_str(&b.name)?;
                 let flags = match b.kind {
                     BindingKind::Const => BINDING_STRICT | BINDING_LEXICAL,
+                    BindingKind::Import => BINDING_STRICT | BINDING_LEXICAL | BINDING_IMPORT,
                     BindingKind::Let => BINDING_MUTABLE | BINDING_LEXICAL,
                     BindingKind::SelfName => 0,
                     _ => BINDING_MUTABLE,
@@ -1590,8 +1674,10 @@ impl<'a, 't> Gen<'a, 't> {
     // ---- programs and functions --------------------------------------
 
     fn script(&mut self, body: &[Statement]) -> CResult<()> {
-        // GlobalDeclarationInstantiation: lexical names, then vars and
-        // functions, all by name on the global environment.
+        // GlobalDeclarationInstantiation checks every name before creating
+        // any bindings. Only the last function declaration per name wins.
+        let mut lexical = Vec::new();
+        let mut vars = Vec::new();
         for s in body {
             match &s.kind {
                 StatementKind::Variable(d) => {
@@ -1604,52 +1690,83 @@ impl<'a, 't> Gen<'a, 't> {
                         let mut names = Vec::new();
                         pattern_names(&decl.target, &mut names);
                         for n in names {
-                            let name = self.atom(&n)?;
-                            self.emit(Op::DeclareGlobal { name, kind });
+                            if kind == declare::VAR {
+                                vars.push(n);
+                            } else {
+                                lexical.push((self.atom(&n)?, kind));
+                            }
                         }
                     }
                 }
                 StatementKind::Class(c) => {
                     if let Some(id) = &c.id {
                         let name = self.atom(&id.name)?;
-                        self.emit(Op::DeclareGlobal {
-                            name,
-                            kind: declare::LET,
-                        });
+                        lexical.push((name, declare::LET));
                     }
                 }
-                _ => {}
+                _ => collect_nested_vars(s, &mut vars),
             }
         }
-        let mut vars = Vec::new();
-        for s in body {
-            // Top-level `var` statements were declared above.
-            if !matches!(s.kind, StatementKind::Variable(_)) {
-                collect_nested_vars(s, &mut vars);
+        let mut names = HashSet::new();
+        let mut functions = Vec::new();
+        for statement in body.iter().rev() {
+            if let StatementKind::Function(function) = &statement.kind {
+                if let Some(id) = &function.id {
+                    let name = self.atom(&id.name)?;
+                    if names.insert(name) {
+                        functions.push((name, function));
+                    }
+                }
             }
         }
+        let mut var_names = Vec::new();
         for n in vars {
             let name = self.atom(&n)?;
+            if names.insert(name) {
+                var_names.push(name);
+            }
+        }
+        for &(name, kind) in &lexical {
+            self.emit(Op::CheckGlobal { name, kind });
+        }
+        for name in functions
+            .iter()
+            .map(|&(name, _)| name)
+            .chain(var_names.iter().copied())
+        {
+            self.emit(Op::CheckGlobalVarName { name });
+        }
+        for &(name, _) in &functions {
+            self.emit(Op::CheckGlobal {
+                name,
+                kind: declare::FUNCTION,
+            });
+        }
+        for &name in &var_names {
+            self.emit(Op::CheckGlobal {
+                name,
+                kind: declare::VAR,
+            });
+        }
+        for (name, kind) in lexical {
+            self.emit(Op::DeclareGlobal { name, kind });
+        }
+        for (name, function) in functions.into_iter().rev() {
+            let mark = self.mark();
+            let src = self.temp()?;
+            self.function_expression(function, src, None, FunctionKind::Normal)?;
+            self.emit(Op::InitGlobalFunction { src, name });
+            self.release(mark);
+        }
+        for name in var_names {
             self.emit(Op::DeclareGlobal {
                 name,
                 kind: declare::VAR,
             });
         }
-        for s in body {
-            if let StatementKind::Function(f) = &s.kind {
-                if let Some(id) = &f.id {
-                    let name = self.atom(&id.name)?;
-                    self.emit(Op::DeclareGlobal {
-                        name,
-                        kind: declare::VAR,
-                    });
-                }
-            }
-        }
         let completion = self.temp()?;
         self.emit(Op::Undefined { dst: completion });
         self.completion = Some(completion);
-        self.hoist_functions(body, true)?;
         self.statements(body)?;
         self.emit(Op::Return { src: completion });
         Ok(())
@@ -2342,9 +2459,22 @@ impl<'a, 't> Gen<'a, 't> {
                 handler,
                 finalizer,
             } => self.try_statement(s, labels, block, handler.as_ref(), finalizer.as_deref())?,
-            StatementKind::Import(_) | StatementKind::Export(_) => {
-                return Err(CompileError::Unsupported("modules", s.span));
-            }
+            StatementKind::Import(_) => {}
+            StatementKind::Export(declaration) => match declaration {
+                ExportDeclaration::Declaration(inner) => self.statement(inner)?,
+                ExportDeclaration::Default(DefaultExport::Class(class)) => {
+                    let value = self.temp()?;
+                    self.class_definition(class, value, Some("default"))?;
+                    let name = class.id.as_ref().map_or(DEFAULT_EXPORT, |id| &id.name);
+                    self.store_binding(name, value, true)?;
+                }
+                ExportDeclaration::Default(DefaultExport::Expression(expression)) => {
+                    let value = self.temp()?;
+                    self.expr_named(expression, value, Some("default"))?;
+                    self.store_binding(DEFAULT_EXPORT, value, true)?;
+                }
+                _ => {}
+            },
         }
         self.release(mark);
         Ok(())
@@ -2612,6 +2742,9 @@ impl<'a, 't> Gen<'a, 't> {
     ) -> CResult<()> {
         let of = kind != ForKind::In;
         let is_await = kind == ForKind::AwaitOf;
+        if is_await && !self.is_async {
+            return Err(CompileError::Unsupported("top-level for await", s.span));
+        }
         let scope = self.tree.scope_of(s).expect("for-in/of is analyzed");
         // The right side sees the loop's lexical names in their TDZ; this
         // engine evaluates it outside the loop scope (TDZ violations there
@@ -3718,8 +3851,37 @@ impl<'a, 't> Gen<'a, 't> {
             }
             ExpressionKind::Parenthesized(inner) => self.expr(inner, dst)?,
             ExpressionKind::NewTarget => self.load_new_target(dst)?,
-            ExpressionKind::ImportMeta | ExpressionKind::ImportCall { .. } => {
-                return Err(CompileError::Unsupported("modules", e.span));
+            ExpressionKind::ImportMeta => {
+                let index =
+                    self.tree.scopes[0]
+                        .find(IMPORT_META)
+                        .ok_or(CompileError::Unsupported(
+                            "import.meta outside a module",
+                            e.span,
+                        ))?;
+                let slot = self.slot_of(0, index);
+                self.emit(Op::ImportMeta {
+                    dst,
+                    hops: self.hops(0),
+                    slot,
+                });
+            }
+            ExpressionKind::ImportCall { source, options } => {
+                let specifier = self.temp()?;
+                self.expr(source, specifier)?;
+                let options_register = self.temp()?;
+                if let Some(options) = options {
+                    self.expr(options, options_register)?;
+                } else {
+                    self.emit(Op::Undefined {
+                        dst: options_register,
+                    });
+                }
+                self.emit(Op::ImportCall {
+                    dst,
+                    source: specifier,
+                    options: options_register,
+                });
             }
             ExpressionKind::Yield {
                 argument,
@@ -3761,6 +3923,9 @@ impl<'a, 't> Gen<'a, 't> {
                 }
             }
             ExpressionKind::Await(argument) => {
+                if !self.is_async {
+                    return Err(CompileError::Unsupported("top-level await", e.span));
+                }
                 let value = self.temp()?;
                 self.expr(argument, value)?;
                 let mode = self.temp()?;

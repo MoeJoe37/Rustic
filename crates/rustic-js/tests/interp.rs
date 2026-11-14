@@ -1825,13 +1825,31 @@ fn arrays_math_symbols_and_dynamic_functions() {
 
 #[test]
 fn unsupported_syntax_is_reported_not_miscompiled() {
-    for source in ["/\\p{L}/u", "import('m')"] {
-        let mut agent = Agent::new().expect("agent");
-        assert!(
-            matches!(agent.evaluate(source), Err(EvalError::Compile(_))),
-            "{source}"
-        );
-    }
+    let mut agent = Agent::new().expect("agent");
+    assert!(matches!(
+        agent.evaluate("/\\p{L}/u"),
+        Err(EvalError::Compile(_))
+    ));
+}
+
+#[test]
+fn intl_canonicalizes_locale_lists_and_tailors_case() {
+    let mut agent = Agent::new().unwrap();
+    let script = r#"
+        const tags = Intl.getCanonicalLocales(['DE-de', 'de-DE', 'iw-IL', 'hy-SU',
+                     'sl-rozaj-biske-1994', 'EN-u-NU-LATN-CA-GREGORY', 'sh']);
+        let invalid;
+        try { 'I'.toLocaleLowerCase(['tr', 'en--US']); } catch (e) { invalid = e instanceof RangeError }
+        const tailored = 'I\u0325\u0307'.toLocaleLowerCase('tr') === 'i\u0325'
+            && 'I'.toLocaleLowerCase('az') === '\u0131'
+            && 'i'.toLocaleUpperCase('tr') === '\u0130'
+            && 'I\u0301'.toLocaleLowerCase('lt') === 'i\u0307\u0301'
+            && 'i\u0307'.toLocaleUpperCase('lt') === 'I'
+            && ('I\uD800').toLocaleLowerCase('tr').charCodeAt(1) === 0xD800;
+        tags.join('|') === 'de-DE|he-IL|hy-AM|sl-1994-biske-rozaj|en-u-ca-gregory-nu-latn|sr-Latn'
+            && invalid && tailored;
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
 
 /// An agent with a global `Symbol` holding the well-known symbols, which
@@ -3481,4 +3499,31 @@ fn atomics_wait_and_notify() {
     agent.run_jobs().expect("jobs run");
     assert_eq!(run_in(&mut agent, "log.join()"), "w1 ok,w3 timed-out,w2 ok");
     assert_eq!(agent.next_waiter_deadline(), None);
+}
+
+#[test]
+fn normalize_preserves_utf16_and_uses_all_four_unicode_forms() {
+    let mut agent = Agent::new().unwrap();
+    let result = agent
+        .evaluate(
+            r#"
+        let log = '';
+        let receiver = { toString() { log += 'r'; return '\u212B'; } };
+        let form = { toString() { log += 'f'; return 'NFD'; } };
+        let valid = String.prototype.normalize.call(receiver, form) === 'A\u030A'
+            && log === 'rf'
+            && 'e\u0301'.normalize() === '\u00e9'
+            && '\u00e9'.normalize('NFD') === 'e\u0301'
+            && '\uFB01'.normalize('NFKC') === 'fi'
+            && '\uFB01\u00e9'.normalize('NFKD') === 'fie\u0301'
+            && '\uD800\u0301\uDC00e\u0301\u{1f600}'.normalize() === '\uD800\u0301\uDC00é\u{1f600}';
+        let bad = false, receiverError = false;
+        try { 'a'.normalize('nfc'); } catch (e) { bad = e instanceof RangeError; }
+        try { String.prototype.normalize.call(null, form); }
+        catch (e) { receiverError = e instanceof TypeError; }
+        valid && bad && receiverError && log === 'rf';
+    "#,
+        )
+        .unwrap();
+    assert_eq!(result, Value::TRUE);
 }

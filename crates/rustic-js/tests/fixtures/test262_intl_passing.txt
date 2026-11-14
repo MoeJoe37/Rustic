@@ -1,0 +1,50 @@
+# Test262 Intl locale identifiers and casing (JS-08).
+# Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
+# 46 pass, 1 fail, 0 skipped (modules, proposals).
+# Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
+Intl/getCanonicalLocales/canonicalized-tags.js
+Intl/getCanonicalLocales/canonicalized-unicode-ext-seq.js
+Intl/getCanonicalLocales/complex-language-subtag-replacement.js
+Intl/getCanonicalLocales/complex-region-subtag-replacement.js
+Intl/getCanonicalLocales/descriptor.js
+Intl/getCanonicalLocales/duplicates.js
+Intl/getCanonicalLocales/elements-not-reordered.js
+Intl/getCanonicalLocales/error-cases.js
+Intl/getCanonicalLocales/get-locale.js
+Intl/getCanonicalLocales/getCanonicalLocales.js
+Intl/getCanonicalLocales/grandfathered.js
+Intl/getCanonicalLocales/has-property.js
+Intl/getCanonicalLocales/invalid-tags.js
+Intl/getCanonicalLocales/length.js
+Intl/getCanonicalLocales/locales-is-not-a-string.js
+Intl/getCanonicalLocales/main.js
+Intl/getCanonicalLocales/name.js
+Intl/getCanonicalLocales/non-iana-canon.js
+Intl/getCanonicalLocales/overriden-arg-length.js
+Intl/getCanonicalLocales/overriden-push.js
+Intl/getCanonicalLocales/preferred-grandfathered.js
+Intl/getCanonicalLocales/preferred-variant.js
+Intl/getCanonicalLocales/returned-object-is-an-array.js
+Intl/getCanonicalLocales/returned-object-is-mutable.js
+Intl/getCanonicalLocales/to-string.js
+Intl/getCanonicalLocales/transformed-ext-canonical.js
+Intl/getCanonicalLocales/transformed-ext-invalid.js
+Intl/getCanonicalLocales/transformed-ext-valid.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-calendar.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-col-strength.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-measurement-system.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-region.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-subdivision.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-timezone.js
+Intl/getCanonicalLocales/unicode-ext-canonicalize-yes-to-true.js
+Intl/getCanonicalLocales/unicode-ext-key-with-digit.js
+Intl/getCanonicalLocales/weird-cases.js
+String/prototype/toLocaleLowerCase/capital_I_with_dot.js
+String/prototype/toLocaleLowerCase/special_casing_Azeri.js
+String/prototype/toLocaleLowerCase/special_casing_Lithuanian.js
+String/prototype/toLocaleLowerCase/special_casing_Turkish.js
+String/prototype/toLocaleLowerCase/validates-all-locale-identifiers.js
+String/prototype/toLocaleUpperCase/special_casing_Azeri.js
+String/prototype/toLocaleUpperCase/special_casing_Lithuanian.js
+String/prototype/toLocaleUpperCase/special_casing_Turkish.js
+String/prototype/toLocaleUpperCase/validates-all-locale-identifiers.js

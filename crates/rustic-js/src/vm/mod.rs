@@ -14,8 +14,10 @@ use std::fmt;
 
 pub use bytecode::CodeId;
 pub use compile::CompileError;
+pub(crate) use compile::{ModuleCode, compile_module};
 pub use interp::VmLimits;
 pub(crate) use interp::exponentiate;
+pub(crate) use scope::DEFAULT_EXPORT;
 
 use crate::ast::Program;
 use crate::parser::{ParseError, ParseLimits, parse_eval, parse_script};
@@ -79,12 +81,18 @@ impl Agent {
     pub fn evaluate(&mut self, text: &str) -> Result<Value, EvalError> {
         let source = Source::from_str_limited(text, MAX_SOURCE_UNITS)
             .map_err(|_| EvalError::SourceTooLong)?;
+        self.evaluate_source(&source)
+    }
+
+    /// Parse, compile and run script source with exact UTF-16 code units.
+    /// As with [`Self::evaluate`], root any handles kept across this call.
+    pub fn evaluate_source(&mut self, source: &Source) -> Result<Value, EvalError> {
         let mut limits = ParseLimits::default();
         if let Some(token) = self.cancellation() {
             limits.cancellation = token;
         }
         let code = {
-            let program = parse_script(&source, &limits).map_err(|e| match e {
+            let program = parse_script(source, &limits).map_err(|e| match e {
                 ParseError::Cancelled => EvalError::Cancelled,
                 other => EvalError::Parse(other),
             })?;

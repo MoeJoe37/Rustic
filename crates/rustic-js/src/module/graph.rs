@@ -4,6 +4,27 @@ use crate::{ParseError, ParseLimits, Source};
 
 use super::{ExportTarget, ImportName, ModuleRecord, ModuleRequest, RequestIndex};
 
+/// Input returned by an explicit module loader.
+pub enum ModuleSource {
+    /// ECMAScript source text.
+    JavaScript(Source),
+    /// JSON text for a synthetic default export.
+    Json(Source),
+    /// Uninterpreted UTF-16 text for a synthetic default export.
+    Text(Source),
+    /// Raw bytes for a synthetic immutable Uint8Array default export.
+    Bytes(Vec<u8>),
+}
+
+impl ModuleSource {
+    fn len(&self) -> usize {
+        match self {
+            Self::JavaScript(source) | Self::Json(source) | Self::Text(source) => source.len(),
+            Self::Bytes(bytes) => bytes.len(),
+        }
+    }
+}
+
 /// Budgets for loading a static module graph and resolving a single export.
 #[derive(Clone, Debug)]
 pub struct GraphLimits {
@@ -85,6 +106,7 @@ pub enum ResolvedExport {
 /// specifiers, enforce import attributes, and provide source.
 pub struct ModuleGraph<K> {
     modules: Vec<Node<K>>,
+    source_units: usize,
 }
 
 struct Node<K> {
@@ -92,10 +114,11 @@ struct Node<K> {
     record: ModuleRecord,
     dependencies: Vec<usize>,
     exports: HashMap<Vec<u16>, usize>,
+    data: Option<ModuleSource>,
 }
 
 impl<K> Node<K> {
-    fn new(key: K, record: ModuleRecord) -> Self {
+    fn new(key: K, record: ModuleRecord, data: Option<ModuleSource>) -> Self {
         let exports = record
             .exports()
             .iter()
@@ -107,6 +130,7 @@ impl<K> Node<K> {
             record,
             dependencies: Vec::new(),
             exports,
+            data,
         }
     }
 }
@@ -119,14 +143,27 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
     pub fn load<E>(
         entry: K,
         limits: &GraphLimits,
-        mut resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
         mut source: impl FnMut(&K) -> Result<Source, E>,
+    ) -> Result<Self, GraphError<E>> {
+        Self::load_sources(entry, limits, resolve, |key| {
+            source(key).map(ModuleSource::JavaScript)
+        })
+    }
+
+    /// Load a graph of JavaScript and synthetic data modules. The host
+    /// decides which requests and attributes resolve to each module key.
+    pub fn load_sources<E>(
+        entry: K,
+        limits: &GraphLimits,
+        mut resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        mut source: impl FnMut(&K) -> Result<ModuleSource, E>,
     ) -> Result<Self, GraphError<E>> {
         let mut graph = Self {
             modules: Vec::new(),
+            source_units: 0,
         };
-        let mut source_units = 0;
-        graph.add(entry.clone(), limits, &mut source_units, &mut source)?;
+        graph.add(entry.clone(), limits, &mut source)?;
         let mut indexes = HashMap::from([(entry, 0)]);
         let mut index = 0;
         while index < graph.modules.len() {
@@ -141,7 +178,7 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
                     target
                 } else {
                     let target = graph.modules.len();
-                    graph.add(key.clone(), limits, &mut source_units, &mut source)?;
+                    graph.add(key.clone(), limits, &mut source)?;
                     indexes.insert(key, target);
                     target
                 };
@@ -158,24 +195,47 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         &mut self,
         key: K,
         limits: &GraphLimits,
-        source_units: &mut usize,
-        source: &mut impl FnMut(&K) -> Result<Source, E>,
+        source: &mut impl FnMut(&K) -> Result<ModuleSource, E>,
     ) -> Result<(), GraphError<E>> {
         check(limits)?;
         if self.modules.len() == limits.max_modules {
             return Err(GraphError::GraphLimit);
         }
         let input = source(&key).map_err(GraphError::Host)?;
-        *source_units = source_units
+        self.source_units = self
+            .source_units
             .checked_add(input.len())
             .filter(|total| *total <= limits.max_source_units)
             .ok_or(GraphError::GraphLimit)?;
-        let record = ModuleRecord::parse(&input, &limits.parse).map_err(|error| match error {
-            ParseError::Cancelled => GraphError::Cancelled,
-            other => GraphError::Parse(other),
-        })?;
-        self.modules.push(Node::new(key, record));
+        let (record, data) = match input {
+            ModuleSource::JavaScript(source) => {
+                let record =
+                    ModuleRecord::parse(&source, &limits.parse).map_err(|error| match error {
+                        ParseError::Cancelled => GraphError::Cancelled,
+                        other => GraphError::Parse(other),
+                    })?;
+                (record, None)
+            }
+            data => (ModuleRecord::synthetic_default(), Some(data)),
+        };
+        self.modules.push(Node::new(key, record, data));
         Ok(())
+    }
+
+    pub(super) fn data(&self, index: usize) -> Option<&ModuleSource> {
+        self.modules[index].data.as_ref()
+    }
+
+    pub(super) fn dependencies(&self, index: usize) -> &[usize] {
+        &self.modules[index].dependencies
+    }
+
+    pub(super) fn module_count(&self) -> usize {
+        self.modules.len()
+    }
+
+    pub(super) fn source_units(&self) -> usize {
+        self.source_units
     }
 
     /// The module record at the given index, where zero is the entry module.
@@ -202,11 +262,20 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         limits: &GraphLimits,
     ) -> Result<Vec<Vec<u16>>, GraphError<std::convert::Infallible>> {
         let mut remaining = limits.max_resolution_steps;
+        self.collect_exported_names(index, limits, &mut remaining)
+    }
+
+    pub(super) fn collect_exported_names(
+        &self,
+        index: usize,
+        limits: &GraphLimits,
+        remaining: &mut usize,
+    ) -> Result<Vec<Vec<u16>>, GraphError<std::convert::Infallible>> {
         let mut seen = HashSet::new();
         let mut names = HashSet::new();
         let mut pending = vec![index];
         while let Some(module) = pending.pop() {
-            spend(limits, &mut remaining)?;
+            spend(limits, remaining)?;
             if !seen.insert(module) {
                 continue;
             }
@@ -214,13 +283,13 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
                 continue;
             };
             for entry in node.record.exports() {
-                spend(limits, &mut remaining)?;
+                spend(limits, remaining)?;
                 if module == index || !is_default(&entry.name) {
                     names.insert(entry.name.as_slice());
                 }
             }
             for request in node.record.star_exports().iter().rev() {
-                spend(limits, &mut remaining)?;
+                spend(limits, remaining)?;
                 pending.push(node.dependencies[request.index()]);
             }
         }
@@ -277,7 +346,7 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         Ok(())
     }
 
-    fn resolve<E>(
+    pub(super) fn resolve<E>(
         &self,
         index: usize,
         name: &[u16],
@@ -343,7 +412,7 @@ fn check<E>(limits: &GraphLimits) -> Result<(), GraphError<E>> {
         .map_err(|_| GraphError::Cancelled)
 }
 
-fn spend<E>(limits: &GraphLimits, remaining: &mut usize) -> Result<(), GraphError<E>> {
+pub(super) fn spend<E>(limits: &GraphLimits, remaining: &mut usize) -> Result<(), GraphError<E>> {
     check(limits)?;
     *remaining = remaining
         .checked_sub(1)

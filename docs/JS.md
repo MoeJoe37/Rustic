@@ -129,10 +129,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,467 | 17,109 |
-| Fail | 960 | 1,465 |
+| Pass | 21,920 | 17,123 |
+| Fail | 507 | 1,451 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 95.7% | 92.1% |
+| Pass rate of the files that run | 97.7% | 92.2% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -174,7 +174,6 @@ release mode on a 64-bit host; the lists are not checked on other targets.
 
 Most `test/language` failures are not interpreter bugs yet:
 
-- About 440 are dynamic `import()` files (modules, JS-06).
 - About 150 `eval-code` files still fail: most declare `arguments` from an
   `eval` in parameter defaults, or are async.
 - Modules account for most of the rest. The real assertion failures left are mostly parameter TDZ in
@@ -185,7 +184,15 @@ In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
 Temporal, `$262.agent` (112 `Atomics` files) or `$262` realms. Skipped files are never
-counted as passing. Module files join with JS-06 module loading (TD-105).
+counted as passing. The script gate continues to report module files as
+skipped. Their execution classifications are recorded by the separate module
+gate below.
+
+`$262.evalScript` runs UTF-16 script source in the current global environment
+and preserves completion values and thrown objects. Its global declaration
+tests cover lexical collisions, non-configurable properties, function
+replacement and atomic rejection before any bindings are installed (§16.1.7).
+Realm creation, explicit collection and test agents remain in TD-105.
 
 ## Fuzzing
 
@@ -663,9 +670,62 @@ Bare star exports do not forward the default export. The API checks module
 count, total UTF-16 source size, resolution work and cancellation. The
 source callback supplies an already constructed source buffer.
 
-Module environments, live bindings, namespace objects, evaluation, top-level
-await and dynamic imports remain tracked under TD-97 and TD-105. Run the
-static graph regressions with `cargo test --locked -p rustic-js --test module`.
+`Agent::evaluate_module_graph` compiles and links a fresh synchronous graph
+instance and returns the entry module's namespace. Linking connects import
+slots directly to the defining bindings. Every environment is created before
+execution, and function declarations and `var` bindings are initialized before
+any body runs. The VM then executes each dependency once in depth-first request
+order, including cyclic graphs. Lexical bindings stay in their temporal dead
+zone until their declarations run.
+
+Namespaces have null prototypes and expose UTF-16-sorted export names through
+live data descriptors. Ambiguous star exports are omitted. Import slots and
+namespace properties trace their targets through garbage collection, and the
+host may keep a namespace alive with `Agent::root`. See [ADR 0019](adr/0019-static-module-evaluation.md).
+
+A module shares its null-prototype `import.meta` object with nested functions.
+By default, the evaluator creates the empty object on first access.
+`Agent::evaluate_module_graph_with_metadata` loads host-provided UTF-16 string
+properties during instantiation for modules that reference `import.meta`.
+The host receives each module's opaque key. Properties use the graph work
+budget and the agent heap budget.
+
+`Agent::start_module_evaluation` returns the entry namespace and a completion
+promise. Top-level `await` and `for await` use the existing promise jobs and
+suspended frames. An asynchronous dependency delays its importers while
+independent siblings can run immediately. The host drives microtask checkpoints
+and roots the returned handles across collection.
+
+`import()` converts the specifier and options in the calling VM, then queues
+the request for the explicit host loader. It resolves to the namespace only
+after evaluation completes. The Test262 host caches evaluated and in-flight
+modules by canonical fixture path and type. It reuses their live bindings
+and completion promises across overlapping graphs.
+
+The Test262 module runner selects files flagged `module`, reads relative
+JavaScript, JSON, text and byte fixtures within the checkout, and distinguishes parse, resolution
+and runtime failures. It uses the same harness, heap and step budgets as
+the script runner. At revision `48221d7c1f7745dc13e420a2e850a248c0b2afb4`,
+817 module files were selected. Of the 696 executed, all 696 passed. The remaining 121 were skipped for proposal features. All verdicts are pinned in
+`tests/fixtures/test262_modules.txt`.
+
+`ModuleGraph::load_sources` accepts JSON, text and bytes as synthetic modules with a
+single default export. JSON uses the engine's JSON parser and invalid input
+fails before any module body executes. Text becomes an exact UTF-16 string. Byte imports produce a Uint8Array
+backed by an immutable ArrayBuffer.
+Every import of the same resolved key shares the same binding and value.
+
+```sh
+cargo test --locked -p rustic-js --test module
+RUSTIC_TEST262_DIR=/absolute/path/to/test262 \
+  cargo test --locked --release -p rustic-js --test test262 test262_module_execution -- --ignored
+cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 \
+  test/language --modules --list module-verdicts.tsv
+```
+
+To update the fixture after a verified change, strip the `test/language/`
+prefix and retain the first word of each verdict. Keep the counts, revision
+and tracked limitations current.
 
 [modules]: https://262.ecma-international.org/17.0/index.html#sec-source-text-module-records
 
@@ -713,7 +773,7 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (110,671; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  (111,649; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
   installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
@@ -755,8 +815,10 @@ longest pause grows with the live heap, about 0.17 ms per MiB
 (`json_tree`, 15 ms at 94 MiB). That is over the 5 ms target of
 [PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) above roughly 30 MiB of
 live data, which is the measured trigger of TD-95; incremental marking is
-`perf.gc` (M12). Timings on a native ARM64 machine are not recorded yet:
-this sandbox has no ARM64 host, and emulated timing is not evidence.
+`perf.gc` (M12). The native Linux ARM64 CI job runs the same release corpus
+and writes its timings, processor, kernel, Rust version and source revision
+to the job summary. The milestone still needs a successful native ARM64 run
+and its recorded results.
 
 ## Built-ins (JS-05)
 
@@ -828,7 +890,12 @@ Part 2 adds the rest of the everyday library, beginning with:
     object argument's `Symbol.match`/`replace`/`search`/`split` method.
   - A string pattern for `match`, `matchAll` or `search` is made into a
     RegExp, as the spec says.
-  - `normalize` is missing (TD-107).
+  - `normalize` implements NFC, NFD, NFKC and NFKD with pinned Unicode
+    17.0.0 data shared with the URL engine. Lone surrogates retain their
+    UTF-16 code units and separate combining runs. The method bounds
+    decomposition workspace and result length using the agent's available
+    heap budget. Its native method and atom add 193 bytes to the measured
+    fresh agent. Locale-dependent comparison and case mapping remain in TD-107.
 - **JSON.** `parse` with a reviver and `stringify` with replacer functions,
   property lists, indentation, `toJSON` and cycle detection.
   - Parsing and the reviver walk keep their own stacks, so 50,000 nested
@@ -924,3 +991,32 @@ start to matter (`perf.startup`, M12); the JS-09 heap report tracks the size.
 With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
 and with the part 2 pieces above to 70.0%. Eval took it to 73.6% and
 generators to 90.8%.
+
+## Intl locale identifiers and casing (JS-08)
+
+`Intl.getCanonicalLocales` validates and deduplicates locale lists in request
+order. The parser implements Unicode BCP 47 locale identifiers, canonical
+casing and ordering, CLDR language, region and extension aliases, and
+likely-region selection for deprecated territories. Locale-sensitive case
+conversion applies the Unicode special casing rules for Azerbaijani,
+Lithuanian and Turkish while preserving lone UTF-16 surrogates.
+
+The pinned Intl selection covers `Intl/getCanonicalLocales` and both
+`String.prototype.toLocale*Case` directories. It passes 46 of 47 files.
+The remaining case requires `Intl.Locale`. Locale negotiation for Intl
+services and locale-sensitive collation remain open under TD-107.
+
+The data generator takes `supplementalMetadata.xml`, `likelySubtags.xml` and the
+listed `bcp47/` XML files from [CLDR release 48], plus Unicode 17.0.0
+`PropList.txt`. The script verifies their SHA-256 digests and checks the
+generated Rust with the pinned formatter. The [Unicode license notice]
+covers the generated tables.
+
+[CLDR release 48]: https://github.com/unicode-org/cldr/tree/release-48/common
+[Unicode license notice]: ../crates/rustic-js/data/CLDR-LICENSE.txt
+
+```sh
+python3 tools/generate_js_locale_data.py /path/to/pinned/locale-inputs --check
+RUSTIC_TEST262_DIR=/path/to/test262 cargo test --locked --release -p rustic-js \
+  --test test262 test262_locale_identifiers_and_case_mapping -- --ignored
+```

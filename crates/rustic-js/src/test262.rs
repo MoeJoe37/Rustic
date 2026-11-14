@@ -18,16 +18,19 @@
 //! heap limit and a step budget ([`RunLimits`]), so a runaway test fails
 //! the same way on every machine instead of timing out. After the test the
 //! promise jobs run; an `async` test passes when it prints
-//! `Test262:AsyncTestComplete` through `$DONE`. Module tests are skipped
-//! until module loading exists (JS-06), and are counted as skipped, never
-//! as passed. [`execute_tree`] runs a directory
-//! of a checkout.
+//! `Test262:AsyncTestComplete` through `$DONE`. [`execute_tree`] runs script
+//! tests from a checkout. [`execute_module_tree`] selects module tests and
+//! loads their static dependencies within the checkout.
 
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use crate::runtime::{Agent, PropertyKey, Value};
-use crate::{EvalError, ParseError, ParseLimits, Source, parse_module, parse_script};
+use crate::module::{
+    GraphError, GraphLimits, ModuleEvalError, ModuleGraph, ModuleRequest, ModuleSource,
+};
+use crate::runtime::{Abrupt, Agent, ErrorKind, JsResult, PropertyKey, Value};
+use crate::{CompileError, EvalError, MAX_SOURCE_UNITS, ParseError, ParseLimits, Source};
+use crate::{parse_module, parse_script};
 
 /// Proposal features the parser does not implement yet (TD-89). Files
 /// using them are skipped and counted separately, never passed.
@@ -344,6 +347,16 @@ pub fn skip_reason(meta: &Metadata) -> Option<&'static str> {
 
 /// Run `text` in every mode its metadata requires.
 pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits) -> Verdict {
+    execute_script(text, meta, harness, limits, None)
+}
+
+fn execute_script(
+    text: &str,
+    meta: &Metadata,
+    harness: &Harness,
+    limits: RunLimits,
+    fixture: Option<(&Path, &Path)>,
+) -> Verdict {
     if let Some(reason) = skip_reason(meta) {
         return Verdict::Skip(reason);
     }
@@ -359,7 +372,15 @@ pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits
         }
     }
     for (mode, strict) in modes {
-        let run = std::panic::catch_unwind(|| execute_mode(text, meta, harness, limits, strict));
+        let run = std::panic::catch_unwind(|| {
+            execute_mode(
+                text,
+                meta,
+                harness,
+                limits,
+                TestMode::Script { strict, fixture },
+            )
+        });
         match run {
             Ok(Ok(())) => {}
             Ok(Err(reason)) => return Verdict::Fail(format!("{mode}: {reason}")),
@@ -369,12 +390,306 @@ pub fn execute(text: &str, meta: &Metadata, harness: &Harness, limits: RunLimits
     Verdict::Pass
 }
 
+#[derive(Clone, Copy)]
+enum TestMode<'a> {
+    Script {
+        strict: bool,
+        fixture: Option<(&'a Path, &'a Path)>,
+    },
+    Module {
+        path: &'a Path,
+        root: &'a Path,
+    },
+}
+
+#[derive(Debug)]
+enum TestError {
+    Runtime(EvalError),
+    Resolution(String),
+    Host(String),
+}
+
+impl From<EvalError> for TestError {
+    fn from(error: EvalError) -> Self {
+        Self::Runtime(error)
+    }
+}
+
+fn execute_module(
+    agent: &mut Agent,
+    text: &str,
+    path: &Path,
+    root: &Path,
+) -> Result<Value, TestError> {
+    let limits = GraphLimits::default();
+    let parse_source = |text: &str| {
+        Source::from_str_limited(text, limits.max_source_units).map_err(|_| "module is too large")
+    };
+    let entry = parse_source(text).map_err(|error| TestError::Host(error.to_owned()))?;
+    // Distinguish a syntax error in the test itself from a failed import.
+    parse_module(&entry, &limits.parse).map_err(EvalError::Parse)?;
+    let entry_key = (path.to_owned(), FixtureKind::JavaScript);
+    let graph =
+        load_fixture_graph(root, entry_key.clone(), &limits, Some(entry)).map_err(|error| {
+            match error {
+                GraphError::UnresolvedExport { .. } | GraphError::Parse(ParseError::Syntax(_)) => {
+                    TestError::Resolution(format!("{error:?}"))
+                }
+                GraphError::Host(ref reason) if reason == UNSUPPORTED_ATTRIBUTES => {
+                    TestError::Resolution(reason.clone())
+                }
+                other => TestError::Host(format!("{other:?}")),
+            }
+        })?;
+    let cache = install_fixture_loader(agent, root, path);
+    let (namespace, completion) =
+        evaluate_fixture_graph(agent, &graph, &limits, &cache).map_err(|error| match error {
+            ModuleEvalError::Runtime(abrupt) => TestError::Runtime(abrupt.into()),
+            ModuleEvalError::InvalidJson { .. } => TestError::Resolution(error.to_string()),
+            other => TestError::Host(other.to_string()),
+        })?;
+    if !cache.borrow().contains_key(&entry_key) {
+        cache_fixture(agent, &cache, entry_key, namespace, completion).map_err(EvalError::from)?;
+    }
+    let root = agent
+        .root(Value::object(completion))
+        .map_err(|_| EvalError::OutOfMemory)?;
+    let settled = settle(agent);
+    let result = match agent.promise_rejected(completion) {
+        Some(false) => Ok(Value::UNDEFINED),
+        Some(true) => Err(EvalError::Throw(
+            agent.promise_result(completion).expect("rejection reason"),
+        )
+        .into()),
+        None => Err(TestError::Host(
+            "module evaluation is still pending after jobs ran".into(),
+        )),
+    };
+    agent.unroot(root);
+    settled.map_err(EvalError::from)?;
+    result
+}
+
+type FixtureKey = (PathBuf, FixtureKind);
+type FixtureCache = std::rc::Rc<
+    std::cell::RefCell<
+        std::collections::HashMap<FixtureKey, (crate::runtime::HostRoot, crate::runtime::HostRoot)>,
+    >,
+>;
+
+fn fixture_referrer(key: &FixtureKey) -> Option<crate::runtime::JsStr> {
+    key.0.to_str().map(crate::runtime::JsStr::from_text)
+}
+
+fn load_fixture_graph(
+    root: &Path,
+    entry: FixtureKey,
+    limits: &GraphLimits,
+    input: Option<Source>,
+) -> Result<ModuleGraph<FixtureKey>, GraphError<String>> {
+    ModuleGraph::load_sources(
+        entry.clone(),
+        limits,
+        |(referrer, _), request| resolve_fixture(root, referrer, request),
+        |key| {
+            if *key == entry {
+                if let Some(input) = &input {
+                    return Ok(ModuleSource::JavaScript(input.clone()));
+                }
+            }
+            if key.1 == FixtureKind::Bytes {
+                let mut bytes = Vec::new();
+                std::fs::File::open(&key.0)
+                    .and_then(|file| {
+                        file.take(limits.max_source_units as u64 + 1)
+                            .read_to_end(&mut bytes)
+                    })
+                    .map_err(|error| format!("read module fixture: {error}"))?;
+                if bytes.len() > limits.max_source_units {
+                    return Err("module is too large".into());
+                }
+                return Ok(ModuleSource::Bytes(bytes));
+            }
+            let max_bytes = 3 * limits.max_source_units;
+            let mut source = String::new();
+            std::fs::File::open(&key.0)
+                .and_then(|file| file.take(max_bytes as u64 + 1).read_to_string(&mut source))
+                .map_err(|error| format!("read module fixture: {error}"))?;
+            if source.len() > max_bytes {
+                return Err("module is too large".into());
+            }
+            let source = Source::from_str_limited(&source, limits.max_source_units)
+                .map_err(|error| error.to_string())?;
+            Ok(match key.1 {
+                FixtureKind::JavaScript => ModuleSource::JavaScript(source),
+                FixtureKind::Json => ModuleSource::Json(source),
+                FixtureKind::Text => ModuleSource::Text(source),
+                FixtureKind::Bytes => unreachable!("byte fixtures use raw input"),
+            })
+        },
+    )
+}
+
+fn cache_fixture(
+    agent: &mut Agent,
+    cache: &FixtureCache,
+    key: FixtureKey,
+    namespace: crate::runtime::ObjectId,
+    completion: crate::runtime::ObjectId,
+) -> JsResult<()> {
+    let namespace = agent.root(Value::object(namespace))?;
+    match agent.root(Value::object(completion)) {
+        Ok(completion) => {
+            cache.borrow_mut().insert(key, (namespace, completion));
+            Ok(())
+        }
+        Err(error) => {
+            agent.unroot(namespace);
+            Err(error.into())
+        }
+    }
+}
+
+fn evaluate_fixture_graph(
+    agent: &mut Agent,
+    graph: &ModuleGraph<FixtureKey>,
+    limits: &GraphLimits,
+    cache: &FixtureCache,
+) -> Result<(crate::runtime::ObjectId, crate::runtime::ObjectId), ModuleEvalError> {
+    agent.start_observed_module_evaluation(
+        graph,
+        limits,
+        fixture_referrer,
+        |agent, key| {
+            let &(namespace, completion) = cache.borrow().get(key)?;
+            let object = |root| agent.rooted(root).and_then(Value::as_object);
+            Some((object(namespace)?, object(completion)?))
+        },
+        Some(|agent: &mut Agent, index, namespace, completion| {
+            let (key, _) = graph.module(index).expect("evaluated fixture");
+            if cache.borrow().contains_key(key) {
+                return Ok(());
+            }
+            if cache.borrow().len() >= limits.max_modules {
+                return Err(agent.throw(ErrorKind::RangeError, "module cache limit exceeded"));
+            }
+            cache_fixture(agent, cache, key.clone(), namespace, completion)
+        }),
+    )
+}
+
+fn install_fixture_loader(agent: &mut Agent, root: &Path, path: &Path) -> FixtureCache {
+    let cache = FixtureCache::default();
+    let loaded = cache.clone();
+    let root = root.to_owned();
+    let path = path.to_owned();
+    agent.set_dynamic_import_loader(Some(std::rc::Rc::new(move |agent, referrer, request| {
+        let referrer = referrer.map(|value| PathBuf::from(value.to_text()));
+        let key = resolve_fixture(&root, referrer.as_deref().unwrap_or(&path), request)
+            .map_err(|error| agent.throw(ErrorKind::TypeError, &error))?;
+        if let Some(&(namespace, completion)) = loaded.borrow().get(&key) {
+            let object = |root| {
+                agent
+                    .rooted(root)
+                    .and_then(Value::as_object)
+                    .expect("cached module")
+            };
+            return Ok((object(namespace), object(completion)));
+        }
+        let limits = GraphLimits::default();
+        if loaded.borrow().len() >= limits.max_modules {
+            return Err(agent.throw(ErrorKind::RangeError, "module cache limit exceeded"));
+        }
+        let graph = load_fixture_graph(&root, key.clone(), &limits, None).map_err(|error| {
+            let kind = match error {
+                GraphError::Parse(_) | GraphError::UnresolvedExport { .. } => {
+                    ErrorKind::SyntaxError
+                }
+                _ => ErrorKind::TypeError,
+            };
+            agent.throw(kind, &format!("{error:?}"))
+        })?;
+        let (namespace, completion) = evaluate_fixture_graph(agent, &graph, &limits, &loaded)
+            .map_err(|error| match error {
+                ModuleEvalError::Runtime(abrupt) => abrupt,
+                ModuleEvalError::Compile {
+                    error: CompileError::OutOfMemory,
+                    ..
+                } => Abrupt::OutOfMemory,
+                other => agent.throw(ErrorKind::SyntaxError, &other.to_string()),
+            })?;
+        if !loaded.borrow().contains_key(&key) {
+            cache_fixture(agent, &loaded, key, namespace, completion)?;
+        }
+        Ok((namespace, completion))
+    })));
+    cache
+}
+
+const UNSUPPORTED_ATTRIBUTES: &str = "unsupported Test262 module attributes";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum FixtureKind {
+    JavaScript,
+    Json,
+    Text,
+    Bytes,
+}
+
+fn resolve_fixture(
+    root: &Path,
+    referrer: &Path,
+    request: &ModuleRequest,
+) -> Result<(PathBuf, FixtureKind), String> {
+    let kind = match request.attributes() {
+        [] => FixtureKind::JavaScript,
+        [(key, value)] if key.iter().copied().eq("type".encode_utf16()) => {
+            if value.iter().copied().eq("json".encode_utf16()) {
+                FixtureKind::Json
+            } else if value.iter().copied().eq("text".encode_utf16()) {
+                FixtureKind::Text
+            } else if value.iter().copied().eq("bytes".encode_utf16()) {
+                FixtureKind::Bytes
+            } else {
+                return Err(UNSUPPORTED_ATTRIBUTES.into());
+            }
+        }
+        _ => return Err(UNSUPPORTED_ATTRIBUTES.into()),
+    };
+    let specifier = String::from_utf16(request.specifier())
+        .map_err(|_| "module specifier is not valid UTF-16")?;
+    let relative = specifier
+        .strip_prefix("./")
+        .ok_or("expected a relative module specifier")?;
+    let relative = Path::new(relative);
+    if (kind == FixtureKind::JavaScript
+        && relative
+            .extension()
+            .is_none_or(|extension| extension != "js"))
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err("expected a module fixture inside the checkout".into());
+    }
+    let path = referrer
+        .parent()
+        .ok_or("module has no containing directory")?
+        .join(relative)
+        .canonicalize()
+        .map_err(|error| format!("locate module fixture: {error}"))?;
+    if path.strip_prefix(root).is_err() || !path.is_file() {
+        return Err("module fixture is outside the checkout or is not a regular file".into());
+    }
+    Ok((path, kind))
+}
+
 fn execute_mode(
     text: &str,
     meta: &Metadata,
     harness: &Harness,
     limits: RunLimits,
-    strict: bool,
+    mode: TestMode<'_>,
 ) -> Result<(), String> {
     let mut agent =
         Agent::with_heap_limit(limits.heap_bytes).map_err(|_| "no memory for an agent")?;
@@ -383,6 +698,13 @@ fn execute_mode(
     // unless the test asks for one that may not.
     agent.set_can_block(!meta.cannot_block);
     install_host_object(&mut agent).map_err(|_| "no memory for $262")?;
+    if let TestMode::Script {
+        fixture: Some((path, root)),
+        ..
+    } = mode
+    {
+        install_fixture_loader(&mut agent, root, path);
+    }
     if meta.is_async {
         // `doneprintHandle.js` reports through the host's `print`; keep
         // what it prints on the function itself.
@@ -409,36 +731,48 @@ fn execute_mode(
             }
         }
     }
-    let full;
-    let source = if strict {
-        full = format!("\"use strict\";\n{text}");
-        &full
-    } else {
-        text
+    let result = match mode {
+        TestMode::Script { strict: true, .. } => agent
+            .evaluate(&format!("\"use strict\";\n{text}"))
+            .map_err(TestError::from),
+        TestMode::Script { strict: false, .. } => agent.evaluate(text).map_err(TestError::from),
+        TestMode::Module { path, root } => execute_module(&mut agent, text, path, root),
     };
-    let result = agent.evaluate(source);
-    // A microtask checkpoint after the script, as a host runs one.
-    let result = match result {
-        Ok(v) => settle(&mut agent).map(|()| v).map_err(EvalError::from),
-        Err(e) => Err(e),
+    // A microtask checkpoint after evaluation, as a host runs one.
+    let result = match mode {
+        TestMode::Module { .. } => result,
+        TestMode::Script { .. } => result.and_then(|v| {
+            settle(&mut agent)
+                .map(|()| v)
+                .map_err(|error| TestError::Runtime(error.into()))
+        }),
+    };
+    let reason = |agent: &mut Agent, error: &TestError| match error {
+        TestError::Runtime(error) => describe(agent, error),
+        TestError::Resolution(error) | TestError::Host(error) => error.clone(),
     };
     match (&meta.negative, result) {
         (None, Ok(_)) if meta.is_async => async_outcome(&mut agent),
         (None, Ok(_)) => Ok(()),
-        (None, Err(error)) => Err(describe(&mut agent, &error)),
+        (None, Err(error)) => Err(reason(&mut agent, &error)),
         (Some(negative), Ok(_)) => Err(format!("ran, but must throw {}", negative.error)),
         (Some(negative), Err(error)) => {
             let (phase, name) = match &error {
-                EvalError::Parse(ParseError::Syntax(_)) => (Phase::Parse, "SyntaxError".to_owned()),
-                EvalError::Throw(value) => (Phase::Runtime, error_name(&mut agent, *value)),
-                _ => return Err(describe(&mut agent, &error)),
+                TestError::Runtime(EvalError::Parse(ParseError::Syntax(_))) => {
+                    (Phase::Parse, "SyntaxError".to_owned())
+                }
+                TestError::Runtime(EvalError::Throw(value)) => {
+                    (Phase::Runtime, error_name(&mut agent, *value))
+                }
+                TestError::Resolution(_) => (Phase::Resolution, "SyntaxError".to_owned()),
+                _ => return Err(reason(&mut agent, &error)),
             };
             if phase == negative.phase && name == negative.error {
                 Ok(())
             } else {
                 Err(format!(
                     "{}, but must throw {} in the {:?} phase",
-                    describe(&mut agent, &error),
+                    reason(&mut agent, &error),
                     negative.error,
                     negative.phase
                 ))
@@ -459,8 +793,8 @@ fn settle(agent: &mut Agent) -> crate::runtime::JsResult<()> {
 }
 
 /// The part of the `$262` host object (INTERPRETING.md) the engine can
-/// provide so far: `global` and `detachArrayBuffer`. Realms, `evalScript`,
-/// `gc` and agents are missing (TD-105), so tests that use them fail.
+/// provide so far: `global`, `detachArrayBuffer` and `evalScript`.
+/// Realms, `gc` and agents are tracked under TD-105.
 fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
     fn detach(agent: &mut Agent, _: Value, args: &[Value]) -> crate::runtime::JsResult<Value> {
         let detached = args
@@ -475,6 +809,8 @@ fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
     let host = agent.new_object()?;
     let key = agent.heap.key("detachArrayBuffer")?;
     agent.define_method(host, key, detach, "detachArrayBuffer", 1)?;
+    let key = agent.heap.key("evalScript")?;
+    agent.define_method(host, key, eval_script, "evalScript", 1)?;
     let global = agent.intrinsics.global;
     let key = agent.heap.key("global")?;
     agent.create_data_property_or_throw(host, key, Value::object(global))?;
@@ -484,6 +820,29 @@ fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
         key,
         crate::runtime::PropertyDescriptor::data_with(Value::object(host), true, false, true),
     )
+}
+
+fn eval_script(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let Some(text) = args.first().and_then(|value| value.as_string()) else {
+        return agent.type_error("$262.evalScript expects script text");
+    };
+    let text = agent.heap.string(text);
+    if text.len() > MAX_SOURCE_UNITS {
+        return Err(agent.throw(ErrorKind::RangeError, "script source too long"));
+    }
+    let source = Source::from_utf16(text.units().collect(), MAX_SOURCE_UNITS)
+        .expect("script source length checked");
+    agent.evaluate_source(&source).map_err(|error| match error {
+        EvalError::Throw(value) => Abrupt::Throw(value),
+        EvalError::OutOfMemory | EvalError::Compile(CompileError::OutOfMemory) => {
+            Abrupt::OutOfMemory
+        }
+        EvalError::Cancelled => Abrupt::Cancelled,
+        EvalError::Parse(_) => agent.throw(ErrorKind::SyntaxError, &error.to_string()),
+        EvalError::SourceTooLong | EvalError::Compile(_) => {
+            agent.throw(ErrorKind::RangeError, &error.to_string())
+        }
+    })
 }
 
 /// What an async test printed through `$DONE`.
@@ -564,23 +923,74 @@ pub fn execute_tree(
     directory: &str,
     limits: RunLimits,
 ) -> io::Result<ExecutionReport> {
-    let harness = Harness::load(root)?;
+    execute_tree_with(root, directory, limits, false)
+}
+
+/// Run only tests flagged `module`, with a local static-module host.
+pub fn execute_module_tree(
+    root: &Path,
+    directory: &str,
+    limits: RunLimits,
+) -> io::Result<ExecutionReport> {
+    execute_tree_with(root, directory, limits, true)
+}
+
+fn execute_tree_with(
+    root: &Path,
+    directory: &str,
+    limits: RunLimits,
+    modules_only: bool,
+) -> io::Result<ExecutionReport> {
+    let root = root.canonicalize()?;
+    let harness = Harness::load(&root)?;
     let mut files = Vec::new();
     walk(&root.join(directory), &mut files)?;
     let mut report = ExecutionReport::default();
     for path in &files {
-        let text = std::fs::read_to_string(path)?;
+        let canonical = if modules_only {
+            let canonical = path.canonicalize()?;
+            if canonical.strip_prefix(&root).is_err() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "module test is outside the checkout",
+                ));
+            }
+            Some(canonical)
+        } else {
+            None
+        };
+        let text = std::fs::read_to_string(canonical.as_ref().unwrap_or(path))?;
         let Some(meta) = metadata(&text) else {
             continue;
         };
+        if modules_only && !meta.module {
+            continue;
+        }
         let relative: Vec<String> = path
-            .strip_prefix(root)
+            .strip_prefix(&root)
             .unwrap_or(path)
             .components()
             .map(|c| c.as_os_str().to_string_lossy().into_owned())
             .collect();
         let relative = relative.join("/");
-        match execute(&text, &meta, &harness, limits) {
+        let verdict = if !modules_only {
+            execute_script(&text, &meta, &harness, limits, Some((path, &root)))
+        } else if meta.unsupported() {
+            Verdict::Skip("proposal")
+        } else {
+            let mode = TestMode::Module {
+                path: canonical
+                    .as_deref()
+                    .expect("module paths were canonicalized"),
+                root: &root,
+            };
+            match std::panic::catch_unwind(|| execute_mode(&text, &meta, &harness, limits, mode)) {
+                Ok(Ok(())) => Verdict::Pass,
+                Ok(Err(reason)) => Verdict::Fail(format!("module: {reason}")),
+                Err(_) => Verdict::Fail("module: the engine panicked".into()),
+            }
+        };
+        match verdict {
             Verdict::Pass => report.passed.push(relative),
             Verdict::Fail(reason) => report.failed.push((relative, reason)),
             Verdict::Skip(reason) => report.skipped.push((relative, reason)),
@@ -720,6 +1130,52 @@ mod tests {
             verdict("/*---\nnegative:\n  phase: runtime\n  type: SyntaxError\n---*/\nvar 1;"),
             Verdict::Fail(_)
         ));
+    }
+
+    #[test]
+    fn eval_script_uses_global_script_declarations_and_exact_utf16() {
+        assert_eq!(
+            verdict(
+                r#"/*---
+---*/
+function run() {
+  let local = 1;
+  assert.sameValue($262.evalScript('var globalVar = 2; let globalLexical = 3; typeof local'), 'undefined');
+}
+run();
+assert.sameValue(globalVar, 2);
+assert.sameValue(globalLexical, 3);
+assert.sameValue(Object.getOwnPropertyDescriptor(globalThis, 'globalVar').configurable, false);
+assert.sameValue($262.evalScript("'" + String.fromCharCode(0xD800) + "'").charCodeAt(0), 0xD800);
+const sentinel = {};
+let thrown;
+try { $262.evalScript('throw sentinel'); } catch (e) { thrown = e; }
+assert.sameValue(thrown, sentinel);
+let duplicate;
+try { $262.evalScript('let globalLexical;'); } catch (e) { duplicate = e; }
+assert.sameValue(duplicate.constructor, SyntaxError);
+Object.defineProperty(globalThis, 'blocked', { value: 1, writable: true });
+let blockedError;
+try { $262.evalScript('var untouched; let lexicalUntouched; function blocked() {}'); }
+catch (e) { blockedError = e; }
+assert.sameValue(blockedError.constructor, TypeError);
+assert.sameValue('untouched' in globalThis, false);
+assert.sameValue($262.evalScript('let lexicalUntouched = 4; lexicalUntouched'), 4);
+let setterCalls = 0;
+Object.defineProperty(globalThis, 'replaceable', { configurable: true, set() { setterCalls++; } });
+assert.sameValue($262.evalScript('function replaceable() { return 1 } function replaceable() { return 2 } replaceable()'), 2);
+assert.sameValue(setterCalls, 0);
+assert.sameValue(Object.getOwnPropertyDescriptor(globalThis, 'replaceable').configurable, false);
+"#,
+            ),
+            Verdict::Pass
+        );
+        assert_eq!(
+            verdict(
+                "/*---\nnegative:\n  phase: runtime\n  type: SyntaxError\n---*/\n$262.evalScript('var 1');"
+            ),
+            Verdict::Pass
+        );
     }
 
     #[test]

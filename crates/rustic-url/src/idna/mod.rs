@@ -16,7 +16,7 @@
 
 mod bidi;
 mod mapping;
-mod normalize;
+use rustic_base::unicode as normalize;
 mod punycode;
 mod tables;
 mod validity;

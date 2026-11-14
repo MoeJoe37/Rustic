@@ -799,8 +799,10 @@ longest pause grows with the live heap, about 0.17 ms per MiB
 (`json_tree`, 15 ms at 94 MiB). That is over the 5 ms target of
 [PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) above roughly 30 MiB of
 live data, which is the measured trigger of TD-95; incremental marking is
-`perf.gc` (M12). Timings on a native ARM64 machine are not recorded yet:
-this sandbox has no ARM64 host, and emulated timing is not evidence.
+`perf.gc` (M12). The native Linux ARM64 CI job runs the same release corpus
+and writes its timings, processor, kernel, Rust version and source revision
+to the job summary. The milestone still needs a successful native ARM64 run
+and its recorded results.
 
 ## Built-ins (JS-05)
 

@@ -26,8 +26,9 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use crate::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph, ModuleRequest};
-use crate::runtime::{Agent, PropertyKey, Value};
-use crate::{EvalError, ParseError, ParseLimits, Source, parse_module, parse_script};
+use crate::runtime::{Abrupt, Agent, ErrorKind, JsResult, PropertyKey, Value};
+use crate::{CompileError, EvalError, MAX_SOURCE_UNITS, ParseError, ParseLimits, Source};
+use crate::{parse_module, parse_script};
 
 /// Proposal features the parser does not implement yet (TD-89). Files
 /// using them are skipped and counted separately, never passed.
@@ -573,8 +574,8 @@ fn settle(agent: &mut Agent) -> crate::runtime::JsResult<()> {
 }
 
 /// The part of the `$262` host object (INTERPRETING.md) the engine can
-/// provide so far: `global` and `detachArrayBuffer`. Realms, `evalScript`,
-/// `gc` and agents are missing (TD-105), so tests that use them fail.
+/// provide so far: `global`, `detachArrayBuffer` and `evalScript`.
+/// Realms, `gc` and agents are tracked under TD-105.
 fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
     fn detach(agent: &mut Agent, _: Value, args: &[Value]) -> crate::runtime::JsResult<Value> {
         let detached = args
@@ -589,6 +590,8 @@ fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
     let host = agent.new_object()?;
     let key = agent.heap.key("detachArrayBuffer")?;
     agent.define_method(host, key, detach, "detachArrayBuffer", 1)?;
+    let key = agent.heap.key("evalScript")?;
+    agent.define_method(host, key, eval_script, "evalScript", 1)?;
     let global = agent.intrinsics.global;
     let key = agent.heap.key("global")?;
     agent.create_data_property_or_throw(host, key, Value::object(global))?;
@@ -598,6 +601,29 @@ fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
         key,
         crate::runtime::PropertyDescriptor::data_with(Value::object(host), true, false, true),
     )
+}
+
+fn eval_script(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let Some(text) = args.first().and_then(|value| value.as_string()) else {
+        return agent.type_error("$262.evalScript expects script text");
+    };
+    let text = agent.heap.string(text);
+    if text.len() > MAX_SOURCE_UNITS {
+        return Err(agent.throw(ErrorKind::RangeError, "script source too long"));
+    }
+    let source = Source::from_utf16(text.units().collect(), MAX_SOURCE_UNITS)
+        .expect("script source length checked");
+    agent.evaluate_source(&source).map_err(|error| match error {
+        EvalError::Throw(value) => Abrupt::Throw(value),
+        EvalError::OutOfMemory | EvalError::Compile(CompileError::OutOfMemory) => {
+            Abrupt::OutOfMemory
+        }
+        EvalError::Cancelled => Abrupt::Cancelled,
+        EvalError::Parse(_) => agent.throw(ErrorKind::SyntaxError, &error.to_string()),
+        EvalError::SourceTooLong | EvalError::Compile(_) => {
+            agent.throw(ErrorKind::RangeError, &error.to_string())
+        }
+    })
 }
 
 /// What an async test printed through `$DONE`.
@@ -885,6 +911,52 @@ mod tests {
             verdict("/*---\nnegative:\n  phase: runtime\n  type: SyntaxError\n---*/\nvar 1;"),
             Verdict::Fail(_)
         ));
+    }
+
+    #[test]
+    fn eval_script_uses_global_script_declarations_and_exact_utf16() {
+        assert_eq!(
+            verdict(
+                r#"/*---
+---*/
+function run() {
+  let local = 1;
+  assert.sameValue($262.evalScript('var globalVar = 2; let globalLexical = 3; typeof local'), 'undefined');
+}
+run();
+assert.sameValue(globalVar, 2);
+assert.sameValue(globalLexical, 3);
+assert.sameValue(Object.getOwnPropertyDescriptor(globalThis, 'globalVar').configurable, false);
+assert.sameValue($262.evalScript("'" + String.fromCharCode(0xD800) + "'").charCodeAt(0), 0xD800);
+const sentinel = {};
+let thrown;
+try { $262.evalScript('throw sentinel'); } catch (e) { thrown = e; }
+assert.sameValue(thrown, sentinel);
+let duplicate;
+try { $262.evalScript('let globalLexical;'); } catch (e) { duplicate = e; }
+assert.sameValue(duplicate.constructor, SyntaxError);
+Object.defineProperty(globalThis, 'blocked', { value: 1, writable: true });
+let blockedError;
+try { $262.evalScript('var untouched; let lexicalUntouched; function blocked() {}'); }
+catch (e) { blockedError = e; }
+assert.sameValue(blockedError.constructor, TypeError);
+assert.sameValue('untouched' in globalThis, false);
+assert.sameValue($262.evalScript('let lexicalUntouched = 4; lexicalUntouched'), 4);
+let setterCalls = 0;
+Object.defineProperty(globalThis, 'replaceable', { configurable: true, set() { setterCalls++; } });
+assert.sameValue($262.evalScript('function replaceable() { return 1 } function replaceable() { return 2 } replaceable()'), 2);
+assert.sameValue(setterCalls, 0);
+assert.sameValue(Object.getOwnPropertyDescriptor(globalThis, 'replaceable').configurable, false);
+"#,
+            ),
+            Verdict::Pass
+        );
+        assert_eq!(
+            verdict(
+                "/*---\nnegative:\n  phase: runtime\n  type: SyntaxError\n---*/\n$262.evalScript('var 1');"
+            ),
+            Verdict::Pass
+        );
     }
 
     #[test]

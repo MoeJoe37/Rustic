@@ -1518,7 +1518,8 @@ and reproduction commands.
 
 Pay with the asynchronous module execution and import hooks in JS-06,
 fixture support where a test requires import attributes, and `$262` with
-realms, `evalScript`, collection and test agents. Extend the built-in gate
+realms, collection and test agents. `$262.evalScript` now runs UTF-16
+script source against the current global environment. Extend the built-in gate
 when new library areas land. Trigger on each implementation.
 
 ### TD-106 — No function source text (eval part paid)

@@ -152,8 +152,14 @@ pub enum Op {
     GetGlobal { dst: Reg, site: u16 },
     /// Assign to a global binding through `sites[site]`.
     SetGlobal { src: Reg, site: u16 },
-    /// Initialize a global lexical binding or declare a global var.
+    /// Check a global declaration before creating any bindings.
+    CheckGlobal { name: u32, kind: u8 },
+    /// Check that a function or var name does not shadow a global lexical.
+    CheckGlobalVarName { name: u32 },
+    /// Create a validated global lexical or var binding.
     DeclareGlobal { name: u32, kind: u8 },
+    /// Create or replace the property for a validated global function.
+    InitGlobalFunction { src: Reg, name: u32 },
     /// Initialize a global lexical binding (`let`, `const` at the top of a
     /// script).
     InitName { src: Reg, name: u32 },
@@ -482,14 +488,16 @@ pub enum Op {
     Nop,
 }
 
-/// The `kind` operand of [`Op::DeclareGlobal`].
+/// Declaration kinds for global script instantiation.
 pub mod declare {
-    /// `var` or a function declaration: a global object property.
+    /// `var`: a global object property.
     pub const VAR: u8 = 0;
     /// `let` or `class`: a mutable global lexical binding.
     pub const LET: u8 = 1;
     /// `const`: an immutable global lexical binding.
     pub const CONST: u8 = 2;
+    /// A function declaration: a global object property with stricter checks.
+    pub const FUNCTION: u8 = 3;
 }
 
 /// An exception handler: a throw from `start .. end` jumps to `target`

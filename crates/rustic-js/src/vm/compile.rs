@@ -9,7 +9,7 @@
 //! script is compiled, only bytecode remains.
 
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use super::bytecode::{
@@ -1649,8 +1649,10 @@ impl<'a, 't> Gen<'a, 't> {
     // ---- programs and functions --------------------------------------
 
     fn script(&mut self, body: &[Statement]) -> CResult<()> {
-        // GlobalDeclarationInstantiation: lexical names, then vars and
-        // functions, all by name on the global environment.
+        // GlobalDeclarationInstantiation checks every name before creating
+        // any bindings. Only the last function declaration per name wins.
+        let mut lexical = Vec::new();
+        let mut vars = Vec::new();
         for s in body {
             match &s.kind {
                 StatementKind::Variable(d) => {
@@ -1663,52 +1665,83 @@ impl<'a, 't> Gen<'a, 't> {
                         let mut names = Vec::new();
                         pattern_names(&decl.target, &mut names);
                         for n in names {
-                            let name = self.atom(&n)?;
-                            self.emit(Op::DeclareGlobal { name, kind });
+                            if kind == declare::VAR {
+                                vars.push(n);
+                            } else {
+                                lexical.push((self.atom(&n)?, kind));
+                            }
                         }
                     }
                 }
                 StatementKind::Class(c) => {
                     if let Some(id) = &c.id {
                         let name = self.atom(&id.name)?;
-                        self.emit(Op::DeclareGlobal {
-                            name,
-                            kind: declare::LET,
-                        });
+                        lexical.push((name, declare::LET));
                     }
                 }
-                _ => {}
+                _ => collect_nested_vars(s, &mut vars),
             }
         }
-        let mut vars = Vec::new();
-        for s in body {
-            // Top-level `var` statements were declared above.
-            if !matches!(s.kind, StatementKind::Variable(_)) {
-                collect_nested_vars(s, &mut vars);
+        let mut names = HashSet::new();
+        let mut functions = Vec::new();
+        for statement in body.iter().rev() {
+            if let StatementKind::Function(function) = &statement.kind {
+                if let Some(id) = &function.id {
+                    let name = self.atom(&id.name)?;
+                    if names.insert(name) {
+                        functions.push((name, function));
+                    }
+                }
             }
         }
+        let mut var_names = Vec::new();
         for n in vars {
             let name = self.atom(&n)?;
+            if names.insert(name) {
+                var_names.push(name);
+            }
+        }
+        for &(name, kind) in &lexical {
+            self.emit(Op::CheckGlobal { name, kind });
+        }
+        for name in functions
+            .iter()
+            .map(|&(name, _)| name)
+            .chain(var_names.iter().copied())
+        {
+            self.emit(Op::CheckGlobalVarName { name });
+        }
+        for &(name, _) in &functions {
+            self.emit(Op::CheckGlobal {
+                name,
+                kind: declare::FUNCTION,
+            });
+        }
+        for &name in &var_names {
+            self.emit(Op::CheckGlobal {
+                name,
+                kind: declare::VAR,
+            });
+        }
+        for (name, kind) in lexical {
+            self.emit(Op::DeclareGlobal { name, kind });
+        }
+        for (name, function) in functions.into_iter().rev() {
+            let mark = self.mark();
+            let src = self.temp()?;
+            self.function_expression(function, src, None, FunctionKind::Normal)?;
+            self.emit(Op::InitGlobalFunction { src, name });
+            self.release(mark);
+        }
+        for name in var_names {
             self.emit(Op::DeclareGlobal {
                 name,
                 kind: declare::VAR,
             });
         }
-        for s in body {
-            if let StatementKind::Function(f) = &s.kind {
-                if let Some(id) = &f.id {
-                    let name = self.atom(&id.name)?;
-                    self.emit(Op::DeclareGlobal {
-                        name,
-                        kind: declare::VAR,
-                    });
-                }
-            }
-        }
         let completion = self.temp()?;
         self.emit(Op::Undefined { dst: completion });
         self.completion = Some(completion);
-        self.hoist_functions(body, true)?;
         self.statements(body)?;
         self.emit(Op::Return { src: completion });
         Ok(())

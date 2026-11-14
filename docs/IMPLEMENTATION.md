@@ -1499,3 +1499,16 @@ NFC implementation and canonical Unicode data moved to `rustic-base` so
 both consumers share them. The pinned Test262 normalization selection
 passes all 14 files. The heap report records a 193-byte increase for the
 new method and its property name. Locale support remains in TD-107/108.
+
+## JS-07 — Test262 script evaluation in the current global environment
+
+`$262.evalScript` executes UTF-16 source through the regular script compiler
+and returns its completion value or throws its exception. It uses the global
+environment and the active run's limits. Global declaration instantiation
+checks all lexical, function and `var` names before creating bindings, so
+a failed declaration leaves the existing environment intact. Function
+declarations install the winning closure with the specified property
+attributes, including replacement of configurable accessors. See
+[JS.md](JS.md#test262-execution-js-07) and TD-105 for the pinned results and
+remaining hooks. The language gate adds nine passing cases, reaching 21,476
+of 22,427 executed files. Built-in and module verdicts are unchanged.

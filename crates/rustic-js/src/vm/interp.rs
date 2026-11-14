@@ -1137,9 +1137,23 @@ impl Agent {
                     let value = reg!(src);
                     t!(self.set_global(code, site, value));
                 }
+                Op::CheckGlobal { name, kind } => {
+                    let name = self.name_of(code, name);
+                    t!(self.check_global_declaration(name, kind));
+                }
+                Op::CheckGlobalVarName { name } => {
+                    let name = self.name_of(code, name);
+                    if self.has_lexical_declaration(self.global_env, name) {
+                        t!(Err(self.redeclaration(name)));
+                    }
+                }
                 Op::DeclareGlobal { name, kind } => {
                     let name = self.name_of(code, name);
                     t!(self.declare_global(name, kind));
+                }
+                Op::InitGlobalFunction { src, name } => {
+                    let name = self.name_of(code, name);
+                    t!(self.create_global_function_binding(self.global_env, name, reg!(src)));
                 }
                 Op::InitName { src, name } => {
                     let name = self.name_of(code, name);
@@ -2342,23 +2356,36 @@ impl Agent {
         }
     }
 
-    fn declare_global(&mut self, name: StringId, kind: u8) -> JsResult<()> {
+    fn check_global_declaration(&mut self, name: StringId, kind: u8) -> JsResult<()> {
         let env = self.global_env;
         let global = self.intrinsics.global;
-        if kind == declare::VAR {
-            if self.has_lexical_declaration(env, name) {
-                return Err(self.redeclaration(name));
+        match kind {
+            declare::VAR => {
+                if !self.can_declare_global_var(global, name)? {
+                    return self.type_error("cannot declare a global variable");
+                }
             }
-            if !self.can_declare_global_var(global, name)? {
-                return self.type_error("cannot declare a global variable");
+            declare::FUNCTION => {
+                if !self.can_declare_global_function(global, name)? {
+                    return self.type_error("cannot declare a global function");
+                }
             }
-            return self.create_global_var_binding(env, name, false);
+            _ => {
+                if self.has_lexical_declaration(env, name)
+                    || self.has_var_declaration(env, name)
+                    || self.has_restricted_global_property(env, name)?
+                {
+                    return Err(self.redeclaration(name));
+                }
+            }
         }
-        if self.has_lexical_declaration(env, name)
-            || self.has_var_declaration(env, name)
-            || self.has_restricted_global_property(env, name)?
-        {
-            return Err(self.redeclaration(name));
+        Ok(())
+    }
+
+    fn declare_global(&mut self, name: StringId, kind: u8) -> JsResult<()> {
+        let env = self.global_env;
+        if kind == declare::VAR {
+            return self.create_global_var_binding(env, name, false);
         }
         self.vm.lexical_generation = self.vm.lexical_generation.wrapping_add(1);
         if kind == declare::CONST {

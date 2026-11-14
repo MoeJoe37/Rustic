@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 21467 pass, 960 fail, 1405 skipped (modules, proposals).
+# 21476 pass, 951 fail, 1405 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -11255,9 +11255,18 @@ global-code/invalid-private-names-member-expression-this.js
 global-code/new.target-arrow.js
 global-code/new.target.js
 global-code/return.js
+global-code/script-decl-func-dups.js
 global-code/script-decl-func-err-non-configurable.js
 global-code/script-decl-func-err-non-extensible.js
+global-code/script-decl-func.js
+global-code/script-decl-lex-deletion.js
+global-code/script-decl-lex-lex.js
+global-code/script-decl-lex-restricted-global.js
+global-code/script-decl-lex-var.js
+global-code/script-decl-lex.js
+global-code/script-decl-var-collision.js
 global-code/script-decl-var-err.js
+global-code/script-decl-var.js
 global-code/super-call-arrow.js
 global-code/super-call.js
 global-code/super-prop-arrow.js

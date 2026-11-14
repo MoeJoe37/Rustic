@@ -129,10 +129,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,467 | 17,109 |
-| Fail | 960 | 1,465 |
+| Pass | 21,476 | 17,119 |
+| Fail | 951 | 1,455 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 95.7% | 92.1% |
+| Pass rate of the files that run | 95.8% | 92.2% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -188,6 +188,12 @@ Temporal, `$262.agent` (112 `Atomics` files) or `$262` realms. Skipped files are
 counted as passing. The script gate continues to report module files as
 skipped. Their execution classifications are recorded by the separate module
 gate below.
+
+`$262.evalScript` runs UTF-16 script source in the current global environment
+and preserves completion values and thrown objects. Its global declaration
+tests cover lexical collisions, non-configurable properties, function
+replacement and atomic rejection before any bindings are installed (§16.1.7).
+Realm creation, explicit collection and test agents remain in TD-105.
 
 ## Fuzzing
 

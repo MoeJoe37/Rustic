@@ -707,12 +707,39 @@ impl Agent {
             let desc = PropertyDescriptor::data_with(Value::UNDEFINED, true, true, deletable);
             self.define_property_or_throw(object, key, desc)?;
         }
+        self.record_global_var_name(env, name);
+        Ok(())
+    }
+
+    /// `CreateGlobalFunctionBinding(N, V, false)` for script declarations.
+    pub(crate) fn create_global_function_binding(
+        &mut self,
+        env: EnvId,
+        name: StringId,
+        value: Value,
+    ) -> JsResult<()> {
+        let Environment::Global { object, .. } = *self.env(env) else {
+            return self.type_error("not a global environment");
+        };
+        let key = PropertyKey::String(name);
+        let descriptor = match self.get_own_property(object, key)? {
+            Some(current) if current.configurable == Some(false) => PropertyDescriptor {
+                value: Some(value),
+                ..PropertyDescriptor::default()
+            },
+            _ => PropertyDescriptor::data_with(value, true, true, false),
+        };
+        self.define_property_or_throw(object, key, descriptor)?;
+        self.record_global_var_name(env, name);
+        Ok(())
+    }
+
+    fn record_global_var_name(&mut self, env: EnvId, name: StringId) {
         if let Environment::Global { var_names, .. } = self.heap.env_mut(env) {
             if !var_names.contains(&name) {
                 var_names.push(name);
             }
         }
-        Ok(())
     }
 
     // ---- references (§6.2.5) ------------------------------------------

@@ -99,8 +99,9 @@ pub(crate) fn compile_module(
     agent: &mut Agent,
     program: &Program,
     allow_await: bool,
+    synthetic_default: bool,
 ) -> CResult<ModuleCode> {
-    let tree = ScopeTree::analyze_module(&program.body);
+    let tree = ScopeTree::analyze_module(&program.body, synthetic_default);
     if let Some(span) = tree.top_level_await {
         if !allow_await {
             return Err(CompileError::Unsupported(

@@ -316,11 +316,7 @@ impl Parser<'_> {
 fn parse(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let text = agent.to_string(arg(args, 0))?;
     let units = agent.heap.string(text).to_units();
-    let value = Parser {
-        text: &units,
-        at: 0,
-    }
-    .parse(agent)?;
+    let value = parse_json_units(agent, &units)?;
     let reviver = arg(args, 1);
     if !agent.is_callable(reviver) {
         return Ok(value);
@@ -329,6 +325,10 @@ fn parse(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let empty = PropertyKey::String(agent.names.empty);
     agent.create_data_property_or_throw(root, empty, value)?;
     internalize(agent, root, empty, reviver)
+}
+
+pub(crate) fn parse_json_units(agent: &mut Agent, text: &[u16]) -> JsResult<Value> {
+    Parser { text, at: 0 }.parse(agent)
 }
 
 /// `InternalizeJSONProperty(holder, name, reviver)` (§25.5.1.1), walked

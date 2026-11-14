@@ -699,14 +699,18 @@ and roots the returned handles across collection. Dynamic imports remain open
 under TD-97.
 
 The Test262 module runner selects files flagged `module`, reads relative
-JavaScript fixtures within the checkout, and distinguishes parse, resolution
+JavaScript, JSON and text fixtures within the checkout, and distinguishes parse, resolution
 and runtime failures. It uses the same harness, heap and step budgets as
 the script runner. At revision `48221d7c1f7745dc13e420a2e850a248c0b2afb4`,
-817 module files were selected. Of the 696 executed, 623 passed and 73
-failed. The remaining 121 were skipped for proposal features. Top-level await
-added 241 passes. The remaining failures require dynamic imports or fixture
-support for import attributes. All verdicts are pinned in
+817 module files were selected. Of the 696 executed, 647 passed and 49
+failed. The remaining 121 were skipped for proposal features. Dynamic imports
+account for 44 failures and byte imports for five. All verdicts are pinned in
 `tests/fixtures/test262_modules.txt`.
+
+`ModuleGraph::load_sources` accepts JSON and text as synthetic modules with a
+single default export. JSON uses the engine's JSON parser and invalid input
+fails before any module body executes. Text becomes an exact UTF-16 string.
+Every import of the same resolved key shares the same binding and value.
 
 ```sh
 cargo test --locked -p rustic-js --test module

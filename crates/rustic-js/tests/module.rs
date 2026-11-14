@@ -589,3 +589,68 @@ fn import_meta_metadata_obeys_the_graph_work_limit() {
             .is_ok()
     );
 }
+
+#[test]
+fn synthetic_modules_export_data_with_shared_identity() {
+    use rustic_js::module::{GraphLimits, ModuleGraph, ModuleSource};
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let source = |text: &str| Source::from_str_limited(text, 1_024).unwrap();
+    let graph = ModuleGraph::load_sources(
+        "entry".to_owned(),
+        &limits,
+        |_, request| String::from_utf16(request.specifier()).map_err(|_| "invalid specifier"),
+        |key| match key.as_str() {
+            "entry" => Ok(ModuleSource::JavaScript(source(
+                r#"
+                import a from 'json' with { type: 'json' };
+                import * as b from 'json' with { type: 'json' };
+                import text from 'text' with { type: 'text' };
+                export const valid = a === b.default && a.x === 42
+                    && Object.keys(b).join() === 'default'
+                    && text.length === 1 && text.charCodeAt(0) === 0xD800;
+            "#,
+            ))),
+            "json" => Ok(ModuleSource::Json(source(r#"{"x":42}"#))),
+            "text" => Ok(ModuleSource::Text(
+                Source::from_utf16(vec![0xD800], 1).unwrap(),
+            )),
+            _ => Err("missing fixture"),
+        },
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let namespace = agent.evaluate_module_graph(&graph, &limits).unwrap();
+    let key = agent.heap.key("valid").unwrap();
+    assert_eq!(agent.get(namespace, key), Ok(Value::TRUE));
+}
+
+#[test]
+fn invalid_json_is_rejected_before_a_module_body_runs() {
+    use rustic_js::module::{GraphLimits, ModuleEvalError, ModuleGraph, ModuleSource};
+    use rustic_js::runtime::{Agent, Value};
+
+    let limits = GraphLimits::default();
+    let graph = ModuleGraph::load_sources(
+        "entry",
+        &limits,
+        |_, _| Ok::<_, ()>("json"),
+        |key| {
+            let source = |text| Source::from_str_limited(text, 128).unwrap();
+            Ok(if *key == "entry" {
+                ModuleSource::JavaScript(source("import 'json'; globalThis.ran = true;"))
+            } else {
+                ModuleSource::Json(source("{ invalid }"))
+            })
+        },
+    )
+    .unwrap();
+    let mut agent = Agent::new().unwrap();
+    assert_eq!(
+        agent.start_module_evaluation(&graph, &limits),
+        Err(ModuleEvalError::InvalidJson { module: 1 })
+    );
+    assert_eq!(agent.evaluate("'ran' in globalThis"), Ok(Value::FALSE));
+}

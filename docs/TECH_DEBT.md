@@ -1513,14 +1513,14 @@ captures one variable costs 64 bytes instead of 112.
 The script runner preserves its exact passing lists for `test/language`
 and the installed areas of `test/built-ins`. The separate module runner
 (JS-07) pins pass, fail and skip verdicts for the 817 files flagged
-`module` in `test/language`. Of the 696 executed, 623 pass. Dynamic imports
-and loading fixtures with import attributes account for the other 73.
+`module` in `test/language`. Of the 696 executed, 647 pass. Dynamic imports
+account for 44 failures and byte imports requiring immutable ArrayBuffer
+account for five.
 The remaining 121 use proposal features. See the
 [Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
 and reproduction commands.
 
-Pay with the dynamic import hooks in JS-06,
-fixture support where a test requires import attributes, and `$262` with
+Pay with the dynamic import hooks in JS-06, byte fixtures, and `$262` with
 realms, collection and test agents. `$262.evalScript` now runs UTF-16
 script source against the current global environment. Extend the built-in gate
 when new library areas land. Trigger on each implementation.

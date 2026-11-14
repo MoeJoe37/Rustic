@@ -1529,3 +1529,11 @@ It tracks cycles and pending dependencies with iterative traversal and resumes
 module bodies through the existing promise queue. The pinned module gate gains
 241 passes, reaching 623 of 696 executed files with 121 proposal skips.
 Dynamic import and import-attribute fixtures remain open under TD-97/105.
+
+## JS-06 — Synthetic JSON and text modules
+
+Explicit host loaders can supply JSON and text data as default-only modules.
+JSON is parsed before evaluation and shared by all importers of the same key.
+Text preserves its UTF-16 units. The pinned module gate gains 24 passes from
+data fixtures and rejected attribute requests, reaching 647 of 696 executed
+files. Byte imports need immutable ArrayBuffer support and remain in TD-105.

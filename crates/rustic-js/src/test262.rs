@@ -25,7 +25,9 @@
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use crate::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph, ModuleRequest};
+use crate::module::{
+    GraphError, GraphLimits, ModuleEvalError, ModuleGraph, ModuleRequest, ModuleSource,
+};
 use crate::runtime::{Abrupt, Agent, ErrorKind, JsResult, PropertyKey, Value};
 use crate::{CompileError, EvalError, MAX_SOURCE_UNITS, ParseError, ParseLimits, Source};
 use crate::{parse_module, parse_script};
@@ -404,30 +406,39 @@ fn execute_module(
     let entry = parse_source(text).map_err(|error| TestError::Host(error.to_owned()))?;
     // Distinguish a syntax error in the test itself from a failed import.
     parse_module(&entry, &limits.parse).map_err(EvalError::Parse)?;
-    let graph = ModuleGraph::load(
-        path.to_owned(),
+    let entry_key = (path.to_owned(), FixtureKind::JavaScript);
+    let graph = ModuleGraph::load_sources(
+        entry_key.clone(),
         &limits,
-        |referrer, request| resolve_fixture(root, referrer, request),
+        |(referrer, _), request| resolve_fixture(root, referrer, request),
         |key| {
-            if key == path {
-                return Ok(entry.clone());
+            if *key == entry_key {
+                return Ok(ModuleSource::JavaScript(entry.clone()));
             }
             // Graph limits count code units. Each code unit takes at most
             // three UTF-8 bytes in a well-formed file.
             let max_bytes = 3 * limits.max_source_units;
             let mut source = String::new();
-            std::fs::File::open(key)
+            std::fs::File::open(&key.0)
                 .and_then(|file| file.take(max_bytes as u64 + 1).read_to_string(&mut source))
                 .map_err(|error| format!("read module fixture: {error}"))?;
             if source.len() > max_bytes {
                 return Err("module is too large".into());
             }
-            parse_source(&source).map_err(str::to_owned)
+            let source = parse_source(&source).map_err(str::to_owned)?;
+            Ok(match key.1 {
+                FixtureKind::JavaScript => ModuleSource::JavaScript(source),
+                FixtureKind::Json => ModuleSource::Json(source),
+                FixtureKind::Text => ModuleSource::Text(source),
+            })
         },
     )
     .map_err(|error| match error {
         GraphError::UnresolvedExport { .. } | GraphError::Parse(ParseError::Syntax(_)) => {
             TestError::Resolution(format!("{error:?}"))
+        }
+        GraphError::Host(ref reason) if reason == UNSUPPORTED_ATTRIBUTES => {
+            TestError::Resolution(reason.clone())
         }
         other => TestError::Host(format!("{other:?}")),
     })?;
@@ -435,6 +446,7 @@ fn execute_module(
         .start_module_evaluation(&graph, &limits)
         .map_err(|error| match error {
             ModuleEvalError::Runtime(abrupt) => TestError::Runtime(abrupt.into()),
+            ModuleEvalError::InvalidJson { .. } => TestError::Resolution(error.to_string()),
             other => TestError::Host(other.to_string()),
         })?;
     let root = agent
@@ -456,28 +468,48 @@ fn execute_module(
     result
 }
 
+const UNSUPPORTED_ATTRIBUTES: &str = "unsupported Test262 module attributes";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum FixtureKind {
+    JavaScript,
+    Json,
+    Text,
+}
+
 fn resolve_fixture(
     root: &Path,
     referrer: &Path,
     request: &ModuleRequest,
-) -> Result<PathBuf, String> {
-    if !request.attributes().is_empty() {
-        return Err("this Test262 host loads source text module fixtures".into());
-    }
+) -> Result<(PathBuf, FixtureKind), String> {
+    let kind = match request.attributes() {
+        [] => FixtureKind::JavaScript,
+        [(key, value)] if key.iter().copied().eq("type".encode_utf16()) => {
+            if value.iter().copied().eq("json".encode_utf16()) {
+                FixtureKind::Json
+            } else if value.iter().copied().eq("text".encode_utf16()) {
+                FixtureKind::Text
+            } else {
+                return Err(UNSUPPORTED_ATTRIBUTES.into());
+            }
+        }
+        _ => return Err(UNSUPPORTED_ATTRIBUTES.into()),
+    };
     let specifier = String::from_utf16(request.specifier())
         .map_err(|_| "module specifier is not valid UTF-16")?;
     let relative = specifier
         .strip_prefix("./")
         .ok_or("expected a relative module specifier")?;
     let relative = Path::new(relative);
-    if relative
-        .extension()
-        .is_none_or(|extension| extension != "js")
+    if (kind == FixtureKind::JavaScript
+        && relative
+            .extension()
+            .is_none_or(|extension| extension != "js"))
         || relative
             .components()
             .any(|part| !matches!(part, std::path::Component::Normal(_)))
     {
-        return Err("expected a JavaScript fixture inside the checkout".into());
+        return Err("expected a module fixture inside the checkout".into());
     }
     let path = referrer
         .parent()
@@ -488,7 +520,7 @@ fn resolve_fixture(
     if path.strip_prefix(root).is_err() || !path.is_file() {
         return Err("module fixture is outside the checkout or is not a regular file".into());
     }
-    Ok(path)
+    Ok((path, kind))
 }
 
 fn execute_mode(

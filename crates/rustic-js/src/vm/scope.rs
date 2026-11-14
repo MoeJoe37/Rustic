@@ -237,7 +237,7 @@ impl ScopeTree {
     }
 
     /// Module declarations are all shared between instantiation and evaluation.
-    pub(crate) fn analyze_module(body: &[Statement]) -> ScopeTree {
+    pub(crate) fn analyze_module(body: &[Statement], synthetic_default: bool) -> ScopeTree {
         let mut r = Resolver {
             tree: ScopeTree::default(),
             stack: Vec::new(),
@@ -245,6 +245,9 @@ impl ScopeTree {
         };
         let top = r.open(ScopeKind::Module, None, true);
         r.declare(top, THIS, BindingKind::Const);
+        if synthetic_default {
+            r.declare(top, DEFAULT_EXPORT, BindingKind::Const);
+        }
         for statement in body {
             match &statement.kind {
                 StatementKind::Import(declaration) => {

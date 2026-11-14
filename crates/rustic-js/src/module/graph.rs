@@ -4,6 +4,24 @@ use crate::{ParseError, ParseLimits, Source};
 
 use super::{ExportTarget, ImportName, ModuleRecord, ModuleRequest, RequestIndex};
 
+/// Input returned by an explicit module loader.
+pub enum ModuleSource {
+    /// ECMAScript source text.
+    JavaScript(Source),
+    /// JSON text for a synthetic default export.
+    Json(Source),
+    /// Uninterpreted UTF-16 text for a synthetic default export.
+    Text(Source),
+}
+
+impl ModuleSource {
+    fn len(&self) -> usize {
+        match self {
+            Self::JavaScript(source) | Self::Json(source) | Self::Text(source) => source.len(),
+        }
+    }
+}
+
 /// Budgets for loading a static module graph and resolving a single export.
 #[derive(Clone, Debug)]
 pub struct GraphLimits {
@@ -93,10 +111,11 @@ struct Node<K> {
     record: ModuleRecord,
     dependencies: Vec<usize>,
     exports: HashMap<Vec<u16>, usize>,
+    data: Option<ModuleSource>,
 }
 
 impl<K> Node<K> {
-    fn new(key: K, record: ModuleRecord) -> Self {
+    fn new(key: K, record: ModuleRecord, data: Option<ModuleSource>) -> Self {
         let exports = record
             .exports()
             .iter()
@@ -108,6 +127,7 @@ impl<K> Node<K> {
             record,
             dependencies: Vec::new(),
             exports,
+            data,
         }
     }
 }
@@ -120,8 +140,21 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
     pub fn load<E>(
         entry: K,
         limits: &GraphLimits,
-        mut resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
         mut source: impl FnMut(&K) -> Result<Source, E>,
+    ) -> Result<Self, GraphError<E>> {
+        Self::load_sources(entry, limits, resolve, |key| {
+            source(key).map(ModuleSource::JavaScript)
+        })
+    }
+
+    /// Load a graph of JavaScript and synthetic data modules. The host
+    /// decides which requests and attributes resolve to each module key.
+    pub fn load_sources<E>(
+        entry: K,
+        limits: &GraphLimits,
+        mut resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        mut source: impl FnMut(&K) -> Result<ModuleSource, E>,
     ) -> Result<Self, GraphError<E>> {
         let mut graph = Self {
             modules: Vec::new(),
@@ -159,7 +192,7 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         &mut self,
         key: K,
         limits: &GraphLimits,
-        source: &mut impl FnMut(&K) -> Result<Source, E>,
+        source: &mut impl FnMut(&K) -> Result<ModuleSource, E>,
     ) -> Result<(), GraphError<E>> {
         check(limits)?;
         if self.modules.len() == limits.max_modules {
@@ -171,12 +204,23 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
             .checked_add(input.len())
             .filter(|total| *total <= limits.max_source_units)
             .ok_or(GraphError::GraphLimit)?;
-        let record = ModuleRecord::parse(&input, &limits.parse).map_err(|error| match error {
-            ParseError::Cancelled => GraphError::Cancelled,
-            other => GraphError::Parse(other),
-        })?;
-        self.modules.push(Node::new(key, record));
+        let (record, data) = match input {
+            ModuleSource::JavaScript(source) => {
+                let record =
+                    ModuleRecord::parse(&source, &limits.parse).map_err(|error| match error {
+                        ParseError::Cancelled => GraphError::Cancelled,
+                        other => GraphError::Parse(other),
+                    })?;
+                (record, None)
+            }
+            data => (ModuleRecord::synthetic_default(), Some(data)),
+        };
+        self.modules.push(Node::new(key, record, data));
         Ok(())
+    }
+
+    pub(super) fn data(&self, index: usize) -> Option<&ModuleSource> {
+        self.modules[index].data.as_ref()
     }
 
     pub(super) fn dependencies(&self, index: usize) -> &[usize] {

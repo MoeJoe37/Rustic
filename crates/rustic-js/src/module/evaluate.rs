@@ -5,7 +5,9 @@ use std::convert::Infallible;
 use std::fmt;
 use std::hash::Hash;
 
-use super::{GraphError, GraphLimits, ImportName, ModuleGraph, ResolvedBinding, ResolvedExport};
+use super::{
+    GraphError, GraphLimits, ImportName, ModuleGraph, ModuleSource, ResolvedBinding, ResolvedExport,
+};
 use crate::runtime::{
     Abrupt, Agent, EnvId, ImportBinding, JsStr, NamespaceBinding, ObjectId, Value,
 };
@@ -23,6 +25,11 @@ pub enum ModuleEvalError {
         /// Compilation error with its original source span, when applicable.
         error: CompileError,
     },
+    /// A JSON module did not have valid JSON syntax.
+    InvalidJson {
+        /// Index of the invalid module.
+        module: usize,
+    },
     /// Evaluation failed with an exception, cancellation or heap exhaustion.
     Runtime(Abrupt),
 }
@@ -35,6 +42,7 @@ impl fmt::Display for ModuleEvalError {
                 write!(f, "module {module} compilation failed: {error:?}")
             }
             Self::Runtime(error) => write!(f, "module evaluation failed: {error:?}"),
+            Self::InvalidJson { module } => write!(f, "module {module} contains invalid JSON"),
         }
     }
 }
@@ -156,14 +164,47 @@ impl Agent {
                 bindings,
                 metadata_slot,
                 has_await,
-            } = compile_module(self, record.program(), allow_await).map_err(|error| {
-                ModuleEvalError::Compile {
-                    module: index,
-                    error,
-                }
+            } = compile_module(
+                self,
+                record.program(),
+                allow_await,
+                graph.data(index).is_some(),
+            )
+            .map_err(|error| ModuleEvalError::Compile {
+                module: index,
+                error,
             })?;
             let env = self.new_module_environment(&bindings)?;
             let namespace = self.new_module_namespace()?;
+            if let Some(data) = graph.data(index) {
+                let value = match data {
+                    ModuleSource::Json(source) => {
+                        match crate::runtime::parse_json_units(self, source.units()) {
+                            Ok(value) => value,
+                            Err(Abrupt::Throw(_)) => {
+                                return Err(ModuleEvalError::InvalidJson { module: index });
+                            }
+                            Err(other) => return Err(other.into()),
+                        }
+                    }
+                    ModuleSource::Text(source) => {
+                        self.string_from(JsStr::from_units(source.units()))?
+                    }
+                    ModuleSource::JavaScript(_) => {
+                        unreachable!("only synthetic module data is stored")
+                    }
+                };
+                let name = self.heap.intern_str(DEFAULT_EXPORT)?;
+                let slot = bindings
+                    .iter()
+                    .position(|&(binding, _)| binding == name)
+                    .expect("synthetic default binding");
+                self.set_env_slot(
+                    env,
+                    u16::try_from(slot).expect("compiler bounds slot count"),
+                    value,
+                );
+            }
             if let Some(slot) = metadata_slot {
                 let mut properties = metadata(key).into_iter().peekable();
                 if properties.peek().is_some() {

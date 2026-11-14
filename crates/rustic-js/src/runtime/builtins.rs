@@ -15,7 +15,7 @@ mod function;
 pub(crate) mod generator;
 mod global;
 mod iterator;
-mod json;
+pub(crate) mod json;
 mod math;
 mod number_object;
 mod object;

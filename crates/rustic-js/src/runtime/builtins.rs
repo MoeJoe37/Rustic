@@ -550,6 +550,23 @@ pub(crate) fn install_constructor(
     length: u32,
     prototype: ObjectId,
 ) -> JsResult<ObjectId> {
+    let constructor = new_constructor(agent, name, behavior, length, prototype)?;
+    let name_key = agent.heap.key(name)?;
+    agent.define_property_or_throw(
+        agent.intrinsics.global,
+        name_key,
+        PropertyDescriptor::data_with(Value::object(constructor), true, false, true),
+    )?;
+    Ok(constructor)
+}
+
+fn new_constructor(
+    agent: &mut Agent,
+    name: &'static str,
+    behavior: NativeFn,
+    length: u32,
+    prototype: ObjectId,
+) -> JsResult<ObjectId> {
     let f = agent.new_native_function(behavior, name, length)?;
     agent
         .heap
@@ -565,13 +582,6 @@ pub(crate) fn install_constructor(
     agent.define_property_or_throw(
         prototype,
         constructor_key,
-        PropertyDescriptor::data_with(Value::object(f), true, false, true),
-    )?;
-    let global = agent.intrinsics.global;
-    let name_key = agent.heap.key(name)?;
-    agent.define_property_or_throw(
-        global,
-        name_key,
         PropertyDescriptor::data_with(Value::object(f), true, false, true),
     )?;
     Ok(f)

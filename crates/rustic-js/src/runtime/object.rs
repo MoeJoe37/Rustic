@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 use super::agent::NativeFn;
 use super::env::EnvId;
 use super::shape::{Attributes, PropertyKey, ROOT_SHAPE, ShapeId};
-use super::value::{ObjectId, Value};
+use super::value::{ObjectId, StringId, Value};
 use crate::vm::bytecode::CodeId;
 
 /// What kind of object this is, for exotic behavior and brand checks.
@@ -303,6 +303,8 @@ impl IteratorKind {
 /// Internal slots the collector treats specially.
 #[derive(Clone, Debug)]
 pub(crate) enum Internal {
+    /// Canonical Unicode locale identifier of an Intl.Locale.
+    Locale(StringId),
     /// A built-in iterator: what it walks and the next position.
     /// `target` is undefined once the iterator is exhausted.
     Iterator {

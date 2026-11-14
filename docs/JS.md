@@ -992,7 +992,7 @@ With part 1, the Test262 `test/language` pass rate rose from 44.4% to 60.4%,
 and with the part 2 pieces above to 70.0%. Eval took it to 73.6% and
 generators to 90.8%.
 
-## Intl locale identifiers and casing (JS-08)
+## Intl locale identifiers, Locale objects and casing (JS-08)
 
 `Intl.getCanonicalLocales` validates and deduplicates locale lists in request
 order. The parser implements Unicode BCP 47 locale identifiers, canonical
@@ -1001,18 +1001,28 @@ likely-region selection for deprecated territories. Locale-sensitive case
 conversion applies the Unicode special casing rules for Azerbaijani,
 Lithuanian and Turkish while preserving lone UTF-16 surrogates.
 
-The pinned Intl selection covers `Intl/getCanonicalLocales` and both
-`String.prototype.toLocale*Case` directories. It passes 46 of 47 files.
-The remaining case requires `Intl.Locale`. Locale negotiation for Intl
-services and locale-sensitive collation remain open under TD-107.
+`Intl.Locale` implements the ECMA-402 §15 constructor, branded accessors,
+`maximize`, `minimize` and seven information methods. Likely-subtag
+changes preserve variants and extensions. Its preference methods read
+pinned calendar, hour-cycle, collation, numbering, script-direction, week
+and time-zone data. Time zones come from the canonical entries in IANA's
+public-domain `zone1970.tab` for the explicit region.
 
-The data generator takes `supplementalMetadata.xml`, `likelySubtags.xml` and the
-listed `bcp47/` XML files from [CLDR release 48], plus Unicode 17.0.0
-`PropList.txt`. The script verifies their SHA-256 digests and checks the
-generated Rust with the pinned formatter. The [Unicode license notice]
-covers the generated tables.
+The pinned Intl selection covers `Intl/getCanonicalLocales`, `Locale`
+and both `String.prototype.toLocale*Case` directories. It passes 233 of 237
+files. The four outstanding cases depend on realms, `Intl.Collator` or
+`Intl.NumberFormat`. Service negotiation and locale-sensitive comparison
+remain open under TD-107.
+
+The data generator takes `supplementalMetadata.xml`, `likelySubtags.xml`,
+`supplemental/supplementalData.xml`, `scriptMetadata.txt`, `core.zip` and
+the listed `bcp47/` XML files from [CLDR release 48]. It also reads
+Unicode 17.0.0 `PropList.txt` and `zone1970.tab` from [IANA tzdb 2026a].
+The script verifies SHA-256 digests and checks the generated Rust with the
+pinned formatter. The [Unicode license notice] covers the Unicode tables.
 
 [CLDR release 48]: https://github.com/unicode-org/cldr/tree/release-48/common
+[IANA tzdb 2026a]: https://www.iana.org/time-zones/releases/2026a
 [Unicode license notice]: ../crates/rustic-js/data/CLDR-LICENSE.txt
 
 ```sh

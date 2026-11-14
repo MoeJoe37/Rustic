@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 28.46%** = 27.20% verified complete + 1.26% partial credit. 63/221 capabilities complete, 5 in progress.
+**Overall completion: 28.58%** = 27.20% verified complete + 1.38% partial credit. 63/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `fd7f760f850f7b8390e0e930bde864c7c7b826eb13ac13afffb72fd49437f5cc`.
+Catalog: `engine-v4`. Source fingerprint: `bc2f9926de83da0c2e754bc7972c537dc983d26e212eded13ae240fe3644bf5f`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `fd7f760f850f7b8390e0e930bde864c7c7b82
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 10/13 | 92.56% | 83.07% | 8.90% |
+| M4 ECMAScript runtime | 10/13 | 93.84% | 83.07% | 8.90% |
 | M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `fd7f760f850f7b8390e0e930bde864c7c7b82
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 10/15 | 4 | 85.15% | 73.97% | 10% | 8.51 |
+| JavaScript & GC | 10/15 | 4 | 86.30% | 73.97% | 10% | 8.63 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 0/10 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -178,9 +178,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `js.modules` — Modules and host loading hooks · size 3 · M4 · 0.41% of engine ([source](../../crates/rustic-js/src/module.rs), [source](../../crates/rustic-js/src/module/graph.rs), [test](../../crates/rustic-js/tests/module.rs), [test](../../crates/rustic-js/tests/module.rs), [source](../../crates/rustic-js/src/module/evaluate.rs), [source](../../crates/rustic-js/src/runtime/exotic.rs), [test](../../crates/rustic-js/tests/module.rs), [test](../../crates/rustic-js/tests/module.rs), [source](../../crates/rustic-js/src/module/evaluate.rs), [test](../../crates/rustic-js/tests/module.rs), [source](../../crates/rustic-js/src/module/evaluate.rs), [source](../../crates/rustic-js/src/module/dynamic.rs), [test](../../crates/rustic-js/tests/module.rs), [test](../../crates/rustic-js/tests/fixtures/test262_modules.txt))
 - **complete** `js.advanced` — BigInt, RegExp, proxies, generators and async · size 8 · M4 · 1.09% of engine ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/vm/interp.rs), [source](../../crates/rustic-js/src/runtime/builtins/async_generator.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/bigint.rs), [source](../../crates/rustic-js/src/runtime/builtins/bigint.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/src/runtime/bigint.rs), [source](../../crates/rustic-js/src/regexp/vm.rs), [source](../../crates/rustic-js/src/runtime/builtins/regexp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs), [source](../../crates/rustic-js/src/runtime/builtins/proxy.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs))
 - **complete** `js.buffers` — Buffers, typed arrays and memory semantics · size 3 · M4 · 0.41% of engine ([source](../../crates/rustic-js/src/runtime/builtins/buffer.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/src/runtime/builtins/buffer.rs), [source](../../crates/rustic-js/src/runtime/builtins/typed_array.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/runtime/builtins/atomics.rs), [source](../../crates/rustic-js/src/runtime/builtins/buffer.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
-- **in progress 33.33%** `js.intl` — Intl and required Unicode semantics · size 5 · M4 · 0.68% of engine
+- **in progress 50.00%** `js.intl` — Intl and required Unicode semantics · size 5 · M4 · 0.68% of engine
   - [x] Unicode normalization forms, shared data and exact UTF-16 handling ([source](../../crates/rustic-base/src/unicode/normalize.rs), [source](../../crates/rustic-js/src/runtime/builtins/string_object.rs), [test](../../crates/rustic-js/tests/interp.rs))
-  - [ ] Locale identifiers, negotiation and locale-sensitive string operations
+  - [x] Locale identifiers, Locale objects with preference data and locale-sensitive casing ([source](../../crates/rustic-js/src/runtime/builtins/intl/locale_object.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/test262.rs))
+  - [ ] Intl service locale negotiation and locale-sensitive string comparison
   - [ ] Intl services, locale data and Test262 Intl evidence
 - **planned** `js.wasm` — JavaScript/WebAssembly identity, conversions and tracing integration · size 3 · M9 · 0.41% of engine
 - **in progress 83.33%** `js.limits` — Cancellation, stack/heap limits and GC stress · size 3 · M4 · 0.41% of engine

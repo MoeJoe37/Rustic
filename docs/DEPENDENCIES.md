@@ -32,7 +32,7 @@ CSS, layout, paint, codecs and URL code stay original Rust (ADR 0001).
 | TLS | Maintained Rust TLS library such as rustls with reviewed crypto/provider/root strategy | Certificate error behavior, HTTPS policy and broker authority |
 | HTTP transport | Reviewed HTTP library such as hyper, with a bounded async runtime if needed | Fetch, redirects, CORS, cookies, cache, MIME and response visibility |
 | Unicode/IDNA | Chosen at M1: original UTS #46/NFC code over tables generated from pinned Unicode data (`tools/generate_idna_data.py`), no library | URL/origin algorithms, data updates and string/index semantics |
-| Font parsing/shaping | **Adopted (M3):** HarfRust 0.15.0, Skrifa 0.49.0, Wuff 0.2.10; discovery is Rustic's own host-granted walk | Font selection, CSS metrics, bidi/line breaking integration, layout |
+| Font parsing/shaping | **Adopted (M3):** HarfRust 0.16.0, Skrifa 0.50.0, Wuff 0.2.10; discovery is Rustic's own host-granted walk | Font selection, CSS metrics, bidi/line breaking integration, layout |
 | Image codecs | **Chosen at M3:** original bounded inflate/PNG/JPEG/GIF/WebP decoders in `rustic-codecs`, no library; video/audio codecs remain candidates | Input/output limits, resource accounting, sandbox isolation and color handling |
 | Raster/GPU | Original CPU display-list interpreter; GPU adapter such as wgpu later | Paint semantics, scene correctness, device loss and CPU fallback |
 | Desktop host | Window/event library such as winit with platform adapters | Chrome, input routing, lifecycle and permission decisions |
@@ -112,3 +112,19 @@ reviewed as part of the graph. Auditing is configured with `cargo-deny 0.20.2`;
 run `cargo deny --locked check advisories licenses bans sources` before merging.
 Font discovery is a separate host-granted local I/O API; the shaping libraries
 receive immutable bytes. TD-85/86/87 record the limits that remain.
+
+### Fontations/HarfRust update (2026-11-14)
+
+Skrifa 0.50.0 brings `read-fonts` 0.47.0. HarfRust 0.16.0 uses the same
+`read-fonts` version, so the lockfile retains one parser version and the
+24-package graph requires no duplicate-version exception. The existing
+`std` features, Rust 1.85 minimum and licenses still apply. The published
+crates have no build scripts and the Type 1 feature stays disabled.
+The revised registry checksums, source revisions and notices are in the
+[reviewed manifest](../third_party/rust-dependencies.json).
+
+Fontations' update includes bounds and malformed-data fixes in CFF, VARC
+and other OpenType table readers. HarfRust's release adds shaping work
+limits, including lookup and syllable processing. Rustic continues using
+the same outline and shaping adapters and tests the resulting glyphs,
+advances and offsets against its committed reference fixtures.

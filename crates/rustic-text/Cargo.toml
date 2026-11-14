@@ -9,7 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-harfrust = { version = "=0.15.0", default-features = false, features = ["std"] }
+harfrust = { version = "=0.16.0", default-features = false, features = ["std"] }
 skrifa = { version = "=0.50.0", default-features = false, features = ["std"] }
 wuff = { version = "=0.2.10", default-features = false, features = ["brotli"] }
 rustic-base = { path = "../rustic-base" }

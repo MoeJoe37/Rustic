@@ -3413,7 +3413,28 @@
               ]
             },
             {
-              "label": "Locale identifiers, negotiation and locale-sensitive string operations",
+              "label": "Locale identifiers, Locale objects with preference data and locale-sensitive casing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/locale_object.rs",
+                  "marker": "fn construct"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn intl_locale_keeps_its_tag_alive_and_supplies_locale_preferences"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/test262.rs",
+                  "marker": "fn test262_locale_identifiers_and_case_mapping_match_the_passing_list"
+                }
+              ]
+            },
+            {
+              "label": "Intl service locale negotiation and locale-sensitive string comparison",
               "status": "planned"
             },
             {

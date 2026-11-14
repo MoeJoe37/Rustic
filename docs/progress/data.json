@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "fd7f760f850f7b8390e0e930bde864c7c7b826eb13ac13afffb72fd49437f5cc",
-  "percent": "28.46",
+  "source_fingerprint": "bc2f9926de83da0c2e754bc7972c537dc983d26e212eded13ae240fe3644bf5f",
+  "percent": "28.58",
   "verified_percent": "27.20",
-  "partial_percent": "1.26",
+  "partial_percent": "1.38",
   "completed": 63,
   "in_progress": 5,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 10,
       "total": 13,
-      "percent": "92.56",
+      "percent": "93.84",
       "verified_percent": "83.07",
-      "partial_percent": "9.49"
+      "partial_percent": "10.77"
     },
     {
       "id": "M5",
@@ -3737,7 +3737,28 @@
               ]
             },
             {
-              "label": "Locale identifiers, negotiation and locale-sensitive string operations",
+              "label": "Locale identifiers, Locale objects with preference data and locale-sensitive casing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/locale_object.rs",
+                  "marker": "fn construct"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn intl_locale_keeps_its_tag_alive_and_supplies_locale_preferences"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/test262.rs",
+                  "marker": "fn test262_locale_identifiers_and_case_mapping_match_the_passing_list"
+                }
+              ]
+            },
+            {
+              "label": "Intl service locale negotiation and locale-sensitive string comparison",
               "status": "planned"
             },
             {
@@ -3745,7 +3766,7 @@
               "status": "planned"
             }
           ],
-          "credit": "33.33",
+          "credit": "50.00",
           "engine_share": "0.68"
         },
         {
@@ -3939,10 +3960,10 @@
       "completed": 10,
       "in_progress": 4,
       "total": 15,
-      "contribution": "8.51",
-      "percent": "85.15",
+      "contribution": "8.63",
+      "percent": "86.30",
       "verified_percent": "73.97",
-      "partial_percent": "11.18"
+      "partial_percent": "12.33"
     },
     {
       "id": "wasm",

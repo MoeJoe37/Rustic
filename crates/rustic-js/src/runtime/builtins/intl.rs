@@ -8,6 +8,8 @@ use crate::runtime::{Agent, ErrorKind, JsResult, PropertyDescriptor, PropertyKey
 mod case;
 mod data;
 mod locale;
+mod locale_info;
+mod locale_object;
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let intl = agent.new_object()?;
@@ -16,6 +18,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         intl,
         &[method("getCanonicalLocales", get_canonical_locales, 1)],
     )?;
+    locale_object::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(
@@ -40,14 +43,21 @@ fn get_canonical_locales(agent: &mut Agent, _: Value, args: &[Value]) -> JsResul
     Ok(Value::object(agent.create_array_from_list(&values)?))
 }
 
-fn canonicalize_locale(agent: &mut Agent, tag: Value) -> JsResult<String> {
+fn locale_input(agent: &mut Agent, tag: Value) -> JsResult<String> {
     if tag.as_string().is_none() && tag.as_object().is_none() {
         return agent.type_error("locale entries must be strings or objects");
     }
-    let tag = agent.to_string(tag)?;
-    let length = agent.heap.string_len(tag);
-    agent.heap.charge(length)?;
-    let text = agent.heap.string(tag).to_text();
+    let id = if let Some(id) = locale_object::locale_slot(agent, tag) {
+        id
+    } else {
+        agent.to_string(tag)?
+    };
+    agent.heap.charge(agent.heap.string_len(id))?;
+    Ok(agent.heap.string(id).to_text())
+}
+
+fn canonicalize_locale(agent: &mut Agent, tag: Value) -> JsResult<String> {
+    let text = locale_input(agent, tag)?;
     locale::canonicalize(&text)
         .ok_or_else(|| agent.throw(ErrorKind::RangeError, "invalid locale identifier"))
 }
@@ -56,7 +66,7 @@ pub(super) fn canonicalize_locale_list(agent: &mut Agent, locales: Value) -> JsR
     if locales == Value::UNDEFINED {
         return Ok(Vec::new());
     }
-    if locales.as_string().is_some() {
+    if locales.as_string().is_some() || locale_object::locale_slot(agent, locales).is_some() {
         return Ok(vec![canonicalize_locale(agent, locales)?]);
     }
     let array = agent.to_object(locales)?;

@@ -433,6 +433,7 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
+                Some(Internal::Locale(tag)) => self.value(Value::string(*tag)),
                 Some(Internal::ModuleEvaluation(graph)) => graph.trace(self),
                 Some(Internal::Captures(values)) => {
                     for &v in values.iter() {

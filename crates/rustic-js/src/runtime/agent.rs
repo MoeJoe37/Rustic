@@ -230,6 +230,8 @@ pub struct Intrinsics {
     pub typed_array_constructors: [ObjectId; 12],
     /// Their prototypes, in the same order.
     pub typed_array_prototypes: [ObjectId; 12],
+    /// `%Intl.Locale.prototype%`.
+    pub locale_prototype: ObjectId,
 }
 
 impl Intrinsics {
@@ -283,6 +285,7 @@ impl Intrinsics {
         ];
         all.extend(self.typed_array_constructors);
         all.extend(self.typed_array_prototypes);
+        all.push(self.locale_prototype);
         all
     }
 }
@@ -375,6 +378,7 @@ impl Agent {
                 typed_array_prototype: placeholder,
                 typed_array_constructors: [placeholder; 12],
                 typed_array_prototypes: [placeholder; 12],
+                locale_prototype: placeholder,
             },
             global_env: EnvId(0),
             vm: VmState::default(),
@@ -464,6 +468,7 @@ impl Agent {
             typed_array_prototype: object_prototype,
             typed_array_constructors: [object_prototype; 12],
             typed_array_prototypes: [object_prototype; 12],
+            locale_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

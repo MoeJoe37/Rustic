@@ -3,14 +3,14 @@
   "decision": "docs/adr/0014-reviewed-font-adapters.md",
   "direct": {
     "crates/rustic-text:harfrust": {
-      "version": "=0.15.0",
+      "version": "=0.16.0",
       "default-features": false,
       "features": [
         "std"
       ]
     },
     "crates/rustic-text:skrifa": {
-      "version": "=0.49.0",
+      "version": "=0.50.0",
       "default-features": false,
       "features": [
         "std"
@@ -121,14 +121,14 @@
     },
     {
       "name": "harfrust",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "865dcc4105d51c323d8fedbb2d75b5e9c8ecddf5613f74c82f851d0afbc97114",
+      "checksum": "741c9cd8fb2f39c393366b9cf13e8c31ad6adbbd9d817f0a18fe47cff36a3cca",
       "license": "MIT",
       "notices": {
-        "third_party/licenses/harfrust-0.15.0-LICENSE.txt": "3a7c3f0b887abb7c638faf022d29257418458614c6724b120ceeffb279f9c7d2"
+        "third_party/licenses/harfrust-0.16.0-LICENSE.txt": "3a7c3f0b887abb7c638faf022d29257418458614c6724b120ceeffb279f9c7d2"
       },
-      "source_revision": "71d965130ea93905f81b8f03a03d7ecc794fbc47"
+      "source_revision": "0de7fe25ded6672336733163b8ff8c7c83b80732"
     },
     {
       "name": "once_cell",
@@ -168,27 +168,27 @@
     },
     {
       "name": "read-fonts",
-      "version": "0.46.0",
+      "version": "0.47.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "bdaa4fffe9ff3ca2c353fa9729792805b9b3e324695ff5a081f860612e81b330",
+      "checksum": "a39d2f8f681030a7bcbbcf3e8568775ac2393afd51401a2e2133ee89e3953897",
       "license": "MIT OR Apache-2.0",
       "notices": {
-        "third_party/licenses/read-fonts-0.46.0-LICENSE-MIT.txt": "7b4c9a3946dfcea7967582760e963e27799e225dcf20565c8ef55324bb017427",
-        "third_party/licenses/read-fonts-0.46.0-LICENSE-APACHE.txt": "eba684204073ed715c4abb48129acdfd2bff8ae48339e6a7da3b341d3027b7f0"
+        "third_party/licenses/read-fonts-0.47.0-LICENSE-MIT.txt": "7b4c9a3946dfcea7967582760e963e27799e225dcf20565c8ef55324bb017427",
+        "third_party/licenses/read-fonts-0.47.0-LICENSE-APACHE.txt": "eba684204073ed715c4abb48129acdfd2bff8ae48339e6a7da3b341d3027b7f0"
       },
-      "source_revision": "47a301615fd95acf0da9fb7dbcd0ea7c7df36943"
+      "source_revision": "73fab6938e44c6bd9f3afe2f4eda1cd66a603eec"
     },
     {
       "name": "skrifa",
-      "version": "0.49.0",
+      "version": "0.50.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "a7459fb60888ad9a5f367dd293fa2fb9df142cb451aa6bfd6cd66a7d6a9b739d",
+      "checksum": "e85ba678a6023a063d0a78c8770f1c166674ef46af13523d05eff67430f79dfe",
       "license": "MIT OR Apache-2.0",
       "notices": {
-        "third_party/licenses/skrifa-0.49.0-LICENSE-MIT.txt": "7b4c9a3946dfcea7967582760e963e27799e225dcf20565c8ef55324bb017427",
-        "third_party/licenses/skrifa-0.49.0-LICENSE-APACHE.txt": "eba684204073ed715c4abb48129acdfd2bff8ae48339e6a7da3b341d3027b7f0"
+        "third_party/licenses/skrifa-0.50.0-LICENSE-MIT.txt": "7b4c9a3946dfcea7967582760e963e27799e225dcf20565c8ef55324bb017427",
+        "third_party/licenses/skrifa-0.50.0-LICENSE-APACHE.txt": "eba684204073ed715c4abb48129acdfd2bff8ae48339e6a7da3b341d3027b7f0"
       },
-      "source_revision": "47a301615fd95acf0da9fb7dbcd0ea7c7df36943"
+      "source_revision": "73fab6938e44c6bd9f3afe2f4eda1cd66a603eec"
     },
     {
       "name": "smallvec",

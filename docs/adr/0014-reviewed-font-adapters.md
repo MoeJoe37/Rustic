@@ -57,3 +57,11 @@ The audit command must pass before publication. Larger shaping corpora and
 native device acceptance remain the existing M9/M8 gates. Revisit for dependency
 updates, a security advisory, glyph-cache pressure, collection/variation/color
 font support, or native font service integration. TD-85/86/87 record these limits.
+
+### Accepted update (2026-11-14)
+
+Use exact Skrifa 0.50.0 and HarfRust 0.16.0 with their existing `std`
+features and defaults disabled. They share `read-fonts` 0.47.0.
+The build-script, platform, resource, MSRV and authority boundaries of
+this decision continue to apply. The release notices and checked package
+identities are recorded in the reviewed manifest.

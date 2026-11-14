@@ -1562,4 +1562,15 @@ four passing built-in cases.
 CLDR 48 alias data. String casing applies Unicode special rules for Azerbaijani,
 Lithuanian and Turkish. The selected Intl test262 gate passes 46 of 47 files.
 The `Intl` object and its initial method add 499 bytes to the agent heap report.
-Locale objects, locale negotiation and locale services remain open.
+
+## JS-08 — Intl.Locale and locale preferences
+
+`Intl.Locale` implements the ECMA-402 §15 constructor, branded accessors,
+`maximize` and `minimize`, and seven information methods. Pinned CLDR 48
+supplies likely subtags and locale preferences. IANA tzdb 2026a supplies
+canonical time-zone names by region. The selection now passes 233 of 237
+Test262 Intl files. A focused GC-stress test checks that live locale objects
+retain the tag and locale-list coercion reads the internal slot. The
+constructor, prototype, accessors and methods increase the 64-bit standard
+library heap report by 5,978 bytes. Realms, service negotiation, collation
+and the Intl service constructors remain open.

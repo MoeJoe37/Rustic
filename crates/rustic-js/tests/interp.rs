@@ -3527,3 +3527,43 @@ fn normalize_preserves_utf16_and_uses_all_four_unicode_forms() {
         .unwrap();
     assert_eq!(result, Value::TRUE);
 }
+
+#[test]
+fn intl_locale_keeps_its_tag_alive_and_supplies_locale_preferences() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    agent
+        .evaluate(
+            r#"
+        class Locale extends Intl.Locale {}
+        const locale = new Locale('zh-TW-x-test', {numeric: true, hourCycle: 'h23'});
+        locale.toString = () => { throw new Error('unexpected coercion'); };
+    "#,
+        )
+        .unwrap();
+    agent.collect_garbage(rustic_js::runtime::Roots::default());
+    let script = r#"
+        let invalid = false;
+        try { Intl.Locale.prototype.getWeekInfo.call(Object.create(Intl.Locale.prototype)); }
+        catch (error) { invalid = error instanceof TypeError; }
+        const week = new Intl.Locale('fa-JP-u-rg-afzzzz', {firstDayOfWeek: 7}).getWeekInfo();
+        invalid && locale instanceof Locale && locale.numeric && locale.baseName === 'zh-TW'
+            && Intl.getCanonicalLocales(locale)[0] === 'zh-TW-u-hc-h23-kn-x-test'
+            && new Intl.Locale(locale).maximize().toString() === 'zh-Hant-TW-u-hc-h23-kn-x-test'
+            && new Intl.Locale('zh-Hant-TW').minimize().toString() === 'zh-TW'
+            && locale.getHourCycles().join(',') === 'h23'
+            && new Intl.Locale('fr-CA').getHourCycles()[0] === 'h23'
+            && new Intl.Locale('en-CA').getHourCycles()[0] === 'h12'
+            && new Intl.Locale('en-u-sd-th10').getCalendars()[0] === 'buddhist'
+            && new Intl.Locale('de-DE').getCollations().includes('phonebk')
+            && new Intl.Locale('ar-SA').getNumberingSystems()[0] === 'arab'
+            && new Intl.Locale('ar-SA-u-nu').getNumberingSystems()[0] === ''
+            && new Intl.Locale('art-lojban-fonipa').baseName === 'jbo-fonipa'
+            && new Intl.Locale('ar').getTextInfo().direction === 'rtl'
+            && new Intl.Locale('en-Zyyy').getTextInfo().direction === undefined
+            && new Intl.Locale('en').getTimeZones() === undefined
+            && new Intl.Locale('ar-IQ').getTimeZones().includes('Asia/Baghdad')
+            && week.firstDay === 7 && week.weekend.join(',') === '4,5';
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

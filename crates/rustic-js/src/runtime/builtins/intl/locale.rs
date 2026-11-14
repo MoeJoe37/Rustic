@@ -3,7 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::data::{
-    EXTENSION_ALIASES, LANGUAGES, LIKELY_REGIONS, REGIONS, SCRIPTS, SUBDIVISIONS, VARIANTS,
+    EXTENSION_ALIASES, LANGUAGES, LIKELY_REGIONS, REGIONS, SCRIPTS, SUBDIVISIONS,
+    VARIANT_LANGUAGES, VARIANTS,
 };
 
 fn alpha(s: &str) -> bool {
@@ -55,6 +56,26 @@ impl<'a> Language<'a> {
     }
 
     fn canonicalize(mut self) -> String {
+        for &(name, variants, replacement) in VARIANT_LANGUAGES {
+            if (name != self.name && name != "und")
+                || !variants
+                    .iter()
+                    .all(|variant| self.variants.contains(variant))
+            {
+                continue;
+            }
+            let replacement = Self::parse(&mut replacement.split('-').peekable())
+                .expect("generated CLDR language replacement");
+            for variant in variants {
+                self.variants.remove(variant);
+            }
+            if name != "und" {
+                self.name = replacement.name;
+            }
+            self.script = self.script.or(replacement.script);
+            self.region = self.region.or(replacement.region);
+            self.variants.extend(replacement.variants);
+        }
         let base = self.render().to_ascii_lowercase();
         if let Some(replacement) = alias(LANGUAGES, &base) {
             if let Some(language) = Self::parse(&mut replacement.split('-').peekable()) {
@@ -84,12 +105,6 @@ impl<'a> Language<'a> {
                 })
                 .or_else(|| replacement.split_ascii_whitespace().next());
         }
-        if self.variants.contains("hepburn") && self.variants.remove("heploc") {
-            self.variants.remove("hepburn");
-            self.variants.insert("alalc97");
-        }
-        self.variants.remove("arevela");
-        self.variants.remove("arevmda");
         self.variants = self
             .variants
             .into_iter()
@@ -154,11 +169,14 @@ fn unicode_extension(parts: &[&str]) -> Option<String> {
 fn extension_alias(key: &str, value: &str) -> String {
     if matches!(key, "rg" | "sd") {
         if let Some(replacement) = alias(SUBDIVISIONS, value) {
-            return replacement
+            let replacement = replacement
                 .split_ascii_whitespace()
                 .next()
-                .expect("CLDR subdivision replacement")
-                .to_owned();
+                .expect("CLDR replacement");
+            if region(replacement) {
+                return format!("{replacement}zzzz");
+            }
+            return replacement.to_owned();
         }
     }
     alias(EXTENSION_ALIASES, &format!("{key}-{value}"))
@@ -258,4 +276,226 @@ pub(super) fn canonicalize(tag: &str) -> Option<String> {
         output.push_str(&private);
     }
     Some(output)
+}
+
+pub(super) fn split_base(tag: &str) -> (&str, &str) {
+    tag.match_indices('-')
+        .find(|(offset, _)| {
+            tag[*offset + 1..]
+                .split('-')
+                .next()
+                .is_some_and(|s| s.len() == 1)
+        })
+        .map_or((tag, ""), |(offset, _)| tag.split_at(offset))
+}
+
+// Canonical base names have disjoint script, region and variant productions.
+pub(super) fn base_fields(base: &str) -> [&str; 4] {
+    let (language, mut rest) = base.split_once('-').unwrap_or((base, ""));
+    let mut fields = [language, "", "", ""];
+    for (field, predicate) in [
+        (1, (|s: &str| s.len() == 4 && alpha(s)) as fn(&str) -> bool),
+        (2, region),
+    ] {
+        let (part, tail) = rest.split_once('-').unwrap_or((rest, ""));
+        if predicate(part) {
+            fields[field] = part;
+            rest = tail;
+        }
+    }
+    fields[3] = rest;
+    fields
+}
+
+pub(super) fn valid_option(index: usize, value: &str) -> bool {
+    match index {
+        0 => matches!(value.len(), 2 | 3 | 5..=8) && alpha(value),
+        1 => value.len() == 4 && alpha(value),
+        2 => region(value),
+        _ => {
+            let lowercase = value.to_ascii_lowercase();
+            let mut seen = BTreeSet::new();
+            lowercase
+                .split('-')
+                .all(|s| variant(s) && alnum(s) && seen.insert(s))
+        }
+    }
+}
+
+fn alnum(value: &str) -> bool {
+    value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+}
+
+pub(super) fn valid_type(value: &str) -> bool {
+    value
+        .split('-')
+        .all(|s| (3..=8).contains(&s.len()) && alnum(s))
+}
+
+fn split_unicode(suffix: &str) -> (&str, &str, &str) {
+    let mut singletons = suffix.match_indices('-').filter_map(|(offset, _)| {
+        let part = suffix[offset + 1..].split('-').next()?;
+        (part.len() == 1).then_some((offset, part))
+    });
+    while let Some((start, singleton)) = singletons.next() {
+        if singleton == "x" {
+            break;
+        }
+        if singleton == "u" {
+            let end = singletons.next().map_or(suffix.len(), |(offset, _)| offset);
+            return (&suffix[..start], &suffix[start + 3..end], &suffix[end..]);
+        }
+    }
+    (suffix, "", "")
+}
+
+fn keywords(extension: &str) -> impl Iterator<Item = (&str, &str)> {
+    let mut offsets = extension
+        .split('-')
+        .scan(0, |offset, part| {
+            let start = *offset;
+            *offset += part.len() + 1;
+            Some((start, part))
+        })
+        .filter(|(_, part)| part.len() == 2)
+        .peekable();
+    std::iter::from_fn(move || {
+        let (start, key) = offsets.next()?;
+        let end = offsets
+            .peek()
+            .map_or(extension.len(), |(offset, _)| offset - 1);
+        let value = extension[start + 2..end]
+            .strip_prefix('-')
+            .unwrap_or_default();
+        Some((key, value))
+    })
+}
+
+pub(super) fn unicode_value<'a>(tag: &'a str, key: &str) -> Option<&'a str> {
+    let (_, extension, _) = split_unicode(split_base(tag).1);
+    keywords(extension).find_map(|(name, value)| (key == name).then_some(value))
+}
+
+pub(super) fn insert_unicode_values(tag: &str, overrides: &[(&str, String)]) -> String {
+    if overrides.is_empty() {
+        return tag.to_owned();
+    }
+    let (base, suffix) = split_base(tag);
+    let (mut before, extension, mut after) = split_unicode(suffix);
+    if extension.is_empty() {
+        if let Some(offset) = suffix.find("-x-") {
+            (before, after) = suffix.split_at(offset);
+        }
+    }
+    let mut values: BTreeMap<&str, &str> = keywords(extension).collect();
+    values.extend(overrides.iter().map(|(key, value)| (*key, value.as_str())));
+    let mut output = format!("{base}{before}-u");
+    for attribute in extension.split('-').take_while(|part| part.len() >= 3) {
+        output.push('-');
+        output.push_str(attribute);
+    }
+    for (key, value) in values {
+        output.push('-');
+        output.push_str(key);
+        if !value.is_empty() {
+            output.push('-');
+            output.push_str(value);
+        }
+    }
+    output.push_str(after);
+    output
+}
+
+fn join_fields(fields: impl IntoIterator<Item = impl AsRef<str>>) -> String {
+    let mut output = String::new();
+    for field in fields {
+        let field = field.as_ref();
+        if !field.is_empty() {
+            if !output.is_empty() {
+                output.push('-');
+            }
+            output.push_str(field);
+        }
+    }
+    output
+}
+
+fn maximize_base([language, script, region, _]: [&str; 4]) -> String {
+    let script = if script == "Zzzz" { "" } else { script };
+    let region = if region == "ZZ" { "" } else { region };
+    let lookup = |name, script, region| {
+        let key = join_fields([name, script, region]).to_ascii_lowercase();
+        alias(super::data::LIKELY_SUBTAGS, &key)
+    };
+    let resolved = lookup(language, script, region)
+        .or_else(|| lookup(language, script, ""))
+        .or_else(|| lookup(language, "", region))
+        .or_else(|| lookup(language, "", ""))
+        .or_else(|| {
+            (!script.is_empty())
+                .then(|| lookup("und", script, ""))
+                .flatten()
+        });
+    let Some(resolved) = resolved else {
+        return join_fields([language, script, region]);
+    };
+    let [default_language, default_script, default_region, _] = base_fields(resolved);
+    join_fields([
+        if language == "und" {
+            default_language
+        } else {
+            language
+        },
+        if script.is_empty() {
+            default_script
+        } else {
+            script
+        },
+        if region.is_empty() {
+            default_region
+        } else {
+            region
+        },
+    ])
+}
+
+pub(super) fn adjust_likely_subtags(tag: &str, minimize: bool) -> String {
+    let (base, suffix) = split_base(tag);
+    let fields = base_fields(base);
+    let maximal = maximize_base(fields);
+    let minimal = if minimize {
+        let [language, script, region, _] = base_fields(&maximal);
+        [
+            [language, "", "", ""],
+            [language, "", region, ""],
+            [language, script, "", ""],
+        ]
+        .into_iter()
+        .find(|candidate| maximize_base(*candidate) == maximal)
+        .map(join_fields)
+    } else {
+        None
+    };
+    let mut maximal = minimal.unwrap_or(maximal);
+    if !fields[3].is_empty() {
+        maximal.push('-');
+        maximal.push_str(fields[3]);
+    }
+    maximal.push_str(suffix);
+    maximal
+}
+
+pub(super) fn subdivision_region(tag: &str, key: &str) -> Option<String> {
+    let value = unicode_value(tag, key)?;
+    let length = if value.as_bytes().first()?.is_ascii_digit() {
+        3
+    } else {
+        2
+    };
+    let (prefix, suffix) = value.split_at_checked(length)?;
+    if !region(prefix) || !(1..=4).contains(&suffix.len()) || !alnum(suffix) {
+        return None;
+    }
+    let tag = canonicalize(&format!("und-{prefix}"))?;
+    Some(base_fields(&tag)[2].to_owned())
 }

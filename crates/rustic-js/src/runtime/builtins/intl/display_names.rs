@@ -301,7 +301,9 @@ impl DisplayNames {
             2 => owned(data.name(self.row, SCRIPT, variant, code)),
             3 => {
                 let numbers = number_data();
-                let row = Resolution::new(&numbers.locales, std::slice::from_ref(&self.locale), false).row;
+                let row =
+                    Resolution::new(&numbers.locales, std::slice::from_ref(&self.locale), false)
+                        .row;
                 let field = match self.style {
                     0 => currency::NARROW,
                     1 => currency::SYMBOL,

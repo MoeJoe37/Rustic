@@ -8,6 +8,7 @@
     }
   },
   "outputs": {
-    "crates/rustic-js/data/intl/number.bin": "fc95b07869704a78dfa7cf0969a3263b1ffb3fb521df022004f4d597d87919fa"
+    "crates/rustic-js/data/intl/number.bin": "fc95b07869704a78dfa7cf0969a3263b1ffb3fb521df022004f4d597d87919fa",
+    "crates/rustic-js/data/intl/relative.bin": "4584bb99e94783acc58f1ac928d9446501015f4b84cba4e7ea6fec5c068ea801"
   }
 }

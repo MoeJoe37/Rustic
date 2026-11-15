@@ -3776,3 +3776,41 @@ fn intl_number_format_parts_ranges_and_the_bound_format_survive_collection() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_relative_time_format_picks_plural_patterns_and_named_days() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        const out = (locale, options, value, unit) =>
+            new Intl.RelativeTimeFormat(locale, options).format(value, unit);
+        const parts = new Intl.RelativeTimeFormat('en').formatToParts(-1234.5, 'days')
+            .map(part => part.type + ':' + part.value + ':' + part.unit).join('|');
+        let rejected = 0;
+        for (const [value, unit] of [[1, 'decade'], [Infinity, 'day'], [NaN, 'day']]) {
+            try { out('en', {}, value, unit); } catch (error) { rejected += error instanceof RangeError; }
+        }
+        const resolved = new Intl.RelativeTimeFormat('ar-u-nu-latn', { style: 'short' })
+            .resolvedOptions();
+        [
+            out('en', {}, 1, 'day') === 'in 1 day',
+            out('en', {}, -2, 'days') === '2 days ago',
+            out('en', {}, -0, 'second') === '0 seconds ago',
+            out('en', { numeric: 'auto' }, -1, 'day') === 'yesterday',
+            out('en', { numeric: 'auto' }, 0, 'year') === 'this year',
+            out('en', { numeric: 'auto' }, 1.5, 'day') === 'in 1.5 days',
+            out('en', { style: 'narrow' }, 3, 'hour') === 'in 3h',
+            out('en', {}, 1000, 'second') === 'in 1,000 seconds',
+            out('pl', {}, 5, 'day') === 'za 5 dni',
+            out('pl', {}, 2, 'day') === 'za 2 dni',
+            out('pl', {}, 1, 'day') === 'za 1 dzień',
+            out('de', { numeric: 'auto' }, 2, 'day') === 'übermorgen',
+            out('ar-u-nu-arab', {}, 3, 'day') === 'خلال ٣ أيام',
+            parts === 'integer:1:day|group:,:day|integer:234:day|decimal:.:day|fraction:5:day|literal: days ago:undefined',
+            rejected === 3,
+            resolved.locale === 'ar-u-nu-latn' && resolved.numberingSystem === 'latn'
+                && resolved.style === 'short' && resolved.numeric === 'always',
+        ].every(Boolean);
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

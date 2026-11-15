@@ -20,6 +20,7 @@ mod numfmt;
 mod pack;
 mod plural;
 pub(crate) mod plural_rules;
+mod relative_time_format;
 mod service;
 
 pub(super) use number_format::to_locale_string as number_to_locale_string;
@@ -28,6 +29,7 @@ pub(super) use number_format::to_locale_string as number_to_locale_string;
 mod slot {
     pub(super) const NUMBER_FORMAT_PROTOTYPE: usize = 0;
     pub(super) const NUMBER_FORMAT: usize = 1;
+    pub(super) const RELATIVE_TIME_FORMAT_PROTOTYPE: usize = 2;
 }
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
@@ -42,6 +44,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     collator::install(agent, intl)?;
     plural_rules::install(agent, intl)?;
     number_format::install(agent, intl)?;
+    relative_time_format::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(

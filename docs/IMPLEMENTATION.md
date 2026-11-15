@@ -1694,3 +1694,14 @@ range collapsing, the legacy constructor call, collection of the bound
 The selected Test262 Intl gate passes 713 of 718 files, including 250 of
 251 NumberFormat files. The constructors and the fallback symbol increase
 the 64-bit standard-library heap report by 1,507 bytes.
+
+
+## JS-08 — Intl.RelativeTimeFormat
+
+`Intl.RelativeTimeFormat` formats a value and a unit with the CLDR relative
+time patterns of every locale (`data/intl/relative.bin`), choosing the
+pattern by the plural category of the formatted number and the named forms
+for `numeric: "auto"`. Regressions cover plural selection in Polish, named
+days, negative zero, numbering systems, parts with their unit, and invalid
+units and values. All 80 Test262 `RelativeTimeFormat` files pass; the
+selected Intl gate passes 793 of 798 files.

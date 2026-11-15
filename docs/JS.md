@@ -1173,7 +1173,7 @@ their `locales` and `options` to each element.
   digit and charges the heap, so the step budget and the heap limit bound
   formatting.
 
-The pinned Intl selection passes 713 of 718 files, including 250 of 251
+At its commit the pinned Intl selection passed 713 of 718 files, including 250 of 251
 NumberFormat files and every `Number`, `BigInt`, `Array` and `TypedArray`
 `toLocaleString` file. The remaining NumberFormat file also needs
 `Intl.DateTimeFormat`. TD-120 records what is simplified.
@@ -1185,3 +1185,17 @@ python3 tools/generate_js_intl_services.py /path/to/pinned/inputs --check
 The input directory holds CLDR 48 `core.zip`; the generator verifies its
 SHA-256 digest against `tests/fixtures/js_intl_manifest.json`, and
 `tools/check_repository.py` verifies the pack against the same manifest.
+
+
+## Intl relative time formatting (JS-08)
+
+`Intl.RelativeTimeFormat` implements `format`, `formatToParts`,
+`resolvedOptions` and `supportedLocalesOf` (ECMA-402 §18) for every CLDR 48
+locale. The number is formatted by the locale's default number format in
+the resolved numbering system, its plural category selects the pattern, and
+`numeric: "auto"` uses the named forms CLDR has ("yesterday", "this year").
+Narrow and short styles fall back to the next longer one where a locale
+has no data of its own. The patterns are a second pack,
+`data/intl/relative.bin` (336 KB), written by the same generator.
+
+All 80 `RelativeTimeFormat` files of the pinned selection pass.

@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from cldr_data import NONE, Cldr, Pack, path  # noqa: E402
+from cldr_data import NONE, STEP, Cldr, Pack, path  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "crates/rustic-js/data/intl"
@@ -309,7 +309,54 @@ def number_pack(cldr):
     return pack.bytes()
 
 
-PACKS = {"number.bin": number_pack}
+RELATIVE_UNITS = ["second", "minute", "hour", "day", "week", "month", "quarter", "year"]
+
+
+def attributes(step):
+    """The tag and the attributes of a path step."""
+    return step.split("[", 1)[0], dict(STEP.findall(step))
+
+
+def relative_pack(cldr):
+    """Relative time patterns: `relative[locale << 16 | key, text]`.
+
+    `key` is `unit << 8 | width << 6 | kind`, with the unit's index in
+    RELATIVE_UNITS, the width's in LENGTHS, and as kind a plural category
+    for the future, 8 plus one for the past, or 18 plus the offset of a
+    named day such as "yesterday" (-1).
+    """
+    pack = Pack()
+    locales = Locales(cldr, pack)
+
+    def fields(locale):
+        result = {}
+        for steps, text in cldr.subtree(locale, path("dates", "fields")).items():
+            tag, attrs = attributes(steps[0])
+            name, _, width = attrs.get("type", "").partition("-")
+            if tag != "field" or name not in RELATIVE_UNITS:
+                continue
+            key = RELATIVE_UNITS.index(name) << 8 | LENGTHS.index(width or "long") << 6
+            tag, attrs = attributes(steps[1])
+            if tag == "relative" and len(steps) == 2 and -2 <= int(attrs["type"]) <= 3:
+                result[key | 18 + int(attrs["type"])] = pack.s(text)
+            elif tag == "relativeTime" and len(steps) == 3:
+                count = attributes(steps[2])[1]["count"]
+                past = 8 if attrs["type"] == "past" else 0
+                result[key | past | COUNTS.index(count)] = pack.s(text)
+        return result
+
+    def shorter(key):
+        # Root aliases narrow to short and short to long.
+        width = key >> 6 & 3
+        return None if width == 0 else key & ~0xC0 | (width - 1) << 6
+
+    pack.table("relative", 2, sorted(
+        [row << 16 | key, value] for row, key, value in locales.sparse(fields, shorter)
+    ))
+    return pack.bytes()
+
+
+PACKS = {"number.bin": number_pack, "relative.bin": relative_pack}
 
 
 def main():

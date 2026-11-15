@@ -86,7 +86,7 @@ fn is_currency(text: &str) -> bool {
 
 /// Whether `text` has the form of a Unicode extension `type`: runs of 3
 /// to 8 letters and digits joined by hyphens.
-fn is_type(text: &str) -> bool {
+pub(super) fn is_type(text: &str) -> bool {
     text.split('-').all(|piece| {
         (3..=8).contains(&piece.len()) && piece.bytes().all(|byte| byte.is_ascii_alphanumeric())
     })
@@ -99,7 +99,7 @@ struct NumberFormat {
 }
 
 /// `ResolveLocale` with the `nu` key against the number data.
-fn resolve_system(
+pub(super) fn resolve_system(
     requested: &[String],
     best: bool,
     system: Option<&str>,
@@ -319,7 +319,7 @@ fn mathematical_value(agent: &mut Agent, value: Value) -> JsResult<Numeric> {
     }
 }
 
-fn charge_parts(agent: &mut Agent, parts: &[Part]) -> JsResult<()> {
+pub(super) fn charge_parts(agent: &mut Agent, parts: &[Part]) -> JsResult<()> {
     let bytes: usize = parts
         .iter()
         .map(|part| part.text.len() + std::mem::size_of::<Part>())

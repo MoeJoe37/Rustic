@@ -9,7 +9,7 @@
 //! Range formatting compares the layers of both ends to decide what
 //! the two numbers share.
 
-use super::decimal::{Decimal, DigitOptions, Formatted, Numeric};
+use super::decimal::{Decimal, DigitOptions, Formatted, Numeric, RoundingMode, RoundingType};
 use super::number_data::{OTHER, Symbol, currency, data, pattern};
 use super::plural::{self, Operands};
 
@@ -736,6 +736,11 @@ impl Format {
     }
 
     fn layers(&self, x: &Numeric, approximately: bool) -> Layers {
+        self.layers_and_category(x, approximately).0
+    }
+
+    /// The layers of `x` and the plural category of its display.
+    fn layers_and_category(&self, x: &Numeric, approximately: bool) -> (Layers, usize) {
         let style = self.style_pattern();
         let core = self.core(x, &style);
         let mut layers = Layers {
@@ -767,7 +772,45 @@ impl Format {
             None => layers.middle = self.affixes(&style, core.sign, approximately, false),
         }
         layers.outer = self.name_affixes(core.category);
-        layers
+        (layers, core.category)
+    }
+
+    /// `PartitionNumberPattern` with the plural category of the result,
+    /// for the services that pick a pattern around a number.
+    pub(super) fn format_plural(&self, x: &Numeric) -> (Vec<Part>, usize) {
+        let (layers, category) = self.layers_and_category(x, false);
+        (layers.flatten(), category)
+    }
+
+    /// The format `new Intl.NumberFormat(locale)` makes: a plain decimal.
+    pub(super) fn plain(row: u32, language: &'static str, system: u32) -> Self {
+        Self {
+            row,
+            language,
+            system,
+            style: Style::Decimal,
+            currency: String::new(),
+            currency_display: 1,
+            accounting: false,
+            unit: String::new(),
+            unit_display: 0,
+            notation: Notation::Standard,
+            compact_long: false,
+            digits: DigitOptions {
+                minimum_integer: 1,
+                minimum_fraction: 0,
+                maximum_fraction: 3,
+                minimum_significant: 1,
+                maximum_significant: 21,
+                rounding_type: RoundingType::FractionDigits,
+                increment: 1,
+                mode: RoundingMode::HalfExpand,
+                strip_if_integer: false,
+                priority: 0,
+            },
+            grouping: 2,
+            sign: 0,
+        }
     }
 
     /// `PartitionNumberPattern` (§16.5.4).

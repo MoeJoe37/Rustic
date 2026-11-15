@@ -17,6 +17,18 @@ pub(super) fn range_error<T>(agent: &mut Agent, message: &str) -> JsResult<T> {
     Err(agent.throw(ErrorKind::RangeError, message))
 }
 
+/// `GetOptionsObject(options)` (§9.2.10): `undefined` reads as an empty
+/// object, anything else must be an object.
+pub(super) fn options_object(agent: &mut Agent, value: Value) -> JsResult<Option<ObjectId>> {
+    if value == Value::UNDEFINED {
+        return Ok(None);
+    }
+    match value.as_object() {
+        Some(object) => Ok(Some(object)),
+        None => agent.type_error("Intl options must be an object"),
+    }
+}
+
 /// `CoerceOptionsToObject(options)` (§9.2.11): `undefined` reads as an
 /// empty object, anything else is converted.
 pub(super) fn coerce_options(agent: &mut Agent, value: Value) -> JsResult<Option<ObjectId>> {

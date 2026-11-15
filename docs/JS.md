@@ -1199,3 +1199,19 @@ has no data of its own. The patterns are a second pack,
 `data/intl/relative.bin` (336 KB), written by the same generator.
 
 All 80 `RelativeTimeFormat` files of the pinned selection pass.
+
+
+## Intl display names (JS-08)
+
+`Intl.DisplayNames` implements `of`, `resolvedOptions` and
+`supportedLocalesOf` (ECMA-402 §12) for languages, regions, scripts,
+currencies, calendars and date-time fields in every CLDR 48 locale. A
+language identifier takes the name of its longest named prefix (dialect
+names such as "American English" unless `languageDisplay` is `"standard"`)
+and lists the remaining script, region and variants in the locale's
+parenthesis pattern. Short and narrow styles use CLDR's short alternatives
+where they exist, and currency symbols for currencies. The names are a
+third pack, `data/intl/names.bin` (4.5 MB; TD-120 covers the size).
+
+56 of the 57 `DisplayNames` files of the pinned selection pass; the last
+one also constructs `Intl.DateTimeFormat`.

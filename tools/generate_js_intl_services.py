@@ -356,7 +356,70 @@ def relative_pack(cldr):
     return pack.bytes()
 
 
-PACKS = {"number.bin": number_pack, "relative.bin": relative_pack}
+# Intl.DisplayNames dateTimeField codes and the CLDR fields that name them.
+DATE_TIME_FIELDS = [
+    ("era", "era"), ("year", "year"), ("quarter", "quarter"), ("month", "month"),
+    ("weekOfYear", "week"), ("weekday", "weekday"), ("day", "day"),
+    ("dayPeriod", "dayperiod"), ("hour", "hour"), ("minute", "minute"),
+    ("second", "second"), ("timeZoneName", "zone"),
+]
+NAME_KINDS = {"languages": 0, "scripts": 1, "territories": 2}
+NAME_VARIANTS = {None: 0, "short": 1, "long": 2, "stand-alone": 3}
+
+
+def names_pack(cldr):
+    """Display names: `names[locale << 16 | kind << 4 | variant, code, text]`.
+
+    Kinds: 0 language, 1 script, 2 region, 3 calendar, 4 date-time field
+    (variant is the width's index in LENGTHS, code the field's index in
+    DATE_TIME_FIELDS), 5 patterns (code 0 "{0} ({1})", code 1 "{0}, {1}").
+    For the first four kinds `code` is a row of `codes[text]`, and the
+    variants of a name are those of NAME_VARIANTS (CLDR's `alt`).
+    """
+    pack = Pack()
+    locales = Locales(cldr, pack)
+    display = path("localeDisplayNames")
+    resolved = {}
+    codes = set()
+    for locale in locales.names:
+        entries = {}
+        for steps, text in cldr.subtree(locale, display).items():
+            tag, attrs = attributes(steps[-1])
+            if steps[0] in NAME_KINDS and len(steps) == 2:
+                variant = NAME_VARIANTS.get(attrs.get("alt"), None)
+                if variant is None:
+                    continue
+                code = attrs["type"].replace("_", "-")
+                entries[(NAME_KINDS[steps[0]] << 4 | variant, code)] = text
+            elif steps[0] == "types" and attrs.get("key") == "calendar" and "alt" not in attrs:
+                entries[(3 << 4, attrs["type"])] = text
+            elif steps[0] == "localeDisplayPattern" and tag in ("localePattern", "localeSeparator"):
+                entries[(5 << 4, int(tag == "localeSeparator"))] = text
+        for steps, text in cldr.subtree(locale, path("dates", "fields")).items():
+            tag, attrs = attributes(steps[0])
+            name, _, width = attrs.get("type", "").partition("-")
+            fields = [index for index, (_, field) in enumerate(DATE_TIME_FIELDS) if field == name]
+            if tag == "field" and fields and steps[1:] == ("displayName",):
+                entries[(4 << 4 | LENGTHS.index(width or "long"), fields[0])] = text
+        codes.update(code for _, code in entries if isinstance(code, str))
+        resolved[locale] = entries
+    order = sorted(codes, key=str.encode)
+    number = {code: index for index, code in enumerate(order)}
+    pack.table("codes", 1, [[pack.s(code)] for code in order])
+
+    def names(locale):
+        return {
+            (key, number.get(code, code)): pack.s(text)
+            for (key, code), text in resolved[locale].items()
+        }
+
+    pack.table("names", 3, sorted(
+        [row << 16 | key, code, value] for row, (key, code), value in locales.sparse(names)
+    ))
+    return pack.bytes()
+
+
+PACKS = {"number.bin": number_pack, "relative.bin": relative_pack, "names.bin": names_pack}
 
 
 def main():

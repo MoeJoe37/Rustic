@@ -151,7 +151,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
 | TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, WEB-02 |
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
-| TD-120 | Deliberate | JS | Number formatting embeds a 3.1 MB all-locale pack, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
+| TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1769,7 +1769,9 @@ performance evidence, whichever comes first.
 ### TD-120 — Number formatting data size and ICU approximations
 
 `Intl.NumberFormat` embeds `data/intl/number.bin` (3.1 MB), the number,
-currency and unit data of every CLDR 48 locale, in every build. Rows are
+currency and unit data of every CLDR 48 locale, in every build. The relative
+time patterns (`relative.bin`, 336 KB) and display names (`names.bin`,
+4.5 MB) of every locale are embedded the same way, 8 MB in all. Rows are
 already limited to what a locale does not inherit; currency and unit names
 are most of the rest. The pack also carries the CLDR plural rules as text,
 which `intl/plural.rs` interprets to choose compact, currency-name and unit

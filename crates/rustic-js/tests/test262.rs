@@ -244,6 +244,7 @@ fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
             "test/intl402/PluralRules",
             "test/intl402/NumberFormat",
             "test/intl402/RelativeTimeFormat",
+            "test/intl402/DisplayNames",
             "test/intl402/Number",
             "test/intl402/BigInt",
             "test/intl402/Array",
@@ -255,7 +256,7 @@ fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
         "test/intl402/",
         INTL_PASSING,
         "test262_intl_passing.txt",
-        "Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules, number and relative time formatting and casing (JS-08).",
+        "Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules, number and relative time formatting, display names and casing (JS-08).",
     );
 }
 

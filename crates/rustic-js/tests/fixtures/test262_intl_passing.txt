@@ -1,6 +1,6 @@
-# Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules, number and relative time formatting and casing (JS-08).
+# Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules, number and relative time formatting, display names and casing (JS-08).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 793 pass, 5 fail, 0 skipped (modules, proposals).
+# 849 pass, 6 fail, 0 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 Array/prototype/toLocaleString/calls-toLocaleString-number-elements.js
 Array/prototype/toLocaleString/invoke-element-tolocalestring.js
@@ -78,6 +78,62 @@ Collator/unicode-ext-seq-in-private-tag.js
 Collator/unicode-ext-seq-with-attribute.js
 Collator/unicode-ext-value-collation.js
 Collator/usage-de.js
+DisplayNames/ctor-custom-get-prototype-poison-throws.js
+DisplayNames/ctor-custom-prototype.js
+DisplayNames/ctor-default-prototype.js
+DisplayNames/instance-extensible.js
+DisplayNames/length.js
+DisplayNames/locales-invalid-throws.js
+DisplayNames/locales-length-poison-throws.js
+DisplayNames/locales-length-tolength-throws.js
+DisplayNames/locales-symbol-length.js
+DisplayNames/name.js
+DisplayNames/options-fallback-abrupt-throws.js
+DisplayNames/options-fallback-invalid-throws.js
+DisplayNames/options-fallback-toString-abrupt-throws.js
+DisplayNames/options-fallback-valid.js
+DisplayNames/options-getoptionsobject.js
+DisplayNames/options-languagedisplay-abrupt-throws.js
+DisplayNames/options-languagedisplay-invalid-throws.js
+DisplayNames/options-languagedisplay-toString-abrupt-throws.js
+DisplayNames/options-languagedisplay-valid.js
+DisplayNames/options-localeMatcher-abrupt-throws.js
+DisplayNames/options-localeMatcher-invalid-throws.js
+DisplayNames/options-localeMatcher-toString-abrupt-throws.js
+DisplayNames/options-localeMatcher-valid.js
+DisplayNames/options-null-throws.js
+DisplayNames/options-random-properties-unchecked.js
+DisplayNames/options-style-abrupt-throws.js
+DisplayNames/options-style-invalid-throws.js
+DisplayNames/options-style-toString-abrupt-throws.js
+DisplayNames/options-style-valid.js
+DisplayNames/options-type-abrupt-throws.js
+DisplayNames/options-type-invalid-throws.js
+DisplayNames/options-type-toString-abrupt-throws.js
+DisplayNames/options-type-valid.js
+DisplayNames/prop-desc.js
+DisplayNames/proto-from-ctor-realm.js
+DisplayNames/proto.js
+DisplayNames/prototype/Symbol.toStringTag.js
+DisplayNames/prototype/of/type-calendar-invalid.js
+DisplayNames/prototype/of/type-calendar-valid.js
+DisplayNames/prototype/of/type-datetimefield-invalid.js
+DisplayNames/prototype/of/type-datetimefield-valid.js
+DisplayNames/prototype/of/type-language-invalid.js
+DisplayNames/prototype/of/type-language-valid.js
+DisplayNames/prototype/of/type-region-invalid.js
+DisplayNames/prototype/prop-desc.js
+DisplayNames/prototype/resolvedOptions/default-option-values.js
+DisplayNames/prototype/resolvedOptions/length.js
+DisplayNames/prototype/resolvedOptions/name.js
+DisplayNames/prototype/resolvedOptions/option-fallback.js
+DisplayNames/prototype/resolvedOptions/option-languagedisplay.js
+DisplayNames/prototype/resolvedOptions/option-style.js
+DisplayNames/prototype/resolvedOptions/option-type.js
+DisplayNames/prototype/resolvedOptions/prop-desc.js
+DisplayNames/prototype/resolvedOptions/return-object.js
+DisplayNames/prototype/resolvedOptions/this-not-object-throws.js
+DisplayNames/undefined-newtarget-throws.js
 Intl/getCanonicalLocales/Locale-object.js
 Intl/getCanonicalLocales/canonicalized-tags.js
 Intl/getCanonicalLocales/canonicalized-unicode-ext-seq.js

@@ -3814,3 +3814,43 @@ fn intl_relative_time_format_picks_plural_patterns_and_named_days() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_display_names_compose_languages_and_fall_back_as_asked() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        const of = (locale, options, code) => new Intl.DisplayNames(locale, options).of(code);
+        let rejected = 0;
+        for (const [type, code] of [['language', 'root'], ['language', 'en-u-ca-gregory'],
+            ['region', 'USA'], ['script', 'Lat'], ['currency', 'US'], ['calendar', 'a'],
+            ['dateTimeField', 'years']]) {
+            try { of('en', { type }, code); } catch (error) { rejected += error instanceof RangeError; }
+        }
+        let needsType = false;
+        try { new Intl.DisplayNames('en'); } catch (error) { needsType = error instanceof TypeError; }
+        const resolved = new Intl.DisplayNames('de-AT', { type: 'region', style: 'short' })
+            .resolvedOptions();
+        [
+            of('en', { type: 'language' }, 'en-US') === 'American English',
+            of('en', { type: 'language', languageDisplay: 'standard' }, 'en-us')
+                === 'English (United States)',
+            of('en', { type: 'language' }, 'zh-Hant-TW') === 'Traditional Chinese (Taiwan)',
+            of('en', { type: 'language' }, 'sr-Latn-RS-fonipa') === 'Serbian (Latin, Serbia, fonipa)',
+            of('en', { type: 'language' }, 'qqq') === 'qqq',
+            of('en', { type: 'language', fallback: 'none' }, 'qqq') === undefined,
+            of('fr', { type: 'region' }, 'us') === 'États-Unis',
+            of('en', { type: 'region', style: 'short' }, 'US') === 'US',
+            of('en', { type: 'region' }, '419') === 'Latin America',
+            of('ja', { type: 'script' }, 'latn') === 'ラテン文字',
+            of('en', { type: 'currency' }, 'eur') === 'Euro',
+            of('en', { type: 'currency', style: 'short' }, 'EUR') === '€',
+            of('en', { type: 'calendar' }, 'gregory') === 'Gregorian',
+            of('es', { type: 'dateTimeField' }, 'weekOfYear') === 'semana',
+            rejected === 7 && needsType,
+            resolved.locale === 'de-AT' && resolved.style === 'short' && resolved.type === 'region'
+                && resolved.fallback === 'code' && !('languageDisplay' in resolved),
+        ].every(Boolean);
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

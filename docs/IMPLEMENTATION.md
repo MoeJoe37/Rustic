@@ -1705,3 +1705,13 @@ for `numeric: "auto"`. Regressions cover plural selection in Polish, named
 days, negative zero, numbering systems, parts with their unit, and invalid
 units and values. All 80 Test262 `RelativeTimeFormat` files pass; the
 selected Intl gate passes 793 of 798 files.
+
+
+## JS-08 — Intl.DisplayNames
+
+`Intl.DisplayNames` names languages, regions, scripts, currencies,
+calendars and date-time fields from the CLDR display names of every locale
+(`data/intl/names.bin`). Regressions cover dialect and standard language
+names, composed names with script, region and variants, both fallbacks,
+code canonicalization and the invalid codes of each type. 56 of 57 Test262
+`DisplayNames` files pass; the selected Intl gate passes 849 of 855 files.

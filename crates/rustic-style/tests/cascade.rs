@@ -131,6 +131,48 @@ fn malformed_scopes_discard_their_blocks_and_keep_later_rules() {
 }
 
 #[test]
+fn animation_and_transition_timing_functions_flow_through_the_cascade() {
+    let html = "<p id=parent><span id=child></span></p>";
+    let css = "#parent { --curve: linear(0, .5, 1);
+                         animation-timing-function: var(--curve), ease-in;
+                         transition-timing-function: steps(4, jump-end);
+                         transition-timing-function: steps(1, jump-none) }";
+    let parsed = document(html);
+    let doc = parsed.document();
+    let parser = CssParser::default();
+    let (sheet, diagnostics) = StyleSheet::parse(&parser, css, Origin::Author).unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].kind, StyleDiagnosticKind::InvalidValue);
+    let mut cascade = Cascade::new();
+    cascade.push(sheet);
+    let styles = style_tree(
+        doc,
+        doc.root(),
+        &cascade,
+        &parser,
+        &MatchContext::html(),
+        &ComputeContext::default(),
+    )
+    .unwrap();
+    let timing = |id: &str, property| {
+        styles
+            .iter()
+            .find(|style| id_of(doc, style.node).as_deref() == Some(id))
+            .unwrap()
+            .computed
+            .get(property)
+            .to_string()
+    };
+    use rustic_css::PropertyId::{AnimationTimingFunction, TransitionTimingFunction};
+    assert_eq!(
+        timing("parent", AnimationTimingFunction),
+        "linear(0 0%, 0.5 50%, 1 100%), ease-in"
+    );
+    assert_eq!(timing("parent", TransitionTimingFunction), "steps(4)");
+    assert_eq!(timing("child", AnimationTimingFunction), "ease");
+}
+
+#[test]
 fn specificity_then_order_decides_within_an_origin() {
     let sheet = "p { color: red } #x { color: blue } p.c { color: green } p { color: yellow; display: block }";
     assert_eq!(

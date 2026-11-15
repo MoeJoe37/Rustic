@@ -1417,8 +1417,50 @@
           "label": "Transitions, CSS animations and Web Animations",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "easing",
+              "label": "Timing-function longhands and deterministic CSS easing evaluation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/easing.rs",
+                  "marker": "pub fn sample"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/easing.rs",
+                  "marker": "fn step_easing_handles_the_before_flag_and_endpoint_clamping"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn animation_and_transition_timing_functions_flow_through_the_cascade"
+                }
+              ]
+            },
+            {
+              "id": "transitions",
+              "label": "CSS transition properties, interpolation, replacement and events",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "css-animations",
+              "label": "CSS keyframes, animation properties, playback and events",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "web-animations",
+              "label": "Web Animations timelines, keyframe effects and script API",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "css.modern",

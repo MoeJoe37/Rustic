@@ -364,6 +364,23 @@ pixels.
   target's dictionary and seeds include math functions, so its fixed-point
   check covers them.
 
+### Easing functions
+
+`animation-timing-function` and `transition-timing-function` accept
+comma-separated timing functions, default to `ease`, and are non-inherited.
+They participate in the ordinary cascade, including substitution of custom
+properties. Computed values serialize keywords, cubic Bézier curves, step
+functions and normalized piecewise-linear stops.
+
+`EasingFunction::sample` evaluates one curve with input progress and the
+step function's before flag. Bézier curves use a bounded inverse search
+within the interval and endpoint tangents outside it. Piecewise-linear
+curves distribute omitted stops, clamp decreasing input positions to the
+preceding position and retain jumps at coincident positions. The sampler follows
+[CSS Easing Functions Level 2 §2](https://www.w3.org/TR/css-easing-2/),
+reviewed 2026-11-15. Playback, shorthand parsing, keyframes, transition and
+animation events, and Web Animations integration remain separate work.
+
 ## Cascade
 
 `StyleSheet::parse` prepares a stylesheet for one origin (user agent, user or

@@ -41,7 +41,8 @@ use crate::flex::{
 };
 use crate::serialize::{serialize_identifier, serialize_string};
 use crate::{
-    Calc, Color, ComponentValue, Declaration, Length, LengthPercentage, LengthUnit, Token, Value,
+    Calc, Color, ComponentValue, Declaration, EasingList, Length, LengthPercentage, LengthUnit,
+    Token, Value,
 };
 
 /// The CSS-wide keywords (CSS Cascade Level 5 §7.3).
@@ -703,6 +704,8 @@ pub enum PropertyValue {
     /// `opacity`, as a number (a percentage is divided by 100). Out-of-range
     /// values are clamped to `0..=1` when computed.
     Opacity(f64),
+    /// The comma-separated easing functions of an animation or transition.
+    Easing(EasingList),
     /// `vertical-align`.
     VerticalAlign(VerticalAlign),
     /// `text-align`.
@@ -913,6 +916,8 @@ property_ids! {
     Filter => "filter", false;
     MixBlendMode => "mix-blend-mode", false;
     Isolation => "isolation", false;
+    AnimationTimingFunction => "animation-timing-function", false;
+    TransitionTimingFunction => "transition-timing-function", false;
 }
 
 impl PropertyId {
@@ -969,6 +974,9 @@ impl PropertyId {
             P::OverflowX | P::OverflowY => PropertyValue::Overflow(Overflow::Visible),
             P::Visibility => PropertyValue::Visibility(Visibility::Visible),
             P::Opacity => PropertyValue::Opacity(1.0),
+            P::AnimationTimingFunction | P::TransitionTimingFunction => {
+                PropertyValue::Easing(EasingList::default())
+            }
             P::VerticalAlign => {
                 PropertyValue::VerticalAlign(VerticalAlign::Keyword(VerticalAlignKeyword::Baseline))
             }
@@ -1534,7 +1542,7 @@ pub(crate) fn number(value: &Value) -> Option<f64> {
 
 /// A `<number>` in `min..=max`. A literal outside the range is invalid; a
 /// math function's result is clamped to it instead (CSS Values 4 §10.9).
-fn number_in(value: &Value, min: f64, max: f64) -> Option<f64> {
+pub(crate) fn number_in(value: &Value, min: f64, max: f64) -> Option<f64> {
     if math_function(value) {
         return Calc::parse_number(value).map(|n| censor(n).clamp(min, max));
     }
@@ -1563,7 +1571,7 @@ fn z_index(value: &Value) -> Option<ZIndex> {
 }
 
 /// An `<integer>`, saturated to `i32`.
-fn integer(value: &Value) -> Option<i32> {
+pub(crate) fn integer(value: &Value) -> Option<i32> {
     if math_function(value) {
         // Math functions in an `<integer>` slot round to the nearest
         // integer, halfway cases toward +infinity (CSS Values 4 §10.9).
@@ -1862,6 +1870,9 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         return display(parts).map(PropertyValue::Display);
     }
     match property {
+        P::AnimationTimingFunction | P::TransitionTimingFunction => {
+            return EasingList::parse(parts).map(PropertyValue::Easing);
+        }
         P::FontFamily => return font_family(parts).map(PropertyValue::FontFamily),
         P::TextTransform => return text_transform(parts).map(PropertyValue::TextTransform),
         P::TextDecorationLine => {
@@ -1941,6 +1952,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
     let name = || ident(value);
     Some(match property {
         P::Display
+        | P::AnimationTimingFunction
+        | P::TransitionTimingFunction
         | P::FontFamily
         | P::TextTransform
         | P::TextDecorationLine
@@ -2333,6 +2346,7 @@ impl fmt::Display for PropertyValue {
             Self::Overflow(v) => write!(f, "{v}"),
             Self::Visibility(v) => write!(f, "{v}"),
             Self::Opacity(n) => write_number(f, *n),
+            Self::Easing(functions) => functions.fmt(f),
             Self::VerticalAlign(VerticalAlign::Keyword(k)) => write!(f, "{k}"),
             Self::VerticalAlign(VerticalAlign::LengthPercentage(lp)) => write!(f, "{lp}"),
             Self::TextAlign(v) => write!(f, "{v}"),

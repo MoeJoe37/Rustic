@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "a96cf1e427c02dccb2810c586f709705553aa48e8dc496669c575fa63a679449",
-  "percent": "29.03",
+  "source_fingerprint": "2b42fdcef3731918befbc8e1a9ffd1336d692df195962d1b9f9df7425871dd07",
+  "percent": "29.18",
   "verified_percent": "27.80",
-  "partial_percent": "1.23",
+  "partial_percent": "1.38",
   "completed": 65,
-  "in_progress": 5,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -97,9 +97,9 @@
       "share": "22.10",
       "completed": 0,
       "total": 52,
-      "percent": "1.90",
+      "percent": "2.59",
       "verified_percent": "0.00",
-      "partial_percent": "1.90"
+      "partial_percent": "2.59"
     },
     {
       "id": "M10",
@@ -1633,9 +1633,51 @@
           "label": "Transitions, CSS animations and Web Animations",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "easing",
+              "label": "Timing-function longhands and deterministic CSS easing evaluation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/easing.rs",
+                  "marker": "pub fn sample"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/easing.rs",
+                  "marker": "fn step_easing_handles_the_before_flag_and_endpoint_clamping"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn animation_and_transition_timing_functions_flow_through_the_cascade"
+                }
+              ]
+            },
+            {
+              "id": "transitions",
+              "label": "CSS transition properties, interpolation, replacement and events",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "css-animations",
+              "label": "CSS keyframes, animation properties, playback and events",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "web-animations",
+              "label": "Web Animations timelines, keyframe effects and script API",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.61"
         },
         {
@@ -1699,12 +1741,12 @@
       ],
       "points": 49,
       "completed": 8,
-      "in_progress": 1,
+      "in_progress": 2,
       "total": 10,
-      "contribution": "4.89",
-      "percent": "81.63",
+      "contribution": "5.05",
+      "percent": "84.18",
       "verified_percent": "79.59",
-      "partial_percent": "2.04"
+      "partial_percent": "4.59"
     },
     {
       "id": "text",

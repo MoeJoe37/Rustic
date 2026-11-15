@@ -732,6 +732,17 @@ Filtered `of S` selectors conservatively use full restyles after mutations
 until counting-scope dependencies exist (TD-36). All new cases compare against
 the independent full-restyle path; ordinary targeted invalidation remains.
 
+## CSS-09 — Animation and transition easing
+
+`rustic-css` parses and evaluates CSS easing functions, including the
+standard keywords, `steps()`, `cubic-bezier()` and `linear()`. The two
+timing-function longhands pass through the regular cascade and computed
+style. Evaluator and cascade tests cover invalid grammar, step jumps,
+Bézier extrapolation, linear stop normalization and custom-property
+substitution. This completes the easing step of `css.animations`.
+[CSS.md](CSS.md#easing-functions) describes the sampler and remaining
+playback work.
+
 ## CSS-09a — Explicit stylesheet scopes
 
 `rustic-style` applies `@scope (<selectors>)` and optional

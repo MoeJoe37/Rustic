@@ -133,6 +133,7 @@ symbols! {
     to_primitive = "Symbol.toPrimitive",
     to_string_tag = "Symbol.toStringTag",
     unscopables = "Symbol.unscopables",
+    intl_fallback = "IntlLegacyConstructedSymbol",
 }
 
 /// The intrinsic objects JS-02 needs.
@@ -240,6 +241,9 @@ pub struct Intrinsics {
     pub collator_prototype: ObjectId,
     /// `%Intl.PluralRules.prototype%`.
     pub plural_rules_prototype: ObjectId,
+    /// The prototypes and constructors of the Intl services built on
+    /// `builtins::intl::service`, by the indices in `builtins::intl::slot`.
+    pub intl: [ObjectId; 16],
 }
 
 impl Intrinsics {
@@ -300,6 +304,7 @@ impl Intrinsics {
             self.collator_prototype,
             self.plural_rules_prototype,
         ]);
+        all.extend(self.intl);
         all
     }
 }
@@ -423,6 +428,7 @@ impl Agent {
                 list_format_prototype: placeholder,
                 collator_prototype: placeholder,
                 plural_rules_prototype: placeholder,
+                intl: [placeholder; 16],
             },
             global_env: EnvId(0),
             realms: Vec::new(),
@@ -678,6 +684,7 @@ impl Agent {
             list_format_prototype: object_prototype,
             collator_prototype: object_prototype,
             plural_rules_prototype: object_prototype,
+            intl: [object_prototype; 16],
         };
         super::builtins::install(self)
     }

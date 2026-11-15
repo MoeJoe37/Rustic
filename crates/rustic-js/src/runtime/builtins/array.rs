@@ -1312,13 +1312,15 @@ fn to_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     super::object_to_string(agent, Value::object(o), &[])
 }
 
-/// `Array.prototype.toLocaleString` (§23.1.3.32), with no locale
-/// support yet: each element's own `toLocaleString`, joined by commas.
-fn to_locale_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+/// `Array.prototype.toLocaleString(locales, options)` (ECMA-402
+/// §19.5.1): each element's own `toLocaleString` with the same
+/// arguments, joined by commas.
+fn to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let (o, length) = this_array_like(agent, this)?;
     let key = agent.heap.key("toLocaleString")?;
+    let passed = [arg(args, 0), arg(args, 1)];
     join_with(agent, o, length, &[u16::from(b',')], |agent, value| {
-        let v = agent.invoke(value, key, &[])?;
+        let v = agent.invoke(value, key, &passed)?;
         let s = agent.to_string(v)?;
         Ok(agent.heap.string(s).to_units())
     })

@@ -1,0 +1,13 @@
+{
+  "license": "Unicode License v3 (crates/rustic-js/data/CLDR-LICENSE.txt)",
+  "generator": "tools/generate_js_intl_services.py",
+  "sources": {
+    "core.zip": {
+      "sha256": "06c7c698d6fd8d67cefac15a0206b0109b00e0ef1636f86f84449fa959561f74",
+      "url": "https://github.com/unicode-org/cldr/releases/download/release-48/core.zip"
+    }
+  },
+  "outputs": {
+    "crates/rustic-js/data/intl/number.bin": "fc95b07869704a78dfa7cf0969a3263b1ffb3fb521df022004f4d597d87919fa"
+  }
+}

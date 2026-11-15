@@ -3692,3 +3692,87 @@ fn intl_plural_rules_rounds_decimal_values_before_classifying() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_number_format_rounds_exactly_and_follows_cldr_patterns() {
+    let mut agent = Agent::new().unwrap();
+    let script = r#"
+        const out = (locale, options, value) =>
+            new Intl.NumberFormat(locale, options).format(value);
+        const usd = { style: 'currency', currency: 'USD' };
+        [
+            out('en-US', {}, 1234567.891) === '1,234,567.891',
+            out('en', {}, 1.005) === '1.005',
+            out('en', { maximumFractionDigits: 2 }, 1.005) === '1.01',
+            out('en', { maximumFractionDigits: 2, roundingMode: 'halfEven' }, 1.005) === '1',
+            out('en', {}, 123456789012345678901234567890n)
+                === '123,456,789,012,345,678,901,234,567,890',
+            out('en', {}, '0.1000000000000000000000001') === '0.1',
+            out('en', { minimumFractionDigits: 25 }, '0.1000000000000000000000001')
+                === '0.1000000000000000000000001',
+            out('en', {}, -0) === '-0',
+            out('en', { signDisplay: 'negative' }, -0) === '0',
+            out('en', { signDisplay: 'exceptZero' }, 5) === '+5',
+            out('de', usd, -1234.5) === '-1.234,50 $',
+            out('en', { ...usd, currencySign: 'accounting' }, -5) === '($5.00)',
+            out('en', { ...usd, currencyDisplay: 'code' }, 5) === 'USD 5.00',
+            out('en', { ...usd, currencyDisplay: 'name' }, 1) === '1.00 US dollars',
+            out('ja', { style: 'currency', currency: 'JPY' }, 5000) === '￥5,000',
+            out('hi-IN', {}, 12345678) === '1,23,45,678',
+            out('es', {}, 1234) === '1234',
+            out('es', {}, 12345) === '12.345',
+            out('ar-EG', {}, 1234.5) === '١٬٢٣٤٫٥',
+            out('en-u-nu-thai', {}, 123) === '๑๒๓',
+            out('zh-TW', {}, NaN) === '非數值',
+            out('en', { style: 'percent' }, 0.256) === '26%',
+            out('en', { notation: 'compact' }, 999999) === '1M',
+            out('fr', { notation: 'compact', compactDisplay: 'long' }, 1234567)
+                === '1,2 million',
+            out('en', { notation: 'scientific' }, 0.000123) === '1.23E-4',
+            out('en', { notation: 'engineering' }, 123456) === '123.456E3',
+            out('en', { style: 'unit', unit: 'kilometer-per-hour', unitDisplay: 'long' }, 1)
+                === '1 kilometer per hour',
+            out('en', { style: 'unit', unit: 'liter', unitDisplay: 'long' }, 2) === '2 liters',
+            out('en', { roundingIncrement: 5, maximumFractionDigits: 2,
+                minimumFractionDigits: 2 }, 1.23) === '1.25',
+            (1234.5).toLocaleString('de') === '1.234,5',
+            (12345n).toLocaleString('en', { style: 'percent' }) === '1,234,500%',
+            [1234.5, 2n].toLocaleString('de') === '1.234,5,2',
+        ].every(Boolean);
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}
+
+#[test]
+fn intl_number_format_parts_ranges_and_the_bound_format_survive_collection() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        let format = new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' });
+        const bound = format.format;
+        const cached = bound === format.format;
+        const parts = format.formatToParts(-1234.5)
+            .map(part => part.type + ':' + part.value).join('|');
+        format = null;
+        const whole = { style: 'currency', currency: 'USD', maximumFractionDigits: 0 };
+        const range = new Intl.NumberFormat('en', whole);
+        const euros = new Intl.NumberFormat('de', { ...whole, currency: 'EUR' });
+        const sources = range.formatRangeToParts(3, 5).map(part => part.source).join(',');
+        const legacy = Intl.NumberFormat.call(Object.create(Intl.NumberFormat.prototype), 'de');
+        let rejected = false;
+        try { range.formatRange(1, NaN); } catch (error) { rejected = error instanceof RangeError; }
+        const options = new Intl.NumberFormat('en', { notation: 'compact' }).resolvedOptions();
+        cached && bound(1.5) === '€1.50' && ['3', '1'].map(bound).join() === '€3.00,€1.00'
+            && parts === 'minusSign:-|currency:€|integer:1|group:,|integer:234|decimal:.|fraction:50'
+            && range.formatRange(3, 5) === '$3 – $5'
+            && euros.formatRange(3, 5) === '3–5 €'
+            && range.formatRange(2.9, 3.1) === '~$3'
+            && sources === 'startRange,startRange,shared,endRange,endRange'
+            && legacy.format(1234.5) === '1.234,5'
+            && Object.getOwnPropertySymbols(legacy).length === 1
+            && rejected
+            && options.useGrouping === 'min2' && options.maximumSignificantDigits === 2
+            && options.roundingPriority === 'morePrecision';
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

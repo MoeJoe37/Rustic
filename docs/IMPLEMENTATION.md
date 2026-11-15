@@ -1672,3 +1672,25 @@ English ordinals, decimal rounding ties, BigInt and range selection.
 The selected Test262 Intl gate passes 440 of 446 files, including 52 of
 53 PluralRules files. The installed constructor and methods increase the
 64-bit standard-library heap report by 1,044 bytes.
+
+
+## JS-08 — Intl.NumberFormat and number `toLocaleString`
+
+`Intl.NumberFormat` formats Numbers, BigInts and numeric strings as exact
+decimals in every CLDR 48 locale: decimal, percent, currency and unit
+styles; standard, scientific, engineering and compact notation; parts and
+ranges. `Number`, `BigInt`, `Array` and typed array `toLocaleString` use it.
+The data is one generated pack (`data/intl/number.bin`) read in place
+through `intl/pack.rs`; `intl/service.rs` holds the option and locale
+resolution operations that further services share, and service objects
+keep their immutable settings in `Internal::Service`.
+
+Regressions cover exact rounding of long decimals, grouping rules (Indian
+groups, Spanish minimum grouping), numbering systems, currency spacing and
+accounting signs, compact and scientific forms, unit compounds, parts,
+range collapsing, the legacy constructor call, collection of the bound
+`format`, and the step budget on long inputs.
+
+The selected Test262 Intl gate passes 713 of 718 files, including 250 of
+251 NumberFormat files. The constructors and the fallback symbol increase
+the 64-bit standard-library heap report by 1,507 bytes.

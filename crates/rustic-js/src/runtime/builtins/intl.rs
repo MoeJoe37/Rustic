@@ -8,12 +8,27 @@ use crate::runtime::{Agent, ErrorKind, JsResult, PropertyDescriptor, PropertyKey
 mod case;
 pub(crate) mod collator;
 mod data;
+mod decimal;
 mod list_format;
 mod locale;
 mod locale_info;
 mod locale_object;
 mod matching;
+mod number_data;
+mod number_format;
+mod numfmt;
+mod pack;
+mod plural;
 pub(crate) mod plural_rules;
+mod service;
+
+pub(super) use number_format::to_locale_string as number_to_locale_string;
+
+/// Indices into `Intrinsics::intl`.
+mod slot {
+    pub(super) const NUMBER_FORMAT_PROTOTYPE: usize = 0;
+    pub(super) const NUMBER_FORMAT: usize = 1;
+}
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let intl = agent.new_object()?;
@@ -26,6 +41,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     list_format::install(agent, intl)?;
     collator::install(agent, intl)?;
     plural_rules::install(agent, intl)?;
+    number_format::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(

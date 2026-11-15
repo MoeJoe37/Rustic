@@ -151,6 +151,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
 | TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, WEB-02 |
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
+| TD-120 | Deliberate | JS | Number formatting embeds a 3.1 MB all-locale pack, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1764,3 +1765,34 @@ Pay by sharing scope membership for unchanged roots and tracking which DOM
 changes invalidate roots, limits and the corresponding affected subjects.
 Trigger when implementing nested scopes or collecting scoped-style
 performance evidence, whichever comes first.
+
+### TD-120 — Number formatting data size and ICU approximations
+
+`Intl.NumberFormat` embeds `data/intl/number.bin` (3.1 MB), the number,
+currency and unit data of every CLDR 48 locale, in every build. Rows are
+already limited to what a locale does not inherit; currency and unit names
+are most of the rest. The pack also carries the CLDR plural rules as text,
+which `intl/plural.rs` interprets to choose compact, currency-name and unit
+patterns, while `Intl.PluralRules` uses its own generated rule functions
+(`intl/plural_rules/data.rs`) and its own decimal rounding
+(`plural_rules/digits.rs` next to `intl/decimal.rs`).
+
+Three behaviors are simplified where ECMA-402 leaves the result to the
+implementation:
+
+- Range formatting follows ICU's default collapse rule from the layers of
+  each end rather than ICU's modifier objects, so a locale whose pattern
+  mixes the sign and the currency in unusual ways can differ from ICU.
+- CLDR currency spacing tests "letter or punctuation" with a small
+  approximation of `[[:^S:]&[:^Z:]]` instead of the general category table.
+- Best fit and lookup matching are the same likely-subtags matcher
+  (see TD-117).
+
+**Why bad:** binary size on every platform, including mobile; two rule
+evaluators and two rounding implementations that must agree.
+
+Pay with: one plural rule source and one decimal type shared by
+PluralRules and NumberFormat; a locale-subset build option or loading the
+pack from the platform layer; the general category table for spacing.
+Trigger: the first binary-size budget (M12), or a formatting difference
+from ICU reported by a page or a Test262 update.

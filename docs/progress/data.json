@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "fb81d07f4e3e36d6f892f33e9984ef6f82ddbeaec3d8f8cf94793c5886132134",
-  "percent": "29.35",
+  "source_fingerprint": "efa9ecabdf7b8a6c64e1c228b5cb4bb86be878eaf14342a8e6448aa96037cb03",
+  "percent": "29.38",
   "verified_percent": "27.80",
-  "partial_percent": "1.55",
+  "partial_percent": "1.58",
   "completed": 65,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 11,
       "total": 13,
-      "percent": "97.30",
+      "percent": "97.69",
       "verified_percent": "87.69",
-      "partial_percent": "9.61"
+      "partial_percent": "10.00"
     },
     {
       "id": "M5",
@@ -3912,11 +3912,52 @@
               ]
             },
             {
-              "label": "Intl services, locale data and Test262 Intl evidence",
+              "label": "Plural rules and number formatting with CLDR number, currency and unit data for every locale",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/plural_rules.rs",
+                  "marker": "fn select_range"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/numfmt.rs",
+                  "marker": "pub(super) fn format_range"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/decimal.rs",
+                  "marker": "pub(super) fn round"
+                },
+                {
+                  "kind": "source",
+                  "path": "tools/generate_js_intl_services.py",
+                  "marker": "def number_pack"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn intl_number_format_rounds_exactly_and_follows_cldr_patterns"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn number_formatting_work_respects_the_step_budget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+                  "marker": "NumberFormat/prototype/formatRangeToParts/en-US.js"
+                }
+              ]
+            },
+            {
+              "label": "Date and time, relative time, duration, display name and segmentation services with Test262 Intl evidence",
               "status": "planned"
             }
           ],
-          "credit": "75.00",
+          "credit": "80.00",
           "engine_share": "0.68"
         },
         {
@@ -4110,10 +4151,10 @@
       "completed": 11,
       "in_progress": 3,
       "total": 15,
-      "contribution": "8.93",
-      "percent": "89.38",
+      "contribution": "8.97",
+      "percent": "89.72",
       "verified_percent": "78.08",
-      "partial_percent": "11.30"
+      "partial_percent": "11.64"
     },
     {
       "id": "wasm",

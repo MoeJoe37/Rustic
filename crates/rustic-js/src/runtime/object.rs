@@ -309,6 +309,16 @@ pub(crate) enum Internal {
     Collator(Box<super::builtins::intl::collator::Collator>),
     /// Locale data and digit options of Intl.PluralRules.
     PluralRules(Box<super::builtins::intl::plural_rules::PluralRules>),
+    /// An ECMA-402 service object with settings that never change
+    /// after construction (NumberFormat and the services built on it),
+    /// and the bound function its accessor hands out, undefined until
+    /// first read.
+    Service {
+        state: std::sync::Arc<dyn std::any::Any + Send + Sync>,
+        bound: Value,
+        /// What the settings charge the heap.
+        bytes: u32,
+    },
     /// The resolved locale and template set for Intl.ListFormat.
     ListFormat {
         locale: &'static str,

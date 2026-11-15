@@ -135,9 +135,10 @@ fn to_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
     agent.string(&number_to_radix_string(x, radix as u32))
 }
 
-fn to_locale_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+/// `Number.prototype.toLocaleString(locales, options)` (ECMA-402 §19.2.1).
+fn to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let x = this_number(agent, this)?;
-    agent.string(&number_to_string(x))
+    super::intl::number_to_locale_string(agent, Value::number(x), arg(args, 0), arg(args, 1))
 }
 
 /// `Number.prototype.toFixed(fractionDigits)` (§21.1.3.3).

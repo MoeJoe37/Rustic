@@ -285,6 +285,22 @@ def main() -> int:
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
             error(data_manifest, f"invalid generated data manifest: {exc}")
 
+    intl_manifest = ROOT / "crates/rustic-js/tests/fixtures/js_intl_manifest.json"
+    try:
+        manifest = json.loads(intl_manifest.read_text(encoding="utf-8"))
+        if not manifest["outputs"]:
+            error(intl_manifest, "the Intl data manifest lists no outputs")
+        for output, digest in manifest["outputs"].items():
+            if hashlib.sha256((ROOT / output).read_bytes()).hexdigest() != digest:
+                error(ROOT / output, "generated Intl data differs from its manifest; rerun tools/generate_js_intl_services.py")
+        if not (ROOT / "crates/rustic-js/data/CLDR-LICENSE.txt").is_file():
+            error(intl_manifest, "missing CLDR license for generated Intl data")
+        for name, source in manifest["sources"].items():
+            if not re.fullmatch(r"[0-9a-f]{64}", source["sha256"]):
+                error(intl_manifest, f"{name} needs a SHA-256 digest")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        error(intl_manifest, f"invalid Intl data manifest: {exc}")
+
     check_debt_markers(files)
     check_html_fixture("html5lib")
     check_html_fixture("references")

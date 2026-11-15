@@ -3588,7 +3588,48 @@
               ]
             },
             {
-              "label": "Intl services, locale data and Test262 Intl evidence",
+              "label": "Plural rules and number formatting with CLDR number, currency and unit data for every locale",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/plural_rules.rs",
+                  "marker": "fn select_range"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/numfmt.rs",
+                  "marker": "pub(super) fn format_range"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/decimal.rs",
+                  "marker": "pub(super) fn round"
+                },
+                {
+                  "kind": "source",
+                  "path": "tools/generate_js_intl_services.py",
+                  "marker": "def number_pack"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn intl_number_format_rounds_exactly_and_follows_cldr_patterns"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn number_formatting_work_respects_the_step_budget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+                  "marker": "NumberFormat/prototype/formatRangeToParts/en-US.js"
+                }
+              ]
+            },
+            {
+              "label": "Date and time, relative time, duration, display name and segmentation services with Test262 Intl evidence",
               "status": "planned"
             }
           ]

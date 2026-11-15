@@ -149,6 +149,25 @@ fn collation_work_respects_the_step_budget() {
     assert_eq!(text(&mut agent, "compare(longer, '2')"), "1");
 }
 
+#[test]
+fn number_formatting_work_respects_the_step_budget() {
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("const digits = '7'.repeat(4_096); const big = BigInt(digits); const format = new Intl.NumberFormat('en').format;")
+        .expect("number format setup");
+    for source in ["format(digits)", "format(big)", "big.toLocaleString('de')"] {
+        agent.set_step_budget(Some(1_000));
+        assert_eq!(
+            agent.evaluate(source),
+            Err(EvalError::Cancelled),
+            "{source}"
+        );
+        agent.set_step_budget(None);
+    }
+    assert_eq!(text(&mut agent, "format(big).length"), "5461");
+    assert_eq!(text(&mut agent, "format(digits)"), "∞");
+}
+
 // ---- ropes ----------------------------------------------------------------
 
 #[test]

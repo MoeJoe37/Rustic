@@ -1105,7 +1105,7 @@ fn join_elements(
     o: ObjectId,
     length: usize,
     separator: &[u16],
-    text: fn(&mut Agent, Value) -> JsResult<Vec<u16>>,
+    text: impl Fn(&mut Agent, Value) -> JsResult<Vec<u16>>,
 ) -> JsResult<Value> {
     let mut out: Vec<u16> = Vec::new();
     for k in 0..length {
@@ -1138,11 +1138,14 @@ fn join(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     })
 }
 
-fn to_locale_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+/// `%TypedArray%.prototype.toLocaleString(locales, options)`
+/// (ECMA-402 §19.5.1 through §23.2.3.31).
+fn to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let (o, _, length) = validate(agent, this)?;
+    let passed = [arg(args, 0), arg(args, 1)];
     join_elements(agent, o, length, &[0x2C], |agent, value| {
         let key = agent.heap.key("toLocaleString")?;
-        let text = agent.invoke(value, key, &[])?;
+        let text = agent.invoke(value, key, &passed)?;
         let s = agent.to_string(text)?;
         Ok(agent.heap.string(s).units().collect())
     })

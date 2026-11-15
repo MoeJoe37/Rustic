@@ -30,7 +30,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         prototype,
         &[
             method("toString", bigint_to_string, 0),
-            method("toLocaleString", bigint_to_string, 0),
+            method("toLocaleString", bigint_to_locale_string, 0),
             method("valueOf", bigint_value_of, 0),
         ],
     )?;
@@ -216,8 +216,13 @@ fn bigint_value_of(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Valu
     this_bigint(agent, this)
 }
 
-/// `BigInt.prototype.toString(radix)` (§21.2.3.3), also `toLocaleString`
-/// until Intl formats numbers.
+/// `BigInt.prototype.toLocaleString(locales, options)` (ECMA-402 §19.3.1).
+fn bigint_to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let value = this_bigint(agent, this)?;
+    super::intl::number_to_locale_string(agent, value, arg(args, 0), arg(args, 1))
+}
+
+/// `BigInt.prototype.toString(radix)` (§21.2.3.3).
 fn bigint_to_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let value = this_bigint(agent, this)?;
     let radix = arg(args, 0);

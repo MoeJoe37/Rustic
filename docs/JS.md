@@ -977,8 +977,8 @@ Part 2 adds the rest of the everyday library, beginning with:
   - Local time is UTC plus one fixed offset, `Agent::set_time_zone_offset`.
     There is no time zone database and so no daylight saving time (TD-108).
     `Agent::set_clock` fixes the current time for tests and fuzzing.
-  - The `toLocale…String` methods return the `toString` forms; Intl is
-    JS-08.
+  - The `toLocale…String` methods return the `toString` forms until
+    `Intl.DateTimeFormat` exists (JS-08).
   - Test262 `test/built-ins/Date`: 595 of 610 files pass. The rest need
     regular expressions, other realms (`$262`) or Temporal.
 - **eval.** Direct and indirect `eval` (§19.2.1).
@@ -1128,8 +1128,60 @@ uses the locale's pinned decimal scales.
 
 The pinned Intl selection passes 440 of 446 files, including 52 of 53
 PluralRules files. Its outstanding constructor test also exercises the
-unfinished `Intl.NumberFormat` and `Intl.DateTimeFormat` constructors.
+unfinished `Intl.DateTimeFormat` constructor.
 
 ```sh
 python3 tools/generate_js_plural_rules.py /path/to/pinned/core.zip --check
 ```
+
+
+## Intl number formatting (JS-08)
+
+`Intl.NumberFormat` implements the ECMA-402 §16 constructor (including the
+legacy call on an existing instance and `UnwrapNumberFormat`), the cached
+bound `format`, `formatToParts`, `formatRange`, `formatRangeToParts`,
+`resolvedOptions` and `supportedLocalesOf`. `Number.prototype.toLocaleString`
+and `BigInt.prototype.toLocaleString` format through it, and
+`Array.prototype.toLocaleString` and its typed array counterpart pass
+their `locales` and `options` to each element.
+
+- **Exact decimals.** A value is a decimal digit string from the start
+  (`intl/decimal.rs`): a Number contributes its shortest round-trip digits, a
+  BigInt and a numeric string every digit. All nine rounding modes, rounding
+  increments, significant and fraction digit limits and both rounding
+  priorities work on those digits, never on binary floating point.
+- **Styles and notations.** Decimal, percent, currency (symbol, narrow
+  symbol, code and name; standard and accounting signs) and unit (short,
+  narrow and long; sanctioned units and `X-per-Y` compounds), in standard,
+  scientific, engineering and compact (short and long) notation, with all
+  five `signDisplay` and four `useGrouping` settings.
+- **Locale data.** Every locale of CLDR 48 `common/main`: symbols, patterns,
+  grouping sizes and minimum grouping digits, compact patterns per plural
+  category, currency names and symbols with ISO 4217 minor units, unit
+  patterns, and every numbering system with decimal digits (`nu` keyword
+  and `numberingSystem` option). The generator resolves CLDR inheritance
+  and root aliases, and stores a row only where a locale differs from what
+  its parent chain gives, in one data pack
+  (`crates/rustic-js/data/intl/number.bin`, 3.1 MB, read in place).
+- **Locale matching.** A request is matched with its likely subtags added,
+  because CLDR names files by what they add to their parent: `zh-TW` reads
+  `zh-Hant-TW` and `en-US` reads `en`, and both are reported as requested.
+- **Ranges.** Equal displays format once with the approximately sign.
+  Otherwise the ends share a unit or a currency name, and a currency or
+  percent sign longer than one character, as ICU does by default.
+- **Budgets.** Converting a long string or BigInt counts native work per
+  digit and charges the heap, so the step budget and the heap limit bound
+  formatting.
+
+The pinned Intl selection passes 713 of 718 files, including 250 of 251
+NumberFormat files and every `Number`, `BigInt`, `Array` and `TypedArray`
+`toLocaleString` file. The remaining NumberFormat file also needs
+`Intl.DateTimeFormat`. TD-120 records what is simplified.
+
+```sh
+python3 tools/generate_js_intl_services.py /path/to/pinned/inputs --check
+```
+
+The input directory holds CLDR 48 `core.zip`; the generator verifies its
+SHA-256 digest against `tests/fixtures/js_intl_manifest.json`, and
+`tools/check_repository.py` verifies the pack against the same manifest.

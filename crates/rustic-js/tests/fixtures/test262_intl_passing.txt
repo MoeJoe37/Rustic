@@ -1,6 +1,6 @@
-# Test262 Intl locale identifiers, Locale objects, list formatting, collation and casing (JS-08).
+# Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules and casing (JS-08).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 388 pass, 5 fail, 0 skipped (modules, proposals).
+# 440 pass, 6 fail, 0 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 Collator/builtin.js
 Collator/constructor-options-throwing-getters.js
@@ -371,6 +371,58 @@ Locale/prototype/variants/prop-desc.js
 Locale/reject-duplicate-variants-in-tlang.js
 Locale/reject-duplicate-variants.js
 Locale/subclassing.js
+PluralRules/builtin.js
+PluralRules/can-be-subclassed.js
+PluralRules/compactDisplay-undefined-unless-notation-compact.js
+PluralRules/constructor-option-read-order.js
+PluralRules/constructor-options-throwing-getters.js
+PluralRules/default-options-object-prototype.js
+PluralRules/internals.js
+PluralRules/length.js
+PluralRules/name.js
+PluralRules/notation.js
+PluralRules/prop-desc.js
+PluralRules/proto-from-ctor-realm.js
+PluralRules/prototype/bind.js
+PluralRules/prototype/builtins.js
+PluralRules/prototype/constructor/main.js
+PluralRules/prototype/constructor/prop-desc.js
+PluralRules/prototype/properties.js
+PluralRules/prototype/prototype.js
+PluralRules/prototype/resolvedOptions/builtins.js
+PluralRules/prototype/resolvedOptions/length.js
+PluralRules/prototype/resolvedOptions/name.js
+PluralRules/prototype/resolvedOptions/order.js
+PluralRules/prototype/resolvedOptions/plural-categories-order.js
+PluralRules/prototype/resolvedOptions/pluralCategories.js
+PluralRules/prototype/resolvedOptions/prop-desc.js
+PluralRules/prototype/resolvedOptions/properties.js
+PluralRules/prototype/resolvedOptions/return-keys-order-default.js
+PluralRules/prototype/select/length.js
+PluralRules/prototype/select/name.js
+PluralRules/prototype/select/non-finite.js
+PluralRules/prototype/select/notation.js
+PluralRules/prototype/select/prop-desc.js
+PluralRules/prototype/select/tainting.js
+PluralRules/prototype/selectRange/argument-tonumber-throws.js
+PluralRules/prototype/selectRange/default-en-us.js
+PluralRules/prototype/selectRange/invoked-as-func.js
+PluralRules/prototype/selectRange/length.js
+PluralRules/prototype/selectRange/name.js
+PluralRules/prototype/selectRange/nan-arguments-throws.js
+PluralRules/prototype/selectRange/prop-desc.js
+PluralRules/prototype/selectRange/undefined-arguments-throws.js
+PluralRules/prototype/selectRange/x-greater-than-y-not-throws.js
+PluralRules/prototype/toStringTag/toString-changed-tag.js
+PluralRules/prototype/toStringTag/toString-removed-tag.js
+PluralRules/prototype/toStringTag/toString.js
+PluralRules/prototype/toStringTag/toStringTag.js
+PluralRules/supportedLocalesOf/arguments.js
+PluralRules/supportedLocalesOf/length.js
+PluralRules/supportedLocalesOf/main.js
+PluralRules/supportedLocalesOf/name.js
+PluralRules/supportedLocalesOf/prop-desc.js
+PluralRules/supportedLocalesOf/supportedLocalesOf.js
 String/prototype/localeCompare/builtin.js
 String/prototype/localeCompare/default-options-object-prototype.js
 String/prototype/localeCompare/length.js

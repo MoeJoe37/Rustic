@@ -819,7 +819,7 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (119,966; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  (121,010; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
   installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
@@ -1114,4 +1114,22 @@ digests. The [Unicode license notice] applies to these tables.
 
 ```sh
 python3 tools/generate_js_collation.py /path/to/pinned/collation-inputs --check
+```
+
+
+## Intl plural rules (JS-08)
+
+`Intl.PluralRules` resolves the locale and selects cardinal, ordinal, and
+range categories with generated CLDR 48 rules. It rounds decimal coefficients
+before deriving the plural operands, retaining significant and visible
+fraction digits according to the options. Decimal strings and BigInts
+retain their precision through the category calculation. Compact notation
+uses the locale's pinned decimal scales.
+
+The pinned Intl selection passes 440 of 446 files, including 52 of 53
+PluralRules files. Its outstanding constructor test also exercises the
+unfinished `Intl.NumberFormat` and `Intl.DateTimeFormat` constructors.
+
+```sh
+python3 tools/generate_js_plural_rules.py /path/to/pinned/core.zip --check
 ```

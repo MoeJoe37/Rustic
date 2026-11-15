@@ -13,6 +13,7 @@ mod locale;
 mod locale_info;
 mod locale_object;
 mod matching;
+pub(crate) mod plural_rules;
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let intl = agent.new_object()?;
@@ -24,6 +25,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     locale_object::install(agent, intl)?;
     list_format::install(agent, intl)?;
     collator::install(agent, intl)?;
+    plural_rules::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(

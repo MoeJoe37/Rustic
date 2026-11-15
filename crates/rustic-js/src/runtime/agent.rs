@@ -238,6 +238,8 @@ pub struct Intrinsics {
     pub list_format_prototype: ObjectId,
     /// `%Intl.Collator.prototype%`.
     pub collator_prototype: ObjectId,
+    /// `%Intl.PluralRules.prototype%`.
+    pub plural_rules_prototype: ObjectId,
 }
 
 impl Intrinsics {
@@ -296,6 +298,7 @@ impl Intrinsics {
             self.locale_prototype,
             self.list_format_prototype,
             self.collator_prototype,
+            self.plural_rules_prototype,
         ]);
         all
     }
@@ -419,6 +422,7 @@ impl Agent {
                 locale_prototype: placeholder,
                 list_format_prototype: placeholder,
                 collator_prototype: placeholder,
+                plural_rules_prototype: placeholder,
             },
             global_env: EnvId(0),
             realms: Vec::new(),
@@ -673,6 +677,7 @@ impl Agent {
             locale_prototype: object_prototype,
             list_format_prototype: object_prototype,
             collator_prototype: object_prototype,
+            plural_rules_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

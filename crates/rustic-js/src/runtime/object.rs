@@ -307,6 +307,8 @@ pub(crate) enum Internal {
     Locale(StringId),
     /// Resolved collation settings and the cached compare callback.
     Collator(Box<super::builtins::intl::collator::Collator>),
+    /// Locale data and digit options of Intl.PluralRules.
+    PluralRules(Box<super::builtins::intl::plural_rules::PluralRules>),
     /// The resolved locale and template set for Intl.ListFormat.
     ListFormat {
         locale: &'static str,

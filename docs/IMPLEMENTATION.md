@@ -1658,3 +1658,17 @@ that selection to 17,291 of 18,574. The five open Intl cases
 require `eor` and other locale tailorings, agreement with the locale
 preference methods, or `Intl.NumberFormat`. TD-107 describes the remaining
 collation work.
+
+
+## JS-08 — Intl.PluralRules
+
+`Intl.PluralRules` exposes `select`, `selectRange`, `resolvedOptions`,
+and `supportedLocalesOf`. Pinned CLDR 48 supplies cardinal and ordinal
+rules, cardinal range tables, and compact decimal scales. The selector
+evaluates decimal operands after rounding with the selected digit options.
+Regressions cover Arabic and Russian plurals, Portuguese regional rules,
+English ordinals, decimal rounding ties, BigInt and range selection.
+
+The selected Test262 Intl gate passes 440 of 446 files, including 52 of
+53 PluralRules files. The installed constructor and methods increase the
+64-bit standard-library heap report by 1,044 bytes.

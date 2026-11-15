@@ -3645,3 +3645,50 @@ fn intl_collator_validates_options_in_getter_order() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_plural_rules_uses_cldr_operands_and_range_data() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        const en = new Intl.PluralRules('en');
+        const ru = new Intl.PluralRules('ru');
+        const ar = new Intl.PluralRules('ar');
+        const pt = new Intl.PluralRules('pt-PT');
+        const ordinal = new Intl.PluralRules('en', {type: 'ordinal'});
+        const categories = ar.resolvedOptions().pluralCategories;
+        categories.join(',') === 'zero,one,two,few,many,other'
+            && [0, 1, 2, 3, 11, 100].map(x => ar.select(x)).join(',') === categories.join(',')
+            && [1, 2, 5, 1.2].map(x => ru.select(x)).join(',') === 'one,few,many,other'
+            && [1, 2, 3, 11, 21].map(x => ordinal.select(x)).join(',') === 'one,two,few,other,one'
+            && pt.select(0) === 'other' && new Intl.PluralRules('pt').select(0) === 'one'
+            && ru.select(1000000000000000000000001n) === 'one'
+            && ru.select('1000000000000000000000002') === 'few'
+            && ru.select('0x100000000000001c') === ru.select(0x100000000000001cn)
+            && en.selectRange(1, 1.00001) === 'one' && en.selectRange(1, 2) === 'other'
+            && ru.selectRange(2, 3) === 'few' && en.select(Infinity) === 'other';
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}
+
+#[test]
+fn intl_plural_rules_rounds_decimal_values_before_classifying() {
+    let mut agent = Agent::new().unwrap();
+    let script = r#"
+        const build = options => new Intl.PluralRules('en', options);
+        const fraction = build({minimumFractionDigits: 1});
+        const trim = build({minimumFractionDigits: 1, trailingZeroDisplay: 'stripIfInteger'});
+        const fixed = build({maximumFractionDigits: 0});
+        const even = build({maximumFractionDigits: 0, roundingMode: 'halfEven'});
+        const increment = build({maximumFractionDigits: 0, roundingIncrement: 2});
+        const significant = build({maximumSignificantDigits: 1});
+        const fr = new Intl.PluralRules('fr', {notation: 'compact'});
+        fraction.select(1) === 'other' && trim.select(1) === 'one'
+            && fixed.select(0.5) === 'one' && even.select(0.5) === 'other'
+            && fixed.select('0.49999999999999999999') === 'other'
+            && fixed.select('0.50000000000000000001') === 'one'
+            && increment.select(1) === 'other' && significant.select(1.2) === 'one'
+            && fr.select(1500000) === 'many';
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

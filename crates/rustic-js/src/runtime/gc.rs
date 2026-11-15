@@ -433,7 +433,7 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
-                Some(Internal::ListFormat { .. }) => {}
+                Some(Internal::ListFormat { .. } | Internal::PluralRules(_)) => {}
                 Some(Internal::Collator(collator)) => {
                     self.string(collator.locale);
                     self.value(collator.bound_compare);
@@ -529,6 +529,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::ImportRequest(request)) => request.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
             Some(Internal::Collator(collator)) => std::mem::size_of_val(&**collator),
+            Some(Internal::PluralRules(rules)) => std::mem::size_of_val(&**rules),
             Some(Internal::RegExp { matcher, .. }) => matcher.footprint(),
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()

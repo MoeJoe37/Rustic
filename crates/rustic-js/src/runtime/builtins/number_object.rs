@@ -316,7 +316,7 @@ fn significant(x: f64, count: i32) -> (Vec<u8>, i32) {
 }
 
 /// The shortest round-trip digits of the non-negative `x`.
-fn shortest_digits(x: f64) -> (Vec<u8>, i32) {
+pub(super) fn shortest_digits(x: f64) -> (Vec<u8>, i32) {
     if x == 0.0 {
         return (vec![0], 1);
     }

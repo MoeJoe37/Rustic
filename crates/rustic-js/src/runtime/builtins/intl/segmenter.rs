@@ -37,8 +37,8 @@ struct Segments {
 }
 
 /// A position in the boundaries of a [`Segments`].
+#[derive(Default)]
 struct SegmentIterator {
-    segments: Arc<Segments>,
     next: AtomicUsize,
 }
 
@@ -138,13 +138,22 @@ fn resolved_options(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Val
 /// The boundaries of `string` at `granularity`, as code unit offsets.
 fn find_boundaries(agent: &mut Agent, string: StringId, granularity: usize) -> JsResult<Segments> {
     let length = agent.heap.string_len(string);
-    // Code points, their offsets, flags and the boundary list.
+    let positions = length.checked_add(1).ok_or(OutOfMemory)?;
+    // Offsets are stored as u32 throughout the table.
+    u32::try_from(length).map_err(|_| OutOfMemory)?;
+    // Bound temporary storage before decoding or flattening the string.
+    let decoded = length
+        .checked_mul(size_of::<u16>() + size_of::<Properties>())
+        .ok_or(OutOfMemory)?;
+    let work = positions
+        .checked_mul(size_of::<u32>() + size_of::<bool>())
+        .ok_or(OutOfMemory)?;
     agent
         .heap
-        .charge(length.checked_mul(14).ok_or(OutOfMemory)?)?;
+        .charge(decoded.checked_add(work).ok_or(OutOfMemory)?)?;
     let units = agent.heap.string(string).to_units();
     let mut text: Vec<Properties> = Vec::with_capacity(length);
-    let mut offsets: Vec<u32> = Vec::with_capacity(length + 1);
+    let mut offsets: Vec<u32> = Vec::with_capacity(positions);
     let mut at = 0;
     while at < units.len() {
         agent.check_native_work()?;
@@ -167,16 +176,36 @@ fn find_boundaries(agent: &mut Agent, string: StringId, granularity: usize) -> J
         1 => segment::word_boundaries(&text),
         _ => segment::sentence_boundaries(&text),
     };
-    let mut boundaries = Vec::new();
-    let mut word_like = Vec::new();
-    for (index, flag) in flags.iter().enumerate() {
-        if *flag {
+    let count = flags.iter().filter(|&&flag| flag).count();
+    let word = granularity == 1;
+    let word_count = if word { count - 1 } else { 0 };
+    let bytes = count
+        .checked_mul(size_of::<u32>())
+        .and_then(|bytes| bytes.checked_add(word_count * size_of::<bool>()))
+        .ok_or(OutOfMemory)?;
+    // The owning service charges these allocations when it publishes them.
+    // Check room first, before reserving the tables.
+    if bytes
+        > agent
+            .heap
+            .byte_limit()
+            .saturating_sub(agent.heap.bytes_used())
+    {
+        return Err(OutOfMemory.into());
+    }
+    let mut boundaries = Vec::with_capacity(count);
+    let mut word_like = Vec::with_capacity(word_count);
+    let mut like = false;
+    for (index, flag) in flags.into_iter().enumerate() {
+        if flag {
+            if word && index > 0 {
+                word_like.push(like);
+            }
             boundaries.push(offsets[index]);
-            word_like.push(false);
+            like = false;
         }
-        let like = granularity == 1 && text.get(index).is_some_and(|code| code.word_like());
-        if let Some(last) = word_like.last_mut().filter(|_| like) {
-            *last = true;
+        if word && text.get(index).is_some_and(|code| code.word_like()) {
+            like = true;
         }
     }
     Ok(Segments {
@@ -193,21 +222,21 @@ fn segment_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
     };
     let string = agent.to_string(arg(args, 0))?;
     let segments = find_boundaries(agent, string, state.granularity)?;
-    let bytes = 5 * segments.boundaries.len();
+    let bytes = segments.boundaries.capacity() * size_of::<u32>()
+        + segments.word_like.capacity() * size_of::<bool>();
     let prototype = agent.intrinsics.intl[slot::SEGMENTS_PROTOTYPE];
-    let object = new_service(agent, prototype, Arc::new(segments), bytes)?;
+    let object = new_service(agent, prototype, segments, bytes)?;
     // The bound slot keeps the string alive.
     set_bound(agent, object, Value::string(string));
     Ok(Value::object(object))
 }
 
 fn this_segments(agent: &mut Agent, this: Value) -> JsResult<(Arc<Segments>, StringId)> {
-    if let (Some(state), Some(object)) = (
-        service::service::<Arc<Segments>>(agent, this),
-        this.as_object(),
-    ) {
+    if let (Some(state), Some(object)) =
+        (service::service::<Segments>(agent, this), this.as_object())
+    {
         if let Some(string) = bound(agent, object).as_string() {
-            return Ok((Arc::clone(&state), string));
+            return Ok((state, string));
         }
     }
     agent.type_error("expected a Segments object")
@@ -223,13 +252,14 @@ fn segment_data(
 ) -> JsResult<Value> {
     let start = segments.boundaries[index] as usize;
     let end = segments.boundaries[index + 1] as usize;
-    agent.heap.charge(2 * (end - start))?;
-    let units: Vec<u16> = agent
-        .heap
-        .string(string)
-        .units()
-        .skip(start)
-        .take(end - start)
+    let len = end - start;
+    for _ in 0..len.div_ceil(256) {
+        agent.check_native_work()?;
+    }
+    agent.heap.charge(len * size_of::<u16>())?;
+    let source = agent.heap.string(string);
+    let units: Vec<u16> = (start..end)
+        .map(|at| source.unit(at).expect("segment boundary within input"))
         .collect();
     let text = agent.string_from(JsStr::from_units(&units))?;
     let object = agent.new_object()?;
@@ -263,31 +293,28 @@ fn containing(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value>
 
 /// `%IntlSegmentsPrototype% [ %Symbol.iterator% ] ()` (§19.5.2.2).
 fn iterate(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    let (segments, string) = this_segments(agent, this)?;
+    this_segments(agent, this)?;
     let prototype = agent.intrinsics.intl[slot::SEGMENT_ITERATOR_PROTOTYPE];
-    let state = SegmentIterator {
-        segments,
-        next: AtomicUsize::new(0),
-    };
-    let object = new_service(agent, prototype, state, 0)?;
-    set_bound(agent, object, Value::string(string));
+    let object = new_service(agent, prototype, SegmentIterator::default(), 0)?;
+    // Trace the Segments owner so its shared boundary table remains charged
+    // even when the only remaining reference is through an iterator.
+    set_bound(agent, object, this);
     Ok(Value::object(object))
 }
 
 /// `%IntlSegmentIteratorPrototype%.next()` (§19.6.2.1).
 fn next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    let state = service::service::<SegmentIterator>(agent, this);
-    let string = this
-        .as_object()
-        .and_then(|object| bound(agent, object).as_string());
-    let (Some(state), Some(string)) = (state, string) else {
+    let Some(state) = service::service::<SegmentIterator>(agent, this) else {
         return agent.type_error("expected a Segmenter String Iterator");
     };
+    let owner = bound(agent, this.as_object().expect("segment iterator object"));
+    let (segments, string) = this_segments(agent, owner)?;
     let index = state.next.load(Ordering::Relaxed);
-    if index + 1 >= state.segments.boundaries.len() {
+    if index + 1 >= segments.boundaries.len() {
         return iterator_result(agent, Value::UNDEFINED, true);
     }
+    let data = segment_data(agent, &segments, string, index)?;
+    let result = iterator_result(agent, data, false)?;
     state.next.store(index + 1, Ordering::Relaxed);
-    let data = segment_data(agent, &state.segments, string, index)?;
-    iterator_result(agent, data, false)
+    Ok(result)
 }

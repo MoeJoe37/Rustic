@@ -186,6 +186,53 @@ fn segmentation_work_respects_the_step_budget() {
     );
 }
 
+#[test]
+fn segment_iterators_keep_their_boundary_tables_charged() {
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("const input = 'x'.repeat(8192); const segmenter = new Intl.Segmenter();")
+        .expect("segmenter setup");
+    let baseline = agent.collect_garbage(Roots::default()).bytes_after;
+    agent
+        .evaluate("let iterator = segmenter.segment(input)[Symbol.iterator]();")
+        .expect("segment iterator setup");
+    let retained = agent.collect_garbage(Roots::default()).bytes_after;
+    assert!(retained >= baseline + 8192 * size_of::<u32>());
+    assert_eq!(text(&mut agent, "iterator.next().value.segment"), "x");
+    agent
+        .evaluate("iterator = undefined;")
+        .expect("drop iterator");
+    let released = agent.collect_garbage(Roots::default()).bytes_after;
+    assert!(retained.saturating_sub(released) >= 8192 * size_of::<u32>());
+}
+
+#[test]
+fn cancelled_segment_copy_preserves_the_iterator_position() {
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate(
+            r#"const word = 'a' + '\u0301'.repeat(8192);
+       const segments = new Intl.Segmenter().segment(word + 'b');
+       const iterator = segments[Symbol.iterator]();"#,
+        )
+        .expect("segment iterator setup");
+    for source in ["segments.containing(4000)", "iterator.next()"] {
+        agent.set_step_budget(Some(8));
+        assert_eq!(
+            agent.evaluate(source),
+            Err(EvalError::Cancelled),
+            "{source}"
+        );
+        agent.set_step_budget(None);
+    }
+    assert_eq!(
+        text(&mut agent, "iterator.next().value.segment === word"),
+        "true"
+    );
+    assert_eq!(text(&mut agent, "iterator.next().value.segment"), "b");
+    assert_eq!(text(&mut agent, "iterator.next().done"), "true");
+}
+
 // ---- ropes ----------------------------------------------------------------
 
 #[test]

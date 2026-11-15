@@ -1252,3 +1252,8 @@ work counted per code unit and the boundary list charged to the heap.
 ideograph or a digit. TD-121 records what the default rules leave out.
 
 All 79 `Segmenter` files of the pinned selection pass.
+
+Iterators trace the owning Segments object so shared boundary storage remains
+charged until it is unreachable. Segment extraction reads the requested UTF-16
+range directly and checks the execution budget before copying. If a copy is
+cancelled, the next call retries the same segment.

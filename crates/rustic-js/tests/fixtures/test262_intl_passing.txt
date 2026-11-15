@@ -1,6 +1,6 @@
 # Test262 Intl locale identifiers, Locale objects, list formatting and casing (JS-08).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 313 pass, 5 fail, 0 skipped (modules, proposals).
+# 315 pass, 3 fail, 0 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 Intl/getCanonicalLocales/Locale-object.js
 Intl/getCanonicalLocales/canonicalized-tags.js
@@ -53,6 +53,7 @@ ListFormat/constructor/constructor/options-throwing-getters.js
 ListFormat/constructor/constructor/options-type-invalid.js
 ListFormat/constructor/constructor/options-type-valid.js
 ListFormat/constructor/constructor/options-undefined.js
+ListFormat/constructor/constructor/proto-from-ctor-realm.js
 ListFormat/constructor/constructor/subclassing.js
 ListFormat/constructor/length.js
 ListFormat/constructor/name.js
@@ -179,6 +180,7 @@ Locale/likely-subtags-grandfathered.js
 Locale/likely-subtags.js
 Locale/name.js
 Locale/prop-desc.js
+Locale/proto-from-ctor-realm.js
 Locale/prototype/baseName/branding.js
 Locale/prototype/baseName/name.js
 Locale/prototype/baseName/prop-desc.js

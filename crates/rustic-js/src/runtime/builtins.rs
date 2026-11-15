@@ -604,5 +604,20 @@ pub(crate) fn prototype_from_new_target(
     };
     let key = PropertyKey::String(agent.names.prototype);
     let prototype = agent.get(target, key)?;
-    Ok(prototype.as_object().unwrap_or(default))
+    match prototype.as_object() {
+        Some(prototype) => Ok(prototype),
+        None => intrinsic_in_function_realm(agent, target, default),
+    }
+}
+
+/// The fallback of `GetPrototypeFromConstructor` (§10.1.14 steps 4-5):
+/// the intrinsic that `default` is in the running realm, taken from the
+/// realm of `constructor`.
+pub(crate) fn intrinsic_in_function_realm(
+    agent: &mut Agent,
+    constructor: ObjectId,
+    default: ObjectId,
+) -> JsResult<ObjectId> {
+    let realm = agent.function_realm(constructor)?;
+    Ok(agent.intrinsic_in_realm(default, realm))
 }

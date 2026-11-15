@@ -1556,6 +1556,19 @@ the standard-library heap report by 286 bytes. The module gate passes all 696
 executed files, with 121 proposal skips. The immutable accessor also adds
 four passing built-in cases.
 
+## JS-06 — Realms
+
+An agent can hold several realms, each with its own global object and
+intrinsics; symbols stay with the agent. Objects record their realm in two
+bytes of former padding, and a call into another realm swaps the running
+intrinsics and global environment in and back out. Missing constructor
+prototypes fall back to the intrinsic of the realm of `newTarget`, found by
+the offset of the object in its realm's creation order. `$262.createRealm`
+and `Error.isError` let 189 more Test262 files pass. `test/language` is at
+21,939 of 22,427 files run. `Error.isError` adds 215 bytes to the
+standard-library heap report. A realm lives as long as its agent (TD-118). See
+[JS.md](JS.md#realms-js-06).
+
 ## JS-08 — Locale identifiers and language-sensitive case conversion
 
 `Intl.getCanonicalLocales` uses bounded locale-list traversal and pinned

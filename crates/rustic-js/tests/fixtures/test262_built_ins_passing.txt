@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17123 pass, 1451 fail, 111 skipped (modules, proposals).
+# 17290 pass, 1284 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -19,6 +19,7 @@ AggregateError/newtarget-proto-fallback.js
 AggregateError/newtarget-proto.js
 AggregateError/order-of-args-evaluation.js
 AggregateError/prop-desc.js
+AggregateError/proto-from-ctor-realm.js
 AggregateError/proto.js
 AggregateError/prototype/constructor.js
 AggregateError/prototype/errors-absent-on-prototype.js
@@ -104,6 +105,7 @@ Array/from/mapfn-is-not-callable-typeerror.js
 Array/from/mapfn-is-symbol-throws.js
 Array/from/mapfn-throws-exception.js
 Array/from/not-a-constructor.js
+Array/from/proto-from-ctor-realm.js
 Array/from/source-array-boundary.js
 Array/from/source-object-constructor.js
 Array/from/source-object-iterator-1.js
@@ -172,6 +174,7 @@ Array/length/S15.4.5.2_A3_T4.js
 Array/length/define-own-prop-length-error.js
 Array/length/define-own-prop-length-no-value-order.js
 Array/length/define-own-prop-length-overflow-order.js
+Array/length/define-own-prop-length-overflow-realm.js
 Array/name.js
 Array/of/construct-this-with-the-number-of-arguments.js
 Array/of/creates-a-new-array-from-arguments.js
@@ -181,6 +184,7 @@ Array/of/length.js
 Array/of/name.js
 Array/of/not-a-constructor.js
 Array/of/of.js
+Array/of/proto-from-ctor-realm.js
 Array/of/return-a-custom-instance.js
 Array/of/return-a-new-array-object.js
 Array/of/return-abrupt-from-contructor.js
@@ -192,6 +196,9 @@ Array/prop-desc.js
 Array/property-cast-boolean-primitive.js
 Array/property-cast-nan-infinity.js
 Array/property-cast-number.js
+Array/proto-from-ctor-realm-one.js
+Array/proto-from-ctor-realm-two.js
+Array/proto-from-ctor-realm-zero.js
 Array/proto.js
 Array/prototype/Symbol.iterator.js
 Array/prototype/Symbol.iterator/not-a-constructor.js
@@ -254,6 +261,8 @@ Array/prototype/concat/call-with-boolean.js
 Array/prototype/concat/create-ctor-non-object.js
 Array/prototype/concat/create-ctor-poisoned.js
 Array/prototype/concat/create-non-array.js
+Array/prototype/concat/create-proto-from-ctor-realm-array.js
+Array/prototype/concat/create-proto-from-ctor-realm-non-array.js
 Array/prototype/concat/create-proxy.js
 Array/prototype/concat/create-revoked-proxy.js
 Array/prototype/concat/create-species-abrupt.js
@@ -795,6 +804,8 @@ Array/prototype/filter/callbackfn-resize-arraybuffer.js
 Array/prototype/filter/create-ctor-non-object.js
 Array/prototype/filter/create-ctor-poisoned.js
 Array/prototype/filter/create-non-array.js
+Array/prototype/filter/create-proto-from-ctor-realm-array.js
+Array/prototype/filter/create-proto-from-ctor-realm-non-array.js
 Array/prototype/filter/create-proxy.js
 Array/prototype/filter/create-revoked-proxy.js
 Array/prototype/filter/create-species-abrupt.js
@@ -1801,6 +1812,8 @@ Array/prototype/map/create-ctor-non-object.js
 Array/prototype/map/create-ctor-poisoned.js
 Array/prototype/map/create-non-array-invalid-len.js
 Array/prototype/map/create-non-array.js
+Array/prototype/map/create-proto-from-ctor-realm-array.js
+Array/prototype/map/create-proto-from-ctor-realm-non-array.js
 Array/prototype/map/create-proxy.js
 Array/prototype/map/create-revoked-proxy.js
 Array/prototype/map/create-species-abrupt.js
@@ -2477,6 +2490,8 @@ Array/prototype/slice/create-ctor-non-object.js
 Array/prototype/slice/create-ctor-poisoned.js
 Array/prototype/slice/create-non-array-invalid-len.js
 Array/prototype/slice/create-non-array.js
+Array/prototype/slice/create-proto-from-ctor-realm-array.js
+Array/prototype/slice/create-proto-from-ctor-realm-non-array.js
 Array/prototype/slice/create-proxied-array-invalid-len.js
 Array/prototype/slice/create-proxy.js
 Array/prototype/slice/create-revoked-proxy.js
@@ -2825,6 +2840,8 @@ Array/prototype/splice/create-ctor-non-object.js
 Array/prototype/splice/create-ctor-poisoned.js
 Array/prototype/splice/create-non-array-invalid-len.js
 Array/prototype/splice/create-non-array.js
+Array/prototype/splice/create-proto-from-ctor-realm-array.js
+Array/prototype/splice/create-proto-from-ctor-realm-non-array.js
 Array/prototype/splice/create-proxy.js
 Array/prototype/splice/create-revoked-proxy.js
 Array/prototype/splice/create-species-abrupt.js
@@ -3037,6 +3054,7 @@ ArrayBuffer/options-maxbytelength-poisoned.js
 ArrayBuffer/options-maxbytelength-undefined.js
 ArrayBuffer/options-non-object.js
 ArrayBuffer/prop-desc.js
+ArrayBuffer/proto-from-ctor-realm.js
 ArrayBuffer/prototype-from-newtarget.js
 ArrayBuffer/prototype/Symbol.toStringTag.js
 ArrayBuffer/prototype/byteLength/detached-buffer.js
@@ -3274,6 +3292,7 @@ AsyncFunction/instance-length.js
 AsyncFunction/instance-prototype-property.js
 AsyncFunction/is-a-constructor.js
 AsyncFunction/is-not-a-global.js
+AsyncFunction/proto-from-ctor-realm.js
 AsyncGeneratorFunction/extensibility.js
 AsyncGeneratorFunction/has-instance.js
 AsyncGeneratorFunction/instance-await-expr-in-param.js
@@ -3289,6 +3308,8 @@ AsyncGeneratorFunction/invoked-as-function-single-argument.js
 AsyncGeneratorFunction/is-a-constructor.js
 AsyncGeneratorFunction/length.js
 AsyncGeneratorFunction/name.js
+AsyncGeneratorFunction/proto-from-ctor-realm-prototype.js
+AsyncGeneratorFunction/proto-from-ctor-realm.js
 AsyncGeneratorFunction/prototype/Symbol.toStringTag.js
 AsyncGeneratorFunction/prototype/constructor.js
 AsyncGeneratorFunction/prototype/extensibility.js
@@ -3681,6 +3702,7 @@ BigInt/prototype/toString/radix-tointegerorinfinity-throws-symbol.js
 BigInt/prototype/toString/radix-tointegerorinfinity-throws-toprimitive-or-bigint.js
 BigInt/prototype/toString/string-is-code-units-of-decimal-digits-only.js
 BigInt/prototype/toString/thisbigintvalue-not-valid-throws.js
+BigInt/prototype/valueOf/cross-realm.js
 BigInt/prototype/valueOf/length.js
 BigInt/prototype/valueOf/name.js
 BigInt/prototype/valueOf/not-a-constructor.js
@@ -3714,6 +3736,7 @@ Boolean/S9.2_A5_T3.js
 Boolean/S9.2_A6_T1.js
 Boolean/is-a-constructor.js
 Boolean/prop-desc.js
+Boolean/proto-from-ctor-realm.js
 Boolean/prototype/S15.6.3.1_A1.js
 Boolean/prototype/S15.6.3.1_A2.js
 Boolean/prototype/S15.6.3.1_A3.js
@@ -3785,6 +3808,8 @@ DataView/negative-byteoffset-throws-sab.js
 DataView/negative-byteoffset-throws.js
 DataView/newtarget-undefined-throws-sab.js
 DataView/newtarget-undefined-throws.js
+DataView/proto-from-ctor-realm-sab.js
+DataView/proto-from-ctor-realm.js
 DataView/proto.js
 DataView/prototype.js
 DataView/prototype/Symbol.toStringTag.js
@@ -4376,6 +4401,9 @@ Date/parse/without-utc-offset.js
 Date/parse/year-zero.js
 Date/parse/zero.js
 Date/prop-desc.js
+Date/proto-from-ctor-realm-one.js
+Date/proto-from-ctor-realm-two.js
+Date/proto-from-ctor-realm-zero.js
 Date/prototype/S15.9.5_A01_T1.js
 Date/prototype/S15.9.5_A02_T1.js
 Date/prototype/S15.9.5_A03_T1.js
@@ -4889,10 +4917,23 @@ Error/error-message-tostring-toprimitive.js
 Error/instance-prototype.js
 Error/internal-prototype.js
 Error/is-a-constructor.js
+Error/isError/bigints.js
+Error/isError/error-subclass.js
+Error/isError/errors-other-realm.js
+Error/isError/errors.js
+Error/isError/fake-errors.js
+Error/isError/is-a-constructor.js
+Error/isError/name.js
+Error/isError/non-error-objects-other-realm.js
+Error/isError/non-error-objects.js
+Error/isError/primitives.js
+Error/isError/prop-desc.js
+Error/isError/symbols.js
 Error/length.js
 Error/message_property.js
 Error/name.js
 Error/prop-desc.js
+Error/proto-from-ctor-realm.js
 Error/prototype/S15.11.3.1_A1_T1.js
 Error/prototype/S15.11.3.1_A2_T1.js
 Error/prototype/S15.11.3.1_A3_T1.js
@@ -4934,6 +4975,7 @@ FinalizationRegistry/length.js
 FinalizationRegistry/name.js
 FinalizationRegistry/newtarget-prototype-is-not-object.js
 FinalizationRegistry/prop-desc.js
+FinalizationRegistry/proto-from-ctor-realm.js
 FinalizationRegistry/proto.js
 FinalizationRegistry/prototype-from-newtarget-abrupt.js
 FinalizationRegistry/prototype-from-newtarget-custom.js
@@ -5140,9 +5182,16 @@ Function/S15.3_A3_T5.js
 Function/S15.3_A3_T6.js
 Function/StrictFunction_reservedwords_with.js
 Function/StrictFunction_restricted-properties.js
+Function/call-bind-this-realm-undef.js
+Function/call-bind-this-realm-value.js
 Function/instance-name.js
+Function/internals/Call/class-ctor-realm.js
 Function/internals/Call/class-ctor.js
+Function/internals/Construct/base-ctor-revoked-proxy-realm.js
+Function/internals/Construct/base-ctor-revoked-proxy.js
+Function/internals/Construct/derived-return-val-realm.js
 Function/internals/Construct/derived-return-val.js
+Function/internals/Construct/derived-this-uninitialized-realm.js
 Function/internals/Construct/derived-this-uninitialized.js
 Function/is-a-constructor.js
 Function/length/15.3.3.2-1.js
@@ -5161,6 +5210,8 @@ Function/length/S15.3.5.1_A4_T3.js
 Function/private-identifiers-not-empty.js
 Function/prop-desc.js
 Function/property-order.js
+Function/proto-from-ctor-realm-prototype.js
+Function/proto-from-ctor-realm.js
 Function/prototype/S15.3.3.1_A1.js
 Function/prototype/S15.3.3.1_A2.js
 Function/prototype/S15.3.3.1_A3.js
@@ -5224,6 +5275,7 @@ Function/prototype/apply/S15.3.4.3_A8_T3.js
 Function/prototype/apply/S15.3.4.3_A8_T4.js
 Function/prototype/apply/S15.3.4.3_A8_T5.js
 Function/prototype/apply/S15.3.4.3_A8_T6.js
+Function/prototype/apply/argarray-not-object-realm.js
 Function/prototype/apply/argarray-not-object.js
 Function/prototype/apply/get-index-abrupt.js
 Function/prototype/apply/get-length-abrupt.js
@@ -5231,6 +5283,7 @@ Function/prototype/apply/length.js
 Function/prototype/apply/name.js
 Function/prototype/apply/not-a-constructor.js
 Function/prototype/apply/resizable-buffer.js
+Function/prototype/apply/this-not-callable-realm.js
 Function/prototype/apply/this-not-callable.js
 Function/prototype/arguments/prop-desc.js
 Function/prototype/bind/15.3.4.5-0-1.js
@@ -5314,6 +5367,8 @@ Function/prototype/bind/S15.3.4.5_A2.js
 Function/prototype/bind/S15.3.4.5_A3.js
 Function/prototype/bind/S15.3.4.5_A4.js
 Function/prototype/bind/S15.3.4.5_A5.js
+Function/prototype/bind/get-fn-realm-recursive.js
+Function/prototype/bind/get-fn-realm.js
 Function/prototype/bind/instance-construct-newtarget-boundtarget-bound.js
 Function/prototype/bind/instance-construct-newtarget-boundtarget.js
 Function/prototype/bind/instance-construct-newtarget-self-new.js
@@ -5330,6 +5385,7 @@ Function/prototype/bind/instance-name.js
 Function/prototype/bind/length.js
 Function/prototype/bind/name.js
 Function/prototype/bind/not-a-constructor.js
+Function/prototype/bind/proto-from-ctor-realm.js
 Function/prototype/call/15.3.4.4-1-s.js
 Function/prototype/call/15.3.4.4-2-s.js
 Function/prototype/call/15.3.4.4-3-s.js
@@ -5478,6 +5534,8 @@ GeneratorFunction/invoked-as-function-single-argument.js
 GeneratorFunction/is-a-constructor.js
 GeneratorFunction/length.js
 GeneratorFunction/name.js
+GeneratorFunction/proto-from-ctor-realm-prototype.js
+GeneratorFunction/proto-from-ctor-realm.js
 GeneratorFunction/prototype/Symbol.toStringTag.js
 GeneratorFunction/prototype/constructor.js
 GeneratorFunction/prototype/extensibility.js
@@ -5609,6 +5667,7 @@ Iterator/length.js
 Iterator/name.js
 Iterator/newtarget-or-active-function-object.js
 Iterator/prop-desc.js
+Iterator/proto-from-ctor-realm.js
 Iterator/proto.js
 Iterator/prototype/Symbol.iterator/is-function.js
 Iterator/prototype/Symbol.iterator/length.js
@@ -6106,6 +6165,7 @@ JSON/stringify/replacer-array-empty.js
 JSON/stringify/replacer-array-number-object.js
 JSON/stringify/replacer-array-number.js
 JSON/stringify/replacer-array-order.js
+JSON/stringify/replacer-array-proxy-revoked-realm.js
 JSON/stringify/replacer-array-proxy-revoked.js
 JSON/stringify/replacer-array-proxy.js
 JSON/stringify/replacer-array-string-object.js
@@ -6133,6 +6193,7 @@ JSON/stringify/value-array-abrupt.js
 JSON/stringify/value-array-circular.js
 JSON/stringify/value-array-proxy-revoked.js
 JSON/stringify/value-array-proxy.js
+JSON/stringify/value-bigint-cross-realm.js
 JSON/stringify/value-bigint-order.js
 JSON/stringify/value-bigint-replacer.js
 JSON/stringify/value-bigint-tojson-receiver.js
@@ -6203,6 +6264,7 @@ Map/name.js
 Map/newtarget.js
 Map/properties-of-map-instances.js
 Map/properties-of-the-map-prototype-object.js
+Map/proto-from-ctor-realm.js
 Map/prototype-of-map.js
 Map/prototype/Symbol.iterator.js
 Map/prototype/Symbol.iterator/not-a-constructor.js
@@ -6697,6 +6759,7 @@ NativeErrors/EvalError/is-error-object.js
 NativeErrors/EvalError/length.js
 NativeErrors/EvalError/name.js
 NativeErrors/EvalError/prop-desc.js
+NativeErrors/EvalError/proto-from-ctor-realm.js
 NativeErrors/EvalError/proto.js
 NativeErrors/EvalError/prototype.js
 NativeErrors/EvalError/prototype/constructor.js
@@ -6711,6 +6774,7 @@ NativeErrors/RangeError/is-error-object.js
 NativeErrors/RangeError/length.js
 NativeErrors/RangeError/name.js
 NativeErrors/RangeError/prop-desc.js
+NativeErrors/RangeError/proto-from-ctor-realm.js
 NativeErrors/RangeError/proto.js
 NativeErrors/RangeError/prototype.js
 NativeErrors/RangeError/prototype/constructor.js
@@ -6725,6 +6789,7 @@ NativeErrors/ReferenceError/is-error-object.js
 NativeErrors/ReferenceError/length.js
 NativeErrors/ReferenceError/name.js
 NativeErrors/ReferenceError/prop-desc.js
+NativeErrors/ReferenceError/proto-from-ctor-realm.js
 NativeErrors/ReferenceError/proto.js
 NativeErrors/ReferenceError/prototype.js
 NativeErrors/ReferenceError/prototype/constructor.js
@@ -6739,6 +6804,7 @@ NativeErrors/SyntaxError/is-error-object.js
 NativeErrors/SyntaxError/length.js
 NativeErrors/SyntaxError/name.js
 NativeErrors/SyntaxError/prop-desc.js
+NativeErrors/SyntaxError/proto-from-ctor-realm.js
 NativeErrors/SyntaxError/proto.js
 NativeErrors/SyntaxError/prototype.js
 NativeErrors/SyntaxError/prototype/constructor.js
@@ -6753,6 +6819,7 @@ NativeErrors/TypeError/is-error-object.js
 NativeErrors/TypeError/length.js
 NativeErrors/TypeError/name.js
 NativeErrors/TypeError/prop-desc.js
+NativeErrors/TypeError/proto-from-ctor-realm.js
 NativeErrors/TypeError/proto.js
 NativeErrors/TypeError/prototype.js
 NativeErrors/TypeError/prototype/constructor.js
@@ -6767,6 +6834,7 @@ NativeErrors/URIError/is-error-object.js
 NativeErrors/URIError/length.js
 NativeErrors/URIError/name.js
 NativeErrors/URIError/prop-desc.js
+NativeErrors/URIError/proto-from-ctor-realm.js
 NativeErrors/URIError/proto.js
 NativeErrors/URIError/prototype.js
 NativeErrors/URIError/prototype/constructor.js
@@ -6912,6 +6980,7 @@ Number/parseFloat/not-a-constructor.js
 Number/parseInt.js
 Number/parseInt/not-a-constructor.js
 Number/prop-desc.js
+Number/proto-from-ctor-realm.js
 Number/prototype/15.7.3.1-2.js
 Number/prototype/S15.7.3.1_A2_T1.js
 Number/prototype/S15.7.3.1_A2_T2.js
@@ -10135,6 +10204,7 @@ Object/preventExtensions/symbol-object-contains-symbol-properties-strict.js
 Object/preventExtensions/throws-when-false.js
 Object/prop-desc.js
 Object/property-order.js
+Object/proto-from-ctor-realm.js
 Object/prototype/15.2.3.1.js
 Object/prototype/S15.2.3.1_A1.js
 Object/prototype/S15.2.3.1_A2.js
@@ -10777,6 +10847,7 @@ Promise/length.js
 Promise/name.js
 Promise/promise.js
 Promise/property-order.js
+Promise/proto-from-ctor-realm.js
 Promise/prototype/S25.4.4.2_A1.1_T1.js
 Promise/prototype/S25.4.5_A3.1_T1.js
 Promise/prototype/Symbol.toStringTag.js
@@ -11096,33 +11167,47 @@ Promise/withResolvers/ctx-non-object.js
 Promise/withResolvers/promise.js
 Promise/withResolvers/resolvers.js
 Promise/withResolvers/result.js
+Proxy/apply/arguments-realm.js
 Proxy/apply/call-parameters.js
 Proxy/apply/call-result.js
+Proxy/apply/null-handler-realm.js
 Proxy/apply/null-handler.js
 Proxy/apply/return-abrupt.js
 Proxy/apply/trap-is-missing-target-is-proxy.js
+Proxy/apply/trap-is-not-callable-realm.js
 Proxy/apply/trap-is-not-callable.js
 Proxy/apply/trap-is-null-target-is-proxy.js
 Proxy/apply/trap-is-null.js
 Proxy/apply/trap-is-undefined-no-property.js
 Proxy/apply/trap-is-undefined-target-is-proxy.js
 Proxy/apply/trap-is-undefined.js
+Proxy/construct/arguments-realm.js
 Proxy/construct/call-parameters-new-target.js
 Proxy/construct/call-parameters.js
 Proxy/construct/call-result.js
+Proxy/construct/null-handler-realm.js
 Proxy/construct/null-handler.js
 Proxy/construct/return-is-abrupt.js
+Proxy/construct/return-not-object-throws-boolean-realm.js
 Proxy/construct/return-not-object-throws-boolean.js
+Proxy/construct/return-not-object-throws-null-realm.js
 Proxy/construct/return-not-object-throws-null.js
+Proxy/construct/return-not-object-throws-number-realm.js
 Proxy/construct/return-not-object-throws-number.js
+Proxy/construct/return-not-object-throws-string-realm.js
 Proxy/construct/return-not-object-throws-string.js
+Proxy/construct/return-not-object-throws-symbol-realm.js
 Proxy/construct/return-not-object-throws-symbol.js
+Proxy/construct/return-not-object-throws-undefined-realm.js
 Proxy/construct/return-not-object-throws-undefined.js
 Proxy/construct/trap-is-missing-target-is-proxy.js
+Proxy/construct/trap-is-not-callable-realm.js
 Proxy/construct/trap-is-not-callable.js
 Proxy/construct/trap-is-null-target-is-proxy.js
 Proxy/construct/trap-is-null.js
 Proxy/construct/trap-is-undefined-no-property.js
+Proxy/construct/trap-is-undefined-proto-from-cross-realm-newtarget.js
+Proxy/construct/trap-is-undefined-proto-from-newtarget-realm.js
 Proxy/construct/trap-is-undefined-target-is-proxy.js
 Proxy/construct/trap-is-undefined.js
 Proxy/constructor.js
@@ -11144,16 +11229,24 @@ Proxy/create-target-not-object-throw-string.js
 Proxy/create-target-not-object-throw-symbol.js
 Proxy/create-target-not-object-throw-undefined.js
 Proxy/defineProperty/call-parameters.js
+Proxy/defineProperty/desc-realm.js
+Proxy/defineProperty/null-handler-realm.js
 Proxy/defineProperty/null-handler.js
 Proxy/defineProperty/return-boolean-and-define-target.js
 Proxy/defineProperty/return-is-abrupt.js
+Proxy/defineProperty/targetdesc-configurable-desc-not-configurable-realm.js
 Proxy/defineProperty/targetdesc-configurable-desc-not-configurable.js
+Proxy/defineProperty/targetdesc-not-compatible-descriptor-not-configurable-target-realm.js
 Proxy/defineProperty/targetdesc-not-compatible-descriptor-not-configurable-target.js
+Proxy/defineProperty/targetdesc-not-compatible-descriptor-realm.js
 Proxy/defineProperty/targetdesc-not-compatible-descriptor.js
 Proxy/defineProperty/targetdesc-not-configurable-writable-desc-not-writable.js
+Proxy/defineProperty/targetdesc-undefined-not-configurable-descriptor-realm.js
 Proxy/defineProperty/targetdesc-undefined-not-configurable-descriptor.js
+Proxy/defineProperty/targetdesc-undefined-target-is-not-extensible-realm.js
 Proxy/defineProperty/targetdesc-undefined-target-is-not-extensible.js
 Proxy/defineProperty/trap-is-missing-target-is-proxy.js
+Proxy/defineProperty/trap-is-not-callable-realm.js
 Proxy/defineProperty/trap-is-not-callable.js
 Proxy/defineProperty/trap-is-null-target-is-proxy.js
 Proxy/defineProperty/trap-is-undefined-target-is-proxy.js
@@ -11170,6 +11263,7 @@ Proxy/deleteProperty/targetdesc-is-configurable-target-is-not-extensible.js
 Proxy/deleteProperty/targetdesc-is-not-configurable.js
 Proxy/deleteProperty/targetdesc-is-undefined-return-true.js
 Proxy/deleteProperty/trap-is-missing-target-is-proxy.js
+Proxy/deleteProperty/trap-is-not-callable-realm.js
 Proxy/deleteProperty/trap-is-not-callable.js
 Proxy/deleteProperty/trap-is-null-target-is-proxy.js
 Proxy/deleteProperty/trap-is-undefined-not-strict.js
@@ -11177,6 +11271,8 @@ Proxy/deleteProperty/trap-is-undefined-strict.js
 Proxy/deleteProperty/trap-is-undefined-target-is-proxy.js
 Proxy/enumerate/removed-does-not-trigger.js
 Proxy/function-prototype.js
+Proxy/get-fn-realm-recursive.js
+Proxy/get-fn-realm.js
 Proxy/get/accessor-get-is-undefined-throws.js
 Proxy/get/call-parameters.js
 Proxy/get/not-same-value-configurable-false-writable-false-throws.js
@@ -11189,6 +11285,7 @@ Proxy/get/return-trap-result-configurable-true-writable-false.js
 Proxy/get/return-trap-result-same-value-configurable-false-writable-false.js
 Proxy/get/return-trap-result.js
 Proxy/get/trap-is-missing-target-is-proxy.js
+Proxy/get/trap-is-not-callable-realm.js
 Proxy/get/trap-is-not-callable.js
 Proxy/get/trap-is-null-target-is-proxy.js
 Proxy/get/trap-is-undefined-no-property.js
@@ -11201,6 +11298,7 @@ Proxy/getOwnPropertyDescriptor/result-is-undefined-target-is-not-extensible.js
 Proxy/getOwnPropertyDescriptor/result-is-undefined-targetdesc-is-not-configurable.js
 Proxy/getOwnPropertyDescriptor/result-is-undefined-targetdesc-is-undefined.js
 Proxy/getOwnPropertyDescriptor/result-is-undefined.js
+Proxy/getOwnPropertyDescriptor/result-type-is-not-object-nor-undefined-realm.js
 Proxy/getOwnPropertyDescriptor/result-type-is-not-object-nor-undefined.js
 Proxy/getOwnPropertyDescriptor/resultdesc-is-invalid-descriptor.js
 Proxy/getOwnPropertyDescriptor/resultdesc-is-not-configurable-not-writable-targetdesc-is-writable.js
@@ -11210,6 +11308,7 @@ Proxy/getOwnPropertyDescriptor/resultdesc-return-configurable.js
 Proxy/getOwnPropertyDescriptor/resultdesc-return-not-configurable.js
 Proxy/getOwnPropertyDescriptor/return-is-abrupt.js
 Proxy/getOwnPropertyDescriptor/trap-is-missing-target-is-proxy.js
+Proxy/getOwnPropertyDescriptor/trap-is-not-callable-realm.js
 Proxy/getOwnPropertyDescriptor/trap-is-not-callable.js
 Proxy/getOwnPropertyDescriptor/trap-is-null-target-is-proxy.js
 Proxy/getOwnPropertyDescriptor/trap-is-undefined-target-is-proxy.js
@@ -11223,6 +11322,7 @@ Proxy/getPrototypeOf/not-extensible-same-proto.js
 Proxy/getPrototypeOf/null-handler.js
 Proxy/getPrototypeOf/return-is-abrupt.js
 Proxy/getPrototypeOf/trap-is-missing-target-is-proxy.js
+Proxy/getPrototypeOf/trap-is-not-callable-realm.js
 Proxy/getPrototypeOf/trap-is-not-callable.js
 Proxy/getPrototypeOf/trap-is-null-target-is-proxy.js
 Proxy/getPrototypeOf/trap-is-undefined-target-is-proxy.js
@@ -11251,6 +11351,7 @@ Proxy/has/return-true-target-prop-exists-using-with.js
 Proxy/has/return-true-target-prop-exists.js
 Proxy/has/return-true-without-same-target-prop.js
 Proxy/has/trap-is-missing-target-is-proxy.js
+Proxy/has/trap-is-not-callable-realm.js
 Proxy/has/trap-is-not-callable-using-with.js
 Proxy/has/trap-is-not-callable.js
 Proxy/has/trap-is-null-target-is-proxy.js
@@ -11264,6 +11365,7 @@ Proxy/isExtensible/return-is-boolean.js
 Proxy/isExtensible/return-is-different-from-target.js
 Proxy/isExtensible/return-same-result-from-target.js
 Proxy/isExtensible/trap-is-missing-target-is-proxy.js
+Proxy/isExtensible/trap-is-not-callable-realm.js
 Proxy/isExtensible/trap-is-not-callable.js
 Proxy/isExtensible/trap-is-null-target-is-proxy.js
 Proxy/isExtensible/trap-is-undefined-target-is-proxy.js
@@ -11283,6 +11385,7 @@ Proxy/ownKeys/return-all-non-configurable-keys.js
 Proxy/ownKeys/return-duplicate-entries-throws.js
 Proxy/ownKeys/return-duplicate-symbol-entries-throws.js
 Proxy/ownKeys/return-is-abrupt.js
+Proxy/ownKeys/return-not-list-object-throws-realm.js
 Proxy/ownKeys/return-not-list-object-throws.js
 Proxy/ownKeys/return-type-throws-array.js
 Proxy/ownKeys/return-type-throws-boolean.js
@@ -11291,6 +11394,7 @@ Proxy/ownKeys/return-type-throws-number.js
 Proxy/ownKeys/return-type-throws-object.js
 Proxy/ownKeys/return-type-throws-undefined.js
 Proxy/ownKeys/trap-is-missing-target-is-proxy.js
+Proxy/ownKeys/trap-is-not-callable-realm.js
 Proxy/ownKeys/trap-is-not-callable.js
 Proxy/ownKeys/trap-is-null-target-is-proxy.js
 Proxy/ownKeys/trap-is-undefined-target-is-proxy.js
@@ -11302,6 +11406,7 @@ Proxy/preventExtensions/return-is-abrupt.js
 Proxy/preventExtensions/return-true-target-is-extensible.js
 Proxy/preventExtensions/return-true-target-is-not-extensible.js
 Proxy/preventExtensions/trap-is-missing-target-is-proxy.js
+Proxy/preventExtensions/trap-is-not-callable-realm.js
 Proxy/preventExtensions/trap-is-not-callable.js
 Proxy/preventExtensions/trap-is-null-target-is-proxy.js
 Proxy/preventExtensions/trap-is-undefined.js
@@ -11327,6 +11432,7 @@ Proxy/revocable/revoke-returns-undefined.js
 Proxy/revocable/revoke.js
 Proxy/revocable/target-is-revoked-function-proxy.js
 Proxy/revocable/target-is-revoked-proxy.js
+Proxy/revocable/tco-fn-realm.js
 Proxy/set/boolean-trap-result-is-false-boolean-return-false.js
 Proxy/set/boolean-trap-result-is-false-null-return-false.js
 Proxy/set/boolean-trap-result-is-false-number-return-false.js
@@ -11347,6 +11453,7 @@ Proxy/set/target-property-is-not-configurable-not-writable-not-equal-to-v.js
 Proxy/set/trap-is-missing-receiver-multiple-calls-index.js
 Proxy/set/trap-is-missing-receiver-multiple-calls.js
 Proxy/set/trap-is-missing-target-is-proxy.js
+Proxy/set/trap-is-not-callable-realm.js
 Proxy/set/trap-is-not-callable.js
 Proxy/set/trap-is-null-receiver.js
 Proxy/set/trap-is-null-target-is-proxy.js
@@ -11365,6 +11472,7 @@ Proxy/setPrototypeOf/return-abrupt-from-trap.js
 Proxy/setPrototypeOf/toboolean-trap-result-false.js
 Proxy/setPrototypeOf/toboolean-trap-result-true-target-is-extensible.js
 Proxy/setPrototypeOf/trap-is-missing-target-is-proxy.js
+Proxy/setPrototypeOf/trap-is-not-callable-realm.js
 Proxy/setPrototypeOf/trap-is-not-callable.js
 Proxy/setPrototypeOf/trap-is-null-target-is-proxy.js
 Proxy/setPrototypeOf/trap-is-undefined-or-null.js
@@ -11945,6 +12053,7 @@ RegExp/early-err-modifiers-should-not-case-fold-m.js
 RegExp/early-err-modifiers-should-not-case-fold-s.js
 RegExp/early-err-modifiers-should-not-unicode-case-fold-i.js
 RegExp/early-err-modifiers-should-not-unicode-case-fold-s.js
+RegExp/escape/cross-realm.js
 RegExp/escape/escaped-control-characters.js
 RegExp/escape/escaped-lineterminator.js
 RegExp/escape/escaped-otherpunctuators.js
@@ -12084,6 +12193,7 @@ RegExp/property-escapes/non-existent-property-value-Script.js
 RegExp/property-escapes/non-existent-property-value-Script_Extensions-negated.js
 RegExp/property-escapes/non-existent-property-value-Script_Extensions.js
 RegExp/property-escapes/non-existent-property-value-general-category.js
+RegExp/proto-from-ctor-realm.js
 RegExp/prototype/15.10.6.js
 RegExp/prototype/S15.10.5.1_A1.js
 RegExp/prototype/S15.10.5.1_A2.js
@@ -12286,6 +12396,7 @@ RegExp/prototype/Symbol.split/species-ctor-species-non-ctor.js
 RegExp/prototype/Symbol.split/species-ctor-species-undef.js
 RegExp/prototype/Symbol.split/species-ctor-y.js
 RegExp/prototype/Symbol.split/species-ctor.js
+RegExp/prototype/Symbol.split/splitter-proto-from-ctor-realm.js
 RegExp/prototype/Symbol.split/str-adv-thru-empty-match.js
 RegExp/prototype/Symbol.split/str-coerce-lastindex-err.js
 RegExp/prototype/Symbol.split/str-coerce-lastindex.js
@@ -12307,6 +12418,7 @@ RegExp/prototype/Symbol.split/str-trailing-chars.js
 RegExp/prototype/Symbol.split/this-val-non-obj.js
 RegExp/prototype/Symbol.split/u-lastindex-adv-thru-failure.js
 RegExp/prototype/Symbol.split/u-lastindex-adv-thru-match.js
+RegExp/prototype/dotAll/cross-realm.js
 RegExp/prototype/dotAll/length.js
 RegExp/prototype/dotAll/name.js
 RegExp/prototype/dotAll/prop-desc.js
@@ -12412,11 +12524,13 @@ RegExp/prototype/global/15.10.7.2-2.js
 RegExp/prototype/global/S15.10.7.2_A10.js
 RegExp/prototype/global/S15.10.7.2_A8.js
 RegExp/prototype/global/S15.10.7.2_A9.js
+RegExp/prototype/global/cross-realm.js
 RegExp/prototype/global/length.js
 RegExp/prototype/global/name.js
 RegExp/prototype/global/this-val-invalid-obj.js
 RegExp/prototype/global/this-val-non-obj.js
 RegExp/prototype/global/this-val-regexp-prototype.js
+RegExp/prototype/hasIndices/cross-realm.js
 RegExp/prototype/hasIndices/length.js
 RegExp/prototype/hasIndices/name.js
 RegExp/prototype/hasIndices/prop-desc.js
@@ -12428,6 +12542,7 @@ RegExp/prototype/ignoreCase/15.10.7.3-2.js
 RegExp/prototype/ignoreCase/S15.10.7.3_A10.js
 RegExp/prototype/ignoreCase/S15.10.7.3_A8.js
 RegExp/prototype/ignoreCase/S15.10.7.3_A9.js
+RegExp/prototype/ignoreCase/cross-realm.js
 RegExp/prototype/ignoreCase/length.js
 RegExp/prototype/ignoreCase/name.js
 RegExp/prototype/ignoreCase/this-val-invalid-obj.js
@@ -12437,12 +12552,14 @@ RegExp/prototype/multiline/15.10.7.4-2.js
 RegExp/prototype/multiline/S15.10.7.4_A10.js
 RegExp/prototype/multiline/S15.10.7.4_A8.js
 RegExp/prototype/multiline/S15.10.7.4_A9.js
+RegExp/prototype/multiline/cross-realm.js
 RegExp/prototype/multiline/length.js
 RegExp/prototype/multiline/name.js
 RegExp/prototype/multiline/this-val-invalid-obj.js
 RegExp/prototype/multiline/this-val-non-obj.js
 RegExp/prototype/multiline/this-val-regexp-prototype.js
 RegExp/prototype/no-regexp-matcher.js
+RegExp/prototype/source/cross-realm.js
 RegExp/prototype/source/length.js
 RegExp/prototype/source/name.js
 RegExp/prototype/source/prop-desc.js
@@ -12454,6 +12571,7 @@ RegExp/prototype/source/value-line-terminator.js
 RegExp/prototype/source/value-slash.js
 RegExp/prototype/source/value-u.js
 RegExp/prototype/source/value.js
+RegExp/prototype/sticky/cross-realm.js
 RegExp/prototype/sticky/length.js
 RegExp/prototype/sticky/name.js
 RegExp/prototype/sticky/prop-desc.js
@@ -12515,6 +12633,7 @@ RegExp/prototype/toString/S15.10.6.4_A9.js
 RegExp/prototype/toString/called-as-function.js
 RegExp/prototype/toString/name.js
 RegExp/prototype/toString/not-a-constructor.js
+RegExp/prototype/unicode/cross-realm.js
 RegExp/prototype/unicode/length.js
 RegExp/prototype/unicode/name.js
 RegExp/prototype/unicode/prop-desc.js
@@ -12550,6 +12669,7 @@ RegExp/prototype/unicodeSets/breaking-change-from-u-to-v-25.js
 RegExp/prototype/unicodeSets/breaking-change-from-u-to-v-26.js
 RegExp/prototype/unicodeSets/breaking-change-from-u-to-v-27.js
 RegExp/prototype/unicodeSets/breaking-change-from-u-to-v-28.js
+RegExp/prototype/unicodeSets/cross-realm.js
 RegExp/prototype/unicodeSets/length.js
 RegExp/prototype/unicodeSets/name.js
 RegExp/prototype/unicodeSets/prop-desc.js
@@ -12773,6 +12893,7 @@ Set/is-a-constructor.js
 Set/length.js
 Set/name.js
 Set/properties-of-the-set-prototype-object.js
+Set/proto-from-ctor-realm.js
 Set/prototype-of-set.js
 Set/prototype/Symbol.iterator.js
 Set/prototype/Symbol.iterator/not-a-constructor.js
@@ -13175,6 +13296,7 @@ SharedArrayBuffer/options-maxbytelength-object.js
 SharedArrayBuffer/options-maxbytelength-poisoned.js
 SharedArrayBuffer/options-maxbytelength-undefined.js
 SharedArrayBuffer/options-non-object.js
+SharedArrayBuffer/proto-from-ctor-realm.js
 SharedArrayBuffer/prototype-from-newtarget.js
 SharedArrayBuffer/prototype/Symbol.toStringTag.js
 SharedArrayBuffer/prototype/byteLength/invoked-as-accessor.js
@@ -13376,6 +13498,7 @@ String/is-a-constructor.js
 String/length.js
 String/numeric-properties.js
 String/prop-desc.js
+String/proto-from-ctor-realm.js
 String/prototype/S15.5.3.1_A1.js
 String/prototype/S15.5.3.1_A2.js
 String/prototype/S15.5.3.1_A3.js
@@ -14222,6 +14345,7 @@ String/prototype/toLowerCase/this-value-tostring-throws-symbol.js
 String/prototype/toLowerCase/this-value-tostring-throws-toprimitive.js
 String/prototype/toString/length.js
 String/prototype/toString/name.js
+String/prototype/toString/non-generic-realm.js
 String/prototype/toString/non-generic.js
 String/prototype/toString/not-a-constructor.js
 String/prototype/toString/string-object.js
@@ -14437,6 +14561,7 @@ String/prototype/trimStart/this-value-symbol-typeerror.js
 String/prototype/trimStart/this-value-whitespace.js
 String/prototype/valueOf/length.js
 String/prototype/valueOf/name.js
+String/prototype/valueOf/non-generic-realm.js
 String/prototype/valueOf/non-generic.js
 String/prototype/valueOf/not-a-constructor.js
 String/prototype/valueOf/string-object.js
@@ -14479,6 +14604,7 @@ StringIteratorPrototype/next/name.js
 StringIteratorPrototype/next/next-iteration-surrogate-pairs.js
 StringIteratorPrototype/next/next-iteration.js
 StringIteratorPrototype/next/next-missing-internal-slots.js
+Symbol/asyncIterator/cross-realm.js
 Symbol/asyncIterator/prop-desc.js
 Symbol/auto-boxing-non-strict.js
 Symbol/auto-boxing-strict.js
@@ -14486,6 +14612,7 @@ Symbol/constructor.js
 Symbol/desc-to-string-symbol.js
 Symbol/desc-to-string.js
 Symbol/for/create-value.js
+Symbol/for/cross-realm.js
 Symbol/for/description.js
 Symbol/for/length.js
 Symbol/for/name.js
@@ -14493,20 +14620,26 @@ Symbol/for/not-a-constructor.js
 Symbol/for/prop-desc.js
 Symbol/for/retrieve-value.js
 Symbol/for/to-string-err.js
+Symbol/hasInstance/cross-realm.js
 Symbol/hasInstance/prop-desc.js
 Symbol/invoked-with-new.js
 Symbol/is-constructor.js
+Symbol/isConcatSpreadable/cross-realm.js
 Symbol/isConcatSpreadable/prop-desc.js
+Symbol/iterator/cross-realm.js
 Symbol/iterator/prop-desc.js
 Symbol/keyFor/arg-non-symbol.js
 Symbol/keyFor/arg-symbol-registry-hit.js
 Symbol/keyFor/arg-symbol-registry-miss.js
+Symbol/keyFor/cross-realm.js
 Symbol/keyFor/length.js
 Symbol/keyFor/name.js
 Symbol/keyFor/not-a-constructor.js
 Symbol/keyFor/prop-desc.js
 Symbol/length.js
+Symbol/match/cross-realm.js
 Symbol/match/prop-desc.js
+Symbol/matchAll/cross-realm.js
 Symbol/matchAll/prop-desc.js
 Symbol/name.js
 Symbol/not-callable.js
@@ -14545,16 +14678,23 @@ Symbol/prototype/valueOf/this-val-non-obj.js
 Symbol/prototype/valueOf/this-val-obj-non-symbol.js
 Symbol/prototype/valueOf/this-val-obj-symbol.js
 Symbol/prototype/valueOf/this-val-symbol.js
+Symbol/replace/cross-realm.js
 Symbol/replace/prop-desc.js
+Symbol/search/cross-realm.js
 Symbol/search/prop-desc.js
 Symbol/species/basic.js
 Symbol/species/builtin-getter-name.js
+Symbol/species/cross-realm.js
 Symbol/species/subclassing.js
+Symbol/split/cross-realm.js
 Symbol/split/prop-desc.js
 Symbol/symbol.js
+Symbol/toPrimitive/cross-realm.js
 Symbol/toPrimitive/prop-desc.js
+Symbol/toStringTag/cross-realm.js
 Symbol/toStringTag/prop-desc.js
 Symbol/uniqueness.js
+Symbol/unscopables/cross-realm.js
 Symbol/unscopables/prop-desc.js
 TypedArray/Symbol.species/length.js
 TypedArray/Symbol.species/name.js
@@ -16163,6 +16303,8 @@ TypedArrayConstructors/ctors-bigint/buffer-arg/length-is-symbol-throws.js
 TypedArrayConstructors/ctors-bigint/buffer-arg/length-to-number-detachbuffer.js
 TypedArrayConstructors/ctors-bigint/buffer-arg/new-instance-extensibility-sab.js
 TypedArrayConstructors/ctors-bigint/buffer-arg/new-instance-extensibility.js
+TypedArrayConstructors/ctors-bigint/buffer-arg/proto-from-ctor-realm-sab.js
+TypedArrayConstructors/ctors-bigint/buffer-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors-bigint/buffer-arg/returns-new-instance-sab.js
 TypedArrayConstructors/ctors-bigint/buffer-arg/returns-new-instance.js
 TypedArrayConstructors/ctors-bigint/buffer-arg/toindex-bytelength-sab.js
@@ -16180,6 +16322,7 @@ TypedArrayConstructors/ctors-bigint/length-arg/is-infinity-throws-rangeerror.js
 TypedArrayConstructors/ctors-bigint/length-arg/is-negative-integer-throws-rangeerror.js
 TypedArrayConstructors/ctors-bigint/length-arg/is-symbol-throws.js
 TypedArrayConstructors/ctors-bigint/length-arg/new-instance-extensibility.js
+TypedArrayConstructors/ctors-bigint/length-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors-bigint/length-arg/returns-object.js
 TypedArrayConstructors/ctors-bigint/length-arg/toindex-length.js
 TypedArrayConstructors/ctors-bigint/length-arg/undefined-newtarget-throws.js
@@ -16187,6 +16330,7 @@ TypedArrayConstructors/ctors-bigint/length-arg/use-custom-proto-if-object.js
 TypedArrayConstructors/ctors-bigint/length-arg/use-default-proto-if-custom-proto-is-not-object.js
 TypedArrayConstructors/ctors-bigint/no-args/custom-proto-access-throws.js
 TypedArrayConstructors/ctors-bigint/no-args/new-instance-extensibility.js
+TypedArrayConstructors/ctors-bigint/no-args/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors-bigint/no-args/returns-object.js
 TypedArrayConstructors/ctors-bigint/no-args/undefined-newtarget-throws.js
 TypedArrayConstructors/ctors-bigint/no-args/use-custom-proto-if-object.js
@@ -16206,6 +16350,7 @@ TypedArrayConstructors/ctors-bigint/object-arg/length-throws.js
 TypedArrayConstructors/ctors-bigint/object-arg/new-instance-extensibility.js
 TypedArrayConstructors/ctors-bigint/object-arg/null-tobigint.js
 TypedArrayConstructors/ctors-bigint/object-arg/number-tobigint.js
+TypedArrayConstructors/ctors-bigint/object-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors-bigint/object-arg/string-nan-tobigint.js
 TypedArrayConstructors/ctors-bigint/object-arg/string-tobigint.js
 TypedArrayConstructors/ctors-bigint/object-arg/symbol-tobigint.js
@@ -16226,6 +16371,7 @@ TypedArrayConstructors/ctors-bigint/typedarray-arg/new-instance-extensibility.js
 TypedArrayConstructors/ctors-bigint/typedarray-arg/other-ctor-buffer-ctor-species-null.js
 TypedArrayConstructors/ctors-bigint/typedarray-arg/other-ctor-buffer-ctor-species-undefined.js
 TypedArrayConstructors/ctors-bigint/typedarray-arg/other-ctor-returns-new-typedarray.js
+TypedArrayConstructors/ctors-bigint/typedarray-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors-bigint/typedarray-arg/same-ctor-buffer-ctor-species-null.js
 TypedArrayConstructors/ctors-bigint/typedarray-arg/same-ctor-buffer-ctor-species-undefined.js
 TypedArrayConstructors/ctors-bigint/typedarray-arg/same-ctor-returns-new-cloned-typedarray.js
@@ -16271,6 +16417,8 @@ TypedArrayConstructors/ctors/buffer-arg/length-is-symbol-throws.js
 TypedArrayConstructors/ctors/buffer-arg/length-to-number-detachbuffer.js
 TypedArrayConstructors/ctors/buffer-arg/new-instance-extensibility-sab.js
 TypedArrayConstructors/ctors/buffer-arg/new-instance-extensibility.js
+TypedArrayConstructors/ctors/buffer-arg/proto-from-ctor-realm-sab.js
+TypedArrayConstructors/ctors/buffer-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors/buffer-arg/resizable-out-of-bounds.js
 TypedArrayConstructors/ctors/buffer-arg/returns-new-instance-sab.js
 TypedArrayConstructors/ctors/buffer-arg/returns-new-instance.js
@@ -16289,6 +16437,7 @@ TypedArrayConstructors/ctors/length-arg/is-infinity-throws-rangeerror.js
 TypedArrayConstructors/ctors/length-arg/is-negative-integer-throws-rangeerror.js
 TypedArrayConstructors/ctors/length-arg/is-symbol-throws.js
 TypedArrayConstructors/ctors/length-arg/new-instance-extensibility.js
+TypedArrayConstructors/ctors/length-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors/length-arg/returns-object.js
 TypedArrayConstructors/ctors/length-arg/toindex-length.js
 TypedArrayConstructors/ctors/length-arg/undefined-newtarget-throws.js
@@ -16296,6 +16445,7 @@ TypedArrayConstructors/ctors/length-arg/use-custom-proto-if-object.js
 TypedArrayConstructors/ctors/length-arg/use-default-proto-if-custom-proto-is-not-object.js
 TypedArrayConstructors/ctors/no-args/custom-proto-access-throws.js
 TypedArrayConstructors/ctors/no-args/new-instance-extensibility.js
+TypedArrayConstructors/ctors/no-args/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors/no-args/returns-object.js
 TypedArrayConstructors/ctors/no-args/undefined-newtarget-throws.js
 TypedArrayConstructors/ctors/no-args/use-custom-proto-if-object.js
@@ -16316,6 +16466,7 @@ TypedArrayConstructors/ctors/object-arg/length-excessive-throws.js
 TypedArrayConstructors/ctors/object-arg/length-is-symbol-throws.js
 TypedArrayConstructors/ctors/object-arg/length-throws.js
 TypedArrayConstructors/ctors/object-arg/new-instance-extensibility.js
+TypedArrayConstructors/ctors/object-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors/object-arg/returns.js
 TypedArrayConstructors/ctors/object-arg/throws-from-property.js
 TypedArrayConstructors/ctors/object-arg/throws-setting-obj-to-primitive-typeerror.js
@@ -16331,6 +16482,7 @@ TypedArrayConstructors/ctors/object-arg/use-default-proto-if-custom-proto-is-not
 TypedArrayConstructors/ctors/typedarray-arg/custom-proto-access-throws.js
 TypedArrayConstructors/ctors/typedarray-arg/new-instance-extensibility.js
 TypedArrayConstructors/ctors/typedarray-arg/other-ctor-returns-new-typedarray.js
+TypedArrayConstructors/ctors/typedarray-arg/proto-from-ctor-realm.js
 TypedArrayConstructors/ctors/typedarray-arg/returns-new-instance.js
 TypedArrayConstructors/ctors/typedarray-arg/same-ctor-buffer-ctor-species-null.js
 TypedArrayConstructors/ctors/typedarray-arg/same-ctor-buffer-ctor-species-undefined.js
@@ -16400,6 +16552,7 @@ TypedArrayConstructors/from/set-value-abrupt-completion.js
 TypedArrayConstructors/from/source-value-is-symbol-throws.js
 TypedArrayConstructors/from/this-is-not-constructor.js
 TypedArrayConstructors/internals/DefineOwnProperty/BigInt/desc-value-throws.js
+TypedArrayConstructors/internals/DefineOwnProperty/BigInt/detached-buffer-throws-realm.js
 TypedArrayConstructors/internals/DefineOwnProperty/BigInt/detached-buffer-throws.js
 TypedArrayConstructors/internals/DefineOwnProperty/BigInt/detached-buffer.js
 TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-greater-than-last-index.js
@@ -16427,6 +16580,7 @@ TypedArrayConstructors/internals/DefineOwnProperty/BigInt/tonumber-value-detache
 TypedArrayConstructors/internals/DefineOwnProperty/conversion-operation-consistent-nan.js
 TypedArrayConstructors/internals/DefineOwnProperty/conversion-operation.js
 TypedArrayConstructors/internals/DefineOwnProperty/desc-value-throws.js
+TypedArrayConstructors/internals/DefineOwnProperty/detached-buffer-throws-realm.js
 TypedArrayConstructors/internals/DefineOwnProperty/detached-buffer-throws.js
 TypedArrayConstructors/internals/DefineOwnProperty/detached-buffer.js
 TypedArrayConstructors/internals/DefineOwnProperty/key-is-greater-than-last-index.js
@@ -16453,6 +16607,7 @@ TypedArrayConstructors/internals/DefineOwnProperty/this-is-not-extensible.js
 TypedArrayConstructors/internals/DefineOwnProperty/tonumber-value-detached-buffer.js
 TypedArrayConstructors/internals/Delete/BigInt/detached-buffer-key-is-not-numeric-index.js
 TypedArrayConstructors/internals/Delete/BigInt/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/Delete/BigInt/detached-buffer-realm.js
 TypedArrayConstructors/internals/Delete/BigInt/detached-buffer.js
 TypedArrayConstructors/internals/Delete/BigInt/indexed-value-ab-non-strict.js
 TypedArrayConstructors/internals/Delete/BigInt/indexed-value-ab-strict.js
@@ -16471,6 +16626,7 @@ TypedArrayConstructors/internals/Delete/BigInt/key-is-out-of-bounds-strict.js
 TypedArrayConstructors/internals/Delete/BigInt/key-is-symbol.js
 TypedArrayConstructors/internals/Delete/detached-buffer-key-is-not-numeric-index.js
 TypedArrayConstructors/internals/Delete/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/Delete/detached-buffer-realm.js
 TypedArrayConstructors/internals/Delete/detached-buffer.js
 TypedArrayConstructors/internals/Delete/indexed-value-ab-non-strict.js
 TypedArrayConstructors/internals/Delete/indexed-value-ab-strict.js
@@ -16490,6 +16646,7 @@ TypedArrayConstructors/internals/Delete/key-is-out-of-bounds-strict.js
 TypedArrayConstructors/internals/Delete/key-is-symbol.js
 TypedArrayConstructors/internals/Get/BigInt/detached-buffer-key-is-not-numeric-index.js
 TypedArrayConstructors/internals/Get/BigInt/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/Get/BigInt/detached-buffer-realm.js
 TypedArrayConstructors/internals/Get/BigInt/detached-buffer.js
 TypedArrayConstructors/internals/Get/BigInt/indexed-value-sab.js
 TypedArrayConstructors/internals/Get/BigInt/indexed-value.js
@@ -16503,6 +16660,7 @@ TypedArrayConstructors/internals/Get/BigInt/key-is-out-of-bounds.js
 TypedArrayConstructors/internals/Get/BigInt/key-is-symbol.js
 TypedArrayConstructors/internals/Get/detached-buffer-key-is-not-numeric-index.js
 TypedArrayConstructors/internals/Get/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/Get/detached-buffer-realm.js
 TypedArrayConstructors/internals/Get/detached-buffer.js
 TypedArrayConstructors/internals/Get/indexed-value-sab.js
 TypedArrayConstructors/internals/Get/indexed-value.js
@@ -16516,6 +16674,7 @@ TypedArrayConstructors/internals/Get/key-is-out-of-bounds.js
 TypedArrayConstructors/internals/Get/key-is-symbol.js
 TypedArrayConstructors/internals/GetOwnProperty/BigInt/detached-buffer-key-is-not-number.js
 TypedArrayConstructors/internals/GetOwnProperty/BigInt/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/GetOwnProperty/BigInt/detached-buffer-realm.js
 TypedArrayConstructors/internals/GetOwnProperty/BigInt/detached-buffer.js
 TypedArrayConstructors/internals/GetOwnProperty/BigInt/enumerate-detached-buffer.js
 TypedArrayConstructors/internals/GetOwnProperty/BigInt/index-prop-desc.js
@@ -16527,6 +16686,7 @@ TypedArrayConstructors/internals/GetOwnProperty/BigInt/key-is-out-of-bounds.js
 TypedArrayConstructors/internals/GetOwnProperty/BigInt/key-is-symbol.js
 TypedArrayConstructors/internals/GetOwnProperty/detached-buffer-key-is-not-number.js
 TypedArrayConstructors/internals/GetOwnProperty/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/GetOwnProperty/detached-buffer-realm.js
 TypedArrayConstructors/internals/GetOwnProperty/detached-buffer.js
 TypedArrayConstructors/internals/GetOwnProperty/enumerate-detached-buffer.js
 TypedArrayConstructors/internals/GetOwnProperty/index-prop-desc.js
@@ -16539,6 +16699,7 @@ TypedArrayConstructors/internals/GetOwnProperty/key-is-symbol.js
 TypedArrayConstructors/internals/HasProperty/BigInt/abrupt-from-ordinary-has-parent-hasproperty.js
 TypedArrayConstructors/internals/HasProperty/BigInt/detached-buffer-key-is-not-number.js
 TypedArrayConstructors/internals/HasProperty/BigInt/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/HasProperty/BigInt/detached-buffer-realm.js
 TypedArrayConstructors/internals/HasProperty/BigInt/detached-buffer.js
 TypedArrayConstructors/internals/HasProperty/BigInt/indexed-value.js
 TypedArrayConstructors/internals/HasProperty/BigInt/infinity-with-detached-buffer.js
@@ -16553,6 +16714,7 @@ TypedArrayConstructors/internals/HasProperty/BigInt/key-is-symbol.js
 TypedArrayConstructors/internals/HasProperty/abrupt-from-ordinary-has-parent-hasproperty.js
 TypedArrayConstructors/internals/HasProperty/detached-buffer-key-is-not-number.js
 TypedArrayConstructors/internals/HasProperty/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/HasProperty/detached-buffer-realm.js
 TypedArrayConstructors/internals/HasProperty/detached-buffer.js
 TypedArrayConstructors/internals/HasProperty/indexed-value.js
 TypedArrayConstructors/internals/HasProperty/infinity-with-detached-buffer.js
@@ -16581,6 +16743,7 @@ TypedArrayConstructors/internals/Set/BigInt/bigint-tobiguint64.js
 TypedArrayConstructors/internals/Set/BigInt/boolean-tobigint.js
 TypedArrayConstructors/internals/Set/BigInt/detached-buffer-key-is-not-numeric-index.js
 TypedArrayConstructors/internals/Set/BigInt/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/Set/BigInt/detached-buffer-realm.js
 TypedArrayConstructors/internals/Set/BigInt/detached-buffer.js
 TypedArrayConstructors/internals/Set/BigInt/indexed-value.js
 TypedArrayConstructors/internals/Set/BigInt/key-is-canonical-invalid-index-prototype-chain-set.js
@@ -16607,6 +16770,7 @@ TypedArrayConstructors/internals/Set/conversion-operation-consistent-nan.js
 TypedArrayConstructors/internals/Set/conversion-operation.js
 TypedArrayConstructors/internals/Set/detached-buffer-key-is-not-numeric-index.js
 TypedArrayConstructors/internals/Set/detached-buffer-key-is-symbol.js
+TypedArrayConstructors/internals/Set/detached-buffer-realm.js
 TypedArrayConstructors/internals/Set/detached-buffer.js
 TypedArrayConstructors/internals/Set/indexed-value.js
 TypedArrayConstructors/internals/Set/key-is-canonical-invalid-index-prototype-chain-set.js
@@ -16732,6 +16896,7 @@ WeakMap/name.js
 WeakMap/no-iterable.js
 WeakMap/properties-of-map-instances.js
 WeakMap/properties-of-the-weakmap-prototype-object.js
+WeakMap/proto-from-ctor-realm.js
 WeakMap/prototype-of-weakmap.js
 WeakMap/prototype/Symbol.toStringTag.js
 WeakMap/prototype/constructor.js
@@ -16857,6 +17022,7 @@ WeakRef/length.js
 WeakRef/name.js
 WeakRef/newtarget-prototype-is-not-object.js
 WeakRef/prop-desc.js
+WeakRef/proto-from-ctor-realm.js
 WeakRef/proto.js
 WeakRef/prototype-from-newtarget-abrupt.js
 WeakRef/prototype-from-newtarget-custom.js
@@ -16892,6 +17058,7 @@ WeakSet/length.js
 WeakSet/name.js
 WeakSet/no-iterable.js
 WeakSet/properties-of-the-weakset-prototype-object.js
+WeakSet/proto-from-ctor-realm.js
 WeakSet/prototype-of-weakset.js
 WeakSet/prototype/Symbol.toStringTag.js
 WeakSet/prototype/add/add.js

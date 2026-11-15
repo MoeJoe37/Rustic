@@ -265,6 +265,10 @@ pub enum Op {
     /// Throw a TypeError unless `src` is an object or undefined: the
     /// result of a derived constructor.
     DerivedResult { src: Reg },
+    /// Run the rest of the frame in the realm of its caller: a derived
+    /// constructor checks its result after its own execution context
+    /// is gone (§10.2.2 steps 11-14), so those errors are the caller's.
+    CallerRealm,
     /// `dst = {}`
     NewObject { dst: Reg },
     /// `dst = []`

@@ -1,6 +1,6 @@
 # Test262 test/language files that pass when executed (JS-07).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 21920 pass, 507 fail, 1405 skipped (modules, proposals).
+# 21939 pass, 488 fail, 1405 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 arguments-object/10.5-1-s.js
 arguments-object/10.5-1gs.js
@@ -872,6 +872,7 @@ eval-code/indirect/parse-failure-3.js
 eval-code/indirect/parse-failure-4.js
 eval-code/indirect/parse-failure-5.js
 eval-code/indirect/parse-failure-6.js
+eval-code/indirect/realm.js
 eval-code/indirect/super-call.js
 eval-code/indirect/super-prop.js
 eval-code/indirect/switch-case-decl-strict.js
@@ -2673,6 +2674,7 @@ expressions/async-generator/early-errors-expression-not-simple-assignment-target
 expressions/async-generator/early-errors-expression-yield-as-function-binding-identifier.js
 expressions/async-generator/early-errors-expression-yield-star-after-newline.js
 expressions/async-generator/escaped-async.js
+expressions/async-generator/eval-body-proto-realm.js
 expressions/async-generator/expression-await-as-yield-operand.js
 expressions/async-generator/expression-await-promise-as-yield-operand.js
 expressions/async-generator/expression-await-thenable-as-yield-operand.js
@@ -3040,6 +3042,7 @@ expressions/call/S11.2.4_A1.4_T4.js
 expressions/call/eval-err-args.js
 expressions/call/eval-first-arg.js
 expressions/call/eval-no-args.js
+expressions/call/eval-realm-indirect.js
 expressions/call/eval-spread-empty.js
 expressions/call/eval-strictness-inherit-non-strict.js
 expressions/call/eval-strictness-inherit-strict.js
@@ -7058,30 +7061,40 @@ expressions/class/private-getter-brand-check-multiple-evaluations-of-class-eval-
 expressions/class/private-getter-brand-check-multiple-evaluations-of-class-eval.js
 expressions/class/private-getter-brand-check-multiple-evaluations-of-class-factory.js
 expressions/class/private-getter-brand-check-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-getter-brand-check-multiple-evaluations-of-class-realm-function-ctor.js
+expressions/class/private-getter-brand-check-multiple-evaluations-of-class-realm.js
 expressions/class/private-method-brand-check-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-method-brand-check-multiple-evaluations-of-class-eval.js
 expressions/class/private-method-brand-check-multiple-evaluations-of-class-factory.js
 expressions/class/private-method-brand-check-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-method-brand-check-multiple-evaluations-of-class-realm-function-ctor.js
+expressions/class/private-method-brand-check-multiple-evaluations-of-class-realm.js
 expressions/class/private-setter-brand-check-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-setter-brand-check-multiple-evaluations-of-class-eval.js
 expressions/class/private-setter-brand-check-multiple-evaluations-of-class-factory.js
 expressions/class/private-setter-brand-check-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-setter-brand-check-multiple-evaluations-of-class-realm-function-ctor.js
+expressions/class/private-setter-brand-check-multiple-evaluations-of-class-realm.js
 expressions/class/private-static-field-multiple-evaluations-of-class-direct-eval.js
 expressions/class/private-static-field-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-static-field-multiple-evaluations-of-class-factory.js
 expressions/class/private-static-field-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-static-field-multiple-evaluations-of-class-realm.js
 expressions/class/private-static-getter-multiple-evaluations-of-class-direct-eval.js
 expressions/class/private-static-getter-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-static-getter-multiple-evaluations-of-class-factory.js
 expressions/class/private-static-getter-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-static-getter-multiple-evaluations-of-class-realm.js
 expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-direct-eval.js
 expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-factory.js
 expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-realm.js
 expressions/class/private-static-setter-multiple-evaluations-of-class-direct-eval.js
 expressions/class/private-static-setter-multiple-evaluations-of-class-eval-indirect.js
 expressions/class/private-static-setter-multiple-evaluations-of-class-factory.js
 expressions/class/private-static-setter-multiple-evaluations-of-class-function-ctor.js
+expressions/class/private-static-setter-multiple-evaluations-of-class-realm.js
 expressions/class/restricted-properties.js
 expressions/class/scope-gen-meth-paramsbody-var-close.js
 expressions/class/scope-gen-meth-paramsbody-var-open.js
@@ -8899,6 +8912,7 @@ expressions/generators/dstr/obj-ptrn-prop-obj.js
 expressions/generators/dstr/obj-ptrn-rest-getter.js
 expressions/generators/dstr/obj-ptrn-rest-skip-non-enumerable.js
 expressions/generators/dstr/obj-ptrn-rest-val-obj.js
+expressions/generators/eval-body-proto-realm.js
 expressions/generators/forbidden-ext/b1/gen-func-expr-forbidden-ext-direct-access-prop-arguments.js
 expressions/generators/forbidden-ext/b1/gen-func-expr-forbidden-ext-direct-access-prop-caller.js
 expressions/generators/forbidden-ext/b2/gen-func-expr-forbidden-ext-indirect-access-own-prop-caller-get.js
@@ -9553,6 +9567,7 @@ expressions/new/ctorExpr-fn-ref-before-args-eval-fn-wrapup.js
 expressions/new/ctorExpr-fn-ref-before-args-eval.js
 expressions/new/ctorExpr-isCtor-after-args-eval-fn-wrapup.js
 expressions/new/ctorExpr-isCtor-after-args-eval.js
+expressions/new/non-ctor-err-realm.js
 expressions/new/spread-err-mult-err-expr-throws.js
 expressions/new/spread-err-mult-err-iter-get-value.js
 expressions/new/spread-err-mult-err-itr-get-call.js
@@ -11156,6 +11171,7 @@ expressions/super/prop-expr-uninitialized-this-putvalue-compound-assign.js
 expressions/super/prop-expr-uninitialized-this-putvalue-increment.js
 expressions/super/prop-expr-uninitialized-this-putvalue.js
 expressions/super/prop-poisoned-underscore-proto.js
+expressions/super/realm.js
 expressions/super/super-reference-resolution.js
 expressions/tagged-template/cache-different-functions-same-site.js
 expressions/tagged-template/cache-differing-expressions-eval.js
@@ -11167,6 +11183,7 @@ expressions/tagged-template/cache-eval-inner-function.js
 expressions/tagged-template/cache-identical-source-eval.js
 expressions/tagged-template/cache-identical-source-new-function.js
 expressions/tagged-template/cache-identical-source.js
+expressions/tagged-template/cache-realm.js
 expressions/tagged-template/cache-same-site-top-level.js
 expressions/tagged-template/cache-same-site.js
 expressions/tagged-template/call-expression-argument-list-evaluation.js
@@ -21821,7 +21838,9 @@ types/reference/S8.7_A5_T1.js
 types/reference/S8.7_A5_T2.js
 types/reference/S8.7_A6.js
 types/reference/S8.7_A7.js
+types/reference/get-value-prop-base-primitive-realm.js
 types/reference/get-value-prop-base-primitive.js
+types/reference/put-value-prop-base-primitive-realm.js
 types/reference/put-value-prop-base-primitive.js
 types/string/S8.4_A1.js
 types/string/S8.4_A10.js

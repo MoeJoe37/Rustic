@@ -73,6 +73,7 @@ const PROTOTYPE_METHODS: &[Method] = &[
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let prototype = agent.intrinsics.array_prototype;
     let constructor = install_constructor(agent, "Array", array_constructor, 1, prototype)?;
+    agent.intrinsics.array = constructor;
     install_methods(agent, constructor, STATIC_METHODS)?;
     install_methods(agent, prototype, PROTOTYPE_METHODS)?;
     // `get Array[@@species]` (§23.1.2.5).
@@ -240,6 +241,17 @@ fn array_species_create(agent: &mut Agent, original: ObjectId, length: f64) -> J
     let key = agent.heap.key("constructor")?;
     let mut c = agent.get(original, key)?;
     if let Some(co) = c.as_object() {
+        // Another realm's %Array% counts as no constructor at all, so the
+        // result is an array of the running realm (step 4.b).
+        if agent.is_constructor_value(c) {
+            let realm = agent.function_realm(co)?;
+            if realm != agent.heap.realm {
+                let array = agent.intrinsics.array;
+                if agent.intrinsic_in_realm(array, realm) == co {
+                    return array_create(agent, length, None);
+                }
+            }
+        }
         let species = PropertyKey::Symbol(agent.symbols.species);
         c = agent.get(co, species)?;
         if c == Value::NULL {

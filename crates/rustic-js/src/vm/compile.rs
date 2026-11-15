@@ -393,6 +393,7 @@ impl<'a, 't> Gen<'a, 't> {
         let r = self.temp()?;
         if self.kind == FunctionKind::DerivedConstructor {
             // The result is `this`, which must be bound by now.
+            self.emit(Op::CallerRealm);
             self.load_this(r)?;
         } else {
             self.emit(Op::Undefined { dst: r });
@@ -2415,6 +2416,7 @@ impl<'a, 't> Gen<'a, 't> {
                 if self.kind == FunctionKind::DerivedConstructor {
                     // An object is returned as is; `undefined` means
                     // `this`; anything else is a TypeError.
+                    self.emit(Op::CallerRealm);
                     self.emit(Op::DerivedResult { src: r });
                     let done = self.emit(Op::JumpIfNotUndefined { src: r, target: 0 });
                     self.load_this(r)?;

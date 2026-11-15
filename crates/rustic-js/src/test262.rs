@@ -793,8 +793,8 @@ fn settle(agent: &mut Agent) -> crate::runtime::JsResult<()> {
 }
 
 /// The part of the `$262` host object (INTERPRETING.md) the engine can
-/// provide so far: `global`, `detachArrayBuffer` and `evalScript`.
-/// Realms, `gc` and agents are tracked under TD-105.
+/// provide so far: `global`, `createRealm`, `detachArrayBuffer` and
+/// `evalScript`. `gc` and agents are tracked under TD-105.
 fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
     fn detach(agent: &mut Agent, _: Value, args: &[Value]) -> crate::runtime::JsResult<Value> {
         let detached = args
@@ -806,7 +806,22 @@ fn install_host_object(agent: &mut Agent) -> crate::runtime::JsResult<()> {
         }
         Ok(Value::NULL)
     }
+    /// `$262.createRealm()`: a new realm with its own `$262`.
+    fn create_realm(agent: &mut Agent, _: Value, _: &[Value]) -> crate::runtime::JsResult<Value> {
+        let realm = agent.create_realm()?;
+        let previous = agent.enter_realm(realm);
+        let installed = install_host_object(agent);
+        let global = agent.intrinsics.global;
+        let host = installed.and_then(|()| {
+            let key = agent.heap.key("$262")?;
+            agent.get(global, key)
+        });
+        agent.enter_realm(previous);
+        host
+    }
     let host = agent.new_object()?;
+    let key = agent.heap.key("createRealm")?;
+    agent.define_method(host, key, create_realm, "createRealm", 0)?;
     let key = agent.heap.key("detachArrayBuffer")?;
     agent.define_method(host, key, detach, "detachArrayBuffer", 1)?;
     let key = agent.heap.key("evalScript")?;

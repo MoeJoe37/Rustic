@@ -639,6 +639,14 @@ impl Agent {
         for object in self.intrinsics.all() {
             marker.value(Value::object(object));
         }
+        // Realms that are not running. The running realm's entry is
+        // stale but still names live objects of that realm.
+        for record in &self.realms {
+            for object in record.intrinsics.all() {
+                marker.value(Value::object(object));
+            }
+            marker.env(record.global_env);
+        }
         for value in heap.roots.values() {
             marker.value(value);
         }

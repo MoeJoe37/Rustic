@@ -691,6 +691,9 @@ pub(crate) const FLAG_CLOSURE: u8 = 4;
 /// methods hand such an object to `exotic.rs`. Its dense `elements` stay
 /// empty, so the interpreter's element fast paths never see one.
 pub(crate) const FLAG_EXOTIC: u8 = 32;
+/// Created while its realm's intrinsics were (see `Agent::create_realm`):
+/// such objects have the same position in every realm's run of them.
+pub(crate) const FLAG_INTRINSIC: u8 = 64;
 
 const NO_PROTOTYPE: u32 = u32::MAX;
 
@@ -704,6 +707,9 @@ pub struct Object {
     pub(crate) length: u32,
     pub(crate) class: Class,
     pub(crate) flags: u8,
+    /// The realm the object was created in (§10.2.1 `[[Realm]]` for
+    /// functions). It fits in what was padding.
+    pub(crate) realm: u16,
     /// Named property values, in shape slot order (unused once a
     /// dictionary).
     pub(crate) slots: Vec<Value>,
@@ -722,6 +728,7 @@ impl Object {
             length: 0,
             class,
             flags: FLAG_EXTENSIBLE | FLAG_ARRAY_LENGTH_WRITABLE,
+            realm: 0,
             slots: Vec::new(),
             elements: Vec::new(),
             extra: None,

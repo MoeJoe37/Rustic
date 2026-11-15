@@ -73,6 +73,15 @@ impl<T> Arena<T> {
         Ok(index)
     }
 
+    /// Allocate past every index ever used, leaving the free list alone,
+    /// so a run of such allocations gets consecutive indices.
+    pub(crate) fn alloc_at_end(&mut self, value: T) -> Result<u32, OutOfMemory> {
+        let index = u32::try_from(self.cells.len()).map_err(|_| OutOfMemory)?;
+        self.cells.push(Some(value));
+        self.live += 1;
+        Ok(index)
+    }
+
     /// The live cell at `index`. Using a freed index is a bug in the
     /// caller's rooting and panics rather than aliasing another value.
     pub(crate) fn get(&self, index: u32) -> &T {
@@ -187,6 +196,11 @@ pub struct Heap {
     /// an object's prototype is replaced: what an inline cache learned
     /// by walking a prototype chain holds only within one value of this.
     pub(crate) proto_epoch: u32,
+    /// The running realm: new objects record it (see `Agent::create_realm`).
+    pub(crate) realm: u16,
+    /// A realm's intrinsics are being created: its objects take
+    /// consecutive indices and carry `FLAG_INTRINSIC`.
+    pub(crate) creating_intrinsics: bool,
     /// The most bytes ever charged at once.
     peak_bytes: usize,
     /// Every byte ever charged, freed or not.
@@ -245,6 +259,8 @@ impl Heap {
             collections: 0,
             gc_stress: false,
             proto_epoch: 0,
+            realm: 0,
+            creating_intrinsics: false,
         }
     }
 
@@ -575,10 +591,15 @@ impl Heap {
     // ---- objects ----------------------------------------------------
 
     /// Store a new object.
-    pub(crate) fn alloc_object(&mut self, object: Object) -> Result<ObjectId, OutOfMemory> {
+    pub(crate) fn alloc_object(&mut self, mut object: Object) -> Result<ObjectId, OutOfMemory> {
         self.charge(std::mem::size_of::<Object>())?;
+        object.realm = self.realm;
         if let Some(proto) = object.proto() {
             self.objects.get_mut(proto.0).set_flag(FLAG_PROTOTYPE, true);
+        }
+        if self.creating_intrinsics {
+            object.set_flag(super::object::FLAG_INTRINSIC, true);
+            return Ok(ObjectId(self.objects.alloc_at_end(object)?));
         }
         Ok(ObjectId(self.objects.alloc(object)?))
     }

@@ -144,6 +144,8 @@ pub struct Intrinsics {
     pub function_prototype: ObjectId,
     /// `%Array.prototype%`.
     pub array_prototype: ObjectId,
+    /// `%Array%`.
+    pub array: ObjectId,
     /// `%Error.prototype%`.
     pub error_prototype: ObjectId,
     /// `%TypeError.prototype%`.
@@ -243,6 +245,7 @@ impl Intrinsics {
             self.object_prototype,
             self.function_prototype,
             self.array_prototype,
+            self.array,
             self.error_prototype,
             self.type_error_prototype,
             self.range_error_prototype,
@@ -299,7 +302,29 @@ pub(crate) type RegExpCacheEntry = (
     std::rc::Rc<crate::regexp::Regex>,
 );
 
-/// One agent with one realm.
+/// A realm of an agent (§9.3): its own global object and intrinsics.
+/// Realm 0 is the one the agent starts in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct RealmId(pub(crate) u16);
+
+impl RealmId {
+    /// The realm an agent starts in.
+    pub const MAIN: RealmId = RealmId(0);
+}
+
+/// What a realm that is not running keeps: the running realm's record
+/// is in [`Agent::intrinsics`] and the agent's global environment.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RealmRecord {
+    pub(crate) intrinsics: Intrinsics,
+    pub(crate) global_env: EnvId,
+    /// The objects created with the realm are `first_object..` for
+    /// `object_count` indices, in the same order in every realm.
+    first_object: u32,
+    object_count: u32,
+}
+
+/// One agent and its realms.
 #[derive(Debug)]
 pub struct Agent {
     /// All values of the agent.
@@ -308,10 +333,14 @@ pub struct Agent {
     pub names: Names,
     /// Well-known symbols.
     pub symbols: WellKnownSymbols,
-    /// Intrinsic objects.
+    /// Intrinsic objects of the running realm.
     pub intrinsics: Intrinsics,
-    /// The realm's global environment.
+    /// The running realm's global environment.
     pub(crate) global_env: EnvId,
+    /// Every realm's record by id. The running realm's entry is stale
+    /// while it runs: `intrinsics` and `global_env` are written back
+    /// when another realm is entered.
+    pub(crate) realms: Vec<RealmRecord>,
     /// The interpreter's stack and frames.
     pub(crate) vm: VmState,
     /// Recently compiled patterns, most recent last, so a pattern built
@@ -339,6 +368,7 @@ impl Agent {
                 object_prototype: placeholder,
                 function_prototype: placeholder,
                 array_prototype: placeholder,
+                array: placeholder,
                 error_prototype: placeholder,
                 type_error_prototype: placeholder,
                 range_error_prototype: placeholder,
@@ -384,21 +414,177 @@ impl Agent {
                 list_format_prototype: placeholder,
             },
             global_env: EnvId(0),
+            realms: Vec::new(),
             vm: VmState::default(),
             regexp_cache: Vec::new(),
         };
-        agent.create_intrinsics().map_err(|_| OutOfMemory)?;
-        let global = agent.intrinsics.global;
-        agent.global_env = agent
-            .new_global_environment(global, global)
-            .map_err(|_| OutOfMemory)?;
+        agent.realms.push(RealmRecord {
+            intrinsics: agent.intrinsics,
+            global_env: agent.global_env,
+            first_object: 0,
+            object_count: 0,
+        });
+        agent.initialize_realm(None).map_err(|_| OutOfMemory)?;
         // Prototypes with more methods than a shape holds became
         // dictionaries while they were built; free the shapes they left.
         agent.collect_garbage(super::Roots::default());
         Ok(agent)
     }
 
-    fn create_intrinsics(&mut self) -> JsResult<()> {
+    // ---- realms ------------------------------------------------------
+
+    /// The running realm.
+    pub fn current_realm(&self) -> RealmId {
+        RealmId(self.heap.realm)
+    }
+
+    /// How many realms the agent has.
+    pub fn realm_count(&self) -> usize {
+        self.realms.len()
+    }
+
+    /// The global object of `realm`.
+    pub fn realm_global(&self, realm: RealmId) -> ObjectId {
+        self.realm_intrinsics(realm.0).global
+    }
+
+    /// The intrinsics of a realm, running or not.
+    pub(crate) fn realm_intrinsics(&self, realm: u16) -> &Intrinsics {
+        if realm == self.heap.realm {
+            &self.intrinsics
+        } else {
+            &self.realms[usize::from(realm)].intrinsics
+        }
+    }
+
+    /// Make `realm` the running realm and return the one that was. The
+    /// caller enters the returned realm again when its work is done.
+    pub fn enter_realm(&mut self, realm: RealmId) -> RealmId {
+        let previous = self.heap.realm;
+        self.switch_realm(realm.0);
+        RealmId(previous)
+    }
+
+    #[inline]
+    pub(crate) fn switch_realm(&mut self, realm: u16) {
+        if realm == self.heap.realm {
+            return;
+        }
+        self.switch_realm_slow(realm);
+    }
+
+    #[cold]
+    fn switch_realm_slow(&mut self, realm: u16) {
+        let running = &mut self.realms[usize::from(self.heap.realm)];
+        running.intrinsics = self.intrinsics;
+        running.global_env = self.global_env;
+        let record = self.realms[usize::from(realm)];
+        self.intrinsics = record.intrinsics;
+        self.global_env = record.global_env;
+        self.heap.realm = realm;
+    }
+
+    /// Create the running realm's intrinsics and global environment, and
+    /// note which objects they are.
+    fn initialize_realm(&mut self, registry: Option<ObjectId>) -> JsResult<()> {
+        // The extent is a `u32` index or allocation would have failed.
+        let first = self.heap.objects.extent() as u32;
+        self.heap.creating_intrinsics = true;
+        let created = self.create_intrinsics(registry).and_then(|()| {
+            let global = self.intrinsics.global;
+            self.global_env = self.new_global_environment(global, global)?;
+            Ok(())
+        });
+        self.heap.creating_intrinsics = false;
+        created?;
+        let count = self.heap.objects.extent() as u32 - first;
+        let record = &mut self.realms[usize::from(self.heap.realm)];
+        record.first_object = first;
+        record.object_count = count;
+        record.intrinsics = self.intrinsics;
+        record.global_env = self.global_env;
+        debug_assert_eq!(
+            count, self.realms[0].object_count,
+            "every realm creates the same intrinsics in the same order"
+        );
+        Ok(())
+    }
+
+    /// `InitializeHostDefinedRealm` (§9.6) for another realm of this
+    /// agent: a new global object with its own set of intrinsics. The
+    /// well-known symbols and the `Symbol.for` registry are the agent's
+    /// and shared. The running realm does not change. A realm lives as
+    /// long as its agent (TD-118).
+    pub fn create_realm(&mut self) -> JsResult<RealmId> {
+        let Ok(id) = u16::try_from(self.realms.len()) else {
+            return Err(self.throw(ErrorKind::RangeError, "too many realms"));
+        };
+        let previous = self.heap.realm;
+        let registry = self.intrinsics.symbol_registry;
+        // Until its own intrinsics exist the record repeats the creating
+        // realm's, so a collection in between traces only live objects.
+        self.realms.push(RealmRecord {
+            intrinsics: self.intrinsics,
+            global_env: self.global_env,
+            first_object: 0,
+            object_count: 0,
+        });
+        self.switch_realm(id);
+        let created = self.initialize_realm(Some(registry));
+        self.switch_realm(previous);
+        if created.is_err() {
+            // Nothing can refer to the half-built realm yet.
+            self.realms.pop();
+        }
+        created.map(|()| RealmId(id))
+    }
+
+    /// The object of `realm` that corresponds to `intrinsic` of the
+    /// running realm (`%Map.prototype%` for `%Map.prototype%`), or
+    /// `intrinsic` itself when it is not one of the running realm's
+    /// intrinsics or its counterpart has been collected.
+    pub(crate) fn intrinsic_in_realm(&self, intrinsic: ObjectId, realm: u16) -> ObjectId {
+        use super::object::FLAG_INTRINSIC;
+        if realm == self.heap.realm {
+            return intrinsic;
+        }
+        let from = &self.realms[usize::from(self.heap.realm)];
+        let to = &self.realms[usize::from(realm)];
+        let Some(offset) = intrinsic.0.checked_sub(from.first_object) else {
+            return intrinsic;
+        };
+        if offset >= from.object_count.min(to.object_count)
+            || !self.heap.object(intrinsic).has_flag(FLAG_INTRINSIC)
+        {
+            return intrinsic;
+        }
+        let other = to.first_object + offset;
+        match self.heap.objects.try_get(other) {
+            Some(object) if object.has_flag(FLAG_INTRINSIC) && object.realm == realm => {
+                ObjectId(other)
+            }
+            _ => intrinsic,
+        }
+    }
+
+    /// `GetFunctionRealm(object)` (§7.3.24): the realm a function was
+    /// created in, looking through bound functions and proxies. A
+    /// revoked proxy throws a TypeError.
+    pub(crate) fn function_realm(&mut self, mut object: ObjectId) -> JsResult<u16> {
+        loop {
+            let o = self.heap.object(object);
+            match o.internal() {
+                Some(super::object::Internal::Bound { target, .. }) => object = *target,
+                Some(super::object::Internal::Proxy { target, .. }) => match *target {
+                    Some(target) => object = target,
+                    None => return self.type_error("proxy has been revoked"),
+                },
+                _ => return Ok(o.realm),
+            }
+        }
+    }
+
+    fn create_intrinsics(&mut self, registry: Option<ObjectId>) -> JsResult<()> {
         let h = &mut self.heap;
         let object_prototype = h.alloc_object(Object::new(Class::Ordinary, None))?;
         let mut function = Object::new(Class::Function, Some(object_prototype));
@@ -430,6 +616,7 @@ impl Agent {
             object_prototype,
             function_prototype,
             array_prototype,
+            array: object_prototype,
             error_prototype,
             type_error_prototype,
             range_error_prototype,
@@ -444,7 +631,12 @@ impl Agent {
             array_iterator_prototype: object_prototype,
             array_values: object_prototype,
             array_iterator_next: object_prototype,
-            symbol_registry: self.heap.alloc_object(Object::new(Class::Ordinary, None))?,
+            symbol_registry: {
+                // Allocated in every realm, so that intrinsics keep the
+                // same positions; only the first realm's is used.
+                let own = self.heap.alloc_object(Object::new(Class::Ordinary, None))?;
+                registry.unwrap_or(own)
+            },
             table_iterator_prototypes: [object_prototype; 2],
             iterator_helper_prototypes: [object_prototype; 2],
             iterator: object_prototype,

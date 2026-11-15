@@ -22,13 +22,14 @@ mod value;
 mod weak;
 
 pub use agent::{
-    Abrupt, Agent, ErrorKind, Intrinsics, JsResult, Names, NativeFn, WellKnownSymbols,
+    Abrupt, Agent, ErrorKind, Intrinsics, JsResult, Names, NativeFn, RealmId, WellKnownSymbols,
 };
 pub use bigint::{BigInt, MAX_BITS as MAX_BIGINT_BITS};
 pub(crate) use builtins::async_generator::create_async_from_sync_iterator;
 pub(crate) use builtins::atomics::Waiter;
 pub(crate) use builtins::bigint::{BigIntBinary, BigIntUnary, SameNumeric, same_numeric_types};
 pub(crate) use builtins::generator::{RESUME_RETURN, RESUME_THROW};
+pub(crate) use builtins::intrinsic_in_function_realm;
 pub(crate) use builtins::iterator_result;
 pub(crate) use builtins::json::parse_json_units;
 pub use builtins::promise::{RejectionEvent, RejectionOperation};

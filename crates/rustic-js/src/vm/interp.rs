@@ -89,6 +89,11 @@ struct Frame {
     /// The frame was resumed from a generator object (it is the first
     /// frame of its run), so a `yield` or `await` ends that run.
     resumed: bool,
+    /// The realm the frame's code runs in: its function's, or for a
+    /// script, module or eval the realm that started it.
+    realm: u16,
+    /// The realm that was running when the frame was pushed.
+    caller_realm: u16,
 }
 
 /// The interpreter's state in an agent.
@@ -388,11 +393,29 @@ impl Agent {
         self.vm.native_from_safe_site = std::mem::take(&mut self.vm.safe_site);
         let saved = self.vm.native_new_target.take();
         let saved_function = self.vm.native_function.replace(f);
+        let realm = self.heap.realm;
+        self.switch_realm(self.native_realm(f));
         let result = behavior(self, this, args);
+        self.switch_realm(realm);
         self.vm.native_new_target = saved;
         self.vm.native_function = saved_function;
         self.vm.native_depth -= 1;
         result
+    }
+
+    /// The realm a built-in function runs in: its own, except that bound
+    /// functions and proxies run no code of their own (§10.4.1.1,
+    /// §10.5.12) and stay in the caller's.
+    #[inline]
+    fn native_realm(&self, f: ObjectId) -> u16 {
+        let object = self.heap.object(f);
+        if object.realm == self.heap.realm {
+            return object.realm;
+        }
+        match object.internal() {
+            Some(Internal::Bound { .. } | Internal::Proxy { .. }) => self.heap.realm,
+            _ => object.realm,
+        }
     }
 
     /// The running built-in function object.
@@ -443,7 +466,10 @@ impl Agent {
         self.vm.native_depth += 1;
         let saved = self.vm.native_new_target.replace(new_target);
         let saved_function = self.vm.native_function.replace(f);
+        let realm = self.heap.realm;
+        self.switch_realm(self.native_realm(f));
         let result = behavior(self, Value::UNDEFINED, args);
+        self.switch_realm(realm);
         self.vm.native_new_target = saved;
         self.vm.native_function = saved_function;
         self.vm.native_depth -= 1;
@@ -729,6 +755,15 @@ impl Agent {
     /// A derived class constructor gets no object: `super()` binds its
     /// `this`.
     fn construct_this(&mut self, f: ObjectId, new_target: Value) -> JsResult<Value> {
+        // Part of the callee's `[[Construct]]`, so in its realm.
+        let realm = self.heap.realm;
+        self.switch_realm(self.heap.object(f).realm);
+        let result = self.construct_this_in_realm(f, new_target);
+        self.switch_realm(realm);
+        result
+    }
+
+    fn construct_this_in_realm(&mut self, f: ObjectId, new_target: Value) -> JsResult<Value> {
         let closure = self.heap.closure(f).expect("caller checked for a closure");
         let code = self.heap.code(closure.code);
         let kind = code.kind;
@@ -740,14 +775,48 @@ impl Agent {
         }
         let source = new_target.as_object().unwrap_or(f);
         let prototype = self.get(source, PropertyKey::String(self.names.prototype))?;
-        let prototype = prototype
-            .as_object()
-            .unwrap_or(self.intrinsics.object_prototype);
+        let prototype = match prototype.as_object() {
+            Some(prototype) => prototype,
+            None => crate::runtime::intrinsic_in_function_realm(
+                self,
+                source,
+                self.intrinsics.object_prototype,
+            )?,
+        };
         Ok(Value::object(self.new_object_with(Some(prototype))?))
     }
 
     #[allow(clippy::too_many_arguments, reason = "one frame's whole state")]
     fn push_closure_frame(
+        &mut self,
+        f: ObjectId,
+        this: Value,
+        new_target: Value,
+        args_at: usize,
+        argc: usize,
+        ret: Reg,
+        construct: bool,
+        floor: usize,
+    ) -> JsResult<()> {
+        // The callee's realm supplies the global `this`, wrapper
+        // prototypes and the errors of a failed call (§10.2.1).
+        let realm = self.heap.realm;
+        self.switch_realm(self.heap.object(f).realm);
+        let result = self
+            .push_closure_frame_in_realm(f, this, new_target, args_at, argc, ret, construct, floor);
+        self.switch_realm(realm);
+        if result.is_ok() {
+            self.vm
+                .frames
+                .last_mut()
+                .expect("the new frame")
+                .caller_realm = realm;
+        }
+        result
+    }
+
+    #[allow(clippy::too_many_arguments, reason = "one frame's whole state")]
+    fn push_closure_frame_in_realm(
         &mut self,
         f: ObjectId,
         this: Value,
@@ -811,6 +880,7 @@ impl Agent {
         self.vm.stack.resize(base + registers, Value::UNDEFINED);
         let copied = argc.min(usize::from(code.params));
         self.vm.stack.copy_within(args_at..args_at + copied, base);
+        let realm = self.frame_realm(function);
         // The stack limit keeps every index within `u32`.
         self.vm.frames.push(Frame {
             code,
@@ -829,15 +899,36 @@ impl Agent {
             new_target,
             generator: Value::UNDEFINED,
             resumed: false,
+            realm,
+            caller_realm: self.heap.realm,
         });
         Ok(())
     }
 
+    /// The realm a frame for `function` runs in.
+    fn frame_realm(&self, function: Value) -> u16 {
+        function
+            .as_object()
+            .map_or(self.heap.realm, |f| self.heap.object(f).realm)
+    }
+
     // ---- running --------------------------------------------------------
 
-    /// Run until the frame stack is back to `floor` frames.
+    /// Run until the frame stack is back to `floor` frames, then return
+    /// to the realm of the caller.
     fn run(&mut self, floor: usize) -> JsResult<Value> {
+        let realm = self.heap.realm;
+        let result = self.run_frames(floor);
+        self.switch_realm(realm);
+        result
+    }
+
+    fn run_frames(&mut self, floor: usize) -> JsResult<Value> {
         loop {
+            let frame = self.vm.frames.last().expect("a frame to run");
+            // Every change of the running frame comes back here.
+            let realm = frame.realm;
+            self.switch_realm(realm);
             let frame = self.vm.frames.last().expect("a frame to run");
             let code = Rc::clone(&frame.code);
             let base = frame.base as usize;
@@ -1439,6 +1530,10 @@ impl Agent {
                             "Super constructor may only be called once"
                         )));
                     }
+                }
+                Op::CallerRealm => {
+                    let realm = self.vm.frames.last().expect("a running frame").caller_realm;
+                    self.switch_realm(realm);
                 }
                 Op::DerivedResult { src } => {
                     let v = reg!(src);
@@ -3273,6 +3368,7 @@ impl Agent {
             self.vm.stack[base + usize::from(mode_reg)] = Value::number(f64::from(mode));
         }
         let code = Rc::clone(self.heap.code(code_id));
+        let realm = self.frame_realm(function);
         // The stack limit keeps every index within `u32`.
         self.vm.frames.push(Frame {
             code,
@@ -3291,6 +3387,8 @@ impl Agent {
             new_target,
             generator: Value::object(o),
             resumed: true,
+            realm,
+            caller_realm: self.heap.realm,
         });
         let outer_floor = self.vm.collect_floor;
         self.vm.native_depth += 1;

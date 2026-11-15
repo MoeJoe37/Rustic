@@ -68,7 +68,18 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let f = install_constructor(agent, "AggregateError", aggregate_error, 2, prototype)?;
     agent.set_prototype_of(f, Some(error))?;
     agent.intrinsics.aggregate_error_prototype = prototype;
+    let key = agent.heap.key("isError")?;
+    agent.define_method(error, key, is_error, "isError", 1)?;
     Ok(())
+}
+
+/// `Error.isError(arg)` (§20.5.2.1): whether `arg` has `[[ErrorData]]`,
+/// in whichever realm it was made. A proxy for an error is not one.
+fn is_error(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let is = arg(args, 0)
+        .as_object()
+        .is_some_and(|o| agent.class(o) == Class::Error);
+    Ok(Value::boolean(is))
 }
 
 /// `AggregateError(errors, message, options)` (§20.5.7.1.1).

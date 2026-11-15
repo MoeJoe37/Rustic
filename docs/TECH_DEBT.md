@@ -136,7 +136,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
-| TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has only `global` and `detachArrayBuffer`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
+| TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
 | TD-107 | Deliberate | JS | `localeCompare` and locale case methods ignore locales | Open, JS-05/JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
@@ -149,6 +149,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-115 | Deliberate | JS | A `SharedArrayBuffer` is shared within one agent only (no cross-agent byte store until workers); typed array elements are read through the generic property path | Open, M9 workers / `perf.interpreter` |
 | TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
+| TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, WEB-02 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1518,8 +1519,8 @@ The remaining 121 use proposal features. See the
 [Test262 run](JS.md#static-module-loading-js-06) for the pinned revision
 and reproduction commands.
 
-Pay with `$262` support for
-realms, collection and test agents. `$262.evalScript` now runs UTF-16
+`$262.createRealm` is implemented (JS-06 realms). Pay with `$262` support
+for collection and test agents. `$262.evalScript` now runs UTF-16
 script source against the current global environment. Extend the built-in gate
 when new library areas land. Trigger on each implementation.
 
@@ -1720,3 +1721,21 @@ Pay with contextual template selection for the affected languages and a
 bounded locale-distance matcher shared by Intl services. Trigger when
 implementing the next service that needs these rules or adding a conformance
 case for a contextual form.
+
+### TD-118 — Realms live as long as their agent
+
+`Agent::create_realm` adds a realm record that the collector treats as a
+root: the realm's global object, global environment and named intrinsics
+stay alive until the agent is dropped, even when no script or host value
+can reach them. Objects find their realm by a 16-bit index, so a record
+cannot be removed while any object might still name it, and at most 65,536
+realms fit in an agent. Each realm also builds its whole standard library
+up front (about 119 KB of heap budget).
+
+A page that creates and discards many frames would grow without bound.
+Nothing creates realms yet except tests and the Test262 host object.
+
+Pay by freeing a realm's record and reusing its index once a collection
+finds no live object of that realm, and by installing library objects on
+first use if the per-realm cost shows up in frame-heavy pages. Trigger when
+WEB-02 gives each same-origin frame a realm.

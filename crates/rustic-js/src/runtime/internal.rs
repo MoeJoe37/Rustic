@@ -99,7 +99,34 @@ impl Agent {
             }
             None => (false, false),
         };
-        let prototype = if generator {
+        // The parents are intrinsics of the function's realm (§10.2.5),
+        // whichever realm first looks.
+        let realm = self.heap.realm;
+        self.switch_realm(self.heap.object(f).realm);
+        let created = self.create_function_prototype(f, generator, is_async);
+        self.switch_realm(realm);
+        let prototype = created?;
+        let value = Value::object(prototype);
+        let key = PropertyKey::String(self.names.prototype);
+        self.store(
+            f,
+            key,
+            Stored {
+                first: value,
+                second: Value::UNDEFINED,
+                attributes,
+            },
+        )?;
+        Ok(value)
+    }
+
+    fn create_function_prototype(
+        &mut self,
+        f: ObjectId,
+        generator: bool,
+        is_async: bool,
+    ) -> JsResult<ObjectId> {
+        Ok(if generator {
             // A generator function's `prototype` inherits from
             // %GeneratorPrototype% (%AsyncGeneratorPrototype%) and has no
             // `constructor` (§15.5.3, §15.6.3).
@@ -118,19 +145,7 @@ impl Agent {
                 PropertyDescriptor::data_with(Value::object(f), true, false, true),
             )?;
             prototype
-        };
-        let value = Value::object(prototype);
-        let key = PropertyKey::String(self.names.prototype);
-        self.store(
-            f,
-            key,
-            Stored {
-                first: value,
-                second: Value::UNDEFINED,
-                attributes,
-            },
-        )?;
-        Ok(value)
+        })
     }
 
     fn describe(&mut self, o: ObjectId, location: Location) -> JsResult<PropertyDescriptor> {

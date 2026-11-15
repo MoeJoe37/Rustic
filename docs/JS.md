@@ -183,7 +183,7 @@ Most `test/language` failures are not interpreter bugs yet:
 In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
-Temporal, `$262.agent` (112 `Atomics` files) or `$262` realms. Skipped files are never
+Temporal or `$262.agent` (112 `Atomics` files). Skipped files are never
 counted as passing. The script gate continues to report module files as
 skipped. Their execution classifications are recorded by the separate module
 gate below.
@@ -224,7 +224,8 @@ small heap as [ADR 0015](adr/0015-js-value-and-memory-layout.md) records:
 | String | 24 bytes (12 on 32-bit targets) plus 1 byte per code unit when all units are below 256, otherwise 2 |
 | Binding in a declarative environment | 12 bytes |
 
-An `Agent` owns one `Heap` and the realm's intrinsic objects. Every
+An `Agent` owns one `Heap` and the intrinsic objects of its
+[realms](#realms-js-06). Every
 allocation is charged to the heap's byte budget; exceeding it returns
 `Abrupt::OutOfMemory`, which script cannot catch, and the heap is never
 over-committed. Unreachable values are freed by the collector below.
@@ -648,6 +649,51 @@ requires the same outcome each time and a usable agent afterwards. Its first
 runs found a loop that could not be cancelled and a function that ran off the
 end of its code; both are fixed and kept as seeds or regressions.
 
+## Realms (JS-06)
+
+An agent starts with one realm and can hold more (§9.3). Each realm has its
+own global object, global environment and set of intrinsics; the well-known
+symbols and the `Symbol.for` registry belong to the agent and are shared.
+
+```rust
+let realm = agent.create_realm()?;          // the running realm stays
+let global = agent.realm_global(realm);     // hand it to script as a value
+let previous = agent.enter_realm(realm);    // host work in that realm
+agent.evaluate("var x = 1")?;
+agent.enter_realm(previous);
+```
+
+- Every object records the realm it was created in, in two bytes that were
+  padding, so `Object` stays at 72 bytes. For a function that is its
+  `[[Realm]]`.
+- `Agent::intrinsics` and the global environment are the running realm's.
+  Calling a function of another realm swaps them in and the return swaps
+  them back, so a call within one realm pays one 16-bit comparison. A
+  frame records its realm; generators and async functions resume in theirs.
+- Bound functions and proxies run no code of their own and stay in the
+  caller's realm, so a revoked proxy from another realm throws the caller's
+  `TypeError`. A derived constructor checks its result after its own context
+  is gone (§10.2.2), so those two errors are the caller's as well.
+- `GetPrototypeFromConstructor` falls back to the intrinsic of the realm of
+  `newTarget` (`GetFunctionRealm` looks through bound functions and
+  proxies). The objects a realm is created with take consecutive indices in
+  the same order in every realm, so the counterpart of an intrinsic is found
+  by offset, with no table per realm. `ArraySpeciesCreate` ignores another
+  realm's `%Array%`.
+- A lazily created function `prototype` inherits from the intrinsics of the
+  function's realm, whichever realm reads it first.
+- A realm costs about what the first one does (119 KB of heap budget) and
+  lives as long as its agent (TD-118). Creating one that does not fit leaves
+  the agent unchanged.
+
+The Test262 host object gains `$262.createRealm()`, which returns the new
+realm's own `$262`. With it, 189 more files pass: 19 in `test/language`,
+168 in the installed `test/built-ins` areas (which also gain
+`Error.isError`) and 2 in the Intl selection. `test/language` passes 21,939
+of 22,427 files run (97.8%) and the built-ins 17,290 of 18,574. The
+cross-realm files still failing use `ShadowRealm` or the `Error.prototype.stack`
+accessor, which are proposals.
+
 ## Static module loading (JS-06)
 
 [`ModuleRecord`](../crates/rustic-js/src/module.rs) derives the static
@@ -1010,8 +1056,8 @@ public-domain `zone1970.tab` for the explicit region.
 
 The pinned Intl selection covers `Intl/getCanonicalLocales`, `Locale`
 and both `String.prototype.toLocale*Case` directories. It passes 233 of 237
-files. The four outstanding cases depend on realms, `Intl.Collator` or
-`Intl.NumberFormat`. Service negotiation and locale-sensitive comparison
+files. The four outstanding cases depended on realms (since added),
+`Intl.Collator` or `Intl.NumberFormat`. Service negotiation and locale-sensitive comparison
 remain open under TD-107.
 
 The data generator takes `supplementalMetadata.xml`, `likelySubtags.xml`,
@@ -1042,7 +1088,7 @@ CLDR templates at generation time and walks the parts in linear time.
 It preserves each string's UTF-16 code units and closes the iterator when
 it encounters a non-string element.
 
-The combined pinned Intl selection passes 313 of 318 files, including
-80 of 81 ListFormat cases. The ListFormat constructor's cross-realm
-prototype case depends on realms. Context-dependent conjunctions and
+The combined pinned Intl selection passed 313 of 318 files, including
+80 of 81 ListFormat cases. With [realms](#realms-js-06) it passes 315,
+including every ListFormat case. Context-dependent conjunctions and
 specialized best-fit matching remain open under TD-117.

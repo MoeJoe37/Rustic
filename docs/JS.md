@@ -1233,3 +1233,22 @@ is outside M4.
 
 102 of the 110 `DurationFormat` files of the pinned selection pass. Six
 need Temporal, one `Intl.supportedValuesOf` and one `Intl.DateTimeFormat`.
+
+
+## Intl segmentation (JS-08)
+
+`Intl.Segmenter` implements `segment`, `resolvedOptions` and
+`supportedLocalesOf`, Segments objects with `containing` and iteration, and
+the segment iterator (ECMA-402 §19). `intl/segment.rs` finds extended
+grapheme cluster, word and sentence boundaries by the default rules of
+UAX #29 for Unicode 17.0.0, each in one linear pass over the code points
+(a lone surrogate is a code point of its own). The break properties are a
+39 KB pack (`data/intl/segment.bin`) generated from the pinned Unicode
+files, and every case of `GraphemeBreakTest.txt`, `WordBreakTest.txt` and
+`SentenceBreakTest.txt` (3,222 cases, `tests/fixtures/segmentation_cases.txt`)
+passes. A string is segmented once, when `segment` is called, with native
+work counted per code unit and the boundary list charged to the heap.
+`isWordLike` is true for a word segment that contains a letter, an
+ideograph or a digit. TD-121 records what the default rules leave out.
+
+All 79 `Segmenter` files of the pinned selection pass.

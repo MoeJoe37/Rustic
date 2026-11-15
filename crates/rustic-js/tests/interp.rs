@@ -3913,3 +3913,48 @@ fn intl_duration_format_joins_units_and_digital_clocks() {
         Ok(String::new())
     );
 }
+
+#[test]
+fn intl_segmenter_finds_graphemes_words_and_sentences() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        const pieces = (granularity, text, show = s => s.segment) =>
+            [...new Intl.Segmenter('en', { granularity }).segment(text)].map(show).join('|');
+        const words = new Intl.Segmenter('en', { granularity: 'word' });
+        let segments = words.segment('ab cd');
+        const iterator = segments[Symbol.iterator]();
+        const found = segments.containing(3);
+        segments = null;
+        const first = iterator.next().value;
+        const resolved = new Intl.Segmenter('de-AT', { granularity: 'sentence' }).resolvedOptions();
+        [
+            pieces('word', "Hello, world! It's 3.14 o'clock 你好",
+                s => s.segment + (s.isWordLike ? '*' : ''))
+                === "Hello*|,| |world*|!| |It's*| |3.14*| |o'clock*| |你*|好*",
+            pieces('sentence', 'He arrived at 3 p.m. today! Really? Yes.')
+                === 'He arrived at 3 p.m. today! |Really? |Yes.',
+            pieces('grapheme', 'é\u{1F468}‍\u{1F469}‍\u{1F467}\u{1F1EB}\u{1F1F7}\u{1F1E9}\u{1F1EA}\r\nx',
+                s => s.index + ':' + s.segment.length) === '0:2|2:8|10:4|14:4|18:2|20:1',
+            pieces('grapheme', '\uD800a', s => s.segment.length) === '1|1',
+            pieces('word', '') === '',
+            found.segment === 'cd' && found.index === 3 && found.input === 'ab cd'
+                && found.isWordLike === true,
+            first.segment === 'ab' && iterator.next().value.segment === ' '
+                && iterator.next().value.segment === 'cd' && iterator.next().done,
+            words.segment('ab').containing(2) === undefined
+                && words.segment('ab').containing(-1) === undefined
+                && words.segment('ab').containing().segment === 'ab',
+            !('isWordLike' in new Intl.Segmenter().segment('a').containing(0)),
+            Object.prototype.toString.call(iterator) === '[object Segmenter String Iterator]',
+            resolved.locale === 'de-AT' && resolved.granularity === 'sentence',
+        ].map((v, i) => v ? '' : i).join('');
+    "#;
+    let result = agent.evaluate(script).unwrap();
+    assert_eq!(
+        agent
+            .to_string(result)
+            .map(|id| agent.heap.string(id).to_text()),
+        Ok(String::new())
+    );
+}

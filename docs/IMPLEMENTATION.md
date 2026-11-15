@@ -1726,3 +1726,14 @@ fractional digits, negative and zero-valued leading units, large values,
 parts with their units, invalid durations and invalid style combinations.
 102 of 110 Test262 `DurationFormat` files pass (six need Temporal); the
 selected Intl gate passes 951 of 965 files.
+
+
+## JS-08 — Intl.Segmenter
+
+`Intl.Segmenter` segments strings into grapheme clusters, words and
+sentences with the default UAX #29 rules for Unicode 17.0.0, generated
+break properties and the three Unicode conformance files as a unit test.
+Regressions cover emoji sequences, flags, lone surrogates, apostrophes and
+decimals in words, sentence terminators, `containing`, iteration after the
+Segments object is unreachable, and the step budget. All 79 Test262
+`Segmenter` files pass; the selected Intl gate passes 1,030 of 1,044 files.

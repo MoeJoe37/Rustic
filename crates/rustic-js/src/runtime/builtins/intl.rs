@@ -23,6 +23,8 @@ mod pack;
 mod plural;
 pub(crate) mod plural_rules;
 mod relative_time_format;
+mod segment;
+mod segmenter;
 mod service;
 
 pub(super) use number_format::to_locale_string as number_to_locale_string;
@@ -34,6 +36,9 @@ mod slot {
     pub(super) const RELATIVE_TIME_FORMAT_PROTOTYPE: usize = 2;
     pub(super) const DISPLAY_NAMES_PROTOTYPE: usize = 3;
     pub(super) const DURATION_FORMAT_PROTOTYPE: usize = 4;
+    pub(super) const SEGMENTER_PROTOTYPE: usize = 5;
+    pub(super) const SEGMENTS_PROTOTYPE: usize = 6;
+    pub(super) const SEGMENT_ITERATOR_PROTOTYPE: usize = 7;
 }
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
@@ -51,6 +56,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     relative_time_format::install(agent, intl)?;
     display_names::install(agent, intl)?;
     duration_format::install(agent, intl)?;
+    segmenter::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(

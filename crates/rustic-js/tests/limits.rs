@@ -168,6 +168,24 @@ fn number_formatting_work_respects_the_step_budget() {
     assert_eq!(text(&mut agent, "format(digits)"), "∞");
 }
 
+#[test]
+fn segmentation_work_respects_the_step_budget() {
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("const long = 'Word. '.repeat(1_024); const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });")
+        .expect("segmenter setup");
+    agent.set_step_budget(Some(1_000));
+    assert_eq!(
+        agent.evaluate("sentences.segment(long)"),
+        Err(EvalError::Cancelled)
+    );
+    agent.set_step_budget(None);
+    assert_eq!(
+        text(&mut agent, "[...sentences.segment(long)].length"),
+        "1024"
+    );
+}
+
 // ---- ropes ----------------------------------------------------------------
 
 #[test]

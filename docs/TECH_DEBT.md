@@ -152,6 +152,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, WEB-02 |
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
 | TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
+| TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1798,3 +1799,31 @@ PluralRules and NumberFormat; a locale-subset build option or loading the
 pack from the platform layer; the general category table for spacing.
 Trigger: the first binary-size budget (M12), or a formatting difference
 from ICU reported by a page or a Test262 update.
+
+### TD-121 — Segmentation is untailored and duplicated
+
+`Intl.Segmenter` applies the default rules of UAX #29 in every locale.
+Three things a browser does beyond them are missing:
+
+- Chinese, Japanese, Thai, Lao, Khmer and Burmese text has no spaces
+  between words; engines find words there with dictionaries. The default
+  rules make each ideograph its own word and leave a run of Thai letters
+  whole.
+- CLDR's sentence break suppressions ("Mr.", "p.ej.") and its locale
+  tailorings (for example Swedish and Finnish colons inside words) are not
+  applied, so "Mr. Smith" ends a sentence after "Mr. ".
+- The locale only matters for `resolvedOptions`.
+
+`rustic-text` has its own grapheme cluster implementation and tables
+(`segment.rs`), because `rustic-js` depends only on `rustic-base` and must
+not pull in the font stack.
+
+**Why bad:** word selection and counting differ from other engines for
+East Asian text; two copies of the grapheme rules must both follow each
+Unicode version.
+
+Pay with: the segmentation rules and tables moved to `rustic-base` and
+used by both crates, CLDR suppressions and tailorings from the pinned
+`common/segments`, and a dictionary segmenter. Trigger: text selection by
+word in the editing milestone, or a Test262 update that checks tailored
+results.

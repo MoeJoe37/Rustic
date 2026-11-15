@@ -3511,126 +3511,142 @@
           "label": "Intl and required Unicode semantics",
           "size": 5,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Unicode normalization forms, shared data and exact UTF-16 handling",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-base/src/unicode/normalize.rs",
-                  "marker": "pub fn normalize_utf16"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
-                  "marker": "fn normalize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "normalize_preserves_utf16_and_uses_all_four_unicode_forms"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-base/src/unicode/normalize.rs",
+              "marker": "pub fn normalize_utf16"
             },
             {
-              "label": "Locale identifiers, Locale objects with preference data and locale-sensitive casing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/intl/locale_object.rs",
-                  "marker": "fn construct"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn intl_locale_keeps_its_tag_alive_and_supplies_locale_preferences"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/test262.rs",
-                  "marker": "fn test262_locale_identifiers_and_case_mapping_match_the_passing_list"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/string_object.rs",
+              "marker": "fn normalize"
             },
             {
-              "label": "Intl service locale negotiation and locale-sensitive string comparison",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/intl/collator.rs",
-                  "marker": "fn negotiate"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/intl/collator/weights.rs",
-                  "marker": "fn key"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn intl_collator_negotiates_options_and_traces_bound_compare"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn collation_work_respects_the_step_budget"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
-                  "marker": "String/prototype/localeCompare"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "normalize_preserves_utf16_and_uses_all_four_unicode_forms"
             },
             {
-              "label": "Plural rules and number formatting with CLDR number, currency and unit data for every locale",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/intl/plural_rules.rs",
-                  "marker": "fn select_range"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/intl/numfmt.rs",
-                  "marker": "pub(super) fn format_range"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/builtins/intl/decimal.rs",
-                  "marker": "pub(super) fn round"
-                },
-                {
-                  "kind": "source",
-                  "path": "tools/generate_js_intl_services.py",
-                  "marker": "def number_pack"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/interp.rs",
-                  "marker": "fn intl_number_format_rounds_exactly_and_follows_cldr_patterns"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn number_formatting_work_respects_the_step_budget"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
-                  "marker": "NumberFormat/prototype/formatRangeToParts/en-US.js"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/locale_object.rs",
+              "marker": "fn construct"
             },
             {
-              "label": "Date and time, relative time, duration, display name and segmentation services with Test262 Intl evidence",
-              "status": "planned"
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn intl_locale_keeps_its_tag_alive_and_supplies_locale_preferences"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/test262.rs",
+              "marker": "fn test262_locale_identifiers_and_case_mapping_match_the_passing_list"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/collator.rs",
+              "marker": "fn negotiate"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/collator/weights.rs",
+              "marker": "fn key"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn intl_collator_negotiates_options_and_traces_bound_compare"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn collation_work_respects_the_step_budget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+              "marker": "String/prototype/localeCompare"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/plural_rules.rs",
+              "marker": "fn select_range"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/numfmt.rs",
+              "marker": "pub(super) fn format_range"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/decimal.rs",
+              "marker": "pub(super) fn round"
+            },
+            {
+              "kind": "source",
+              "path": "tools/generate_js_intl_services.py",
+              "marker": "def number_pack"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn intl_number_format_rounds_exactly_and_follows_cldr_patterns"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn number_formatting_work_respects_the_step_budget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+              "marker": "NumberFormat/prototype/formatRangeToParts/en-US.js"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/date_time_format.rs",
+              "marker": "fn format_range_to_parts"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/time_zone.rs",
+              "marker": "fn future_offset"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/relative_time_format.rs",
+              "marker": "fn format_to_parts"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/duration_format.rs",
+              "marker": "fn format_to_parts"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/display_names.rs",
+              "marker": "fn of"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/builtins/intl/segmenter.rs",
+              "marker": "fn segment_string"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn intl_date_time_format_reads_options_and_formats_in_the_requested_zone"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn intl_date_time_range_and_supported_lists_preserve_their_contracts"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+              "marker": "DateTimeFormat/prototype/format/throws-value-non-finite.js"
             }
           ]
         },

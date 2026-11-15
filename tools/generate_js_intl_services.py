@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cldr_data import NONE, STEP, Cldr, Pack, path  # noqa: E402
+from js_date_time_data import pack_date_time  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "crates/rustic-js/data/intl"
@@ -509,7 +510,12 @@ def segment_pack(cldr, directory):
     return pack.bytes()
 
 
+def date_time_pack(cldr, _):
+    return pack_date_time(cldr, Locales)
+
+
 PACKS = {
+    "date-time.bin": date_time_pack,
     "number.bin": lambda cldr, directory: number_pack(cldr),
     "relative.bin": lambda cldr, directory: relative_pack(cldr),
     "names.bin": lambda cldr, directory: names_pack(cldr),

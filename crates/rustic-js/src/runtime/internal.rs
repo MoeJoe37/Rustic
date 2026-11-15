@@ -194,7 +194,7 @@ impl Agent {
 
     // ---- storage ------------------------------------------------------
 
-    fn make_dictionary(&mut self, o: ObjectId) {
+    pub(super) fn make_dictionary(&mut self, o: ObjectId) {
         if self.heap.object(o).dictionary().is_some() {
             return;
         }

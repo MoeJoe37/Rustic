@@ -40,6 +40,7 @@
     }
   },
   "outputs": {
+    "crates/rustic-js/data/intl/date-time.bin": "91cbfa6098e9eb49fdf8c0008199e53b336cb8892a765ee7f7df2c68830f7c72",
     "crates/rustic-js/data/intl/names.bin": "1dafb5b1733f7be2d6112900cdb1da387ebbe75ceae97eb8b8ed24474ca81a11",
     "crates/rustic-js/data/intl/number.bin": "fc95b07869704a78dfa7cf0969a3263b1ffb3fb521df022004f4d597d87919fa",
     "crates/rustic-js/data/intl/relative.bin": "4584bb99e94783acc58f1ac928d9446501015f4b84cba4e7ea6fec5c068ea801",

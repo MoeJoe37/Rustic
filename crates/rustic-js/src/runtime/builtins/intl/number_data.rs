@@ -96,6 +96,14 @@ pub(super) fn data() -> &'static Data {
 }
 
 impl Data {
+    pub(super) fn system_names(&self) -> impl Iterator<Item = &'static str> + '_ {
+        (0..self.systems.rows()).map(|row| self.systems.text(row, 0))
+    }
+
+    pub(super) fn currency_codes(&self) -> impl Iterator<Item = &'static str> + '_ {
+        (0..self.currency_codes.rows()).map(|row| self.currency_codes.text(row, 0))
+    }
+
     /// The number of a numbering system with decimal digits.
     pub(super) fn numbering_system(&self, name: &str) -> Option<u32> {
         self.systems.find_text(name)

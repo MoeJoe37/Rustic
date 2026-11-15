@@ -253,8 +253,8 @@ impl Agent {
         self.vm.clock = now.map(f64::floor);
     }
 
-    /// Set local time to UTC plus `minutes`. There is no time zone
-    /// database, so the offset is the same all year (TD-108).
+    /// Set the host's default local time to UTC plus `minutes` all year.
+    /// Intl formatters can select a named time zone explicitly.
     pub fn set_time_zone_offset(&mut self, minutes: i32) {
         self.vm.time_zone_offset_ms = f64::from(minutes) * 60_000.0;
     }

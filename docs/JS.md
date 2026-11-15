@@ -1260,3 +1260,40 @@ Iterators trace the owning Segments object so shared boundary storage remains
 charged until it is unreachable. Segment extraction reads the requested UTF-16
 range directly and checks the execution budget before copying. If a copy is
 cancelled, the next call retries the same segment.
+
+## Intl date and time formatting (JS-08)
+
+`Intl.DateTimeFormat` formats numeric instants and Date objects with CLDR 48
+date, clock, and interval patterns. It exposes the locale and calendar,
+numbering system, time zone and hour-cycle choices. The bound `format`
+function uses the injected clock when its argument is omitted.
+`formatToParts` exposes fields and literals, and `formatRangeToParts` labels
+parts as shared or taken from either endpoint. Date's three
+`toLocale*String` methods use the same formatter and honor their distinct
+date-only, time-only and combined defaults.
+
+The supported calendars are Gregorian, ISO 8601, Buddhist and civil Islamic.
+An explicit IANA zone uses the transitions in the pinned tzdata 2025b
+release. TZif footer rules extend recurring transitions beyond the table.
+Numeric offsets and aliases are supported. Named zones and the implicit
+host offset use the same UTC-to-local conversion. TD-108 covers the host
+default, and TD-122 covers the remaining formatting data and behavior.
+
+`Intl.supportedValuesOf` returns new sorted arrays from the supported
+calendar, collation, currency, numbering-system, primary time-zone and unit
+tables. The time-zone table and its license are checked against
+`js_intl_time_zones.json`. To reproduce it, build `zic` from tzcode 2025b,
+then run the data generators with the inputs referenced in the manifests.
+
+```sh
+python3 tools/generate_js_intl_services.py /path/to/pinned/inputs --only date-time.bin --check
+python3 tools/generate_js_time_zones.py /path/to/tzdata2025b.tar.gz /path/to/zic --check
+```
+
+The pinned Intl selection passes 1,240 of 1,326 files, including 168 of 245
+DateTimeFormat files, 24 of 25 supported-value files and all 12 Date locale
+method files. The DateTimeFormat and enumeration intrinsics raise the 64-bit
+standard-library heap baseline by 1,170 bytes. The global object and
+Date prototype are populated directly in their dictionary representation
+so the existing 128 KiB startup limit still works. TD-122 records the
+outstanding calendar, metazone and Temporal coverage.

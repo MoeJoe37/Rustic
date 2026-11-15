@@ -1,0 +1,17 @@
+{
+  "version": "2025b",
+  "license": "Public domain (crates/rustic-js/data/IANATZ-LICENSE.txt)",
+  "sources": {
+    "tzdata": {
+      "url": "https://data.iana.org/time-zones/releases/tzdata2025b.tar.gz",
+      "sha256": "11810413345fc7805017e27ea9fa4885fd74cd61b2911711ad038f5d28d71474"
+    },
+    "tzcode": {
+      "url": "https://data.iana.org/time-zones/releases/tzcode2025b.tar.gz",
+      "sha256": "05f8fedb3525ee70d49c87d3fae78a8a0dbae4fe87aa565c65cda9948ae135ec"
+    }
+  },
+  "outputs": {
+    "crates/rustic-js/data/intl/time-zones.bin": "8fdf94b2cea0c9d6f25a2952170b8c013d9251fd1fa8ed37355dc5bc91a0251d"
+  }
+}

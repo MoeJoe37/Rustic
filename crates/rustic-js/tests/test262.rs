@@ -238,6 +238,9 @@ fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
     check_trees(
         &[
             "test/intl402/Intl/getCanonicalLocales",
+            "test/intl402/Intl/supportedValuesOf",
+            "test/intl402/DateTimeFormat",
+            "test/intl402/Date",
             "test/intl402/Locale",
             "test/intl402/ListFormat",
             "test/intl402/Collator",
@@ -258,7 +261,7 @@ fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
         "test/intl402/",
         INTL_PASSING,
         "test262_intl_passing.txt",
-        "Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules, number, relative time and duration formatting, display names, segmentation and casing (JS-08).",
+        "Test262 Intl locale identifiers, Locale objects, list formatting, collation, plural rules, number, relative time and duration formatting, display names, segmentation, date/time formatting, enumeration and casing (JS-08).",
     );
 }
 

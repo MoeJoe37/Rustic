@@ -686,6 +686,9 @@ impl Agent {
             plural_rules_prototype: object_prototype,
             intl: [object_prototype; 16],
         };
+        // The built-in globals exceed the shape limit in every realm.
+        // Start with their final storage and avoid charging transitional shapes.
+        self.make_dictionary(global);
         super::builtins::install(self)
     }
 

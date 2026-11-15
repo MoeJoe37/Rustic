@@ -22,7 +22,7 @@ use crate::runtime::{
 };
 
 /// The units ECMA-402 sanctions (§6.6.2, table 2).
-const UNITS: &[&str] = &[
+pub(super) const UNITS: &[&str] = &[
     "acre",
     "bit",
     "byte",

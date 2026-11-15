@@ -27,7 +27,7 @@ const MS_PER_MINUTE: f64 = 60_000.0;
 const MS_PER_HOUR: f64 = 3_600_000.0;
 const MS_PER_DAY: f64 = 86_400_000.0;
 /// The largest time value magnitude (§21.4.1.31): 100,000,000 days.
-const MAX_TIME: f64 = 8.64e15;
+pub(super) const MAX_TIME: f64 = 8.64e15;
 
 const DAY_NAMES: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES: [&str; 12] = [
@@ -79,9 +79,9 @@ const PROTOTYPE_METHODS: &[Method] = &[
     method("toDateString", to_date_string, 0),
     method("toISOString", to_iso_string, 0),
     method("toJSON", to_json, 1),
-    method("toLocaleDateString", to_date_string, 0),
-    method("toLocaleString", to_string, 0),
-    method("toLocaleTimeString", to_time_string, 0),
+    method("toLocaleDateString", to_locale_date_string, 0),
+    method("toLocaleString", to_locale_string, 0),
+    method("toLocaleTimeString", to_locale_time_string, 0),
     method("toString", to_string, 0),
     method("toTimeString", to_time_string, 0),
     method("toUTCString", to_utc_string, 0),
@@ -91,6 +91,8 @@ const PROTOTYPE_METHODS: &[Method] = &[
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let object_prototype = agent.intrinsics.object_prototype;
     let prototype = agent.new_object_with(Some(object_prototype))?;
+    // Date's methods exceed the shape limit. Populate the dictionary directly.
+    agent.make_dictionary(prototype);
     let date = install_constructor(agent, "Date", date_constructor, 7, prototype)?;
     install_methods(agent, date, STATIC_METHODS)?;
     install_methods(agent, prototype, PROTOTYPE_METHODS)?;
@@ -115,7 +117,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
 
 /// Days from 1970-01-01 to the proleptic Gregorian date `y`-`m`-`d`
 /// (`m` from 1). Exact for any year the heap can name.
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+pub(super) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -126,7 +128,7 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
 }
 
 /// The date of day number `z`: year, month from 1, day of month.
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
+pub(super) fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;
@@ -139,7 +141,7 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
     (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
-fn days_in_month(y: i64, m: i64) -> i64 {
+pub(super) fn days_in_month(y: i64, m: i64) -> i64 {
     match m {
         2 if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) => 29,
         2 => 28,
@@ -150,23 +152,23 @@ fn days_in_month(y: i64, m: i64) -> i64 {
 
 /// The calendar fields of a finite time value.
 #[derive(Clone, Copy)]
-struct Fields {
-    year: i64,
+pub(super) struct Fields {
+    pub(super) year: i64,
     /// From 0.
-    month: i64,
-    date: i64,
-    hour: i64,
-    minute: i64,
-    second: i64,
-    ms: i64,
+    pub(super) month: i64,
+    pub(super) date: i64,
+    pub(super) hour: i64,
+    pub(super) minute: i64,
+    pub(super) second: i64,
+    pub(super) ms: i64,
     /// 0 is Sunday.
-    weekday: i64,
+    pub(super) weekday: i64,
 }
 
 impl Fields {
     // Time values are integers within ±8.64e15 plus an offset, so the
     // day number and the time within the day fit `i64` exactly.
-    fn of(t: f64) -> Fields {
+    pub(super) fn of(t: f64) -> Fields {
         let days = (t / MS_PER_DAY).floor() as i64;
         let within = t.rem_euclid(MS_PER_DAY) as i64;
         let (year, month, date) = civil_from_days(days);
@@ -627,6 +629,21 @@ fn to_date_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value
 fn to_time_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let t = this_time(agent, this, "toTimeString")?;
     string_value(agent, t, Format::Time)
+}
+
+fn to_locale_date_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let time = this_time(agent, this, "toLocaleDateString")?;
+    super::intl::date_locale_string(agent, time, args, super::intl::DateTimeUsage::Date)
+}
+
+fn to_locale_time_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let time = this_time(agent, this, "toLocaleTimeString")?;
+    super::intl::date_locale_string(agent, time, args, super::intl::DateTimeUsage::Time)
+}
+
+fn to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let time = this_time(agent, this, "toLocaleString")?;
+    super::intl::date_locale_string(agent, time, args, super::intl::DateTimeUsage::Both)
 }
 
 fn to_utc_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {

@@ -1745,3 +1745,18 @@ original Segments reference, and the step budget. All 79 Test262
 Segment iterators keep the boundary table alive and charged after the original
 Segments reference is dropped. Limit tests cover live heap accounting, metered
 UTF-16 extraction and resuming an iterator after cancellation.
+
+## JS-08 — Intl.DateTimeFormat and supported-value enumeration
+
+Date and date-range formatting use the CLDR date/clock patterns and an IANA
+zone table that carries historical and recurring offset transitions. Date's
+locale methods share the formatter. Focused tests cover a DST transition,
+civil Islamic calendar conversion, fixed offsets, common interval compression,
+part provenance, and fresh supported-value lists.
+See [JS.md](JS.md#intl-date-and-time-formatting-js-08) and TD-122.
+
+The pinned Intl gate passes 1,240 of 1,326 files and preserves every prior
+passing file. The source and test evidence completes the catalog's Intl
+service step. The existing 128 KiB limit test still passes after removing temporary
+global and Date prototype shape transitions at realm startup. The native
+ARM64 benchmark remains open.

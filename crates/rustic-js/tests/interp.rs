@@ -3978,3 +3978,72 @@ fn collator_extends_root_contractions_across_unblocked_marks() {
     "#);
     assert_eq!(run, "true,true,true,true,true,true,true");
 }
+
+#[test]
+fn intl_date_time_format_reads_options_and_formats_in_the_requested_zone() {
+    let result = run(r#"
+        const stamp = Date.UTC(2025, 2, 9, 7, 0, 1, 250);
+        const clock = new Intl.DateTimeFormat('en', {
+            timeZone: 'america/new_york', hourCycle: 'h23', hour: '2-digit',
+            minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3,
+            timeZoneName: 'longOffset'
+        });
+        const parts = Object.fromEntries(clock.formatToParts(stamp).map(({type, value}) => [type, value]));
+        const before = Object.fromEntries(clock.formatToParts(stamp - 2000)
+            .map(({type, value}) => [type, value]));
+        const french = new Intl.DateTimeFormat('fr', {timeZone: 'UTC', dateStyle: 'long'});
+        const buddhist = new Intl.DateTimeFormat('en-u-ca-buddhist', {timeZone: 'UTC', year: 'numeric'});
+        let rejected = 0;
+        for (const options of [{timeZone: '+00:99'}, {dateStyle: 'short', year: 'numeric'}]) {
+            try { new Intl.DateTimeFormat('en', options); } catch(e) { rejected++; }
+        }
+        [
+            parts.hour === '03' && parts.minute === '00' && parts.second === '01',
+            parts.fractionalSecond === '250' && parts.timeZoneName === 'GMT-04:00',
+            before.hour === '01' && before.timeZoneName === 'GMT-05:00',
+            clock.resolvedOptions().timeZone === 'America/New_York',
+            clock.format === clock.format,
+            french.format(Date.UTC(2025, 0, 4)) === '4 janvier 2025',
+            buddhist.format(stamp) === '2568',
+            new Date(stamp).toLocaleDateString('fr', {dateStyle: 'long', timeZone: 'UTC'}) === '9 mars 2025',
+            new Date(NaN).toLocaleDateString('fr', {timeZone: 'missing'}) === 'Invalid Date',
+            Intl.supportedValuesOf('timeZone').includes('Asia/Baghdad'),
+            rejected === 2,
+        ].join(',');
+    "#);
+    assert_eq!(
+        result,
+        "true,true,true,true,true,true,true,true,true,true,true"
+    );
+}
+
+#[test]
+fn intl_date_time_range_and_supported_lists_preserve_their_contracts() {
+    let result = run(r#"
+        const from = Date.UTC(2019, 0, 3), to = Date.UTC(2019, 0, 5);
+        const dates = new Intl.DateTimeFormat('en', {
+            timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric'
+        });
+        const compact = dates.formatRangeToParts(from, to);
+        const values = Intl.supportedValuesOf('calendar');
+        const before = new Intl.DateTimeFormat('en', {
+            timeZone: 'UTC', calendar: 'islamicc', year: 'numeric',
+            month: 'numeric', day: 'numeric', era: 'short'
+        });
+        const islamic = Object.fromEntries(before.formatToParts(Date.UTC(622, 6, 19))
+            .map(({type, value}) => [type, value]));
+        const segment = (type, source) => compact.find(part => part.type === type && part.source === source);
+        [
+            dates.formatRange(from, from) === dates.format(from),
+            segment('month', 'shared').value === 'Jan',
+            segment('day', 'startRange').value === '3',
+            segment('day', 'endRange').value === '5',
+            segment('year', 'shared').value === '2019',
+            values.includes('islamic-civil') && !values.includes('islamicc'),
+            values !== Intl.supportedValuesOf('calendar'),
+            before.resolvedOptions().calendar === 'islamic-civil',
+            islamic.year === '1' && islamic.month === '1' && islamic.day === '1',
+        ].join(',');
+    "#);
+    assert_eq!(result, "true,true,true,true,true,true,true,true,true");
+}

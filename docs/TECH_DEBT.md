@@ -153,6 +153,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
 | TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 | TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
+| TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, JS-08 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1568,8 +1569,8 @@ conformance data.
 ### TD-108 — Date local time is a fixed offset
 
 `Date` computes local time as UTC plus the offset the embedder passes to
-`Agent::set_time_zone_offset` (zero by default). Without a time zone
-database the offset cannot change with daylight saving time or with a
+`Agent::set_time_zone_offset` (zero by default). The Date local-time default does not select an IANA zone, so its offset
+cannot change with daylight saving time or with a
 zone's history, so local fields, `getTimezoneOffset` and parsed local times
 are off by the DST shift for part of the year in most zones, and the
 `toString` forms carry no zone name except for UTC. The engine embeds no
@@ -1827,3 +1828,24 @@ used by both crates, CLDR suppressions and tailorings from the pinned
 `common/segments`, and a dictionary segmenter. Trigger: text selection by
 word in the editing milestone, or a Test262 update that checks tailored
 results.
+
+### TD-122 — DateTimeFormat calendar and localization completeness
+
+`Intl.DateTimeFormat` accepts Gregorian, ISO 8601, Buddhist and civil Islamic
+calendars. Other calendar preferences fall back to the locale's supported
+default. Date pattern selection currently uses Gregorian CLDR skeletons and a
+component-distance matcher. Buddhist and civil Islamic dates derive their fields
+from their own calendar arithmetic and use localized calendar names where the
+data supplies them. The formatter uses a complete two-endpoint fallback when
+a compact interval pattern cannot preserve the displayed fields.
+
+The zone data uses the IANA 2025b default distribution and its link targets; it
+does not add the optional pre-1970 `backzone` history. Named-zone display uses
+available UTC names, short English abbreviations and localized GMT offsets.
+Localized metazone, generic and long names still need the CLDR zone-name data.
+The Temporal-dependent DateTimeFormat cases require a Temporal runtime.
+
+Pay with: additional calendar arithmetic and calendar-specific patterns, pinned
+CLDR metazone display names and full basic/best-fit pattern matching. Keep the
+Test262 ratchet visible while these are added. Trigger: Intl conformance work
+and locale-sensitive date display in the browser.

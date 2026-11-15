@@ -8,6 +8,8 @@ use crate::runtime::{Agent, ErrorKind, JsResult, PropertyDescriptor, PropertyKey
 mod case;
 pub(crate) mod collator;
 mod data;
+mod date_time_format;
+mod date_time_patterns;
 mod decimal;
 mod display_names;
 mod duration_format;
@@ -26,7 +28,9 @@ mod relative_time_format;
 mod segment;
 mod segmenter;
 mod service;
+mod time_zone;
 
+pub(super) use date_time_format::{Usage as DateTimeUsage, date_locale_string};
 pub(super) use number_format::to_locale_string as number_to_locale_string;
 
 /// Indices into `Intrinsics::intl`.
@@ -39,6 +43,8 @@ mod slot {
     pub(super) const SEGMENTER_PROTOTYPE: usize = 5;
     pub(super) const SEGMENTS_PROTOTYPE: usize = 6;
     pub(super) const SEGMENT_ITERATOR_PROTOTYPE: usize = 7;
+    pub(super) const DATE_TIME_FORMAT_PROTOTYPE: usize = 8;
+    pub(super) const DATE_TIME_FORMAT: usize = 9;
 }
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
@@ -46,7 +52,10 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_methods(
         agent,
         intl,
-        &[method("getCanonicalLocales", get_canonical_locales, 1)],
+        &[
+            method("getCanonicalLocales", get_canonical_locales, 1),
+            method("supportedValuesOf", supported_values_of, 1),
+        ],
     )?;
     locale_object::install(agent, intl)?;
     list_format::install(agent, intl)?;
@@ -57,6 +66,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     display_names::install(agent, intl)?;
     duration_format::install(agent, intl)?;
     segmenter::install(agent, intl)?;
+    date_time_format::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(
@@ -78,6 +88,41 @@ fn get_canonical_locales(agent: &mut Agent, _: Value, args: &[Value]) -> JsResul
         .iter()
         .map(|tag| agent.string(tag))
         .collect::<JsResult<Vec<_>>>()?;
+    Ok(Value::object(agent.create_array_from_list(&values)?))
+}
+
+fn supported_values_of(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let key = service::text_of(agent, arg(args, 0))?;
+    let mut names: Vec<_> = match key.as_str() {
+        "calendar" => date_time_format::CALENDARS.to_vec(),
+        "collation" => vec!["phonebk"],
+        "currency" => {
+            let data = number_data::data();
+            let row = service::Resolution::new(&data.locales, &[], false).row;
+            data.currency_codes()
+                .filter(|&code| {
+                    data.currency(row, code, number_data::currency::NAME)
+                        .or_else(|| data.currency(row, code, number_data::currency::SYMBOL))
+                        .is_some_and(|name| name != code)
+                })
+                .collect()
+        }
+
+        "numberingSystem" => number_data::data().system_names().collect(),
+        "timeZone" => time_zone::primary_identifiers().collect(),
+        "unit" => number_format::UNITS.to_vec(),
+        _ => return service::range_error(agent, "invalid Intl.supportedValuesOf key"),
+    };
+    names.sort_unstable();
+    names.dedup();
+    agent
+        .heap
+        .charge(names.len() * (size_of::<&str>() + size_of::<Value>()))?;
+    let mut values = Vec::with_capacity(names.len());
+    for name in names {
+        agent.check_native_work()?;
+        values.push(agent.string(name)?);
+    }
     Ok(Value::object(agent.create_array_from_list(&values)?))
 }
 

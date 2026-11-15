@@ -3,9 +3,8 @@ use std::ffi::OsString;
 use std::io::{self, Write};
 use std::process::ExitCode;
 
-use rustic_base::{CancellationToken, EscapedText};
-use rustic_engine::Viewport;
-use rustic_html::ParsedDocument;
+use rustic_base::EscapedText;
+use rustic_engine::{Engine, EngineDocument, Viewport};
 use std::path::Path;
 
 mod fonts;
@@ -127,32 +126,38 @@ fn main() -> ExitCode {
         );
         return ExitCode::SUCCESS;
     }
+    let mut engine = Engine::new(1);
     if args[0] == "dump-dom" {
-        return dump_command("dump-dom", &args[1..], loader::dump_dom);
+        return dump_command(&mut engine, "dump-dom", &args[1..], loader::dump_dom);
     }
     if args[0] == "dump-style" {
-        return dump_command("dump-style", &args[1..], loader::dump_style);
+        return dump_command(&mut engine, "dump-style", &args[1..], loader::dump_style);
     }
     if args[0] == "dump-boxes" {
-        return dump_command("dump-boxes", &args[1..], loader::dump_boxes);
+        return dump_command(&mut engine, "dump-boxes", &args[1..], loader::dump_boxes);
     }
     if args[0] == "dump-layout" {
-        return dump_command("dump-layout", &args[1..], loader::dump_layout);
+        return dump_command(&mut engine, "dump-layout", &args[1..], loader::dump_layout);
     }
     if args[0] == "dump-paint" {
-        return dump_command("dump-paint", &args[1..], loader::dump_paint);
+        return dump_command(&mut engine, "dump-paint", &args[1..], loader::dump_paint);
     }
     if args[0] == "render" {
-        return render_command(&args[1..]);
+        return render_command(&mut engine, &args[1..]);
     }
     if args[0] == "hit-test" {
-        return hit_test_command(&args[1..]);
+        return hit_test_command(&mut engine, &args[1..]);
     }
     if args[0] == "reftest" {
-        return reftest_command(&args[1..]);
+        return reftest_command(&mut engine, &args[1..]);
     }
     if args[0] == "dump-formatting" {
-        return dump_command("dump-formatting", &args[1..], loader::dump_formatting);
+        return dump_command(
+            &mut engine,
+            "dump-formatting",
+            &args[1..],
+            loader::dump_formatting,
+        );
     }
     eprintln!(
         "Unsupported command. Rendering and navigation are not implemented; see docs/ROADMAP.md."
@@ -161,9 +166,10 @@ fn main() -> ExitCode {
 }
 
 fn dump_command(
+    engine: &mut Engine,
     command: &str,
     args: &[OsString],
-    dump: fn(&ParsedDocument, &Path, LoaderLimits) -> Result<String, LoadError>,
+    dump: fn(&EngineDocument, &Path, LoaderLimits) -> Result<String, LoadError>,
 ) -> ExitCode {
     let (limits, path) = match parse_dump_args(args) {
         Ok(parsed) => parsed,
@@ -172,19 +178,20 @@ fn dump_command(
             return ExitCode::from(2);
         }
     };
-    dump_command_with(command, limits, &path, |parsed, path| {
+    dump_command_with(engine, command, limits, &path, |parsed, path| {
         dump(parsed, path, limits)
     })
 }
 
 /// Load a document, run `dump` and write its output to stdout.
 fn dump_command_with(
+    engine: &mut Engine,
     command: &str,
     limits: LoaderLimits,
     path: &OsString,
-    dump: impl FnOnce(&ParsedDocument, &Path) -> Result<String, LoadError>,
+    dump: impl FnOnce(&EngineDocument, &Path) -> Result<String, LoadError>,
 ) -> ExitCode {
-    match load(command, limits, path, dump) {
+    match load(engine, command, limits, path, dump) {
         Ok(dump) => {
             let mut stdout = io::stdout().lock();
             if stdout
@@ -202,10 +209,11 @@ fn dump_command_with(
 
 /// Load a local document and run `then`, reporting errors on stderr.
 fn load<T>(
+    engine: &mut Engine,
     command: &str,
     limits: LoaderLimits,
     path: &std::ffi::OsStr,
-    then: impl FnOnce(&ParsedDocument, &Path) -> Result<T, LoadError>,
+    then: impl FnOnce(&EngineDocument, &Path) -> Result<T, LoadError>,
 ) -> Result<T, ExitCode> {
     let path = match loader::local_path(path) {
         Ok(path) => path,
@@ -214,8 +222,11 @@ fn load<T>(
             return Err(ExitCode::from(2));
         }
     };
-    let result = loader::load_document(&path, limits, CancellationToken::default())
-        .and_then(|parsed| then(&parsed, &path));
+    let result = loader::load_document(engine, &path, limits).and_then(|parsed| {
+        let value = then(&parsed, &path)?;
+        loader::check_cancelled(parsed.cancellation())?;
+        Ok(value)
+    });
     match result {
         Ok(value) => Ok(value),
         Err(error @ LoadError::InvalidLimits) => {
@@ -301,7 +312,7 @@ fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     })
 }
 
-fn render_command(args: &[OsString]) -> ExitCode {
+fn render_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
     let usage = |message: String| {
         eprintln!("rustic render: {message}\n\n{USAGE}");
         ExitCode::from(2)
@@ -314,7 +325,7 @@ fn render_command(args: &[OsString]) -> ExitCode {
         return usage("missing --output".into());
     };
     let (limits, view) = (args.limits, args.view);
-    let png = match load("render", limits, &args.path, |parsed, path| {
+    let png = match load(engine, "render", limits, &args.path, |parsed, path| {
         loader::render_png(parsed, path, limits, view)
     }) {
         Ok(png) => png,
@@ -330,7 +341,7 @@ fn render_command(args: &[OsString]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn hit_test_command(args: &[OsString]) -> ExitCode {
+fn hit_test_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
     let mut points = Vec::new();
     let mut rest = Vec::new();
     let mut iter = args.iter();
@@ -367,12 +378,12 @@ fn hit_test_command(args: &[OsString]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    dump_command_with("hit-test", limits, &path, |parsed, path| {
+    dump_command_with(engine, "hit-test", limits, &path, |parsed, path| {
         loader::hit_test(parsed, path, limits, &points)
     })
 }
 
-fn reftest_command(args: &[OsString]) -> ExitCode {
+fn reftest_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
     let args = match parse_render_args(args) {
         Ok(args) if args.output.is_some() => Err("--output is not accepted".into()),
         other => other,
@@ -385,10 +396,13 @@ fn reftest_command(args: &[OsString]) -> ExitCode {
         }
     };
     let (limits, view) = (args.limits, args.view);
-    let loaded = load("reftest", limits, &args.path, |parsed, path| {
+    let loaded = load(engine, "reftest", limits, &args.path, |parsed, path| {
         let test = std::fs::canonicalize(path).map_err(loader::LoadError::Io)?;
         let rendered = loader::render_list(parsed, path, limits, view)?;
-        Ok((rendered, reftest::manifest(parsed.document(), &test)))
+        Ok((
+            rendered,
+            reftest::manifest(parsed.parsed().document(), &test),
+        ))
     });
     let (rendered, manifest) = match loaded {
         Ok(loaded) => loaded,
@@ -410,13 +424,24 @@ fn reftest_command(args: &[OsString]) -> ExitCode {
     for reference in &manifest.references {
         let detail = match &reference.path {
             Err(reason) => Err((*reason).to_owned()),
-            Ok(path) => load("reftest", limits, path.as_os_str(), |parsed, path| {
-                let other = loader::render_list(parsed, path, limits, view)?;
-                // Paint conformance for damage: repainting what changed
-                // from the reference to the test gives the test exactly.
-                let exact = loader::damage_repaints_exactly(&other, &rendered, view.scale())?;
-                Ok((other.1, exact))
-            })
+            Ok(path) => load(
+                engine,
+                "reftest",
+                limits,
+                path.as_os_str(),
+                |parsed, path| {
+                    let other = loader::render_list(parsed, path, limits, view)?;
+                    // Paint conformance for damage: repainting what changed
+                    // from the reference to the test gives the test exactly.
+                    let exact = loader::damage_repaints_exactly(
+                        &other,
+                        &rendered,
+                        view.scale(),
+                        parsed.cancellation(),
+                    )?;
+                    Ok((other.1, exact))
+                },
+            )
             .map_err(|_| "failed to render".to_owned()),
         };
         let (pass, detail) = match detail {

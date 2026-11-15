@@ -294,7 +294,7 @@ mobile gates remain mandatory through M9.
 
 | Task | Work and deliverable | Prerequisite |
 | --- | --- | --- |
-| WEB-01 | Agent/task sources, microtask checkpoints, safe points, fake clock/timers and cancellation | JS-06, engine lifecycle |
+| WEB-01 | Agent/task sources, microtask checkpoints, safe points, fake clock/timers and cancellation | JS-06, [engine lifecycle](adr/0020-document-lifecycle.md) |
 | WEB-02 | Web IDL subset generator and conversions, wrapper identity, DOM/JS tracing and exceptions | DOC-09, JS-03 |
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | WEB-02, CSS-02 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | WEB-01, WEB-03 |

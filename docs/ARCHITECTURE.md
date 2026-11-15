@@ -59,7 +59,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
-| `rustic-engine` | Public Rust facade and browser/document lifecycle coordination | component/service interfaces | M0 onward |
+| `rustic-engine` | Rust facade and browser/document lifecycle coordination | base, HTML parser and future service interfaces | M0 onward |
 | `rustic-cli` / future `rustic-shell` | Headless test host / desktop browser chrome | engine API, platform | M0 / M8 |
 | `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
 
@@ -86,6 +86,13 @@ flowchart TD
 
 Arrows show major data/control flow, not every Cargo dependency. In particular,
 JS interacts with DOM through bindings and service access goes through policy.
+
+The headless host admits a bounded number of documents through `rustic-engine`.
+An admitted load owns the parser, then transfers the completed tree to a document
+owner. The engine weakly tracks a cancellation scope for each owner. Shutdown
+closes admission and signals all scopes, while dropping an individual owner
+signals only its own work. Host adapters participate by passing the document's
+token through parsing, resource reads and rendering. See [ADR 0020](adr/0020-document-lifecycle.md).
 
 ## 3. Documents, identity, and memory
 

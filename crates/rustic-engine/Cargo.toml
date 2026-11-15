@@ -1,12 +1,16 @@
 [package]
 name = "rustic-engine"
-description = "Foundation for the Rustic browser engine; rendering is not implemented yet"
+description = "Headless engine lifecycle and configuration for the Rustic browser engine"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
+
+[dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-html = { path = "../rustic-html" }
 
 [lints]
 workspace = true

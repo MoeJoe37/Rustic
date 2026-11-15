@@ -56,7 +56,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-06 | Bad | CI | Fuzz workflow toolchain/action pins were unchecked | Paid |
 | TD-07 | Deliberate | Process | Progress bot commits to `main`, so `feature` drifts | Open |
 | TD-08 | Watch | Docs | Hard-coded corpus and test counts repeated across docs | Open, rule 8 |
-| TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Open, pay with the engine facade |
+| TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
 | TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, M1 queue |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, M1 queue |
 | TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
@@ -249,13 +249,17 @@ the source of truth and are digest-checked; the prose copies are not.
 fail on stale prose, or link to the manifest instead of repeating numbers.
 **Trigger:** the first stale count found in review.
 
-### TD-09 — `rustic-engine` holds only `Viewport`
+### TD-09 — `rustic-engine` holds only `Viewport` (Paid)
 
 The crate is nearly a placeholder, which `AGENTS.md` discourages. It is kept as
 the seam between hosts (CLI, desktop, mobile) and the engine. Do not grow it
 with unrelated helpers. **Pay:** fill it with the engine facade (navigation,
 document lifecycle) or fold `Viewport` into its first real consumer.
 **Trigger:** the first host-facing engine API (M2).
+
+**Paid:** [ADR 0020](adr/0020-document-lifecycle.md) defines the engine's
+bounded document admission and shutdown contract. The CLI uses the facade
+from HTML loading through rendering.
 
 ### TD-10 — Scripting-on and processing instructions pending
 

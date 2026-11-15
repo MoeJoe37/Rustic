@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "26cf711383f1080bdc3563ff862b5f6f6a2cacda7677adc2509992fc495bffb2",
-  "percent": "28.72",
-  "verified_percent": "27.61",
-  "partial_percent": "1.11",
-  "completed": 64,
+  "source_fingerprint": "a2a7a0e114e7bfdff0445bb22072c0953e2acc2924c9afb75a0265bb839ed9d2",
+  "percent": "28.90",
+  "verified_percent": "27.80",
+  "partial_percent": "1.10",
+  "completed": 65,
   "in_progress": 4,
   "total": 221,
   "fully_complete": false,
@@ -55,10 +55,10 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 0,
+      "completed": 1,
       "total": 12,
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "percent": "3.54",
+      "verified_percent": "3.54",
       "partial_percent": "0.00"
     },
     {
@@ -325,19 +325,35 @@
           "label": "Coordinated lifecycle, shutdown and resource ownership",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/lifecycle.rs",
+              "marker": "pub fn shutdown"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/lifecycle.rs",
+              "marker": "fn shutdown_cancels_existing_work_and_closes_admission"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn shutdown_stops_document_loading_and_rendering"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.18"
         }
       ],
       "points": 16,
-      "completed": 7,
+      "completed": 8,
       "in_progress": 0,
       "total": 8,
-      "contribution": "0.81",
-      "percent": "81.25",
-      "verified_percent": "81.25",
+      "contribution": "1.00",
+      "percent": "100.00",
+      "verified_percent": "100.00",
       "partial_percent": "0.00"
     },
     {

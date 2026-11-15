@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 28.72%** = 27.61% verified complete + 1.11% partial credit. 64/221 capabilities complete, 4 in progress.
+**Overall completion: 28.90%** = 27.80% verified complete + 1.10% partial credit. 65/221 capabilities complete, 4 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `26cf711383f1080bdc3563ff862b5f6f6a2cacda7677adc2509992fc495bffb2`.
+Catalog: `engine-v4`. Source fingerprint: `a2a7a0e114e7bfdff0445bb22072c0953e2acc2924c9afb75a0265bb839ed9d2`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `26cf711383f1080bdc3563ff862b5f6f6a2ca
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 11/13 | 95.38% | 87.69% | 8.90% |
-| M5 Scripted documents | 0/12 | 0.00% | 0.00% | 5.29% |
+| M5 Scripted documents | 1/12 | 3.54% | 3.54% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -28,7 +28,7 @@ Catalog: `engine-v4`. Source fingerprint: `26cf711383f1080bdc3563ff862b5f6f6a2ca
 
 | Subsystem | Completed | In progress | Progress | Verified | Engine weight | Engine points |
 | --- | --- | --- | --- | --- | --- | --- |
-| Foundation | 7/8 | 0 | 81.25% | 81.25% | 1% | 0.81 |
+| Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 2% | 0.86 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 4% | 2.26 |
 | HTML | 9/11 | 0 | 70.27% | 70.27% | 5% | 3.51 |
@@ -67,7 +67,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `base.clocks` — Injectable monotonic clocks · size 1 · M1 · 0.06% of engine ([source](../../crates/rustic-base/src/clock.rs), [test](../../crates/rustic-base/src/clock.rs))
 - **complete** `base.geometry` — Typed CSS/device geometry and checked surface allocation · size 3 · M3 · 0.18% of engine ([source](../../crates/rustic-base/src/geometry.rs), [source](../../crates/rustic-base/src/geometry.rs), [test](../../crates/rustic-base/tests/geometry.rs), [test](../../crates/rustic-base/tests/geometry.rs), [test](../../crates/rustic-layout/tests/reference.rs))
 - **complete** `base.diagnostics` — Structured source/revision diagnostics and redaction · size 2 · M1 · 0.12% of engine ([source](../../crates/rustic-base/src/diagnostic.rs), [source](../../crates/rustic-base/src/revision.rs), [test](../../crates/rustic-base/src/diagnostic.rs), [test](../../crates/rustic-base/src/revision.rs))
-- **planned** `base.lifecycle` — Coordinated lifecycle, shutdown and resource ownership · size 3 · M5 · 0.18% of engine
+- **complete** `base.lifecycle` — Coordinated lifecycle, shutdown and resource ownership · size 3 · M5 · 0.18% of engine ([source](../../crates/rustic-engine/src/lifecycle.rs), [test](../../crates/rustic-engine/tests/lifecycle.rs), [test](../../crates/rustic-cli/src/loader.rs))
 
 ### URLs & encoding
 

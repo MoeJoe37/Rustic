@@ -15,11 +15,11 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use rustic_base::CancellationToken;
-use rustic_base::EscapedText;
-use rustic_css::{CssParser, MediaEnvironment};
+use rustic_base::{CancellationToken, EscapedText};
+use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment};
 use rustic_dom::DumpError;
-use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
+use rustic_engine::{DocumentStartError, Engine, EngineDocument};
+use rustic_html::{DocumentMode, ParseError, ParserLimits};
 use rustic_style::{
     ComputeContext, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader,
     StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
@@ -83,8 +83,12 @@ pub enum LoadError {
     },
     /// The file could not be inspected, opened or read.
     Io(io::Error),
-    /// Cancellation was requested between read steps.
+    /// This document's work was cancelled.
     Cancelled,
+    /// The engine could not admit a new document.
+    Engine(DocumentStartError),
+    /// The CSS parser could not be initialized.
+    Css(CssError),
     /// The parser rejected the input or exceeded one of its budgets.
     Parse(ParseError),
     /// The tree dump would exceed its output limit.
@@ -114,6 +118,8 @@ impl fmt::Display for LoadError {
             Self::FileTooLarge { limit } => write!(f, "file exceeds the {limit}-byte input limit"),
             Self::Io(error) => write!(f, "cannot read file: {error}"),
             Self::Cancelled => f.write_str("load cancelled"),
+            Self::Engine(error) => error.fmt(f),
+            Self::Css(error) => error.fmt(f),
             Self::Parse(error) => error.fmt(f),
             Self::Dump(error) => error.fmt(f),
             Self::Layout(error) => error.fmt(f),
@@ -130,6 +136,8 @@ impl Error for LoadError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Io(error) => Some(error),
+            Self::Engine(error) => Some(error),
+            Self::Css(error) => Some(error),
             Self::Parse(error) => Some(error),
             Self::Dump(error) => Some(error),
             Self::Layout(error) => Some(error),
@@ -182,25 +190,31 @@ fn looks_like_url(argument: &OsStr) -> bool {
 /// file that grows after inspection still cannot exceed the limit. Any failure
 /// returns no partial document.
 pub fn load_document(
+    engine: &mut Engine,
     path: &Path,
     limits: LoaderLimits,
-    cancellation: CancellationToken,
-) -> Result<ParsedDocument, LoadError> {
+) -> Result<EngineDocument, LoadError> {
     if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
         return Err(LoadError::InvalidLimits);
     }
+    let mut parser_limits = limits.parser;
+    parser_limits.tokenizer.max_input_bytes = limits.max_file_bytes;
+    let mut load = engine
+        .begin_document(parser_limits)
+        .map_err(|error| match error {
+            DocumentStartError::Parser(error) => LoadError::Parse(error),
+            other => LoadError::Engine(other),
+        })?;
+    let cancellation = load.cancellation().expect("admitted load").clone();
+    check_cancelled(&cancellation)?;
     check_regular_file(fs::metadata(path).map_err(LoadError::Io)?, limits)?;
     let mut file = File::open(path).map_err(LoadError::Io)?;
     check_regular_file(file.metadata().map_err(LoadError::Io)?, limits)?;
 
-    let mut parser_limits = limits.parser;
-    parser_limits.tokenizer.max_input_bytes = limits.max_file_bytes;
-    let mut parser = HtmlDocumentParser::new(parser_limits, cancellation.clone())?;
-
     let mut buffer = vec![0; limits.read_chunk_bytes.min(limits.max_file_bytes)];
     let mut total = 0usize;
     loop {
-        cancellation.check().map_err(|_| LoadError::Cancelled)?;
+        check_cancelled(&cancellation)?;
         let read = match file.read(&mut buffer) {
             Ok(0) => break,
             Ok(read) => read,
@@ -213,10 +227,14 @@ pub fn load_document(
             .ok_or(LoadError::FileTooLarge {
                 limit: limits.max_file_bytes,
             })?;
-        parser.feed(&buffer[..read])?;
+        load.feed(&buffer[..read])?;
     }
-    cancellation.check().map_err(|_| LoadError::Cancelled)?;
-    Ok(parser.finish()?)
+    check_cancelled(&cancellation)?;
+    Ok(load.finish()?)
+}
+
+pub fn check_cancelled(cancellation: &CancellationToken) -> Result<(), LoadError> {
+    cancellation.check().map_err(|_| LoadError::Cancelled)
 }
 
 fn check_regular_file(metadata: fs::Metadata, limits: LoaderLimits) -> Result<(), LoadError> {
@@ -233,11 +251,11 @@ fn check_regular_file(metadata: fs::Metadata, limits: LoaderLimits) -> Result<()
 
 /// Deterministic preorder tree dump of the whole document, never HTML.
 pub fn dump_dom(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     _path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let document = parsed.document();
+    let document = parsed.parsed().document();
     document
         .dump_tree(document.root(), limits.max_dump_bytes)
         .map_err(LoadError::Dump)
@@ -285,11 +303,11 @@ fn push_diagnostics(out: &mut String, indent: &str, diagnostics: &[rustic_style:
 /// [`LoaderLimits::stylesheets`]. Hrefs and import URLs are printed as
 /// written, escaped, so the dump never depends on where the files live.
 pub fn dump_style(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let document = parsed.document();
+    let document = parsed.parsed().document();
     let (styles, sheets) = compute_styles(parsed, path, limits, default_view())?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
@@ -328,7 +346,7 @@ pub fn dump_style(
 
 /// Share the same local stylesheet policy and M2 reference cascade in all dumps.
 fn compute_styles(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -339,16 +357,19 @@ fn compute_styles(
     ),
     LoadError,
 > {
-    let document = parsed.document();
+    let document = parsed.parsed().document();
     let node_error = |error| LoadError::Dump(DumpError::Node(error));
-    let parser = CssParser::default();
+    let cancellation = parsed.cancellation();
+    check_cancelled(cancellation)?;
+    let parser =
+        CssParser::new(CssLimits::default(), cancellation.clone()).map_err(LoadError::Css)?;
     let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
     let document_url = file_url(&canonical);
     let mut local = canonical.parent().and_then(|root| {
         LocalStylesheetFetcher::new(
             root.to_path_buf(),
             limits.read_chunk_bytes,
-            CancellationToken::default(),
+            cancellation.clone(),
         )
     });
     let mut no_fetch = NoFetch;
@@ -376,16 +397,17 @@ fn compute_styles(
     environment.initial_font = compute.initial_font_ratios();
     cascade.set_environment(environment);
     let mut cx = MatchContext::html();
-    cx.quirks = parsed.mode() == DocumentMode::Quirks;
+    cx.quirks = parsed.parsed().mode() == DocumentMode::Quirks;
     let styles = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)
         .map_err(node_error)?;
+    check_cancelled(cancellation)?;
     Ok((styles, sheets))
 }
 
 /// Dump an initial principal-box snapshot, before anonymous/line box construction.
 /// This has no layout positions, shaped text, images or paint output yet.
 pub fn dump_boxes(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
@@ -396,33 +418,29 @@ pub fn dump_boxes(
 
 /// Normalize flow boxes and dump anonymous wrappers/inline continuations.
 pub fn dump_formatting(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
     let principal = box_tree(parsed, path, limits, default_view())?;
-    rustic_layout::FormattingTree::build(
-        &principal,
-        limits.formatting,
-        &CancellationToken::default(),
-    )
-    .and_then(|tree| tree.dump(limits.max_dump_bytes))
-    .map_err(LoadError::Formatting)
+    rustic_layout::FormattingTree::build(&principal, limits.formatting, parsed.cancellation())
+        .and_then(|tree| tree.dump(limits.max_dump_bytes))
+        .map_err(LoadError::Formatting)
 }
 
 fn box_tree(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
 ) -> Result<rustic_layout::BoxTree, LoadError> {
     let (styles, _) = compute_styles(parsed, path, limits, view)?;
     rustic_layout::BoxTree::build(
-        parsed.document(),
-        parsed.document().root(),
+        parsed.parsed().document(),
+        parsed.parsed().document().root(),
         &styles,
         layout_limits(limits),
-        &CancellationToken::default(),
+        parsed.cancellation(),
     )
     .map_err(LoadError::Layout)
 }
@@ -445,7 +463,7 @@ fn layout_limits(limits: LoaderLimits) -> rustic_layout::LayoutLimits {
 /// Compute used block rectangles with adjoining-margin collapse for the static subset.
 /// Unsupported formatting returns no partial output; this does not paint pixels.
 pub fn dump_layout(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
@@ -461,7 +479,7 @@ fn fonts() -> &'static rustic_text::FontDatabase {
 }
 
 fn block_layout(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -477,12 +495,12 @@ fn block_layout(
     let mut tree = box_tree(parsed, path, limits, view)?;
     let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
     let images = crate::images::load(
-        parsed.document(),
+        parsed.parsed().document(),
         &tree,
         &canonical,
         limits.images,
         limits.read_chunk_bytes,
-        &CancellationToken::default(),
+        parsed.cancellation(),
     );
     if !images.sizes.is_empty() {
         tree.set_natural_sizes(&images.sizes)
@@ -494,14 +512,14 @@ fn block_layout(
         viewport,
         layout_limits(limits),
         fonts(),
-        &CancellationToken::default(),
+        parsed.cancellation(),
     )
     .map_err(LoadError::Flow)?;
     Ok((tree, layout, viewport, images))
 }
 
 fn display_list(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -512,20 +530,20 @@ fn display_list(
         images: images.images,
     };
     rustic_paint::DisplayList::build_with(
-        parsed.document(),
+        parsed.parsed().document(),
         &tree,
         &layout,
         viewport,
         &resources,
         rustic_paint::PaintLimits::default(),
-        &CancellationToken::default(),
+        parsed.cancellation(),
     )
     .map_err(LoadError::Paint)
 }
 
 /// Dump the display list for the block-only layout reference.
 pub fn dump_paint(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
@@ -538,7 +556,7 @@ pub fn dump_paint(
 /// display list and report one line per point: the box, node and element
 /// name found, or `none` outside the viewport.
 pub fn hit_test(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     points: &[(f64, f64)],
@@ -551,7 +569,7 @@ pub fn hit_test(
             .map(|(x, y)| rustic_layout::CssPoint { x, y });
         let line = match point.ok().and_then(|point| list.hit_test(point)) {
             Some(hit) => {
-                let name = match parsed.document().node(hit.node).map(|n| n.kind()) {
+                let name = match parsed.parsed().document().node(hit.node).map(|n| n.kind()) {
                     Ok(rustic_dom::NodeKind::Element(e)) => e.name().local().to_string(),
                     _ => String::from("?"),
                 };
@@ -575,7 +593,7 @@ pub fn hit_test(
 /// Rasterize the display list at `scale`. Only block backgrounds and solid
 /// borders are painted.
 pub fn render_surface(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -585,7 +603,7 @@ pub fn render_surface(
 
 /// Rasterize like [`render_surface`], keeping the display list.
 pub fn render_list(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -595,7 +613,7 @@ pub fn render_list(
         &list,
         view.scale(),
         rustic_raster::RasterLimits::default(),
-        &CancellationToken::default(),
+        parsed.cancellation(),
     )
     .map_err(LoadError::Raster)?;
     Ok((list, surface))
@@ -607,6 +625,7 @@ pub fn damage_repaints_exactly(
     (old, old_surface): &(rustic_paint::DisplayList, rustic_raster::Surface),
     (new, new_surface): &(rustic_paint::DisplayList, rustic_raster::Surface),
     scale: rustic_layout::DeviceScale,
+    cancellation: &CancellationToken,
 ) -> Result<bool, LoadError> {
     if (old_surface.width(), old_surface.height()) != (new_surface.width(), new_surface.height()) {
         // A new size repaints the whole surface: nothing to compare.
@@ -620,7 +639,7 @@ pub fn damage_repaints_exactly(
         scale,
         &regions,
         rustic_raster::RasterLimits::default(),
-        &CancellationToken::default(),
+        cancellation,
     )
     .map_err(LoadError::Raster)?;
     Ok(surface.premultiplied() == new_surface.premultiplied())
@@ -629,7 +648,7 @@ pub fn damage_repaints_exactly(
 /// Rasterize like [`render_surface`] and encode the result as PNG, within
 /// the output byte limit.
 pub fn render_png(
-    parsed: &ParsedDocument,
+    parsed: &EngineDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -668,7 +687,8 @@ mod tests {
     const SOURCE: &[u8] = b"<!doctype html><title>A &amp; B</title><p>one<p>two<div>three</div>";
 
     fn dump(file: &TempFile, limits: LoaderLimits) -> Result<String, LoadError> {
-        let parsed = load_document(&file.0, limits, CancellationToken::default())?;
+        let mut engine = Engine::new(1);
+        let parsed = load_document(&mut engine, &file.0, limits)?;
         dump_dom(&parsed, &file.0, limits)
     }
 
@@ -784,16 +804,12 @@ mod tests {
     fn rejects_directories_missing_files_and_zero_limits() {
         let directory = std::env::temp_dir();
         assert!(matches!(
-            load_document(
-                &directory,
-                LoaderLimits::default(),
-                CancellationToken::default()
-            ),
+            load_document(&mut Engine::new(1), &directory, LoaderLimits::default(),),
             Err(LoadError::NotRegularFile)
         ));
         let missing = directory.join("rustic-loader-definitely-missing.html");
         assert!(matches!(
-            load_document(&missing, LoaderLimits::default(), CancellationToken::default()),
+            load_document(&mut Engine::new(1), &missing, LoaderLimits::default()),
             Err(LoadError::Io(error)) if error.kind() == io::ErrorKind::NotFound
         ));
         let file = TempFile::new(SOURCE);
@@ -820,22 +836,28 @@ mod tests {
     fn rejects_endless_devices_before_opening() {
         assert!(matches!(
             load_document(
+                &mut Engine::new(1),
                 Path::new("/dev/zero"),
                 LoaderLimits::default(),
-                CancellationToken::default()
             ),
             Err(LoadError::NotRegularFile)
         ));
     }
 
     #[test]
-    fn cancellation_stops_before_reading() {
+    fn shutdown_stops_document_loading_and_rendering() {
+        let mut engine = Engine::new(1);
         let file = TempFile::new(SOURCE);
-        let token = CancellationToken::default();
-        token.cancel();
+        let limits = LoaderLimits::default();
+        let document = load_document(&mut engine, &file.0, limits).expect("load");
+        engine.shutdown();
         assert!(matches!(
-            load_document(&file.0, LoaderLimits::default(), token),
+            render_png(&document, &file.0, limits, default_view()),
             Err(LoadError::Cancelled)
+        ));
+        assert!(matches!(
+            load_document(&mut engine, Path::new("never-open-this-path"), limits),
+            Err(LoadError::Engine(DocumentStartError::Shutdown))
         ));
     }
 }

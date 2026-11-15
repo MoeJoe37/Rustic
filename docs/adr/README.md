@@ -28,6 +28,7 @@ instead of rewriting the history of a decision.
 | [0018](0018-parity-and-performance-leadership.md) | Feature parity with Blink/Gecko/WebKit through a pinned inventory, performance leadership gates against all three, milestones M11–M13, `engine-v4` catalog | Accepted scope update; implementation pending |
 
 | [0019](0019-static-module-evaluation.md) | Traced environments, import slots and namespaces for source text modules | Accepted for synchronous evaluation |
+| [0020](0020-document-lifecycle.md) | Host-owned document lifetimes with bounded admission and coordinated cancellation | Accepted for the headless pipeline |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

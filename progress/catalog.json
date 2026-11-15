@@ -225,8 +225,24 @@
           "label": "Coordinated lifecycle, shutdown and resource ownership",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/lifecycle.rs",
+              "marker": "pub fn shutdown"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/lifecycle.rs",
+              "marker": "fn shutdown_cancels_existing_work_and_closes_admission"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn shutdown_stops_document_loading_and_rendering"
+            }
+          ]
         }
       ]
     },

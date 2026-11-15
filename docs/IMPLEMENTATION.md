@@ -61,6 +61,23 @@ UTF-16 positions, structured (JSON) export and a process-wide logging sink are
 not implemented. Redaction classifies values at the point they are recorded; it
 does not detect secrets inside text that a caller wrongly marks `Public`.
 
+## Engine lifecycle — Bounded document ownership and shutdown
+
+`rustic-engine` admits incremental HTML loads up to a host-selected document
+limit. A pending parse and the resulting document use one slot and one
+cancellation scope. Parser initialization failure, a fatal parse or dropping
+the owner releases the slot. Cloned cancellation tokens can outlive the owner
+without retaining the DOM or consuming a slot. Shutdown closes admission and
+signals all pending and live documents, including when the engine is dropped.
+
+The CLI uses the coordinator for dumps, rendering, hit testing and reftests.
+It carries the document token through HTML and CSS parsing, local stylesheet
+and image reads, layout, display-list construction and rasterization. The host
+keeps file access policy and owns finished render outputs. Tests cover exact
+admission limits, cleanup after failure, worker-visible cancellation and the
+CLI's load and render behavior after shutdown. [ADR 0020](adr/0020-document-lifecycle.md)
+documents the contract for the future M5 scheduler.
+
 ## DOC-03 and DOC-04a — Document-owned tree core
 
 Implemented in `rustic-dom`, depending only on `rustic-base`:

@@ -1,10 +1,11 @@
-//! Foundation for an original Rust browser engine.
-//!
-//! Only bounded viewport configuration exists today. Parsing, navigation,
-//! scripting, and rendering are planned in `docs/ROADMAP.md`.
+//! Host-facing lifecycle and configuration for an original Rust browser engine.
 
 use std::error::Error;
 use std::fmt;
+
+mod lifecycle;
+
+pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 
 /// Initial allocation budget for a headless viewport, in device pixels.
 pub const MAX_VIEWPORT_PIXELS: u64 = 16_777_216;

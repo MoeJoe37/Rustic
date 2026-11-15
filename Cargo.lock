@@ -170,6 +170,10 @@ dependencies = [
 [[package]]
 name = "rustic-engine"
 version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-html",
+]
 
 [[package]]
 name = "rustic-fuzz"

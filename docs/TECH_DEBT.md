@@ -1544,7 +1544,7 @@ allows that only for built-in and host functions. Pay with: a source span per
 function so `toString` can return its text. Trigger: the first page script
 or Test262 group that needs it.
 
-### TD-107 — Locale-sensitive comparison and case mapping
+### TD-107 — Complete collation data and matching
 
 `String.prototype.normalize` is implemented for all four forms. IDNA and
 JavaScript share the canonical tables and normalization code in
@@ -1554,8 +1554,14 @@ lone surrogates.
 `Intl.getCanonicalLocales` canonicalizes locale lists. `Intl.Locale` exposes
 identifiers, likely subtags and pinned locale preferences. Locale casing
 applies Azerbaijani, Lithuanian and Turkish rules, using default Unicode
-casing for other languages. `localeCompare` still compares code points.
-Pay with locale negotiation for Intl services and collation (JS-08).
+casing for other languages. `Intl.Collator` and `localeCompare` negotiate
+the locale and collation options and compare CLDR root weights, with German
+phonebook and search handling. Other locale tailorings remain open, including
+European ordering (`eor`), locale-specific search, and synchronization with
+`Intl.Locale.prototype.getCollations`. The root reader handles contiguous
+contractions and a limited set of implicit ranges. Pay in JS-08 with generated
+tailoring rules, discontiguous contractions, complete implicit weights and
+Unicode collation conformance data.
 
 ### TD-108 — Date local time is a fixed offset
 

@@ -434,6 +434,10 @@ impl Marker<'_> {
                     }
                 }
                 Some(Internal::ListFormat { .. }) => {}
+                Some(Internal::Collator(collator)) => {
+                    self.string(collator.locale);
+                    self.value(collator.bound_compare);
+                }
                 Some(Internal::Locale(tag)) => self.value(Value::string(*tag)),
                 Some(Internal::ModuleEvaluation(graph)) => graph.trace(self),
                 Some(Internal::Captures(values)) => {
@@ -524,6 +528,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::ModuleEvaluation(graph)) => graph.footprint(),
             Some(Internal::ImportRequest(request)) => request.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
+            Some(Internal::Collator(collator)) => std::mem::size_of_val(&**collator),
             Some(Internal::RegExp { matcher, .. }) => matcher.footprint(),
             Some(Internal::Registry { cells, pending }) => {
                 WEAK_ENTRY_BYTES * cells.len() + 8 * pending.len()

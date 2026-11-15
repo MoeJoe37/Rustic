@@ -129,10 +129,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,920 | 17,123 |
-| Fail | 507 | 1,451 |
+| Pass | 21,939 | 17,291 |
+| Fail | 488 | 1,283 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 97.7% | 92.2% |
+| Pass rate of the files that run | 97.8% | 93.1% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -819,7 +819,7 @@ contract, the benchmark corpus and the heap-size report.
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
   26 per instruction with its tables) and a new agent with the library
-  (111,649; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
+  (119,966; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
   installed). The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
@@ -1056,9 +1056,8 @@ public-domain `zone1970.tab` for the explicit region.
 
 The pinned Intl selection covers `Intl/getCanonicalLocales`, `Locale`
 and both `String.prototype.toLocale*Case` directories. It passes 233 of 237
-files. The four outstanding cases depended on realms (since added),
-`Intl.Collator` or `Intl.NumberFormat`. Service negotiation and locale-sensitive comparison
-remain open under TD-107.
+files in the original run. Later runs include realms, list formatting, and
+collation. See [Intl collation](#intl-collation-js-08) for the current selection.
 
 The data generator takes `supplementalMetadata.xml`, `likelySubtags.xml`,
 `supplemental/supplementalData.xml`, `scriptMetadata.txt`, `core.zip` and
@@ -1092,3 +1091,27 @@ The combined pinned Intl selection passed 313 of 318 files, including
 80 of 81 ListFormat cases. With [realms](#realms-js-06) it passes 315,
 including every ListFormat case. Context-dependent conjunctions and
 specialized best-fit matching remain open under TD-117.
+
+## Intl collation (JS-08)
+
+`Intl.Collator` and `String.prototype.localeCompare` share locale lookup and
+Unicode `co`, `kn`, and `kf` negotiation. The comparison uses CLDR 48 root
+weights and Unicode 17 canonical decomposition, preserves lone surrogates,
+and supports German phonebook ordering, case ordering, sensitivity, variable
+punctuation and decimal runs from every Unicode decimal script. Case and
+accent sensitivity are applied to separate collation levels. Each instance
+caches its bound `compare` function. The collector traces the callback and
+its captured instance.
+
+The pinned selection passes 388 of 393 Intl files, including 63 of 65
+Collator files and all 10 `localeCompare` files. TD-107 records the remaining
+tailorings and root collation gaps. The broader Intl service constructors
+remain open.
+
+Generate or verify the static tables with CLDR 48 `core.zip` and Unicode
+17.0.0 `UnicodeData.txt`. The generator verifies the upstream SHA-256
+digests. The [Unicode license notice] applies to these tables.
+
+```sh
+python3 tools/generate_js_collation.py /path/to/pinned/collation-inputs --check
+```

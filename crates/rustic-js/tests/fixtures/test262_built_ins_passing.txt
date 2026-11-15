@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17290 pass, 1284 fail, 111 skipped (modules, proposals).
+# 17291 pass, 1283 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -13753,6 +13753,7 @@ String/prototype/lastIndexOf/not-a-constructor.js
 String/prototype/lastIndexOf/not-a-substring.js
 String/prototype/lastIndexOf/this-value-not-obj-coercible.js
 String/prototype/localeCompare/15.5.4.9_3.js
+String/prototype/localeCompare/15.5.4.9_CE.js
 String/prototype/localeCompare/S15.5.4.9_A10.js
 String/prototype/localeCompare/S15.5.4.9_A11.js
 String/prototype/localeCompare/S15.5.4.9_A1_T1.js

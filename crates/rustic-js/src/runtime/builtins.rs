@@ -14,7 +14,7 @@ mod error;
 mod function;
 pub(crate) mod generator;
 mod global;
-mod intl;
+pub(crate) mod intl;
 mod iterator;
 pub(crate) mod json;
 mod math;

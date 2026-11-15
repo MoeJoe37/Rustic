@@ -19,18 +19,48 @@ pub(super) fn option_index(
     name: &str,
     choices: &[&str],
 ) -> JsResult<usize> {
-    let Some(options) = options else { return Ok(0) };
+    Ok(option_index_optional(agent, options, name, choices)?.unwrap_or(0))
+}
+
+pub(super) fn get_option(
+    agent: &mut Agent,
+    options: Option<ObjectId>,
+    name: &str,
+) -> JsResult<Value> {
+    let Some(options) = options else {
+        return Ok(Value::UNDEFINED);
+    };
     let key = agent.heap.key(name)?;
-    let value = agent.get(options, key)?;
+    agent.get(options, key)
+}
+
+pub(super) fn string_option(
+    agent: &mut Agent,
+    options: Option<ObjectId>,
+    name: &str,
+) -> JsResult<Option<String>> {
+    let value = get_option(agent, options, name)?;
     if value == Value::UNDEFINED {
-        return Ok(0);
+        return Ok(None);
     }
     let text = agent.to_string(value)?;
     agent.heap.charge(agent.heap.string_len(text))?;
-    let text = agent.heap.string(text).to_text();
+    Ok(Some(agent.heap.string(text).to_text()))
+}
+
+pub(super) fn option_index_optional(
+    agent: &mut Agent,
+    options: Option<ObjectId>,
+    name: &str,
+    choices: &[&str],
+) -> JsResult<Option<usize>> {
+    let Some(text) = string_option(agent, options, name)? else {
+        return Ok(None);
+    };
     choices
         .iter()
         .position(|choice| *choice == text)
+        .map(Some)
         .ok_or_else(|| {
             agent.throw(
                 ErrorKind::RangeError,
@@ -48,7 +78,7 @@ fn lookup<T: Copy>(table: &[(&'static str, T)], mut candidate: &str) -> Option<(
     }
 }
 
-fn match_locale<T: Copy>(
+pub(super) fn match_locale<T: Copy>(
     table: &[(&'static str, T)],
     tag: &str,
     best_fit: bool,

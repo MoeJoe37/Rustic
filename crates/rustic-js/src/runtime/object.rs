@@ -305,6 +305,8 @@ impl IteratorKind {
 pub(crate) enum Internal {
     /// Canonical Unicode locale identifier of an Intl.Locale.
     Locale(StringId),
+    /// Resolved collation settings and the cached compare callback.
+    Collator(Box<super::builtins::intl::collator::Collator>),
     /// The resolved locale and template set for Intl.ListFormat.
     ListFormat {
         locale: &'static str,

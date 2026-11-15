@@ -3593,3 +3593,55 @@ fn intl_list_format_preserves_utf16_and_closes_invalid_iterables() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_collator_negotiates_options_and_traces_bound_compare() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        let collator = Intl.Collator(['zxx', 'de-u-co-phonebk-kf-upper-kn']);
+        const settings = collator.resolvedOptions();
+        const compare = collator.compare;
+        const cached = compare === collator.compare;
+        collator = null;
+        const order = ['item10', 'item02', 'item1'].sort(compare);
+        const base = new Intl.Collator('en', { sensitivity: 'base' });
+        const byCase = new Intl.Collator('en', { sensitivity: 'case' });
+        const numerical = new Intl.Collator('ar', { numeric: true });
+        cached && settings.locale === 'de-u-co-phonebk-kf-upper-kn'
+            && settings.collation === 'phonebk' && settings.numeric
+            && settings.caseFirst === 'upper'
+            && order.join(',') === 'item1,item02,item10'
+            && compare('A', 'a') < 0 && compare('ä', 'af') < 0
+            && compare('ä', 'a\u0308') === 0 && compare('\uD800', '\uD801') < 0
+            && base.compare('á', 'A') === 0
+            && byCase.compare('á', 'a') === 0 && byCase.compare('á', 'A') !== 0
+            && numerical.compare('٤', '١٢') < 0
+            && 'item10'.localeCompare('item2', 'en', { numeric: true }) > 0;
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}
+
+#[test]
+fn intl_collator_validates_options_in_getter_order() {
+    let mut agent = Agent::new().unwrap();
+    let script = r#"
+        const calls = [];
+        const options = {};
+        for (const key of ['usage', 'localeMatcher', 'collation', 'numeric', 'caseFirst',
+            'sensitivity', 'ignorePunctuation']) {
+            Object.defineProperty(options, key, { get() { calls.push(key); } });
+        }
+        const receiver = { toString() { calls.push('receiver'); return 'a'; } };
+        const other = { toString() { calls.push('other'); return 'b'; } };
+        const result = String.prototype.localeCompare.call(receiver, other, 'en', options);
+        let invalid = false;
+        try { Intl.Collator('en', { collation: 'too-long-for-a-subtag' }); }
+        catch (error) { invalid = error instanceof RangeError; }
+        const settings = Intl.Collator('de-u-kn-co-phonebk', { numeric: false }).resolvedOptions();
+        invalid && result < 0 && settings.locale === 'de-u-co-phonebk' && !settings.numeric
+            && calls.join(',') ===
+                'receiver,other,usage,localeMatcher,collation,numeric,caseFirst,sensitivity,ignorePunctuation';
+    "#;
+    assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
+}

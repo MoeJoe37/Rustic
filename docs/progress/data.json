@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "2b42fdcef3731918befbc8e1a9ffd1336d692df195962d1b9f9df7425871dd07",
-  "percent": "29.18",
+  "source_fingerprint": "ecb7e94e9b497551c3144eec1edd93aec9834f08e578dd5531c7d630bc1ca862",
+  "percent": "29.35",
   "verified_percent": "27.80",
-  "partial_percent": "1.38",
+  "partial_percent": "1.55",
   "completed": 65,
   "in_progress": 6,
   "total": 221,
@@ -47,9 +47,9 @@
       "share": "8.90",
       "completed": 11,
       "total": 13,
-      "percent": "95.38",
+      "percent": "97.30",
       "verified_percent": "87.69",
-      "partial_percent": "7.69"
+      "partial_percent": "9.61"
     },
     {
       "id": "M5",
@@ -3882,14 +3882,41 @@
             },
             {
               "label": "Intl service locale negotiation and locale-sensitive string comparison",
-              "status": "planned"
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/collator.rs",
+                  "marker": "fn negotiate"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/collator/weights.rs",
+                  "marker": "fn key"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn intl_collator_negotiates_options_and_traces_bound_compare"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn collation_work_respects_the_step_budget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+                  "marker": "String/prototype/localeCompare"
+                }
+              ]
             },
             {
               "label": "Intl services, locale data and Test262 Intl evidence",
               "status": "planned"
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.68"
         },
         {
@@ -4083,10 +4110,10 @@
       "completed": 11,
       "in_progress": 3,
       "total": 15,
-      "contribution": "8.76",
-      "percent": "87.67",
+      "contribution": "8.93",
+      "percent": "89.38",
       "verified_percent": "78.08",
-      "partial_percent": "9.59"
+      "partial_percent": "11.30"
     },
     {
       "id": "wasm",

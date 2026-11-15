@@ -134,6 +134,21 @@ fn endless_loops_stop_on_cancellation_and_on_the_step_budget() {
     assert_eq!(text(&mut agent, "6 * 7"), "42");
 }
 
+#[test]
+fn collation_work_respects_the_step_budget() {
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("const longer = '1'.repeat(4_096); const compare = Intl.Collator('en', {numeric: true}).compare;")
+        .expect("collation setup");
+    agent.set_step_budget(Some(1_000));
+    assert_eq!(
+        agent.evaluate("compare(longer, '2')"),
+        Err(EvalError::Cancelled)
+    );
+    agent.set_step_budget(None);
+    assert_eq!(text(&mut agent, "compare(longer, '2')"), "1");
+}
+
 // ---- ropes ----------------------------------------------------------------
 
 #[test]

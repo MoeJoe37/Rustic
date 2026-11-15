@@ -3558,7 +3558,34 @@
             },
             {
               "label": "Intl service locale negotiation and locale-sensitive string comparison",
-              "status": "planned"
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/collator.rs",
+                  "marker": "fn negotiate"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/builtins/intl/collator/weights.rs",
+                  "marker": "fn key"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/interp.rs",
+                  "marker": "fn intl_collator_negotiates_options_and_traces_bound_compare"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/limits.rs",
+                  "marker": "fn collation_work_respects_the_step_budget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-js/tests/fixtures/test262_intl_passing.txt",
+                  "marker": "String/prototype/localeCompare"
+                }
+              ]
             },
             {
               "label": "Intl services, locale data and Test262 Intl evidence",

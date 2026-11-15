@@ -1640,3 +1640,21 @@ passes 313 of 318 Intl files, including 80 of 81 ListFormat files. The
 constructor, prototype and methods increase the standard-library heap
 report by 1,237 bytes. TD-117 records the remaining list-formatting and
 best-fit limits.
+
+## JS-08 — Intl.Collator and String locale comparison
+
+`Intl.Collator` uses shared locale lookup and negotiates Unicode collation,
+numeric and case-order preferences with the matching constructor options.
+Both `compare` and `String.prototype.localeCompare` compare canonicalized
+Unicode strings using pinned CLDR root collation weights. The comparison
+charges temporary storage to the heap and checks the native work budget.
+The standard library increases the 64-bit heap report by 887 bytes for the
+Collator constructor, prototype, methods and accessors. Its collation tables
+are static data shared by agents.
+
+The pinned Test262 Intl selection passes 388 of 393 files. Canonically
+equivalent strings now pass the built-in `localeCompare` test, raising
+that selection to 17,291 of 18,574. The five open Intl cases
+require `eor` and other locale tailorings, agreement with the locale
+preference methods, or `Intl.NumberFormat`. TD-107 describes the remaining
+collation work.

@@ -465,27 +465,11 @@ fn normalize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
     agent.string_from(JsStr::from_units(&output))
 }
 
-/// `String.prototype.localeCompare` (§22.1.3.12) without a locale: code
-/// point order.
+/// `String.prototype.localeCompare` coerces both strings before resolving the locale.
 fn locale_compare(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let s = this_units(agent, this)?;
-    let that = units_of(agent, arg(args, 0))?;
-    let points = |units: &[u16]| -> Vec<u32> {
-        let mut out = Vec::with_capacity(units.len());
-        let mut i = 0;
-        while i < units.len() {
-            let (cp, n) = code_point(units, i);
-            out.push(cp);
-            i += n;
-        }
-        out
-    };
-    let order = points(&s).cmp(&points(&that));
-    Ok(Value::number(match order {
-        std::cmp::Ordering::Less => -1.0,
-        std::cmp::Ordering::Equal => 0.0,
-        std::cmp::Ordering::Greater => 1.0,
-    }))
+    let first = this_string(agent, this)?;
+    let second = agent.to_string(arg(args, 0))?;
+    super::intl::collator::locale_compare(agent, first, second, arg(args, 1), arg(args, 2))
 }
 
 // ---- building ---------------------------------------------------------------

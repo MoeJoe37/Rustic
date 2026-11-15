@@ -236,6 +236,8 @@ pub struct Intrinsics {
     pub locale_prototype: ObjectId,
     /// `%Intl.ListFormat.prototype%`.
     pub list_format_prototype: ObjectId,
+    /// `%Intl.Collator.prototype%`.
+    pub collator_prototype: ObjectId,
 }
 
 impl Intrinsics {
@@ -290,7 +292,11 @@ impl Intrinsics {
         ];
         all.extend(self.typed_array_constructors);
         all.extend(self.typed_array_prototypes);
-        all.extend([self.locale_prototype, self.list_format_prototype]);
+        all.extend([
+            self.locale_prototype,
+            self.list_format_prototype,
+            self.collator_prototype,
+        ]);
         all
     }
 }
@@ -412,6 +418,7 @@ impl Agent {
                 typed_array_prototypes: [placeholder; 12],
                 locale_prototype: placeholder,
                 list_format_prototype: placeholder,
+                collator_prototype: placeholder,
             },
             global_env: EnvId(0),
             realms: Vec::new(),
@@ -665,6 +672,7 @@ impl Agent {
             typed_array_prototypes: [object_prototype; 12],
             locale_prototype: object_prototype,
             list_format_prototype: object_prototype,
+            collator_prototype: object_prototype,
         };
         super::builtins::install(self)
     }

@@ -1215,3 +1215,21 @@ third pack, `data/intl/names.bin` (4.5 MB; TD-120 covers the size).
 
 56 of the 57 `DisplayNames` files of the pinned selection pass; the last
 one also constructs `Intl.DateTimeFormat`.
+
+
+## Intl duration formatting (JS-08)
+
+`Intl.DurationFormat` implements `format`, `formatToParts`,
+`resolvedOptions` and `supportedLocalesOf` (ECMA-402 §13). Each unit that is
+shown goes through a number format of the resolved locale and numbering
+system: a unit format for the long, short and narrow styles, plain digits
+joined by the locale's time separator for `numeric` and `2-digit`. Units
+styled as a fraction of the previous one (milliseconds after numeric
+seconds) are added exactly, in integer nanoseconds, and truncated to
+`fractionalDigits`. The groups are joined with the locale's unit list
+patterns. A duration is read as a record of integral fields and validated
+as §13.5.2 requires; strings and Temporal durations need Temporal, which
+is outside M4.
+
+102 of the 110 `DurationFormat` files of the pinned selection pass. Six
+need Temporal, one `Intl.supportedValuesOf` and one `Intl.DateTimeFormat`.

@@ -3854,3 +3854,62 @@ fn intl_display_names_compose_languages_and_fall_back_as_asked() {
     "#;
     assert_eq!(agent.evaluate(script), Ok(Value::TRUE));
 }
+
+#[test]
+fn intl_duration_format_joins_units_and_digital_clocks() {
+    let mut agent = Agent::new().unwrap();
+    agent.heap.set_gc_stress(true);
+    let script = r#"
+        const out = (locale, options, duration) =>
+            new Intl.DurationFormat(locale, options).format(duration);
+        const all = { years: 1, months: 2, weeks: 3, days: 4, hours: 5, minutes: 6,
+            seconds: 7, milliseconds: 8, microseconds: 9, nanoseconds: 10 };
+        const parts = new Intl.DurationFormat('en', { style: 'digital' })
+            .formatToParts({ hours: -1, minutes: -2, seconds: -3 })
+            .map(part => part.type + ':' + part.value + ':' + part.unit).join('|');
+        let rejected = 0;
+        for (const duration of [{ hours: 1, minutes: -1 }, { hours: 1.5 }, 'PT1H',
+            { years: 2 ** 32 }]) {
+            try { out('en', {}, duration); } catch (error) { rejected += error instanceof RangeError; }
+        }
+        let typed = 0;
+        for (const duration of [{}, 5, undefined]) {
+            try { out('en', {}, duration); } catch (error) { typed += error instanceof TypeError; }
+        }
+        let invalid = false;
+        try { new Intl.DurationFormat('en', { hours: 'numeric', minutes: 'long' }); }
+        catch (error) { invalid = error instanceof RangeError; }
+        const resolved = new Intl.DurationFormat('en', { style: 'digital' }).resolvedOptions();
+        [
+            out('en', {}, { hours: 1, minutes: 30 }) === '1 hr, 30 min',
+            out('en', { style: 'long' }, { hours: 1, minutes: 30, seconds: 5 })
+                === '1 hour, 30 minutes, 5 seconds',
+            out('en', { style: 'narrow' }, { days: 2, hours: 3 }) === '2d 3h',
+            out('en', { style: 'digital' }, { hours: 1, minutes: 2, seconds: 3 }) === '1:02:03',
+            out('en', { style: 'digital' }, { seconds: 3, milliseconds: 450 }) === '0:00:03.45',
+            out('en', { style: 'digital', fractionalDigits: 2 }, { seconds: 3, milliseconds: 459 })
+                === '0:00:03.45',
+            out('en', { style: 'digital' }, all)
+                === '1 yr, 2 mths, 3 wks, 4 days, 5:06:07.00800901',
+            out('en', {}, { seconds: 1, milliseconds: 500 }) === '1 sec, 500 ms',
+            out('en', { milliseconds: 'numeric' }, { seconds: 1, milliseconds: 500 }) === '1.5 sec',
+            out('en', {}, { hours: -1, minutes: -30 }) === '-1 hr, 30 min',
+            out('en', { hoursDisplay: 'always' }, { hours: 0, minutes: -5 }) === '-0 hr, 5 min',
+            out('de', { style: 'long' }, { hours: 1, minutes: 30 }) === '1 Stunde, 30 Minuten',
+            out('en', { secondsDisplay: 'always' }, { seconds: 9007199254740991, nanoseconds: 1 })
+                === '9,007,199,254,740,991 sec, 1 ns',
+            parts === 'minusSign:-:hour|integer:1:hour|literal:::undefined|integer:02:minute|literal:::undefined|integer:03:second',
+            rejected === 4 && typed === 3 && invalid,
+            resolved.hours === 'numeric' && resolved.minutes === '2-digit'
+                && resolved.milliseconds === 'numeric' && resolved.millisecondsDisplay === 'auto'
+                && resolved.hoursDisplay === 'always' && !('fractionalDigits' in resolved),
+        ].map((v, i) => v ? '' : i).join('');
+    "#;
+    let result = agent.evaluate(script).unwrap();
+    assert_eq!(
+        agent
+            .to_string(result)
+            .map(|id| agent.heap.string(id).to_text()),
+        Ok(String::new())
+    );
+}

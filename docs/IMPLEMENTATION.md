@@ -1715,3 +1715,14 @@ calendars and date-time fields from the CLDR display names of every locale
 names, composed names with script, region and variants, both fallbacks,
 code canonicalization and the invalid codes of each type. 56 of 57 Test262
 `DisplayNames` files pass; the selected Intl gate passes 849 of 855 files.
+
+
+## JS-08 — Intl.DurationFormat
+
+`Intl.DurationFormat` formats a duration record unit by unit through number
+formats and joins the results as a unit list, with digital clocks, exact
+fractional seconds and the sign shown once. Regressions cover every style,
+fractional digits, negative and zero-valued leading units, large values,
+parts with their units, invalid durations and invalid style combinations.
+102 of 110 Test262 `DurationFormat` files pass (six need Temporal); the
+selected Intl gate passes 951 of 965 files.

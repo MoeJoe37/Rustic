@@ -10,6 +10,7 @@ pub(crate) mod collator;
 mod data;
 mod decimal;
 mod display_names;
+mod duration_format;
 mod list_format;
 mod locale;
 mod locale_info;
@@ -32,6 +33,7 @@ mod slot {
     pub(super) const NUMBER_FORMAT: usize = 1;
     pub(super) const RELATIVE_TIME_FORMAT_PROTOTYPE: usize = 2;
     pub(super) const DISPLAY_NAMES_PROTOTYPE: usize = 3;
+    pub(super) const DURATION_FORMAT_PROTOTYPE: usize = 4;
 }
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
@@ -48,6 +50,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     number_format::install(agent, intl)?;
     relative_time_format::install(agent, intl)?;
     display_names::install(agent, intl)?;
+    duration_format::install(agent, intl)?;
     let tag = agent.string("Intl")?;
     let tag_key = PropertyKey::Symbol(agent.symbols.to_string_tag);
     agent.define_property_or_throw(

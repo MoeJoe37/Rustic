@@ -31,6 +31,7 @@ pub(super) enum Symbol {
     Nan,
     CurrencyDecimal,
     CurrencyGroup,
+    TimeSeparator,
 }
 
 /// Pattern kinds, in the generator's numbering.

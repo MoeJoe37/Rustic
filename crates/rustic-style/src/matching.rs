@@ -91,9 +91,9 @@ pub(crate) fn matches_complex_cached<E: ElementView>(
 /// [`matches_complex_cached`] for a selector from a stylesheet of the shadow
 /// tree hosted by `host` (`None` for the document tree).
 ///
-/// Inside a shadow tree the host is *featureless*: it matches only `:host`
-/// and `:host()` (possibly within `:is()` or `:where()`), combinators reach
-/// it from the shadow tree's top-level elements, and nothing beyond it.
+/// Inside a shadow tree the host is *featureless*: it can match `:host` or
+/// `:host()`, plus the scope selectors if it is the scoping root. Combinators
+/// reach it from the shadow tree's top-level elements and stop there.
 pub(crate) fn matches_in_tree<E: ElementView>(
     selector: &ComplexSelector,
     element: E,
@@ -413,6 +413,9 @@ fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, m: &Matcher<'_,
             SimpleSelector::PseudoClass(
                 class @ (PseudoClass::Host(_) | PseudoClass::Is(_) | PseudoClass::Where(_)),
             ) => pseudo_class_matches(class, e, m),
+            SimpleSelector::PseudoClass(PseudoClass::Scope) | SimpleSelector::Nesting(None) => {
+                m.cx.scope == Some(e)
+            }
             _ => false,
         };
     }

@@ -732,6 +732,20 @@ Filtered `of S` selectors conservatively use full restyles after mutations
 until counting-scope dependencies exist (TD-36). All new cases compare against
 the independent full-restyle path; ordinary targeted invalidation remains.
 
+## CSS-09a — Explicit stylesheet scopes
+
+`rustic-style` applies `@scope (<selectors>)` and optional
+`to (<selectors>)` limits in the ordinary cascade. Scoped relative
+selectors use `&` and `:scope` against each applicable root. The cascade
+uses the closest matching root after comparing specificity, and a scope
+limit blocks its subtree. Media, layer and container grouping preserve the
+scope. Regression tests cover matching, overlap, cascade ordering, malformed
+boundaries and restyling after changes to roots and limits.
+
+This implements the explicit stylesheet scope step of `css.modern`.
+[CSS.md](CSS.md#explicit-stylesheet-scopes) records the remaining scope
+work and the conservative invalidation path.
+
 ## REN-01a — Checked geometry, principal boxes and block widths
 
 M3 has started in `rustic-layout`: checked CSS/device geometry, an immutable flat

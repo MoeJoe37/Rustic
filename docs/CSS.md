@@ -395,7 +395,9 @@ Cascade Level 5 §6.1, reviewed 2026-11-08 against the editor's draft):
 4. Cascade layer: the later layer wins for normal declarations, the earlier
    for important ones; unlayered declarations form the final layer.
 5. Specificity of the most specific matching selector in the rule's list.
-6. Order of appearance across sheets, rules and declarations.
+6. Scope proximity, with fewer element hops winning and unscoped rules
+   treated as infinitely far away.
+7. Order of appearance across sheets, rules and declarations.
 
 `initial`, `inherit` and `unset` resolve as specified. `revert` rolls back to
 the previous origin (author to user to user agent; in the user-agent origin it
@@ -409,6 +411,29 @@ inherit or take their initial value.
 The result is the *specified* value. Inheritance and `inherit` take the parent
 element's *computed* value (see [Computed style](#computed-style)), so
 `font-size: 2em` is inherited as pixels, not re-applied.
+
+### Explicit stylesheet scopes
+
+`@scope (<selector-list>)`, optionally followed by `to (<selector-list>)`,
+applies style rules to each matching root and its descendants, excluding
+subtrees rooted at a matching limit. Scoped style selectors can start with a
+combinator. A selector without a leading combinator or explicit `:scope` or
+`&` gets an implied descendant relationship to its root. `&` matches the
+root with zero specificity, while `:scope` carries pseudo-class specificity.
+Selectors for the roots and limits do not add specificity to the rule.
+
+Cascade ties after specificity favor the closest matching scope. A scoped
+rule can appear in a media, layer or container group and still depends on
+that group's conditions and precedence. Invalid explicit boundary lists
+discard the whole scope with a diagnostic. A mutation in a document with
+scoped rules uses the full-restyle reference path because root or limit
+membership may have changed ([TD-119](TECH_DEBT.md)).
+
+The reference is [CSS Cascade Level 6 §3.1 and §3.5](https://drafts.csswg.org/css-cascade-6/),
+reviewed 2026-11-15. Implicit roots, nested scope rules, declarations directly
+inside scopes, scoped imports and the CSSOM interface remain open. Tests
+exercise matching, root specificity, proximity, invalid rules and boundary
+mutations through the cascade and style-tree entry points.
 
 ### Cascade layers
 

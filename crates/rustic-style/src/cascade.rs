@@ -3,7 +3,7 @@
 //! For each element and longhand, the winning declaration is chosen by, in
 //! order: origin and importance (with the animation and transition origins);
 //! encapsulation context (shadow trees); whether it comes from the element's
-//! `style` attribute; cascade layer; selector specificity; and order of
+//! `style` attribute; cascade layer; selector specificity; scope proximity; and order of
 //! appearance. CSS-wide keywords are then resolved: `initial`, `inherit`,
 //! `unset`, `revert` (roll back to the previous origin) and `revert-layer`
 //! (roll back to the previous layer). Properties with no declaration
@@ -13,6 +13,7 @@
 //! values come from the parent's [`ComputedStyle`], and
 //! [`ComputedStyle::compute`] turns the result into computed values.
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 use rustic_css::{
@@ -191,12 +192,15 @@ struct Priority {
     /// important ones; unlayered declarations are the final layer.
     layer: u32,
     specificity: Specificity,
+    /// Closest scope wins among declarations with the same specificity.
+    proximity: Reverse<usize>,
     /// Order of appearance across all sheets, then within the block.
     order: (usize, usize, usize),
 }
 
 const ANIMATION_TIER: u8 = 3;
 const TRANSITION_TIER: u8 = 7;
+const UNSCOPED: Reverse<usize> = Reverse(usize::MAX);
 
 fn tier(origin: Origin, important: bool) -> u8 {
     match (origin, important) {
@@ -248,6 +252,7 @@ impl Candidate<'_> {
             inline: false,
             layer: 0,
             specificity: Specificity::default(),
+            proximity: UNSCOPED,
             order: (0, 0, 0),
         };
         if p.tier == ANIMATION_TIER || p.tier == TRANSITION_TIER {
@@ -473,17 +478,21 @@ impl Cascade {
                 if !StyleSheet::rule_applies(rule, media) {
                     continue;
                 }
-                let specificity = rule
-                    .selectors
-                    .selectors()
-                    .iter()
-                    .filter(|s| {
-                        s.pseudo_element().is_none()
-                            && matches_in_tree(s, element, cx, cache, tree.0)
-                    })
-                    .map(|s| s.specificity())
-                    .max();
-                let Some(specificity) = specificity else {
+                let matched = if let Some(scope) = &rule.scope {
+                    scope.match_rule(&rule.selectors, element, cx, cache, tree.0)
+                } else {
+                    rule.selectors
+                        .selectors()
+                        .iter()
+                        .filter(|s| {
+                            s.pseudo_element().is_none()
+                                && matches_in_tree(s, element, cx, cache, tree.0)
+                        })
+                        .map(|s| s.specificity())
+                        .max()
+                        .map(|specificity| (specificity, UNSCOPED))
+                };
+                let Some((specificity, proximity)) = matched else {
                     continue;
                 };
                 // Container conditions walk the ancestors and may substitute
@@ -508,6 +517,7 @@ impl Cascade {
                             inline: false,
                             layer: layer_key(rank, important),
                             specificity,
+                            proximity,
                             order: (sheet_index, rule_index, declaration_index),
                         },
                         level,
@@ -528,6 +538,7 @@ impl Cascade {
                     inline: true,
                     layer: layer_key(UNLAYERED, important),
                     specificity: Specificity::default(),
+                    proximity: UNSCOPED,
                     order: (usize::MAX, 0, declaration_index),
                 },
                 level: RevertLevel::Author,
@@ -548,6 +559,7 @@ impl Cascade {
                         inline: false,
                         layer: 0,
                         specificity: Specificity::default(),
+                        proximity: UNSCOPED,
                         order: (0, 0, index),
                     },
                     level: RevertLevel::Author,

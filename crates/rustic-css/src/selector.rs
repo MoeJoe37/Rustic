@@ -712,6 +712,21 @@ pub fn parse_selector_list(
     Parser::new(namespaces, None).list(values, 0, true, false)
 }
 
+/// Parse the selector list of a scoped style rule or a scoping limit.
+///
+/// Relative entries are anchored to the scoping root with zero additional
+/// specificity. An explicit `&` or `:scope` supplies its own anchor unless
+/// the entry starts with a combinator.
+pub fn parse_scoped_selector_list(
+    values: &[Value],
+    namespaces: &NamespaceMap,
+    allow_pseudo_element: bool,
+) -> Result<SelectorList, SelectorError> {
+    let mut parser = Parser::new(namespaces, None);
+    parser.scoped = true;
+    parser.list(values, 0, allow_pseudo_element, false)
+}
+
 /// Parse the selector list of a style rule nested in a style rule whose
 /// selectors are `parent` (CSS Nesting §2-3, Editor's Draft reviewed
 /// 2026-11-08).
@@ -762,6 +777,7 @@ struct Parser<'a> {
     namespaces: &'a NamespaceMap,
     /// The parent rule's selectors, for `&` in a nested rule.
     parent: Option<Arc<SelectorList>>,
+    scoped: bool,
     /// Whether the selector being parsed has used `&` so far.
     saw_nesting: Cell<bool>,
     /// Whether parsing is inside `:has()`, which may not nest.
@@ -805,6 +821,31 @@ fn complex_height(selector: &ComplexSelector) -> usize {
         )
         .max()
         .unwrap_or(0)
+}
+
+fn selector_uses_scope(selector: &ComplexSelector) -> bool {
+    let uses_scope = |list: &SelectorList| list.selectors.iter().any(selector_uses_scope);
+    selector
+        .compounds
+        .iter()
+        .flat_map(|c| &c.simple)
+        .any(|simple| match simple {
+            SimpleSelector::Nesting(None) | SimpleSelector::PseudoClass(PseudoClass::Scope) => true,
+            SimpleSelector::PseudoClass(
+                PseudoClass::Is(list) | PseudoClass::Where(list) | PseudoClass::Not(list),
+            ) => uses_scope(list),
+            SimpleSelector::PseudoClass(PseudoClass::Nth { nth, .. }) => {
+                nth.of.as_deref().is_some_and(uses_scope)
+            }
+            SimpleSelector::PseudoClass(PseudoClass::Host(list)) => {
+                list.as_deref().is_some_and(uses_scope)
+            }
+            SimpleSelector::PseudoClass(PseudoClass::Has(list)) => list
+                .selectors
+                .iter()
+                .any(|relative| selector_uses_scope(&relative.selector)),
+            _ => false,
+        })
 }
 
 fn span_at(values: &[Value], index: usize) -> SourceSpan {
@@ -857,10 +898,10 @@ impl<'a> Parser<'a> {
         }
         let mut selectors = Vec::new();
         // Only the entries of a nested rule's own list are relative.
-        let nested_top = depth == 0 && self.parent.is_some();
+        let nested_top = depth == 0 && (self.scoped || self.parent.is_some());
         for entry in split_commas(values) {
             let parsed = if nested_top {
-                self.nested_entry(entry)
+                self.nested_entry(entry, allow_pseudo_element)
             } else {
                 self.complex(entry, depth, allow_pseudo_element)
             };
@@ -882,6 +923,7 @@ impl<'a> Parser<'a> {
         Self {
             namespaces,
             parent,
+            scoped: false,
             saw_nesting: Cell::new(false),
             in_has: Cell::new(false),
         }
@@ -900,24 +942,39 @@ impl<'a> Parser<'a> {
     }
 
     /// One entry of a nested rule's selector list (CSS Nesting §2.1).
-    fn nested_entry(&self, entry: &[Value]) -> Result<ComplexSelector, SelectorError> {
+    fn nested_entry(
+        &self,
+        entry: &[Value],
+        allow_pseudo_element: bool,
+    ) -> Result<ComplexSelector, SelectorError> {
         let start = skip_whitespace(entry, 0);
         let (leading, rest) = Self::leading_combinator(entry, start);
         if leading.is_some() && rest == entry.len() {
             return err(SelectorErrorKind::DanglingCombinator, entry, start);
         }
         self.saw_nesting.set(false);
-        let selector = self.complex(&entry[rest..], 0, true)?;
-        if leading.is_none() && self.saw_nesting.get() {
+        let selector = self.complex(&entry[rest..], 0, allow_pseudo_element)?;
+        let has_anchor = if self.scoped {
+            selector_uses_scope(&selector)
+        } else {
+            self.saw_nesting.get()
+        };
+        if leading.is_none() && has_anchor {
             return Ok(selector);
         }
-        let parent = self.parent.clone().expect("nested parser has a parent");
-        if parent.height + 1 > MAX_SELECTOR_NESTING {
+        if self
+            .parent
+            .as_ref()
+            .is_some_and(|parent| parent.height + 1 > MAX_SELECTOR_NESTING)
+        {
             return err(SelectorErrorKind::NestingLimit, entry, start);
         }
-        let specificity = parent.max_specificity();
+        let specificity = self
+            .parent
+            .as_ref()
+            .map_or(Specificity::default(), |parent| parent.max_specificity());
         let anchor = Compound {
-            simple: vec![SimpleSelector::Nesting(Some(parent))],
+            simple: vec![SimpleSelector::Nesting(self.parent.clone())],
         };
         Ok(prefix(
             anchor,

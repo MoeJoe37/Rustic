@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "a2a7a0e114e7bfdff0445bb22072c0953e2acc2924c9afb75a0265bb839ed9d2",
-  "percent": "28.90",
+  "source_fingerprint": "a96cf1e427c02dccb2810c586f709705553aa48e8dc496669c575fa63a679449",
+  "percent": "29.03",
   "verified_percent": "27.80",
-  "partial_percent": "1.10",
+  "partial_percent": "1.23",
   "completed": 65,
-  "in_progress": 4,
+  "in_progress": 5,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -117,9 +117,9 @@
       "share": "14.85",
       "completed": 0,
       "total": 30,
-      "percent": "0.00",
+      "percent": "0.82",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "0.82"
     },
     {
       "id": "M12",
@@ -1643,20 +1643,68 @@
           "label": "Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope",
           "size": 5,
           "milestone": "M11",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "id": "explicit-scopes",
+              "label": "Explicit stylesheet scopes, limits, relative selectors and cascade proximity",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/scope.rs",
+                  "marker": "pub(crate) fn match_rule"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn explicit_scopes_match_relative_rules_and_stop_at_limits"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn mutations_of_scope_roots_and_limits_restyle_existing_subjects"
+                }
+              ]
+            },
+            {
+              "id": "scope-integration",
+              "label": "Implicit and nested scopes, scoped declarations and imports, and CSSOM",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "anchor-positioning",
+              "label": "CSS anchor positioning",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "view-transitions",
+              "label": "View transitions",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "scroll-driven-animations",
+              "label": "Scroll-driven animations",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "20.00",
           "engine_share": "0.61"
         }
       ],
       "points": 49,
       "completed": 8,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "4.77",
-      "percent": "79.59",
+      "contribution": "4.89",
+      "percent": "81.63",
       "verified_percent": "79.59",
-      "partial_percent": "0.00"
+      "partial_percent": "2.04"
     },
     {
       "id": "text",

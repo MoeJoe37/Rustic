@@ -33,6 +33,24 @@ fn attribute(local: &str) -> QualifiedName {
     QualifiedName::from_parsed(None, None, local).unwrap()
 }
 
+#[test]
+fn mutations_of_scope_roots_and_limits_restyle_existing_subjects() {
+    let mut page = Page::new(
+        "<main id=root class=card><div id=limit><p id=subject>text</p></div></main>",
+        "@scope (.card) to (.closed) { p { color: red } }",
+    );
+    assert_eq!(page.color("subject"), "rgb(255, 0, 0)");
+    page.set("limit", "class", "closed");
+    page.restyle();
+    assert_eq!(page.color("subject"), "rgb(0, 0, 0)");
+    page.remove("limit", "class");
+    page.restyle();
+    assert_eq!(page.color("subject"), "rgb(255, 0, 0)");
+    page.remove("root", "class");
+    page.restyle();
+    assert_eq!(page.color("subject"), "rgb(0, 0, 0)");
+}
+
 /// A document, its cascade (UA sheet, `<style>` elements, plus `author`)
 /// and incremental styles.
 struct Page {

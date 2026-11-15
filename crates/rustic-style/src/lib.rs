@@ -49,6 +49,7 @@ mod invalidation;
 mod layer;
 mod loading;
 mod matching;
+mod scope;
 mod sheet;
 mod text;
 mod variables;
@@ -74,6 +75,7 @@ pub use loading::{
 };
 pub use matching::{MatchContext, matches, matches_complex};
 pub use rustic_text::EmRatios;
+pub use scope::ScopeRule;
 pub use sheet::{
     ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
     parse_style_attribute,

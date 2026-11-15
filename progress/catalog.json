@@ -1425,8 +1425,56 @@
           "label": "Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope",
           "size": 5,
           "milestone": "M11",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "id": "explicit-scopes",
+              "label": "Explicit stylesheet scopes, limits, relative selectors and cascade proximity",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/scope.rs",
+                  "marker": "pub(crate) fn match_rule"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/cascade.rs",
+                  "marker": "fn explicit_scopes_match_relative_rules_and_stop_at_limits"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/invalidation.rs",
+                  "marker": "fn mutations_of_scope_roots_and_limits_restyle_existing_subjects"
+                }
+              ]
+            },
+            {
+              "id": "scope-integration",
+              "label": "Implicit and nested scopes, scoped declarations and imports, and CSSOM",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "anchor-positioning",
+              "label": "CSS anchor positioning",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "view-transitions",
+              "label": "View transitions",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "id": "scroll-driven-animations",
+              "label": "Scroll-driven animations",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         }
       ]
     },

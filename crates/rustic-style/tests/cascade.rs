@@ -64,6 +64,73 @@ fn style_of(html: &str, sheets: &[(Origin, &str)], id: &str) -> String {
 }
 
 #[test]
+fn explicit_scopes_match_relative_rules_and_stop_at_limits() {
+    let html = "<main><section class=card id=root><p id=direct></p><div class=stop>
+                <p id=excluded></p></div><div><p id=deep></p></div></section>
+                <p id=outside></p></main>";
+    let css = "@scope (.card) to (:scope > .stop) {
+                    & { width: 1px }
+                    > p { width: 2px }
+                    main :scope p { height: 3px }
+                    @media screen { p { opacity: 0.5 } }
+               }";
+    let styled = styles(html, &[(Origin::Author, css)]);
+    let style = |id| styled.iter().find(|(i, _)| i == id).unwrap().1.as_str();
+    assert_eq!(style("root"), "width: 1px\n");
+    assert!(style("direct").contains("width: 2px\n"));
+    assert!(style("direct").contains("height: 3px\n"));
+    assert!(style("direct").contains("opacity: 0.5\n"));
+    assert!(!style("deep").contains("width:"));
+    assert!(style("deep").contains("height: 3px\n"));
+    assert_eq!(style("excluded"), "");
+    assert_eq!(style("outside"), "");
+}
+
+#[test]
+fn specificity_and_layers_precede_scope_proximity() {
+    let html = "<main class=far><div class=near><p id=target class=near></p></div></main>";
+    let css = "@layer defaults {
+                    @scope (.near) { p { min-width: 1px } }
+               }
+               @scope (.near) {
+                    :is(:scope > p) { width: 10px }
+                    p { height: 20px; max-width: 100px }
+               }
+               @scope (.far) { p { height: 30px } }
+               p#target { max-width: 200px }
+               p { width: 40px; height: 50px; min-width: 2px }";
+    let style = style_of(html, &[(Origin::Author, css)], "target");
+    for property in [
+        "width: 10px",
+        "height: 20px",
+        "max-width: 200px",
+        "min-width: 2px",
+    ] {
+        assert!(style.lines().any(|line| line == property), "{style}");
+    }
+}
+
+#[test]
+fn malformed_scopes_discard_their_blocks_and_keep_later_rules() {
+    let parser = CssParser::default();
+    let source = "@scope (.card, ) { p { width: 1px } }
+                  @scope (.card::before) { p { width: 2px } }
+                  @scope (.card) to (.stop::before) { p { width: 3px } }
+                  @scope (.card);
+                  @scope (.card) to (.stop) extra { p { width: 4px } }
+                  p { width: 5px }";
+    let (sheet, diagnostics) = StyleSheet::parse(&parser, source, Origin::Author).unwrap();
+    assert_eq!(sheet.rules.len(), 1);
+    assert_eq!(
+        diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.kind)
+            .collect::<Vec<_>>(),
+        [StyleDiagnosticKind::InvalidScopeRule; 5]
+    );
+}
+
+#[test]
 fn specificity_then_order_decides_within_an_origin() {
     let sheet = "p { color: red } #x { color: blue } p.c { color: green } p { color: yellow; display: block }";
     assert_eq!(

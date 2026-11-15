@@ -150,6 +150,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
 | TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, WEB-02 |
+| TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1743,3 +1744,17 @@ Pay by freeing a realm's record and reusing its index once a collection
 finds no live object of that realm, and by installing library objects on
 first use if the per-realm cost shows up in frame-heavy pages. Trigger when
 WEB-02 gives each same-origin frame a realm.
+
+### TD-119 — Scoped styles recompute after DOM mutation
+
+Root and limit selectors can read ancestors, siblings, descendants and
+element state. The incremental style engine conservatively restyles the
+document after a mutation when scoped style rules are present. That
+preserves the reference cascade result without assuming which subjects the
+changed boundary can affect. Scope matching checks ancestor candidates
+against each rule and may rewalk the path to its root to check limits.
+
+Pay by sharing scope membership for unchanged roots and tracking which DOM
+changes invalidate roots, limits and the corresponding affected subjects.
+Trigger when implementing nested scopes or collecting scoped-style
+performance evidence, whichever comes first.

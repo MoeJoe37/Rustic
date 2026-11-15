@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 28.90%** = 27.80% verified complete + 1.10% partial credit. 65/221 capabilities complete, 4 in progress.
+**Overall completion: 29.03%** = 27.80% verified complete + 1.23% partial credit. 65/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `a2a7a0e114e7bfdff0445bb22072c0953e2acc2924c9afb75a0265bb839ed9d2`.
+Catalog: `engine-v4`. Source fingerprint: `a96cf1e427c02dccb2810c586f709705553aa48e8dc496669c575fa63a679449`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -20,7 +20,7 @@ Catalog: `engine-v4`. Source fingerprint: `a2a7a0e114e7bfdff0445bb22072c0953e2ac
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
 | M9 Compatibility expansion | 0/52 | 1.90% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
-| M11 Web platform parity | 0/30 | 0.00% | 0.00% | 14.85% |
+| M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.85% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.91% |
 | M13 Full engine 1.0 | 0/1 | 0.00% | 0.00% | 0.50% |
 
@@ -32,7 +32,7 @@ Catalog: `engine-v4`. Source fingerprint: `a2a7a0e114e7bfdff0445bb22072c0953e2ac
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 2% | 0.86 |
 | DOM | 6/10 | 1 | 56.61% | 52.94% | 4% | 2.26 |
 | HTML | 9/11 | 0 | 70.27% | 70.27% | 5% | 3.51 |
-| CSS & style | 8/10 | 0 | 79.59% | 79.59% | 6% | 4.77 |
+| CSS & style | 8/10 | 1 | 81.63% | 79.59% | 6% | 4.89 |
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
@@ -126,7 +126,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 0.61% of engine ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/containers.rs), [source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
 - **complete** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 0.61% of engine ([source](../../tools/import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/wpt_conformance.rs), [test](../../tools/tests/test_import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/corpus.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
 - **planned** `css.animations` — Transitions, CSS animations and Web Animations · size 5 · M9 · 0.61% of engine
-- **planned** `css.modern` — Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope · size 5 · M11 · 0.61% of engine
+- **in progress 20.00%** `css.modern` — Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope · size 5 · M11 · 0.61% of engine
+  - [x] Explicit stylesheet scopes, limits, relative selectors and cascade proximity ([source](../../crates/rustic-style/src/scope.rs), [test](../../crates/rustic-style/tests/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
+  - [ ] Implicit and nested scopes, scoped declarations and imports, and CSSOM
+  - [ ] CSS anchor positioning
+  - [ ] View transitions
+  - [ ] Scroll-driven animations
 
 ### Text & fonts
 

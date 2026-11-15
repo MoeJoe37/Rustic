@@ -116,6 +116,8 @@ pub struct InvalidationMap {
     structural_outside_subject: bool,
     /// Filtered sibling counting can read arbitrary selector dependencies.
     nth_filter: bool,
+    /// Scoping boundaries can depend on selectors outside the subject subtree.
+    scoped_rules: bool,
     /// Any `+` or `~` combinator outside `:has()` arguments.
     siblings: bool,
     /// The `:has()` dependencies.
@@ -168,6 +170,7 @@ impl InvalidationMap {
         for sheet in cascade.sheets() {
             for rule in &sheet.rules {
                 map.list(&rule.selectors, top);
+                map.scoped_rules |= rule.scope.is_some();
             }
         }
         map
@@ -694,7 +697,10 @@ impl StyledDocument {
         // its membership can change outside the mutation's sibling list.
         // Keep the reference fallback until those dependencies carry their
         // counting scope (TD-36).
-        if self.map.nth_filter {
+        // Scope membership and proximity can change after any mutation
+        // affecting a root or limit selector. Full restyle is the reference
+        // path until those selectors have dedicated invalidation (TD-119).
+        if self.map.nth_filter || self.map.scoped_rules {
             self.dirty.all = true;
         }
         match mutation {

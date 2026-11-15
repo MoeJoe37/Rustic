@@ -11,10 +11,10 @@ use rustic_css::{
     Declaration, MediaQueryList, NamespaceMap, PropertyDeclaration, PropertyError, PropertySyntax,
     Rule, SelectorErrorKind, SelectorList, Token, Value, parse_block_contents,
     parse_container_query_list, parse_declaration, parse_media_query_list,
-    parse_nested_selector_list, parse_selector_list,
+    parse_nested_selector_list, parse_scoped_selector_list, parse_selector_list,
 };
 
-use crate::{LayerName, LayerSegment, PropertyRegistration};
+use crate::{LayerName, LayerSegment, PropertyRegistration, ScopeRule};
 
 /// Where a stylesheet comes from (CSS Cascade Level 5 §6.2).
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -49,6 +49,8 @@ pub struct StyleRule {
     /// [`StyleSheet::layers`]; `None` for an unlayered rule. An index past
     /// the end of the list is treated as unlayered.
     pub layer: Option<usize>,
+    /// The explicit `@scope` this rule belongs to, if any.
+    pub scope: Option<Arc<ScopeRule>>,
 }
 
 /// A stylesheet ready for the cascade.
@@ -95,6 +97,8 @@ pub enum StyleDiagnosticKind {
     InvalidMediaRule,
     /// An `@container` rule without a block or with an invalid prelude.
     InvalidContainerRule,
+    /// An explicit `@scope` with an invalid root, limit or missing block.
+    InvalidScopeRule,
     /// A malformed `@layer` rule, such as one naming a layer `initial`, or a
     /// block rule naming more than one layer.
     InvalidLayerRule,
@@ -186,13 +190,19 @@ impl NestingFrame {
 
     /// Emit the rule itself the first time, then a nested declarations rule
     /// for each later run of declarations.
-    fn flush(&mut self, rules: &mut Vec<StyleRule>, layer: Option<usize>) {
+    fn flush(
+        &mut self,
+        rules: &mut Vec<StyleRule>,
+        layer: Option<usize>,
+        scope: &Option<Arc<ScopeRule>>,
+    ) {
         if !self.pending.is_empty() || !self.emitted {
             rules.push(StyleRule {
                 selectors: SelectorList::clone(&self.selectors),
                 declarations: std::mem::take(&mut self.pending),
                 media: self.media.clone(),
                 layer,
+                scope: scope.clone(),
             });
             self.emitted = true;
         }
@@ -348,6 +358,7 @@ struct Frame {
     items: std::vec::IntoIter<BlockItem>,
     layer: Option<usize>,
     media: Vec<usize>,
+    scope: Option<Arc<ScopeRule>>,
 }
 
 /// Builds a [`StyleSheet`] from rules, tracking layers and diagnostics.
@@ -418,14 +429,15 @@ impl Builder {
 
     /// `@media` or `@container`: the frame for its block, with its
     /// condition added.
-    fn media_rule(&mut self, at: AtRule, layer: Option<usize>, media: &[usize]) -> Option<Frame> {
+    fn media_rule(&mut self, at: AtRule, parent: &Frame) -> Option<Frame> {
         let (index, block) = self.condition(at)?;
-        let mut nested = media.to_vec();
+        let mut nested = parent.media.clone();
         nested.push(index);
         Some(Frame {
             items: parse_block_contents(&block, 0).value.into_iter(),
-            layer,
+            layer: parent.layer,
             media: nested,
+            scope: parent.scope.clone(),
         })
     }
 
@@ -443,12 +455,13 @@ impl Builder {
         selectors: SelectorList,
         layer: Option<usize>,
         media: Vec<usize>,
+        scope: Option<Arc<ScopeRule>>,
         block: &[Value],
     ) {
         let mut stack = vec![NestingFrame::new(Arc::new(selectors), media, block)];
         while let Some(frame) = stack.last_mut() {
             let Some(item) = frame.items.next() else {
-                frame.flush(&mut self.sheet.rules, layer);
+                frame.flush(&mut self.sheet.rules, layer, &scope);
                 stack.pop();
                 continue;
             };
@@ -460,7 +473,7 @@ impl Builder {
                     match parse_nested_selector_list(&q.prelude, &self.namespaces, &frame.selectors)
                     {
                         Ok(nested) => {
-                            frame.flush(&mut self.sheet.rules, layer);
+                            frame.flush(&mut self.sheet.rules, layer, &scope);
                             let media = frame.media.clone();
                             stack.push(NestingFrame::new(Arc::new(nested), media, &q.block));
                         }
@@ -476,7 +489,7 @@ impl Builder {
                     let Some((index, block)) = self.condition(at) else {
                         continue;
                     };
-                    frame.flush(&mut self.sheet.rules, layer);
+                    frame.flush(&mut self.sheet.rules, layer, &scope);
                     let mut media = frame.media.clone();
                     media.push(index);
                     let mut child = NestingFrame::new(Arc::clone(&frame.selectors), media, &block);
@@ -492,12 +505,12 @@ impl Builder {
     }
 
     /// `@layer`: declare the named layers, or return the frame for a block.
-    fn layer_rule(&mut self, at: AtRule, parent: Option<usize>, media: &[usize]) -> Option<Frame> {
+    fn layer_rule(&mut self, at: AtRule, parent: &Frame) -> Option<Frame> {
         let names = layer_names(&at.prelude);
         match (names, at.block) {
             (Some(names), None) if !names.is_empty() => {
                 for name in names {
-                    self.declare_layer(parent, name);
+                    self.declare_layer(parent.layer, name);
                 }
                 None
             }
@@ -506,11 +519,12 @@ impl Builder {
                     self.anonymous_layers = self.anonymous_layers.saturating_add(1);
                     vec![LayerSegment::Anonymous(self.anonymous_layers)]
                 });
-                let layer = self.declare_layer(parent, segments);
+                let layer = self.declare_layer(parent.layer, segments);
                 Some(Frame {
                     items: parse_block_contents(&block, 0).value.into_iter(),
                     layer: Some(layer),
-                    media: media.to_vec(),
+                    media: parent.media.clone(),
+                    scope: parent.scope.clone(),
                 })
             }
             _ => {
@@ -518,6 +532,27 @@ impl Builder {
                 None
             }
         }
+    }
+
+    fn scope_rule(&mut self, at: AtRule, parent: &Frame) -> Option<Frame> {
+        let prelude = trim_whitespace(&at.prelude);
+        let implicit = prelude.is_empty()
+            || matches!(prelude[0].token(), Some(Token::Ident(name)) if name.eq_ignore_ascii_case("to"));
+        if parent.scope.is_some() || implicit {
+            self.diagnose(StyleDiagnosticKind::UnsupportedAtRule, at.span);
+            return None;
+        }
+        let (Some(block), Some(scope)) = (at.block, ScopeRule::parse(prelude, &self.namespaces))
+        else {
+            self.diagnose(StyleDiagnosticKind::InvalidScopeRule, at.span);
+            return None;
+        };
+        Some(Frame {
+            items: parse_block_contents(&block, 0).value.into_iter(),
+            layer: parent.layer,
+            media: parent.media.clone(),
+            scope: Some(Arc::new(scope)),
+        })
     }
 }
 
@@ -581,15 +616,15 @@ impl StyleSheet {
             items: top.into_iter(),
             layer: None,
             media: Vec::new(),
+            scope: None,
         }];
-        while let Some(frame) = stack.last_mut() {
+        while !stack.is_empty() {
+            let top_level = stack.len() == 1;
+            let frame = stack.last_mut().expect("nonempty stack");
             let Some(item) = frame.items.next() else {
                 stack.pop();
                 continue;
             };
-            let layer = frame.layer;
-            let media = frame.media.clone();
-            let top_level = stack.len() == 1;
             let rule = match item {
                 BlockItem::Rule(rule) => rule,
                 BlockItem::Declaration(declaration) => {
@@ -636,7 +671,7 @@ impl StyleSheet {
                     if at.block.is_some() {
                         builder.namespaces_allowed = false;
                     }
-                    if let Some(frame) = builder.layer_rule(at, layer, &media) {
+                    if let Some(frame) = builder.layer_rule(at, frame) {
                         stack.push(frame);
                     }
                 }
@@ -645,7 +680,13 @@ impl StyleSheet {
                         || at.name.eq_ignore_ascii_case("container") =>
                 {
                     builder.namespaces_allowed = false;
-                    if let Some(frame) = builder.media_rule(at, layer, &media) {
+                    if let Some(frame) = builder.media_rule(at, frame) {
+                        stack.push(frame);
+                    }
+                }
+                Rule::At(at) if at.name.eq_ignore_ascii_case("scope") => {
+                    builder.namespaces_allowed = false;
+                    if let Some(frame) = builder.scope_rule(at, frame) {
                         stack.push(frame);
                     }
                 }
@@ -653,7 +694,7 @@ impl StyleSheet {
                     builder.namespaces_allowed = false;
                     // Top level or in `@layer` blocks only: a registration
                     // is global, so it cannot depend on a condition.
-                    match property_rule(&at).filter(|_| media.is_empty()) {
+                    match property_rule(&at).filter(|_| frame.media.is_empty()) {
                         Some(registration) => builder.sheet.properties.push(registration),
                         None => builder.diagnose(StyleDiagnosticKind::InvalidPropertyRule, at.span),
                     }
@@ -668,8 +709,19 @@ impl StyleSheet {
                 }
                 Rule::Qualified(q) => {
                     builder.namespaces_allowed = false;
-                    match parse_selector_list(&q.prelude, &builder.namespaces) {
-                        Ok(selectors) => builder.expand(selectors, layer, media, &q.block),
+                    let parsed = if frame.scope.is_some() {
+                        parse_scoped_selector_list(&q.prelude, &builder.namespaces, true)
+                    } else {
+                        parse_selector_list(&q.prelude, &builder.namespaces)
+                    };
+                    match parsed {
+                        Ok(selectors) => builder.expand(
+                            selectors,
+                            frame.layer,
+                            frame.media.clone(),
+                            frame.scope.clone(),
+                            &q.block,
+                        ),
                         Err(error) => builder
                             .diagnose(StyleDiagnosticKind::InvalidSelector(error.kind), q.span),
                     }

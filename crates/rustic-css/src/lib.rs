@@ -91,7 +91,7 @@ pub use selector::{
     ComplexSelector, Compound, ElementState, FormState, MAX_SELECTOR_NESTING, NamespaceMap,
     NamespaceSelector, Nth, NthKind, PseudoClass, PseudoElement, RelativeSelector,
     RelativeSelectorList, SelectorError, SelectorErrorKind, SelectorList, SimpleSelector,
-    Specificity, parse_nested_selector_list, parse_selector_list,
+    Specificity, parse_nested_selector_list, parse_scoped_selector_list, parse_selector_list,
 };
 pub use serialize::{serialize_identifier, serialize_string};
 pub use shape::{BasicShape, ClipPath, GeometryBox, ShapeRadius};

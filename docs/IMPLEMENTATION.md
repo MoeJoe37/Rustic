@@ -1659,6 +1659,10 @@ require `eor` and other locale tailorings, agreement with the locale
 preference methods, or `Intl.NumberFormat`. TD-107 describes the remaining
 collation work.
 
+Root collation extends contractions across unblocked combining marks in NFD
+input. The skipped marks keep their order and weight. Equal-class marks can
+block a contraction under UTS #10 §7.2, and repeated marks are handled with
+cached run boundaries and links to unconsumed input.
 
 ## JS-08 — Intl.PluralRules
 

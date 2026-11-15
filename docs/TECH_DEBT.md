@@ -138,7 +138,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
 | TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
-| TD-107 | Deliberate | JS | `localeCompare` and locale case methods ignore locales | Open, JS-05/JS-08 |
+| TD-107 | Deliberate | JS | CLDR collation still needs full tailorings, implicit weights and conformance evidence | Open, JS-08 |
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
@@ -1560,10 +1560,10 @@ casing for other languages. `Intl.Collator` and `localeCompare` negotiate
 the locale and collation options and compare CLDR root weights, with German
 phonebook and search handling. Other locale tailorings remain open, including
 European ordering (`eor`), locale-specific search, and synchronization with
-`Intl.Locale.prototype.getCollations`. The root reader handles contiguous
-contractions and a limited set of implicit ranges. Pay in JS-08 with generated
-tailoring rules, discontiguous contractions, complete implicit weights and
-Unicode collation conformance data.
+`Intl.Locale.prototype.getCollations`. The root reader handles contiguous and
+discontiguous contractions and a limited set of implicit ranges. Pay in JS-08
+with generated tailoring rules, complete implicit weights and Unicode collation
+conformance data.
 
 ### TD-108 — Date local time is a fixed offset
 

@@ -1103,10 +1103,9 @@ accent sensitivity are applied to separate collation levels. Each instance
 caches its bound `compare` function. The collector traces the callback and
 its captured instance.
 
-The pinned selection passes 388 of 393 Intl files, including 63 of 65
-Collator files and all 10 `localeCompare` files. TD-107 records the remaining
-tailorings and root collation gaps. The broader Intl service constructors
-remain open.
+The pinned selection passes 63 of 65 Collator files and all 10
+`localeCompare` files. TD-107 records the remaining tailorings and root
+collation gaps.
 
 Generate or verify the static tables with CLDR 48 `core.zip` and Unicode
 17.0.0 `UnicodeData.txt`. The generator verifies the upstream SHA-256
@@ -1116,6 +1115,10 @@ digests. The [Unicode license notice] applies to these tables.
 python3 tools/generate_js_collation.py /path/to/pinned/collation-inputs --check
 ```
 
+Root collation matches contractions across intervening lower-class combining
+marks under UTS #10 §7.2. It keeps skipped marks in order for further lookup
+and jumps over blocked runs of equal combining class. Tests cover decomposed
+Cyrillic and Arabic, equal-class blocking, and long runs of combining marks.
 
 ## Intl plural rules (JS-08)
 

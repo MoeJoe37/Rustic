@@ -3958,3 +3958,23 @@ fn intl_segmenter_finds_graphemes_words_and_sentences() {
         Ok(String::new())
     );
 }
+
+#[test]
+fn collator_extends_root_contractions_across_unblocked_marks() {
+    let run = run(r#"
+        const primary = new Intl.Collator('en', { sensitivity: 'base' });
+        const variant = new Intl.Collator('en');
+        const cyrillic = '\u0438\u0327\u0306';
+        const arabic = '\u0627\u0656\u0654';
+        [
+            primary.compare(cyrillic, '\u0439') === 0,
+            primary.compare(cyrillic, '\u0438') !== 0,
+            variant.compare(cyrillic, '\u0439') !== 0,
+            primary.compare('\u0438\u0301\u0306', '\u0438') === 0,
+            primary.compare(arabic, '\u0623') === 0,
+            primary.compare(arabic, '\u0627') !== 0,
+            primary.compare('\u0438' + '\u0327'.repeat(3000) + '\u0306', '\u0439') === 0,
+        ].join(',');
+    "#);
+    assert_eq!(run, "true,true,true,true,true,true,true");
+}

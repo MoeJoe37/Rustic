@@ -581,3 +581,144 @@ fn html_collection_named_property_allows_proxy_visibility_traps_to_mutate_the_do
         Value::TRUE
     );
 }
+
+#[test]
+fn page_window_keeps_a_distinct_global_this_and_the_live_document() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    assert_ne!(agent.intrinsics.global, agent.global_this());
+    agent.heap.set_gc_stress(true);
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        var declared = 1;
+        let lexicalOnly = 2;
+        const originalView = window;
+        if (this !== window || globalThis !== window || window.window !== window ||
+            self !== window || frames !== window || parent !== window || top !== window ||
+            length !== 0 || closed || frameElement !== null ||
+            document.defaultView !== window || window.document !== document ||
+            !(window instanceof Window) || Object.getPrototypeOf(window) !== Window.prototype ||
+            Object.prototype.toString.call(window) !== "[object Window]" ||
+            window.declared !== 1 || "lexicalOnly" in window)
+            throw "Window identity or bindings";
+        window.declared = 3;
+        window.fromWindow = 4;
+        if (declared !== 3 || fromWindow !== 4 ||
+            (function () { return this; })() !== window || eval("this") !== window ||
+            (0, eval)("this") !== window || Function("return this")() !== window)
+            throw "Window global environment";
+        Object.defineProperty(window, "accessor", {
+            get() { return this; },
+            set(value) { this.receiverWasView = this === originalView && value === 8; }
+        });
+        accessor = 8;
+        if (accessor !== originalView || !receiverWasView || eval("accessor") !== originalView)
+            throw "an identifier accessor exposed the underlying Window";
+        globalThis = 5;
+        const sameView = () => this === originalView;
+        if (!sameView() || globalThis !== 5 || document.defaultView !== originalView ||
+            (function () { return this; })() !== originalView)
+            throw "mutable globalThis property changed the realm's this";
+        Promise.resolve().then(function () {
+            window.jobSawWindow = this === originalView && document.defaultView === originalView;
+        });
+        true;
+    "#
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+    assert!(agent.run_jobs_limited(8).unwrap());
+    assert_eq!(
+        agent
+            .evaluate("this === originalView && jobSawWindow && window.document === document")
+            .unwrap(),
+        Value::TRUE
+    );
+
+    let page = agent.current_realm();
+    let standalone = agent.create_realm().unwrap();
+    agent.enter_realm(standalone);
+    assert_eq!(agent.global_this(), agent.intrinsics.global);
+    assert_eq!(agent.evaluate("this === globalThis && typeof Window === 'undefined' && typeof document === 'undefined'").unwrap(), Value::TRUE);
+    agent.enter_realm(page);
+    assert_eq!(
+        agent
+            .evaluate("this === originalView && globalThis === 5")
+            .unwrap(),
+        Value::TRUE
+    );
+}
+
+#[test]
+fn window_proxy_forwards_properties_and_enforces_its_own_descriptor_rules() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    assert_eq!(agent.evaluate(r#"
+        (() => {
+            for (const key of ["window", "top", "document"]) {
+                const descriptor = Object.getOwnPropertyDescriptor(window, key);
+                if (typeof descriptor.get !== "function" || descriptor.set !== undefined ||
+                    !descriptor.enumerable || descriptor.configurable ||
+                    Reflect.set(window, key, 5) || Reflect.deleteProperty(window, key) ||
+                    Reflect.defineProperty(window, key, { value: 5 }))
+                    throw "unforgeable attribute";
+            }
+            const getDocument = Object.getOwnPropertyDescriptor(window, "document").get;
+            const getView = Object.getOwnPropertyDescriptor(Document.prototype, "defaultView").get;
+            if (getDocument() !== document || getDocument.call(null) !== document)
+                throw "default Window receiver";
+            let rejected = 0;
+            for (const call of [
+                () => getDocument.call(Window.prototype),
+                () => getView.call(window),
+                () => new Window(),
+                () => Window(),
+                () => Reflect.get(window, "document", {}),
+            ]) {
+                try { call(); } catch (error) { if (error instanceof TypeError) rejected++; }
+            }
+            if (rejected !== 5 || !Object.isExtensible(window) ||
+                Reflect.preventExtensions(window) || Reflect.setPrototypeOf(window, {}) ||
+                !Reflect.setPrototypeOf(window, Window.prototype) ||
+                Reflect.setPrototypeOf(Window.prototype, window))
+                throw "Window brand or prototype";
+            for (const key of ["length", "self", "frames", "parent"]) {
+                const descriptor = Object.getOwnPropertyDescriptor(window, key);
+                if (!descriptor.enumerable || !descriptor.configurable || typeof descriptor.set !== "function")
+                    throw "replaceable attribute descriptor";
+                window[key] = 41;
+                const data = Object.getOwnPropertyDescriptor(window, key);
+                if (data.value !== 41 || !data.writable || !data.enumerable || !data.configurable)
+                    throw "replaceable attribute setter";
+            }
+            if ("0" in window || window[0] !== undefined ||
+                Reflect.defineProperty(window, "0", {value: 9}) || Reflect.set(window, "0", 9) ||
+                !Reflect.deleteProperty(window, "0"))
+                throw "empty child window indices";
+            const marker = Symbol();
+            const receiver = {};
+            Object.defineProperty(window, marker, {
+                get() { return this; },
+                set(value) { this.captured = value; },
+                configurable: true
+            });
+            if (window[marker] !== window || Reflect.get(window, marker, receiver) !== receiver ||
+                !Reflect.set(window, marker, 6, receiver) || receiver.captured !== 6 ||
+                !Reflect.ownKeys(window).includes(marker) || !Reflect.deleteProperty(window, marker) ||
+                marker in window)
+                throw "ordinary property forwarding";
+            return document.defaultView === window && top === window;
+        })();
+    "#).unwrap(), Value::TRUE);
+}

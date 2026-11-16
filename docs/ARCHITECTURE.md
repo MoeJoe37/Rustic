@@ -140,6 +140,14 @@ call Proxy traps after releasing DOM borrows.
 [ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
 [ADR 0031](adr/0031-live-html-collections.md)
 
+A scripted page retains one ordinary Window as the realm's global object and
+a distinct WindowProxy as its global this binding. Global name resolution
+and property storage retain the same realm and DOM. Script accessors receive
+the proxy when invoked through a global identifier. Both objects are traced
+through the realm's global environment. Standalone agents keep their ordinary
+global object as global this.
+[ADR 0032](adr/0032-top-level-window-realm.md)
+
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed
 interface's realm prototype. Engine error conversion uses that prototype

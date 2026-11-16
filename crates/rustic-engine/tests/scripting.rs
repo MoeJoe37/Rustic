@@ -337,3 +337,51 @@ fn document_selectors_follow_parser_quirks_mode() {
         assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
     }
 }
+
+#[test]
+fn window_identity_persists_across_document_turns() {
+    let mut engine = Engine::new(1);
+    let mut load = engine.begin_document(ParserLimits::default()).unwrap();
+    load.feed(b"<!doctype html><main>original</main>").unwrap();
+    let mut scripts = load
+        .finish()
+        .unwrap()
+        .into_scripted(TaskLimits::default())
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+        const firstView = document.defaultView;
+        if (firstView !== this || firstView !== window) throw "initial Window";
+        Promise.resolve().then(function () {
+            if (this !== firstView) throw "promise receiver";
+            this.readyForNextTurn = true;
+        });
+    "#,
+        ))
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+        if (this !== firstView || window !== firstView || !readyForNextTurn)
+            throw "Window identity across turns";
+        window.document.documentElement.setAttribute("data-window", "ready");
+    "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    let document = scripts.document();
+    let tree = document.parsed().document();
+    let root = tree
+        .walk(tree.root())
+        .unwrap()
+        .find_map(|(id, _)| {
+            let rustic_dom::NodeKind::Element(element) = tree.node(id).unwrap().kind() else {
+                return None;
+            };
+            (element.name().local() == "html").then_some(element)
+        })
+        .unwrap();
+    assert_eq!(root.attributes()[0].name().local(), "data-window");
+}

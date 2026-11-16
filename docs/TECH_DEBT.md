@@ -161,6 +161,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
+| TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1893,8 +1894,8 @@ needed for detached documents and cross-document operations. Element
 creation provides the base Element interface with no custom element
 registry. Requested custom element creation options fail explicitly.
 Install HTML element-specific prototypes and custom element reactions
-alongside the HTML interface and registry work. Named HTMLCollection
-properties and the remaining collection APIs are tracked in WEB-03.
+alongside the HTML interface and registry work. The remaining document
+factories and cross-document operations are tracked in WEB-03.
 [ADR 0028](adr/0028-scripted-document-collection.md)
 [ADR 0029](adr/0029-scripted-node-creation.md)
 
@@ -1928,3 +1929,16 @@ to guide a bounded, mutation-versioned filter or name index. Preserve live
 behavior through attribute changes, subtree moves, and potential reentrancy
 during named property visibility checks.
 [ADR 0031](adr/0031-live-html-collections.md)
+
+
+### TD-130 — Window named access and additional browsing contexts
+
+The page host has one top-level document per script agent and a fixed
+WindowProxy target for that document's lifetime. This gives event and
+script integration one global identity. Extend the prototype chain with
+Window named access and the EventTarget interface alongside their DOM and
+HTML APIs. Before exposing related browsing contexts or navigation, add
+lifetime-aware proxy retargeting and implement origin-sensitive property
+access. Test context identity across navigation and cross-origin property
+descriptors with the corresponding Web Platform Tests.
+[ADR 0032](adr/0032-top-level-window-realm.md)

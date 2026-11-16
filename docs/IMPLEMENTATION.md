@@ -195,14 +195,23 @@ non-enumerable and respect own and inherited properties. A document child-link
 revision invalidates the shared direct-child index. Descendant and name
 lookups still walk their live source under the native work budget (TD-129).
 
-The host exposes one document per scripted agent. Window integration,
-additional documents, and cross-document operations remain open.
+Each scripted agent exposes one top-level Window. The ordinary Window
+stores global properties, and the realm exposes a distinct WindowProxy as
+global `this`. `window`, `self`, and `document.defaultView` initially share
+that identity. Scripts, eval, and sloppy callbacks use it even if script
+overwrites `globalThis`. `window.document` exposes the same live tree used
+by the renderer. The proxy forwards ordinary properties and reserves array
+indices for child contexts. Window named properties, nested and navigable
+contexts, and cross-origin WindowProxy operations are TD-130.
+
+Additional documents and cross-document operations remain open.
 TD-126 covers other remaining interfaces and constructor behavior.
 TD-127 covers the UTF-8 name storage limit.
 [ADR 0028](adr/0028-scripted-document-collection.md),
 [ADR 0029](adr/0029-scripted-node-creation.md),
 [ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
-[ADR 0031](adr/0031-live-html-collections.md)
+[ADR 0031](adr/0031-live-html-collections.md),
+[ADR 0032](adr/0032-top-level-window-realm.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

@@ -354,6 +354,40 @@ impl Agent {
         })
     }
 
+    /// The current realm's global this binding, independent of changes to
+    /// the script-visible globalThis property.
+    pub fn global_this(&self) -> ObjectId {
+        let Environment::Global { this, .. } = self.env(self.global_env) else {
+            unreachable!("realm global environment")
+        };
+        *this
+    }
+
+    pub(crate) fn set_global_this(&mut self, value: ObjectId) {
+        let Environment::Global { this, .. } = self.heap.env_mut(self.global_env) else {
+            unreachable!("realm global environment")
+        };
+        *this = value;
+    }
+
+    /// Global properties are stored on the Window. Script accessors must
+    /// receive the associated WindowProxy instead of exposing that target.
+    pub(crate) fn global_property_object(&self, env: EnvId) -> ObjectId {
+        let Environment::Global { object, this, .. } = *self.env(env) else {
+            unreachable!("realm global environment")
+        };
+        if this != object
+            && matches!(
+                self.heap.object(this).internal(),
+                Some(super::object::Internal::WindowProxy(window)) if *window == object
+            )
+        {
+            this
+        } else {
+            object
+        }
+    }
+
     /// The outer environment.
     pub fn outer_environment(&self, env: EnvId) -> Option<EnvId> {
         self.env(env).outer()
@@ -457,9 +491,12 @@ impl Agent {
                 record.values[at] = value;
                 Ok(())
             }
-            (None, Shallow::Global { object }) => {
-                self.set(object, PropertyKey::String(name), value, false)
-            }
+            (None, Shallow::Global { .. }) => self.set(
+                self.global_property_object(env),
+                PropertyKey::String(name),
+                value,
+                false,
+            ),
             (None, _) => Err(self.throw(ErrorKind::ReferenceError, "binding does not exist")),
         }
     }
@@ -481,7 +518,8 @@ impl Agent {
             return self.set(object, key, value, strict);
         }
         let Some(at) = self.env(env).declarative().and_then(|d| d.find(name)) else {
-            if let Shallow::Global { object } = shallow {
+            if let Shallow::Global { .. } = shallow {
+                let object = self.global_property_object(env);
                 let key = PropertyKey::String(name);
                 if !self.has_property(object, key)? && strict {
                     return Err(self.reference_error_for(name, "is not defined"));
@@ -539,7 +577,9 @@ impl Agent {
                 Ok(value)
             }
             None => match shallow {
-                Shallow::Global { object } => self.object_binding_value(object, name, strict),
+                Shallow::Global { .. } => {
+                    self.object_binding_value(self.global_property_object(env), name, strict)
+                }
                 _ => Err(self.reference_error_for(name, "is not defined")),
             },
         }
@@ -821,7 +861,7 @@ impl Agent {
                 if reference.strict {
                     return Err(self.reference_error_for(name, "is not defined"));
                 }
-                let global = self.intrinsics.global;
+                let global = self.global_property_object(self.global_env);
                 self.set(global, reference.name, value, false)
             }
             ReferenceBase::Value(base) => {

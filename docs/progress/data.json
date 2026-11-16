@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "6b69dc31d8343aa1edc4fc737882802df15899cf00b2999afdefc9566aa66e74",
-  "percent": "31.01",
+  "source_fingerprint": "0ed2ac8e0c63a10ce39754c465f534b59fe9aeef89f0328c8f5a92b081dde83d",
+  "percent": "31.11",
   "verified_percent": "29.89",
-  "partial_percent": "1.12",
+  "partial_percent": "1.22",
   "completed": 69,
   "in_progress": 5,
   "total": 221,
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 3,
       "total": 12,
-      "percent": "30.28",
+      "percent": "32.25",
       "verified_percent": "22.42",
-      "partial_percent": "7.86"
+      "partial_percent": "9.83"
     },
     {
       "id": "M6",
@@ -4444,8 +4444,34 @@
             },
             {
               "label": "Window interface and browsing realm integration",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/window.rs",
+                  "marker": "pub(super) fn install"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/host.rs",
+                  "marker": "pub fn install_window_proxy"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn page_window_keeps_a_distinct_global_this_and_the_live_document"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn window_proxy_forwards_properties_and_enforces_its_own_descriptor_rules"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn window_identity_persists_across_document_turns"
+                }
+              ]
             },
             {
               "label": "Basic selectors and static and live NodeList bindings",
@@ -4520,7 +4546,7 @@
               ]
             }
           ],
-          "credit": "66.66",
+          "credit": "83.33",
           "engine_share": "0.62"
         },
         {
@@ -4669,10 +4695,10 @@
       "completed": 2,
       "in_progress": 1,
       "total": 10,
-      "contribution": "1.41",
-      "percent": "28.33",
+      "contribution": "1.52",
+      "percent": "30.41",
       "verified_percent": "20.00",
-      "partial_percent": "8.33"
+      "partial_percent": "10.41"
     },
     {
       "id": "media",

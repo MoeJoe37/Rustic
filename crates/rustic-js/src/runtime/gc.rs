@@ -461,6 +461,7 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
+                Some(Internal::WindowProxy(window)) => self.value(Value::object(*window)),
                 Some(Internal::Proxy { target, handler }) => {
                     for o in [target, handler].into_iter().flatten() {
                         self.value(Value::object(*o));

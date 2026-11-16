@@ -20,6 +20,7 @@ mod collections;
 mod creation;
 mod html_collections;
 mod selectors;
+mod window;
 
 /// Shared access to the real document rendered by the host.
 pub trait PageTree: Debug {
@@ -36,6 +37,8 @@ pub trait PageTree: Debug {
 #[derive(Debug)]
 struct Page {
     tree: Rc<dyn PageTree>,
+    root: Value,
+    window: Value,
     wrappers: RefCell<DomHeap>,
     child_lists: RefCell<HashMap<(NodeId, RealmId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
@@ -109,6 +112,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         0,
         &[
             ("documentElement", "get documentElement", document_element),
+            ("defaultView", "get defaultView", window::default_view),
             (
                 "children",
                 "get children",
@@ -187,14 +191,11 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     let mut wrappers = DomHeap::new(&document);
     let root = wrap(&mut wrappers, agent, &document, document.root())?;
     drop(document);
-    let key = agent.heap.key("document")?;
-    agent.define_property_or_throw(
-        agent.intrinsics.global,
-        key,
-        PropertyDescriptor::data_with(root, false, true, false),
-    )?;
+    let window = window::install(agent)?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
+        root,
+        window,
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),

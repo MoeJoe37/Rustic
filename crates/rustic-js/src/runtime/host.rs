@@ -3,7 +3,9 @@
 use super::agent::{Agent, JsResult, NativeFn};
 use super::builtins::new_constructor;
 use super::heap::OutOfMemory;
-use super::object::{Class, Internal, Object, PropertyDescriptor};
+use super::object::{
+    Class, FLAG_EXOTIC, FLAG_IMMUTABLE_PROTO, Internal, Object, PropertyDescriptor,
+};
 use super::shape::PropertyKey;
 use super::value::{ObjectId, StringId, Value};
 
@@ -88,6 +90,40 @@ impl Agent {
         Ok(self
             .heap
             .alloc_object(Object::new(Class::Error, Some(prototype)))?)
+    }
+
+    /// Install the script-facing WindowProxy for the current realm before
+    /// evaluating any page code. The target is the realm's existing global
+    /// object, and only this realm's global this binding changes.
+    pub fn install_window_proxy(&mut self, prototype: ObjectId) -> JsResult<ObjectId> {
+        let window = self.intrinsics.global;
+        if self.global_this() != window {
+            return self.type_error("the realm already has a WindowProxy");
+        }
+        let mut proxy = Object::new(Class::Ordinary, Some(prototype));
+        proxy.set_flag(FLAG_EXOTIC, true);
+        proxy.extra_mut().internal = Some(Internal::WindowProxy(window));
+        let proxy = self.heap.alloc_object(proxy)?;
+        if !self.set_prototype_of(window, Some(prototype))? {
+            return self.type_error("cannot set the Window prototype");
+        }
+        self.define_property_or_throw(
+            window,
+            PropertyKey::String(self.names.global_this),
+            PropertyDescriptor::data_with(Value::object(proxy), true, false, true),
+        )?;
+        self.heap
+            .object_mut(window)
+            .set_flag(FLAG_IMMUTABLE_PROTO, true);
+        self.set_global_this(proxy);
+        Ok(proxy)
+    }
+
+    pub(crate) fn window_proxy_target(&self, proxy: ObjectId) -> ObjectId {
+        let Some(Internal::WindowProxy(window)) = self.heap.object(proxy).internal() else {
+            unreachable!("WindowProxy internal slot")
+        };
+        *window
     }
 
     /// Create a branded host exception with two private, traced strings.

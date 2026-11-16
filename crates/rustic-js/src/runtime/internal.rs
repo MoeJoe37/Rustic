@@ -419,7 +419,9 @@ impl Agent {
         if current == proto {
             return true;
         }
-        if !self.heap.object(o).has_flag(FLAG_EXTENSIBLE) {
+        let object = self.heap.object(o);
+        if !object.has_flag(FLAG_EXTENSIBLE) || object.has_flag(super::object::FLAG_IMMUTABLE_PROTO)
+        {
             return false;
         }
         let mut p = proto;

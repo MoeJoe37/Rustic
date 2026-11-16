@@ -312,13 +312,13 @@ impl Agent {
     /// collects garbage at its safe points: every handle the caller keeps
     /// across this call must be rooted ([`Agent::root`]).
     pub fn run_script(&mut self, code: CodeId) -> JsResult<Value> {
-        self.run_in_environment(code, self.global_env, Value::object(self.intrinsics.global))
+        self.run_in_environment(code, self.global_env, Value::object(self.global_this()))
     }
 
     /// Run indirect `eval` code on `env` with the global `this`, from
     /// inside a native call.
     pub(crate) fn run_eval(&mut self, code: CodeId, env: EnvId) -> JsResult<Value> {
-        self.run_in_environment(code, env, Value::object(self.intrinsics.global))
+        self.run_in_environment(code, env, Value::object(self.global_this()))
     }
 
     pub(crate) fn run_in_environment(
@@ -837,7 +837,7 @@ impl Agent {
         } else if code.strict || this.as_object().is_some() {
             this
         } else if this.is_nullish() {
-            Value::object(self.intrinsics.global)
+            Value::object(self.global_this())
         } else {
             Value::object(self.to_object(this)?)
         };
@@ -2330,7 +2330,7 @@ impl Agent {
         if !self.has_property(global, key)? {
             return Err(self.not_defined_error(site.name));
         }
-        self.get(global, key)
+        self.get(self.global_property_object(self.global_env), key)
     }
 
     fn set_global(&mut self, code: &FunctionCode, site: u16, value: Value) -> JsResult<()> {

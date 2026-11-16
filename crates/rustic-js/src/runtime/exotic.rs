@@ -25,6 +25,7 @@ enum Exotic {
     TypedArray,
     ModuleNamespace,
     HostIndexed,
+    WindowProxy,
 }
 
 impl Agent {
@@ -35,6 +36,7 @@ impl Agent {
             Some(Internal::TypedArray { .. }) => Exotic::TypedArray,
             Some(Internal::ModuleNamespace(..)) => Exotic::ModuleNamespace,
             Some(Internal::HostIndexed(_)) => Exotic::HostIndexed,
+            Some(Internal::WindowProxy(_)) => Exotic::WindowProxy,
             _ => unreachable!("only exotic objects carry the exotic flag"),
         }
     }
@@ -62,6 +64,7 @@ impl Agent {
 
     pub(crate) fn exotic_get_prototype_of(&mut self, o: ObjectId) -> JsResult<Option<ObjectId>> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy => Ok(self.stored_prototype(self.window_proxy_target(o))),
             Exotic::Proxy => self.in_proxy(|a| proxy::get_prototype_of(a, o)),
             Exotic::Arguments
             | Exotic::TypedArray
@@ -76,6 +79,7 @@ impl Agent {
         proto: Option<ObjectId>,
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy => Ok(proto == self.stored_prototype(self.window_proxy_target(o))),
             Exotic::Proxy => self.in_proxy(|a| proxy::set_prototype_of(a, o, proto)),
             Exotic::Arguments
             | Exotic::TypedArray
@@ -86,6 +90,7 @@ impl Agent {
 
     pub(crate) fn exotic_is_extensible(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy => Ok(true),
             Exotic::Proxy => self.in_proxy(|a| proxy::is_extensible(a, o)),
             Exotic::Arguments
             | Exotic::TypedArray
@@ -99,7 +104,7 @@ impl Agent {
     pub(crate) fn exotic_prevent_extensions(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::prevent_extensions(a, o)),
-            Exotic::HostIndexed => Ok(false),
+            Exotic::HostIndexed | Exotic::WindowProxy => Ok(false),
             Exotic::Arguments | Exotic::TypedArray | Exotic::ModuleNamespace => {
                 self.heap
                     .object_mut(o)
@@ -115,6 +120,8 @@ impl Agent {
         key: PropertyKey,
     ) -> JsResult<Option<PropertyDescriptor>> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy if matches!(key, PropertyKey::Index(_)) => Ok(None),
+            Exotic::WindowProxy => self.ordinary_get_own_property(self.window_proxy_target(o), key),
             Exotic::Proxy => self.in_proxy(|a| proxy::get_own_property(a, o, key)),
             Exotic::TypedArray => typed_array::get_own_property(self, o, key),
             Exotic::HostIndexed => {
@@ -159,6 +166,10 @@ impl Agent {
         desc: PropertyDescriptor,
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy if matches!(key, PropertyKey::Index(_)) => Ok(false),
+            Exotic::WindowProxy => {
+                self.ordinary_define_own_property(self.window_proxy_target(o), key, desc)
+            }
             Exotic::Proxy => self.in_proxy(|a| proxy::define_own_property(a, o, key, desc)),
             Exotic::TypedArray => typed_array::define_own_property(self, o, key, desc),
             Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => Ok(false),
@@ -216,6 +227,13 @@ impl Agent {
 
     pub(crate) fn exotic_has_property(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy if matches!(key, PropertyKey::Index(_)) => {
+                match self.stored_prototype(self.window_proxy_target(o)) {
+                    Some(parent) => self.has_property(parent, key),
+                    None => Ok(false),
+                }
+            }
+            Exotic::WindowProxy => self.has_property_from(self.window_proxy_target(o), key, true),
             Exotic::Proxy => self.in_proxy(|a| proxy::has_property(a, o, key)),
             Exotic::TypedArray => typed_array::has_property(self, o, key),
             Exotic::Arguments => self.has_property_from(o, key, true),
@@ -234,6 +252,13 @@ impl Agent {
         receiver: Value,
     ) -> JsResult<Value> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy if matches!(key, PropertyKey::Index(_)) => {
+                match self.stored_prototype(self.window_proxy_target(o)) {
+                    Some(parent) => self.get_with_receiver(parent, key, receiver),
+                    None => Ok(Value::UNDEFINED),
+                }
+            }
+            Exotic::WindowProxy => self.get_from(self.window_proxy_target(o), key, receiver, true),
             Exotic::Proxy => self.in_proxy(|a| proxy::get(a, o, key, receiver)),
             Exotic::TypedArray => typed_array::get(self, o, key, receiver),
             Exotic::HostIndexed => {
@@ -265,6 +290,10 @@ impl Agent {
         receiver: Value,
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy if matches!(key, PropertyKey::Index(_)) => Ok(false),
+            Exotic::WindowProxy => {
+                self.set_from(self.window_proxy_target(o), key, value, receiver, true)
+            }
             Exotic::Proxy => self.in_proxy(|a| proxy::set(a, o, key, value, receiver)),
             Exotic::TypedArray => typed_array::set(self, o, key, value, receiver),
             Exotic::HostIndexed => {
@@ -289,6 +318,8 @@ impl Agent {
 
     pub(crate) fn exotic_delete(&mut self, o: ObjectId, key: PropertyKey) -> JsResult<bool> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy if matches!(key, PropertyKey::Index(_)) => Ok(true),
+            Exotic::WindowProxy => self.ordinary_delete(self.window_proxy_target(o), key),
             Exotic::Proxy => self.in_proxy(|a| proxy::delete(a, o, key)),
             Exotic::TypedArray => typed_array::delete(self, o, key),
             Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => {
@@ -320,6 +351,7 @@ impl Agent {
 
     pub(crate) fn exotic_own_property_keys(&mut self, o: ObjectId) -> JsResult<Vec<PropertyKey>> {
         match self.exotic_kind(o) {
+            Exotic::WindowProxy => Ok(self.ordinary_own_property_keys(self.window_proxy_target(o))),
             Exotic::Proxy => self.in_proxy(|a| proxy::own_property_keys(a, o)),
             Exotic::TypedArray => Ok(typed_array::own_property_keys(self, o)),
             Exotic::ModuleNamespace => Ok(self

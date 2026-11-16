@@ -337,6 +337,8 @@ pub(crate) enum Internal {
     Host(u64),
     /// A read-only Web IDL indexed property getter and its source.
     HostIndexed(super::host_indexed::IndexedHost),
+    /// The ordinary Window of a local browsing realm.
+    WindowProxy(ObjectId),
     /// Private string state of a branded host exception.
     HostError {
         interface: &'static str,
@@ -716,6 +718,8 @@ pub(crate) const FLAG_EXOTIC: u8 = 32;
 /// Created while its realm's intrinsics were (see `Agent::create_realm`):
 /// such objects have the same position in every realm's run of them.
 pub(crate) const FLAG_INTRINSIC: u8 = 64;
+/// The prototype of the underlying Window is fixed after host initialization.
+pub(crate) const FLAG_IMMUTABLE_PROTO: u8 = 128;
 
 const NO_PROTOTYPE: u32 = u32::MAX;
 

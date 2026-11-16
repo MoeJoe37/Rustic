@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "afc175ab144d205304a774a506ab8eee90c0848c01c8d529127e35b00b24891a",
-  "percent": "30.52",
-  "verified_percent": "29.48",
-  "partial_percent": "1.04",
-  "completed": 68,
-  "in_progress": 5,
+  "source_fingerprint": "a20da8e4ee3ce004dec98d59e746ecd8e2e9cba969805f74a02a0c43fea0d465",
+  "percent": "30.59",
+  "verified_percent": "29.89",
+  "partial_percent": "0.70",
+  "completed": 69,
+  "in_progress": 4,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -45,11 +45,11 @@
       "id": "M4",
       "label": "ECMAScript runtime",
       "share": "8.90",
-      "completed": 12,
+      "completed": 13,
       "total": 13,
-      "percent": "99.23",
-      "verified_percent": "95.38",
-      "partial_percent": "3.85"
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "M5",
@@ -3991,116 +3991,85 @@
           "label": "Cancellation, stack/heap limits and GC stress",
           "size": 3,
           "milestone": "M4",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Frame, stack and heap limits, cancellation and the step budget",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/vm/interp.rs",
-                  "marker": "fn enter_nested_run"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn deep_recursion_throws_a_catchable_range_error_at_the_frame_limit"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn heap_exhaustion_ends_the_run_and_leaves_a_usable_agent"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn endless_loops_stop_on_cancellation_and_on_the_step_budget"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/vm/interp.rs",
+              "marker": "fn enter_nested_run"
             },
             {
-              "label": "String ropes: appending is linear, with a late-charge bound (TD-116)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/heap.rs",
-                  "marker": "pub fn concat"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn appending_in_a_loop_allocates_linearly"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn a_rope_too_large_to_copy_stays_a_rope_through_a_collection"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn deep_recursion_throws_a_catchable_range_error_at_the_frame_limit"
             },
             {
-              "label": "Benchmark corpus with deterministic gates: checksums, cache and GC-stress independence, no quadratic workload",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/benchmarks/framework_diff.js",
-                  "marker": "function run(n)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn corpus_results_do_not_depend_on_caches_or_collection"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn no_workload_is_quadratic_in_its_input"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn heap_exhaustion_ends_the_run_and_leaves_a_usable_agent"
             },
             {
-              "label": "Committed heap-size report",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/tests/fixtures/heap_report.txt",
-                  "marker": "empty object:"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn the_heap_report_matches_the_committed_one"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn endless_loops_stop_on_cancellation_and_on_the_step_budget"
             },
             {
-              "label": "Benchmark runner and recorded x86-64 results",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/examples/js_bench.rs",
-                  "marker": "fn run_once"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-js/tests/limits.rs",
-                  "marker": "fn the_corpus_fits_a_small_heap"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/heap.rs",
+              "marker": "pub fn concat"
             },
             {
-              "label": "Recorded results on a native ARM64 machine",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn appending_in_a_loop_allocates_linearly"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn a_rope_too_large_to_copy_stays_a_rope_through_a_collection"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/benchmarks/framework_diff.js",
+              "marker": "function run(n)"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn corpus_results_do_not_depend_on_caches_or_collection"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn no_workload_is_quadratic_in_its_input"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/tests/fixtures/heap_report.txt",
+              "marker": "empty object:"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn the_heap_report_matches_the_committed_one"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/examples/js_bench.rs",
+              "marker": "fn run_once"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/limits.rs",
+              "marker": "fn the_corpus_fits_a_small_heap"
+            },
+            {
+              "kind": "source",
+              "path": "docs/reviews/2026-11-15-m4-js09.md",
+              "marker": "## Linux ARM64 under QEMU emulation"
             }
           ],
-          "credit": "83.33",
+          "credit": "100.00",
           "engine_share": "0.41"
         },
         {
@@ -4164,13 +4133,13 @@
         }
       ],
       "points": 73,
-      "completed": 12,
-      "in_progress": 2,
+      "completed": 13,
+      "in_progress": 1,
       "total": 15,
-      "contribution": "9.10",
-      "percent": "91.09",
-      "verified_percent": "84.93",
-      "partial_percent": "6.16"
+      "contribution": "9.17",
+      "percent": "91.78",
+      "verified_percent": "89.04",
+      "partial_percent": "2.74"
     },
     {
       "id": "wasm",

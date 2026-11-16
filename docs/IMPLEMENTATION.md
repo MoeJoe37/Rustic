@@ -1495,8 +1495,8 @@ concatenations are ropes flattened on first read and by the collector
 (TD-101 paid, TD-116 opened); the string index accessors no longer copy the
 string; top-level `var` globals are cached by dictionary entry; and `for-in`
 skips prototypes that contribute no keys. Recorded x86-64 results are in
-[JS.md](JS.md#limits-and-performance-gate-js-09). Native ARM64 timings are
-not recorded: the sandbox has no ARM64 host. Collection pauses pass the 5 ms
+[JS.md](JS.md#limits-and-performance-gate-js-09). The ARM64 record is from QEMU
+emulation; native ARM64 timings are TD-125. Collection pauses pass the 5 ms
 target up to about 30 MiB of live heap (TD-95, `perf.gc`).
 
 ## REN-03 completion: font formats, shaping and text policies
@@ -1835,5 +1835,5 @@ See [JS.md](JS.md#intl-date-and-time-formatting-js-08) and TD-122.
 The pinned Intl gate passes 1,240 of 1,326 files and preserves every prior
 passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
-global and Date prototype shape transitions at realm startup. The native
-ARM64 benchmark remains open.
+global and Date prototype shape transitions at realm startup. The ARM64
+benchmark record is from QEMU emulation (TD-125).

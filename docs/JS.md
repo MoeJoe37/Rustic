@@ -860,11 +860,13 @@ longest pause grows with the live heap, about 0.17 ms per MiB
 (`json_tree`, 15 ms at 94 MiB). That is over the 5 ms target of
 [PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) above roughly 30 MiB of
 live data, which is the measured trigger of TD-95; incremental marking is
-`perf.gc` (M12). The native Linux ARM64 CI job runs the same release corpus
-and writes its timings, processor, kernel, Rust version and source revision
-to the job summary. The [JS-09 sandbox report](reviews/2026-11-15-m4-js09.md)
-records the native x86-64 benchmarks for `cb0cf04` and gives the capture
-commands for the outstanding native ARM64 run.
+`perf.gc` (M12). The [JS-09 report](reviews/2026-11-15-m4-js09.md) records
+the native x86-64 benchmarks and the ARM64 run under QEMU emulation, whose
+checksums, peak heap sizes and collection counts match x86-64. MoeJoe
+accepted the emulated record for M4; timings from native ARM64 hardware are
+TD-125. The native Linux ARM64 CI job runs the same release corpus and
+writes its timings, processor, kernel, Rust version and source revision to
+the job summary once Actions runs again.
 
 ## Built-ins (JS-05)
 

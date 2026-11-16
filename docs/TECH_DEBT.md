@@ -156,6 +156,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, JS-08 |
 | TD-123 | Deliberate | DOM / JS | Interpreter safe points still use JS-only collection | Open, WEB-03 |
 | TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
+| TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1866,3 +1867,17 @@ stacks alongside native Error stacks when script debugging adds that
 storage. Serialize the exception's private name and message when the
 structured clone capability lands.
 [ADR 0027](adr/0027-host-exception-bindings.md)
+
+### TD-125 — ARM64 benchmark timings are emulated
+
+The JS-09 gate asked for recorded benchmark results on x64 and ARM64. The
+ARM64 record in the
+[JS-09 report](reviews/2026-11-15-m4-js09.md#linux-arm64-under-qemu-emulation)
+comes from QEMU user-mode emulation on an x86-64 host, because GitHub Actions
+could not start jobs and the sandbox has no ARM64 hardware. MoeJoe accepted
+this record for M4 on 2026-11-16. Emulation proves the results that do not
+depend on the processor: checksums, peak heap sizes and collection counts
+match x86-64. Its times and pauses say nothing about real ARM64 speed. Record
+the corpus on native ARM64 hardware (the `Linux ARM64` CI job already prints
+it to the job summary) before any ARM64 performance claim, at the latest with
+the first cross-engine report of PERF-01.

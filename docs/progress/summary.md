@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 30.52%** = 29.48% verified complete + 1.04% partial credit. 68/221 capabilities complete, 5 in progress.
+**Overall completion: 30.59%** = 29.89% verified complete + 0.70% partial credit. 69/221 capabilities complete, 4 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `afc175ab144d205304a774a506ab8eee90c0848c01c8d529127e35b00b24891a`.
+Catalog: `engine-v4`. Source fingerprint: `a20da8e4ee3ce004dec98d59e746ecd8e2e9cba969805f74a02a0c43fea0d465`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -13,7 +13,7 @@ Catalog: `engine-v4`. Source fingerprint: `afc175ab144d205304a774a506ab8eee90c08
 | M1 Document core | 28/28 | 100.00% | 100.00% | 7.28% |
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
-| M4 ECMAScript runtime | 12/13 | 99.23% | 95.38% | 8.90% |
+| M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 3/12 | 22.42% | 22.42% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `afc175ab144d205304a774a506ab8eee90c08
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
-| JavaScript & GC | 12/15 | 2 | 91.09% | 84.93% | 10% | 9.10 |
+| JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 2/10 | 0 | 20.00% | 20.00% | 5% | 1.00 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
@@ -186,13 +186,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `js.buffers` — Buffers, typed arrays and memory semantics · size 3 · M4 · 0.41% of engine ([source](../../crates/rustic-js/src/runtime/builtins/buffer.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/src/runtime/builtins/buffer.rs), [source](../../crates/rustic-js/src/runtime/builtins/typed_array.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/runtime/builtins/atomics.rs), [source](../../crates/rustic-js/src/runtime/builtins/buffer.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/gc.rs))
 - **complete** `js.intl` — Intl and required Unicode semantics · size 5 · M4 · 0.68% of engine ([source](../../crates/rustic-base/src/unicode/normalize.rs), [source](../../crates/rustic-js/src/runtime/builtins/string_object.rs), [test](../../crates/rustic-js/tests/interp.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/locale_object.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/test262.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/collator.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/collator/weights.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/fixtures/test262_intl_passing.txt), [source](../../crates/rustic-js/src/runtime/builtins/intl/plural_rules.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/numfmt.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/decimal.rs), [source](../../tools/generate_js_intl_services.py), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/fixtures/test262_intl_passing.txt), [source](../../crates/rustic-js/src/runtime/builtins/intl/date_time_format.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/time_zone.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/relative_time_format.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/duration_format.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/display_names.rs), [source](../../crates/rustic-js/src/runtime/builtins/intl/segmenter.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/interp.rs), [test](../../crates/rustic-js/tests/fixtures/test262_intl_passing.txt))
 - **planned** `js.wasm` — JavaScript/WebAssembly identity, conversions and tracing integration · size 3 · M9 · 0.41% of engine
-- **in progress 83.33%** `js.limits` — Cancellation, stack/heap limits and GC stress · size 3 · M4 · 0.41% of engine
-  - [x] Frame, stack and heap limits, cancellation and the step budget ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs))
-  - [x] String ropes: appending is linear, with a late-charge bound (TD-116) ([source](../../crates/rustic-js/src/runtime/heap.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs))
-  - [x] Benchmark corpus with deterministic gates: checksums, cache and GC-stress independence, no quadratic workload ([source](../../crates/rustic-js/benchmarks/framework_diff.js), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs))
-  - [x] Committed heap-size report ([source](../../crates/rustic-js/tests/fixtures/heap_report.txt), [test](../../crates/rustic-js/tests/limits.rs))
-  - [x] Benchmark runner and recorded x86-64 results ([source](../../crates/rustic-js/examples/js_bench.rs), [test](../../crates/rustic-js/tests/limits.rs))
-  - [ ] Recorded results on a native ARM64 machine
+- **complete** `js.limits` — Cancellation, stack/heap limits and GC stress · size 3 · M4 · 0.41% of engine ([source](../../crates/rustic-js/src/vm/interp.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs), [source](../../crates/rustic-js/src/runtime/heap.rs), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs), [source](../../crates/rustic-js/benchmarks/framework_diff.js), [test](../../crates/rustic-js/tests/limits.rs), [test](../../crates/rustic-js/tests/limits.rs), [source](../../crates/rustic-js/tests/fixtures/heap_report.txt), [test](../../crates/rustic-js/tests/limits.rs), [source](../../crates/rustic-js/examples/js_bench.rs), [test](../../crates/rustic-js/tests/limits.rs), [source](../../docs/reviews/2026-11-15-m4-js09.md))
 - **in progress 40.00%** `js.conformance` — Declared full Test262 and runtime correctness gate · size 5 · M9 · 0.68% of engine
   - [x] Test262 runner: metadata, strict and sloppy modes, negative tests, deterministic step and heap limits ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/src/test262.rs))
   - [x] Exact passing list for test/language at the pinned revision ([source](../../crates/rustic-js/src/test262.rs), [test](../../crates/rustic-js/tests/test262.rs))

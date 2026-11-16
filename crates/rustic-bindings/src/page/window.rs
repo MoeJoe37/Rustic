@@ -3,13 +3,15 @@
 use rustic_dom::NodeKind;
 use rustic_js::runtime::{Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
 
-use super::{illegal_constructor, install_interface, prototype, require_receiver, with_page};
+use super::{
+    events, illegal_constructor, install_interface, prototype, require_receiver, with_page,
+};
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<Value> {
     install_interface(
         agent,
         "Window",
-        None,
+        Some(events::TARGET),
         illegal_constructor,
         0,
         &[],

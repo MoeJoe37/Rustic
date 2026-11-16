@@ -225,6 +225,27 @@ TD-126 tracks additional interfaces. TD-127 covers UTF-8 name storage.
 [ADR 0032](adr/0032-top-level-window-realm.md),
 [ADR 0033](adr/0033-detached-documents-and-adoption.md)
 
+## WEB-04 — Synthetic DOM events
+
+`EventTarget` is constructible and is the base of Node and Window.
+`Event` and `CustomEvent` use private state, including a monotonic timestamp,
+dispatch phase, and the current target. Script dispatch follows a frozen
+light-DOM ancestor path and includes the Window of a connected document.
+The document's `load` event ends at the document. A listener may synchronously
+mutate or adopt nodes, register or remove listeners, or dispatch another event.
+
+Dispatch supports capture, target, and bubble phases, cancellation, both stop
+methods, function and `handleEvent` callbacks, and the `capture`, `once`,
+and `passive` options. Each phase observes a snapshot of listeners on its
+current target. Removed records are skipped, and once listeners are removed
+before invocation. Listener exceptions let the dispatch continue and increment
+a report count the host can consume. The joint collector keeps reachable
+listeners and event state alive and reclaims unreachable target-listener cycles.
+
+Trusted input, HTML activation/default actions, AbortSignal listener removal,
+shadow retargeting, and full exception reporting remain tracked in TD-131.
+[ADR 0034](adr/0034-dom-event-dispatch.md)
+
 ## DOC-03 and DOC-04a — Document-owned tree core
 
 Implemented in `rustic-dom`, depending only on `rustic-base`:

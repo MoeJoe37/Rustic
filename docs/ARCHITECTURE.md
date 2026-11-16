@@ -157,6 +157,14 @@ the source removal and wrapper retargeting. Direct-child collection caches
 use wrapper identity so they follow an adopted node's new arena IDs.
 [ADR 0033](adr/0033-detached-documents-and-adoption.md)
 
+EventTarget listeners and Event state live in the agent's traced heap.
+The page roots private weak maps keyed by target and event wrapper identity,
+so connected targets keep their callbacks and adoption leaves registration
+identity intact. A dispatch holds its frozen path across callbacks. Each
+phase snapshots matching listener records, then releases native DOM borrows
+before running script.
+[ADR 0034](adr/0034-dom-event-dispatch.md)
+
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed
 interface's realm prototype. Engine error conversion uses that prototype

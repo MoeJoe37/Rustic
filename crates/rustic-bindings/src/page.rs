@@ -20,6 +20,7 @@ mod character_data;
 mod collections;
 mod creation;
 mod documents;
+mod events;
 mod html_collections;
 mod selectors;
 mod window;
@@ -49,6 +50,7 @@ struct Page {
     additional: RefCell<HashMap<DocumentId, AuxiliaryDocument>>,
     root: Value,
     window: Value,
+    events: events::Events,
     wrappers: RefCell<DomHeap>,
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
@@ -172,12 +174,13 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     let Some(document) = tree.read() else {
         return agent.type_error("document is busy");
     };
+    events::install(agent)?;
     collections::install(agent)?;
     html_collections::install(agent)?;
     install_interface(
         agent,
         "Node",
-        None,
+        Some(events::TARGET),
         illegal_constructor,
         0,
         &[
@@ -302,16 +305,26 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     let main = document.id();
     drop(document);
     let window = window::install(agent)?;
+    let events = events::Events::new(agent)?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
         main,
         additional: RefCell::new(HashMap::new()),
         root,
         window,
+        events,
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),
     }))
+}
+
+/// Read and clear the number of exceptions reported by event listeners.
+pub fn take_listener_error_count(agent: &Agent) -> u64 {
+    let host = agent.execution_host();
+    host.as_ref()
+        .and_then(|host| host.as_any().downcast_ref::<Page>())
+        .map_or(0, |page| page.events.take_listener_error_count())
 }
 
 fn install_interface(

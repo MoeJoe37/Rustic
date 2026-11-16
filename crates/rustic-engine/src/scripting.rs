@@ -216,6 +216,13 @@ impl<C: Clock> ScriptedDocument<C> {
         self.document.0.borrow()
     }
 
+    /// Read and clear the number of listener exceptions reported by the page.
+    pub fn take_listener_error_count(&self) -> u64 {
+        self.agent
+            .as_ref()
+            .map_or(0, page::take_listener_error_count)
+    }
+
     /// Queue a host-supplied script after checking both pending-work limits.
     pub fn queue_script(&mut self, source: Source) -> Result<(), ScriptQueueError> {
         self.check_live().map_err(ScriptQueueError::Stopped)?;

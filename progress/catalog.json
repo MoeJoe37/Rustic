@@ -555,8 +555,61 @@
           "label": "DOM event propagation and default actions",
           "size": 5,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Synthetic EventTarget dispatch, propagation, listener options and cancellation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/events.rs",
+                  "marker": "fn dispatch_event"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/events/state.rs",
+                  "marker": "pub(super) struct Event"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/events.rs",
+                  "marker": "fn event_phases_follow_the_dom_and_top_level_window"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/events.rs",
+                  "marker": "fn listeners_handle_reentry_once_removal_and_ordered_option_reads"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/events.rs",
+                  "marker": "fn cancellation_propagation_and_passive_listeners_keep_distinct_flags"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/events.rs",
+                  "marker": "fn frozen_dispatch_path_and_listener_edges_survive_gc_and_adoption"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/events.rs",
+                  "marker": "fn canceled_native_dispatch_can_reuse_the_same_event"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn event_listeners_survive_turns_and_mutate_the_renderer_owned_tree"
+                }
+              ]
+            },
+            {
+              "label": "Trusted input, activation behavior and default actions",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "dom.observers",

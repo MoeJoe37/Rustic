@@ -342,6 +342,12 @@ integration are tracked as TD-130.
 [ADR 0026](adr/0026-realm-dom-wrappers.md),
 [ADR 0027](adr/0027-host-exception-bindings.md)
 
+WEB-04 has synchronous synthetic EventTarget dispatch, capture and bubble
+phases, listener options, cancellation, and reentrant callbacks against
+the real DOM. Trusted input delivery and HTML activation/default actions
+remain open.
+[ADR 0034](adr/0034-dom-event-dispatch.md)
+
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.
 

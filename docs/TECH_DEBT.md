@@ -162,6 +162,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
 | TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
+| TD-131 | Deliberate | DOM events | Synthetic light-DOM dispatch excludes trusted input, activation, signal-driven removal, shadow retargeting and HTML error reporting | Open, WEB-04, WEB-07 and M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1931,10 +1932,23 @@ during named property visibility checks.
 
 The page host has one top-level browsing context per script agent and a
 fixed WindowProxy target for the active document's lifetime. This gives event and
-script integration one global identity. Extend the prototype chain with
-Window named access and the EventTarget interface alongside their DOM and
+script integration one global identity. Extend the Window prototype chain with named access alongside the remaining
 HTML APIs. Before exposing related browsing contexts or navigation, add
 lifetime-aware proxy retargeting and implement origin-sensitive property
 access. Test context identity across navigation and cross-origin property
 descriptors with the corresponding Web Platform Tests.
 [ADR 0032](adr/0032-top-level-window-realm.md)
+
+
+### TD-131 — Trusted input, activation and extended event delivery
+
+Synthetic EventTarget dispatch supports light-DOM propagation, listener
+options, and cancellation. Connect the host input path to trusted events
+and HTML activation and default actions in WEB-04. Add signal-driven
+listener removal with the AbortSignal interface. Route listener exceptions
+to HTML error reporting and console/debugging in WEB-07. The current host
+can consume an exception count. Extend the path to handle shadow retargeting
+and scoped composed paths when exposing shadow trees in M9. Listener
+registration and matching walk the current target's list under the script
+budget. Consider indexing when measured listener workloads warrant it.
+[ADR 0034](adr/0034-dom-event-dispatch.md)

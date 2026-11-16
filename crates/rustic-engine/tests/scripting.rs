@@ -425,3 +425,60 @@ fn detached_document_moves_reach_the_rendered_page_and_change_live_quirks_matchi
     assert!(dump.contains("Added"), "{dump}");
     assert!(dump.contains("adopted text"), "{dump}");
 }
+
+#[test]
+fn event_listeners_survive_turns_and_mutate_the_renderer_owned_tree() {
+    let mut engine = Engine::new(1);
+    let mut load = engine.begin_document(ParserLimits::default()).unwrap();
+    load.feed(b"<!doctype html><main><button></button></main>")
+        .unwrap();
+    let mut page = load
+        .finish()
+        .unwrap()
+        .into_scripted(TaskLimits::default())
+        .unwrap();
+    page.queue_script(source(
+        r#"
+        const main = document.querySelector("main");
+        const button = main.firstChild;
+        main.addEventListener("count", () => main.setAttribute("data-capture", "hit"), true);
+        button.addEventListener("count", () => { throw new Error("listener"); }, {once: true});
+        button.addEventListener("count", function (event) {
+            this.setAttribute("data-count", event.detail);
+            event.preventDefault();
+            Promise.resolve().then(() => {
+                if (event.currentTarget === null && event.eventPhase === Event.NONE)
+                    button.setAttribute("data-checkpoint", "ready");
+            });
+        });
+    "#,
+    ))
+    .unwrap();
+    page.queue_script(source(
+        r#"
+        const result = button.dispatchEvent(new CustomEvent("count", {
+            cancelable: true, bubbles: true, detail: 12,
+        }));
+        if (result || main.getAttribute("data-capture") !== "hit" ||
+            button.getAttribute("data-checkpoint") !== null)
+            throw "dispatch should be synchronous and schedule its microtask";
+    "#,
+    ))
+    .unwrap();
+    assert_eq!(page.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(page.take_listener_error_count(), 0);
+    assert_eq!(page.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(page.take_listener_error_count(), 1);
+    assert_eq!(page.take_listener_error_count(), 0);
+    let document = page.document();
+    let tree = document.parsed().document();
+    let serialized = tree.dump_tree(tree.root(), 65536).unwrap();
+    assert!(
+        serialized.contains(r#"local="data-count" value="12""#),
+        "{serialized}"
+    );
+    assert!(
+        serialized.contains(r#"local="data-checkpoint" value="ready""#),
+        "{serialized}"
+    );
+}

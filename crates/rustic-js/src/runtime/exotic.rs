@@ -24,6 +24,7 @@ enum Exotic {
     Arguments,
     TypedArray,
     ModuleNamespace,
+    HostIndexed,
 }
 
 impl Agent {
@@ -33,6 +34,7 @@ impl Agent {
             Some(Internal::Arguments { .. }) => Exotic::Arguments,
             Some(Internal::TypedArray { .. }) => Exotic::TypedArray,
             Some(Internal::ModuleNamespace(..)) => Exotic::ModuleNamespace,
+            Some(Internal::HostIndexed(_)) => Exotic::HostIndexed,
             _ => unreachable!("only exotic objects carry the exotic flag"),
         }
     }
@@ -61,9 +63,10 @@ impl Agent {
     pub(crate) fn exotic_get_prototype_of(&mut self, o: ObjectId) -> JsResult<Option<ObjectId>> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get_prototype_of(a, o)),
-            Exotic::Arguments | Exotic::TypedArray | Exotic::ModuleNamespace => {
-                Ok(self.heap.object(o).proto())
-            }
+            Exotic::Arguments
+            | Exotic::TypedArray
+            | Exotic::ModuleNamespace
+            | Exotic::HostIndexed => Ok(self.heap.object(o).proto()),
         }
     }
 
@@ -74,16 +77,20 @@ impl Agent {
     ) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::set_prototype_of(a, o, proto)),
-            Exotic::Arguments | Exotic::TypedArray | Exotic::ModuleNamespace => {
-                Ok(self.ordinary_set_prototype_of(o, proto))
-            }
+            Exotic::Arguments
+            | Exotic::TypedArray
+            | Exotic::ModuleNamespace
+            | Exotic::HostIndexed => Ok(self.ordinary_set_prototype_of(o, proto)),
         }
     }
 
     pub(crate) fn exotic_is_extensible(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::is_extensible(a, o)),
-            Exotic::Arguments | Exotic::TypedArray | Exotic::ModuleNamespace => {
+            Exotic::Arguments
+            | Exotic::TypedArray
+            | Exotic::ModuleNamespace
+            | Exotic::HostIndexed => {
                 Ok(self.heap.object(o).has_flag(super::object::FLAG_EXTENSIBLE))
             }
         }
@@ -92,6 +99,7 @@ impl Agent {
     pub(crate) fn exotic_prevent_extensions(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::prevent_extensions(a, o)),
+            Exotic::HostIndexed => Ok(false),
             Exotic::Arguments | Exotic::TypedArray | Exotic::ModuleNamespace => {
                 self.heap
                     .object_mut(o)
@@ -109,6 +117,12 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get_own_property(a, o, key)),
             Exotic::TypedArray => typed_array::get_own_property(self, o, key),
+            Exotic::HostIndexed => match self.host_indexed_value(o, key)? {
+                Some(value) => Ok(Some(PropertyDescriptor::data_with(
+                    value, false, true, true,
+                ))),
+                None => self.ordinary_get_own_property(o, key),
+            },
             Exotic::ModuleNamespace => match self.namespace_binding(o, key) {
                 Some(binding) => Ok(Some(PropertyDescriptor::data_with(
                     self.namespace_value(binding)?,
@@ -140,6 +154,8 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::define_own_property(a, o, key, desc)),
             Exotic::TypedArray => typed_array::define_own_property(self, o, key, desc),
+            Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => Ok(false),
+            Exotic::HostIndexed => self.ordinary_define_own_property(o, key, desc),
             Exotic::ModuleNamespace => {
                 if matches!(key, PropertyKey::Symbol(_)) {
                     return self.ordinary_define_own_property(o, key, desc);
@@ -189,6 +205,9 @@ impl Agent {
             Exotic::Proxy => self.in_proxy(|a| proxy::has_property(a, o, key)),
             Exotic::TypedArray => typed_array::has_property(self, o, key),
             Exotic::Arguments => self.has_property_from(o, key, true),
+            Exotic::HostIndexed => Ok(
+                self.host_index_is_supported(o, key)? || self.has_property_from(o, key, true)?
+            ),
             Exotic::ModuleNamespace => Ok(self.namespace_binding(o, key).is_some()
                 || self.ordinary_get_own_property(o, key)?.is_some()),
         }
@@ -203,6 +222,10 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get(a, o, key, receiver)),
             Exotic::TypedArray => typed_array::get(self, o, key, receiver),
+            Exotic::HostIndexed => match self.host_indexed_value(o, key)? {
+                Some(value) => Ok(value),
+                None => self.get_from(o, key, receiver, true),
+            },
             Exotic::ModuleNamespace => match self.namespace_binding(o, key) {
                 Some(binding) => self.namespace_value(binding),
                 None => self.get_from(o, key, receiver, true),
@@ -225,6 +248,12 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::set(a, o, key, value, receiver)),
             Exotic::TypedArray => typed_array::set(self, o, key, value, receiver),
+            Exotic::HostIndexed => {
+                if self.host_index_is_supported(o, key)? {
+                    return Ok(false);
+                }
+                self.set_from(o, key, value, receiver, true)
+            }
             Exotic::ModuleNamespace => Ok(false),
             Exotic::Arguments => {
                 // §10.4.4.4: only a write through the object itself
@@ -243,6 +272,10 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::delete(a, o, key)),
             Exotic::TypedArray => typed_array::delete(self, o, key),
+            Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => {
+                Ok(!self.host_index_is_supported(o, key)?)
+            }
+            Exotic::HostIndexed => self.ordinary_delete(o, key),
             Exotic::ModuleNamespace => {
                 if self.namespace_binding(o, key).is_some() {
                     Ok(false)
@@ -272,6 +305,7 @@ impl Agent {
                 .chain(self.ordinary_own_property_keys(o))
                 .collect()),
             Exotic::Arguments => Ok(self.ordinary_own_property_keys(o)),
+            Exotic::HostIndexed => self.host_indexed_keys(o),
         }
     }
 

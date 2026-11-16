@@ -4082,7 +4082,43 @@
               "evidence": []
             },
             {
-              "label": "Basic selectors and DOM collection bindings",
+              "label": "Basic selectors and static and live NodeList bindings",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/dom.rs",
+                  "marker": "pub struct ScopedSelector"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/collections.rs",
+                  "marker": "fn child_nodes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn page_selectors_keep_scope_order_and_use_live_tree_after_coercion"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn node_lists_distinguish_static_membership_and_live_children_through_gc"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn selector_limits_stop_native_walks_instead_of_returning_partial_lists"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_selectors_follow_parser_quirks_mode"
+                }
+              ]
+            },
+            {
+              "label": "Live HTMLCollection bindings and named properties",
               "status": "planned",
               "evidence": []
             }

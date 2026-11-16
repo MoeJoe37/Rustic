@@ -59,8 +59,8 @@ pub use cascade::{Cascade, SpecifiedStyle, StyleInputs, TreeContext, TreeScope};
 pub use computed::{ComputeContext, ComputedStyle};
 pub use containers::{ContainerInfo, ContainerSize};
 pub use dom::{
-    DomElement, ElementStyle, query_selector_all, shadow_tree_context, style_tree,
-    style_tree_with_sizes,
+    DomElement, ElementStyle, ScopedSelector, SelectorQueryError, SelectorWork, query_selector_all,
+    shadow_tree_context, style_tree, style_tree_with_sizes,
 };
 pub use fonts::{FontMetricsSource, FontQuery};
 pub use html::{

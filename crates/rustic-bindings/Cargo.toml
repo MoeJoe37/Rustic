@@ -10,8 +10,10 @@ publish.workspace = true
 
 [dependencies]
 rustic-base = { path = "../rustic-base" }
+rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-js = { path = "../rustic-js" }
+rustic-style = { path = "../rustic-style" }
 
 [lints]
 workspace = true

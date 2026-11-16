@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 30.84%** = 29.89% verified complete + 0.95% partial credit. 69/221 capabilities complete, 5 in progress.
+**Overall completion: 30.90%** = 29.89% verified complete + 1.01% partial credit. 69/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `4d78ef7aa583fb80f347cef6967893f57f66adbac196c7a082f1e80b03391e18`.
+Catalog: `engine-v4`. Source fingerprint: `08825f289733309b7bca558930e33baf416dd83766c9f7a5faf0e5b867c10d34`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `4d78ef7aa583fb80f347cef6967893f57f66a
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 3/12 | 27.14% | 22.42% | 5.29% |
+| M5 Scripted documents | 3/12 | 28.32% | 22.42% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `4d78ef7aa583fb80f347cef6967893f57f66a
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 2/10 | 1 | 25.00% | 20.00% | 5% | 1.25 |
+| Bindings & web APIs | 2/10 | 1 | 26.25% | 20.00% | 5% | 1.31 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -208,12 +208,13 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 ### Bindings & web APIs
 
 - **complete** `web.idl` — Web IDL tooling, conversions and rooted wrappers · size 5 · M5 · 0.62% of engine ([source](../../crates/rustic-bindings/src/webidl.rs), [source](../../crates/rustic-bindings/src/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [source](../../tools/generate_dom_idl.py), [source](../../crates/rustic-bindings/src/metadata.rs), [test](../../tools/tests/test_generate_dom_idl.py), [test](../../crates/rustic-bindings/tests/metadata.rs), [test](../../crates/rustic-bindings/tests/metadata.rs), [source](../../crates/rustic-bindings/src/heap.rs), [source](../../crates/rustic-bindings/src/heap.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [source](../../crates/rustic-bindings/src/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
-- **in progress 40.00%** `web.window` — Window/Document/Element bindings and identity · size 5 · M5 · 0.62% of engine
+- **in progress 50.00%** `web.window` — Window/Document/Element bindings and identity · size 5 · M5 · 0.62% of engine
   - [x] Live document, node traversal and child mutation with joint safe-point collection ([source](../../crates/rustic-js/src/runtime/host.rs), [source](../../crates/rustic-bindings/src/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
   - [x] Node factories, specialized node prototypes, character-data operations and element attributes ([source](../../crates/rustic-bindings/src/page/creation.rs), [source](../../crates/rustic-dom/src/document/character_data.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
   - [ ] Additional document construction, namespace-aware factories and cross-document operations
   - [ ] Window interface and browsing realm integration
-  - [ ] Basic selectors and DOM collection bindings
+  - [x] Basic selectors and static and live NodeList bindings ([source](../../crates/rustic-style/src/dom.rs), [source](../../crates/rustic-bindings/src/page/collections.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
+  - [ ] Live HTMLCollection bindings and named properties
 - **complete** `web.scheduler` — Tasks, microtasks and rendering opportunities · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-engine/src/tasks.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [source](../../crates/rustic-engine/src/scripting.rs), [source](../../crates/rustic-engine/src/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-cli/src/loader.rs))
 - **planned** `web.scripts` — Classic/module script lifecycle and readiness · size 3 · M5 · 0.37% of engine
 - **planned** `web.input` — Forms, focus, editing and user input · size 5 · M5 · 0.62% of engine

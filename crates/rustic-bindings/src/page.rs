@@ -2,20 +2,23 @@
 
 use std::any::Any;
 use std::cell::{Ref, RefCell, RefMut};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 
 use rustic_dom::{Document, DomError, Node, NodeId, NodeKind};
 use rustic_js::runtime::{
     Agent, ExecutionHost, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor,
-    PropertyKey, Roots, Value,
+    PropertyKey, RealmId, Roots, Value,
 };
 
 use crate::{DomGcError, DomHeap, dom_exception};
 
 mod attributes;
 mod character_data;
+mod collections;
 mod creation;
+mod selectors;
 
 /// Shared access to the real document rendered by the host.
 pub trait PageTree: Debug {
@@ -23,12 +26,17 @@ pub trait PageTree: Debug {
     fn read(&self) -> Option<Ref<'_, Document>>;
     /// Borrow the document for a checked edit or collection.
     fn write(&self) -> Option<RefMut<'_, Document>>;
+    /// Whether ID and class selectors use HTML quirks matching.
+    fn quirks_mode(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
 struct Page {
     tree: Rc<dyn PageTree>,
     wrappers: RefCell<DomHeap>,
+    child_lists: RefCell<HashMap<(NodeId, RealmId), ObjectId>>,
 }
 
 impl ExecutionHost for Page {
@@ -39,6 +47,10 @@ impl ExecutionHost for Page {
             .map_err(|_| OutOfMemory)?
             .collect(agent, &mut document, Roots::default())
             .map_err(|_| OutOfMemory)?;
+        self.child_lists
+            .try_borrow_mut()
+            .map_err(|_| OutOfMemory)?
+            .retain(|(node, _), _| document.node(*node).is_ok());
         Ok(())
     }
 
@@ -56,6 +68,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     let Some(document) = tree.read() else {
         return agent.type_error("document is busy");
     };
+    collections::install(agent)?;
     install_interface(
         agent,
         "Node",
@@ -68,6 +81,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
             ("firstChild", "get firstChild", first_child),
             ("nextSibling", "get nextSibling", next_sibling),
             ("ownerDocument", "get ownerDocument", owner_document),
+            ("childNodes", "get childNodes", collections::child_nodes),
         ],
         |agent, prototype| {
             for (name, behavior) in [
@@ -87,7 +101,11 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         illegal_constructor,
         0,
         &[("documentElement", "get documentElement", document_element)],
-        creation::install_factories,
+        |agent, proto| {
+            creation::install_factories(agent, proto)?;
+            selectors::install_parent_node(agent, proto)?;
+            selectors::install_non_element_parent(agent, proto)
+        },
     )?;
     install_interface(
         agent,
@@ -96,7 +114,11 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         illegal_constructor,
         0,
         &[("localName", "get localName", local_name)],
-        attributes::install,
+        |agent, proto| {
+            attributes::install(agent, proto)?;
+            selectors::install_parent_node(agent, proto)?;
+            selectors::install_element(agent, proto)
+        },
     )?;
     install_interface(
         agent,
@@ -105,7 +127,10 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         creation::construct_fragment,
         0,
         &[],
-        |_, _| Ok(()),
+        |agent, proto| {
+            selectors::install_parent_node(agent, proto)?;
+            selectors::install_non_element_parent(agent, proto)
+        },
     )?;
     character_data::install(agent)?;
     install_interface(
@@ -144,6 +169,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     agent.attach_execution_host(Rc::new(Page {
         tree,
         wrappers: RefCell::new(wrappers),
+        child_lists: RefCell::new(HashMap::new()),
     }))
 }
 
@@ -340,11 +366,11 @@ fn required_arg(agent: &mut Agent, args: &[Value], at: usize) -> JsResult<Value>
     }
 }
 
-fn read_node(
+fn read_node<T>(
     agent: &mut Agent,
     receiver: Value,
-    read: impl FnOnce(&mut Agent, &mut DomHeap, &Document, NodeId, &Node) -> JsResult<Value>,
-) -> JsResult<Value> {
+    read: impl FnOnce(&mut Agent, &mut DomHeap, &Document, NodeId, &Node) -> JsResult<T>,
+) -> JsResult<T> {
     with_page(agent, |agent, page| {
         let Some(document) = page.tree.read() else {
             return agent.type_error("document is busy");

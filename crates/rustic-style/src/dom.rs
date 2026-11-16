@@ -1,6 +1,9 @@
 //! [`ElementView`] for `rustic-dom` documents.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+
+use rustic_base::CancellationToken;
 
 use rustic_css::{CssParser, SelectorList};
 use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
@@ -18,7 +21,8 @@ pub struct DomElement<'a> {
     document: &'a Document,
     id: NodeId,
     node: &'a Node,
-    element: &'a Element,
+    element: Option<&'a Element>,
+    work: Option<&'a SelectorWork<'a>>,
 }
 
 impl PartialEq for DomElement<'_> {
@@ -39,16 +43,30 @@ impl std::hash::Hash for DomElement<'_> {
 impl<'a> DomElement<'a> {
     /// The element `id`, or `None` if `id` is not an element of `document`.
     pub fn new(document: &'a Document, id: NodeId) -> Option<Self> {
-        let node = document.node(id).ok()?;
-        match node.kind() {
-            NodeKind::Element(element) => Some(Self {
-                document,
-                id,
-                node,
-                element,
-            }),
-            _ => None,
+        Self::with_work(document, id, None)
+    }
+
+    fn with_work(
+        document: &'a Document,
+        id: NodeId,
+        work: Option<&'a SelectorWork<'a>>,
+    ) -> Option<Self> {
+        if work.is_some_and(|work| !work.spend(1)) {
+            return None;
         }
+        let node = document.node(id).ok()?;
+        let element = match node.kind() {
+            NodeKind::Element(element) => Some(element),
+            NodeKind::DocumentFragment if work.is_some() => None,
+            _ => return None,
+        };
+        Some(Self {
+            document,
+            id,
+            node,
+            element,
+            work,
+        })
     }
 
     /// The element's node ID.
@@ -60,24 +78,41 @@ impl<'a> DomElement<'a> {
         self.document
     }
 
+    fn spend(&self, amount: u64) -> bool {
+        self.work.is_none_or(|work| work.spend(amount))
+    }
+
     fn element_at(
         &self,
         mut id: Option<NodeId>,
         next: fn(&Node) -> Option<NodeId>,
     ) -> Option<Self> {
         while let Some(current) = id {
-            if let Some(element) = Self::new(self.document, current) {
-                return Some(element);
+            if !self.spend(1) {
+                return None;
             }
-            id = next(self.document.node(current).ok()?);
+            let node = self.document.node(current).ok()?;
+            if let NodeKind::Element(element) = node.kind() {
+                return Some(Self {
+                    id: current,
+                    node,
+                    element: Some(element),
+                    ..*self
+                });
+            }
+            id = next(node);
         }
         None
     }
 }
 
 impl ElementView for DomElement<'_> {
+    fn is_virtual_scope(&self) -> bool {
+        self.element.is_none()
+    }
+
     fn parent_element(&self) -> Option<Self> {
-        Self::new(self.document, self.node.parent()?)
+        Self::with_work(self.document, self.node.parent()?, self.work)
     }
 
     fn previous_sibling_element(&self) -> Option<Self> {
@@ -90,30 +125,44 @@ impl ElementView for DomElement<'_> {
 
     fn parent_shadow_host(&self) -> Option<Self> {
         let parent = self.document.node(self.node.parent()?).ok()?;
-        Self::new(self.document, parent.shadow_host()?)
+        Self::with_work(self.document, parent.shadow_host()?, self.work)
     }
 
     fn is_root(&self) -> bool {
-        self.node
-            .parent()
-            .and_then(|p| self.document.node(p).ok())
-            .is_some_and(|p| matches!(p.kind(), NodeKind::Document))
+        self.spend(1)
+            && self
+                .node
+                .parent()
+                .and_then(|p| self.document.node(p).ok())
+                .is_some_and(|p| matches!(p.kind(), NodeKind::Document))
     }
 
     fn local_name(&self) -> &str {
-        self.element.name().local()
+        if self.spend(1) {
+            self.element.map_or("", |element| element.name().local())
+        } else {
+            ""
+        }
     }
 
     fn namespace(&self) -> Option<&str> {
-        self.element.name().namespace()
+        if self.spend(1) {
+            self.element.and_then(|element| element.name().namespace())
+        } else {
+            None
+        }
     }
 
     fn attributes(&self) -> impl Iterator<Item = AttributeRef<'_>> {
-        self.element.attributes().iter().map(|a| AttributeRef {
-            namespace: a.name().namespace(),
-            local: a.name().local(),
-            value: a.value().as_units(),
-        })
+        self.element
+            .into_iter()
+            .flat_map(Element::attributes)
+            .take_while(|a| self.spend(1 + a.value().as_units().len() as u64 / 64))
+            .map(|a| AttributeRef {
+                namespace: a.name().namespace(),
+                local: a.name().local(),
+                value: a.value().as_units(),
+            })
     }
 
     fn children(&self) -> impl Iterator<Item = ChildRef<'_, Self>> {
@@ -122,8 +171,11 @@ impl ElementView for DomElement<'_> {
             .children(self.id)
             .into_iter()
             .flatten()
+            .take_while(|_| self.spend(1))
             .filter_map(move |child| match document.node(child).ok()?.kind() {
-                NodeKind::Element(_) => Self::new(document, child).map(ChildRef::Element),
+                NodeKind::Element(_) => {
+                    Self::with_work(document, child, self.work).map(ChildRef::Element)
+                }
                 NodeKind::Text(data) | NodeKind::CdataSection(data) => {
                     Some(ChildRef::Text(data.as_units()))
                 }
@@ -140,11 +192,16 @@ impl ElementView for DomElement<'_> {
         let Ok(mut children) = self.document.children(self.id) else {
             return true;
         };
-        !children.any(|child| match self.document.node(child).map(Node::kind) {
-            Ok(NodeKind::Element(_)) => true,
-            Ok(NodeKind::Text(data) | NodeKind::CdataSection(data)) => !data.as_units().is_empty(),
-            _ => false,
-        })
+        !children
+            .by_ref()
+            .take_while(|_| self.spend(1))
+            .any(|child| match self.document.node(child).map(Node::kind) {
+                Ok(NodeKind::Element(_)) => true,
+                Ok(NodeKind::Text(data) | NodeKind::CdataSection(data)) => {
+                    !data.as_units().is_empty()
+                }
+                _ => false,
+            })
     }
 }
 
@@ -172,6 +229,162 @@ pub fn query_selector_all(
         }
     }
     Ok(found)
+}
+
+/// Exhaustion or failure in a script-visible selector query.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectorQueryError {
+    /// An invalid tree handle or an allocation failure.
+    Dom(DomError),
+    /// A host cancellation token was set.
+    Cancelled,
+    /// The query exhausted its work allowance.
+    WorkLimit,
+}
+
+/// Per-query work allowance shared by the tree walk and selector traversal.
+#[derive(Debug)]
+pub struct SelectorWork<'a> {
+    remaining: Cell<u64>,
+    failure: Cell<Option<SelectorQueryError>>,
+    cancellation: Option<&'a CancellationToken>,
+}
+
+impl<'a> SelectorWork<'a> {
+    /// Set a deterministic allowance and optional cancellation token.
+    pub fn new(allowance: u64, cancellation: Option<&'a CancellationToken>) -> Self {
+        Self {
+            remaining: Cell::new(allowance),
+            failure: Cell::new(None),
+            cancellation,
+        }
+    }
+
+    /// Work left for the caller's surrounding task.
+    pub fn remaining(&self) -> u64 {
+        self.remaining.get()
+    }
+
+    /// Spend work, stopping further traversal after cancellation or exhaustion.
+    pub fn spend(&self, amount: u64) -> bool {
+        if self.failure.get().is_some() {
+            return false;
+        }
+        if self
+            .cancellation
+            .is_some_and(CancellationToken::is_cancelled)
+        {
+            self.failure.set(Some(SelectorQueryError::Cancelled));
+            return false;
+        }
+        let Some(left) = self.remaining.get().checked_sub(amount) else {
+            self.remaining.set(0);
+            self.failure.set(Some(SelectorQueryError::WorkLimit));
+            return false;
+        };
+        self.remaining.set(left);
+        true
+    }
+
+    /// Report the stop reason before publishing a query result.
+    pub fn check(&self) -> Result<(), SelectorQueryError> {
+        self.failure.get().map_or(Ok(()), Err)
+    }
+}
+
+/// A scoped query over a fixed HTML tree and one parsed selector list.
+pub struct ScopedSelector<'a> {
+    document: &'a Document,
+    list: &'a SelectorList,
+    scope: NodeId,
+    context: MatchContext<DomElement<'a>>,
+    work: &'a SelectorWork<'a>,
+    cache: MatchCache<DomElement<'a>>,
+}
+
+impl<'a> ScopedSelector<'a> {
+    /// Prepare a query. An element scope participates in selector matching
+    /// even when the query only returns its descendants.
+    pub fn new(
+        document: &'a Document,
+        scope: NodeId,
+        list: &'a SelectorList,
+        quirks: bool,
+        work: &'a SelectorWork<'a>,
+    ) -> Self {
+        let scope_element = DomElement::with_work(document, scope, Some(work));
+        Self {
+            document,
+            list,
+            scope,
+            work,
+            context: MatchContext {
+                scope: scope_element,
+                quirks,
+                ..MatchContext::html()
+            },
+            cache: MatchCache::default(),
+        }
+    }
+
+    fn matches_element(&self, element: DomElement<'a>) -> bool {
+        self.list.selectors().iter().any(|selector| {
+            self.work.spend(1)
+                && selector.pseudo_element().is_none()
+                && matches_complex_cached(selector, element, &self.context, &self.cache)
+        })
+    }
+
+    /// Test the scoping element itself.
+    pub fn matches(&self) -> Result<bool, SelectorQueryError> {
+        let result = self
+            .context
+            .scope
+            .is_some_and(|e| !e.is_virtual_scope() && self.matches_element(e));
+        self.work.check()?;
+        Ok(result)
+    }
+
+    /// Find the nearest matching inclusive element ancestor.
+    pub fn closest(&self) -> Result<Option<NodeId>, SelectorQueryError> {
+        let answer = std::iter::successors(self.context.scope, ElementView::parent_element)
+            .find(|&element| !element.is_virtual_scope() && self.matches_element(element))
+            .map(|element| element.id());
+        self.work.check()?;
+        Ok(answer)
+    }
+
+    fn descendant_matches(&self) -> Result<impl Iterator<Item = NodeId> + '_, SelectorQueryError> {
+        Ok(self
+            .document
+            .walk(self.scope)
+            .map_err(SelectorQueryError::Dom)?
+            .skip(1)
+            .take_while(|_| self.work.spend(1))
+            .filter_map(|(id, _)| DomElement::with_work(self.document, id, Some(self.work)))
+            .filter(|&element| self.matches_element(element))
+            .map(|element| element.id()))
+    }
+
+    /// Find the first matching descendant in tree order.
+    pub fn first(&self) -> Result<Option<NodeId>, SelectorQueryError> {
+        let result = self.descendant_matches()?.next();
+        self.work.check()?;
+        Ok(result)
+    }
+
+    /// Collect all matching descendants once, in tree order.
+    pub fn all(&self) -> Result<Vec<NodeId>, SelectorQueryError> {
+        let mut result = Vec::new();
+        for id in self.descendant_matches()? {
+            result
+                .try_reserve(1)
+                .map_err(|_| SelectorQueryError::Dom(DomError::AllocationFailed))?;
+            result.push(id);
+        }
+        self.work.check()?;
+        Ok(result)
+    }
 }
 
 /// One element's style from [`style_tree`].
@@ -352,7 +565,7 @@ pub(crate) fn style_walk<'a>(
         // Only a direct parent element (or host) passes its style on.
         let parent_entry = path.last().copied().filter(|e| e.depth + 1 == depth);
         let parent_id = parent_entry.map(|e| out[e.index].node);
-        let shadow_root = element.element.shadow_root();
+        let shadow_root = element.element.and_then(Element::shadow_root);
 
         let mut subtree = parent_entry.is_some_and(|e| e.subtree);
         let kept = match reuse.as_mut() {

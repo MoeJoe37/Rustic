@@ -335,6 +335,8 @@ pub(crate) enum Internal {
     },
     /// A host object's embedder data.
     Host(u64),
+    /// A read-only Web IDL indexed property getter and its source.
+    HostIndexed(super::host_indexed::IndexedHost),
     /// Private string state of a branded host exception.
     HostError {
         interface: &'static str,

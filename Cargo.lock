@@ -124,8 +124,10 @@ name = "rustic-bindings"
 version = "0.1.0"
 dependencies = [
  "rustic-base",
+ "rustic-css",
  "rustic-dom",
  "rustic-js",
+ "rustic-style",
 ]
 
 [[package]]

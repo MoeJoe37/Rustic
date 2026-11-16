@@ -27,6 +27,11 @@ pub enum ChildRef<'a, E> {
 /// Equality must mean "the same element", and hashing must agree with it
 /// (the matcher memoizes nested selector results per element).
 pub trait ElementView: Copy + Eq + std::hash::Hash {
+    /// A featureless fragment root usable for scoped selector relationships.
+    fn is_virtual_scope(&self) -> bool {
+        false
+    }
+
     /// The parent, if it is an element.
     fn parent_element(&self) -> Option<Self>;
 

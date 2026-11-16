@@ -307,3 +307,32 @@ fn document_script_factories_change_the_rendered_tree() {
     assert!(output.contains("from "));
     assert!(output.contains("script"));
 }
+
+#[test]
+fn document_selectors_follow_parser_quirks_mode() {
+    let mut engine = Engine::new(1);
+    for (markup, expected) in [
+        ("<p id='Heading' class='Active'>", true),
+        ("<!doctype html><p id='Heading' class='Active'>", false),
+    ] {
+        let mut load = engine.begin_document(ParserLimits::default()).unwrap();
+        load.feed(markup.as_bytes()).unwrap();
+        let mut scripts = load
+            .finish()
+            .unwrap()
+            .into_scripted(TaskLimits::default())
+            .unwrap();
+        scripts
+            .queue_script(source(&format!(
+                r#"
+            const p = document.getElementById("Heading");
+            if (!p || document.getElementById("heading") !== null ||
+                p.matches('#heading.active') !== {expected} ||
+                (document.querySelector('#heading.active') === p) !== {expected})
+                throw "incorrect case sensitivity";
+        "#
+            )))
+            .unwrap();
+        assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    }
+}

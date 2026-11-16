@@ -221,3 +221,139 @@ fn attribute_calls_preserve_namespaces_and_finish_coercion_before_editing() {
     assert_eq!(link.prefix(), Some("xlink"));
     assert_eq!(link.local(), "href");
 }
+
+#[test]
+fn page_selectors_keep_scope_order_and_use_live_tree_after_coercion() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let tree = Rc::new(Tree(RefCell::new(document)));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    assert_eq!(agent.evaluate(r#"
+        const root = document.createElement("main");
+        const section = document.createElement("section");
+        const first = document.createElement("p");
+        const second = document.createElement("p");
+        const fragment = document.createDocumentFragment();
+        document.appendChild(root);
+        root.appendChild(section);
+        section.appendChild(first);
+        section.appendChild(second);
+        first.setAttribute("id", "Heading");
+        first.setAttribute("class", "active");
+        second.setAttribute("id", "Heading");
+        if (document.querySelector(":scope") !== root || section.querySelector(":scope") !== null ||
+            section.querySelector(":scope > p") !== first ||
+            section.querySelector("main p") !== first ||
+            section.querySelectorAll(".active, p").length !== 2 ||
+            document.getElementById("Heading") !== first ||
+            document.getElementById("heading") !== null ||
+            !first.matches("section > :scope") ||
+            first.closest("main") !== root || first.closest(":scope") !== first)
+            throw "selector scope, identity, or order";
+        if (first.matches("p::before") || root.querySelector("p::before") !== null)
+            throw "pseudo-element returned as a DOM node";
+        const result = section.querySelector({ toString() {
+            fragment.appendChild(first);
+            return "p";
+        } });
+        if (result !== second || fragment.querySelector(".active") !== first ||
+            fragment.querySelector(":scope > .active") !== first ||
+            fragment.querySelector(":scope") !== null ||
+            fragment.querySelector("* > .active") !== null ||
+            fragment.getElementById("Heading") !== first)
+            throw "query used the tree before coercion";
+        for (const invalid of ["", "div >", "p, > x", "x|p"]) {
+            try { root.querySelectorAll(invalid); throw "accepted invalid selector"; }
+            catch (error) { if (!(error instanceof DOMException) || error.name !== "SyntaxError") throw error; }
+        }
+        try { Element.prototype.matches.call(document, {toString(){throw "converted unbranded receiver";}}); }
+        catch (error) { if (!(error instanceof TypeError)) throw error; }
+        true;
+    "#).unwrap(), Value::TRUE);
+}
+
+#[test]
+fn node_lists_distinguish_static_membership_and_live_children_through_gc() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree.clone()).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(agent.evaluate(r#"
+        var snapshot, live;
+        (() => {
+            const detached = document.createElement("section");
+            const p = document.createElement("p");
+            p.marker = "snapshot";
+            detached.appendChild(p);
+            detached.appendChild(document.createTextNode("tail"));
+            snapshot = detached.querySelectorAll("p");
+            live = detached.childNodes;
+            if (!(live instanceof NodeList) || Array.isArray(live) || detached.childNodes !== live ||
+                !(snapshot instanceof NodeList) || snapshot[0] !== p || live[0] !== p ||
+                live.item(1).data !== "tail" || live.item(2) !== null || live[2] !== undefined)
+                throw "NodeList brand or indices";
+            const desc = Object.getOwnPropertyDescriptor(live, "0");
+            if (!desc.enumerable || !desc.configurable || desc.writable ||
+                Reflect.set(live, "0", p) || Reflect.deleteProperty(live, "0") ||
+                Reflect.defineProperty(live, "8", {value:p}) || Reflect.preventExtensions(live))
+                throw "invalid indexed internal methods";
+            detached.removeChild(p);
+            if (snapshot.item(0) !== p || snapshot.length !== 1 ||
+                live.length !== 1 || live[0].data !== "tail" ||
+                Reflect.ownKeys(live).join() !== "0" || 1 in live)
+                throw "snapshot or live membership";
+            if (Array.from(snapshot)[0] !== p || [...live.keys()][0] !== 0 ||
+                [...live.entries()][0][1] !== live[0])
+                throw "iterable";
+            let visited = 0;
+            live.forEach((value, index, list) => {
+                if (value !== live[0] || index !== 0 || list !== live) throw "wrong visitor arguments";
+                visited++;
+            });
+            if (visited !== 1) throw "missing visitor";
+        })();
+        (() => snapshot[0].marker === "snapshot" && live[0].parentNode.childNodes === live)();
+    "#).unwrap(), Value::TRUE);
+    assert_eq!(tree.0.borrow().node_count(), 4);
+    agent
+        .evaluate("snapshot = null; live = null; (() => 0)();")
+        .unwrap();
+    assert_eq!(tree.0.borrow().node_count(), 1);
+}
+
+#[test]
+fn selector_limits_stop_native_walks_instead_of_returning_partial_lists() {
+    let mut document = Document::new(DocumentLimits::default()).unwrap();
+    let root = document
+        .create_element(QualifiedName::html("main").unwrap())
+        .unwrap();
+    document.append_child(document.root(), root).unwrap();
+    for _ in 0..20 {
+        let child = document
+            .create_element(QualifiedName::html("p").unwrap())
+            .unwrap();
+        document.append_child(root, child).unwrap();
+    }
+    let tree = Rc::new(Tree(RefCell::new(document)));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.set_step_budget(Some(10));
+    assert!(matches!(
+        agent.evaluate("globalThis.result = document.querySelectorAll('p');"),
+        Err(rustic_js::EvalError::Cancelled)
+    ));
+    agent.set_step_budget(None);
+    assert_eq!(
+        agent
+            .evaluate(
+                "typeof result === 'undefined' && document.querySelectorAll('p').length === 20"
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+}

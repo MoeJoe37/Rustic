@@ -47,7 +47,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-codecs` | Bounded from-scratch decoders: inflate, PNG, JPEG, GIF and WebP | base | M3 |
 | `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
 | `rustic-wasm` | Original bounded Wasm decoder, validator, interpreter and reviewed acceleration | base; JS/Web integration through explicit adapters | M4 foundations, M5/M9 integration |
-| `rustic-bindings` | Web IDL subset tooling, JS/DOM wrappers, exception conversion, tracing edges | JS, DOM; generated from pinned IDL | M5 |
+| `rustic-bindings` | Web IDL tooling, JS/DOM wrappers, exception conversion, selector queries, tracing edges | JS, DOM, CSS parser, style matcher; generated from pinned IDL | M5 |
 | `rustic-web` | Window, agents, tasks/microtasks, timers, script loading, browser APIs | JS, bindings, DOM, service interfaces | M5 |
 | `rustic-net` | Fetch policy, HTTP adapter, redirects, cookies, cache, TLS integration | URL, base, audited protocol libraries | M6 |
 | `rustic-storage` | Partitioned profile data, quotas, transactions, eviction/private mode | base, origin/storage keys, database adapter | M6/M9 |
@@ -126,6 +126,12 @@ release it before any script callback. Node factories and text operations
 also finish argument coercion before mutating the DOM.
 [ADR 0028](adr/0028-scripted-document-collection.md),
 [ADR 0029](adr/0029-scripted-node-creation.md)
+
+Selector queries borrow the live document after JavaScript string coercion
+and meter native traversal against the current script turn. A static
+NodeList traces its node wrappers. A live child list and its source node
+trace each other, so the joint collector can reclaim an unreachable cycle.
+[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)
 
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed

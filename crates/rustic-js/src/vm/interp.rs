@@ -1016,7 +1016,8 @@ impl Agent {
         Ok(())
     }
 
-    pub(crate) fn check_native_work(&mut self) -> JsResult<()> {
+    /// Poll cancellation and spend one step for work in a host operation.
+    pub fn check_native_work(&mut self) -> JsResult<()> {
         if self
             .vm
             .cancel

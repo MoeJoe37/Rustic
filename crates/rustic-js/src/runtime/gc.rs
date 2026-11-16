@@ -391,6 +391,11 @@ impl Marker<'_> {
             match &extra.internal {
                 None | Some(Internal::ImportRequest(_)) => {}
                 Some(Internal::Host(data)) => self.hosts.push((ObjectId(index), *data)),
+                Some(Internal::HostIndexed(data)) => {
+                    for &value in data.roots() {
+                        self.value(value);
+                    }
+                }
                 Some(Internal::HostError { name, message, .. }) => {
                     self.string(*name);
                     self.string(*message);
@@ -539,6 +544,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::ModuleEvaluation(graph)) => graph.footprint(),
             Some(Internal::ImportRequest(request)) => request.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
+            Some(Internal::HostIndexed(data)) => data.footprint(),
             Some(Internal::Service { bytes, .. }) => *bytes as usize,
             Some(Internal::Collator(collator)) => std::mem::size_of_val(&**collator),
             Some(Internal::PluralRules(rules)) => std::mem::size_of_val(&**rules),

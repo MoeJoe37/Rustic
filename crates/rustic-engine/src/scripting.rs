@@ -152,6 +152,10 @@ impl PageTree for ScriptTree {
             .ok()
             .map(|owner| RefMut::map(owner, |owner| owner.parsed_mut().document_mut()))
     }
+
+    fn quirks_mode(&self) -> bool {
+        self.0.borrow().parsed().mode() == rustic_html::DocumentMode::Quirks
+    }
 }
 
 /// A completed document with a single script agent and a host-driven turn scheduler.

@@ -174,12 +174,26 @@ original text. Element content attribute methods preserve namespaces on existing
 qualified names and apply ASCII case folding on HTML elements. Argument
 coercions run before tree writes, including when coercion calls the DOM again.
 
+Document, Element, and DocumentFragment expose `querySelector` and
+`querySelectorAll`. Element has `matches` and `closest`. Document and
+DocumentFragment have case-sensitive `getElementById`. CSS queries share
+the style matcher, honor parser quirks mode and scoped roots, return results
+in tree order, and charge native traversal to the script turn. Invalid
+selectors throw a DOMException named SyntaxError.
+
+`querySelectorAll` returns a static NodeList. `childNodes` returns a live
+NodeList with stable identity. Both provide read-only indexed properties,
+`item`, `length`, iteration and `forEach`. The joint collector preserves
+either a snapshot's nodes or a live list's source while the list is reachable.
+
 The host exposes one document per scripted agent. Window integration,
-additional documents and cross-document operations, and selectors remain open.
-TD-126 covers the remaining interfaces and constructor behavior. TD-127 covers
-the UTF-8 name storage limit.
+additional documents, cross-document operations, and HTMLCollection named
+properties remain open. TD-126 covers the remaining interfaces and
+constructor behavior. TD-127 covers the UTF-8 name storage limit.
+TD-128 tracks live list traversal cost.
 [ADR 0028](adr/0028-scripted-document-collection.md),
-[ADR 0029](adr/0029-scripted-node-creation.md)
+[ADR 0029](adr/0029-scripted-node-creation.md),
+[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

@@ -407,6 +407,17 @@ fn attribute_value<'a, E: ElementView>(e: &'a E, local: &str) -> Option<&'a [u16
 }
 
 fn simple_matches<E: ElementView>(simple: &SimpleSelector, e: E, m: &Matcher<'_, E>) -> bool {
+    if e.is_virtual_scope() {
+        return match simple {
+            SimpleSelector::PseudoClass(PseudoClass::Scope) | SimpleSelector::Nesting(None) => {
+                m.cx.scope == Some(e)
+            }
+            SimpleSelector::PseudoClass(PseudoClass::Is(list) | PseudoClass::Where(list)) => {
+                m.list(list, e)
+            }
+            _ => false,
+        };
+    }
     if m.host == Some(e) {
         // The featureless host.
         return match simple {

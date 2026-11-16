@@ -159,6 +159,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
 | TD-126 | Deliberate | Web bindings | The page host has one document and a subset of HTML and DOM interfaces | Open, WEB-03 and HTML integration |
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
+| TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walk child links | Open, DOM collections |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1891,8 +1892,8 @@ needed for detached documents and cross-document operations. Element
 creation provides the base Element interface with no custom element
 registry. Requested custom element creation options fail explicitly.
 Install HTML element-specific prototypes and custom element reactions
-alongside the HTML interface and registry work. Live collections and
-selectors are tracked in WEB-03.
+alongside the HTML interface and registry work. Named HTMLCollection
+properties and the remaining collection APIs are tracked in WEB-03.
 [ADR 0028](adr/0028-scripted-document-collection.md)
 [ADR 0029](adr/0029-scripted-node-creation.md)
 
@@ -1905,3 +1906,13 @@ creation. Attribute lookups for such names find no matching record. Update
 name storage and its parser, selector and serializer consumers together
 when name conformance requires representing those code units.
 [ADR 0029](adr/0029-scripted-node-creation.md)
+
+### TD-128 — Live NodeList positional access walks child links
+
+A live child list retains its source wrapper and reads the current sibling
+chain. This keeps it current through all tree edits without an invalidation
+table. Counting or accessing a later index is linear in the relevant
+children. Repeated indexed traversal can be quadratic, and charges each
+sibling step to the script turn. Measure real collection reads and introduce
+a mutation-versioned index when extending the live collection surface.
+[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)

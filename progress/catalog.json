@@ -4036,7 +4036,43 @@
               ]
             },
             {
-              "label": "Node and document creation, specialized interfaces and DOM attributes",
+              "label": "Node factories, specialized node prototypes, character-data operations and element attributes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/creation.rs",
+                  "marker": "fn install_factories"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document/character_data.rs",
+                  "marker": "pub fn split_text_with_preflight"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn factories_create_live_nodes_with_specialized_prototypes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn character_data_uses_utf16_and_reenters_before_tree_mutation"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn attribute_calls_preserve_namespaces_and_finish_coercion_before_editing"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_script_factories_change_the_rendered_tree"
+                }
+              ]
+            },
+            {
+              "label": "Additional document construction, namespace-aware factories and cross-document operations",
               "status": "planned",
               "evidence": []
             },

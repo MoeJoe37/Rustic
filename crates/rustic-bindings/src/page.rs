@@ -13,6 +13,10 @@ use rustic_js::runtime::{
 
 use crate::{DomGcError, DomHeap, dom_exception};
 
+mod attributes;
+mod character_data;
+mod creation;
+
 /// Shared access to the real document rendered by the host.
 pub trait PageTree: Debug {
     /// Borrow the document for reading.
@@ -55,7 +59,9 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     install_interface(
         agent,
         "Node",
-        agent.intrinsics.object_prototype,
+        None,
+        illegal_constructor,
+        0,
         &[
             ("nodeType", "get nodeType", node_type),
             ("parentNode", "get parentNode", parent_node),
@@ -74,19 +80,55 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
             Ok(())
         },
     )?;
-    let node_prototype = prototype(agent, "Node")?;
     install_interface(
         agent,
         "Document",
-        node_prototype,
+        Some("Node"),
+        illegal_constructor,
+        0,
         &[("documentElement", "get documentElement", document_element)],
-        |_, _| Ok(()),
+        creation::install_factories,
     )?;
     install_interface(
         agent,
         "Element",
-        node_prototype,
+        Some("Node"),
+        illegal_constructor,
+        0,
         &[("localName", "get localName", local_name)],
+        attributes::install,
+    )?;
+    install_interface(
+        agent,
+        "DocumentFragment",
+        Some("Node"),
+        creation::construct_fragment,
+        0,
+        &[],
+        |_, _| Ok(()),
+    )?;
+    character_data::install(agent)?;
+    install_interface(
+        agent,
+        "ProcessingInstruction",
+        Some("CharacterData"),
+        creation::construct_instruction,
+        1,
+        &[("target", "get target", creation::instruction_target)],
+        |_, _| Ok(()),
+    )?;
+
+    install_interface(
+        agent,
+        "DocumentType",
+        Some("Node"),
+        illegal_constructor,
+        0,
+        &[
+            ("name", "get name", creation::doctype_name),
+            ("publicId", "get publicId", creation::doctype_public_id),
+            ("systemId", "get systemId", creation::doctype_system_id),
+        ],
         |_, _| Ok(()),
     )?;
 
@@ -108,11 +150,21 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
 fn install_interface(
     agent: &mut Agent,
     interface: &'static str,
-    parent: ObjectId,
+    parent: Option<&'static str>,
+    constructor: NativeFn,
+    length: u32,
     attributes: &[(&str, &str, NativeFn)],
     initialize: impl FnOnce(&mut Agent, ObjectId) -> JsResult<()>,
 ) -> JsResult<()> {
-    let prototype = agent.new_object_with(Some(parent))?;
+    let (parent_prototype, parent_constructor) = match parent {
+        Some(parent) => {
+            let prototype = prototype(agent, parent)?;
+            let key = PropertyKey::String(agent.names.constructor);
+            (prototype, agent.get(prototype, key)?.as_object())
+        }
+        None => (agent.intrinsics.object_prototype, None),
+    };
+    let prototype = agent.new_object_with(Some(parent_prototype))?;
     let tag = Value::string(agent.heap.intern_str(interface)?);
     agent.define_property_or_throw(
         prototype,
@@ -129,16 +181,10 @@ fn install_interface(
         )?;
     }
     initialize(agent, prototype)?;
-    let parent_constructor = if interface == "Node" {
-        None
-    } else {
-        let key = agent.heap.key("Node")?;
-        agent.get(agent.intrinsics.global, key)?.as_object()
-    };
     agent.install_host_interface(
         interface,
-        illegal_constructor,
-        0,
+        constructor,
+        length,
         prototype,
         |agent, constructor| {
             if let Some(parent) = parent_constructor {
@@ -172,9 +218,24 @@ fn wrap(
     let interface = match node.kind() {
         NodeKind::Document => "Document",
         NodeKind::Element(_) => "Element",
-        _ => "Node",
+        NodeKind::Text(_) => "Text",
+        NodeKind::Comment(_) => "Comment",
+        NodeKind::CdataSection(_) => "CDATASection",
+        NodeKind::ProcessingInstruction(_) => "ProcessingInstruction",
+        NodeKind::DocumentFragment => "DocumentFragment",
+        NodeKind::DocumentType(_) => "DocumentType",
     };
     let proto = prototype(agent, interface)?;
+    wrap_using(wrappers, agent, document, id, proto)
+}
+
+fn wrap_using(
+    wrappers: &mut DomHeap,
+    agent: &mut Agent,
+    document: &Document,
+    id: NodeId,
+    proto: ObjectId,
+) -> JsResult<Value> {
     wrappers
         .wrap_with_prototype(agent, document, id, proto)
         .map(Value::object)
@@ -216,10 +277,73 @@ fn node_id(
     }
 }
 
+fn require_receiver(
+    agent: &mut Agent,
+    receiver: Value,
+    brand: fn(&NodeKind) -> bool,
+    interface: &str,
+) -> JsResult<NodeId> {
+    with_page(agent, |agent, page| {
+        let Some(document) = page.tree.read() else {
+            return agent.type_error("document is busy");
+        };
+        let Ok(wrappers) = page.wrappers.try_borrow() else {
+            return agent.type_error("DOM bindings are busy");
+        };
+        let id = node_id(agent, &wrappers, &document, receiver)?;
+        if !document.node(id).is_ok_and(|node| brand(node.kind())) {
+            return agent.type_error(interface);
+        }
+        Ok(id)
+    })
+}
+
+fn with_mut_tree<T>(
+    agent: &mut Agent,
+    operation: impl FnOnce(&mut Agent, &mut Document, &mut DomHeap) -> JsResult<T>,
+) -> JsResult<T> {
+    with_page(agent, |agent, page| {
+        let Some(mut document) = page.tree.write() else {
+            return agent.type_error("document is busy");
+        };
+        let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
+            return agent.type_error("DOM bindings are busy");
+        };
+        operation(agent, &mut document, &mut wrappers)
+    })
+}
+
+fn create_node(
+    agent: &mut Agent,
+    custom_prototype: Option<ObjectId>,
+    create: impl FnOnce(&mut Document) -> Result<NodeId, DomError>,
+) -> JsResult<Value> {
+    with_mut_tree(agent, |agent, document, wrappers| {
+        let id = create(document).map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        let result = match custom_prototype {
+            Some(proto) => wrap_using(wrappers, agent, document, id, proto),
+            None => wrap(wrappers, agent, document, id),
+        };
+        if result.is_err() {
+            document
+                .destroy_subtree(id)
+                .expect("detached node from factory");
+        }
+        result
+    })
+}
+
+fn required_arg(agent: &mut Agent, args: &[Value], at: usize) -> JsResult<Value> {
+    match args.get(at) {
+        Some(&value) => Ok(value),
+        None => agent.type_error("required Web IDL argument is missing"),
+    }
+}
+
 fn read_node(
     agent: &mut Agent,
     receiver: Value,
-    read: impl FnOnce(&mut Agent, &mut DomHeap, &Document, &Node) -> JsResult<Value>,
+    read: impl FnOnce(&mut Agent, &mut DomHeap, &Document, NodeId, &Node) -> JsResult<Value>,
 ) -> JsResult<Value> {
     with_page(agent, |agent, page| {
         let Some(document) = page.tree.read() else {
@@ -233,12 +357,12 @@ fn read_node(
             .node(id)
             .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         // These operations never run script while the tree or cache is borrowed.
-        read(agent, &mut wrappers, &document, node)
+        read(agent, &mut wrappers, &document, id, node)
     })
 }
 
 fn node_type(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
-    read_node(agent, receiver, |_, _, _, node| {
+    read_node(agent, receiver, |_, _, _, _, node| {
         let kind = match node.kind() {
             NodeKind::Element(_) => 1,
             NodeKind::Text(_) => 3,
@@ -261,7 +385,7 @@ fn related(
     read_node(
         agent,
         receiver,
-        |agent, wrappers, document, node| match relation(document, node) {
+        |agent, wrappers, document, _, node| match relation(document, node) {
             Some(other) => wrap(wrappers, agent, document, other),
             None => Ok(Value::NULL),
         },
@@ -287,7 +411,7 @@ fn owner_document(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<V
 }
 
 fn document_element(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
-    read_node(agent, receiver, |agent, wrappers, document, node| {
+    read_node(agent, receiver, |agent, wrappers, document, _, node| {
         if !matches!(node.kind(), NodeKind::Document) {
             return agent.type_error("expected a Document receiver");
         }
@@ -306,7 +430,7 @@ fn document_element(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult
 }
 
 fn local_name(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
-    read_node(agent, receiver, |agent, _, _, node| match node.kind() {
+    read_node(agent, receiver, |agent, _, _, _, node| match node.kind() {
         NodeKind::Element(element) => agent.string(element.name().local()),
         _ => agent.type_error("expected an Element receiver"),
     })
@@ -335,7 +459,14 @@ fn edit_child(
 }
 
 fn append_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    edit_child(agent, receiver, args, Document::append_child)
+    edit_child(agent, receiver, args, |document, parent, child| {
+        document
+            .append_child(parent, child)
+            .map_err(|error| match error {
+                DomError::ProtectedRoot => DomError::InvalidHierarchy,
+                error => error,
+            })
+    })
 }
 
 fn remove_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {

@@ -157,7 +157,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-123 | Deliberate | DOM / JS | Interpreter safe points used JS-only collection | Paid |
 | TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
 | TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
-| TD-126 | Deliberate | Web bindings | Initial Node, Document and Element surface omits document construction and specialized prototypes | Open, WEB-03 |
+| TD-126 | Deliberate | Web bindings | The page host has one document and a subset of HTML and DOM interfaces | Open, WEB-03 and HTML integration |
+| TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1882,11 +1883,25 @@ the first cross-engine report of PERF-01.
 
 ### TD-126 — Initial DOM prototype and construction coverage
 
-The first script bindings expose an existing HTML document and its
-navigation and child-mutation methods. The host currently registers one
-document, so the Document interface constructor rejects construction.
-Nodes outside Element and Document use the base Node prototype. Add the
-specific prototypes and multi-document registration when exposing node
-creation, additional documents, and adoption to script. Live collections
-and selectors are tracked in the WEB-03 work.
+The page host supports node factories, CharacterData, text and comment
+constructors, fragments, processing instructions, document types, and the
+initial element attribute operations on its single HTML document.
+Document construction and the multi-document collection path are still
+needed for detached documents and cross-document operations. Element
+creation provides the base Element interface with no custom element
+registry. Requested custom element creation options fail explicitly.
+Install HTML element-specific prototypes and custom element reactions
+alongside the HTML interface and registry work. Live collections and
+selectors are tracked in WEB-03.
 [ADR 0028](adr/0028-scripted-document-collection.md)
+[ADR 0029](adr/0029-scripted-node-creation.md)
+
+### TD-127 — Element and attribute names use scalar UTF-8 storage
+
+Node and attribute payloads preserve every UTF-16 code unit. QualifiedName
+stores names as UTF-8 because parsing, matching and styling consume scalar
+names. The new script factories reject unpaired surrogates in names on
+creation. Attribute lookups for such names find no matching record. Update
+name storage and its parser, selector and serializer consumers together
+when name conformance requires representing those code units.
+[ADR 0029](adr/0029-scripted-node-creation.md)

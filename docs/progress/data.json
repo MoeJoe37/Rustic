@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "4fdb255484cec062e6d0856061a5d145edcad96fd58f0c04cb4fd62513d2495b",
-  "percent": "30.75",
+  "source_fingerprint": "4d78ef7aa583fb80f347cef6967893f57f66adbac196c7a082f1e80b03391e18",
+  "percent": "30.84",
   "verified_percent": "29.89",
-  "partial_percent": "0.86",
+  "partial_percent": "0.95",
   "completed": 69,
   "in_progress": 5,
   "total": 221,
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 3,
       "total": 12,
-      "percent": "25.37",
+      "percent": "27.14",
       "verified_percent": "22.42",
-      "partial_percent": "2.95"
+      "partial_percent": "4.72"
     },
     {
       "id": "M6",
@@ -4402,7 +4402,43 @@
               ]
             },
             {
-              "label": "Node and document creation, specialized interfaces and DOM attributes",
+              "label": "Node factories, specialized node prototypes, character-data operations and element attributes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/creation.rs",
+                  "marker": "fn install_factories"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document/character_data.rs",
+                  "marker": "pub fn split_text_with_preflight"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn factories_create_live_nodes_with_specialized_prototypes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn character_data_uses_utf16_and_reenters_before_tree_mutation"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn attribute_calls_preserve_namespaces_and_finish_coercion_before_editing"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_script_factories_change_the_rendered_tree"
+                }
+              ]
+            },
+            {
+              "label": "Additional document construction, namespace-aware factories and cross-document operations",
               "status": "planned",
               "evidence": []
             },
@@ -4417,7 +4453,7 @@
               "evidence": []
             }
           ],
-          "credit": "25.00",
+          "credit": "40.00",
           "engine_share": "0.62"
         },
         {
@@ -4566,10 +4602,10 @@
       "completed": 2,
       "in_progress": 1,
       "total": 10,
-      "contribution": "1.15",
-      "percent": "23.12",
+      "contribution": "1.25",
+      "percent": "25.00",
       "verified_percent": "20.00",
-      "partial_percent": "3.12"
+      "partial_percent": "5.00"
     },
     {
       "id": "media",

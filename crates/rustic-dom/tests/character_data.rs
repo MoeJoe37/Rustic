@@ -315,3 +315,47 @@ fn seeded_edits_match_an_independent_utf16_model_under_a_shared_budget() {
     }
     assert!(accepted > 500 && limited > 100 && invalid > 10);
 }
+
+#[test]
+fn split_text_keeps_the_exact_payload_budget_and_rolls_back_handle_failure() {
+    use rustic_dom::DomString;
+
+    let mut document = Document::new(DocumentLimits {
+        max_nodes: 4,
+        max_data_bytes: 6,
+        ..DocumentLimits::default()
+    })
+    .unwrap();
+    let parent = document.create_document_fragment().unwrap();
+    let first = document
+        .create_text(DomString::from_units(vec![0x61, 0xd83d, 0xde80]))
+        .unwrap();
+    document.append_child(parent, first).unwrap();
+
+    assert_eq!(
+        document
+            .split_text_with_preflight(first, 2, |_, _| Err::<(), _>(DomError::AllocationFailed)),
+        Err(DomError::AllocationFailed)
+    );
+    assert_eq!(document.node_count(), 3);
+    assert_eq!(document.node(first).unwrap().next_sibling(), None);
+    assert_eq!(
+        document.character_data(first).unwrap().as_units(),
+        [0x61, 0xd83d, 0xde80]
+    );
+    let tail = document
+        .split_text_with_preflight(first, 2, |_, id| Ok(id))
+        .unwrap();
+    assert_eq!(
+        document.character_data(first).unwrap().as_units(),
+        [0x61, 0xd83d]
+    );
+    assert_eq!(document.character_data(tail).unwrap().as_units(), [0xde80]);
+    assert_eq!(document.node(tail).unwrap().parent(), Some(parent));
+    assert_eq!(document.node(first).unwrap().next_sibling(), Some(tail));
+    assert_eq!(
+        document.split_text_with_preflight(first, 0, |_, id| Ok(id)),
+        Err(DomError::NodeLimit)
+    );
+    document.check_invariants().unwrap();
+}

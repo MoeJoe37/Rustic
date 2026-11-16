@@ -166,10 +166,20 @@ DOM's checked mutations. Render turns read the same parsed tree. Tests
 exercise live mutations, error atomicity, and collection of detached
 cycles during ordinary script and promise-job safe points.
 
-The initial host exposes one document per scripted agent. Window,
-creation of nodes and additional documents, specialized interfaces,
-and selectors remain open. See TD-126 for the partial prototype surface.
-[ADR 0028](adr/0028-scripted-document-collection.md)
+Document factories create elements, text, comments, fragments, and processing
+instructions. Text and Comment constructors use the pinned IDL defaults.
+CharacterData methods operate on UTF-16 code units, including lone surrogates.
+`splitText` creates the sibling and prepares its wrapper before changing the
+original text. Element content attribute methods preserve namespaces on existing
+qualified names and apply ASCII case folding on HTML elements. Argument
+coercions run before tree writes, including when coercion calls the DOM again.
+
+The host exposes one document per scripted agent. Window integration,
+additional documents and cross-document operations, and selectors remain open.
+TD-126 covers the remaining interfaces and constructor behavior. TD-127 covers
+the UTF-8 name storage limit.
+[ADR 0028](adr/0028-scripted-document-collection.md),
+[ADR 0029](adr/0029-scripted-node-creation.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

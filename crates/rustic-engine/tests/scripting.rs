@@ -257,3 +257,53 @@ fn document_wrappers_use_the_live_dom_across_script_and_render_turns() {
     assert!(output.contains("keep"));
     assert!(!output.contains("drop"));
 }
+
+#[test]
+fn document_script_factories_change_the_rendered_tree() {
+    let mut engine = Engine::new(1);
+    let document = engine
+        .begin_document(ParserLimits::default())
+        .unwrap()
+        .finish()
+        .unwrap();
+    let mut scripts = document.into_scripted(TaskLimits::default()).unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+        const body = document.documentElement.firstChild.nextSibling;
+        const element = document.createElement("P");
+        element.setAttribute("ID", "created");
+        body.appendChild(element);
+        element.appendChild(document.createTextNode("from "));
+        element.appendChild(new Text("script"));
+    "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    scripts.offer_rendering_opportunity().unwrap();
+    let render = scripts
+        .run_next_with_render(|document, _| {
+            let tree = document.parsed().document();
+            let element = tree
+                .walk(tree.root())
+                .unwrap()
+                .find_map(|(id, _)| match tree.node(id).unwrap().kind() {
+                    rustic_dom::NodeKind::Element(element) if element.name().local() == "p" => {
+                        Some(element)
+                    }
+                    _ => None,
+                })
+                .expect("script-created paragraph");
+            let attribute = &element.attributes()[0];
+            assert_eq!(attribute.name().local(), "id");
+            assert_eq!(attribute.value(), &rustic_dom::DomString::from("created"));
+            tree.dump_tree(tree.root(), 4096).unwrap()
+        })
+        .unwrap()
+        .unwrap();
+    let rustic_engine::DocumentTurn::Rendered { output, .. } = render else {
+        panic!("expected rendering after the script");
+    };
+    assert!(output.contains("from "));
+    assert!(output.contains("script"));
+}

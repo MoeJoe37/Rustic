@@ -37,6 +37,7 @@ instead of rewriting the history of a decision.
 | [0026](0026-realm-dom-wrappers.md) | Realm-scoped wrapper identity, shared collection and adoption retargeting | Accepted for the WEB-02 host bindings |
 | [0027](0027-host-exception-bindings.md) | Realm-owned interface prototypes and traced DOMException string slots | Accepted for WEB-02 |
 | [0028](0028-scripted-document-collection.md) | Joint safe-point collection and live document bindings | Accepted for the first WEB-03 interfaces |
+| [0029](0029-scripted-node-creation.md) | Reentrant conversions and transactional node factories and text splits | Accepted for WEB-03 |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

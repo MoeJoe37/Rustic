@@ -53,7 +53,10 @@ pub fn to_nullable_dom_string(agent: &mut Agent, value: Value) -> JsResult<Optio
 
 /// Convert a DOM string to a JavaScript string with the same UTF-16 units.
 pub fn from_dom_string(agent: &mut Agent, value: &DomString) -> JsResult<Value> {
-    let units = value.as_units();
+    from_dom_units(agent, value.as_units())
+}
+
+pub(crate) fn from_dom_units(agent: &mut Agent, units: &[u16]) -> JsResult<Value> {
     let contents = if units.iter().all(|&unit| unit <= u16::from(u8::MAX)) {
         let bytes = copy_exact(units.len(), units.iter().map(|&unit| unit as u8))?;
         JsStr::Latin1(bytes.into_boxed_slice())

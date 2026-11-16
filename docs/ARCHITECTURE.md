@@ -122,8 +122,10 @@ all wrappers through the DOM identity map.
 A scripted document shares its parsed tree between the renderer and the
 agent's binding host. The VM asks that host to collect at script and
 promise-job safe points. Binding operations borrow the tree briefly and
-release it before any script callback.
-[ADR 0028](adr/0028-scripted-document-collection.md)
+release it before any script callback. Node factories and text operations
+also finish argument coercion before mutating the DOM.
+[ADR 0028](adr/0028-scripted-document-collection.md),
+[ADR 0029](adr/0029-scripted-node-creation.md)
 
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed

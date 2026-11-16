@@ -318,8 +318,11 @@ documents together. Document scripts can construct `DOMException` and
 host bindings can throw it for document failures. WEB-03 now exposes
 the live document, initial node traversal and child mutation operations.
 Document script and promise-job safe points use the joint collector.
-Window, additional DOM interfaces, and selectors remain open.
-[ADR 0028](adr/0028-scripted-document-collection.md)
+The document can create nodes, and scripts can edit UTF-16 character data
+and element content attributes. Window, additional documents and
+cross-document operations, and selectors remain open.
+[ADR 0028](adr/0028-scripted-document-collection.md),
+[ADR 0029](adr/0029-scripted-node-creation.md)
 [ADR 0024](adr/0024-web-idl-conversions.md),
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
 [ADR 0026](adr/0026-realm-dom-wrappers.md),

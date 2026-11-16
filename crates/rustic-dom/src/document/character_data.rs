@@ -90,7 +90,8 @@ impl Document {
         Ok(())
     }
 
-    fn character_data(&self, id: NodeId) -> Result<&DomString, DomError> {
+    /// Read the node's character data in UTF-16 code units.
+    pub fn character_data(&self, id: NodeId) -> Result<&DomString, DomError> {
         match self.node(id)?.kind() {
             NodeKind::Text(value) | NodeKind::Comment(value) | NodeKind::CdataSection(value) => {
                 Ok(value)
@@ -98,6 +99,56 @@ impl Document {
             NodeKind::ProcessingInstruction(instruction) => Ok(&instruction.data),
             _ => Err(DomError::WrongNodeKind),
         }
+    }
+
+    /// Split a Text or CDATA node and insert the new Text after it when attached.
+    ///
+    /// The callback prepares a handle for the new, empty node before the
+    /// split is committed. Failure removes that empty node and preserves the
+    /// original text, children, and accounting. The two final payloads share
+    /// the original byte charge, even at the exact payload limit.
+    pub fn split_text_with_preflight<T>(
+        &mut self,
+        id: NodeId,
+        offset: usize,
+        prepare: impl FnOnce(&Self, NodeId) -> Result<T, DomError>,
+    ) -> Result<T, DomError> {
+        let node = self.node(id)?;
+        let (NodeKind::Text(text) | NodeKind::CdataSection(text)) = node.kind() else {
+            return Err(DomError::WrongNodeKind);
+        };
+        let units = text.as_units();
+        let suffix = units.get(offset..).ok_or(DomError::InvalidOffset)?;
+        let len = units.len();
+        let (parent, next) = (node.parent(), node.next_sibling());
+        let mut tail = Vec::new();
+        tail.try_reserve_exact(suffix.len())
+            .map_err(|_| DomError::AllocationFailed)?;
+        tail.extend_from_slice(suffix);
+        let tail = DomString::from_units(tail);
+        let new = self.create_text(DomString::default())?;
+        let handle = match prepare(self, new) {
+            Ok(handle) => handle,
+            Err(error) => {
+                self.arena.remove_detached_leaf(new);
+                return Err(error);
+            }
+        };
+        self.arena
+            .resize_data(id, offset * std::mem::size_of::<u16>())
+            .expect("shorter live text payload");
+        self.character_data_mut(id)
+            .replace_reserved(offset..len, &[], offset);
+        self.arena
+            .resize_data(new, tail.data_bytes())
+            .expect("split payload bytes already released");
+        *self.character_data_mut(new) = tail;
+        if let Some(parent) = parent {
+            // The existing sibling establishes the parent, legal child kind,
+            // and depth for another text leaf at this position.
+            self.link_before(parent, new, next);
+        }
+        Ok(handle)
     }
 
     fn character_data_mut(&mut self, id: NodeId) -> &mut DomString {

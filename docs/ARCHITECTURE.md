@@ -245,8 +245,11 @@ Event dispatch, custom callbacks, and getters are reentry points. Define safe
 points and root scopes before implementing them.
 
 The headless coordinator now offers an explicit scripted document owner.
-It runs host-supplied script tasks and bounded microtask checkpoints using
-the document's cancellation scope. See [ADR 0021](adr/0021-document-script-turns.md).
+It runs immediate and timed host script tasks with bounded microtask
+checkpoints and one cancellation scope. Timer eligibility uses a host
+monotonic clock.
+[ADR 0021](adr/0021-document-script-turns.md),
+[ADR 0022](adr/0022-document-task-sources-and-timers.md)
 
 ## 6. Navigation, resources, and persistence
 

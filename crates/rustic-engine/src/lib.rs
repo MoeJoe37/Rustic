@@ -5,11 +5,13 @@ use std::fmt;
 
 mod lifecycle;
 mod scripting;
+mod tasks;
 
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use scripting::{
     ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument, TaskLimits,
 };
+pub use tasks::TimerId;
 
 /// Initial allocation budget for a headless viewport, in device pixels.
 pub const MAX_VIEWPORT_PIXELS: u64 = 16_777_216;

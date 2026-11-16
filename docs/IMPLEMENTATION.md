@@ -88,10 +88,20 @@ errors still reach the checkpoint. Queue count and UTF-16 source limits
 bound pending work. Each turn shares VM safe points between the script and
 its jobs, with a separate job-count bound for the checkpoint.
 
-The document token cancels running or pending script work. Cancellation and
-fatal budget failures release queued scripts and the agent at the host safe
-point. Task sources, timers and the host clock, rendering opportunities and
-parser-scheduled scripts remain open. See [ADR 0021](adr/0021-document-script-turns.md).
+The host can also schedule one-shot script turns and cancel them by
+document-scoped timer ID. `run_next` selects between immediate scripts and
+ready timers, alternating when both sources have work. Timers become
+eligible using the selected monotonic clock and run by deadline, with
+equal deadlines resolved by admission order. Hosts can query the delay
+until the next timer and inject a manual clock for tests. The existing
+queue limits cover both sources.
+
+The document token cancels running or pending script and timer work.
+Cancellation and fatal budget failures release queued work and the agent
+at the host safe point. Rendering opportunities, page timer APIs and
+parser-scheduled scripts remain open.
+[ADR 0021](adr/0021-document-script-turns.md),
+[ADR 0022](adr/0022-document-task-sources-and-timers.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

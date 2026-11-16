@@ -30,6 +30,7 @@ instead of rewriting the history of a decision.
 | [0019](0019-static-module-evaluation.md) | Traced environments, import slots and namespaces for source text modules | Accepted for synchronous evaluation |
 | [0020](0020-document-lifecycle.md) | Host-owned document lifetimes with bounded admission and coordinated cancellation | Accepted for the headless pipeline |
 | [0021](0021-document-script-turns.md) | Document-owned script tasks and bounded microtask checkpoints | Accepted for the initial WEB-01 scheduler |
+| [0022](0022-document-task-sources-and-timers.md) | Immediate and timed script sources, monotonic host clocks and timer cancellation | Accepted for WEB-01 host timers |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

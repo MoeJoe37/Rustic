@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "f7828070dc4fb2f90fff3c963cadc2cfb79a6f1697ef3a4b9df4f99f8f4ff22a",
-  "percent": "29.65",
+  "source_fingerprint": "93a23d256e0f2c3fd3e7c0e90a2b1a089d0f3d1862bddba392eed3866e7e4185",
+  "percent": "29.77",
   "verified_percent": "28.48",
-  "partial_percent": "1.17",
+  "partial_percent": "1.29",
   "completed": 66,
   "in_progress": 6,
   "total": 221,
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 1,
       "total": 12,
-      "percent": "5.90",
+      "percent": "8.26",
       "verified_percent": "3.54",
-      "partial_percent": "2.36"
+      "partial_percent": "4.72"
     },
     {
       "id": "M6",
@@ -4323,8 +4323,29 @@
             },
             {
               "label": "Task-source selection, host clock and timers",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/tasks.rs",
+                  "marker": "pub(crate) fn pop_ready"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "pub fn into_scripted_with_clock"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn timer_turns_follow_deadlines_and_alternate_with_immediate_tasks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn timer_ids_are_document_scoped_and_cancellation_refunds_both_limits"
+                }
+              ]
             },
             {
               "label": "Rendering opportunities and frame ordering",
@@ -4332,7 +4353,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.37"
         },
         {
@@ -4410,10 +4431,10 @@
       "completed": 0,
       "in_progress": 1,
       "total": 10,
-      "contribution": "0.12",
-      "percent": "2.50",
+      "contribution": "0.25",
+      "percent": "5.00",
       "verified_percent": "0.00",
-      "partial_percent": "2.50"
+      "partial_percent": "5.00"
     },
     {
       "id": "media",

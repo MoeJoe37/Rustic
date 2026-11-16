@@ -1,17 +1,19 @@
 //! WEB-01 document-owned script tasks and microtask checkpoints.
 
-use std::collections::VecDeque;
 use std::fmt;
+use std::time::Duration;
 
+use rustic_base::{Clock, SystemClock};
 use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::EngineDocument;
+use crate::tasks::{ScriptQueue, TimerId};
 
 /// Resource limits for one scripted document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TaskLimits {
-    /// Maximum number of script tasks waiting to run.
+    /// Maximum number of immediate and timed script tasks waiting to run.
     pub pending_scripts: usize,
     /// Maximum total UTF-16 source units in waiting tasks.
     pub pending_source_units: usize,
@@ -44,6 +46,10 @@ pub enum ScriptQueueError {
     Limit,
     /// The queue could not allocate a slot.
     Capacity,
+    /// The requested delay exceeds the monotonic clock range.
+    DeadlineOverflow,
+    /// This document has exhausted its non-reusable timer identities.
+    TimerIdsExhausted,
 }
 
 impl fmt::Display for ScriptQueueError {
@@ -52,6 +58,8 @@ impl fmt::Display for ScriptQueueError {
             Self::Stopped(reason) => reason.fmt(f),
             Self::Limit => f.write_str("pending script limit reached"),
             Self::Capacity => f.write_str("cannot allocate a script task slot"),
+            Self::DeadlineOverflow => f.write_str("script timer deadline exceeds the clock range"),
+            Self::TimerIdsExhausted => f.write_str("script timer identity space exhausted"),
         }
     }
 }
@@ -104,15 +112,15 @@ pub enum ScriptTurn {
     Failed(ScriptFailure),
 }
 
-/// A completed document with a single script agent and a FIFO script task queue.
+/// A completed document with a single script agent and two script task sources.
 ///
 /// The host explicitly queues scripts and pumps turns. The document and agent
 /// move together, with the document's existing token shared by the VM.
-pub struct ScriptedDocument {
+pub struct ScriptedDocument<C = SystemClock> {
     document: EngineDocument,
     agent: Result<Agent, ScriptStop>,
-    pending: VecDeque<Source>,
-    pending_source_units: usize,
+    pending: ScriptQueue,
+    clock: C,
     limits: TaskLimits,
 }
 
@@ -122,6 +130,16 @@ impl EngineDocument {
     /// The conversion consumes the inert document. If initialization fails, its
     /// scope is closed as when dropping any document owner.
     pub fn into_scripted(self, limits: TaskLimits) -> Result<ScriptedDocument, ScriptStop> {
+        self.into_scripted_with_clock(limits, SystemClock::default())
+    }
+
+    /// Give this document a script agent and a host-selected monotonic clock.
+    /// The clock governs timer eligibility. JavaScript reads civil time separately.
+    pub fn into_scripted_with_clock<C: Clock>(
+        self,
+        limits: TaskLimits,
+        clock: C,
+    ) -> Result<ScriptedDocument<C>, ScriptStop> {
         if self.cancellation().is_cancelled() {
             return Err(ScriptStop::DocumentCancelled);
         }
@@ -129,17 +147,18 @@ impl EngineDocument {
             Agent::with_heap_limit(limits.heap_bytes).map_err(|_| ScriptStop::OutOfMemory)?;
         agent.set_cancellation(Some(self.cancellation().clone()));
         agent.set_can_block(false);
+        let pending = ScriptQueue::new(self.parsed().document().id(), limits);
         Ok(ScriptedDocument {
             document: self,
             agent: Ok(agent),
-            pending: VecDeque::new(),
-            pending_source_units: 0,
+            pending,
+            clock,
             limits,
         })
     }
 }
 
-impl ScriptedDocument {
+impl<C: Clock> ScriptedDocument<C> {
     /// Inspect the parsed document and its lifetime token.
     pub fn document(&self) -> &EngineDocument {
         &self.document
@@ -148,30 +167,53 @@ impl ScriptedDocument {
     /// Queue a host-supplied script after checking both pending-work limits.
     pub fn queue_script(&mut self, source: Source) -> Result<(), ScriptQueueError> {
         self.check_live().map_err(ScriptQueueError::Stopped)?;
-        let units = source.units().len();
-        if self.pending.len() == self.limits.pending_scripts
-            || units > self.limits.pending_source_units - self.pending_source_units
-        {
-            return Err(ScriptQueueError::Limit);
-        }
-        self.pending
-            .try_reserve(1)
-            .map_err(|_| ScriptQueueError::Capacity)?;
-        self.pending.push_back(source);
-        self.pending_source_units += units;
-        Ok(())
+        self.pending.queue(source)
     }
 
-    /// Run the next script and drain its promise jobs before taking a later task.
+    /// Access the host-selected timer clock, for example to advance a manual clock.
+    pub fn clock(&self) -> &C {
+        &self.clock
+    }
+
+    /// Queue a one-shot script timer that becomes eligible after `delay`.
+    /// A zero delay makes it eligible on a later host turn.
+    pub fn schedule_script(
+        &mut self,
+        delay: Duration,
+        source: Source,
+    ) -> Result<TimerId, ScriptQueueError> {
+        self.check_live().map_err(ScriptQueueError::Stopped)?;
+        let deadline = self
+            .clock
+            .now()
+            .checked_add(delay)
+            .ok_or(ScriptQueueError::DeadlineOverflow)?;
+        self.pending.schedule(deadline, source)
+    }
+
+    /// Remove a pending timer and release its queue budget.
+    /// Returns `false` for a foreign timer or one that has already run or been removed.
+    pub fn cancel_timer(&mut self, timer: TimerId) -> Result<bool, ScriptStop> {
+        self.check_live()?;
+        Ok(self.pending.cancel(timer))
+    }
+
+    /// Delay until the earliest pending timer, or zero if already eligible.
+    /// Returns `None` if no timers are pending.
+    pub fn time_until_next_timer(&mut self) -> Result<Option<Duration>, ScriptStop> {
+        self.check_live()?;
+        Ok(self.pending.delay(self.clock.now()))
+    }
+
+    /// Run one eligible script and drain its promise jobs before a later task.
     ///
     /// A terminal failure discards pending scripts and releases the JS agent.
-    /// Returns `Ok(None)` when there is no pending script.
+    /// Returns `Ok(None)` when there is no eligible task.
     pub fn run_next(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
         self.check_live()?;
-        let Some(source) = self.pending.pop_front() else {
+        let Some(source) = self.pending.pop_ready(self.clock.now()) else {
             return Ok(None);
         };
-        self.pending_source_units -= source.units().len();
 
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         agent.set_step_budget(Some(self.limits.steps_per_turn));
@@ -216,8 +258,7 @@ impl ScriptedDocument {
 
     fn stop(&mut self, reason: ScriptStop) -> ScriptStop {
         self.agent = Err(reason);
-        self.pending = VecDeque::new();
-        self.pending_source_units = 0;
+        self.pending.clear();
         reason
     }
 }

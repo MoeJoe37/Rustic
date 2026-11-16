@@ -3955,8 +3955,29 @@
             },
             {
               "label": "Task-source selection, host clock and timers",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/tasks.rs",
+                  "marker": "pub(crate) fn pop_ready"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "pub fn into_scripted_with_clock"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn timer_turns_follow_deadlines_and_alternate_with_immediate_tasks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn timer_ids_are_document_scoped_and_cancellation_refunds_both_limits"
+                }
+              ]
             },
             {
               "label": "Rendering opportunities and frame ordering",

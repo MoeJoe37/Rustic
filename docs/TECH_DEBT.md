@@ -157,7 +157,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-123 | Deliberate | DOM / JS | Interpreter safe points used JS-only collection | Paid |
 | TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
 | TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
-| TD-126 | Deliberate | Web bindings | The page host has one document and a subset of HTML and DOM interfaces | Open, WEB-03 and HTML integration |
+| TD-126 | Deliberate | Web bindings | The page host exposes a subset of HTML and DOM interfaces | Open, DOM and HTML integration |
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
@@ -1886,18 +1886,14 @@ the first cross-engine report of PERF-01.
 
 ### TD-126 — Initial DOM prototype and construction coverage
 
-The page host supports node factories, CharacterData, text and comment
-constructors, fragments, processing instructions, document types, and the
-initial element attribute operations on its single HTML document.
-Document construction and the multi-document collection path are still
-needed for detached documents and cross-document operations. Element
-creation provides the base Element interface with no custom element
-registry. Requested custom element creation options fail explicitly.
-Install HTML element-specific prototypes and custom element reactions
-alongside the HTML interface and registry work. The remaining document
-factories and cross-document operations are tracked in WEB-03.
-[ADR 0028](adr/0028-scripted-document-collection.md)
-[ADR 0029](adr/0029-scripted-node-creation.md)
+The page host supports detached HTML and XML documents, explicit and
+automatic cross-document node moves, and namespace-aware element and
+attribute operations. Element creation provides the base Element interface.
+Add Attr nodes and NamedNodeMap with the DOM attribute wrappers, and add
+HTML element-specific prototypes and custom element reactions with the
+HTML interface and registry work.
+[ADR 0029](adr/0029-scripted-node-creation.md),
+[ADR 0033](adr/0033-detached-documents-and-adoption.md)
 
 ### TD-127 — Element and attribute names use scalar UTF-8 storage
 
@@ -1933,8 +1929,8 @@ during named property visibility checks.
 
 ### TD-130 — Window named access and additional browsing contexts
 
-The page host has one top-level document per script agent and a fixed
-WindowProxy target for that document's lifetime. This gives event and
+The page host has one top-level browsing context per script agent and a
+fixed WindowProxy target for the active document's lifetime. This gives event and
 script integration one global identity. Extend the prototype chain with
 Window named access and the EventTarget interface alongside their DOM and
 HTML APIs. Before exposing related browsing contexts or navigation, add

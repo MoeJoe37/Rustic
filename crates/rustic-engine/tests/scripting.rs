@@ -385,3 +385,43 @@ fn window_identity_persists_across_document_turns() {
         .unwrap();
     assert_eq!(root.attributes()[0].name().local(), "data-window");
 }
+
+#[test]
+fn detached_document_moves_reach_the_rendered_page_and_change_live_quirks_matching() {
+    let mut engine = Engine::new(1);
+    let mut load = engine.begin_document(ParserLimits::default()).unwrap();
+    load.feed(b"<main><section><span class=Active></span></section></main>")
+        .unwrap();
+    let mut scripts = load
+        .finish()
+        .unwrap()
+        .into_scripted(TaskLimits::default())
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+        const main = document.querySelector("main");
+        const section = main.firstChild;
+        const collection = section.getElementsByClassName("active");
+        if (collection.length !== 1) throw "expected quirks matching";
+        const auxiliary = new Document();
+        auxiliary.appendChild(section);
+        if (collection.length !== 0 || main.firstChild !== null || auxiliary.defaultView !== null)
+            throw "moved subtree is in a standards-mode document";
+        const newChild = auxiliary.createElement("Added");
+        section.appendChild(newChild);
+        main.appendChild(section);
+        if (collection.length !== 1 || section.firstChild !== collection[0] ||
+            newChild.ownerDocument !== document || newChild.localName !== "Added")
+            throw "did not preserve the live tree across adoption";
+        newChild.appendChild(document.createTextNode("adopted text"));
+    "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    let document = scripts.document();
+    let tree = document.parsed().document();
+    let dump = tree.dump_tree(tree.root(), 65536).unwrap();
+    assert!(dump.contains("Added"), "{dump}");
+    assert!(dump.contains("adopted text"), "{dump}");
+}

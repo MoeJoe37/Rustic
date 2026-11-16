@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "0ed2ac8e0c63a10ce39754c465f534b59fe9aeef89f0328c8f5a92b081dde83d",
-  "percent": "31.11",
-  "verified_percent": "29.89",
-  "partial_percent": "1.22",
-  "completed": 69,
-  "in_progress": 5,
+  "source_fingerprint": "97a1c05d3116f38eff5c61871addf4f594338d87d2fa19ed4e885f4057becb6e",
+  "percent": "31.21",
+  "verified_percent": "30.52",
+  "partial_percent": "0.69",
+  "completed": 70,
+  "in_progress": 4,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -55,11 +55,11 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 3,
+      "completed": 4,
       "total": 12,
-      "percent": "32.25",
-      "verified_percent": "22.42",
-      "partial_percent": "9.83"
+      "percent": "34.22",
+      "verified_percent": "34.22",
+      "partial_percent": "0.00"
     },
     {
       "id": "M6",
@@ -4372,181 +4372,190 @@
           "label": "Window/Document/Element bindings and identity",
           "size": 5,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Live document, node traversal and child mutation with joint safe-point collection",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/host.rs",
-                  "marker": "fn collect_at_safe_point"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page.rs",
-                  "marker": "pub fn install"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn automatic_collection_preserves_attached_wrappers_and_sweeps_detached_cycles"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn document_wrappers_use_the_live_dom_across_script_and_render_turns"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/host.rs",
+              "marker": "fn collect_at_safe_point"
             },
             {
-              "label": "Node factories, specialized node prototypes, character-data operations and element attributes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/creation.rs",
-                  "marker": "fn install_factories"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-dom/src/document/character_data.rs",
-                  "marker": "pub fn split_text_with_preflight"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn factories_create_live_nodes_with_specialized_prototypes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn character_data_uses_utf16_and_reenters_before_tree_mutation"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn attribute_calls_preserve_namespaces_and_finish_coercion_before_editing"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn document_script_factories_change_the_rendered_tree"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page.rs",
+              "marker": "pub fn install"
             },
             {
-              "label": "Additional document construction, namespace-aware factories and cross-document operations",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn automatic_collection_preserves_attached_wrappers_and_sweeps_detached_cycles"
             },
             {
-              "label": "Window interface and browsing realm integration",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/window.rs",
-                  "marker": "pub(super) fn install"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/host.rs",
-                  "marker": "pub fn install_window_proxy"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn page_window_keeps_a_distinct_global_this_and_the_live_document"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn window_proxy_forwards_properties_and_enforces_its_own_descriptor_rules"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn window_identity_persists_across_document_turns"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn document_wrappers_use_the_live_dom_across_script_and_render_turns"
             },
             {
-              "label": "Basic selectors and static and live NodeList bindings",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/dom.rs",
-                  "marker": "pub struct ScopedSelector"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/collections.rs",
-                  "marker": "fn child_nodes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn page_selectors_keep_scope_order_and_use_live_tree_after_coercion"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn node_lists_distinguish_static_membership_and_live_children_through_gc"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn selector_limits_stop_native_walks_instead_of_returning_partial_lists"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn document_selectors_follow_parser_quirks_mode"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/creation.rs",
+              "marker": "fn install_factories"
             },
             {
-              "label": "Live HTMLCollection bindings and named properties",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/html_collections.rs",
-                  "marker": "pub(super) fn install"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-js/src/runtime/host_indexed.rs",
-                  "marker": "fn supported_name_is_visible"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn html_collection_children_live_names_and_descriptor_visibility"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn html_collection_descendant_filters_preserve_scope_namespaces_and_liveness"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn html_collection_named_property_allows_proxy_visibility_traps_to_mutate_the_dom"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn document_selectors_follow_parser_quirks_mode"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/character_data.rs",
+              "marker": "pub fn split_text_with_preflight"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn factories_create_live_nodes_with_specialized_prototypes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn character_data_uses_utf16_and_reenters_before_tree_mutation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn attribute_calls_preserve_namespaces_and_finish_coercion_before_editing"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn document_script_factories_change_the_rendered_tree"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/window.rs",
+              "marker": "pub(super) fn install"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/host.rs",
+              "marker": "pub fn install_window_proxy"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn page_window_keeps_a_distinct_global_this_and_the_live_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn window_proxy_forwards_properties_and_enforces_its_own_descriptor_rules"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn window_identity_persists_across_document_turns"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/dom.rs",
+              "marker": "pub struct ScopedSelector"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/collections.rs",
+              "marker": "fn child_nodes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn page_selectors_keep_scope_order_and_use_live_tree_after_coercion"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn node_lists_distinguish_static_membership_and_live_children_through_gc"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn selector_limits_stop_native_walks_instead_of_returning_partial_lists"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn document_selectors_follow_parser_quirks_mode"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/html_collections.rs",
+              "marker": "pub(super) fn install"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/host_indexed.rs",
+              "marker": "fn supported_name_is_visible"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn html_collection_children_live_names_and_descriptor_visibility"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn html_collection_descendant_filters_preserve_scope_namespaces_and_liveness"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn html_collection_named_property_allows_proxy_visibility_traps_to_mutate_the_dom"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn document_selectors_follow_parser_quirks_mode"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/documents.rs",
+              "marker": "fn register"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/creation.rs",
+              "marker": "fn create_element_ns"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/adoption.rs",
+              "marker": "pub fn insert_from_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn detached_document_factories_keep_format_and_namespace_rules"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn cross_document_moves_preserve_wrappers_and_revalidate_after_coercion"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn auxiliary_documents_are_collected_when_their_last_wrapper_dies"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn foreign_fragment_insertion_uses_only_the_nodes_that_move"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/adoption.rs",
+              "marker": "fn rejected_cross_document_forest_preserves_tree_and_quota_accounting"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn detached_document_moves_reach_the_rendered_page_and_change_live_quirks_matching"
             }
           ],
-          "credit": "83.33",
+          "credit": "100.00",
           "engine_share": "0.62"
         },
         {
@@ -4692,13 +4701,13 @@
         }
       ],
       "points": 40,
-      "completed": 2,
-      "in_progress": 1,
+      "completed": 3,
+      "in_progress": 0,
       "total": 10,
-      "contribution": "1.52",
-      "percent": "30.41",
-      "verified_percent": "20.00",
-      "partial_percent": "10.41"
+      "contribution": "1.62",
+      "percent": "32.50",
+      "verified_percent": "32.50",
+      "partial_percent": "0.00"
     },
     {
       "id": "media",

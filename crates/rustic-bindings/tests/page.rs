@@ -722,3 +722,223 @@ fn window_proxy_forwards_properties_and_enforces_its_own_descriptor_rules() {
         })();
     "#).unwrap(), Value::TRUE);
 }
+
+#[test]
+fn detached_document_factories_keep_format_and_namespace_rules() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(agent.evaluate(r#"
+        (() => {
+            const empty = new Document();
+            const api = document.implementation;
+            if (!(empty instanceof Document) || empty instanceof XMLDocument ||
+                empty.contentType !== "application/xml" || empty.documentElement !== null ||
+                empty.defaultView !== null || document.defaultView !== window ||
+                api !== document.implementation || !(api instanceof DOMImplementation) ||
+                empty.implementation === api || !api.hasFeature())
+                throw "factory brands or document identity";
+            const doctype = api.createDocumentType("kite", "pub", "sys");
+            if (doctype.ownerDocument !== document) throw "initial doctype owner";
+            const xml = api.createDocument("urn:kite", "k:Kite", doctype);
+            if (!(xml instanceof XMLDocument) || xml.contentType !== "application/xml" ||
+                xml.documentElement.localName !== "Kite" || xml.documentElement.prefix !== "k" ||
+                xml.documentElement.tagName !== "k:Kite" ||
+                xml.documentElement.namespaceURI !== "urn:kite" || xml.doctype !== doctype ||
+                xml.firstChild !== doctype || doctype.ownerDocument !== xml ||
+                doctype.publicId !== "pub" || doctype.systemId !== "sys" ||
+                xml.createElement("Mixed").localName !== "Mixed" ||
+                xml.createElement("Mixed").namespaceURI !== null ||
+                xml.createCDATASection("\ud800").data !== "\ud800")
+                throw "XML document or namespace";
+            const htmlNS = "http://www.w3.org/1999/xhtml";
+            const xhtml = api.createDocument(htmlNS, "html");
+            const htmlElement = xhtml.createElement("Mixed");
+            xhtml.documentElement.appendChild(htmlElement);
+            htmlElement.setAttribute("Case", "yes");
+            if (xhtml.contentType !== "application/xhtml+xml" ||
+                htmlElement.namespaceURI !== htmlNS || htmlElement.tagName !== "Mixed" ||
+                htmlElement.getAttribute("case") !== null ||
+                xhtml.getElementsByTagName("Mixed")[0] !== htmlElement ||
+                xhtml.getElementsByTagName("MIXED").length !== 0)
+                throw "XHTML is case-sensitive";
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = api.createDocument(svgNS, "svg");
+            const svgNode = document.createElementNS(svgNS, "svg:linearGradient");
+            if (svg.contentType !== "image/svg+xml" ||
+                svgNode.localName !== "linearGradient" || svgNode.tagName !== "svg:linearGradient")
+                throw "SVG factory";
+            svgNode.setAttributeNS("urn:paint", "old:Paint", "\ud800");
+            svgNode.setAttributeNS("urn:paint", "new:Paint", "blue");
+            if (!svgNode.hasAttributeNS("urn:paint", "Paint") ||
+                svgNode.getAttributeNS("urn:paint", "Paint") !== "blue" ||
+                svgNode.getAttribute("old:Paint") !== "blue" ||
+                svgNode.getAttribute("new:Paint") !== null)
+                throw "expanded name update";
+            svgNode.removeAttributeNS("urn:paint", "Paint");
+            if (svgNode.hasAttributeNS("urn:paint", "Paint")) throw "expanded name removal";
+            const html = api.createHTMLDocument("ship \ud800");
+            if (html.contentType !== "text/html" || html.defaultView !== null ||
+                html.doctype.name !== "html" || html.documentElement.tagName !== "HTML" ||
+                html.querySelector("head > title").firstChild.data !== "ship \ud800" ||
+                html.querySelector("body").tagName !== "BODY")
+                throw "HTML skeleton";
+            for (const [call, expected] of [
+                [() => document.createElementNS(null, "p:name"), "NamespaceError"],
+                [() => document.createElementNS("urn:x", "xml:name"), "NamespaceError"],
+                [() => document.createElementNS("http://www.w3.org/2000/xmlns/", "name"), "NamespaceError"],
+                [() => xml.createElementNS("urn:x", ":bad"), "InvalidCharacterError"],
+                [() => xml.createCDATASection("]]>"), "InvalidCharacterError"],
+                [() => api.createDocumentType("bad name", "", ""), "InvalidCharacterError"],
+                [() => api.createDocument("urn:x", "root", {}), "TypeError"]
+            ]) {
+                let found;
+                try { call(); } catch (error) { found = error.name; }
+                if (found !== expected) throw "unexpected factory exception";
+            }
+            return true;
+        })();
+    "#).unwrap(), Value::TRUE);
+}
+
+#[test]
+fn cross_document_moves_preserve_wrappers_and_revalidate_after_coercion() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(agent.evaluate(r#"
+        (() => {
+            const a = document.implementation.createDocument(null, "a");
+            const b = document.implementation.createDocument(null, "b");
+            const root = a.documentElement;
+            const child = a.createElement("Child");
+            const text = a.createTextNode("ab");
+            root.appendChild(child);
+            child.appendChild(text);
+            const children = child.children;
+            const nodes = child.childNodes;
+            child.saved = {marker: 7};
+            const shallow = b.importNode(child);
+            const deep = b.importNode(child, true);
+            const dictionary = b.importNode(child, {selfOnly: false});
+            const clone = child.cloneNode(true);
+            if (shallow.firstChild !== null || deep.firstChild.data !== "ab" ||
+                dictionary.firstChild.data !== "ab" || clone.firstChild.data !== "ab" ||
+                deep.firstChild === text || deep.ownerDocument !== b || clone.ownerDocument !== a ||
+                deep.saved !== undefined || child.parentNode !== root)
+                throw "cross document import and clone";
+            let rejected;
+            try { b.appendChild(child); } catch (error) { rejected = error.name; }
+            if (rejected !== "HierarchyRequestError" || child.parentNode !== root ||
+                text.ownerDocument !== a || root.firstChild !== child)
+                throw "failed append changed source tree";
+            const split = text.splitText({valueOf() {
+                if (b.adoptNode(child) !== child) throw "adopt returns the same wrapper";
+                return 1;
+            }});
+            if (root.firstChild !== null || child.parentNode !== null ||
+                child.ownerDocument !== b || text.ownerDocument !== b || split.ownerDocument !== b ||
+                child.children !== children || child.childNodes !== nodes ||
+                nodes.length !== 2 || nodes[1] !== split || child.saved.marker !== 7 ||
+                text.data !== "a" || split.data !== "b")
+                throw "adoption and reentrant mutation";
+            b.documentElement.appendChild(child);
+            const sentinel = b.createElement("sentinel");
+            child.appendChild(sentinel);
+            const fragment = a.createDocumentFragment();
+            const first = a.createElement("first");
+            const second = a.createElement("second");
+            fragment.appendChild(first);
+            fragment.appendChild(second);
+            const fragmentChildren = fragment.children;
+            if (child.insertBefore(fragment, sentinel) !== fragment || fragment.ownerDocument !== a ||
+                fragment.children !== fragmentChildren || fragmentChildren.length !== 0 ||
+                children.length !== 3 || children[0] !== first || children[1] !== second ||
+                children[2] !== sentinel ||
+                first.ownerDocument !== b || second.parentNode !== child)
+                throw "foreign fragment contents";
+            const clonedDocument = b.cloneNode(true);
+            if (clonedDocument === b || clonedDocument.contentType !== b.contentType ||
+                clonedDocument.documentElement.firstChild.localName !== "Child" ||
+                clonedDocument.documentElement.ownerDocument !== clonedDocument ||
+                b.cloneNode().documentElement !== null)
+                throw "document cloning";
+            try { b.removeChild(a.documentElement); throw "removed foreign node"; }
+            catch (error) { if (error.name !== "NotFoundError") throw error; }
+            try { b.importNode(a); throw "imported a Document"; }
+            catch (error) { if (error.name !== "NotSupportedError") throw error; }
+            try { b.adoptNode(a); throw "adopted a Document"; }
+            catch (error) { if (error.name !== "NotSupportedError") throw error; }
+            try { b.appendChild(a.implementation); throw "implementation accepted as a Node"; }
+            catch (error) { if (error.name !== "TypeError") throw error; }
+            return true;
+        })();
+    "#).unwrap(), Value::TRUE);
+}
+
+#[test]
+fn auxiliary_documents_are_collected_when_their_last_wrapper_dies() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        var kept = [];
+        var aNode, anImplementation;
+        (() => {
+            const doc = document.implementation.createDocument(null, "tree");
+            doc.marker = 4;
+            aNode = doc.createElement("detached");
+            anImplementation = doc.implementation;
+        })();
+        (() => {
+            if (aNode.ownerDocument.marker !== 4 ||
+                aNode.ownerDocument.implementation !== anImplementation)
+                throw "lost the owning document of a detached node";
+            aNode = null;
+            if (anImplementation.createDocumentType("root", "", "").ownerDocument.marker !== 4)
+                throw "lost the owning document of DOMImplementation";
+            anImplementation = null;
+        })();
+        for (let i = 0; i < 16; i++) kept.push(new Document());
+        let errorName;
+        try { kept.push(new Document()); } catch (error) { errorName = error.name; }
+        errorName === "QuotaExceededError" && kept.length === 16;
+    "#
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        kept = null;
+        for (let i = 0; i < 64; i++) {
+            (() => {
+                const fresh = new Document();
+                fresh.cycle = fresh.implementation;
+                fresh.implementation.cycle = fresh;
+            })();
+        }
+        new Document().defaultView === null && document.defaultView === window;
+    "#
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+}

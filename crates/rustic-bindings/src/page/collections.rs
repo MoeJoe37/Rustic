@@ -134,11 +134,8 @@ impl ChildIndex {
         Ok(())
     }
 
-    pub(super) fn discard_collected(&mut self, document: &Document) {
-        if self
-            .key
-            .is_some_and(|(root, _)| document.node(root).is_err())
-        {
+    pub(super) fn discard_collected(&mut self, is_live: impl FnOnce(NodeId) -> bool) {
+        if self.key.is_some_and(|(root, _)| !is_live(root)) {
             *self = Self::default();
         }
     }
@@ -163,7 +160,7 @@ pub(super) fn cached_children(
 ) -> JsResult<Value> {
     with_page(agent, |agent, page| {
         read_node(agent, receiver, |agent, wrappers, document, id, _| {
-            let key = (id, agent.current_realm(), kind);
+            let key = (receiver.as_object().expect("checked Node wrapper"), kind);
             let Ok(mut cache) = page.child_lists.try_borrow_mut() else {
                 return agent.type_error("DOM collections are busy");
             };

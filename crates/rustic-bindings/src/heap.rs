@@ -1,6 +1,6 @@
 //! Wrapper identity and joint collection across one agent's documents.
 
-use std::collections::{HashMap, HashSet, TryReserveError};
+use std::collections::{HashMap, TryReserveError};
 use std::fmt;
 
 use rustic_base::{DocumentId, IdSequence, NodeId};
@@ -60,9 +60,16 @@ pub struct DomGcStats {
     pub edges_dropped: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum WrapperKind {
+    Node,
+    Implementation,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Wrapper {
     realm: RealmId,
+    kind: WrapperKind,
     object: ObjectId,
     data: u64,
 }
@@ -74,8 +81,10 @@ struct NodeBindings {
 }
 
 impl NodeBindings {
-    fn wrapper(&self, realm: RealmId) -> Option<&Wrapper> {
-        self.wrappers.iter().find(|wrapper| wrapper.realm == realm)
+    fn wrapper(&self, realm: RealmId, kind: WrapperKind) -> Option<&Wrapper> {
+        self.wrappers
+            .iter()
+            .find(|wrapper| wrapper.realm == realm && wrapper.kind == kind)
     }
 }
 
@@ -86,18 +95,18 @@ impl NodeBindings {
 /// when registering node-held edges.
 #[derive(Debug)]
 pub struct DomHeap {
-    documents: HashSet<DocumentId>,
+    documents: HashMap<DocumentId, bool>,
     agent: Option<AgentId>,
     bindings: HashMap<NodeId, NodeBindings>,
     // Embedder data keys are never reused, even across coordinators.
-    nodes: HashMap<u64, (NodeId, ObjectId)>,
+    nodes: HashMap<u64, (NodeId, ObjectId, WrapperKind)>,
 }
 
 impl DomHeap {
     /// Start with one document registered.
     pub fn new(document: &Document) -> Self {
         Self {
-            documents: HashSet::from([document.id()]),
+            documents: HashMap::from([(document.id(), true)]),
             agent: None,
             bindings: HashMap::new(),
             nodes: HashMap::new(),
@@ -107,15 +116,42 @@ impl DomHeap {
     /// Register a document in the agent's collection domain. Returns whether
     /// the document was newly registered.
     pub fn attach_document(&mut self, document: &Document) -> Result<bool, DomGcError> {
-        if self.documents.contains(&document.id()) {
+        self.register_document(document, true)
+    }
+
+    pub(crate) fn register_document(
+        &mut self,
+        document: &Document,
+        rooted: bool,
+    ) -> Result<bool, DomGcError> {
+        if self.documents.contains_key(&document.id()) {
             return Ok(false);
         }
         self.documents.try_reserve(1)?;
-        Ok(self.documents.insert(document.id()))
+        self.documents.insert(document.id(), rooted);
+        Ok(true)
+    }
+
+    pub(crate) fn has_document(&self, id: DocumentId) -> bool {
+        self.documents.contains_key(&id)
+    }
+
+    pub(crate) fn discard_document(&mut self, id: DocumentId) {
+        debug_assert_eq!(self.documents.get(&id), Some(&false));
+        self.documents.remove(&id);
+        self.bindings.retain(|node, bindings| {
+            if node.document() != id {
+                return true;
+            }
+            for wrapper in &bindings.wrappers {
+                self.nodes.remove(&wrapper.data);
+            }
+            false
+        });
     }
 
     fn check_document(&self, document: &Document) -> Result<(), DomGcError> {
-        if !self.documents.contains(&document.id()) {
+        if !self.has_document(document.id()) {
             return Err(DomGcError::WrongDocument);
         }
         Ok(())
@@ -150,11 +186,26 @@ impl DomHeap {
         node: NodeId,
         prototype: ObjectId,
     ) -> Result<ObjectId, DomGcError> {
+        self.wrap_with_kind(agent, document, node, prototype, WrapperKind::Node)
+    }
+
+    pub(crate) fn wrap_with_kind(
+        &mut self,
+        agent: &mut Agent,
+        document: &Document,
+        node: NodeId,
+        prototype: ObjectId,
+        kind: WrapperKind,
+    ) -> Result<ObjectId, DomGcError> {
         self.check_document(document)?;
         document.node(node)?;
         self.check_agent(agent)?;
         let realm = agent.current_realm();
-        if let Some(wrapper) = self.bindings.get(&node).and_then(|b| b.wrapper(realm)) {
+        if let Some(wrapper) = self
+            .bindings
+            .get(&node)
+            .and_then(|b| b.wrapper(realm, kind))
+        {
             if agent.host_data(wrapper.object) == Some(wrapper.data) {
                 return Ok(wrapper.object);
             }
@@ -166,7 +217,10 @@ impl DomHeap {
         }
         let mut fresh = NodeBindings::default();
         let bindings = self.bindings.get_mut(&node).unwrap_or(&mut fresh);
-        let old = bindings.wrappers.iter().position(|w| w.realm == realm);
+        let old = bindings
+            .wrappers
+            .iter()
+            .position(|w| w.realm == realm && w.kind == kind);
         if old.is_none() {
             bindings.wrappers.try_reserve(1)?;
         }
@@ -179,6 +233,7 @@ impl DomHeap {
             .map_err(|_| DomError::AllocationFailed)?;
         let wrapper = Wrapper {
             realm,
+            kind,
             object,
             data,
         };
@@ -191,18 +246,28 @@ impl DomHeap {
         if !fresh.wrappers.is_empty() {
             self.bindings.insert(node, fresh);
         }
-        self.nodes.insert(data, (node, object));
+        self.nodes.insert(data, (node, object, kind));
         self.agent = Some(agent.id());
         Ok(object)
     }
 
     /// The node a live wrapper stands for in `document`.
     pub fn node_of(&self, agent: &Agent, document: &Document, wrapper: ObjectId) -> Option<NodeId> {
+        let node = self.identity(agent, wrapper, WrapperKind::Node)?;
+        document.node(node).is_ok().then_some(node)
+    }
+
+    pub(crate) fn identity(
+        &self,
+        agent: &Agent,
+        wrapper: ObjectId,
+        kind: WrapperKind,
+    ) -> Option<NodeId> {
         if self.agent != Some(agent.id()) {
             return None;
         }
-        let &(node, object) = self.nodes.get(&agent.host_data(wrapper)?)?;
-        (object == wrapper && document.node(node).is_ok()).then_some(node)
+        let &(node, object, role) = self.nodes.get(&agent.host_data(wrapper)?)?;
+        (object == wrapper && role == kind).then_some(node)
     }
 
     /// The cached wrapper in the initial realm, without creating one.
@@ -212,7 +277,10 @@ impl DomHeap {
 
     /// The cached wrapper in `realm`, without creating one.
     pub fn existing_wrapper_in_realm(&self, node: NodeId, realm: RealmId) -> Option<ObjectId> {
-        self.bindings.get(&node)?.wrapper(realm).map(|w| w.object)
+        self.bindings
+            .get(&node)?
+            .wrapper(realm, WrapperKind::Node)
+            .map(|w| w.object)
     }
 
     /// Move a node between registered documents and preserve its subtree's
@@ -224,13 +292,40 @@ impl DomHeap {
         source: &mut Document,
         node: NodeId,
     ) -> Result<Adopted, DomGcError> {
+        self.transfer(target, source, node, None)
+    }
+
+    pub(crate) fn insert_adopted(
+        &mut self,
+        target: &mut Document,
+        source: &mut Document,
+        node: NodeId,
+        parent: NodeId,
+        before: Option<NodeId>,
+    ) -> Result<Adopted, DomGcError> {
+        self.transfer(target, source, node, Some((parent, before)))
+    }
+
+    fn transfer(
+        &mut self,
+        target: &mut Document,
+        source: &mut Document,
+        node: NodeId,
+        insert: Option<(NodeId, Option<NodeId>)>,
+    ) -> Result<Adopted, DomGcError> {
         self.check_document(source)?;
         self.check_document(target)?;
-        let adopted = target.adopt_node_with_preflight(source, node, |count| {
+        let reserve = |count: usize| {
             self.bindings
                 .try_reserve(count.min(self.bindings.len()))
                 .map_err(|_| DomError::AllocationFailed)
-        })?;
+        };
+        let adopted = match insert {
+            Some((parent, before)) => {
+                target.insert_from_document(source, node, parent, before, reserve)
+            }
+            None => target.adopt_node_with_preflight(source, node, reserve),
+        }?;
         for &(old, new) in &adopted.ids {
             if let Some(bindings) = self.bindings.remove(&old) {
                 for wrapper in &bindings.wrappers {
@@ -346,13 +441,19 @@ impl DomHeap {
         }
         let wrappers_freed = self.prune_wrappers(agent);
         let mut nodes_destroyed = 0;
-        for entry in marked.values_mut() {
-            nodes_destroyed += entry.document.sweep_unmarked_trees(&entry.marks)?;
+        for (&id, entry) in &mut marked {
+            if entry.marks.is_marked(entry.document.root()) {
+                nodes_destroyed += entry.document.sweep_unmarked_trees(&entry.marks)?;
+            } else {
+                self.documents.remove(&id);
+                nodes_destroyed += entry.document.node_count();
+            }
         }
 
         let mut edges_dropped = 0;
         self.bindings.retain(|node, bindings| {
-            let live = marked[&node.document()].document.node(*node).is_ok();
+            let live = self.documents.contains_key(&node.document())
+                && marked[&node.document()].document.node(*node).is_ok();
             if !live {
                 edges_dropped += bindings.edges.len();
                 for wrapper in &bindings.wrappers {
@@ -397,7 +498,10 @@ struct Tracer<'a, 'doc> {
 
 impl HostTracer for Tracer<'_, '_> {
     fn roots(&mut self, sink: &mut dyn FnMut(Value)) {
-        for entry in self.documents.values_mut() {
+        for (&id, entry) in &mut *self.documents {
+            if !self.heap.documents[&id] {
+                continue;
+            }
             let root = entry.document.root();
             if let Err(error) = mark(self.heap, entry, root, sink) {
                 self.error.get_or_insert(error);
@@ -408,13 +512,16 @@ impl HostTracer for Tracer<'_, '_> {
     fn trace(&mut self, _: u64, _: &mut dyn FnMut(Value)) {}
 
     fn trace_object(&mut self, object: ObjectId, data: u64, sink: &mut dyn FnMut(Value)) {
-        if let Some(&(node, wrapper)) = self.heap.nodes.get(&data) {
+        if let Some(&(node, wrapper, _)) = self.heap.nodes.get(&data) {
             let entry = self
                 .documents
                 .get_mut(&node.document())
                 .expect("registered document");
             if object == wrapper && entry.document.node(node).is_ok() {
-                if let Err(error) = mark(self.heap, entry, node, sink) {
+                let root = entry.document.root();
+                if let Err(error) = mark(self.heap, entry, root, sink)
+                    .and_then(|()| mark(self.heap, entry, node, sink))
+                {
                     self.error.get_or_insert(error);
                 }
             }

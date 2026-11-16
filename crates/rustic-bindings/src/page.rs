@@ -6,18 +6,20 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use rustic_dom::{Document, DomError, Node, NodeId, NodeKind};
+use rustic_dom::{Document, DocumentFormat, DocumentId, DomError, Node, NodeId, NodeKind};
 use rustic_js::runtime::{
     Agent, ExecutionHost, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor,
-    PropertyKey, RealmId, Roots, Value,
+    PropertyKey, Roots, Value,
 };
 
+use crate::heap::WrapperKind;
 use crate::{DomGcError, DomHeap, dom_exception};
 
 mod attributes;
 mod character_data;
 mod collections;
 mod creation;
+mod documents;
 mod html_collections;
 mod selectors;
 mod window;
@@ -35,37 +37,130 @@ pub trait PageTree: Debug {
 }
 
 #[derive(Debug)]
+struct AuxiliaryDocument {
+    tree: RefCell<Document>,
+    quirks: bool,
+}
+
+#[derive(Debug)]
 struct Page {
     tree: Rc<dyn PageTree>,
+    main: DocumentId,
+    additional: RefCell<HashMap<DocumentId, AuxiliaryDocument>>,
     root: Value,
     window: Value,
     wrappers: RefCell<DomHeap>,
-    child_lists: RefCell<HashMap<(NodeId, RealmId, collections::ChildKind), ObjectId>>,
+    child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
 }
 
 impl ExecutionHost for Page {
     fn collect(&self, agent: &mut Agent) -> Result<(), OutOfMemory> {
         let mut document = self.tree.write().ok_or(OutOfMemory)?;
-        self.wrappers
-            .try_borrow_mut()
-            .map_err(|_| OutOfMemory)?
-            .collect(agent, &mut document, Roots::default())
+        let mut wrappers = self.wrappers.try_borrow_mut().map_err(|_| OutOfMemory)?;
+        let mut additional = self.additional.try_borrow_mut().map_err(|_| OutOfMemory)?;
+        let mut trees = Vec::new();
+        trees
+            .try_reserve_exact(additional.len().saturating_add(1))
             .map_err(|_| OutOfMemory)?;
+        trees.push(&mut *document);
+        for cell in additional.values_mut() {
+            trees.push(cell.tree.get_mut());
+        }
+        wrappers
+            .collect_documents(agent, &mut trees, Roots::default())
+            .map_err(|_| OutOfMemory)?;
+        additional.retain(|&id, _| wrappers.has_document(id));
         self.child_lists
             .try_borrow_mut()
             .map_err(|_| OutOfMemory)?
-            .retain(|(node, _, _), _| document.node(*node).is_ok());
+            .retain(|(object, _), _| {
+                wrappers
+                    .identity(agent, *object, WrapperKind::Node)
+                    .is_some()
+            });
         self.child_index
             .try_borrow_mut()
             .map_err(|_| OutOfMemory)?
-            .discard_collected(&document);
+            .discard_collected(|id| {
+                if id.document() == self.main {
+                    document.node(id).is_ok()
+                } else {
+                    additional
+                        .get_mut(&id.document())
+                        .is_some_and(|cell| cell.tree.get_mut().node(id).is_ok())
+                }
+            });
         Ok(())
     }
 
     fn as_any(&self) -> &dyn Any {
         self
     }
+}
+
+impl Page {
+    fn read<T>(
+        &self,
+        agent: &mut Agent,
+        id: DocumentId,
+        operation: impl FnOnce(&mut Agent, &Document) -> JsResult<T>,
+    ) -> JsResult<T> {
+        if id == self.main {
+            let Some(document) = self.tree.read() else {
+                return agent.type_error("document is busy");
+            };
+            return operation(agent, &document);
+        }
+        let Ok(documents) = self.additional.try_borrow() else {
+            return agent.type_error("document registry is busy");
+        };
+        let Some(cell) = documents.get(&id) else {
+            return agent.type_error("document is outside this page");
+        };
+        let Ok(document) = cell.tree.try_borrow() else {
+            return agent.type_error("document is busy");
+        };
+        operation(agent, &document)
+    }
+
+    fn write<T>(
+        &self,
+        agent: &mut Agent,
+        id: DocumentId,
+        operation: impl FnOnce(&mut Agent, &mut Document) -> JsResult<T>,
+    ) -> JsResult<T> {
+        if id == self.main {
+            let Some(mut document) = self.tree.write() else {
+                return agent.type_error("document is busy");
+            };
+            return operation(agent, &mut document);
+        }
+        let Ok(documents) = self.additional.try_borrow() else {
+            return agent.type_error("document registry is busy");
+        };
+        let Some(cell) = documents.get(&id) else {
+            return agent.type_error("document is outside this page");
+        };
+        let Ok(mut document) = cell.tree.try_borrow_mut() else {
+            return agent.type_error("document is busy");
+        };
+        operation(agent, &mut document)
+    }
+}
+
+fn quirks_mode(agent: &mut Agent, node: NodeId) -> JsResult<bool> {
+    with_page(agent, |agent, page| {
+        if node.document() == page.main {
+            return Ok(page.tree.quirks_mode());
+        }
+        let Ok(documents) = page.additional.try_borrow() else {
+            return agent.type_error("document registry is busy");
+        };
+        Ok(documents
+            .get(&node.document())
+            .is_some_and(|document| document.quirks))
+    })
 }
 
 /// Attach joint collection and install the root of a host's document in the
@@ -94,12 +189,14 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
             ("childNodes", "get childNodes", collections::child_nodes),
         ],
         |agent, prototype| {
-            for (name, behavior) in [
-                ("appendChild", append_child as NativeFn),
-                ("removeChild", remove_child),
+            for (name, behavior, length) in [
+                ("appendChild", append_child as NativeFn, 1),
+                ("insertBefore", insert_before, 2),
+                ("removeChild", remove_child, 1),
+                ("cloneNode", documents::clone_node, 0),
             ] {
                 let key = agent.heap.key(name)?;
-                agent.define_method(prototype, key, behavior, name, 1)?;
+                agent.define_method(prototype, key, behavior, name, length)?;
             }
             Ok(())
         },
@@ -108,11 +205,18 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         agent,
         "Document",
         Some("Node"),
-        illegal_constructor,
+        documents::construct_document,
         0,
         &[
             ("documentElement", "get documentElement", document_element),
             ("defaultView", "get defaultView", window::default_view),
+            (
+                "implementation",
+                "get implementation",
+                documents::implementation,
+            ),
+            ("contentType", "get contentType", documents::content_type),
+            ("doctype", "get doctype", documents::doctype),
             (
                 "children",
                 "get children",
@@ -121,11 +225,13 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         ],
         |agent, proto| {
             creation::install_factories(agent, proto)?;
+            documents::install_methods(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
             selectors::install_non_element_parent(agent, proto)?;
             html_collections::install_lookup::<true>(agent, proto)
         },
     )?;
+    documents::install(agent)?;
     install_interface(
         agent,
         "Element",
@@ -134,6 +240,9 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         0,
         &[
             ("localName", "get localName", local_name),
+            ("prefix", "get prefix", creation::prefix),
+            ("namespaceURI", "get namespaceURI", creation::namespace_uri),
+            ("tagName", "get tagName", creation::tag_name),
             (
                 "children",
                 "get children",
@@ -190,10 +299,13 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
 
     let mut wrappers = DomHeap::new(&document);
     let root = wrap(&mut wrappers, agent, &document, document.root())?;
+    let main = document.id();
     drop(document);
     let window = window::install(agent)?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
+        main,
+        additional: RefCell::new(HashMap::new()),
         root,
         window,
         wrappers: RefCell::new(wrappers),
@@ -271,7 +383,10 @@ fn wrap(
         .node(id)
         .map_err(|error| dom_exception::from_dom_error(agent, error))?;
     let interface = match node.kind() {
-        NodeKind::Document => "Document",
+        NodeKind::Document => match document.format() {
+            DocumentFormat::Html | DocumentFormat::Xml => "Document",
+            _ => "XMLDocument",
+        },
         NodeKind::Element(_) => "Element",
         NodeKind::Text(_) => "Text",
         NodeKind::Comment(_) => "Comment",
@@ -317,18 +432,18 @@ fn with_page<T>(
     operation(agent, page)
 }
 
-fn node_id(
+fn identity(
     agent: &mut Agent,
     wrappers: &DomHeap,
-    document: &Document,
     value: Value,
+    kind: WrapperKind,
 ) -> JsResult<NodeId> {
     match value
         .as_object()
-        .and_then(|object| wrappers.node_of(agent, document, object))
+        .and_then(|object| wrappers.identity(agent, object, kind))
     {
         Some(id) => Ok(id),
-        None => agent.type_error("expected a live DOM Node"),
+        None => agent.type_error("invalid DOM receiver or node argument"),
     }
 }
 
@@ -338,54 +453,76 @@ fn require_receiver(
     brand: fn(&NodeKind) -> bool,
     interface: &str,
 ) -> JsResult<NodeId> {
-    with_page(agent, |agent, page| {
-        let Some(document) = page.tree.read() else {
-            return agent.type_error("document is busy");
-        };
-        let Ok(wrappers) = page.wrappers.try_borrow() else {
-            return agent.type_error("DOM bindings are busy");
-        };
-        let id = node_id(agent, &wrappers, &document, receiver)?;
-        if !document.node(id).is_ok_and(|node| brand(node.kind())) {
-            return agent.type_error(interface);
+    read_node(agent, receiver, |agent, _, _, id, node| {
+        if brand(node.kind()) {
+            Ok(id)
+        } else {
+            agent.type_error(interface)
         }
-        Ok(id)
     })
 }
 
 fn with_mut_tree<T>(
     agent: &mut Agent,
-    operation: impl FnOnce(&mut Agent, &mut Document, &mut DomHeap) -> JsResult<T>,
+    receiver: Value,
+    operation: impl FnOnce(&mut Agent, &mut Document, &mut DomHeap, NodeId) -> JsResult<T>,
 ) -> JsResult<T> {
     with_page(agent, |agent, page| {
-        let Some(mut document) = page.tree.write() else {
-            return agent.type_error("document is busy");
-        };
         let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
             return agent.type_error("DOM bindings are busy");
         };
-        operation(agent, &mut document, &mut wrappers)
+        let id = identity(agent, &wrappers, receiver, WrapperKind::Node)?;
+        page.write(agent, id.document(), |agent, document| {
+            document
+                .node(id)
+                .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+            operation(agent, document, &mut wrappers, id)
+        })
     })
 }
 
 fn create_node(
     agent: &mut Agent,
+    receiver: Option<Value>,
     custom_prototype: Option<ObjectId>,
     create: impl FnOnce(&mut Document) -> Result<NodeId, DomError>,
 ) -> JsResult<Value> {
-    with_mut_tree(agent, |agent, document, wrappers| {
+    let create = |agent: &mut Agent, document: &mut Document, wrappers: &mut DomHeap| {
         let id = create(document).map_err(|error| dom_exception::from_dom_error(agent, error))?;
-        let result = match custom_prototype {
-            Some(proto) => wrap_using(wrappers, agent, document, id, proto),
-            None => wrap(wrappers, agent, document, id),
+        finish_creation(agent, document, wrappers, id, custom_prototype)
+    };
+    if let Some(receiver) = receiver {
+        return with_mut_tree(agent, receiver, |agent, document, wrappers, _| {
+            create(agent, document, wrappers)
+        });
+    }
+    with_page(agent, |agent, page| {
+        let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
+            return agent.type_error("DOM bindings are busy");
         };
-        if result.is_err() {
-            document
-                .destroy_subtree(id)
-                .expect("detached node from factory");
-        }
-        result
+        page.write(agent, page.main, |agent, document| {
+            create(agent, document, &mut wrappers)
+        })
     })
+}
+
+fn finish_creation(
+    agent: &mut Agent,
+    document: &mut Document,
+    wrappers: &mut DomHeap,
+    id: NodeId,
+    custom_prototype: Option<ObjectId>,
+) -> JsResult<Value> {
+    let result = match custom_prototype {
+        Some(proto) => wrap_using(wrappers, agent, document, id, proto),
+        None => wrap(wrappers, agent, document, id),
+    };
+    if result.is_err() {
+        document
+            .destroy_subtree(id)
+            .expect("detached node from factory");
+    }
+    result
 }
 
 fn required_arg(agent: &mut Agent, args: &[Value], at: usize) -> JsResult<Value> {
@@ -401,18 +538,17 @@ fn read_node<T>(
     read: impl FnOnce(&mut Agent, &mut DomHeap, &Document, NodeId, &Node) -> JsResult<T>,
 ) -> JsResult<T> {
     with_page(agent, |agent, page| {
-        let Some(document) = page.tree.read() else {
-            return agent.type_error("document is busy");
-        };
         let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
             return agent.type_error("DOM bindings are busy");
         };
-        let id = node_id(agent, &wrappers, &document, receiver)?;
-        let node = document
-            .node(id)
-            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-        // These operations never run script while the tree or cache is borrowed.
-        read(agent, &mut wrappers, &document, id, node)
+        let id = identity(agent, &wrappers, receiver, WrapperKind::Node)?;
+        page.read(agent, id.document(), |agent, document| {
+            let node = document
+                .node(id)
+                .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+            // These operations never run script while the tree or cache is borrowed.
+            read(agent, &mut wrappers, document, id, node)
+        })
     })
 }
 
@@ -491,44 +627,84 @@ fn local_name(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value
     })
 }
 
-fn edit_child(
+fn append_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
+    let value = required_arg(agent, args, 0)?;
+    insert_child(agent, receiver, value, Value::NULL)
+}
+
+fn insert_before(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
+    let value = required_arg(agent, args, 0)?;
+    let before = required_arg(agent, args, 1)?;
+    insert_child(agent, receiver, value, before)
+}
+
+fn insert_child(
     agent: &mut Agent,
     receiver: Value,
-    args: &[Value],
-    edit: impl FnOnce(&mut Document, NodeId, NodeId) -> Result<(), DomError>,
+    value: Value,
+    before: Value,
 ) -> JsResult<Value> {
-    with_page(agent, |agent, page| {
-        let Some(mut document) = page.tree.write() else {
-            return agent.type_error("document is busy");
+    with_mut_tree(agent, receiver, |agent, target, wrappers, parent| {
+        let child = identity(agent, wrappers, value, WrapperKind::Node)?;
+        let before = if before.is_nullish() {
+            None
+        } else {
+            let node = identity(agent, wrappers, before, WrapperKind::Node)?;
+            if node.document() != parent.document() {
+                return Err(dom_exception::from_dom_error(
+                    agent,
+                    DomError::InvalidReference,
+                ));
+            }
+            Some(node)
         };
-        let Ok(wrappers) = page.wrappers.try_borrow() else {
-            return agent.type_error("DOM bindings are busy");
-        };
-        let parent = node_id(agent, &wrappers, &document, receiver)?;
-        let value = args.first().copied().unwrap_or(Value::UNDEFINED);
-        let child = node_id(agent, &wrappers, &document, value)?;
-        edit(&mut document, parent, child)
-            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        if child.document() == parent.document() {
+            target
+                .insert_before(parent, child, before)
+                .map_err(|error| append_error(agent, error))?;
+        } else {
+            with_page(agent, |agent, page| {
+                page.write(agent, child.document(), |agent, source| {
+                    documents::charge_copy(agent, source, child, true, true)?;
+                    wrappers
+                        .insert_adopted(target, source, child, parent, before)
+                        .map_err(|error| match error {
+                            DomGcError::Dom(error) => append_error(agent, error),
+                            error => documents::binding_error(agent, error),
+                        })?;
+                    Ok(())
+                })
+            })?;
+        }
         Ok(value)
     })
 }
 
-fn append_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    edit_child(agent, receiver, args, |document, parent, child| {
-        document
-            .append_child(parent, child)
-            .map_err(|error| match error {
-                DomError::ProtectedRoot => DomError::InvalidHierarchy,
-                error => error,
-            })
-    })
+fn append_error(agent: &mut Agent, error: DomError) -> rustic_js::runtime::Abrupt {
+    dom_exception::from_dom_error(
+        agent,
+        match error {
+            DomError::ProtectedRoot => DomError::InvalidHierarchy,
+            error => error,
+        },
+    )
 }
 
 fn remove_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    edit_child(agent, receiver, args, |document, parent, child| {
-        if document.node(child)?.parent() != Some(parent) {
-            return Err(DomError::InvalidReference);
+    let value = required_arg(agent, args, 0)?;
+    with_mut_tree(agent, receiver, |agent, document, wrappers, parent| {
+        let child = identity(agent, wrappers, value, WrapperKind::Node)?;
+        if child.document() != parent.document()
+            || document.node(child).ok().and_then(Node::parent) != Some(parent)
+        {
+            return Err(dom_exception::from_dom_error(
+                agent,
+                DomError::InvalidReference,
+            ));
         }
-        document.detach(child)
+        document
+            .detach(child)
+            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        Ok(value)
     })
 }

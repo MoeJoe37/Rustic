@@ -8,7 +8,7 @@ use rustic_style::{ScopedSelector, SelectorQueryError, SelectorWork};
 use crate::dom_exception;
 use crate::webidl::to_usv_string;
 
-use super::{collections, read_node, require_receiver, required_arg, with_page, wrap};
+use super::{collections, quirks_mode, read_node, require_receiver, required_arg, wrap};
 
 const UNMETERED_HOST_ALLOWANCE: u64 = 1_000_000;
 
@@ -105,10 +105,10 @@ fn query<T>(
     let list = parsed
         .value
         .map_err(|_| exception(agent, "SyntaxError", "invalid selector"))?;
-    let quirks = with_page(agent, |_, page| Ok(page.tree.quirks_mode()))?;
     let limit = agent.step_budget();
     let work = SelectorWork::new(limit.unwrap_or(UNMETERED_HOST_ALLOWANCE), token.as_ref());
-    let result = read_node(agent, receiver, |_, _, document, id, _| {
+    let result = read_node(agent, receiver, |agent, _, document, id, _| {
+        let quirks = quirks_mode(agent, id)?;
         Ok(run(&ScopedSelector::new(
             document, id, &list, quirks, &work,
         )))

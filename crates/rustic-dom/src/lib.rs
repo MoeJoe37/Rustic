@@ -31,7 +31,9 @@ mod string;
 mod traversal;
 
 pub use document::marking::TreeMarks;
-pub use document::{Adopted, Document, DocumentLimits, InvariantViolation, ReadyState};
+pub use document::{
+    Adopted, Document, DocumentFormat, DocumentLimits, InvariantViolation, ReadyState,
+};
 pub use dump::DumpError;
 pub use error::DomError;
 pub use name::{HTML_NAMESPACE, MATHML_NAMESPACE, QualifiedName, SVG_NAMESPACE};

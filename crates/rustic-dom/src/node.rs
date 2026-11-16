@@ -186,6 +186,11 @@ pub struct Node {
 }
 
 impl Node {
+    /// Bytes of retained names and character data charged to the document.
+    pub fn retained_data_bytes(&self) -> usize {
+        self.data_bytes
+    }
+
     pub(crate) fn new(kind: NodeKind, data_bytes: usize) -> Self {
         Self {
             kind,

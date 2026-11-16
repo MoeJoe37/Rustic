@@ -341,3 +341,73 @@ fn ids_from_a_dropped_document_never_resolve_in_a_new_one() {
     assert_ne!(fresh.id(), old_id);
     assert_eq!(fresh.node(node).unwrap_err(), DomError::WrongDocument);
 }
+
+#[test]
+fn foreign_fragment_insertion_uses_only_the_nodes_that_move() {
+    let mut source = document();
+    let fragment = source.create_document_fragment().unwrap();
+    let child = html(&mut source, "span");
+    let text = source.create_text("one").unwrap();
+    source.append_child(fragment, child).unwrap();
+    source.append_child(child, text).unwrap();
+
+    let mut target = Document::new(DocumentLimits {
+        max_nodes: 4,
+        ..DocumentLimits::default()
+    })
+    .unwrap();
+    let root = target.root();
+    let parent = html(&mut target, "p");
+    target.append_child(root, parent).unwrap();
+    let moved = target
+        .insert_from_document(&mut source, fragment, parent, None, |count| {
+            assert_eq!(count, 2);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(moved.root, fragment);
+    assert_eq!(moved.ids.len(), 2);
+    assert_eq!(target.node_count(), 4);
+    assert_eq!(
+        target.children(parent).unwrap().next(),
+        Some(moved.ids[0].1)
+    );
+    assert_eq!(
+        target.children(moved.ids[0].1).unwrap().next(),
+        Some(moved.ids[1].1)
+    );
+    assert!(source.node(child).is_err());
+    assert_eq!(source.children(fragment).unwrap().count(), 0);
+    // An empty fragment requires no target slots.
+    assert!(
+        target
+            .insert_from_document(&mut source, fragment, parent, None, |_| unreachable!())
+            .is_ok()
+    );
+    source.check_invariants().unwrap();
+    target.check_invariants().unwrap();
+}
+
+#[test]
+fn rejected_cross_document_forest_preserves_tree_and_quota_accounting() {
+    let mut source = document();
+    let fragment = source.create_document_fragment().unwrap();
+    for name in ["a", "b"] {
+        let child = html(&mut source, name);
+        source.append_child(fragment, child).unwrap();
+    }
+    let mut target = document();
+    let root = target.root();
+    let target_before = dump(&target, root);
+    let fragment_before = dump(&source, fragment);
+    assert_eq!(
+        target.insert_from_document(&mut source, fragment, root, None, |_| Ok(())),
+        Err(DomError::InvalidHierarchy)
+    );
+    assert_eq!(target.node_count(), 1);
+    assert_eq!(target.data_bytes(), 0);
+    assert_eq!(dump(&target, root), target_before);
+    assert_eq!(dump(&source, fragment), fragment_before);
+    source.check_invariants().unwrap();
+    target.check_invariants().unwrap();
+}

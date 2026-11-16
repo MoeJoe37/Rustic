@@ -12,8 +12,8 @@ use crate::dom_exception;
 use crate::webidl::{IntegerConversion, coerce_string, from_dom_units, to_unsigned_long};
 
 use super::{
-    DomHeap, collections, illegal_constructor, install_interface, prototype, read_node,
-    require_receiver, required_arg, with_page, wrap,
+    DomHeap, collections, illegal_constructor, install_interface, prototype, quirks_mode,
+    read_node, require_receiver, required_arg, wrap,
 };
 
 const HTML_COLLECTION: &str = "HTMLCollection";
@@ -123,9 +123,9 @@ fn named_item(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value>
 #[derive(Clone, Copy)]
 enum Filter {
     Children,
-    Tag(StringId),
+    Tag(StringId, bool),
     Namespace(Option<StringId>, StringId),
-    Classes(StringId, bool),
+    Classes(StringId),
 }
 
 #[derive(Clone, Copy)]
@@ -154,9 +154,9 @@ impl Collection {
             .expect("collection query");
         let extra = agent.get(array, PropertyKey::Index(3))?;
         let filter = match kind.as_number() {
-            Some(0.0) => Filter::Tag(name),
+            Some(0.0) => Filter::Tag(name, extra == Value::TRUE),
             Some(1.0) => Filter::Namespace(extra.as_string(), name),
-            _ => Filter::Classes(name, extra == Value::TRUE),
+            _ => Filter::Classes(name),
         };
         Ok(Self { root, filter })
     }
@@ -173,7 +173,7 @@ impl Collection {
         ) -> JsResult<ControlFlow<T>>,
     ) -> JsResult<Option<T>> {
         let mut consider =
-            |agent: &mut Agent, wrappers: &mut DomHeap, document: &Document, node_id| {
+            |agent: &mut Agent, wrappers: &mut DomHeap, document: &Document, node_id, quirks| {
                 agent.check_native_work()?;
                 let node = document
                     .node(node_id)
@@ -181,7 +181,7 @@ impl Collection {
                 let NodeKind::Element(element) = node.kind() else {
                     return Ok(ControlFlow::Continue(()));
                 };
-                if self.filter.matches(agent, element)? {
+                if self.filter.matches(agent, element, quirks)? {
                     visit(agent, wrappers, document, node_id, element)
                 } else {
                     Ok(ControlFlow::Continue(()))
@@ -194,7 +194,8 @@ impl Collection {
                 collections::ChildKind::Elements,
                 |agent, wrappers, document, ids| {
                     for &id in ids {
-                        if let ControlFlow::Break(value) = consider(agent, wrappers, document, id)?
+                        if let ControlFlow::Break(value) =
+                            consider(agent, wrappers, document, id, false)?
                         {
                             return Ok(Some(value));
                         }
@@ -204,11 +205,13 @@ impl Collection {
             );
         }
         read_node(agent, self.root, |agent, wrappers, document, root, _| {
+            let quirks = matches!(self.filter, Filter::Classes(_)) && quirks_mode(agent, root)?;
             let nodes = document
                 .walk(root)
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
             for (id, _) in nodes.skip(1) {
-                if let ControlFlow::Break(value) = consider(agent, wrappers, document, id)? {
+                if let ControlFlow::Break(value) = consider(agent, wrappers, document, id, quirks)?
+                {
                     return Ok(Some(value));
                 }
             }
@@ -294,7 +297,8 @@ fn by_tag<const DOCUMENT: bool>(agent: &mut Agent, root: Value, args: &[Value]) 
     lookup_receiver::<DOCUMENT>(agent, root)?;
     let name = required_arg(agent, args, 0)?;
     let name = coerce_string(agent, name)?;
-    descendants(agent, root, 0, name, Value::UNDEFINED)
+    let html = read_node(agent, root, |_, _, document, _, _| Ok(document.is_html()))?;
+    descendants(agent, root, 0, name, Value::boolean(html))
 }
 
 fn by_namespace<const DOCUMENT: bool>(
@@ -330,14 +334,7 @@ fn by_class<const DOCUMENT: bool>(
     lookup_receiver::<DOCUMENT>(agent, root)?;
     let name = required_arg(agent, args, 0)?;
     let name = coerce_string(agent, name)?;
-    let quirks = with_page(agent, |_, page| Ok(page.tree.quirks_mode()))?;
-    descendants(
-        agent,
-        root,
-        2,
-        name,
-        if quirks { Value::TRUE } else { Value::FALSE },
-    )
+    descendants(agent, root, 2, name, Value::UNDEFINED)
 }
 
 fn live_length(agent: &mut Agent, source: Value) -> JsResult<u32> {
@@ -411,11 +408,11 @@ fn supported_names<'a>(
 }
 
 impl Filter {
-    fn matches(self, agent: &mut Agent, element: &Element) -> JsResult<bool> {
+    fn matches(self, agent: &mut Agent, element: &Element, quirks: bool) -> JsResult<bool> {
         let name = element.name();
         match self {
             Filter::Children => Ok(true),
-            Filter::Tag(query) => {
+            Filter::Tag(query, html) => {
                 charge_units(agent, agent.heap.string(query).len())?;
                 let query = agent.heap.string(query);
                 let qualified = name
@@ -425,7 +422,7 @@ impl Filter {
                     .chain(name.prefix().map(|_| u16::from(b':')))
                     .chain(name.local().encode_utf16());
                 Ok(query.units().eq([u16::from(b'*')])
-                    || if name.namespace() == Some(HTML_NAMESPACE) {
+                    || if html && name.namespace() == Some(HTML_NAMESPACE) {
                         query.units().map(ascii_lower).eq(qualified)
                     } else {
                         query.units().eq(qualified)
@@ -449,7 +446,7 @@ impl Filter {
                         .namespace()
                         .is_some_and(|ns| namespace.units().eq(ns.encode_utf16())))
             }
-            Filter::Classes(query, quirks) => {
+            Filter::Classes(query) => {
                 for attribute in element.attributes() {
                     agent.check_native_work()?;
                     if attribute.name().namespace().is_none() && attribute.name().local() == "class"

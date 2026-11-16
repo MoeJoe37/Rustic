@@ -177,7 +177,7 @@ fn length(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
 }
 
 fn set_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    let id = character_receiver(agent, receiver)?;
+    character_receiver(agent, receiver)?;
     let value_type = members(CHARACTER_DATA)
         .iter()
         .find_map(|member| match member {
@@ -191,7 +191,7 @@ fn set_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Valu
         .expect("committed data attribute metadata");
     let value = args.first().copied().unwrap_or(Value::UNDEFINED);
     let value = string(value_type.convert(agent, value)?);
-    mutate(agent, |document| {
+    mutate(agent, receiver, |document, id| {
         document.set_character_data(id, value).map(drop)
     })
 }
@@ -220,50 +220,51 @@ fn substring_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResul
 
 fn mutate(
     agent: &mut Agent,
-    edit: impl FnOnce(&mut Document) -> Result<(), DomError>,
+    receiver: Value,
+    edit: impl FnOnce(&mut Document, NodeId) -> Result<(), DomError>,
 ) -> JsResult<Value> {
-    with_mut_tree(agent, |agent, document, _| {
-        edit(document).map_err(|error| dom_exception::from_dom_error(agent, error))?;
+    with_mut_tree(agent, receiver, |agent, document, _, id| {
+        edit(document, id).map_err(|error| dom_exception::from_dom_error(agent, error))?;
         Ok(Value::UNDEFINED)
     })
 }
 
 fn append_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    let id = character_receiver(agent, receiver)?;
+    character_receiver(agent, receiver)?;
     let arg = operation(CHARACTER_DATA, "appendData")[0];
     let text = string(arg.convert(agent, args.first().copied())?);
-    mutate(agent, |document| {
+    mutate(agent, receiver, |document, id| {
         document.append_character_data(id, text.as_units())
     })
 }
 
 fn insert_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    let id = character_receiver(agent, receiver)?;
+    character_receiver(agent, receiver)?;
     let signature = operation(CHARACTER_DATA, "insertData");
     if args.len() < signature.len() {
         return agent.type_error("required Web IDL argument is missing");
     }
     let offset = index(signature[0].convert(agent, args.first().copied())?)?;
     let text = string(signature[1].convert(agent, args.get(1).copied())?);
-    mutate(agent, |document| {
+    mutate(agent, receiver, |document, id| {
         document.replace_character_data(id, offset, 0, text.as_units())
     })
 }
 
 fn delete_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    let id = character_receiver(agent, receiver)?;
+    character_receiver(agent, receiver)?;
     let (offset, count) = range_arguments(agent, "deleteData", args)?;
-    mutate(agent, |document| {
+    mutate(agent, receiver, |document, id| {
         document.replace_character_data(id, offset, count, &[])
     })
 }
 
 fn replace_data(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    let id = character_receiver(agent, receiver)?;
+    character_receiver(agent, receiver)?;
     let (offset, count) = range_arguments(agent, "replaceData", args)?;
     let arg = operation(CHARACTER_DATA, "replaceData")[2];
     let text = string(arg.convert(agent, args.get(2).copied())?);
-    mutate(agent, |document| {
+    mutate(agent, receiver, |document, id| {
         document.replace_character_data(id, offset, count, text.as_units())
     })
 }
@@ -286,7 +287,9 @@ fn construct(
         .expect("committed constructor metadata");
     let text = string(signature[0].convert(agent, args.first().copied())?);
     let prototype = agent.host_prototype_from_new_target(interface, target)?;
-    create_node(agent, Some(prototype), |document| create(document, text))
+    create_node(agent, None, Some(prototype), |document| {
+        create(document, text)
+    })
 }
 
 fn construct_text(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -302,11 +305,11 @@ fn construct_comment(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Va
 }
 
 fn split_text(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    let id = require_receiver(agent, receiver, is_text, "expected a Text receiver")?;
+    require_receiver(agent, receiver, is_text, "expected a Text receiver")?;
     let arg = operation(TEXT, "splitText")[0];
     let offset = index(arg.convert(agent, args.first().copied())?)?;
     let prototype = prototype(agent, TEXT)?;
-    with_mut_tree(agent, |agent, document, wrappers| {
+    with_mut_tree(agent, receiver, |agent, document, wrappers, id| {
         document
             .split_text_with_preflight(id, offset, |document, new| {
                 wrappers

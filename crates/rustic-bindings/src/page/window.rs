@@ -107,11 +107,17 @@ fn replace_length(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
 }
 
 pub(super) fn default_view(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    require_receiver(
+    let id = require_receiver(
         agent,
         this,
         |kind| matches!(kind, NodeKind::Document),
         "expected a Document receiver",
     )?;
-    with_page(agent, |_, page| Ok(page.window))
+    with_page(agent, |_, page| {
+        Ok(if id.document() == page.main {
+            page.window
+        } else {
+            Value::NULL
+        })
+    })
 }

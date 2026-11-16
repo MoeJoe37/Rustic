@@ -63,6 +63,20 @@ impl Document {
         Ok(self.materialize(plan)?[0])
     }
 
+    /// Copy a non-document node into this document without changing the source.
+    pub fn import_node(
+        &mut self,
+        source: &Document,
+        node: NodeId,
+        deep: bool,
+    ) -> Result<NodeId, DomError> {
+        if node == source.root {
+            return Err(DomError::ProtectedRoot);
+        }
+        let plan = snapshot(source, node, deep, false)?;
+        Ok(self.materialize(plan)?[0])
+    }
+
     /// Move a subtree from `source` into this document, as `adoptNode` does.
     ///
     /// The subtree is detached from its source parent, copied here with new IDs
@@ -84,27 +98,142 @@ impl Document {
         node: NodeId,
         preflight: impl FnOnce(usize) -> Result<(), DomError>,
     ) -> Result<Adopted, DomError> {
+        self.transfer(source, node, None, preflight)
+    }
+
+    /// Adopt and insert in one checked operation. Inserting a fragment moves
+    /// only its children; the empty fragment retains its owner and identity.
+    pub fn insert_from_document(
+        &mut self,
+        source: &mut Document,
+        node: NodeId,
+        parent: NodeId,
+        before: Option<NodeId>,
+        preflight: impl FnOnce(usize) -> Result<(), DomError>,
+    ) -> Result<Adopted, DomError> {
+        self.transfer(source, node, Some((parent, before)), preflight)
+    }
+
+    fn transfer(
+        &mut self,
+        source: &mut Document,
+        node: NodeId,
+        insert: Option<(NodeId, Option<NodeId>)>,
+        preflight: impl FnOnce(usize) -> Result<(), DomError>,
+    ) -> Result<Adopted, DomError> {
         if node == source.root {
             return Err(DomError::ProtectedRoot);
         }
-        if source.node(node)?.owner_host().is_some() {
+        let node_kind = source.node(node)?;
+        if node_kind.owner_host().is_some() {
             return Err(DomError::InvalidHierarchy);
         }
-        let plan = snapshot(source, node, true, true)?;
+        let fragment = insert.is_some() && matches!(node_kind.kind(), NodeKind::DocumentFragment);
+        if let Some((parent, before)) = insert {
+            if !matches!(
+                self.node(parent)?.kind(),
+                NodeKind::Document | NodeKind::DocumentFragment | NodeKind::Element(_)
+            ) {
+                return Err(DomError::InvalidHierarchy);
+            }
+            if let Some(before) = before {
+                if self.node(before)?.parent() != Some(parent) {
+                    return Err(DomError::InvalidReference);
+                }
+            }
+            if fragment && node_kind.first_child().is_none() {
+                return Ok(Adopted {
+                    root: node,
+                    ids: Vec::new(),
+                });
+            }
+        }
+        let mut plan = snapshot(source, node, true, true)?;
+        let mut roots = Vec::new();
+        if fragment {
+            roots
+                .try_reserve_exact(source.children(node)?.count())
+                .map_err(|_| DomError::AllocationFailed)?;
+            // The fragment itself keeps its original identity and takes no
+            // space in the destination. Its former children are forest roots.
+            plan.remove(0);
+            for item in &mut plan {
+                item.link = match item.link {
+                    Link::ChildOf(0) => Link::Root,
+                    Link::ChildOf(index) => Link::ChildOf(index - 1),
+                    Link::ContentsOf(index) => Link::ContentsOf(index - 1),
+                    Link::ShadowOf(index, mode) => Link::ShadowOf(index - 1, mode),
+                    Link::Root => unreachable!("only the fragment was a root"),
+                };
+            }
+        }
         let mut ids = Vec::new();
         ids.try_reserve_exact(plan.len())
             .map_err(|_| DomError::AllocationFailed)?;
         ids.extend(plan.iter().map(|item| (item.source, item.source)));
         preflight(plan.len())?;
         let created = self.materialize(plan)?;
-        for (pair, new) in ids.iter_mut().zip(created) {
+        for (pair, &new) in ids.iter_mut().zip(&created) {
             pair.1 = new;
         }
+        let root = ids[0].1;
+        if let Some((parent, before)) = insert {
+            let result = if fragment {
+                roots.extend(
+                    created
+                        .iter()
+                        .copied()
+                        .filter(|&id| self.is_detached_root(id)),
+                );
+                self.insert_forest(parent, before, &roots)
+            } else {
+                self.insert_before(parent, root, before)
+            };
+            if let Err(error) = result {
+                self.destroy_materialized(&created);
+                return Err(error);
+            }
+        }
+        if fragment {
+            while let Some(child) = source.live(node).first_child() {
+                source.destroy_unchecked(child);
+            }
+            return Ok(Adopted { root: node, ids });
+        }
         source.destroy_unchecked(node);
-        Ok(Adopted {
-            root: ids[0].1,
-            ids,
-        })
+        Ok(Adopted { root, ids })
+    }
+
+    fn insert_forest(
+        &mut self,
+        parent: NodeId,
+        before: Option<NodeId>,
+        roots: &[NodeId],
+    ) -> Result<(), DomError> {
+        let mut at = parent;
+        let mut depth = 0usize;
+        while let Some(ancestor) = self.live(at).parent() {
+            at = ancestor;
+            depth += 1;
+        }
+        for &root in roots {
+            if parent != self.root && matches!(self.live(root).kind(), NodeKind::DocumentType(_)) {
+                return Err(DomError::InvalidHierarchy);
+            }
+            let height = self.walk(root)?.map(|(_, depth)| depth).max().unwrap_or(0);
+            depth
+                .checked_add(1)
+                .and_then(|depth| depth.checked_add(height))
+                .filter(|&depth| depth <= self.limits.max_depth)
+                .ok_or(DomError::DepthLimit)?;
+        }
+        if parent == self.root {
+            self.validate_document_order(roots, before)?;
+        }
+        for &root in roots {
+            self.link_before(parent, root, before);
+        }
+        Ok(())
     }
 
     /// Create a new document with the same limits and a deep copy of this tree.
@@ -112,7 +241,15 @@ impl Document {
     /// The copy is `Complete` (readiness is not copied) and has a new document
     /// ID. It fails, creating nothing, if allocation fails.
     pub fn clone_document(&self) -> Result<Document, DomError> {
-        let mut copy = Document::new(self.limits)?;
+        self.clone_document_with_children(true)
+    }
+
+    /// Clone this document's format, optionally including its child trees.
+    pub fn clone_document_with_children(&self, deep: bool) -> Result<Document, DomError> {
+        let mut copy = Document::new_with_format(self.limits, self.format())?;
+        if !deep {
+            return Ok(copy);
+        }
         for child in self.children(self.root)? {
             let plan = snapshot(self, child, true, false)?;
             let root = copy.materialize(plan)?[0];
@@ -131,9 +268,7 @@ impl Document {
             let id = match self.arena.insert(item.kind) {
                 Ok(id) => id,
                 Err(error) => {
-                    if let Some(&root) = created.first() {
-                        self.destroy_unchecked(root);
-                    }
+                    self.destroy_materialized(&created);
                     return Err(error);
                 }
             };
@@ -153,28 +288,56 @@ impl Document {
             }
             created.push(id);
         }
-        // The copy has the source subtree's height, but the target's limit may
-        // be lower (adoption), so check it once the tree exists.
-        let root = created[0];
-        if self.subtree_height(root)? > self.limits.max_depth {
-            self.destroy_unchecked(root);
-            return Err(DomError::DepthLimit);
+        // The target may have a lower depth limit than the source.
+        let depth_check = created
+            .iter()
+            .copied()
+            .filter(|&id| self.is_detached_root(id))
+            .try_for_each(|root| {
+                if self.subtree_height(root)? > self.limits.max_depth {
+                    Err(DomError::DepthLimit)
+                } else {
+                    Ok(())
+                }
+            });
+        if let Err(error) = depth_check {
+            self.destroy_materialized(&created);
+            return Err(error);
         }
         Ok(created)
+    }
+
+    fn is_detached_root(&self, id: NodeId) -> bool {
+        self.node(id)
+            .is_ok_and(|node| node.parent().is_none() && node.owner_host().is_none())
+    }
+
+    fn destroy_materialized(&mut self, created: &[NodeId]) {
+        for &id in created {
+            if self.is_detached_root(id) {
+                self.destroy_unchecked(id);
+            }
+        }
     }
 
     /// Greatest edge depth within the tree rooted at `root` or any template
     /// contents or shadow root nested in it (each is its own tree root).
     fn subtree_height(&self, root: NodeId) -> Result<usize, DomError> {
         let mut height = 0;
-        let mut roots = vec![root];
-        while let Some(next) = roots.pop() {
-            for (id, depth) in self.walk(next)? {
+        let mut roots = Vec::new();
+        let mut next = Some(root);
+        while let Some(root) = next {
+            for (id, depth) in self.walk(root)? {
                 height = height.max(depth);
                 if let NodeKind::Element(element) = self.live(id).kind() {
-                    roots.extend(element.owned_roots());
+                    let owned = element.owned_roots();
+                    roots
+                        .try_reserve(owned.size_hint().1.unwrap_or(0))
+                        .map_err(|_| DomError::AllocationFailed)?;
+                    roots.extend(owned);
                 }
             }
+            next = roots.pop();
         }
         Ok(height)
     }

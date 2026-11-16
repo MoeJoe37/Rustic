@@ -160,7 +160,7 @@ failure caught by JavaScript. Native stack information, the derived
 Document realms expose `document` with `Document`, `Node`, and `Element`
 prototypes. Script can traverse the live tree through `documentElement`,
 `firstChild`, `nextSibling`, `parentNode`, and `ownerDocument`, and read
-`nodeType` and `localName`. `appendChild` and `removeChild` validate
+`nodeType` and `localName`. `appendChild`, `insertBefore`, and `removeChild` validate
 node receivers and arguments, preserve wrapper identity, and use the
 DOM's checked mutations. Render turns read the same parsed tree. Tests
 exercise live mutations, error atomicity, and collection of detached
@@ -204,14 +204,26 @@ by the renderer. The proxy forwards ordinary properties and reserves array
 indices for child contexts. Window named properties, nested and navigable
 contexts, and cross-origin WindowProxy operations are TD-130.
 
-Additional documents and cross-document operations remain open.
-TD-126 covers other remaining interfaces and constructor behavior.
-TD-127 covers the UTF-8 name storage limit.
+`new Document()` and `DOMImplementation` create detached XML and HTML
+documents in the page's agent. The format controls name case, content type,
+and CDATA creation. `createElementNS` and the namespace-aware attribute
+methods validate qualified names and preserve UTF-16 values. Detached
+documents have a null `defaultView`. The agent supports up to 16 live detached
+documents in addition to its active tree and collects them when their last
+reachable wrapper or DOMImplementation disappears.
+
+`cloneNode` and `importNode` create independent nodes, and `adoptNode` and
+cross-document insertion preserve the original wrappers, expandos, and
+live collections. Data and tree validation complete before the source
+is detached. Inserting a foreign fragment moves its children and keeps
+the fragment in its original document. Native subtree copying is metered.
+TD-126 tracks additional interfaces. TD-127 covers UTF-8 name storage.
 [ADR 0028](adr/0028-scripted-document-collection.md),
 [ADR 0029](adr/0029-scripted-node-creation.md),
 [ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
 [ADR 0031](adr/0031-live-html-collections.md),
-[ADR 0032](adr/0032-top-level-window-realm.md)
+[ADR 0032](adr/0032-top-level-window-realm.md),
+[ADR 0033](adr/0033-detached-documents-and-adoption.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

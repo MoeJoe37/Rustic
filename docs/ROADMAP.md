@@ -326,14 +326,17 @@ and element content attributes. Scoped selectors use the CSS matcher.
 `children` and the descendant name, namespace, and class methods return live
 HTMLCollections with indexed and named properties. A top-level WindowProxy
 gives document scripts and callbacks a stable global identity, including
-`document.defaultView`. Additional documents and cross-document operations
-remain open. Named windows and frame, navigation, and origin integration
-are tracked as TD-130.
+`document.defaultView`. WEB-03 also covers detached HTML/XML documents,
+namespace-aware element and attribute operations, cloning, importing, and
+cross-document adoption and insertion. The shared collector reclaims
+unreachable documents. Named windows and frame, navigation, and origin
+integration are tracked as TD-130.
 [ADR 0028](adr/0028-scripted-document-collection.md),
 [ADR 0029](adr/0029-scripted-node-creation.md),
 [ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
 [ADR 0031](adr/0031-live-html-collections.md),
-[ADR 0032](adr/0032-top-level-window-realm.md)
+[ADR 0032](adr/0032-top-level-window-realm.md),
+[ADR 0033](adr/0033-detached-documents-and-adoption.md)
 [ADR 0024](adr/0024-web-idl-conversions.md),
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
 [ADR 0026](adr/0026-realm-dom-wrappers.md),

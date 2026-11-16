@@ -148,6 +148,15 @@ through the realm's global environment. Standalone agents keep their ordinary
 global object as global this.
 [ADR 0032](adr/0032-top-level-window-realm.md)
 
+Detached documents share the page's wrapper coordinator. A reachable
+node or DOMImplementation marks its owning document and connected tree.
+The active tree remains rooted through the page, and an unreachable
+detached document is removed from the registry as a unit. Cross-document
+insertion stages target nodes, checks the destination, and then commits
+the source removal and wrapper retargeting. Direct-child collection caches
+use wrapper identity so they follow an adopted node's new arena IDs.
+[ADR 0033](adr/0033-detached-documents-and-adoption.md)
+
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed
 interface's realm prototype. Engine error conversion uses that prototype

@@ -46,3 +46,4 @@ Changes to public API stability, native/unsafe boundaries, runtime replacement,
 process authority, GC, or a major platform dependency require an ADR.
 | [0031](0031-live-html-collections.md) | Live HTMLCollections, named property visibility, and direct-child indexing | Accepted for WEB-03 |
 | [0032](0032-top-level-window-realm.md) | Top-level WindowProxy and realm global identity | Accepted for WEB-03 |
+| [0033](0033-detached-documents-and-adoption.md) | Detached document ownership and transactional cross-document insertion | Accepted for WEB-03 |

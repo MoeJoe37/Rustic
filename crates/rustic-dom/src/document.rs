@@ -52,6 +52,33 @@ pub enum ReadyState {
     Complete,
 }
 
+/// The document type and content type exposed by DOM bindings.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DocumentFormat {
+    /// An HTML document, typically from the HTML parser.
+    Html,
+    /// The XML document returned by the Document constructor.
+    Xml,
+    /// An XMLDocument returned by DOMImplementation.
+    XmlDocument,
+    /// An XMLDocument whose document element is XHTML.
+    XhtmlDocument,
+    /// An XMLDocument whose document element is SVG.
+    SvgDocument,
+}
+
+impl DocumentFormat {
+    /// MIME type initialized by the corresponding DOM factory.
+    pub fn content_type(self) -> &'static str {
+        match self {
+            Self::Html => "text/html",
+            Self::Xml | Self::XmlDocument => "application/xml",
+            Self::XhtmlDocument => "application/xhtml+xml",
+            Self::SvgDocument => "image/svg+xml",
+        }
+    }
+}
+
 /// Sole owner of an arena and its tree links; it is deliberately not `Clone`.
 ///
 /// Checked moves operate within one document; [`Self::clone_node`] copies within
@@ -63,6 +90,7 @@ pub struct Document {
     root: NodeId,
     limits: DocumentLimits,
     ready_state: ReadyState,
+    format: DocumentFormat,
     child_revision: u64,
 }
 
@@ -71,7 +99,27 @@ impl Document {
     ///
     /// The root is charged against the node limit.
     pub fn new(limits: DocumentLimits) -> Result<Self, DomError> {
-        Self::with_ready_state(limits, ReadyState::Complete)
+        Self::new_with_format(limits, DocumentFormat::Html)
+    }
+
+    /// Create a complete, empty document with the given format.
+    pub fn new_with_format(
+        limits: DocumentLimits,
+        format: DocumentFormat,
+    ) -> Result<Self, DomError> {
+        let mut document = Self::with_ready_state(limits, ReadyState::Complete)?;
+        document.format = format;
+        Ok(document)
+    }
+
+    /// The document's HTML/XML type and content type.
+    pub fn format(&self) -> DocumentFormat {
+        self.format
+    }
+
+    /// Whether the document applies HTML case folding to DOM names.
+    pub fn is_html(&self) -> bool {
+        self.format == DocumentFormat::Html
     }
 
     /// Create a document for a parser to fill, starting in `Loading`.
@@ -87,6 +135,7 @@ impl Document {
             root,
             limits,
             ready_state,
+            format: DocumentFormat::Html,
             child_revision: 0,
         })
     }
@@ -635,8 +684,11 @@ impl Document {
             }
             Ok(())
         };
+        let has_moved_child = inserted
+            .iter()
+            .any(|&id| self.live(id).parent() == Some(self.root));
         for existing in self.children(self.root)? {
-            if inserted.contains(&existing) {
+            if has_moved_child && inserted.contains(&existing) {
                 continue;
             }
             if Some(existing) == before {

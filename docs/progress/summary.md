@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 29.77%** = 28.48% verified complete + 1.29% partial credit. 66/221 capabilities complete, 6 in progress.
+**Overall completion: 29.90%** = 28.86% verified complete + 1.04% partial credit. 67/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `93a23d256e0f2c3fd3e7c0e90a2b1a089d0f3d1862bddba392eed3866e7e4185`.
+Catalog: `engine-v4`. Source fingerprint: `1070b225df00e8abd755efa2f40b8eb6c5891f3f90cf6b0867c5cc109d272954`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `93a23d256e0f2c3fd3e7c0e90a2b1a089d0f3
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 12/13 | 99.23% | 95.38% | 8.90% |
-| M5 Scripted documents | 1/12 | 8.26% | 3.54% | 5.29% |
+| M5 Scripted documents | 2/12 | 10.62% | 10.62% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `93a23d256e0f2c3fd3e7c0e90a2b1a089d0f3
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 12/15 | 2 | 91.09% | 84.93% | 10% | 9.10 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 0/10 | 1 | 5.00% | 0.00% | 5% | 0.25 |
+| Bindings & web APIs | 1/10 | 0 | 7.50% | 7.50% | 5% | 0.37 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -215,10 +215,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 - **planned** `web.idl` — Web IDL tooling, conversions and rooted wrappers · size 5 · M5 · 0.62% of engine
 - **planned** `web.window` — Window/Document/Element bindings and identity · size 5 · M5 · 0.62% of engine
-- **in progress 66.66%** `web.scheduler` — Tasks, microtasks and rendering opportunities · size 3 · M5 · 0.37% of engine
-  - [x] Document script tasks, bounded microtask checkpoints and lifecycle cancellation ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
-  - [x] Task-source selection, host clock and timers ([source](../../crates/rustic-engine/src/tasks.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs))
-  - [ ] Rendering opportunities and frame ordering
+- **complete** `web.scheduler` — Tasks, microtasks and rendering opportunities · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-engine/src/tasks.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [source](../../crates/rustic-engine/src/scripting.rs), [source](../../crates/rustic-engine/src/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-cli/src/loader.rs))
 - **planned** `web.scripts` — Classic/module script lifecycle and readiness · size 3 · M5 · 0.37% of engine
 - **planned** `web.input` — Forms, focus, editing and user input · size 5 · M5 · 0.62% of engine
 - **planned** `web.observers` — Timers, animation frames and observer APIs · size 3 · M5 · 0.37% of engine

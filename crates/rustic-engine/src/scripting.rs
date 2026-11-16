@@ -8,6 +8,7 @@ use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::EngineDocument;
+use crate::frames::{RenderFrame, Rendering};
 use crate::tasks::{ScriptQueue, TimerId};
 
 /// Resource limits for one scripted document.
@@ -77,6 +78,8 @@ pub enum ScriptStop {
     JobLimit,
     /// The JavaScript heap budget was exhausted.
     OutOfMemory,
+    /// This document has exhausted its non-reusable frame sequence.
+    FrameIdsExhausted,
 }
 
 impl fmt::Display for ScriptStop {
@@ -86,6 +89,7 @@ impl fmt::Display for ScriptStop {
             Self::StepLimit => "script turn exhausted its safe-point budget",
             Self::JobLimit => "microtask checkpoint exhausted its job budget",
             Self::OutOfMemory => "script agent exhausted its heap budget",
+            Self::FrameIdsExhausted => "document frame identity space exhausted",
         })
     }
 }
@@ -112,7 +116,21 @@ pub enum ScriptTurn {
     Failed(ScriptFailure),
 }
 
-/// A completed document with a single script agent and two script task sources.
+/// Work selected by the document pump when the host supplies a renderer.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DocumentTurn<T> {
+    /// A script or timer ran and completed its microtask checkpoint.
+    Script(ScriptTurn),
+    /// The host renderer ran for an offered rendering opportunity.
+    Rendered {
+        /// Ticket to validate before presenting the output.
+        frame: RenderFrame,
+        /// The renderer's result, including any host-defined error.
+        output: T,
+    },
+}
+
+/// A completed document with a single script agent and a host-driven turn scheduler.
 ///
 /// The host explicitly queues scripts and pumps turns. The document and agent
 /// move together, with the document's existing token shared by the VM.
@@ -120,6 +138,7 @@ pub struct ScriptedDocument<C = SystemClock> {
     document: EngineDocument,
     agent: Result<Agent, ScriptStop>,
     pending: ScriptQueue,
+    rendering: Rendering,
     clock: C,
     limits: TaskLimits,
 }
@@ -134,7 +153,8 @@ impl EngineDocument {
     }
 
     /// Give this document a script agent and a host-selected monotonic clock.
-    /// The clock governs timer eligibility. JavaScript reads civil time separately.
+    /// The clock governs timer eligibility and rendering timestamps. JavaScript
+    /// reads civil time separately.
     pub fn into_scripted_with_clock<C: Clock>(
         self,
         limits: TaskLimits,
@@ -147,11 +167,12 @@ impl EngineDocument {
             Agent::with_heap_limit(limits.heap_bytes).map_err(|_| ScriptStop::OutOfMemory)?;
         agent.set_cancellation(Some(self.cancellation().clone()));
         agent.set_can_block(false);
-        let pending = ScriptQueue::new(self.parsed().document().id(), limits);
+        let owner = self.parsed().document().id();
         Ok(ScriptedDocument {
             document: self,
             agent: Ok(agent),
-            pending,
+            pending: ScriptQueue::new(owner, limits),
+            rendering: Rendering::new(owner),
             clock,
             limits,
         })
@@ -205,12 +226,55 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(self.pending.delay(self.clock.now()))
     }
 
+    /// Offer this document a rendering opportunity at the current clock time.
+    /// Offers made before the next rendering turn coalesce to the latest time.
+    pub fn offer_rendering_opportunity(&mut self) -> Result<(), ScriptStop> {
+        self.check_live()?;
+        self.rendering.offer(self.clock.now());
+        Ok(())
+    }
+
+    /// Pump one script, timer or rendering turn.
+    ///
+    /// A ready script or timer and an offered frame alternate when both can
+    /// run. Each script completes its checkpoint before a later rendering turn.
+    /// The renderer receives the completed document and a ticket for its output.
+    pub fn run_next_with_render<T>(
+        &mut self,
+        render: impl FnOnce(&EngineDocument, RenderFrame) -> T,
+    ) -> Result<Option<DocumentTurn<T>>, ScriptStop> {
+        self.check_live()?;
+        if !self.rendering.has_priority() {
+            if let Some(turn) = self.run_script()? {
+                return Ok(Some(DocumentTurn::Script(turn)));
+            }
+        }
+        let Some(frame) = self.rendering.begin().map_err(|reason| self.stop(reason))? else {
+            return Ok(None);
+        };
+        let output = render(&self.document, frame);
+        self.check_live()?;
+        Ok(Some(DocumentTurn::Rendered { frame, output }))
+    }
+
+    /// Accept the current frame once before presenting its output.
+    /// A later rendering turn invalidates earlier tickets.
+    pub fn accept_rendered_frame(&mut self, frame: RenderFrame) -> Result<bool, ScriptStop> {
+        self.check_live()?;
+        Ok(self.rendering.accept(frame))
+    }
+
     /// Run one eligible script and drain its promise jobs before a later task.
     ///
     /// A terminal failure discards pending scripts and releases the JS agent.
-    /// Returns `Ok(None)` when there is no eligible task.
+    /// Returns `Ok(None)` when there is no eligible script or timer. Use
+    /// [`Self::run_next_with_render`] to service rendering offers as well.
     pub fn run_next(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
         self.check_live()?;
+        self.run_script()
+    }
+
+    fn run_script(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
         let Some(source) = self.pending.pop_ready(self.clock.now()) else {
             return Ok(None);
         };
@@ -232,6 +296,7 @@ impl<C: Clock> ScriptedDocument<C> {
                 // Web rejection-event dispatch belongs to the later event layer.
                 agent.take_rejection_events();
                 self.check_live()?;
+                self.rendering.after_script();
                 Ok(Some(turn))
             }
             Ok(false) => Err(self.stop(ScriptStop::JobLimit)),
@@ -259,6 +324,7 @@ impl<C: Clock> ScriptedDocument<C> {
     fn stop(&mut self, reason: ScriptStop) -> ScriptStop {
         self.agent = Err(reason);
         self.pending.clear();
+        self.rendering.clear();
         reason
     }
 }

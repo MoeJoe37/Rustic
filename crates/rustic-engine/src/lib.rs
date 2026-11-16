@@ -3,13 +3,16 @@
 use std::error::Error;
 use std::fmt;
 
+mod frames;
 mod lifecycle;
 mod scripting;
 mod tasks;
 
+pub use frames::RenderFrame;
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use scripting::{
-    ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument, TaskLimits,
+    DocumentTurn, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument,
+    TaskLimits,
 };
 pub use tasks::TimerId;
 

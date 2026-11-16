@@ -294,7 +294,7 @@ mobile gates remain mandatory through M9.
 
 | Task | Work and deliverable | Prerequisite |
 | --- | --- | --- |
-| WEB-01 | Agent/task sources, microtask checkpoints, safe points, fake clock/timers and cancellation | JS-06, [engine lifecycle](adr/0020-document-lifecycle.md) |
+| WEB-01 | Agent/task sources, microtask checkpoints, safe points, fake clock/timers, rendering opportunities and cancellation | JS-06, [engine lifecycle](adr/0020-document-lifecycle.md) |
 | WEB-02 | Web IDL subset generator and conversions, wrapper identity, DOM/JS tracing and exceptions | DOC-09, JS-03 |
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | WEB-02, CSS-02 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | WEB-01, WEB-03 |
@@ -302,11 +302,13 @@ mobile gates remain mandatory through M9.
 | WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | M3, WEB-03 |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | WEB-04–WEB-06 |
 
-WEB-01 has document-owned immediate and timed script queues, bounded
-microtask checkpoints, lifecycle cancellation and injectable monotonic
-clocks. Rendering opportunities and frame ordering are next.
+WEB-01 is complete for the host scheduler. The document pump selects
+immediate scripts, due timers and offered rendering opportunities. It
+bounds microtask checkpoints, shares lifecycle cancellation and orders
+rendered output with document-scoped tickets.
 [ADR 0021](adr/0021-document-script-turns.md),
-[ADR 0022](adr/0022-document-task-sources-and-timers.md)
+[ADR 0022](adr/0022-document-task-sources-and-timers.md),
+[ADR 0023](adr/0023-document-rendering-turns.md)
 
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.

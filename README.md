@@ -24,8 +24,9 @@ scripts with classes, generators, promises, async functions, regular
 expressions and the core standard library, designed around memory use and
 interpreter speed ([plan](docs/ROADMAP.md#memory-and-performance-design)); the
 [JavaScript notes](docs/JS.md) list what is still missing and the measured
-Test262 results. M5 has host-queued script tasks, one-shot timers and microtask
-checkpoints. HTML script loading and web-page bindings are still planned.
+Test262 results. M5 has host-queued script tasks, one-shot timers, microtask
+checkpoints and scheduled rendering turns. HTML script loading and web-page
+bindings are still planned.
 Networking and native app hosts are later milestones. See the
 [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
@@ -35,7 +36,7 @@ Networking and native app hosts are later milestones. See the
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 29.77%** (28.48% verified complete + 1.29% partial credit) — 66/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 99.23% done.
+**Overall engine completion: 29.90%** (28.86% verified complete + 1.04% partial credit) — 67/221 capabilities complete and 5 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 99.23% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

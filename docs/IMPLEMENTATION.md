@@ -96,12 +96,20 @@ equal deadlines resolved by admission order. Hosts can query the delay
 until the next timer and inject a manual clock for tests. The existing
 queue limits cover both sources.
 
-The document token cancels running or pending script and timer work.
-Cancellation and fatal budget failures release queued work and the agent
-at the host safe point. Rendering opportunities, page timer APIs and
-parser-scheduled scripts remain open.
+Hosts offer rendering opportunities and pass a rendering function to
+`run_next_with_render`. Offers coalesce to the latest clock timestamp.
+The pump alternates rendering and ready script work, completing a script's
+checkpoint before the next turn. The host can validate each output once
+against its document and the latest started frame before presentation.
+
+The document token cancels script, timer and rendering work. Cancellation
+and fatal budget failures clear pending work, drop the agent and invalidate
+frame tickets at a safe point. The headless CPU rendering integration test
+compares the scheduled PNG with the directly rendered reference. Page timer
+and animation APIs, parser-scheduled scripts and layout invalidation remain open.
 [ADR 0021](adr/0021-document-script-turns.md),
-[ADR 0022](adr/0022-document-task-sources-and-timers.md)
+[ADR 0022](adr/0022-document-task-sources-and-timers.md),
+[ADR 0023](adr/0023-document-rendering-turns.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

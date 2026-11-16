@@ -845,6 +845,29 @@ mod tests {
     }
 
     #[test]
+    fn scheduled_rendering_turn_produces_the_reference_png() {
+        use rustic_engine::{DocumentTurn, TaskLimits};
+
+        let mut engine = Engine::new(1);
+        let file = TempFile::new(SOURCE);
+        let limits = LoaderLimits::default();
+        let view = default_view();
+        let document = load_document(&mut engine, &file.0, limits).expect("load");
+        let expected = render_png(&document, &file.0, limits, view).expect("direct render");
+        let mut scripts = document.into_scripted(TaskLimits::default()).unwrap();
+        scripts.offer_rendering_opportunity().unwrap();
+
+        let Some(DocumentTurn::Rendered { frame, output }) = scripts
+            .run_next_with_render(|document, _| render_png(document, &file.0, limits, view))
+            .unwrap()
+        else {
+            panic!("expected the scheduled rendering turn");
+        };
+        assert!(scripts.accept_rendered_frame(frame).unwrap());
+        assert_eq!(output.expect("scheduled render"), expected);
+    }
+
+    #[test]
     fn shutdown_stops_document_loading_and_rendering() {
         let mut engine = Engine::new(1);
         let file = TempFile::new(SOURCE);

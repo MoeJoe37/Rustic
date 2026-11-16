@@ -31,6 +31,7 @@ instead of rewriting the history of a decision.
 | [0020](0020-document-lifecycle.md) | Host-owned document lifetimes with bounded admission and coordinated cancellation | Accepted for the headless pipeline |
 | [0021](0021-document-script-turns.md) | Document-owned script tasks and bounded microtask checkpoints | Accepted for the initial WEB-01 scheduler |
 | [0022](0022-document-task-sources-and-timers.md) | Immediate and timed script sources, monotonic host clocks and timer cancellation | Accepted for WEB-01 host timers |
+| [0023](0023-document-rendering-turns.md) | Coalesced rendering opportunities and document-local frame ordering | Accepted for WEB-01 rendering turns |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

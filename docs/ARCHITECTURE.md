@@ -246,10 +246,13 @@ points and root scopes before implementing them.
 
 The headless coordinator now offers an explicit scripted document owner.
 It runs immediate and timed host script tasks with bounded microtask
-checkpoints and one cancellation scope. Timer eligibility uses a host
-monotonic clock.
+checkpoints and one cancellation scope. The host clock governs timer
+eligibility and supplies rendering opportunity timestamps. A renderer-aware
+pump orders rendering turns with script work and gives the host
+document-scoped tickets to validate before presentation.
 [ADR 0021](adr/0021-document-script-turns.md),
-[ADR 0022](adr/0022-document-task-sources-and-timers.md)
+[ADR 0022](adr/0022-document-task-sources-and-timers.md),
+[ADR 0023](adr/0023-document-rendering-turns.md)
 
 ## 6. Navigation, resources, and persistence
 

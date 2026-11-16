@@ -3929,60 +3929,67 @@
           "label": "Tasks, microtasks and rendering opportunities",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Document script tasks, bounded microtask checkpoints and lifecycle cancellation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "pub fn run_next"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn jobs_queued_by_scripts_and_jobs_run_before_the_next_script"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn engine_shutdown_cancels_queued_script_turns"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub fn run_next"
             },
             {
-              "label": "Task-source selection, host clock and timers",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/tasks.rs",
-                  "marker": "pub(crate) fn pop_ready"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "pub fn into_scripted_with_clock"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn timer_turns_follow_deadlines_and_alternate_with_immediate_tasks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn timer_ids_are_document_scoped_and_cancellation_refunds_both_limits"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn jobs_queued_by_scripts_and_jobs_run_before_the_next_script"
             },
             {
-              "label": "Rendering opportunities and frame ordering",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn engine_shutdown_cancels_queued_script_turns"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/tasks.rs",
+              "marker": "pub(crate) fn pop_ready"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub fn into_scripted_with_clock"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn timer_turns_follow_deadlines_and_alternate_with_immediate_tasks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn timer_ids_are_document_scoped_and_cancellation_refunds_both_limits"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub fn run_next_with_render"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/frames.rs",
+              "marker": "pub(crate) fn accept"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/frames.rs",
+              "marker": "fn rendering_follows_script_checkpoints_and_alternates_with_ready_work"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/frames.rs",
+              "marker": "fn shutdown_during_rendering_discards_the_output_and_ticket"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn scheduled_rendering_turn_produces_the_reference_png"
             }
           ]
         },

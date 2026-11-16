@@ -111,6 +111,20 @@ and animation APIs, parser-scheduled scripts and layout invalidation remain open
 [ADR 0022](adr/0022-document-task-sources-and-timers.md),
 [ADR 0023](adr/0023-document-rendering-turns.md)
 
+## WEB-02 — Web IDL conversion foundation
+
+`rustic-bindings::webidl` implements `DOMString` round trips, nullable
+and legacy null policies, `ByteString`, `USVString`, and signed and
+unsigned 32-bit IDL integers. Numeric modes cover wrapping, `[Clamp]`
+and `[EnforceRange]`. Conversions reuse `ToString` and `ToNumber`,
+keep the input object alive across coercion, preserve user exceptions
+and return a TypeError for invalid IDL input.
+
+Tests exercise conversion boundaries, user getters and garbage collection
+through host and native JavaScript calls. Generated bindings, realm-aware
+wrappers and DOMException exposure are separate WEB-02 steps.
+[ADR 0024](adr/0024-web-idl-conversions.md)
+
 ## DOC-03 and DOC-04a — Document-owned tree core
 
 Implemented in `rustic-dom`, depending only on `rustic-base`:

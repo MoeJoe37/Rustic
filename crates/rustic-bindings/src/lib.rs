@@ -1,7 +1,6 @@
-//! JavaScript/DOM bindings (WEB-02 grows here). For now this crate holds the
-//! part JS-03 needs: wrapper identity for nodes and the single garbage
-//! collection that spans one document and one JavaScript agent (ADR 0012,
-//! ADR 0016).
+//! JavaScript/DOM bindings. WEB-02 adds [Web IDL conversions](webidl) to the
+//! existing node wrapper identity and shared collection across one document
+//! and one JavaScript agent (ADR 0012, ADR 0016).
 //!
 //! A node's wrapper is a JS host object. Holding a wrapper keeps the node's
 //! whole tree alive, a live tree keeps its nodes' wrappers and their
@@ -36,5 +35,6 @@
 #![warn(missing_docs)]
 
 mod heap;
+pub mod webidl;
 
 pub use heap::{DomGcError, DomGcStats, DomHeap};

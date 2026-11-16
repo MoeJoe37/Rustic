@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "1070b225df00e8abd755efa2f40b8eb6c5891f3f90cf6b0867c5cc109d272954",
-  "percent": "29.90",
+  "source_fingerprint": "986dd9ceca5434b2e0adf78ea4d36a288aca66acf73bd0d4025c17bbb7436017",
+  "percent": "30.05",
   "verified_percent": "28.86",
-  "partial_percent": "1.04",
+  "partial_percent": "1.19",
   "completed": 67,
-  "in_progress": 5,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 2,
       "total": 12,
-      "percent": "10.62",
+      "percent": "13.57",
       "verified_percent": "10.62",
-      "partial_percent": "0.00"
+      "partial_percent": "2.95"
     },
     {
       "id": "M6",
@@ -4277,9 +4277,62 @@
           "label": "Web IDL tooling, conversions and rooted wrappers",
           "size": 5,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Web IDL string and 32-bit integer conversions with rooted coercion",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/webidl.rs",
+                  "marker": "pub fn to_dom_string"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/webidl.rs",
+                  "marker": "pub fn to_unsigned_long"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/webidl.rs",
+                  "marker": "fn string_kinds_apply_their_distinct_code_unit_rules"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/webidl.rs",
+                  "marker": "fn integer_modes_wrap_clamp_and_enforce_range_at_the_boundaries"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/webidl.rs",
+                  "marker": "fn host_coercion_roots_input_across_collecting_getters"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/webidl.rs",
+                  "marker": "fn native_bindings_keep_user_exceptions_and_throw_type_errors_in_javascript"
+                }
+              ]
+            },
+            {
+              "label": "Pinned Web IDL subset generator and binding metadata",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Realm-aware node wrapper identity and DOM/JS tracing",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "DOMException bindings and host error conversion",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.62"
         },
         {
@@ -4436,12 +4489,12 @@
       ],
       "points": 40,
       "completed": 1,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "0.37",
-      "percent": "7.50",
+      "contribution": "0.53",
+      "percent": "10.62",
       "verified_percent": "7.50",
-      "partial_percent": "0.00"
+      "partial_percent": "3.12"
     },
     {
       "id": "media",

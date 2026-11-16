@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1382" viewBox="0 0 1000 1382" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 29.90%</title>
-<desc id="desc">Weighted engine completion is 29.90%: 28.86% from capabilities verified complete and 1.04% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
+<title id="title">Rustic engine completion: 30.05%</title>
+<desc id="desc">Weighted engine completion is 30.05%: 28.86% from capabilities verified complete and 1.19% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
-<text x="24.00" y="60" fill="#8b949e" font-size="12">67/221 capabilities complete · 5 in progress · 25 subsystems · engine-v4</text>
-<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">29.90%</text>
+<text x="24.00" y="60" fill="#8b949e" font-size="12">67/221 capabilities complete · 6 in progress · 25 subsystems · engine-v4</text>
+<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">30.05%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
-<rect x="24.00" y="76" width="284.65" height="14" rx="4" fill="#388bfd"/>
+<rect x="24.00" y="76" width="286.08" height="14" rx="4" fill="#388bfd"/>
 <rect x="24.00" y="76" width="274.75" height="14" rx="4" fill="#2ea043"/>
 <rect x="24" y="104" width="10" height="10" rx="2" fill="#2ea043"/>
 <text x="40.00" y="113" fill="#c9d1d9" font-size="12">28.86% verified complete</text>
 <rect x="224" y="104" width="10" height="10" rx="2" fill="#388bfd"/>
-<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+1.04% partial credit (verified steps)</text>
+<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+1.19% partial credit (verified steps)</text>
 <rect x="524" y="104" width="10" height="10" rx="2" fill="#30363d"/>
-<text x="540.00" y="113" fill="#c9d1d9" font-size="12">70.10% remaining</text>
+<text x="540.00" y="113" fill="#c9d1d9" font-size="12">69.95% remaining</text>
 <text x="24.00" y="142" fill="#f0f6fc" font-size="14" font-weight="600">Scope map</text>
 <text x="976.00" y="142" fill="#8b949e" font-size="11" text-anchor="end">block width = share of engine · fill = subsystem progress</text>
 <g><title>Foundation: 100.00% of 1% engine weight (1.00 engine points)</title>
@@ -80,8 +80,9 @@
 <rect x="428.10" y="184" width="1" height="16" fill="#30363d"/>
 <text x="428.60" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Wasm</text>
 </g>
-<g><title>Bindings &amp; web APIs: 7.50% of 5% engine weight (0.37 engine points)</title>
+<g><title>Bindings &amp; web APIs: 10.62% of 5% engine weight (0.53 engine points)</title>
 <rect x="443.88" y="150" width="45.60" height="32" rx="3" fill="#21262d"/>
+<rect x="443.88" y="150" width="4.84" height="32" rx="3" fill="#388bfd"/>
 <rect x="443.88" y="150" width="3.42" height="32" rx="3" fill="#2ea043"/>
 <rect x="466.18" y="184" width="1" height="4" fill="#30363d"/>
 <text x="466.68" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Web</text>
@@ -192,12 +193,13 @@
 <text x="434.00" y="368" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">99.23%</text>
 <text x="488.00" y="368" fill="#8b949e" font-size="11" text-anchor="end">8.90%</text>
 </g>
-<g><title>M5 Scripted documents: 10.62% (2/12 capabilities, 5.29% of engine)</title>
+<g><title>M5 Scripted documents: 13.57% (2/12 capabilities, 5.29% of engine)</title>
 <text x="24.00" y="398" fill="#8b949e" font-size="12" font-weight="600">M5</text>
 <text x="60.00" y="398" fill="#c9d1d9" font-size="12">Scripted documents</text>
 <rect x="224.00" y="389" width="150.00" height="10" rx="3" fill="#21262d"/>
+<rect x="224.00" y="389" width="20.36" height="10" rx="3" fill="#388bfd"/>
 <rect x="224.00" y="389" width="15.93" height="10" rx="3" fill="#2ea043"/>
-<text x="434.00" y="398" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">10.62%</text>
+<text x="434.00" y="398" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">13.57%</text>
 <text x="488.00" y="398" fill="#8b949e" font-size="11" text-anchor="end">5.29%</text>
 </g>
 <g><title>M6 Networking &amp; services: 0.00% (0/12 capabilities, 4.38% of engine)</title>
@@ -660,14 +662,17 @@
 </g>
 <text x="976.00" y="827" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
-<g><title>Bindings &amp; web APIs: 1/10 capabilities complete, 7.50% done, 0.37 of 5 engine points</title>
+<g><title>Bindings &amp; web APIs: 1/10 capabilities complete, 10.62% done, 0.53 of 5 engine points</title>
 <text x="32.00" y="857" fill="#f0f6fc" font-size="12">Bindings &amp; web APIs</text>
 <text x="236.00" y="857" fill="#8b949e" font-size="12" text-anchor="end">5%</text>
 <rect x="252.00" y="848" width="200.00" height="10" rx="3" fill="#21262d"/>
+<rect x="252.00" y="848" width="21.24" height="10" rx="3" fill="#388bfd"/>
 <rect x="252.00" y="848" width="15.00" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="857" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">7.50%</text>
-<g><title>Web IDL tooling, conversions and rooted wrappers: planned, size 5, M5</title>
+<text x="504.00" y="857" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">10.62%</text>
+<g><title>Web IDL tooling, conversions and rooted wrappers: in progress, size 5, M5, 25.00% verified</title>
 <rect x="520.00" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
+<rect x="520.00" y="846" width="11.38" height="14" rx="2" fill="#388bfd"/>
+<rect x="520.50" y="846.5" width="44.50" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <g><title>Window/Document/Element bindings and identity: planned, size 5, M5</title>
 <rect x="567.50" y="846" width="45.50" height="14" rx="2" fill="#30363d"/>
@@ -696,7 +701,7 @@
 <g><title>Performance timeline, Navigation/Resource Timing and Reporting APIs: planned, size 3, M11</title>
 <rect x="871.50" y="846" width="26.50" height="14" rx="2" fill="#30363d"/>
 </g>
-<text x="976.00" y="857" fill="#c9d1d9" font-size="12" text-anchor="end">0.37</text>
+<text x="976.00" y="857" fill="#c9d1d9" font-size="12" text-anchor="end">0.53</text>
 </g>
 <g><title>Media &amp; real-time: 0/9 capabilities complete, 0.00% done, 0.00 of 5 engine points</title>
 <rect x="24" y="868" width="952" height="30" fill="#161b22"/>
@@ -1149,6 +1154,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 1070b225df00</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 986dd9ceca54</text>
 </g>
 </svg>

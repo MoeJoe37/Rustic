@@ -244,6 +244,11 @@ distinct. No Rust lock or DOM mutable borrow is held across a call into page JS.
 Event dispatch, custom callbacks, and getters are reentry points. Define safe
 points and root scopes before implementing them.
 
+The Web IDL conversion layer roots each object it coerces and propagates
+ECMAScript exceptions through the agent. Binding callers complete
+coercion before borrowing the DOM for mutation.
+[ADR 0024](adr/0024-web-idl-conversions.md)
+
 The headless coordinator now offers an explicit scripted document owner.
 It runs immediate and timed host script tasks with bounded microtask
 checkpoints and one cancellation scope. The host clock governs timer

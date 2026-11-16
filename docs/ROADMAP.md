@@ -310,6 +310,11 @@ rendered output with document-scoped tickets.
 [ADR 0022](adr/0022-document-task-sources-and-timers.md),
 [ADR 0023](adr/0023-document-rendering-turns.md)
 
+WEB-02 has string and 32-bit integer conversion helpers with rooted
+coercion and JavaScript exception propagation. The pinned IDL generator,
+realm-aware wrappers and DOMException bindings remain open.
+[ADR 0024](adr/0024-web-idl-conversions.md)
+
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.
 

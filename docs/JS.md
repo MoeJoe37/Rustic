@@ -818,9 +818,8 @@ contract, the benchmark corpus and the heap-size report.
   dense array of 1,000 numbers (8,074), 1,000-character Latin-1 and UTF-16
   strings (1,025 and 2,025), closures (120, and 184 with one captured
   variable), a symbol, compiled code (232 bytes for an empty function and
-  26 per instruction with its tables) and a new agent with the library
-  (121,010; it was 105,954 before `SharedArrayBuffer` and `Atomics` were
-  installed). The test compares a fresh report with the committed file on
+  26 per instruction with its tables), and a new agent with the standard
+  library. The test compares a fresh report with the committed file on
   64-bit targets and names `RUSTIC_HEAP_REPORT_BLESS=1` to regenerate it; a
   line that grows needs an explanation in the same change.
 - **Runner.** `cargo run --release -p rustic-js --example js_bench` runs
@@ -863,8 +862,9 @@ longest pause grows with the live heap, about 0.17 ms per MiB
 live data, which is the measured trigger of TD-95; incremental marking is
 `perf.gc` (M12). The native Linux ARM64 CI job runs the same release corpus
 and writes its timings, processor, kernel, Rust version and source revision
-to the job summary. The milestone still needs a successful native ARM64 run
-and its recorded results.
+to the job summary. The [JS-09 sandbox report](reviews/2026-11-15-m4-js09.md)
+records the native x86-64 benchmarks for `cb0cf04` and gives the capture
+commands for the outstanding native ARM64 run.
 
 ## Built-ins (JS-05)
 

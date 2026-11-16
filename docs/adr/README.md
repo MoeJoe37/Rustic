@@ -33,6 +33,7 @@ instead of rewriting the history of a decision.
 | [0022](0022-document-task-sources-and-timers.md) | Immediate and timed script sources, monotonic host clocks and timer cancellation | Accepted for WEB-01 host timers |
 | [0023](0023-document-rendering-turns.md) | Coalesced rendering opportunities and document-local frame ordering | Accepted for WEB-01 rendering turns |
 | [0024](0024-web-idl-conversions.md) | Rooted ECMAScript coercion and explicit Web IDL string and integer policies | Accepted for the initial WEB-02 conversion layer |
+| [0025](0025-pinned-dom-idl-metadata.md) | Reproducible metadata from pinned DOM Standard IDL | Accepted for the WEB-02 text interfaces |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

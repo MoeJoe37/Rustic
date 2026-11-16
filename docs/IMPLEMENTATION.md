@@ -121,9 +121,18 @@ keep the input object alive across coercion, preserve user exceptions
 and return a TypeError for invalid IDL input.
 
 Tests exercise conversion boundaries, user getters and garbage collection
-through host and native JavaScript calls. Generated bindings, realm-aware
-wrappers and DOMException exposure are separate WEB-02 steps.
-[ADR 0024](adr/0024-web-idl-conversions.md)
+through host and native JavaScript calls. The pinned generator emits typed
+metadata for `CharacterData`, `Text`, `CDATASection` and `Comment`. The
+metadata drives argument conversion, including optional constructor defaults
+and legacy null handling on the data setter. A Rust test uses those
+conversions to edit a DOM text node.
+
+Run `python3 tools/generate_dom_idl.py --check` to verify the committed
+output offline. Pass `--upstream-source /path/to/dom.bs` to verify the full
+pinned source and selected declarations as well. Realm-aware wrappers and
+DOMException bindings remain open.
+[ADR 0024](adr/0024-web-idl-conversions.md),
+[ADR 0025](adr/0025-pinned-dom-idl-metadata.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

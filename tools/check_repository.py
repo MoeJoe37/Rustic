@@ -8,6 +8,7 @@ import re
 import sys
 import tomllib
 from urllib.parse import unquote, urlsplit
+import generate_dom_idl
 import import_html_entities
 import import_html_tests
 import import_html_tree_tests
@@ -310,6 +311,11 @@ def main() -> int:
     check_html_fixture("references")
     check_html_fixture("text")
     check_entities()
+    try:
+        generate_dom_idl.check()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        error(generate_dom_idl.MANIFEST, str(exc))
+
     try:
         import_css_tests.check()
     except (OSError, ValueError) as exc:

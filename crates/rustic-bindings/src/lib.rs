@@ -35,6 +35,7 @@
 #![warn(missing_docs)]
 
 mod heap;
+pub mod metadata;
 pub mod webidl;
 
 pub use heap::{DomGcError, DomGcStats, DomHeap};

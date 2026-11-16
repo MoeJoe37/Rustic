@@ -78,6 +78,12 @@ in separately. Generated artifacts go under ignored `artifacts` or `target`.
 Generated source must identify its input revision and reproducible generator;
 test whether checked-in generated output is fresh once generators exist.
 
+The bindings crate vendors selected WHATWG DOM Web IDL declarations, a
+revision and checksum manifest, and the upstream license. The offline
+generator verifies those inputs and reproduces the committed Rust metadata.
+[IDL manifest](../crates/rustic-bindings/idl/dom_manifest.json),
+[WHATWG DOM license](../crates/rustic-bindings/idl/WHATWG-DOM-LICENSE.txt)
+
 Current imported test data includes a pinned BSD-licensed WPT URL subset and an
 MIT-licensed html5lib declaration-tokenizer subset. Their per-crate fixture
 directories retain notices, source revisions/digests, selection manifests and

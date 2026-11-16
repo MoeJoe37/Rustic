@@ -3954,8 +3954,34 @@
             },
             {
               "label": "Pinned Web IDL subset generator and binding metadata",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/generate_dom_idl.py",
+                  "marker": "def generate"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/metadata.rs",
+                  "marker": "pub fn interface"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/tests/test_generate_dom_idl.py",
+                  "marker": "def test_committed_metadata_reproduces_offline"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/metadata.rs",
+                  "marker": "fn generated_argument_metadata_drives_character_data_conversion"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/metadata.rs",
+                  "marker": "fn generated_text_constructor_distinguishes_defaults_from_null"
+                }
+              ]
             },
             {
               "label": "Realm-aware node wrapper identity and DOM/JS tracing",

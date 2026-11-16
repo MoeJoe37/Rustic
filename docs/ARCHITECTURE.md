@@ -246,8 +246,10 @@ points and root scopes before implementing them.
 
 The Web IDL conversion layer roots each object it coerces and propagates
 ECMAScript exceptions through the agent. Binding callers complete
-coercion before borrowing the DOM for mutation.
-[ADR 0024](adr/0024-web-idl-conversions.md)
+coercion before borrowing the DOM for mutation. Pinned IDL declarations
+generate the text interface metadata consumed by these conversion paths.
+[ADR 0024](adr/0024-web-idl-conversions.md),
+[ADR 0025](adr/0025-pinned-dom-idl-metadata.md)
 
 The headless coordinator now offers an explicit scripted document owner.
 It runs immediate and timed host script tasks with bounded microtask

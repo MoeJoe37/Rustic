@@ -1,0 +1,12 @@
+{
+  "revision": "e4f4f4f0ace83fe6c52ab68e047351ce7f2dcd69",
+  "interfaces": [
+    "CharacterData",
+    "Text",
+    "CDATASection",
+    "Comment"
+  ],
+  "dom_bs_sha256": "19a6d0b92549926f971a0d181d501b694a3129b7a3d3bbedccafaf30c26bd570",
+  "subset_sha256": "b10303f9e3d580a242ec0b1bfc8490aef7fc03d8f0bf84ab88651bbfef79d9a1",
+  "license_sha256": "85dc6f5ccb57a6fe8c33d158f9fc8fc7ee5655a5d3db2cdd131c6a3d0f48a864"
+}

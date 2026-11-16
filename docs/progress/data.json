@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "986dd9ceca5434b2e0adf78ea4d36a288aca66acf73bd0d4025c17bbb7436017",
-  "percent": "30.05",
+  "source_fingerprint": "6f0c6acbeeb073d823a95a22d2695646b0afa2d6a890e33fd6731ba8f887346f",
+  "percent": "30.21",
   "verified_percent": "28.86",
-  "partial_percent": "1.19",
+  "partial_percent": "1.35",
   "completed": 67,
   "in_progress": 6,
   "total": 221,
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 2,
       "total": 12,
-      "percent": "13.57",
+      "percent": "16.52",
       "verified_percent": "10.62",
-      "partial_percent": "2.95"
+      "partial_percent": "5.90"
     },
     {
       "id": "M6",
@@ -4318,8 +4318,34 @@
             },
             {
               "label": "Pinned Web IDL subset generator and binding metadata",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/generate_dom_idl.py",
+                  "marker": "def generate"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/metadata.rs",
+                  "marker": "pub fn interface"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/tests/test_generate_dom_idl.py",
+                  "marker": "def test_committed_metadata_reproduces_offline"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/metadata.rs",
+                  "marker": "fn generated_argument_metadata_drives_character_data_conversion"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/metadata.rs",
+                  "marker": "fn generated_text_constructor_distinguishes_defaults_from_null"
+                }
+              ]
             },
             {
               "label": "Realm-aware node wrapper identity and DOM/JS tracing",
@@ -4332,7 +4358,7 @@
               "evidence": []
             }
           ],
-          "credit": "25.00",
+          "credit": "50.00",
           "engine_share": "0.62"
         },
         {
@@ -4491,10 +4517,10 @@
       "completed": 1,
       "in_progress": 1,
       "total": 10,
-      "contribution": "0.53",
-      "percent": "10.62",
+      "contribution": "0.68",
+      "percent": "13.75",
       "verified_percent": "7.50",
-      "partial_percent": "3.12"
+      "partial_percent": "6.25"
     },
     {
       "id": "media",

@@ -3985,8 +3985,39 @@
             },
             {
               "label": "Realm-aware node wrapper identity and DOM/JS tracing",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/heap.rs",
+                  "marker": "pub fn collect_documents"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/heap.rs",
+                  "marker": "pub fn adopt_node"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn each_realm_keeps_its_own_wrapper_and_prototype"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn registered_documents_trace_transitive_edges_in_one_collection"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn adoption_retargets_owned_descendants_and_preserves_realm_expandos"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn failed_adoption_keeps_source_wrapper_and_edge"
+                }
+              ]
             },
             {
               "label": "DOMException bindings and host error conversion",

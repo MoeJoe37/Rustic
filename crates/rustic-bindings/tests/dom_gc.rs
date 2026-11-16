@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use rustic_bindings::{DomGcError, DomHeap};
 use rustic_dom::{Document, DocumentLimits, NodeId, QualifiedName, ShadowRootMode};
-use rustic_js::runtime::{Agent, ObjectId, PropertyKey, Roots, Value};
+use rustic_js::runtime::{Agent, ObjectId, PropertyKey, RealmId, Roots, Value};
 
 struct World {
     agent: Agent,
@@ -529,4 +529,213 @@ fn stress_mode_collects_at_every_safe_point_without_losing_held_values() {
     let attached = 20;
     assert!(w.doc.node_count() >= 2 + attached);
     assert!(w.doc.node_count() < 2 + 200);
+}
+
+#[test]
+fn each_realm_keeps_its_own_wrapper_and_prototype() {
+    let mut w = World::new();
+    let node = w.element("item");
+    let main = w.wrap(node);
+    let main_proto = w.agent.intrinsics.object_prototype;
+    let realm = w.agent.create_realm().unwrap();
+    assert_eq!(w.agent.enter_realm(realm), RealmId::MAIN);
+    let other_proto = w.agent.intrinsics.object_prototype;
+    let other = w.wrap(node);
+    assert_ne!(main, other);
+    assert_ne!(main_proto, other_proto);
+    assert_eq!(w.agent.get_prototype_of(main).unwrap(), Some(main_proto));
+    assert_eq!(w.agent.get_prototype_of(other).unwrap(), Some(other_proto));
+    assert_eq!(w.wrap(node), other);
+    assert_eq!(w.dom.existing_wrapper(node), Some(main));
+    assert_eq!(w.dom.existing_wrapper_in_realm(node, realm), Some(other));
+    w.set(other, "expando", Value::TRUE);
+    assert_eq!(w.collect(&[main]).0, 0);
+    let key = w.key("expando");
+    assert_eq!(w.agent.get(other, key).unwrap(), Value::TRUE);
+    assert_eq!(w.agent.get(main, key).unwrap(), Value::UNDEFINED);
+    w.agent.enter_realm(RealmId::MAIN);
+    assert_eq!(w.wrap(node), main);
+    assert_eq!(w.collect(&[]), (1, 2));
+    assert_eq!(w.dom.wrapper_count(), 0);
+}
+
+#[test]
+fn registered_documents_trace_transitive_edges_in_one_collection() {
+    let mut w = World::new();
+    let mut other = Document::new(DocumentLimits::default()).unwrap();
+    assert!(w.dom.attach_document(&other).unwrap());
+    assert!(!w.dom.attach_document(&other).unwrap());
+    let local = w.element("local");
+    let local_wrapper = w.wrap(local);
+    let remote = other.create_text("remote").unwrap();
+    let remote_wrapper = w.dom.wrap(&mut w.agent, &other, remote).unwrap();
+    let root = w.doc.root();
+    w.dom
+        .add_edge(&w.doc, root, Value::object(remote_wrapper))
+        .unwrap();
+    w.dom
+        .add_edge(&other, remote, Value::object(local_wrapper))
+        .unwrap();
+    assert_eq!(
+        w.dom.collect(&mut w.agent, &mut w.doc, Roots::default()),
+        Err(DomGcError::DocumentSet)
+    );
+    assert_eq!(
+        w.dom.node_of(&w.agent, &other, remote_wrapper),
+        Some(remote)
+    );
+    let stats = w
+        .dom
+        .collect_documents(
+            &mut w.agent,
+            &mut [&mut other, &mut w.doc],
+            Roots::default(),
+        )
+        .unwrap();
+    assert_eq!(stats.nodes_destroyed, 0);
+    assert_eq!(stats.wrappers_freed, 0);
+    assert!(w.dom.remove_edge(root, Value::object(remote_wrapper)));
+    let stats = w
+        .dom
+        .collect_documents(
+            &mut w.agent,
+            &mut [&mut w.doc, &mut other],
+            Roots::default(),
+        )
+        .unwrap();
+    assert_eq!(stats.nodes_destroyed, 2);
+    assert_eq!(stats.wrappers_freed, 2);
+    assert_eq!(stats.edges_dropped, 1);
+    assert_eq!(w.doc.node_count(), 1);
+    assert_eq!(other.node_count(), 1);
+}
+
+#[test]
+fn adoption_retargets_owned_descendants_and_preserves_realm_expandos() {
+    let mut w = World::new();
+    let mut target = Document::new(DocumentLimits::default()).unwrap();
+    w.dom.attach_document(&target).unwrap();
+    let host = w.element("section");
+    let shadow = w.doc.attach_shadow(host, ShadowRootMode::Open).unwrap();
+    let child = w.doc.create_text("child").unwrap();
+    w.doc.append_child(shadow, child).unwrap();
+    let main = w.wrap(child);
+    let realm = w.agent.create_realm().unwrap();
+    w.agent.enter_realm(realm);
+    let other = w.wrap(child);
+    w.set(main, "expando", Value::TRUE);
+    w.set(other, "expando", Value::FALSE);
+    let listener = w.agent.new_object().unwrap();
+    w.set(listener, "alive", Value::TRUE);
+    w.dom
+        .add_edge(&w.doc, shadow, Value::object(listener))
+        .unwrap();
+
+    let adopted = w.dom.adopt_node(&mut target, &mut w.doc, host).unwrap();
+    let ids: HashMap<_, _> = adopted.ids.into_iter().collect();
+    for &old in &[host, shadow, child] {
+        assert!(w.doc.node(old).is_err());
+        assert!(target.node(ids[&old]).is_ok());
+    }
+    assert_eq!(w.dom.existing_wrapper(child), None);
+    assert_eq!(w.dom.node_of(&w.agent, &w.doc, main), None);
+    for wrapper in [main, other] {
+        assert_eq!(w.dom.node_of(&w.agent, &target, wrapper), Some(ids[&child]));
+    }
+    assert_eq!(
+        w.dom.wrap(&mut w.agent, &target, ids[&child]).unwrap(),
+        other
+    );
+    w.agent.enter_realm(RealmId::MAIN);
+    assert_eq!(
+        w.dom.wrap(&mut w.agent, &target, ids[&child]).unwrap(),
+        main
+    );
+
+    let roots = [Value::object(other)];
+    let stats = w
+        .dom
+        .collect_documents(
+            &mut w.agent,
+            &mut [&mut target, &mut w.doc],
+            Roots {
+                values: &roots,
+                ..Roots::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(stats.nodes_destroyed, 0);
+    assert_eq!(stats.wrappers_freed, 0);
+    let alive = w.key("alive");
+    assert_eq!(w.agent.get(listener, alive).unwrap(), Value::TRUE);
+    let key = w.key("expando");
+    assert_eq!(w.agent.get(main, key).unwrap(), Value::TRUE);
+    assert_eq!(w.agent.get(other, key).unwrap(), Value::FALSE);
+    assert!(!w.dom.remove_edge(shadow, Value::object(listener)));
+    assert!(w.dom.remove_edge(ids[&shadow], Value::object(listener)));
+    let stats = w
+        .dom
+        .collect_documents(
+            &mut w.agent,
+            &mut [&mut target, &mut w.doc],
+            Roots::default(),
+        )
+        .unwrap();
+    assert_eq!(stats.nodes_destroyed, 3);
+    assert_eq!(stats.wrappers_freed, 2);
+    assert_eq!(stats.js.objects_freed, 3);
+    w.doc.check_invariants().unwrap();
+    target.check_invariants().unwrap();
+}
+
+#[test]
+fn failed_adoption_keeps_source_wrapper_and_edge() {
+    let mut w = World::new();
+    let mut target = Document::new(DocumentLimits {
+        max_nodes: 1,
+        ..DocumentLimits::default()
+    })
+    .unwrap();
+    let node = w.element("item");
+    let wrapper = w.wrap(node);
+    let listener = Value::object(w.agent.new_object().unwrap());
+    w.dom.add_edge(&w.doc, node, listener).unwrap();
+    assert_eq!(
+        w.dom.adopt_node(&mut target, &mut w.doc, node),
+        Err(DomGcError::WrongDocument)
+    );
+    w.dom.attach_document(&target).unwrap();
+    assert_eq!(
+        w.dom.adopt_node(&mut target, &mut w.doc, node),
+        Err(DomGcError::Dom(rustic_dom::DomError::NodeLimit))
+    );
+    assert_eq!(w.dom.node_of(&w.agent, &w.doc, wrapper), Some(node));
+    assert_eq!(w.wrap(node), wrapper);
+    assert!(w.dom.remove_edge(node, listener));
+    assert_eq!(target.node_count(), 1);
+}
+
+#[test]
+fn other_agents_and_unrelated_host_objects_cannot_name_nodes() {
+    let mut w = World::new();
+    let node = w.element("item");
+    let wrapper = w.wrap(node);
+    let data = w.agent.host_data(wrapper).unwrap();
+    let unrelated = w.agent.new_host_object(None, data).unwrap();
+    assert_eq!(w.dom.node_of(&w.agent, &w.doc, unrelated), None);
+    let mut other = Agent::new().unwrap();
+    let foreign = other.new_host_object(None, data).unwrap();
+    assert_eq!(wrapper, foreign, "raw object slots coincide between agents");
+    assert_eq!(w.dom.node_of(&other, &w.doc, foreign), None);
+    assert_eq!(
+        w.dom.wrap(&mut other, &w.doc, node),
+        Err(DomGcError::WrongAgent)
+    );
+    assert_eq!(
+        w.dom.collect(&mut other, &mut w.doc, Roots::default()),
+        Err(DomGcError::WrongAgent)
+    );
+    assert_eq!(w.collect(&[unrelated]), (1, 1));
+    assert_eq!(w.dom.node_of(&w.agent, &w.doc, wrapper), None);
+    assert_eq!(w.agent.host_data(unrelated), Some(data));
 }

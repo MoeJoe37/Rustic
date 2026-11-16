@@ -79,7 +79,8 @@ one document: a reachable wrapper marks its node's whole tree in the DOM's own
 mark table, each newly marked node reports its wrapper and node-held values
 back, and after the JS sweep the DOM destroys unmarked trees. That is one
 marking phase over both heaps, so node/wrapper/listener cycles need no special
-case.
+case. [ADR 0026](0026-realm-dom-wrappers.md) extends this contract to multiple
+documents and realms.
 
 **Policy.** Collect when charged bytes reach a threshold: 1 MiB at first, then
 twice the live footprint after each collection (at least 1 MiB above it), and

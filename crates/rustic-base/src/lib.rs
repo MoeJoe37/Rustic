@@ -31,7 +31,7 @@ pub use geometry::{
     Css, Device, GeometryError, Length, MAX_COORDINATE, Point2, Rect, Scale, Size2,
     SurfaceAllocation, SurfaceError, SurfaceLimits,
 };
-pub use id::{DocumentId, IdExhausted, NodeId};
+pub use id::{DocumentId, IdExhausted, IdSequence, NodeId};
 pub use redact::{DiagnosticValue, EscapedText, REDACTED, RedactionPolicy, Sensitivity};
 pub use revision::{LocationError, RevisionExhausted, SourceId, SourceLocation, SourceRevision};
 pub use source::{InvalidSpan, SourceSpan};

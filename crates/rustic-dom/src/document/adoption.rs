@@ -16,8 +16,8 @@ use crate::{DomError, Element, NodeKind, ShadowRootMode};
 /// Node IDs embed their document, so adoption gives every node a new ID in the
 /// target document. `ids` maps each old ID to its new ID in preorder (template
 /// contents and shadow trees follow the whole tree they hang off), with the
-/// root first. A future
-/// binding layer uses this map to retarget wrappers; the old IDs are invalid.
+/// root first. The binding layer uses this map to retarget wrappers; the old
+/// IDs are invalid.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Adopted {
     /// The adopted subtree's root in the target document.
@@ -72,6 +72,18 @@ impl Document {
     /// cannot be adopted. Any failure, including this
     /// document's node, data or depth limits, leaves both documents unchanged.
     pub fn adopt_node(&mut self, source: &mut Document, node: NodeId) -> Result<Adopted, DomError> {
+        self.adopt_node_with_preflight(source, node, |_| Ok(()))
+    }
+
+    /// Adopt after the host reserves any storage needed to retarget its
+    /// handles. The callback receives the number of identities to be moved
+    /// and runs before either document changes.
+    pub fn adopt_node_with_preflight(
+        &mut self,
+        source: &mut Document,
+        node: NodeId,
+        preflight: impl FnOnce(usize) -> Result<(), DomError>,
+    ) -> Result<Adopted, DomError> {
         if node == source.root {
             return Err(DomError::ProtectedRoot);
         }
@@ -83,6 +95,7 @@ impl Document {
         ids.try_reserve_exact(plan.len())
             .map_err(|_| DomError::AllocationFailed)?;
         ids.extend(plan.iter().map(|item| (item.source, item.source)));
+        preflight(plan.len())?;
         let created = self.materialize(plan)?;
         for (pair, new) in ids.iter_mut().zip(created) {
             pair.1 = new;

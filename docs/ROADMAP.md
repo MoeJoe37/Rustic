@@ -312,10 +312,12 @@ rendered output with document-scoped tickets.
 
 WEB-02 has string and 32-bit integer conversion helpers with rooted
 coercion and JavaScript exception propagation. A pinned generator emits
-binding metadata for the initial DOM text interfaces. Realm-aware
-wrappers and DOMException bindings remain open.
+binding metadata for the initial DOM text interfaces. Its wrapper cache
+preserves realm identity across adoption and traces all registered
+documents together. DOMException and host error conversion remain open.
 [ADR 0024](adr/0024-web-idl-conversions.md),
-[ADR 0025](adr/0025-pinned-dom-idl-metadata.md)
+[ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
+[ADR 0026](adr/0026-realm-dom-wrappers.md)
 
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.

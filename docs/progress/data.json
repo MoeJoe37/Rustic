@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "6f0c6acbeeb073d823a95a22d2695646b0afa2d6a890e33fd6731ba8f887346f",
-  "percent": "30.21",
+  "source_fingerprint": "49e9799b1109057e99bb73fd8e6ec2d2d560f978034a5db99ba6d1abffcabfca",
+  "percent": "30.36",
   "verified_percent": "28.86",
-  "partial_percent": "1.35",
+  "partial_percent": "1.50",
   "completed": 67,
   "in_progress": 6,
   "total": 221,
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 2,
       "total": 12,
-      "percent": "16.52",
+      "percent": "19.47",
       "verified_percent": "10.62",
-      "partial_percent": "5.90"
+      "partial_percent": "8.85"
     },
     {
       "id": "M6",
@@ -4349,8 +4349,39 @@
             },
             {
               "label": "Realm-aware node wrapper identity and DOM/JS tracing",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/heap.rs",
+                  "marker": "pub fn collect_documents"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/heap.rs",
+                  "marker": "pub fn adopt_node"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn each_realm_keeps_its_own_wrapper_and_prototype"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn registered_documents_trace_transitive_edges_in_one_collection"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn adoption_retargets_owned_descendants_and_preserves_realm_expandos"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
+                  "marker": "fn failed_adoption_keeps_source_wrapper_and_edge"
+                }
+              ]
             },
             {
               "label": "DOMException bindings and host error conversion",
@@ -4358,7 +4389,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.62"
         },
         {
@@ -4517,10 +4548,10 @@
       "completed": 1,
       "in_progress": 1,
       "total": 10,
-      "contribution": "0.68",
-      "percent": "13.75",
+      "contribution": "0.84",
+      "percent": "16.87",
       "verified_percent": "7.50",
-      "partial_percent": "6.25"
+      "partial_percent": "9.37"
     },
     {
       "id": "media",

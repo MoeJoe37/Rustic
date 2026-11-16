@@ -2,6 +2,10 @@
 //! intrinsic objects of its realm (§9.3, §9.7). Built-in library objects
 //! beyond what JS-02's conversions need arrive with JS-05.
 
+use std::num::NonZeroU64;
+
+use rustic_base::IdSequence;
+
 use super::env::EnvId;
 use super::heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory};
 use super::number::number_to_string;
@@ -316,6 +320,12 @@ pub(crate) type RegExpCacheEntry = (
     std::rc::Rc<crate::regexp::Regex>,
 );
 
+/// Identity of an agent, used to scope host handles to the owning heap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AgentId(NonZeroU64);
+
+static NEXT_AGENT_ID: IdSequence = IdSequence::new();
+
 /// A realm of an agent (§9.3): its own global object and intrinsics.
 /// Realm 0 is the one the agent starts in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -341,6 +351,7 @@ pub(crate) struct RealmRecord {
 /// One agent and its realms.
 #[derive(Debug)]
 pub struct Agent {
+    id: AgentId,
     /// All values of the agent.
     pub heap: Heap,
     /// Interned names.
@@ -374,7 +385,9 @@ impl Agent {
         let names = Names::new(&mut heap)?;
         let symbols = WellKnownSymbols::new(&mut heap)?;
         let placeholder = ObjectId(0);
+        let id = NEXT_AGENT_ID.allocate().map_err(|_| OutOfMemory)?;
         let mut agent = Agent {
+            id: AgentId(id),
             heap,
             names,
             symbols,
@@ -446,6 +459,11 @@ impl Agent {
         // dictionaries while they were built; free the shapes they left.
         agent.collect_garbage(super::Roots::default());
         Ok(agent)
+    }
+
+    /// The identity of this agent's heap and realms.
+    pub fn id(&self) -> AgentId {
+        self.id
     }
 
     // ---- realms ------------------------------------------------------

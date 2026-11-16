@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 30.21%** = 28.86% verified complete + 1.35% partial credit. 67/221 capabilities complete, 6 in progress.
+**Overall completion: 30.36%** = 28.86% verified complete + 1.50% partial credit. 67/221 capabilities complete, 6 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `6f0c6acbeeb073d823a95a22d2695646b0afa2d6a890e33fd6731ba8f887346f`.
+Catalog: `engine-v4`. Source fingerprint: `49e9799b1109057e99bb73fd8e6ec2d2d560f978034a5db99ba6d1abffcabfca`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `6f0c6acbeeb073d823a95a22d2695646b0afa
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 12/13 | 99.23% | 95.38% | 8.90% |
-| M5 Scripted documents | 2/12 | 16.52% | 10.62% | 5.29% |
+| M5 Scripted documents | 2/12 | 19.47% | 10.62% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `6f0c6acbeeb073d823a95a22d2695646b0afa
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 12/15 | 2 | 91.09% | 84.93% | 10% | 9.10 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 1/10 | 1 | 13.75% | 7.50% | 5% | 0.68 |
+| Bindings & web APIs | 1/10 | 1 | 16.87% | 7.50% | 5% | 0.84 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -213,10 +213,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Bindings & web APIs
 
-- **in progress 50.00%** `web.idl` — Web IDL tooling, conversions and rooted wrappers · size 5 · M5 · 0.62% of engine
+- **in progress 75.00%** `web.idl` — Web IDL tooling, conversions and rooted wrappers · size 5 · M5 · 0.62% of engine
   - [x] Web IDL string and 32-bit integer conversions with rooted coercion ([source](../../crates/rustic-bindings/src/webidl.rs), [source](../../crates/rustic-bindings/src/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs))
   - [x] Pinned Web IDL subset generator and binding metadata ([source](../../tools/generate_dom_idl.py), [source](../../crates/rustic-bindings/src/metadata.rs), [test](../../tools/tests/test_generate_dom_idl.py), [test](../../crates/rustic-bindings/tests/metadata.rs), [test](../../crates/rustic-bindings/tests/metadata.rs))
-  - [ ] Realm-aware node wrapper identity and DOM/JS tracing
+  - [x] Realm-aware node wrapper identity and DOM/JS tracing ([source](../../crates/rustic-bindings/src/heap.rs), [source](../../crates/rustic-bindings/src/heap.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs))
   - [ ] DOMException bindings and host error conversion
 - **planned** `web.window` — Window/Document/Element bindings and identity · size 5 · M5 · 0.62% of engine
 - **complete** `web.scheduler` — Tasks, microtasks and rendering opportunities · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-engine/src/tasks.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [source](../../crates/rustic-engine/src/scripting.rs), [source](../../crates/rustic-engine/src/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-cli/src/loader.rs))

@@ -23,7 +23,7 @@ use super::heap::{ATOM_BYTES, Heap, OutOfMemory, ROPE_BYTES, Symbol};
 use super::object::{Closure, Internal, Object};
 use super::shape::{PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
-use super::value::{Kind, StringId, Value};
+use super::value::{Kind, ObjectId, StringId, Value};
 use crate::runtime::bigint::BigInt;
 use crate::vm::bytecode::CodeId;
 
@@ -195,6 +195,11 @@ pub trait HostTracer {
     /// it keeps alive. Called once per reachable host object.
     fn trace(&mut self, data: u64, sink: &mut dyn FnMut(Value));
 
+    /// Report the edges of a reachable host object with its heap identity.
+    fn trace_object(&mut self, _object: ObjectId, data: u64, sink: &mut dyn FnMut(Value)) {
+        self.trace(data, sink);
+    }
+
     /// A host object created with `data` was collected.
     fn finalize(&mut self, _data: u64) {}
 }
@@ -219,7 +224,7 @@ struct Marker<'h> {
     /// Scratch for keys of newly marked shapes.
     keys: Vec<PropertyKey>,
     /// Reachable host objects whose edges the host has not reported yet.
-    hosts: Vec<u64>,
+    hosts: Vec<(ObjectId, u64)>,
     /// Reachable weak objects, fixed up after marking.
     weak_refs: Vec<u32>,
     weak_maps: Vec<u32>,
@@ -318,8 +323,8 @@ impl Marker<'_> {
                     Gray::Code(index) => heap.codes.get(index).trace(self),
                 }
             }
-            while let Some(data) = self.hosts.pop() {
-                host.trace(data, &mut |value| self.value(value));
+            while let Some((object, data)) = self.hosts.pop() {
+                host.trace_object(object, data, &mut |value| self.value(value));
             }
             if !self.work.is_empty() {
                 continue;
@@ -384,7 +389,7 @@ impl Marker<'_> {
             }
             match &extra.internal {
                 None | Some(Internal::ImportRequest(_)) => {}
-                Some(Internal::Host(data)) => self.hosts.push(*data),
+                Some(Internal::Host(data)) => self.hosts.push((ObjectId(index), *data)),
                 Some(Internal::Iterator { target, kind, .. }) => {
                     self.value(*target);
                     if kind.walks_table() {

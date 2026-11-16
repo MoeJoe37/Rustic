@@ -22,7 +22,8 @@ mod value;
 mod weak;
 
 pub use agent::{
-    Abrupt, Agent, ErrorKind, Intrinsics, JsResult, Names, NativeFn, RealmId, WellKnownSymbols,
+    Abrupt, Agent, AgentId, ErrorKind, Intrinsics, JsResult, Names, NativeFn, RealmId,
+    WellKnownSymbols,
 };
 pub use bigint::{BigInt, MAX_BITS as MAX_BIGINT_BITS};
 pub(crate) use builtins::async_generator::create_async_from_sync_iterator;

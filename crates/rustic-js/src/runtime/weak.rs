@@ -38,9 +38,14 @@ impl Agent {
         self.new_internal(Class::Host, proto, Internal::Host(data))
     }
 
-    /// The embedder data of a host object, or `None` for any other object.
+    /// The embedder data of a live host object, or `None` if absent.
     pub fn host_data(&self, object: ObjectId) -> Option<u64> {
-        match self.internal_of(object, Class::Host) {
+        match self
+            .heap
+            .objects
+            .try_get(object.0)
+            .and_then(Object::internal)
+        {
             Some(Internal::Host(data)) => Some(*data),
             _ => None,
         }

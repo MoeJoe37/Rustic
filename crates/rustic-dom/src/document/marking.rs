@@ -35,8 +35,8 @@ impl TreeMarks {
 }
 
 impl Document {
-    /// Empty marks for a collection. All storage is reserved here, so
-    /// marking itself only fails on stale or foreign nodes.
+    /// Empty marks for a collection. The document must stay unchanged
+    /// until marking and sweeping finish.
     pub fn tree_marks(&self) -> Result<TreeMarks, DomError> {
         let slots = self.arena.slot_count();
         let mut marks = Vec::new();
@@ -64,6 +64,9 @@ impl Document {
             return Err(DomError::WrongDocument);
         }
         self.node(node)?;
+        if marks.is_marked(node) {
+            return Ok(());
+        }
         marks.pending.push(node);
         while let Some(start) = marks.pending.pop() {
             let mut tree = start;
@@ -103,17 +106,14 @@ impl Document {
             return Err(DomError::WrongDocument);
         }
         let before = self.node_count();
-        let mut victims = Vec::new();
-        victims
-            .try_reserve_exact(before)
-            .map_err(|_| DomError::AllocationFailed)?;
-        victims.extend(self.arena.live_ids().filter(|id| {
-            !marks.is_marked(*id)
-                && self.live(*id).parent().is_none()
-                && self.live(*id).owner_host().is_none()
-        }));
-        for root in victims {
-            self.destroy_subtree(root)?;
+        for slot in 0..self.arena.slot_count() {
+            let Some(id) = self.arena.live_id(slot) else {
+                continue;
+            };
+            let node = self.live(id);
+            if !marks.is_marked(id) && node.parent().is_none() && node.owner_host().is_none() {
+                self.destroy_subtree(id)?;
+            }
         }
         Ok(before - self.node_count())
     }

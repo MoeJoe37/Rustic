@@ -1,13 +1,12 @@
-//! JavaScript/DOM bindings. WEB-02 adds [Web IDL conversions](webidl) to the
-//! existing node wrapper identity and shared collection across one document
-//! and one JavaScript agent (ADR 0012, ADR 0016).
+//! JavaScript/DOM bindings with [Web IDL conversions](webidl), realm-scoped
+//! node wrappers and shared collection across an agent's registered
+//! documents (ADR 0026).
 //!
 //! A node's wrapper is a JS host object. Holding a wrapper keeps the node's
-//! whole tree alive, a live tree keeps its nodes' wrappers and their
-//! node-held values (event listeners, expandos) alive, and the document's
-//! own tree is always live. Everything else, including node ↔ wrapper ↔
-//! listener cycles, is collected: unreachable trees are destroyed and their
-//! wrappers freed.
+//! whole tree alive. A live tree keeps its nodes' wrappers and node-held
+//! values (such as event listeners) alive. A document's own tree is always
+//! live. Joint collection frees unreachable trees and wrappers, including
+//! node, wrapper and listener cycles across documents.
 //!
 //! ```
 //! use rustic_bindings::DomHeap;

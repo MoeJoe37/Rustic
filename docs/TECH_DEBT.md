@@ -63,8 +63,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
-| TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Open, pay with JS wrappers (DOC-09/WEB-02) |
-| TD-17 | Deliberate | DOM / JS | DOM/JS collection is bound to one document; adoption does not retarget wrappers | Open, WEB-02 |
+| TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Paid with wrapper retargeting |
+| TD-17 | Deliberate | DOM / JS | DOM/JS collection was bound to one document and adoption discarded wrapper identity | Paid |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
 | TD-19 | Watch | CI | Runners without rustup download its installer unpinned | Paid |
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
@@ -154,6 +154,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 | TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
 | TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, JS-08 |
+| TD-123 | Deliberate | DOM / JS | Interpreter safe points still use JS-only collection | Open, WEB-03 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -335,30 +336,22 @@ byte offsets, but a URL string has no `SourceId`/revision of its own, so the
 conversion belongs to the caller that knows which document attribute or
 script string the URL came from. Pay at the same trigger.
 
-### TD-16 — Adoption reissues node IDs instead of keeping node identity
+### TD-16 — Adoption reissues node IDs instead of keeping node identity (Paid)
 
-`Document::adopt_node` copies a subtree into the target arena and destroys it in
-the source, because a `NodeId` embeds its document and slot generation (ADR
-0002, [ADR 0011](adr/0011-fragments-cloning-adoption.md)). The DOM's adopt keeps
-the same node object. Today no script object holds an ID, and `Adopted::ids`
-returns the complete old-to-new map, so nothing is lost or silently stale: old
-IDs fail as `InvalidNode`. **Why deliberate:** moving slots between arenas would
-break per-document budgets and generation checks. **Pay:** when JS wrappers
-exist, the binding layer must retarget every wrapper through the map in the same
-operation (or wrappers must hold a stable cross-document identity). **Trigger:**
-the first script-visible node wrapper (WEB-02). The DOC-09 prototype heap prunes adopted IDs rather than retargeting them (TD-17).
+`Document::adopt_node` moves a subtree by allocating in the target arena
+and invalidating each source ID. Each `NodeId` includes a document and slot
+generation, so the move preserves document-local budgets and stale handle
+detection. The binding adoption path reserves its cache storage up front
+and applies the complete `Adopted::ids` map to each realm's wrapper and the
+node-held edges. JavaScript wrapper identity survives the move.
+[ADR 0026](adr/0026-realm-dom-wrappers.md)
 
-### TD-17 — Prototype host heap lives in the DOM crate, one document only
+### TD-17 — Prototype collection was bound to one document (Paid)
 
-The prototype `HostHeap` that stood in for the JS heap is gone: JS-03 owns
-objects and roots, the DOM keeps tree marking, and `rustic-bindings::DomHeap`
-runs one collection over both (ADR 0016). What remains is that a `DomHeap` is
-bound to one document: a realm spanning several documents needs one marking
-phase across all of them, and adoption reissues node IDs (TD-16), so a
-wrapper of an adopted node stops naming it instead of following it through
-`Adopted::ids`. **Why deliberate:** nothing creates wrappers for script yet.
-**Pay:** WEB-02 keeps a wrapper table per realm and retargets on adoption.
-**Trigger:** the first generated binding, or a second document in a realm.
+JS-03 replaced the DOM prototype with a host tracer and real JS heap.
+WEB-02 extends the explicit tracer to all documents registered with one
+agent and keeps wrapper identity across adoption.
+[ADR 0026](adr/0026-realm-dom-wrappers.md)
 
 ### TD-18 — Tree dumps grew quadratically with nested template contents (Paid)
 
@@ -1401,8 +1394,8 @@ says.
 The first part of JS-03 had strong edges only. Paid by its second part: weak
 references, weak maps and sets with ephemeron marking and finalization
 registries in `runtime/weak.rs`; host objects and `HostTracer`; and
-`rustic-bindings::DomHeap`, which replaced the DOC-09 `HostHeap`. One document
-per heap remains (TD-17).
+`rustic-bindings::DomHeap`, which replaced the DOC-09 `HostHeap` and now
+traces multiple documents (TD-17 paid).
 
 ### TD-97 — Syntax the bytecode compiler rejects
 
@@ -1849,3 +1842,15 @@ Pay with: additional calendar arithmetic and calendar-specific patterns, pinned
 CLDR metazone display names and full basic/best-fit pattern matching. Keep the
 Test262 ratchet visible while these are added. Trigger: Intl conformance work
 and locale-sensitive date display in the browser.
+
+### TD-123 — Page script safe points need the joint collector
+
+The host-side `DomHeap` can collect a JS agent and all registered documents
+together when called explicitly. The bytecode interpreter's automatic GC safe
+points still use the standalone JS collector. The current document scheduler
+can use that path because page script cannot create DOM wrappers or register
+node-held values. Before installing the first page-facing DOM interface,
+connect scheduler and interpreter safe points to the document coordinator.
+Cover reentrant getters and callbacks, collection under stress, and release
+of document roots at teardown.
+[ADR 0026](adr/0026-realm-dom-wrappers.md)

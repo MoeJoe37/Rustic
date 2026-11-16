@@ -2,7 +2,39 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-static NEXT_DOCUMENT_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_DOCUMENT_ID: IdSequence = IdSequence::new();
+
+/// A process-local identity sequence that never wraps or reissues a value.
+pub struct IdSequence(AtomicU64);
+
+impl IdSequence {
+    /// A fresh identity domain, starting at one.
+    pub const fn new() -> Self {
+        Self(AtomicU64::new(1))
+    }
+
+    /// Allocate the next identity, failing permanently on exhaustion.
+    pub fn allocate(&self) -> Result<NonZeroU64, IdExhausted> {
+        // Relaxed is sufficient for uniqueness; IDs do not publish other memory.
+        let mut value = self.0.load(Ordering::Relaxed);
+        loop {
+            let next = value.checked_add(1).ok_or(IdExhausted)?;
+            match self
+                .0
+                .compare_exchange_weak(value, next, Ordering::Relaxed, Ordering::Relaxed)
+            {
+                Ok(_) => return NonZeroU64::new(value).ok_or(IdExhausted),
+                Err(actual) => value = actual,
+            }
+        }
+    }
+}
+
+impl Default for IdSequence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// A process-local document identity that is never reused, including after drop.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -11,19 +43,7 @@ pub struct DocumentId(NonZeroU64);
 impl DocumentId {
     /// Allocate a unique identity, failing permanently if the counter is exhausted.
     pub fn allocate() -> Result<Self, IdExhausted> {
-        allocate_from(&NEXT_DOCUMENT_ID)
-    }
-}
-
-fn allocate_from(counter: &AtomicU64) -> Result<DocumentId, IdExhausted> {
-    // Relaxed is sufficient for uniqueness; IDs do not publish other memory.
-    let mut value = counter.load(Ordering::Relaxed);
-    loop {
-        let next = value.checked_add(1).ok_or(IdExhausted)?;
-        match counter.compare_exchange_weak(value, next, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => return NonZeroU64::new(value).map(DocumentId).ok_or(IdExhausted),
-            Err(actual) => value = actual,
-        }
+        NEXT_DOCUMENT_ID.allocate().map(Self)
     }
 }
 
@@ -64,13 +84,13 @@ impl NodeId {
     }
 }
 
-/// The process-local document identity space has been exhausted.
+/// The process-local identity space has been exhausted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct IdExhausted;
 
 impl fmt::Display for IdExhausted {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("document identity space exhausted")
+        formatter.write_str("identity space exhausted")
     }
 }
 
@@ -82,11 +102,11 @@ mod tests {
 
     #[test]
     fn exhaustion_does_not_wrap_or_reuse_an_identity() {
-        let counter = AtomicU64::new(u64::MAX - 1);
-        assert_eq!(allocate_from(&counter).unwrap().0.get(), u64::MAX - 1);
-        assert_eq!(allocate_from(&counter), Err(IdExhausted));
-        assert_eq!(allocate_from(&counter), Err(IdExhausted));
-        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
+        let counter = IdSequence(AtomicU64::new(u64::MAX - 1));
+        assert_eq!(counter.allocate().unwrap().get(), u64::MAX - 1);
+        assert_eq!(counter.allocate(), Err(IdExhausted));
+        assert_eq!(counter.allocate(), Err(IdExhausted));
+        assert_eq!(counter.0.load(Ordering::Relaxed), u64::MAX);
     }
 
     #[test]

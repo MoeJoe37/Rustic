@@ -113,7 +113,12 @@ across JS objects, DOM nodes, event listeners, and closures must be collectable.
 
 Start with stop-the-world mark/sweep on the document agent thread. Incremental or
 generational collection needs a later ADR, barriers, and correctness tests. A weak
-wrapper cache preserves identity without retaining dead nodes. Generation IDs
+wrapper cache preserves identity without retaining dead nodes. One binding
+coordinator per agent records wrappers by node and realm. The joint trace
+includes every registered document, and cross-document adoption retargets
+all wrappers through the DOM identity map.
+[ADR 0026](adr/0026-realm-dom-wrappers.md)
+Generation IDs
 detect stale references; they do not replace reachability tracking. Style/layout
 data live in separate epoch-owned arenas and use weak node identity. Explicitly
 dispose native resources; collection is not a timely file/network close protocol.

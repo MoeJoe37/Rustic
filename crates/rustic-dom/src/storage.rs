@@ -164,12 +164,15 @@ impl Arena {
 
     /// Every live node identity in slot order, which is deterministic.
     pub(crate) fn live_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
-        self.slots.iter().enumerate().filter_map(|(index, slot)| {
-            slot.node.as_ref().map(|_| {
-                let index = u32::try_from(index).expect("slot index was checked at insertion");
-                NodeId::from_parts(self.id, index, slot.generation)
-            })
-        })
+        (0..self.slots.len()).filter_map(|index| self.live_id(index))
+    }
+
+    /// The current identity at an occupied slot.
+    pub(crate) fn live_id(&self, index: usize) -> Option<NodeId> {
+        let slot = self.slots.get(index)?;
+        slot.node.as_ref()?;
+        let index = u32::try_from(index).expect("slot index was checked at insertion");
+        Some(NodeId::from_parts(self.id, index, slot.generation))
     }
 }
 

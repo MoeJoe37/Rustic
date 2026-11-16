@@ -111,7 +111,7 @@ and animation APIs, parser-scheduled scripts and layout invalidation remain open
 [ADR 0022](adr/0022-document-task-sources-and-timers.md),
 [ADR 0023](adr/0023-document-rendering-turns.md)
 
-## WEB-02 — Web IDL conversion foundation
+## WEB-02 — Web IDL conversion and DOM wrapper foundation
 
 `rustic-bindings::webidl` implements `DOMString` round trips, nullable
 and legacy null policies, `ByteString`, `USVString`, and signed and
@@ -129,10 +129,20 @@ conversions to edit a DOM text node.
 
 Run `python3 tools/generate_dom_idl.py --check` to verify the committed
 output offline. Pass `--upstream-source /path/to/dom.bs` to verify the full
-pinned source and selected declarations as well. Realm-aware wrappers and
-DOMException bindings remain open.
+pinned source and selected declarations as well.
+
+`DomHeap` caches a wrapper per node and realm with that realm's
+`Object.prototype`. Its explicit collector traces across every registered
+document and the agent's JavaScript heap. A detached tree reachable through
+any wrapper keeps all its wrappers and node-held values alive. Adoption
+retargets wrappers and moves edges for the adopted nodes, including owned
+shadow trees and template contents. Tests cover cross-document tracing,
+identity and expandos across adoption, unrelated host objects and failure
+atomicity. DOMException bindings remain open. Page interface installation
+must route interpreter safe points through the joint collector (TD-123).
 [ADR 0024](adr/0024-web-idl-conversions.md),
-[ADR 0025](adr/0025-pinned-dom-idl-metadata.md)
+[ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
+[ADR 0026](adr/0026-realm-dom-wrappers.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 
@@ -1248,8 +1258,8 @@ roots and each reachable host object's edges and reports collected ones.
 `rustic-bindings` crate uses these for the DOM: `DomHeap` keeps one wrapper per
 node and node-held values, and collects a document and an agent together. The
 DOC-09 scenarios, a seeded reachability model and a stress run pass against the
-real heap, and the prototype `HostHeap` is removed (TD-17 narrowed, TD-96
-paid). The constructors and prototype methods of the weak built-ins arrive with
+real heap, and the prototype `HostHeap` was removed (TD-96 paid). WEB-02
+subsequently extended this collector to multiple documents (TD-17 paid). The constructors and prototype methods of the weak built-ins arrive with
 JS-05.
 
 ## JS-04 — Bytecode compiler and interpreter (first part)

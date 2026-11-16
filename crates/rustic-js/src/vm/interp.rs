@@ -1002,12 +1002,12 @@ impl Agent {
     fn safepoint(&mut self) -> JsResult<()> {
         self.check_native_work()?;
         if self.vm.native_depth == self.vm.collect_floor && self.should_collect() {
-            self.collect_garbage(crate::runtime::Roots::default());
+            self.collect_at_safe_point()?;
         }
         // Ropes flattened since the last allocation are charged late.
         if self.heap.over_limit() {
             if self.vm.native_depth == self.vm.collect_floor {
-                self.collect_garbage(crate::runtime::Roots::default());
+                self.collect_at_safe_point()?;
             }
             if self.heap.over_limit() {
                 return Err(Abrupt::OutOfMemory);

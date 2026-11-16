@@ -625,7 +625,8 @@ impl Agent {
     /// Collect everything not reachable from the agent's intrinsics, the
     /// host root table and `roots`. Every handle the caller still uses
     /// must be reachable from one of them: a collected cell's index is
-    /// reused, and reading a freed one panics.
+    /// reused, and reading a freed one panics. When an execution host is
+    /// attached, use its joint collector while host objects are live.
     pub fn collect_garbage(&mut self, roots: Roots<'_>) -> GcStats {
         self.collect_garbage_with(roots, &mut NoHost)
     }

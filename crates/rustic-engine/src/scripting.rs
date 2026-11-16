@@ -1,10 +1,14 @@
 //! WEB-01 document-owned script tasks and microtask checkpoints.
 
+use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
+use std::rc::Rc;
 use std::time::Duration;
 
 use rustic_base::{Clock, SystemClock};
 use rustic_bindings::dom_exception;
+use rustic_bindings::page::{self, PageTree};
+use rustic_dom::Document;
 use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
@@ -131,12 +135,31 @@ pub enum DocumentTurn<T> {
     },
 }
 
+#[derive(Debug)]
+struct ScriptTree(RefCell<EngineDocument>);
+
+impl PageTree for ScriptTree {
+    fn read(&self) -> Option<Ref<'_, Document>> {
+        self.0
+            .try_borrow()
+            .ok()
+            .map(|owner| Ref::map(owner, |owner| owner.parsed().document()))
+    }
+
+    fn write(&self) -> Option<RefMut<'_, Document>> {
+        self.0
+            .try_borrow_mut()
+            .ok()
+            .map(|owner| RefMut::map(owner, |owner| owner.parsed_mut().document_mut()))
+    }
+}
+
 /// A completed document with a single script agent and a host-driven turn scheduler.
 ///
 /// The host explicitly queues scripts and pumps turns. The document and agent
 /// move together, with the document's existing token shared by the VM.
 pub struct ScriptedDocument<C = SystemClock> {
-    document: EngineDocument,
+    document: Rc<ScriptTree>,
     agent: Result<Agent, ScriptStop>,
     pending: ScriptQueue,
     rendering: Rendering,
@@ -170,8 +193,10 @@ impl EngineDocument {
         agent.set_can_block(false);
         dom_exception::install(&mut agent).map_err(|_| ScriptStop::OutOfMemory)?;
         let owner = self.parsed().document().id();
+        let document = Rc::new(ScriptTree(RefCell::new(self)));
+        page::install(&mut agent, document.clone()).map_err(|_| ScriptStop::OutOfMemory)?;
         Ok(ScriptedDocument {
-            document: self,
+            document,
             agent: Ok(agent),
             pending: ScriptQueue::new(owner, limits),
             rendering: Rendering::new(owner),
@@ -183,8 +208,8 @@ impl EngineDocument {
 
 impl<C: Clock> ScriptedDocument<C> {
     /// Inspect the parsed document and its lifetime token.
-    pub fn document(&self) -> &EngineDocument {
-        &self.document
+    pub fn document(&self) -> Ref<'_, EngineDocument> {
+        self.document.0.borrow()
     }
 
     /// Queue a host-supplied script after checking both pending-work limits.
@@ -254,7 +279,7 @@ impl<C: Clock> ScriptedDocument<C> {
         let Some(frame) = self.rendering.begin().map_err(|reason| self.stop(reason))? else {
             return Ok(None);
         };
-        let output = render(&self.document, frame);
+        let output = render(&self.document(), frame);
         self.check_live()?;
         Ok(Some(DocumentTurn::Rendered { frame, output }))
     }
@@ -309,14 +334,14 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     fn check_live(&mut self) -> Result<(), ScriptStop> {
-        if self.document.cancellation().is_cancelled() {
+        if self.document().cancellation().is_cancelled() {
             return Err(self.stop(ScriptStop::DocumentCancelled));
         }
         self.agent.as_ref().map(|_| ()).map_err(|reason| *reason)
     }
 
     fn stop_after_cancellation(&mut self) -> ScriptStop {
-        if self.document.cancellation().is_cancelled() {
+        if self.document().cancellation().is_cancelled() {
             self.stop(ScriptStop::DocumentCancelled)
         } else {
             self.stop(ScriptStop::StepLimit)

@@ -58,6 +58,11 @@ impl ParsedDocument {
         &self.document
     }
 
+    /// Access the completed tree for checked document mutation.
+    pub fn document_mut(&mut self) -> &mut Document {
+        &mut self.document
+    }
+
     /// Transfer ownership for subsequent checked document mutations.
     pub fn into_document(self) -> Document {
         self.document

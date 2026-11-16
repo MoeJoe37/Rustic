@@ -41,8 +41,9 @@ prototypes in the creation realm. Independent per-document collection
 would need an additional mechanism for cycles through JavaScript and across
 documents. The agent already supplies a shared mark phase.
 
-The coordinator is an explicit host API. WEB-03 must connect automatic
-interpreter safe points before page interfaces expose node wrappers (TD-123).
+The coordinator remains an explicit host API. WEB-03 connects it to
+the interpreter's script and promise-job safe points.
+[ADR 0028](0028-scripted-document-collection.md)
 Document unregistration and reclamation of detached realms belong to
 the page host lifecycle (TD-118 for realm reclamation).
 

@@ -163,6 +163,10 @@ impl EngineDocument {
         &self.parsed
     }
 
+    pub(crate) fn parsed_mut(&mut self) -> &mut ParsedDocument {
+        &mut self.parsed
+    }
+
     /// The token to pass through operations on this document.
     ///
     /// Dropping the document or shutting down its engine signals all clones.

@@ -128,3 +128,39 @@ impl Agent {
         }
     }
 }
+
+/// Agent-local host state that participates in automatic collections.
+pub trait ExecutionHost: std::fmt::Debug {
+    /// Collect the host and agent with the VM suspended at a safe point.
+    /// The host calls [`Agent::collect_garbage_with`] with its tracer.
+    /// A failure ends the run as an uncatchable abrupt completion.
+    fn collect(&self, agent: &mut Agent) -> Result<(), OutOfMemory>;
+
+    /// The concrete host state, for native binding operations.
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+impl Agent {
+    /// Attach the agent's host before exposing host objects to script.
+    pub fn attach_execution_host(&mut self, host: std::rc::Rc<dyn ExecutionHost>) -> JsResult<()> {
+        if self.execution_host.is_some() {
+            return self.type_error("an execution host is already attached");
+        }
+        self.execution_host = Some(host);
+        Ok(())
+    }
+
+    /// The attached host, independently of the current realm.
+    pub fn execution_host(&self) -> Option<std::rc::Rc<dyn ExecutionHost>> {
+        self.execution_host.clone()
+    }
+
+    pub(crate) fn collect_at_safe_point(&mut self) -> JsResult<()> {
+        if let Some(host) = self.execution_host() {
+            host.collect(self)?;
+        } else {
+            self.collect_garbage(super::Roots::default());
+        }
+        Ok(())
+    }
+}

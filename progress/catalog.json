@@ -4006,8 +4006,51 @@
           "label": "Window/Document/Element bindings and identity",
           "size": 5,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Live document, node traversal and child mutation with joint safe-point collection",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/host.rs",
+                  "marker": "fn collect_at_safe_point"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page.rs",
+                  "marker": "pub fn install"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn automatic_collection_preserves_attached_wrappers_and_sweeps_detached_cycles"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_wrappers_use_the_live_dom_across_script_and_render_turns"
+                }
+              ]
+            },
+            {
+              "label": "Node and document creation, specialized interfaces and DOM attributes",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Window interface and browsing realm integration",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Basic selectors and DOM collection bindings",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "web.scheduler",

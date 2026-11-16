@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "a20da8e4ee3ce004dec98d59e746ecd8e2e9cba969805f74a02a0c43fea0d465",
-  "percent": "30.59",
+  "source_fingerprint": "4fdb255484cec062e6d0856061a5d145edcad96fd58f0c04cb4fd62513d2495b",
+  "percent": "30.75",
   "verified_percent": "29.89",
-  "partial_percent": "0.70",
+  "partial_percent": "0.86",
   "completed": 69,
-  "in_progress": 4,
+  "in_progress": 5,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 3,
       "total": 12,
-      "percent": "22.42",
+      "percent": "25.37",
       "verified_percent": "22.42",
-      "partial_percent": "0.00"
+      "partial_percent": "2.95"
     },
     {
       "id": "M6",
@@ -4372,9 +4372,52 @@
           "label": "Window/Document/Element bindings and identity",
           "size": 5,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Live document, node traversal and child mutation with joint safe-point collection",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/host.rs",
+                  "marker": "fn collect_at_safe_point"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page.rs",
+                  "marker": "pub fn install"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn automatic_collection_preserves_attached_wrappers_and_sweeps_detached_cycles"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_wrappers_use_the_live_dom_across_script_and_render_turns"
+                }
+              ]
+            },
+            {
+              "label": "Node and document creation, specialized interfaces and DOM attributes",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Window interface and browsing realm integration",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Basic selectors and DOM collection bindings",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.62"
         },
         {
@@ -4521,12 +4564,12 @@
       ],
       "points": 40,
       "completed": 2,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "1.00",
-      "percent": "20.00",
+      "contribution": "1.15",
+      "percent": "23.12",
       "verified_percent": "20.00",
-      "partial_percent": "0.00"
+      "partial_percent": "3.12"
     },
     {
       "id": "media",

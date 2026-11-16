@@ -352,6 +352,7 @@ pub(crate) struct RealmRecord {
 #[derive(Debug)]
 pub struct Agent {
     id: AgentId,
+    pub(crate) execution_host: Option<std::rc::Rc<dyn super::ExecutionHost>>,
     /// All values of the agent.
     pub heap: Heap,
     /// Interned names.
@@ -388,6 +389,7 @@ impl Agent {
         let id = NEXT_AGENT_ID.allocate().map_err(|_| OutOfMemory)?;
         let mut agent = Agent {
             id: AgentId(id),
+            execution_host: None,
             heap,
             names,
             symbols,

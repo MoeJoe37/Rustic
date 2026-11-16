@@ -154,9 +154,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 | TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
 | TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, JS-08 |
-| TD-123 | Deliberate | DOM / JS | Interpreter safe points still use JS-only collection | Open, WEB-03 |
+| TD-123 | Deliberate | DOM / JS | Interpreter safe points used JS-only collection | Paid |
 | TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
 | TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
+| TD-126 | Deliberate | Web bindings | Initial Node, Document and Element surface omits document construction and specialized prototypes | Open, WEB-03 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1845,17 +1846,14 @@ CLDR metazone display names and full basic/best-fit pattern matching. Keep the
 Test262 ratchet visible while these are added. Trigger: Intl conformance work
 and locale-sensitive date display in the browser.
 
-### TD-123 — Page script safe points need the joint collector
+### TD-123 — Page script safe points need the joint collector (Paid)
 
-The host-side `DomHeap` can collect a JS agent and all registered documents
-together when called explicitly. The bytecode interpreter's automatic GC safe
-points still use the standalone JS collector. The current document scheduler
-can use that path because page script cannot create DOM wrappers or register
-node-held values. Before installing page interfaces that create node wrappers,
-connect scheduler and interpreter safe points to the document coordinator.
-Cover reentrant getters and callbacks, collection under stress, and release
-of document roots at teardown.
-[ADR 0026](adr/0026-realm-dom-wrappers.md)
+The scripted document host now runs `DomHeap` at interpreter safe points,
+including those reached by promise jobs. One tree and wrapper cache are
+shared with the document scheduler. Tests under collection stress verify
+connected expandos, detached nodes retained by jobs, and unreachable
+cycles reclaimed by the joint sweep.
+[ADR 0028](adr/0028-scripted-document-collection.md)
 
 ### TD-124 — DOMException stack, derived interfaces and serialization
 
@@ -1881,3 +1879,14 @@ match x86-64. Its times and pauses say nothing about real ARM64 speed. Record
 the corpus on native ARM64 hardware (the `Linux ARM64` CI job already prints
 it to the job summary) before any ARM64 performance claim, at the latest with
 the first cross-engine report of PERF-01.
+
+### TD-126 — Initial DOM prototype and construction coverage
+
+The first script bindings expose an existing HTML document and its
+navigation and child-mutation methods. The host currently registers one
+document, so the Document interface constructor rejects construction.
+Nodes outside Element and Document use the base Node prototype. Add the
+specific prototypes and multi-document registration when exposing node
+creation, additional documents, and adoption to script. Live collections
+and selectors are tracked in the WEB-03 work.
+[ADR 0028](adr/0028-scripted-document-collection.md)

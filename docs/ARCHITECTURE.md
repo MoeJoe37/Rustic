@@ -119,6 +119,12 @@ includes every registered document, and cross-document adoption retargets
 all wrappers through the DOM identity map.
 [ADR 0026](adr/0026-realm-dom-wrappers.md)
 
+A scripted document shares its parsed tree between the renderer and the
+agent's binding host. The VM asks that host to collect at script and
+promise-job safe points. Binding operations borrow the tree briefly and
+release it before any script callback.
+[ADR 0028](adr/0028-scripted-document-collection.md)
+
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed
 interface's realm prototype. Engine error conversion uses that prototype

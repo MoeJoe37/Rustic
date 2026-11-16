@@ -138,8 +138,8 @@ any wrapper keeps all its wrappers and node-held values alive. Adoption
 retargets wrappers and moves edges for the adopted nodes, including owned
 shadow trees and template contents. Tests cover cross-document tracing,
 identity and expandos across adoption, unrelated host objects and failure
-atomicity. Page interfaces that expose node wrappers must route interpreter
-safe points through the joint collector (TD-123).
+atomicity. Scripted documents route interpreter safe points through the
+joint collector (WEB-03, TD-123 paid).
 
 Document script realms install the base `DOMException` constructor.
 Its private string slots preserve UTF-16, and its prototype exposes
@@ -154,6 +154,22 @@ failure caught by JavaScript. Native stack information, the derived
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
 [ADR 0026](adr/0026-realm-dom-wrappers.md),
 [ADR 0027](adr/0027-host-exception-bindings.md)
+
+## WEB-03 — Live document wrappers and script collection
+
+Document realms expose `document` with `Document`, `Node`, and `Element`
+prototypes. Script can traverse the live tree through `documentElement`,
+`firstChild`, `nextSibling`, `parentNode`, and `ownerDocument`, and read
+`nodeType` and `localName`. `appendChild` and `removeChild` validate
+node receivers and arguments, preserve wrapper identity, and use the
+DOM's checked mutations. Render turns read the same parsed tree. Tests
+exercise live mutations, error atomicity, and collection of detached
+cycles during ordinary script and promise-job safe points.
+
+The initial host exposes one document per scripted agent. Window,
+creation of nodes and additional documents, specialized interfaces,
+and selectors remain open. See TD-126 for the partial prototype surface.
+[ADR 0028](adr/0028-scripted-document-collection.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

@@ -315,8 +315,11 @@ coercion and JavaScript exception propagation. A pinned generator emits
 binding metadata for the initial DOM text interfaces. Its wrapper cache
 preserves realm identity across adoption and traces all registered
 documents together. Document scripts can construct `DOMException` and
-host bindings can throw it for document failures. WEB-03 next connects
-the joint collector to page-visible DOM nodes.
+host bindings can throw it for document failures. WEB-03 now exposes
+the live document, initial node traversal and child mutation operations.
+Document script and promise-job safe points use the joint collector.
+Window, additional DOM interfaces, and selectors remain open.
+[ADR 0028](adr/0028-scripted-document-collection.md)
 [ADR 0024](adr/0024-web-idl-conversions.md),
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
 [ADR 0026](adr/0026-realm-dom-wrappers.md),

@@ -36,6 +36,7 @@
 pub mod dom_exception;
 mod heap;
 pub mod metadata;
+pub mod page;
 pub mod webidl;
 
 pub use heap::{DomGcError, DomGcStats, DomHeap};

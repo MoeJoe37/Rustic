@@ -137,6 +137,19 @@ impl DomHeap {
         document: &Document,
         node: NodeId,
     ) -> Result<ObjectId, DomGcError> {
+        let prototype = agent.intrinsics.object_prototype;
+        self.wrap_with_prototype(agent, document, node, prototype)
+    }
+
+    /// As [`Self::wrap`], with the realm's installed interface prototype
+    /// for a wrapper that has yet to be created.
+    pub(crate) fn wrap_with_prototype(
+        &mut self,
+        agent: &mut Agent,
+        document: &Document,
+        node: NodeId,
+        prototype: ObjectId,
+    ) -> Result<ObjectId, DomGcError> {
         self.check_document(document)?;
         document.node(node)?;
         self.check_agent(agent)?;
@@ -162,7 +175,7 @@ impl DomHeap {
             .map_err(|_| DomError::AllocationFailed)?
             .get();
         let object = agent
-            .new_host_object(Some(agent.intrinsics.object_prototype), data)
+            .new_host_object(Some(prototype), data)
             .map_err(|_| DomError::AllocationFailed)?;
         let wrapper = Wrapper {
             realm,

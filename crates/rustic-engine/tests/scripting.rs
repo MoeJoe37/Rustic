@@ -199,3 +199,61 @@ fn document_script_realms_install_dom_exception() {
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
 }
+
+#[test]
+fn document_wrappers_use_the_live_dom_across_script_and_render_turns() {
+    let mut engine = Engine::new(1);
+    let mut load = engine.begin_document(ParserLimits::default()).unwrap();
+    load.feed(b"<!doctype html><p>keep</p><em>drop</em>")
+        .unwrap();
+    let mut scripts = load
+        .finish()
+        .unwrap()
+        .into_scripted(TaskLimits::default())
+        .unwrap();
+
+    scripts.queue_script(source(r#"
+        const html = document.documentElement;
+        const body = html.firstChild.nextSibling;
+        const keep = body.firstChild;
+        if (!(document instanceof Document) || !(document instanceof Node) ||
+            !(keep instanceof Element) || keep.nodeType !== 1 || document.nodeType !== 9 ||
+            keep.localName !== "p" || keep.parentNode !== body || keep.ownerDocument !== document ||
+            document.ownerDocument !== null)
+            throw "bad interface or traversal";
+        let caught = 0;
+        try { body.removeChild(html); } catch (error) {
+            if (!(error instanceof DOMException) || error.name !== "NotFoundError") throw error;
+            caught++;
+        }
+        try { keep.appendChild(body); } catch (error) {
+            if (!(error instanceof DOMException) || error.name !== "HierarchyRequestError") throw error;
+            caught++;
+        }
+        try { Node.prototype.appendChild.call(Object.create(Node.prototype), keep); }
+        catch (error) {
+            if (!(error instanceof TypeError)) throw error;
+            caught++;
+        }
+        if (caught !== 3 || body.firstChild !== keep) throw "mutation was not atomic";
+        (() => {
+            const removed = keep.nextSibling;
+            if (body.removeChild(removed) !== removed || keep.nextSibling !== null)
+                throw "bad removeChild";
+        })();
+    "#)).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    scripts.offer_rendering_opportunity().unwrap();
+    let rendered = scripts
+        .run_next_with_render(|host, _| {
+            let tree = host.parsed().document();
+            tree.dump_tree(tree.root(), 4096).unwrap()
+        })
+        .unwrap()
+        .unwrap();
+    let rustic_engine::DocumentTurn::Rendered { output, .. } = rendered else {
+        panic!("expected a rendering turn");
+    };
+    assert!(output.contains("keep"));
+    assert!(!output.contains("drop"));
+}

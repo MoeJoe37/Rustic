@@ -36,6 +36,7 @@ instead of rewriting the history of a decision.
 | [0025](0025-pinned-dom-idl-metadata.md) | Reproducible metadata from pinned DOM Standard IDL | Accepted for the WEB-02 text interfaces |
 | [0026](0026-realm-dom-wrappers.md) | Realm-scoped wrapper identity, shared collection and adoption retargeting | Accepted for the WEB-02 host bindings |
 | [0027](0027-host-exception-bindings.md) | Realm-owned interface prototypes and traced DOMException string slots | Accepted for WEB-02 |
+| [0028](0028-scripted-document-collection.md) | Joint safe-point collection and live document bindings | Accepted for the first WEB-03 interfaces |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "175de35451341cf1adbb3a5203105b19d45fc167249f8ff5c884a41084be47d1",
-  "percent": "29.52",
+  "source_fingerprint": "f7828070dc4fb2f90fff3c963cadc2cfb79a6f1697ef3a4b9df4f99f8f4ff22a",
+  "percent": "29.65",
   "verified_percent": "28.48",
-  "partial_percent": "1.04",
+  "partial_percent": "1.17",
   "completed": 66,
-  "in_progress": 5,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 1,
       "total": 12,
-      "percent": "3.54",
+      "percent": "5.90",
       "verified_percent": "3.54",
-      "partial_percent": "0.00"
+      "partial_percent": "2.36"
     },
     {
       "id": "M6",
@@ -4297,9 +4297,42 @@
           "label": "Tasks, microtasks and rendering opportunities",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Document script tasks, bounded microtask checkpoints and lifecycle cancellation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "pub fn run_next"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn jobs_queued_by_scripts_and_jobs_run_before_the_next_script"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn engine_shutdown_cancels_queued_script_turns"
+                }
+              ]
+            },
+            {
+              "label": "Task-source selection, host clock and timers",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Rendering opportunities and frame ordering",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.37"
         },
         {
@@ -4375,12 +4408,12 @@
       ],
       "points": 40,
       "completed": 0,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "0.00",
-      "percent": "0.00",
+      "contribution": "0.12",
+      "percent": "2.50",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "2.50"
     },
     {
       "id": "media",

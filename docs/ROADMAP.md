@@ -302,6 +302,11 @@ mobile gates remain mandatory through M9.
 | WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | M3, WEB-03 |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | WEB-04–WEB-06 |
 
+WEB-01 has started with a document-owned script queue, bounded microtask
+checkpoints and lifecycle cancellation. Task-source selection, timers and
+the host clock, and rendering opportunities follow.
+[ADR 0021](adr/0021-document-script-turns.md)
+
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.
 

@@ -76,7 +76,22 @@ and image reads, layout, display-list construction and rasterization. The host
 keeps file access policy and owns finished render outputs. Tests cover exact
 admission limits, cleanup after failure, worker-visible cancellation and the
 CLI's load and render behavior after shutdown. [ADR 0020](adr/0020-document-lifecycle.md)
-documents the contract for the future M5 scheduler.
+documents the document lifetime contract used by the M5 scheduler.
+
+## WEB-01 — Document script turns and microtask checkpoints
+
+`EngineDocument::into_scripted` creates one agent for a completed document.
+The host passes immutable `rustic_js::Source` values to
+`ScriptedDocument::queue_script` and advances the FIFO with `run_next`.
+Each script turn drains its promise jobs before the next script. Ordinary
+errors still reach the checkpoint. Queue count and UTF-16 source limits
+bound pending work. Each turn shares VM safe points between the script and
+its jobs, with a separate job-count bound for the checkpoint.
+
+The document token cancels running or pending script work. Cancellation and
+fatal budget failures release queued scripts and the agent at the host safe
+point. Task sources, timers and the host clock, rendering opportunities and
+parser-scheduled scripts remain open. See [ADR 0021](adr/0021-document-script-turns.md).
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

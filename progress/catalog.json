@@ -3929,8 +3929,41 @@
           "label": "Tasks, microtasks and rendering opportunities",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Document script tasks, bounded microtask checkpoints and lifecycle cancellation",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "pub fn run_next"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn jobs_queued_by_scripts_and_jobs_run_before_the_next_script"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn engine_shutdown_cancels_queued_script_turns"
+                }
+              ]
+            },
+            {
+              "label": "Task-source selection, host clock and timers",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Rendering opportunities and frame ordering",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "web.scripts",

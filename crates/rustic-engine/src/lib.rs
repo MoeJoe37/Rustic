@@ -4,8 +4,12 @@ use std::error::Error;
 use std::fmt;
 
 mod lifecycle;
+mod scripting;
 
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
+pub use scripting::{
+    ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument, TaskLimits,
+};
 
 /// Initial allocation budget for a headless viewport, in device pixels.
 pub const MAX_VIEWPORT_PIXELS: u64 = 16_777_216;

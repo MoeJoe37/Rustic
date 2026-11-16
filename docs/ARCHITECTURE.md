@@ -59,7 +59,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
-| `rustic-engine` | Rust facade and browser/document lifecycle coordination | base, HTML parser and future service interfaces | M0 onward |
+| `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime and future service interfaces | M0 onward |
 | `rustic-cli` / future `rustic-shell` | Headless test host / desktop browser chrome | engine API, platform | M0 / M8 |
 | `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
 
@@ -243,6 +243,10 @@ and user input according to the HTML model. ECMAScript jobs and host tasks are
 distinct. No Rust lock or DOM mutable borrow is held across a call into page JS.
 Event dispatch, custom callbacks, and getters are reentry points. Define safe
 points and root scopes before implementing them.
+
+The headless coordinator now offers an explicit scripted document owner.
+It runs host-supplied script tasks and bounded microtask checkpoints using
+the document's cancellation scope. See [ADR 0021](adr/0021-document-script-turns.md).
 
 ## 6. Navigation, resources, and persistence
 

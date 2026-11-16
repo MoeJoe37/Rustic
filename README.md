@@ -24,10 +24,10 @@ scripts with classes, generators, promises, async functions, regular
 expressions and the core standard library, designed around memory use and
 interpreter speed ([plan](docs/ROADMAP.md#memory-and-performance-design)); the
 [JavaScript notes](docs/JS.md) list what is still missing and the measured
-Test262 results. Scripts do not run inside documents yet (M5), and web-page
-networking and native app hosts are later
-milestones. See the [implementation ledger](docs/IMPLEMENTATION.md) for precise
-tested contracts.
+Test262 results. M5 has started with host-queued script tasks and microtask
+checkpoints. HTML script loading and web-page bindings are still planned.
+Networking and native app hosts are later milestones. See the
+[implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 <!-- rustic-progress:start -->
 
@@ -35,7 +35,7 @@ tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 29.52%** (28.48% verified complete + 1.04% partial credit) — 66/221 capabilities complete and 5 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 99.23% done.
+**Overall engine completion: 29.65%** (28.48% verified complete + 1.17% partial credit) — 66/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M4 ECMAScript runtime**, 99.23% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

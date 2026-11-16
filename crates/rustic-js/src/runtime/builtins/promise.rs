@@ -693,14 +693,31 @@ impl Agent {
     /// Errors thrown inside a job settle promises and never end the run;
     /// only running out of memory or being cancelled does.
     pub fn run_jobs(&mut self) -> JsResult<()> {
-        while let Some(job) = self.vm.jobs.pop_front() {
+        self.drain_jobs(None).map(|_| ())
+    }
+
+    /// Run up to `limit` jobs in FIFO order, counting jobs queued by other jobs.
+    /// Returns `true` if the checkpoint drained the queue. A `false` result leaves
+    /// the unrun jobs queued. As with [`Self::run_jobs`], call at a host safe point.
+    pub fn run_jobs_limited(&mut self, limit: usize) -> JsResult<bool> {
+        self.drain_jobs(Some(limit))
+    }
+
+    fn drain_jobs(&mut self, mut remaining: Option<usize>) -> JsResult<bool> {
+        while !self.vm.jobs.is_empty() {
             if self
                 .cancellation()
                 .is_some_and(|token| token.is_cancelled())
             {
-                self.vm.jobs.push_front(job);
                 return Err(Abrupt::Cancelled);
             }
+            if let Some(left) = &mut remaining {
+                if *left == 0 {
+                    return Ok(false);
+                }
+                *left -= 1;
+            }
+            let job = self.vm.jobs.pop_front().expect("a queued job");
             self.vm.running_job = Some(job);
             let result = self.run_job(job);
             self.vm.running_job = None;
@@ -709,7 +726,7 @@ impl Agent {
                 Err(other) => return Err(other),
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     fn run_job(&mut self, job: Job) -> JsResult<()> {

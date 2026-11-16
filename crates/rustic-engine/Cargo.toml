@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 rustic-base = { path = "../rustic-base" }
+rustic-bindings = { path = "../rustic-bindings" }
 rustic-html = { path = "../rustic-html" }
 rustic-js = { path = "../rustic-js" }
 

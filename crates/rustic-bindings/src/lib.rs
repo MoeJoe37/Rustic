@@ -33,6 +33,7 @@
 
 #![warn(missing_docs)]
 
+pub mod dom_exception;
 mod heap;
 pub mod metadata;
 pub mod webidl;

@@ -20,6 +20,7 @@
 use super::agent::Agent;
 use super::env::EnvId;
 use super::heap::{ATOM_BYTES, Heap, OutOfMemory, ROPE_BYTES, Symbol};
+use super::host::HOST_INTERFACE_BYTES;
 use super::object::{Closure, Internal, Object};
 use super::shape::{PropertyKey, ROOT_SHAPE};
 use super::string::JsStr;
@@ -390,6 +391,10 @@ impl Marker<'_> {
             match &extra.internal {
                 None | Some(Internal::ImportRequest(_)) => {}
                 Some(Internal::Host(data)) => self.hosts.push((ObjectId(index), *data)),
+                Some(Internal::HostError { name, message, .. }) => {
+                    self.string(*name);
+                    self.string(*message);
+                }
                 Some(Internal::Iterator { target, kind, .. }) => {
                     self.value(*target);
                     if kind.walks_table() {
@@ -567,9 +572,20 @@ fn live_footprint(heap: &Heap) -> usize {
     let envs: usize = heap.envs.iter().map(|(_, e)| e.footprint()).sum();
     let shapes = (heap.shapes.len() - 1) * 64;
     let roots = heap.roots.live * HOST_ROOT_BYTES;
+    let host_interfaces = heap.host_interfaces.len() * HOST_INTERFACE_BYTES;
     let codes: usize = heap.codes.iter().map(|(_, c)| c.code_bytes()).sum();
     let closures = heap.closures.live() * std::mem::size_of::<Closure>();
-    strings + atoms + symbols + bigints + objects + envs + shapes + roots + codes + closures
+    strings
+        + atoms
+        + symbols
+        + bigints
+        + objects
+        + envs
+        + shapes
+        + roots
+        + codes
+        + closures
+        + host_interfaces
 }
 
 /// Rebuild the atom table without freed strings. Chains keep their order,
@@ -659,6 +675,9 @@ impl Agent {
                 marker.value(Value::object(object));
             }
             marker.env(record.global_env);
+        }
+        for &prototype in heap.host_interfaces.values() {
+            marker.value(Value::object(prototype));
         }
         for value in heap.roots.values() {
             marker.value(value);

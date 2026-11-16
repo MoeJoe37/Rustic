@@ -4,6 +4,7 @@ use std::fmt;
 use std::time::Duration;
 
 use rustic_base::{Clock, SystemClock};
+use rustic_bindings::dom_exception;
 use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
@@ -167,6 +168,7 @@ impl EngineDocument {
             Agent::with_heap_limit(limits.heap_bytes).map_err(|_| ScriptStop::OutOfMemory)?;
         agent.set_cancellation(Some(self.cancellation().clone()));
         agent.set_can_block(false);
+        dom_exception::install(&mut agent).map_err(|_| ScriptStop::OutOfMemory)?;
         let owner = self.parsed().document().id();
         Ok(ScriptedDocument {
             document: self,

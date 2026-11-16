@@ -12,6 +12,7 @@ mod env;
 mod exotic;
 mod gc;
 mod heap;
+mod host;
 mod internal;
 mod number;
 mod object;

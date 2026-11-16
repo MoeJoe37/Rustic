@@ -155,6 +155,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
 | TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, JS-08 |
 | TD-123 | Deliberate | DOM / JS | Interpreter safe points still use JS-only collection | Open, WEB-03 |
+| TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1849,8 +1850,19 @@ The host-side `DomHeap` can collect a JS agent and all registered documents
 together when called explicitly. The bytecode interpreter's automatic GC safe
 points still use the standalone JS collector. The current document scheduler
 can use that path because page script cannot create DOM wrappers or register
-node-held values. Before installing the first page-facing DOM interface,
+node-held values. Before installing page interfaces that create node wrappers,
 connect scheduler and interpreter safe points to the document coordinator.
 Cover reentrant getters and callbacks, collection under stress, and release
 of document roots at teardown.
 [ADR 0026](adr/0026-realm-dom-wrappers.md)
+
+### TD-124 — DOMException stack, derived interfaces and serialization
+
+Document realms install the base interface. Host quota limits throw the
+legacy base `QuotaExceededError` name and code. The derived interface
+requires numeric option conversion and its own quota and requested slots.
+Add it when an exposed API can report those values. Capture DOMException
+stacks alongside native Error stacks when script debugging adds that
+storage. Serialize the exception's private name and message when the
+structured clone capability lands.
+[ADR 0027](adr/0027-host-exception-bindings.md)

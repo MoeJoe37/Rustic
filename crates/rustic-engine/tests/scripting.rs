@@ -166,3 +166,36 @@ fn failed_agent_initialization_releases_document_admission() {
     assert!(token.is_cancelled());
     assert!(engine.begin_document(ParserLimits::default()).is_ok());
 }
+
+#[test]
+fn document_script_realms_install_dom_exception() {
+    let mut engine = Engine::new(1);
+    let mut scripts = engine
+        .begin_document(ParserLimits::default())
+        .unwrap()
+        .finish()
+        .unwrap()
+        .into_scripted(TaskLimits::default())
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+        var failure;
+        Promise.resolve().then(() => {
+            failure = new DOMException("operation aborted", "AbortError");
+        });
+    "#,
+        ))
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+        if (!(failure instanceof DOMException) || !(failure instanceof Error) ||
+            failure.message !== "operation aborted" || failure.code !== DOMException.ABORT_ERR)
+            throw "DOMException was not installed";
+    "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+}

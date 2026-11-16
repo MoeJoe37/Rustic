@@ -134,7 +134,7 @@ fn integer32(
     }
 }
 
-fn coerce_string(agent: &mut Agent, value: Value) -> JsResult<StringId> {
+pub(crate) fn coerce_string(agent: &mut Agent, value: Value) -> JsResult<StringId> {
     with_input_root(agent, value, Agent::to_string)
 }
 

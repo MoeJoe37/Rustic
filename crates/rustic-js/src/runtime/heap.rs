@@ -186,6 +186,8 @@ pub struct Heap {
     /// the collector alone.
     pub(crate) codes: Arena<Rc<FunctionCode>>,
     pub(crate) roots: HostRoots,
+    /// Interface prototypes owned by their host realm, independent of globals.
+    pub(crate) host_interfaces: HashMap<(u16, &'static str), ObjectId>,
     pub(crate) budget: Budget,
     /// Collect once `bytes_used` reaches this (see `gc.rs`).
     pub(crate) gc_threshold: usize,
@@ -254,6 +256,7 @@ impl Heap {
             closures: Arena::default(),
             codes: Arena::default(),
             roots: HostRoots::default(),
+            host_interfaces: HashMap::new(),
             budget: Budget::new(limit),
             gc_threshold: super::gc::initial_threshold(limit),
             collections: 0,

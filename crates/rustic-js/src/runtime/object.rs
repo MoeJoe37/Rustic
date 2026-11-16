@@ -335,6 +335,12 @@ pub(crate) enum Internal {
     },
     /// A host object's embedder data.
     Host(u64),
+    /// Private string state of a branded host exception.
+    HostError {
+        interface: &'static str,
+        name: StringId,
+        message: StringId,
+    },
     /// A bound function exotic object (§10.4.1): `[[BoundTargetFunction]]`,
     /// `[[BoundThis]]` and `[[BoundArguments]]`.
     Bound {

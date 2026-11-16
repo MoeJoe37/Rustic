@@ -42,7 +42,7 @@ would need an additional mechanism for cycles through JavaScript and across
 documents. The agent already supplies a shared mark phase.
 
 The coordinator is an explicit host API. WEB-03 must connect automatic
-interpreter safe points before installing page interfaces (TD-123).
+interpreter safe points before page interfaces expose node wrappers (TD-123).
 Document unregistration and reclamation of detached realms belong to
 the page host lifecycle (TD-118 for realm reclamation).
 

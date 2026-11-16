@@ -488,24 +488,30 @@ fn error_to_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Valu
     };
     let name = agent.get(o, PropertyKey::String(agent.names.name))?;
     let name = if name == Value::UNDEFINED {
-        "Error".to_owned()
+        agent.heap.intern_str("Error")?
     } else {
-        let s = agent.to_string(name)?;
-        agent.heap.string(s).to_text()
+        agent.to_string(name)?
     };
-    let message = agent.get(o, PropertyKey::String(agent.names.message))?;
-    let message = if message == Value::UNDEFINED {
-        String::new()
-    } else {
-        let s = agent.to_string(message)?;
-        agent.heap.string(s).to_text()
-    };
-    let text = match (name.is_empty(), message.is_empty()) {
-        (true, _) => message,
-        (_, true) => name,
-        _ => format!("{name}: {message}"),
-    };
-    agent.string(&text)
+    let root = agent.root(Value::string(name))?;
+    let message = (|| {
+        let message = agent.get(o, PropertyKey::String(agent.names.message))?;
+        if message == Value::UNDEFINED {
+            Ok(agent.names.empty)
+        } else {
+            agent.to_string(message)
+        }
+    })();
+    agent.unroot(root);
+    let message = message?;
+    if agent.heap.string(name).is_empty() {
+        return Ok(Value::string(message));
+    }
+    if agent.heap.string(message).is_empty() {
+        return Ok(Value::string(name));
+    }
+    let separator = agent.heap.intern_str(": ")?;
+    let prefix = agent.heap.concat(name, separator)?;
+    Ok(Value::string(agent.heap.concat(prefix, message)?))
 }
 
 // ---- support for the library modules -------------------------------------
@@ -560,7 +566,7 @@ pub(crate) fn install_constructor(
     Ok(constructor)
 }
 
-fn new_constructor(
+pub(crate) fn new_constructor(
     agent: &mut Agent,
     name: &'static str,
     behavior: NativeFn,

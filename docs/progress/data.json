@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "49e9799b1109057e99bb73fd8e6ec2d2d560f978034a5db99ba6d1abffcabfca",
-  "percent": "30.36",
-  "verified_percent": "28.86",
-  "partial_percent": "1.50",
-  "completed": 67,
-  "in_progress": 6,
+  "source_fingerprint": "afc175ab144d205304a774a506ab8eee90c0848c01c8d529127e35b00b24891a",
+  "percent": "30.52",
+  "verified_percent": "29.48",
+  "partial_percent": "1.04",
+  "completed": 68,
+  "in_progress": 5,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -55,11 +55,11 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 2,
+      "completed": 3,
       "total": 12,
-      "percent": "19.47",
-      "verified_percent": "10.62",
-      "partial_percent": "8.85"
+      "percent": "22.42",
+      "verified_percent": "22.42",
+      "partial_percent": "0.00"
     },
     {
       "id": "M6",
@@ -4277,119 +4277,125 @@
           "label": "Web IDL tooling, conversions and rooted wrappers",
           "size": 5,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Web IDL string and 32-bit integer conversions with rooted coercion",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/webidl.rs",
-                  "marker": "pub fn to_dom_string"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/webidl.rs",
-                  "marker": "pub fn to_unsigned_long"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/webidl.rs",
-                  "marker": "fn string_kinds_apply_their_distinct_code_unit_rules"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/webidl.rs",
-                  "marker": "fn integer_modes_wrap_clamp_and_enforce_range_at_the_boundaries"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/webidl.rs",
-                  "marker": "fn host_coercion_roots_input_across_collecting_getters"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/webidl.rs",
-                  "marker": "fn native_bindings_keep_user_exceptions_and_throw_type_errors_in_javascript"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/webidl.rs",
+              "marker": "pub fn to_dom_string"
             },
             {
-              "label": "Pinned Web IDL subset generator and binding metadata",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/generate_dom_idl.py",
-                  "marker": "def generate"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/metadata.rs",
-                  "marker": "pub fn interface"
-                },
-                {
-                  "kind": "test",
-                  "path": "tools/tests/test_generate_dom_idl.py",
-                  "marker": "def test_committed_metadata_reproduces_offline"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/metadata.rs",
-                  "marker": "fn generated_argument_metadata_drives_character_data_conversion"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/metadata.rs",
-                  "marker": "fn generated_text_constructor_distinguishes_defaults_from_null"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/webidl.rs",
+              "marker": "pub fn to_unsigned_long"
             },
             {
-              "label": "Realm-aware node wrapper identity and DOM/JS tracing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/heap.rs",
-                  "marker": "pub fn collect_documents"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/heap.rs",
-                  "marker": "pub fn adopt_node"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
-                  "marker": "fn each_realm_keeps_its_own_wrapper_and_prototype"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
-                  "marker": "fn registered_documents_trace_transitive_edges_in_one_collection"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
-                  "marker": "fn adoption_retargets_owned_descendants_and_preserves_realm_expandos"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/dom_gc.rs",
-                  "marker": "fn failed_adoption_keeps_source_wrapper_and_edge"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/webidl.rs",
+              "marker": "fn string_kinds_apply_their_distinct_code_unit_rules"
             },
             {
-              "label": "DOMException bindings and host error conversion",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/webidl.rs",
+              "marker": "fn integer_modes_wrap_clamp_and_enforce_range_at_the_boundaries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/webidl.rs",
+              "marker": "fn host_coercion_roots_input_across_collecting_getters"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/webidl.rs",
+              "marker": "fn native_bindings_keep_user_exceptions_and_throw_type_errors_in_javascript"
+            },
+            {
+              "kind": "source",
+              "path": "tools/generate_dom_idl.py",
+              "marker": "def generate"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/metadata.rs",
+              "marker": "pub fn interface"
+            },
+            {
+              "kind": "test",
+              "path": "tools/tests/test_generate_dom_idl.py",
+              "marker": "def test_committed_metadata_reproduces_offline"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/metadata.rs",
+              "marker": "fn generated_argument_metadata_drives_character_data_conversion"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/metadata.rs",
+              "marker": "fn generated_text_constructor_distinguishes_defaults_from_null"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/heap.rs",
+              "marker": "pub fn collect_documents"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/heap.rs",
+              "marker": "pub fn adopt_node"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_gc.rs",
+              "marker": "fn each_realm_keeps_its_own_wrapper_and_prototype"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_gc.rs",
+              "marker": "fn registered_documents_trace_transitive_edges_in_one_collection"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_gc.rs",
+              "marker": "fn adoption_retargets_owned_descendants_and_preserves_realm_expandos"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_gc.rs",
+              "marker": "fn failed_adoption_keeps_source_wrapper_and_edge"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/dom_exception.rs",
+              "marker": "pub fn from_dom_error"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_exception.rs",
+              "marker": "fn installed_interface_has_web_idl_properties_and_legacy_codes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_exception.rs",
+              "marker": "fn constructor_preserves_utf16_order_user_throws_and_brand_checks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_exception.rs",
+              "marker": "fn interface_prototypes_and_exception_strings_survive_collection_in_each_realm"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/dom_exception.rs",
+              "marker": "fn host_error_conversion_uses_a_real_dom_operation_and_preserves_fatal_failures"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn document_script_realms_install_dom_exception"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.62"
         },
         {
@@ -4545,13 +4551,13 @@
         }
       ],
       "points": 40,
-      "completed": 1,
-      "in_progress": 1,
+      "completed": 2,
+      "in_progress": 0,
       "total": 10,
-      "contribution": "0.84",
-      "percent": "16.87",
-      "verified_percent": "7.50",
-      "partial_percent": "9.37"
+      "contribution": "1.00",
+      "percent": "20.00",
+      "verified_percent": "20.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "media",

@@ -59,7 +59,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
-| `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime and future service interfaces | M0 onward |
+| `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime, Web IDL bindings and future service interfaces | M0 onward |
 | `rustic-cli` / future `rustic-shell` | Headless test host / desktop browser chrome | engine API, platform | M0 / M8 |
 | `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
 
@@ -118,6 +118,13 @@ coordinator per agent records wrappers by node and realm. The joint trace
 includes every registered document, and cross-document adoption retargets
 all wrappers through the DOM identity map.
 [ADR 0026](adr/0026-realm-dom-wrappers.md)
+
+Document script realms install `DOMException` through `rustic-bindings`.
+The JS heap owns the exception's private strings and the installed
+interface's realm prototype. Engine error conversion uses that prototype
+even when script has replaced the global constructor.
+[ADR 0027](adr/0027-host-exception-bindings.md)
+
 Generation IDs
 detect stale references; they do not replace reachability tracking. Style/layout
 data live in separate epoch-owned arenas and use weak node identity. Explicitly

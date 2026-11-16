@@ -796,9 +796,7 @@ impl Agent {
             ErrorKind::ReferenceError => self.intrinsics.reference_error_prototype,
             ErrorKind::SyntaxError => self.intrinsics.syntax_error_prototype,
         };
-        let error = self
-            .heap
-            .alloc_object(Object::new(Class::Error, Some(proto)))?;
+        let error = self.new_error_object_with(proto)?;
         let message = self.string(message)?;
         let key = PropertyKey::String(self.names.message);
         self.define_property_or_throw(

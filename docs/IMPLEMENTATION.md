@@ -138,11 +138,22 @@ any wrapper keeps all its wrappers and node-held values alive. Adoption
 retargets wrappers and moves edges for the adopted nodes, including owned
 shadow trees and template contents. Tests cover cross-document tracing,
 identity and expandos across adoption, unrelated host objects and failure
-atomicity. DOMException bindings remain open. Page interface installation
-must route interpreter safe points through the joint collector (TD-123).
+atomicity. Page interfaces that expose node wrappers must route interpreter
+safe points through the joint collector (TD-123).
+
+Document script realms install the base `DOMException` constructor.
+Its private string slots preserve UTF-16, and its prototype exposes
+branded getters, the legacy constants and the usual Error behavior.
+The binding converts document failures to named exceptions, including
+`IndexSizeError` for an invalid character-data offset. Allocation and
+identity exhaustion remain fatal. Tests exercise construction, reentrant
+coercion, storage across collection, cross-realm fallback, and a real DOM
+failure caught by JavaScript. Native stack information, the derived
+`QuotaExceededError` interface and structured cloning remain open (TD-124).
 [ADR 0024](adr/0024-web-idl-conversions.md),
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
-[ADR 0026](adr/0026-realm-dom-wrappers.md)
+[ADR 0026](adr/0026-realm-dom-wrappers.md),
+[ADR 0027](adr/0027-host-exception-bindings.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

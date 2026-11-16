@@ -18,6 +18,7 @@ mod attributes;
 mod character_data;
 mod collections;
 mod creation;
+mod html_collections;
 mod selectors;
 
 /// Shared access to the real document rendered by the host.
@@ -36,7 +37,8 @@ pub trait PageTree: Debug {
 struct Page {
     tree: Rc<dyn PageTree>,
     wrappers: RefCell<DomHeap>,
-    child_lists: RefCell<HashMap<(NodeId, RealmId), ObjectId>>,
+    child_lists: RefCell<HashMap<(NodeId, RealmId, collections::ChildKind), ObjectId>>,
+    child_index: RefCell<collections::ChildIndex>,
 }
 
 impl ExecutionHost for Page {
@@ -50,7 +52,11 @@ impl ExecutionHost for Page {
         self.child_lists
             .try_borrow_mut()
             .map_err(|_| OutOfMemory)?
-            .retain(|(node, _), _| document.node(*node).is_ok());
+            .retain(|(node, _, _), _| document.node(*node).is_ok());
+        self.child_index
+            .try_borrow_mut()
+            .map_err(|_| OutOfMemory)?
+            .discard_collected(&document);
         Ok(())
     }
 
@@ -69,6 +75,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         return agent.type_error("document is busy");
     };
     collections::install(agent)?;
+    html_collections::install(agent)?;
     install_interface(
         agent,
         "Node",
@@ -100,11 +107,19 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         Some("Node"),
         illegal_constructor,
         0,
-        &[("documentElement", "get documentElement", document_element)],
+        &[
+            ("documentElement", "get documentElement", document_element),
+            (
+                "children",
+                "get children",
+                html_collections::document_children,
+            ),
+        ],
         |agent, proto| {
             creation::install_factories(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
-            selectors::install_non_element_parent(agent, proto)
+            selectors::install_non_element_parent(agent, proto)?;
+            html_collections::install_lookup::<true>(agent, proto)
         },
     )?;
     install_interface(
@@ -113,11 +128,19 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         Some("Node"),
         illegal_constructor,
         0,
-        &[("localName", "get localName", local_name)],
+        &[
+            ("localName", "get localName", local_name),
+            (
+                "children",
+                "get children",
+                html_collections::element_children,
+            ),
+        ],
         |agent, proto| {
             attributes::install(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
-            selectors::install_element(agent, proto)
+            selectors::install_element(agent, proto)?;
+            html_collections::install_lookup::<false>(agent, proto)
         },
     )?;
     install_interface(
@@ -126,7 +149,11 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         Some("Node"),
         creation::construct_fragment,
         0,
-        &[],
+        &[(
+            "children",
+            "get children",
+            html_collections::fragment_children,
+        )],
         |agent, proto| {
             selectors::install_parent_node(agent, proto)?;
             selectors::install_non_element_parent(agent, proto)
@@ -170,6 +197,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         tree,
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),
+        child_index: RefCell::new(collections::ChildIndex::default()),
     }))
 }
 

@@ -117,12 +117,19 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get_own_property(a, o, key)),
             Exotic::TypedArray => typed_array::get_own_property(self, o, key),
-            Exotic::HostIndexed => match self.host_indexed_value(o, key)? {
-                Some(value) => Ok(Some(PropertyDescriptor::data_with(
-                    value, false, true, true,
-                ))),
-                None => self.ordinary_get_own_property(o, key),
-            },
+            Exotic::HostIndexed => {
+                if let Some(value) = self.host_indexed_value(o, key)? {
+                    return Ok(Some(PropertyDescriptor::data_with(
+                        value, false, true, true,
+                    )));
+                }
+                if let Some(value) = self.visible_host_named_item(o, key)? {
+                    return Ok(Some(PropertyDescriptor::data_with(
+                        value, false, false, true,
+                    )));
+                }
+                self.ordinary_get_own_property(o, key)
+            }
             Exotic::ModuleNamespace => match self.namespace_binding(o, key) {
                 Some(binding) => Ok(Some(PropertyDescriptor::data_with(
                     self.namespace_value(binding)?,
@@ -155,7 +162,14 @@ impl Agent {
             Exotic::Proxy => self.in_proxy(|a| proxy::define_own_property(a, o, key, desc)),
             Exotic::TypedArray => typed_array::define_own_property(self, o, key, desc),
             Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => Ok(false),
-            Exotic::HostIndexed => self.ordinary_define_own_property(o, key, desc),
+            Exotic::HostIndexed => {
+                if self.ordinary_get_own_property(o, key)?.is_none()
+                    && self.host_named_exists(o, key)?
+                {
+                    return Ok(false);
+                }
+                self.ordinary_define_own_property(o, key, desc)
+            }
             Exotic::ModuleNamespace => {
                 if matches!(key, PropertyKey::Symbol(_)) {
                     return self.ordinary_define_own_property(o, key, desc);
@@ -205,9 +219,9 @@ impl Agent {
             Exotic::Proxy => self.in_proxy(|a| proxy::has_property(a, o, key)),
             Exotic::TypedArray => typed_array::has_property(self, o, key),
             Exotic::Arguments => self.has_property_from(o, key, true),
-            Exotic::HostIndexed => Ok(
-                self.host_index_is_supported(o, key)? || self.has_property_from(o, key, true)?
-            ),
+            Exotic::HostIndexed => Ok(self.host_index_is_supported(o, key)?
+                || self.host_named_is_visible(o, key)?
+                || self.has_property_from(o, key, true)?),
             Exotic::ModuleNamespace => Ok(self.namespace_binding(o, key).is_some()
                 || self.ordinary_get_own_property(o, key)?.is_some()),
         }
@@ -222,10 +236,15 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::get(a, o, key, receiver)),
             Exotic::TypedArray => typed_array::get(self, o, key, receiver),
-            Exotic::HostIndexed => match self.host_indexed_value(o, key)? {
-                Some(value) => Ok(value),
-                None => self.get_from(o, key, receiver, true),
-            },
+            Exotic::HostIndexed => {
+                if let Some(value) = self.host_indexed_value(o, key)? {
+                    return Ok(value);
+                }
+                if let Some(value) = self.visible_host_named_item(o, key)? {
+                    return Ok(value);
+                }
+                self.get_from(o, key, receiver, true)
+            }
             Exotic::ModuleNamespace => match self.namespace_binding(o, key) {
                 Some(binding) => self.namespace_value(binding),
                 None => self.get_from(o, key, receiver, true),
@@ -275,7 +294,12 @@ impl Agent {
             Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => {
                 Ok(!self.host_index_is_supported(o, key)?)
             }
-            Exotic::HostIndexed => self.ordinary_delete(o, key),
+            Exotic::HostIndexed => {
+                if self.host_named_is_visible(o, key)? {
+                    return Ok(false);
+                }
+                self.ordinary_delete(o, key)
+            }
             Exotic::ModuleNamespace => {
                 if self.namespace_binding(o, key).is_some() {
                     Ok(false)

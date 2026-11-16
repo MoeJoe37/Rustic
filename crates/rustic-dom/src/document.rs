@@ -63,6 +63,7 @@ pub struct Document {
     root: NodeId,
     limits: DocumentLimits,
     ready_state: ReadyState,
+    child_revision: u64,
 }
 
 impl Document {
@@ -86,6 +87,7 @@ impl Document {
             root,
             limits,
             ready_state,
+            child_revision: 0,
         })
     }
 
@@ -251,6 +253,12 @@ impl Document {
         self.arena.insert(NodeKind::DocumentType(value))
     }
 
+    /// Version of the document's child links for a transient positional index.
+    /// Returns `None` if the counter has saturated and caching must stop.
+    pub fn child_revision(&self) -> Option<u64> {
+        (self.child_revision != u64::MAX).then_some(self.child_revision)
+    }
+
     /// Visit direct children in order, without copying IDs or allocating a stack.
     pub fn children(&self, parent: NodeId) -> Result<impl Iterator<Item = NodeId> + '_, DomError> {
         Ok(std::iter::successors(
@@ -389,6 +397,7 @@ impl Document {
 
     /// Unchecked link of a detached node before `before` (or last).
     fn link_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
+        self.child_revision = self.child_revision.saturating_add(1);
         let previous = before
             .map(|id| self.live(id).previous_sibling())
             .unwrap_or_else(|| self.live(parent).last_child());
@@ -555,6 +564,7 @@ impl Document {
 
     /// Unchecked append of a detached node, used only during destruction.
     fn link_last_child(&mut self, parent: NodeId, child: NodeId) {
+        self.child_revision = self.child_revision.saturating_add(1);
         let previous = self.live(parent).last_child();
         if let Some(id) = previous {
             self.live_mut(id).next_sibling = Some(child);
@@ -574,6 +584,7 @@ impl Document {
         else {
             return;
         };
+        self.child_revision = self.child_revision.saturating_add(1);
         if let Some(previous) = previous {
             self.live_mut(previous).next_sibling = next;
         } else {

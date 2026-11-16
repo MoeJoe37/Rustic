@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "84747f093212d12b89f8873abb54c4e8dcbaa2958c986da447018d0e5132c6ed",
-  "percent": "30.90",
+  "source_fingerprint": "6b69dc31d8343aa1edc4fc737882802df15899cf00b2999afdefc9566aa66e74",
+  "percent": "31.01",
   "verified_percent": "29.89",
-  "partial_percent": "1.01",
+  "partial_percent": "1.12",
   "completed": 69,
   "in_progress": 5,
   "total": 221,
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 3,
       "total": 12,
-      "percent": "28.32",
+      "percent": "30.28",
       "verified_percent": "22.42",
-      "partial_percent": "5.90"
+      "partial_percent": "7.86"
     },
     {
       "id": "M6",
@@ -4485,11 +4485,42 @@
             },
             {
               "label": "Live HTMLCollection bindings and named properties",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/html_collections.rs",
+                  "marker": "pub(super) fn install"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/host_indexed.rs",
+                  "marker": "fn supported_name_is_visible"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn html_collection_children_live_names_and_descriptor_visibility"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn html_collection_descendant_filters_preserve_scope_namespaces_and_liveness"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn html_collection_named_property_allows_proxy_visibility_traps_to_mutate_the_dom"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_selectors_follow_parser_quirks_mode"
+                }
+              ]
             }
           ],
-          "credit": "50.00",
+          "credit": "66.66",
           "engine_share": "0.62"
         },
         {
@@ -4638,10 +4669,10 @@
       "completed": 2,
       "in_progress": 1,
       "total": 10,
-      "contribution": "1.31",
-      "percent": "26.25",
+      "contribution": "1.41",
+      "percent": "28.33",
       "verified_percent": "20.00",
-      "partial_percent": "6.25"
+      "partial_percent": "8.33"
     },
     {
       "id": "media",

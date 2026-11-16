@@ -44,3 +44,4 @@ For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.
 Changes to public API stability, native/unsafe boundaries, runtime replacement,
 process authority, GC, or a major platform dependency require an ADR.
+| [0031](0031-live-html-collections.md) | Live HTMLCollections, named property visibility, and direct-child indexing | Accepted for WEB-03 |

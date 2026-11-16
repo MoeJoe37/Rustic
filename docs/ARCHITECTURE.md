@@ -131,7 +131,14 @@ Selector queries borrow the live document after JavaScript string coercion
 and meter native traversal against the current script turn. A static
 NodeList traces its node wrappers. A live child list and its source node
 trace each other, so the joint collector can reclaim an unreachable cycle.
-[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)
+Direct `children` HTMLCollections share that ownership model. A filtered
+descendant collection traces its source and filter through private JS data.
+One page-local positional index shares the current root's child and
+element-child IDs, versioned by document child links. Collection membership
+and names are read from the current tree. Named-property visibility can
+call Proxy traps after releasing DOM borrows.
+[ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
+[ADR 0031](adr/0031-live-html-collections.md)
 
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed

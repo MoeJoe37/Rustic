@@ -328,7 +328,8 @@ fn document_selectors_follow_parser_quirks_mode() {
             const p = document.getElementById("Heading");
             if (!p || document.getElementById("heading") !== null ||
                 p.matches('#heading.active') !== {expected} ||
-                (document.querySelector('#heading.active') === p) !== {expected})
+                (document.querySelector('#heading.active') === p) !== {expected} ||
+                (document.getElementsByClassName("active")[0] === p) !== {expected})
                 throw "incorrect case sensitivity";
         "#
             )))

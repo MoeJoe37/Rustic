@@ -50,7 +50,7 @@ pub(crate) use gc::Tracer;
 pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};
 pub use heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory, Symbol};
 pub use host::ExecutionHost;
-pub use host_indexed::LiveIndexAccess;
+pub use host_indexed::{LiveIndexAccess, LiveNameAccess};
 pub use internal::IntegrityLevel;
 pub use number::{
     number_to_string, string_to_number, to_int32, to_integer_or_infinity, to_length, to_uint16,

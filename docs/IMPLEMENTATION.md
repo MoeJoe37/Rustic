@@ -186,14 +186,23 @@ NodeList with stable identity. Both provide read-only indexed properties,
 `item`, `length`, iteration and `forEach`. The joint collector preserves
 either a snapshot's nodes or a live list's source while the list is reachable.
 
+Document, Element, and DocumentFragment expose a stable live `children`
+HTMLCollection. Document and Element have live descendant collections
+by qualified tag name, namespace and local name, or class tokens. These
+collections provide `length`, indexed reads, iteration, `item`, and `namedItem`.
+Named properties use IDs and HTML name attributes in tree order. They are
+non-enumerable and respect own and inherited properties. A document child-link
+revision invalidates the shared direct-child index. Descendant and name
+lookups still walk their live source under the native work budget (TD-129).
+
 The host exposes one document per scripted agent. Window integration,
-additional documents, cross-document operations, and HTMLCollection named
-properties remain open. TD-126 covers the remaining interfaces and
-constructor behavior. TD-127 covers the UTF-8 name storage limit.
-TD-128 tracks live list traversal cost.
+additional documents, and cross-document operations remain open.
+TD-126 covers other remaining interfaces and constructor behavior.
+TD-127 covers the UTF-8 name storage limit.
 [ADR 0028](adr/0028-scripted-document-collection.md),
 [ADR 0029](adr/0029-scripted-node-creation.md),
-[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)
+[ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
+[ADR 0031](adr/0031-live-html-collections.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

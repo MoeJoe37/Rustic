@@ -4119,8 +4119,39 @@
             },
             {
               "label": "Live HTMLCollection bindings and named properties",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/html_collections.rs",
+                  "marker": "pub(super) fn install"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-js/src/runtime/host_indexed.rs",
+                  "marker": "fn supported_name_is_visible"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn html_collection_children_live_names_and_descriptor_visibility"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn html_collection_descendant_filters_preserve_scope_namespaces_and_liveness"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/page.rs",
+                  "marker": "fn html_collection_named_property_allows_proxy_visibility_traps_to_mutate_the_dom"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/scripting.rs",
+                  "marker": "fn document_selectors_follow_parser_quirks_mode"
+                }
+              ]
             }
           ]
         },

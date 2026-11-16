@@ -3113,6 +3113,35 @@ impl Agent {
         result
     }
 
+    /// Keep an indexed receiver and its supported names alive during
+    /// prototype queries, which can call Proxy traps.
+    pub(crate) fn with_rooted_names<T>(
+        &mut self,
+        receiver: ObjectId,
+        names: &[crate::runtime::StringId],
+        operation: impl FnOnce(&mut Self) -> JsResult<T>,
+    ) -> JsResult<T> {
+        if names.is_empty() {
+            return operation(self);
+        }
+        let base = self.vm.stack.len();
+        let extra = names.len().checked_add(1).ok_or(Abrupt::OutOfMemory)?;
+        if base.saturating_add(extra) > self.vm.limits.max_stack_values {
+            return Err(Abrupt::OutOfMemory);
+        }
+        self.vm
+            .stack
+            .try_reserve(extra)
+            .map_err(|_| Abrupt::OutOfMemory)?;
+        self.vm.stack.push(Value::object(receiver));
+        self.vm
+            .stack
+            .extend(names.iter().copied().map(Value::string));
+        let result = operation(self);
+        self.vm.stack.truncate(base);
+        result
+    }
+
     /// Resume an async function suspended in `await` from a promise job
     /// at the host level: with the awaited value, or throwing it.
     pub(crate) fn async_resume(&mut self, o: ObjectId, throw: bool, value: Value) -> JsResult<()> {

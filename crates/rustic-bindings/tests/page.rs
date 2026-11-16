@@ -356,4 +356,228 @@ fn selector_limits_stop_native_walks_instead_of_returning_partial_lists() {
             .unwrap(),
         Value::TRUE
     );
+    agent
+        .evaluate("globalThis.live = document.getElementsByTagName('p');")
+        .unwrap();
+    agent.set_step_budget(Some(10));
+    assert!(matches!(
+        agent.evaluate("globalThis.collectionKeys = Reflect.ownKeys(live);"),
+        Err(rustic_js::EvalError::Cancelled)
+    ));
+    agent.set_step_budget(None);
+    assert_eq!(
+        agent
+            .evaluate(
+                "typeof collectionKeys === 'undefined' && Reflect.ownKeys(live).length === 20"
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+}
+
+#[test]
+fn html_collection_children_live_names_and_descriptor_visibility() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree.clone()).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(agent.evaluate(r#"
+        var saved;
+        (() => {
+            const root = document.createDocumentFragment();
+            const a = document.createElement("p");
+            const b = document.createElement("p");
+            const c = document.createElement("p");
+            const text = document.createTextNode("ab");
+            const nodes = root.childNodes;
+            saved = root.children;
+            const list = saved;
+            list.future = 42;
+            a.setAttribute("name", "shared");
+            a.setAttribute("id", "first");
+            b.setAttribute("id", "shared");
+            b.setAttribute("name", "item");
+            c.setAttribute("id", "8");
+            c.setAttribute("name", "future");
+            root.appendChild(a);
+            root.appendChild(text);
+            root.appendChild(b);
+            root.appendChild(c);
+            if (!(list instanceof HTMLCollection) || list !== root.children ||
+                list.length !== 3 || list[1] !== b || list.item(2) !== c ||
+                list.item(3) !== null || list[3] !== undefined || [...list][1] !== b ||
+                nodes.length !== 4 || nodes[1] !== text || list.namedItem("") !== null)
+                throw "child collections";
+            if (list.shared !== a || list.namedItem("shared") !== a ||
+                list.namedItem("item") !== b || list.item !== HTMLCollection.prototype.item ||
+                list.namedItem("8") !== c || list[8] !== undefined || list.future !== 42)
+                throw "names or shadowing";
+            const symbol = Symbol();
+            list[symbol] = 19;
+            const keys = Reflect.ownKeys(list);
+            if (keys.slice(0, -1).join() !== "0,1,2,first,shared,future" ||
+                keys[keys.length - 1] !== symbol || Object.keys(list).join() !== "0,1,2,future")
+                throw "own key order or enumerability";
+            const desc = Object.getOwnPropertyDescriptor(list, "shared");
+            if (!desc.configurable || desc.enumerable || desc.writable || desc.value !== a ||
+                Reflect.set(list, "shared", 1) || Reflect.deleteProperty(list, "shared") ||
+                Reflect.defineProperty(list, "item", {value: 1}) || Reflect.preventExtensions(list))
+                throw "named property internal methods";
+            if (!Reflect.deleteProperty(list, "future") || list.future !== c)
+                throw "named property after deleting expando";
+            text.splitText(1);
+            root.removeChild(a);
+            if (nodes.length !== 4 || list.length !== 2 || list.shared !== b || "first" in list)
+                throw "child index after split and remove";
+            b.removeAttribute("id");
+            if ("shared" in list || list.namedItem("shared") !== null)
+                throw "name must follow attributes";
+            b.setAttribute("id", "\ud800");
+            if (list["\ud800"] !== b || list.namedItem("\ud800") !== b)
+                throw "names are UTF-16";
+            const getter = Object.getOwnPropertyDescriptor(DocumentFragment.prototype, "children").get;
+            let illegal = 0;
+            try { getter.call(text); } catch (error) { if (error instanceof TypeError) illegal++; }
+            try { getter.call(a); } catch (error) { if (error instanceof TypeError) illegal++; }
+            try { Document.prototype.getElementsByTagName.call(a, "p"); }
+            catch (error) { if (error instanceof TypeError) illegal++; }
+            try { list.namedItem(); } catch (error) { if (error instanceof TypeError) illegal++; }
+            try { new HTMLCollection(); } catch (error) { if (error instanceof TypeError) illegal++; }
+            if (illegal !== 5) throw "brand or required argument";
+        })();
+        (() => saved.length === 2 && saved[0].parentNode.children === saved)();
+    "#).unwrap(), Value::TRUE);
+    agent.evaluate("(() => 0)();").unwrap();
+    assert_eq!(tree.0.borrow().node_count(), 6);
+    agent.evaluate("saved = null; (() => 0)();").unwrap();
+    assert_eq!(tree.0.borrow().node_count(), 1);
+}
+
+#[test]
+fn html_collection_descendant_filters_preserve_scope_namespaces_and_liveness() {
+    use rustic_dom::{DomString, SVG_NAMESPACE};
+
+    let mut document = Document::new(DocumentLimits::default()).unwrap();
+    let root = document
+        .create_element(QualifiedName::html("main").unwrap())
+        .unwrap();
+    document.append_child(document.root(), root).unwrap();
+    for (name, id) in [
+        (
+            QualifiedName::from_parsed(Some(SVG_NAMESPACE), Some("svg"), "linearGradient").unwrap(),
+            "gradient",
+        ),
+        (
+            QualifiedName::from_parsed(None, None, "P").unwrap(),
+            "foreign",
+        ),
+    ] {
+        let node = document.create_element(name).unwrap();
+        document
+            .set_attribute(
+                node,
+                QualifiedName::from_parsed(None, None, "id").unwrap(),
+                DomString::from(id),
+            )
+            .unwrap();
+        document
+            .set_attribute(
+                node,
+                QualifiedName::from_parsed(None, None, "name").unwrap(),
+                DomString::from("foreignName"),
+            )
+            .unwrap();
+        document.append_child(root, node).unwrap();
+    }
+    let tree = Rc::new(Tree(RefCell::new(document)));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree.clone()).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        const root = document.documentElement;
+        const branch = document.createElement("div");
+        root.appendChild(branch);
+        const p = document.createElement("p");
+        p.setAttribute("class", "alpha\tbeta");
+        p.setAttribute("id", "selected");
+        branch.appendChild(p);
+        const tag = branch.getElementsByTagName("P");
+        const cls = root.getElementsByClassName(" beta  alpha alpha\r");
+        const explicitNamespace = root.getElementsByTagNameNS(
+            {toString() { return "http://www.w3.org/2000/" + "svg"; }},
+            {toString() { (() => 0)(); return "linearGradient"; }});
+        const gradient = explicitNamespace[0];
+        if (!(cls instanceof HTMLCollection) || root.getElementsByTagName("main").length !== 0 ||
+            document.getElementsByTagName("main")[0] !== root || tag[0] !== p ||
+            cls.length !== 1 || cls.namedItem("selected") !== p ||
+            root.getElementsByClassName("Alpha").length !== 0 ||
+            root.getElementsByClassName("\r\n \t").length !== 0)
+            throw "descendant scope and class tokens";
+        if (root.getElementsByTagName("svg:linearGradient")[0] !== gradient ||
+            root.getElementsByTagName("SVG:LINEARGRADIENT").length !== 0 ||
+            explicitNamespace.length !== 1 || gradient.getAttribute("id") !== "gradient" ||
+            root.getElementsByTagNameNS("*", "linearGradient")[0] !== gradient ||
+            root.getElementsByTagNameNS("", "P")[0].getAttribute("id") !== "foreign" ||
+            root.getElementsByTagNameNS(null, "p").length !== 0 ||
+            root.getElementsByTagName("P").length !== 2 ||
+            root.getElementsByTagName("*").namedItem("foreignName") !== null)
+            throw "qualified names and namespaces";
+        p.setAttribute("class", "beta");
+        if (cls.length !== 0) throw "class mutation";
+        const newClasses = root.getElementsByClassName({toString() {
+            p.setAttribute("class", "alpha beta");
+            return "alpha";
+        }});
+        if (newClasses[0] !== p || cls[0] !== p) throw "class conversion reentry";
+        root.appendChild(p);
+        tag.length === 0 && cls[0] === p && root.children.namedItem("selected") === p;
+    "#
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+    tree.0.borrow().check_invariants().unwrap();
+}
+
+#[test]
+fn html_collection_named_property_allows_proxy_visibility_traps_to_mutate_the_dom() {
+    let tree = Rc::new(Tree(RefCell::new(
+        Document::new(DocumentLimits::default()).unwrap(),
+    )));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        (() => {
+            const root = document.createElement("div");
+            const element = document.createElement("p");
+            element.setAttribute("id", "one");
+            root.appendChild(element);
+            const list = root.children;
+            Object.setPrototypeOf(list, new Proxy(HTMLCollection.prototype, {
+                getOwnPropertyDescriptor(target, key) {
+                    if (key === "one") element.setAttribute("id", "two");
+                    return Reflect.getOwnPropertyDescriptor(target, key);
+                }
+            }));
+            const descriptor = Object.getOwnPropertyDescriptor(list, "one");
+            return descriptor.value === null && !("one" in list) && list.two === element &&
+                Reflect.ownKeys(list).join() === "0,two";
+        })();
+    "#
+            )
+            .unwrap(),
+        Value::TRUE
+    );
 }

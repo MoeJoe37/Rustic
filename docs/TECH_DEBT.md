@@ -159,7 +159,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
 | TD-126 | Deliberate | Web bindings | The page host has one document and a subset of HTML and DOM interfaces | Open, WEB-03 and HTML integration |
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
-| TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walk child links | Open, DOM collections |
+| TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
+| TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1907,12 +1908,23 @@ name storage and its parser, selector and serializer consumers together
 when name conformance requires representing those code units.
 [ADR 0029](adr/0029-scripted-node-creation.md)
 
-### TD-128 — Live NodeList positional access walks child links
+### TD-128 — Live NodeList positional access walked child links (Paid)
 
-A live child list retains its source wrapper and reads the current sibling
-chain. This keeps it current through all tree edits without an invalidation
-table. Counting or accessing a later index is linear in the relevant
-children. Repeated indexed traversal can be quadratic, and charges each
-sibling step to the script turn. Measure real collection reads and introduce
-a mutation-versioned index when extending the live collection surface.
-[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)
+Reading length or a later index originally walked the current sibling chain.
+A page-local positional index now retains the last requested root's child
+and element-child IDs. The document child-link revision invalidates the
+index on structural edits. After a scan, subsequent reads on that root are
+constant time while the cache remains valid.
+[ADR 0031](adr/0031-live-html-collections.md)
+
+### TD-129 — Descendant and named collection reads scan live nodes and attributes
+
+Filtered descendant reads and named collection reads scan their current
+source, so attribute changes and reordering become visible immediately.
+The scans are metered against the script turn. Iterating a descendant view
+can repeatedly walk the same subtree, and changing collection roots can
+cause repeated direct-child index rebuilds. Use measured collection traces
+to guide a bounded, mutation-versioned filter or name index. Preserve live
+behavior through attribute changes, subtree moves, and potential reentrancy
+during named property visibility checks.
+[ADR 0031](adr/0031-live-html-collections.md)

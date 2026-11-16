@@ -323,11 +323,13 @@ Document script and promise-job safe points use the joint collector.
 The document can create nodes, and scripts can edit UTF-16 character data
 and element content attributes. Scoped selectors use the CSS matcher.
 `querySelectorAll` and `childNodes` provide static and live NodeLists.
-Window, additional documents, cross-document operations, and named
-HTMLCollection bindings remain open.
+`children` and the descendant name, namespace, and class methods return live
+HTMLCollections with indexed and named properties. Window, additional
+documents, and cross-document operations remain open.
 [ADR 0028](adr/0028-scripted-document-collection.md),
 [ADR 0029](adr/0029-scripted-node-creation.md),
-[ADR 0030](adr/0030-dom-selectors-and-node-lists.md)
+[ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
+[ADR 0031](adr/0031-live-html-collections.md)
 [ADR 0024](adr/0024-web-idl-conversions.md),
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
 [ADR 0026](adr/0026-realm-dom-wrappers.md),

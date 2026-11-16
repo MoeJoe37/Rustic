@@ -249,3 +249,67 @@ fn canceled_native_dispatch_can_reuse_the_same_event() {
     agent.set_step_budget(None);
     assert_eq!(agent.evaluate("event.eventPhase === 0 && event.currentTarget === null && event.composedPath().length === 0 && calls === 0 && bus.dispatchEvent(event) && calls === 64").unwrap(), Value::TRUE);
 }
+
+#[test]
+fn synthetic_mouse_click_preactivation_rolls_back_and_traces_control_state() {
+    let (mut agent, _) = scripted_page();
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        (() => {
+            const main = document.createElement("main");
+            document.appendChild(main);
+            const box = document.createElement("input");
+            box.setAttribute("type", "checkbox");
+            main.appendChild(box);
+            if (!(box instanceof HTMLInputElement) || !(box instanceof Element) ||
+                box.checked || box.defaultChecked || box.indeterminate)
+                throw "initial control state";
+            box.defaultChecked = true;
+            if (!box.checked || box.getAttribute("checked") !== "") throw "content reflection";
+            box.indeterminate = true;
+            let trace = "";
+            const cancel = (event) => {
+                if (box.checked || box.indeterminate || event.isTrusted ||
+                    event.button !== -1 || event.buttons !== 1) throw "preactivation or payload";
+                trace += "cancel ";
+                event.preventDefault();
+            };
+            box.addEventListener("click", cancel, {once:true});
+            main.addEventListener("input", e => {
+                if (e.target !== box || !e.isTrusted) throw "input";
+                trace += "input ";
+            });
+            main.addEventListener("change", e => {
+                if (e.target !== box || !e.isTrusted) throw "change";
+                trace += "change ";
+            });
+            const mouse = new MouseEvent("click", {bubbles:true, cancelable:true, button:65535,
+                buttons:65537, view:window});
+            if (box.dispatchEvent(mouse) || !box.checked || !box.indeterminate ||
+                trace !== "cancel " || mouse.view !== window)
+                throw "rollback";
+            box.dispatchEvent(new Event("click"));
+            if (!box.checked || !box.indeterminate) throw "generic event activation";
+            const successful = new MouseEvent("before", {clientX:5});
+            successful.initEvent("click", true, true);
+            if (!box.dispatchEvent(successful) || successful.clientX !== 5 || box.checked ||
+                box.indeterminate || trace !== "cancel input change ")
+                throw "successful mouse dispatch";
+            box.defaultChecked = false;
+            box.setAttribute("checked", "kept");
+            box.defaultChecked = true;
+            if (box.checked || !box.defaultChecked || box.getAttribute("checked") !== "kept")
+                throw "dirty checkedness";
+            const getter = Object.getOwnPropertyDescriptor(PointerEvent.prototype, "pointerId").get;
+            try { getter.call(mouse); } catch (e) { return e instanceof TypeError; }
+            return false;
+        })();
+    "#
+            )
+            .unwrap(),
+        Value::TRUE
+    );
+    assert_eq!(page::take_listener_error_count(&agent), 0);
+}

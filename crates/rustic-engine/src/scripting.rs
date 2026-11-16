@@ -8,22 +8,22 @@ use std::time::Duration;
 use rustic_base::{Clock, SystemClock};
 use rustic_bindings::dom_exception;
 use rustic_bindings::page::{self, PageTree};
-use rustic_dom::Document;
+use rustic_dom::{Document, NodeId};
 use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
-use crate::EngineDocument;
 use crate::frames::{RenderFrame, Rendering};
-use crate::tasks::{ScriptQueue, TimerId};
+use crate::tasks::{ScriptQueue, Task, TimerId};
+use crate::{EngineDocument, InputEvent};
 
 /// Resource limits for one scripted document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TaskLimits {
-    /// Maximum number of immediate and timed script tasks waiting to run.
+    /// Maximum number of script, timer and input tasks waiting to run.
     pub pending_scripts: usize,
-    /// Maximum total UTF-16 source units in waiting tasks.
+    /// Maximum total UTF-16 units in waiting script sources and keyboard input.
     pub pending_source_units: usize,
-    /// VM safe points shared by a script and its microtask checkpoint.
+    /// VM safe points shared by a task and its microtask checkpoint.
     pub steps_per_turn: u64,
     /// Jobs that a single microtask checkpoint may run, including newly queued jobs.
     pub jobs_per_checkpoint: usize,
@@ -43,7 +43,7 @@ impl Default for TaskLimits {
     }
 }
 
-/// Why a script task could not be queued.
+/// Why a document task could not be queued.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScriptQueueError {
     /// Script execution has stopped.
@@ -54,6 +54,8 @@ pub enum ScriptQueueError {
     Capacity,
     /// The requested delay exceeds the monotonic clock range.
     DeadlineOverflow,
+    /// The input target is outside the active document tree.
+    InvalidInputTarget,
     /// This document has exhausted its non-reusable timer identities.
     TimerIdsExhausted,
 }
@@ -62,8 +64,11 @@ impl fmt::Display for ScriptQueueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Stopped(reason) => reason.fmt(f),
-            Self::Limit => f.write_str("pending script limit reached"),
-            Self::Capacity => f.write_str("cannot allocate a script task slot"),
+            Self::Limit => f.write_str("pending document task limit reached"),
+            Self::Capacity => f.write_str("cannot allocate a document task slot"),
+            Self::InvalidInputTarget => {
+                f.write_str("input target is outside the active document tree")
+            }
             Self::DeadlineOverflow => f.write_str("script timer deadline exceeds the clock range"),
             Self::TimerIdsExhausted => f.write_str("script timer identity space exhausted"),
         }
@@ -112,19 +117,19 @@ pub enum ScriptFailure {
     UncaughtException,
 }
 
-/// The result of one script task and its completed microtask checkpoint.
+/// The result of one script or input task and its completed microtask checkpoint.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScriptTurn {
-    /// The script completed normally.
+    /// The task completed normally.
     Completed,
-    /// The script failed and the checkpoint still ran.
+    /// The task failed and the checkpoint still ran.
     Failed(ScriptFailure),
 }
 
 /// Work selected by the document pump when the host supplies a renderer.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DocumentTurn<T> {
-    /// A script or timer ran and completed its microtask checkpoint.
+    /// A script, timer or input task ran and completed its microtask checkpoint.
     Script(ScriptTurn),
     /// The host renderer ran for an offered rendering opportunity.
     Rendered {
@@ -226,7 +231,23 @@ impl<C: Clock> ScriptedDocument<C> {
     /// Queue a host-supplied script after checking both pending-work limits.
     pub fn queue_script(&mut self, source: Source) -> Result<(), ScriptQueueError> {
         self.check_live().map_err(ScriptQueueError::Stopped)?;
-        self.pending.queue(source)
+        self.pending.queue(Task::Script(source))
+    }
+
+    /// Queue host input for a connected target in this document.
+    ///
+    /// The host supplies the hit-tested pointer or selected keyboard target.
+    /// Targets detached or adopted before delivery are skipped.
+    pub fn queue_input(
+        &mut self,
+        target: NodeId,
+        event: InputEvent,
+    ) -> Result<(), ScriptQueueError> {
+        self.check_live().map_err(ScriptQueueError::Stopped)?;
+        if !page::connected_input_target(self.document().parsed().document(), target) {
+            return Err(ScriptQueueError::InvalidInputTarget);
+        }
+        self.pending.queue(Task::Input { target, event })
     }
 
     /// Access the host-selected timer clock, for example to advance a manual clock.
@@ -272,10 +293,10 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(())
     }
 
-    /// Pump one script, timer or rendering turn.
+    /// Pump one script, timer, input or rendering turn.
     ///
-    /// A ready script or timer and an offered frame alternate when both can
-    /// run. Each script completes its checkpoint before a later rendering turn.
+    /// A ready task and an offered frame alternate when both can
+    /// run. Each task completes its checkpoint before a later rendering turn.
     /// The renderer receives the completed document and a ticket for its output.
     pub fn run_next_with_render<T>(
         &mut self,
@@ -302,10 +323,10 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(self.rendering.accept(frame))
     }
 
-    /// Run one eligible script and drain its promise jobs before a later task.
+    /// Run one eligible task and drain its promise jobs before a later task.
     ///
-    /// A terminal failure discards pending scripts and releases the JS agent.
-    /// Returns `Ok(None)` when there is no eligible script or timer. Use
+    /// A terminal failure discards pending tasks and releases the JS agent.
+    /// Returns `Ok(None)` when there is no eligible script, timer or input. Use
     /// [`Self::run_next_with_render`] to service rendering offers as well.
     pub fn run_next(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
         self.check_live()?;
@@ -313,13 +334,19 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     fn run_script(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
-        let Some(source) = self.pending.pop_ready(self.clock.now()) else {
+        let Some(task) = self.pending.pop_ready(self.clock.now()) else {
             return Ok(None);
         };
 
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         agent.set_step_budget(Some(self.limits.steps_per_turn));
-        let turn = match agent.evaluate_source(&source) {
+        let result = match task {
+            Task::Script(source) => agent.evaluate_source(&source).map(|_| ()),
+            Task::Input { target, event } => {
+                page::deliver_input(agent, target, &event).map_err(EvalError::from)
+            }
+        };
+        let turn = match result {
             Ok(_) => ScriptTurn::Completed,
             Err(EvalError::Parse(error)) => ScriptTurn::Failed(ScriptFailure::Parse(error)),
             Err(EvalError::Compile(error)) => ScriptTurn::Failed(ScriptFailure::Compile(error)),

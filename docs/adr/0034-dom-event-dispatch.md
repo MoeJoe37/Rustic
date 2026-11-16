@@ -31,8 +31,8 @@ script and use the agent's native work budget for path and listener traversal.
 The dispatch clears temporary state after normal completion and fatal
 interruption. Listener exceptions increment a host report count and leave
 dispatch running. Event timestamps use the page host's monotonic origin.
-Trusted scheduling, default actions, AbortSignal, shadow retargeting,
-and report delivery to HTML error handlers are tracked as TD-131.
+[ADR 0035](0035-trusted-input-and-activation.md) adds the trusted input path
+and initial activation behavior. TD-131 tracks extended event delivery.
 
 ## Verification
 

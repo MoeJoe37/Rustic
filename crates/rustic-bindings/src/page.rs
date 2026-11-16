@@ -25,6 +25,8 @@ mod html_collections;
 mod selectors;
 mod window;
 
+pub use events::{InputEvent, KeyInput, Modifiers};
+
 /// Shared access to the real document rendered by the host.
 pub trait PageTree: Debug {
     /// Borrow the document for reading.
@@ -259,6 +261,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
             html_collections::install_lookup::<false>(agent, proto)
         },
     )?;
+    events::install_controls(agent)?;
     install_interface(
         agent,
         "DocumentFragment",
@@ -317,6 +320,16 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),
     }))
+}
+
+/// Whether a host input target has an unbroken parent path to this document.
+pub fn connected_input_target(document: &Document, target: NodeId) -> bool {
+    events::connected(document, target)
+}
+
+/// Deliver host input in the active page. A target that went away is skipped.
+pub fn deliver_input(agent: &mut Agent, target: NodeId, input: &InputEvent) -> JsResult<()> {
+    events::deliver(agent, target, input)
 }
 
 /// Read and clear the number of exceptions reported by event listeners.
@@ -400,6 +413,12 @@ fn wrap(
             DocumentFormat::Html | DocumentFormat::Xml => "Document",
             _ => "XMLDocument",
         },
+        NodeKind::Element(element)
+            if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+                && element.name().local() == "input" =>
+        {
+            "HTMLInputElement"
+        }
         NodeKind::Element(_) => "Element",
         NodeKind::Text(_) => "Text",
         NodeKind::Comment(_) => "Comment",

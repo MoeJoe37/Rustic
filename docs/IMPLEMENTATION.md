@@ -225,7 +225,7 @@ TD-126 tracks additional interfaces. TD-127 covers UTF-8 name storage.
 [ADR 0032](adr/0032-top-level-window-realm.md),
 [ADR 0033](adr/0033-detached-documents-and-adoption.md)
 
-## WEB-04 — Synthetic DOM events
+## WEB-04 — DOM dispatch and host input
 
 `EventTarget` is constructible and is the base of Node and Window.
 `Event` and `CustomEvent` use private state, including a monotonic timestamp,
@@ -242,9 +242,26 @@ before invocation. Listener exceptions let the dispatch continue and increment
 a report count the host can consume. The joint collector keeps reachable
 listeners and event state alive and reclaims unreachable target-listener cycles.
 
-Trusted input, HTML activation/default actions, AbortSignal listener removal,
-shadow retargeting, and full exception reporting remain tracked in TD-131.
-[ADR 0034](adr/0034-dom-event-dispatch.md)
+`ScriptedDocument::queue_input` takes a host-selected node for a primary
+mouse click or key press/release. It shares the immediate FIFO, queue limits,
+and microtask checkpoint with script work. Delivery skips targets that have
+left the active tree. Host clicks are trusted PointerEvents. Key input
+produces trusted KeyboardEvents. Script dispatch clears trust even when it
+reuses an event received from the host.
+
+Enter on an enabled button and a completed Space press on an enabled button
+or checkbox can dispatch a trusted click. Cancellation suppresses those
+keyboard defaults. Checkbox listeners observe toggled checkedness and cleared
+indeterminateness during click. Cancellation restores both. A completed
+activation of a connected checkbox emits input and change before the turn's
+microtask checkpoint. HTMLInputElement exposes checked, defaultChecked, and
+indeterminate. Script-created MouseEvents can exercise checkbox activation.
+
+Form actions, focus, editing, and additional input types are tracked under
+WEB-07. Script-visible timers and animation callbacks remain open. TD-131
+tracks extended event delivery.
+[ADR 0034](adr/0034-dom-event-dispatch.md),
+[ADR 0035](adr/0035-trusted-input-and-activation.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

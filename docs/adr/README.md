@@ -48,3 +48,4 @@ process authority, GC, or a major platform dependency require an ADR.
 | [0032](0032-top-level-window-realm.md) | Top-level WindowProxy and realm global identity | Accepted for WEB-03 |
 | [0033](0033-detached-documents-and-adoption.md) | Detached document ownership and transactional cross-document insertion | Accepted for WEB-03 |
 | [0034](0034-dom-event-dispatch.md) | Scripted DOM event delivery and listener ownership | Accepted for WEB-04 |
+| [0035](0035-trusted-input-and-activation.md) | Trusted host input and control activation | Accepted for WEB-04 |

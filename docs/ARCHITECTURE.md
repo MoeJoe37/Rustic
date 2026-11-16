@@ -162,8 +162,10 @@ The page roots private weak maps keyed by target and event wrapper identity,
 so connected targets keep their callbacks and adoption leaves registration
 identity intact. A dispatch holds its frozen path across callbacks. Each
 phase snapshots matching listener records, then releases native DOM borrows
-before running script.
-[ADR 0034](adr/0034-dom-event-dispatch.md)
+before running script. Trust is private event state set by native delivery.
+A separate weak map keyed by HTML input wrappers stores checkbox state.
+[ADR 0034](adr/0034-dom-event-dispatch.md),
+[ADR 0035](adr/0035-trusted-input-and-activation.md)
 
 Document script realms install `DOMException` through `rustic-bindings`.
 The JS heap owns the exception's private strings and the installed
@@ -310,14 +312,18 @@ generate the text interface metadata consumed by these conversion paths.
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md)
 
 The headless coordinator now offers an explicit scripted document owner.
-It runs immediate and timed host script tasks with bounded microtask
-checkpoints and one cancellation scope. The host clock governs timer
+It runs immediate scripts, timed scripts, and host-selected input with bounded
+microtask checkpoints and one cancellation scope. Input uses the immediate
+FIFO. Pointer hit testing and keyboard targeting belong to the host, and the
+coordinator validates the supplied node when it queues and delivers the input.
+The host clock governs timer
 eligibility and supplies rendering opportunity timestamps. A renderer-aware
 pump orders rendering turns with script work and gives the host
 document-scoped tickets to validate before presentation.
 [ADR 0021](adr/0021-document-script-turns.md),
 [ADR 0022](adr/0022-document-task-sources-and-timers.md),
-[ADR 0023](adr/0023-document-rendering-turns.md)
+[ADR 0023](adr/0023-document-rendering-turns.md),
+[ADR 0035](adr/0035-trusted-input-and-activation.md)
 
 ## 6. Navigation, resources, and persistence
 

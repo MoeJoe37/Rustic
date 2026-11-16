@@ -1,6 +1,8 @@
 //! Event and CustomEvent slots and their script interfaces.
 
-use rustic_js::runtime::{Agent, JsResult, NativeFn, OutOfMemory, PropertyDescriptor, Value};
+use rustic_js::runtime::{
+    Agent, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor, Value,
+};
 
 use crate::webidl::coerce_string;
 
@@ -33,16 +35,22 @@ impl Event {
     const PATH: u32 = 5;
     const TIMESTAMP: u32 = 6;
     const DETAIL: u32 = 7;
+    const EXTRA: u32 = 8;
 
-    const BUBBLES: u16 = 1 << 0;
-    const CANCELABLE: u16 = 1 << 1;
-    const COMPOSED: u16 = 1 << 2;
+    pub(super) const BUBBLES: u16 = 1 << 0;
+    pub(super) const CANCELABLE: u16 = 1 << 1;
+    pub(super) const COMPOSED: u16 = 1 << 2;
     const DISPATCHING: u16 = 1 << 3;
     const STOPPED: u16 = 1 << 4;
     const IMMEDIATE: u16 = 1 << 5;
     const CANCELED: u16 = 1 << 6;
     const PASSIVE: u16 = 1 << 7;
     const CUSTOM: u16 = 1 << 8;
+    const TRUSTED: u16 = 1 << 9;
+    pub(super) const UI: u16 = 1 << 10;
+    pub(super) const MOUSE: u16 = 1 << 11;
+    pub(super) const KEYBOARD: u16 = 1 << 12;
+    pub(super) const POINTER: u16 = 1 << 13;
 
     pub(super) fn receiver(agent: &mut Agent, value: Value) -> JsResult<Self> {
         with_page(agent, |agent, page| {
@@ -65,7 +73,7 @@ impl Event {
             .set(agent, Self::FLAGS, Value::number(f64::from(flags)))
     }
 
-    fn has(self, agent: &mut Agent, flag: u16) -> JsResult<bool> {
+    pub(super) fn has(self, agent: &mut Agent, flag: u16) -> JsResult<bool> {
         Ok(self.flags(agent)? & flag != 0)
     }
 
@@ -75,6 +83,20 @@ impl Event {
 
     pub(super) fn is_dispatching(self, agent: &mut Agent) -> JsResult<bool> {
         self.has(agent, Self::DISPATCHING)
+    }
+
+    pub(super) fn untrust(self, agent: &mut Agent) -> JsResult<()> {
+        let flags = self.flags(agent)?;
+        self.set_flags(agent, flags & !Self::TRUSTED)
+    }
+
+    pub(super) fn detail(self, agent: &mut Agent) -> JsResult<Value> {
+        self.0.get(agent, Self::DETAIL)
+    }
+
+    pub(super) fn extra(self, agent: &mut Agent) -> JsResult<PrivateArray> {
+        let value = self.0.get(agent, Self::EXTRA)?;
+        Ok(PrivateArray::from_value(value).expect("UI event fields"))
     }
 
     pub(super) fn bubbles(self, agent: &mut Agent) -> JsResult<bool> {
@@ -145,7 +167,13 @@ impl Event {
         bubbles: bool,
         cancelable: bool,
     ) -> JsResult<()> {
-        let flags = self.flags(agent)? & (Self::CUSTOM | Self::COMPOSED);
+        let flags = self.flags(agent)?
+            & (Self::CUSTOM
+                | Self::COMPOSED
+                | Self::UI
+                | Self::MOUSE
+                | Self::POINTER
+                | Self::KEYBOARD);
         let flags = flags
             | (u16::from(bubbles) * Self::BUBBLES)
             | (u16::from(cancelable) * Self::CANCELABLE);
@@ -273,42 +301,72 @@ fn construct<const CUSTOM: bool>(agent: &mut Agent, _: Value, args: &[Value]) ->
         with_root(agent, detail, |agent| {
             let interface = if CUSTOM { "CustomEvent" } else { "Event" };
             let prototype = agent.host_prototype_from_new_target(interface, new_target)?;
-            let object = agent.new_object_with(Some(prototype))?;
-            let value = Value::object(object);
-            with_page(agent, |agent, page| {
-                let key = agent.heap.key("isTrusted")?;
-                agent.define_property_or_throw(
-                    object,
-                    key,
-                    PropertyDescriptor::accessor(
-                        page.events.is_trusted,
-                        Value::UNDEFINED,
-                        true,
-                        false,
-                    ),
-                )?;
-                let timestamp = Value::number(page.events.started.elapsed().as_secs_f64() * 1000.0);
-                let record = PrivateArray::new(
-                    agent,
-                    &[
-                        event_type,
-                        Value::number(f64::from(flags)),
-                        Value::NULL,
-                        Value::NULL,
-                        Phase::None.value(),
-                        Value::NULL,
-                        timestamp,
-                        detail,
-                    ],
-                )?;
-                agent.weak_map_set(page.events.states, value, record.value())?;
-                Ok(value)
-            })
+            create(agent, prototype, event_type, flags, detail, Value::NULL)
         })
     })
 }
 
-fn init_options<const CUSTOM: bool>(agent: &mut Agent, options: Value) -> JsResult<(u16, Value)> {
+pub(super) fn create(
+    agent: &mut Agent,
+    prototype: ObjectId,
+    event_type: Value,
+    flags: u16,
+    detail: Value,
+    extra: Value,
+) -> JsResult<Value> {
+    let object = agent.new_object_with(Some(prototype))?;
+    let value = Value::object(object);
+    with_page(agent, |agent, page| {
+        let key = agent.heap.key("isTrusted")?;
+        agent.define_property_or_throw(
+            object,
+            key,
+            PropertyDescriptor::accessor(page.events.is_trusted, Value::UNDEFINED, true, false),
+        )?;
+        let timestamp = Value::number(page.events.started.elapsed().as_secs_f64() * 1000.0);
+        let record = PrivateArray::new(
+            agent,
+            &[
+                event_type,
+                Value::number(f64::from(flags)),
+                Value::NULL,
+                Value::NULL,
+                Phase::None.value(),
+                Value::NULL,
+                timestamp,
+                detail,
+                extra,
+            ],
+        )?;
+        agent.weak_map_set(page.events.states, value, record.value())?;
+        Ok(value)
+    })
+}
+
+pub(super) fn trusted_event(
+    agent: &mut Agent,
+    interface: &'static str,
+    event_type: &str,
+    flags: u16,
+    detail: Value,
+    extra: Value,
+) -> JsResult<Value> {
+    let prototype = super::prototype(agent, interface)?;
+    let event_type = agent.string(event_type)?;
+    create(
+        agent,
+        prototype,
+        event_type,
+        flags | Event::TRUSTED,
+        detail,
+        extra,
+    )
+}
+
+pub(super) fn init_options<const CUSTOM: bool>(
+    agent: &mut Agent,
+    options: Value,
+) -> JsResult<(u16, Value)> {
     let mut flags = if CUSTOM { Event::CUSTOM } else { 0 };
     let mut detail = Value::NULL;
     if !options.is_nullish() {
@@ -351,8 +409,8 @@ pub(super) fn trusted_getter(agent: &mut Agent) -> JsResult<Value> {
 }
 
 fn is_trusted(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    Event::receiver(agent, this)?;
-    Ok(Value::FALSE)
+    let event = Event::receiver(agent, this)?;
+    Ok(Value::boolean(event.has(agent, Event::TRUSTED)?))
 }
 
 fn detail(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {

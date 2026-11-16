@@ -342,11 +342,15 @@ integration are tracked as TD-130.
 [ADR 0026](adr/0026-realm-dom-wrappers.md),
 [ADR 0027](adr/0027-host-exception-bindings.md)
 
-WEB-04 has synchronous synthetic EventTarget dispatch, capture and bubble
-phases, listener options, cancellation, and reentrant callbacks against
-the real DOM. Trusted input delivery and HTML activation/default actions
-remain open.
-[ADR 0034](adr/0034-dom-event-dispatch.md)
+WEB-04 covers synchronous EventTarget dispatch, capture and bubble phases,
+listener options, cancellation, and reentrant callbacks against the live DOM.
+The host can queue trusted primary clicks and key input for connected
+targets. Buttons support Enter and Space activation. Checkboxes support click
+and Space activation with rollback and input/change delivery. Script-visible
+timers and animation callbacks remain open. WEB-07 covers focus, editing,
+forms, and further control defaults.
+[ADR 0034](adr/0034-dom-event-dispatch.md),
+[ADR 0035](adr/0035-trusted-input-and-activation.md)
 
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.

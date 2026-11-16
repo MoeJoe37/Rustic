@@ -10,6 +10,7 @@ mod tasks;
 
 pub use frames::RenderFrame;
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
+pub use rustic_bindings::page::{InputEvent, KeyInput, Modifiers};
 pub use scripting::{
     DocumentTurn, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument,
     TaskLimits,

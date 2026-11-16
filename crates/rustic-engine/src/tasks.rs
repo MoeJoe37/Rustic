@@ -4,10 +4,10 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use std::time::Duration;
 
-use rustic_base::{Budget, DocumentId};
+use rustic_base::{Budget, DocumentId, NodeId};
 use rustic_js::Source;
 
-use crate::{ScriptQueueError, TaskLimits};
+use crate::{InputEvent, ScriptQueueError, TaskLimits};
 
 /// Opaque identity of a one-shot timer within its owning document.
 ///
@@ -51,9 +51,34 @@ impl Ord for TimedScript {
     }
 }
 
+pub(crate) enum Task {
+    Script(Source),
+    Input { target: NodeId, event: InputEvent },
+}
+
+impl Task {
+    fn units(&self) -> usize {
+        match self {
+            Self::Script(source) => source.units().len(),
+            Self::Input {
+                event: InputEvent::KeyDown(key) | InputEvent::KeyUp(key),
+                ..
+            } => key
+                .key
+                .as_units()
+                .len()
+                .saturating_add(key.code.as_units().len()),
+            Self::Input {
+                event: InputEvent::Click { .. },
+                ..
+            } => 0,
+        }
+    }
+}
+
 pub(crate) struct ScriptQueue {
     owner: DocumentId,
-    immediate: VecDeque<Source>,
+    immediate: VecDeque<Task>,
     timers: BinaryHeap<TimedScript>,
     task_limit: usize,
     source_budget: Budget,
@@ -74,13 +99,14 @@ impl ScriptQueue {
         }
     }
 
-    pub(crate) fn queue(&mut self, source: Source) -> Result<(), ScriptQueueError> {
-        let units = self.check_admission(&source)?;
+    pub(crate) fn queue(&mut self, task: Task) -> Result<(), ScriptQueueError> {
+        let units = task.units();
+        self.check_admission(units)?;
         self.immediate
             .try_reserve(1)
             .map_err(|_| ScriptQueueError::Capacity)?;
         self.source_budget.charge(units).expect("checked admission");
-        self.immediate.push_back(source);
+        self.immediate.push_back(task);
         Ok(())
     }
 
@@ -89,7 +115,8 @@ impl ScriptQueue {
         deadline: Duration,
         source: Source,
     ) -> Result<TimerId, ScriptQueueError> {
-        let units = self.check_admission(&source)?;
+        let units = source.units().len();
+        self.check_admission(units)?;
         let sequence = self.next_timer;
         let next = sequence
             .checked_add(1)
@@ -110,14 +137,13 @@ impl ScriptQueue {
         })
     }
 
-    fn check_admission(&self, source: &Source) -> Result<usize, ScriptQueueError> {
-        let units = source.units().len();
+    fn check_admission(&self, units: usize) -> Result<(), ScriptQueueError> {
         if self.immediate.len() + self.timers.len() == self.task_limit
             || units > self.source_budget.remaining()
         {
             return Err(ScriptQueueError::Limit);
         }
-        Ok(units)
+        Ok(())
     }
 
     pub(crate) fn cancel(&mut self, id: TimerId) -> bool {
@@ -144,23 +170,23 @@ impl ScriptQueue {
             .map(|timer| timer.deadline.saturating_sub(now))
     }
 
-    pub(crate) fn pop_ready(&mut self, now: Duration) -> Option<Source> {
+    pub(crate) fn pop_ready(&mut self, now: Duration) -> Option<Task> {
         let timer_ready = self
             .timers
             .peek()
             .is_some_and(|timer| timer.deadline <= now);
-        let source = if timer_ready && (self.prefer_timers || self.immediate.is_empty()) {
+        let task = if timer_ready && (self.prefer_timers || self.immediate.is_empty()) {
             self.prefer_timers = false;
-            self.timers.pop().expect("a ready timer").source
+            Task::Script(self.timers.pop().expect("a ready timer").source)
         } else {
-            let source = self.immediate.pop_front()?;
+            let task = self.immediate.pop_front()?;
             self.prefer_timers = true;
-            source
+            task
         };
         self.source_budget
-            .release(source.units().len())
-            .expect("charged script");
-        Some(source)
+            .release(task.units())
+            .expect("charged task");
+        Some(task)
     }
 
     pub(crate) fn clear(&mut self) {

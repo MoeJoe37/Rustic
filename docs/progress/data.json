@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "e9fc22a7dc3468d1f46ed395eab52f7ef24cdcc984da05d68ce91d8884d90d53",
-  "percent": "31.51",
-  "verified_percent": "30.52",
-  "partial_percent": "0.99",
-  "completed": 70,
-  "in_progress": 5,
+  "source_fingerprint": "d44646e07478270e23d7f9f9ca6b1b1bac78fda0523573649c3d42f87d458106",
+  "percent": "31.80",
+  "verified_percent": "31.11",
+  "partial_percent": "0.69",
+  "completed": 71,
+  "in_progress": 4,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -55,11 +55,11 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 4,
+      "completed": 5,
       "total": 12,
-      "percent": "39.77",
-      "verified_percent": "34.22",
-      "partial_percent": "5.55"
+      "percent": "45.32",
+      "verified_percent": "45.32",
+      "partial_percent": "0.00"
     },
     {
       "id": "M6",
@@ -707,62 +707,85 @@
           "label": "DOM event propagation and default actions",
           "size": 5,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Synthetic EventTarget dispatch, propagation, listener options and cancellation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/events.rs",
-                  "marker": "fn dispatch_event"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/events/state.rs",
-                  "marker": "pub(super) struct Event"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/events.rs",
-                  "marker": "fn event_phases_follow_the_dom_and_top_level_window"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/events.rs",
-                  "marker": "fn listeners_handle_reentry_once_removal_and_ordered_option_reads"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/events.rs",
-                  "marker": "fn cancellation_propagation_and_passive_listeners_keep_distinct_flags"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/events.rs",
-                  "marker": "fn frozen_dispatch_path_and_listener_edges_survive_gc_and_adoption"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/events.rs",
-                  "marker": "fn canceled_native_dispatch_can_reuse_the_same_event"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/scripting.rs",
-                  "marker": "fn event_listeners_survive_turns_and_mutate_the_renderer_owned_tree"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events.rs",
+              "marker": "fn dispatch_event"
             },
             {
-              "label": "Trusted input, activation behavior and default actions",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/state.rs",
+              "marker": "pub(super) struct Event"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn event_phases_follow_the_dom_and_top_level_window"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn listeners_handle_reentry_once_removal_and_ordered_option_reads"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn cancellation_propagation_and_passive_listeners_keep_distinct_flags"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn frozen_dispatch_path_and_listener_edges_survive_gc_and_adoption"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn canceled_native_dispatch_can_reuse_the_same_event"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/scripting.rs",
+              "marker": "fn event_listeners_survive_turns_and_mutate_the_renderer_owned_tree"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub fn queue_input"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/input.rs",
+              "marker": "pub(super) fn preactivate"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/input.rs",
+              "marker": "fn the_host_click_carries_pointer_fields_and_finishes_its_checkpoint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/input.rs",
+              "marker": "fn keyboard_defaults_follow_the_uncanceled_press_and_release"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/input.rs",
+              "marker": "fn disabled_controls_and_targets_detached_during_a_key_handler_do_not_activate"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/input.rs",
+              "marker": "fn queued_input_drops_adopted_targets_and_releases_shared_limits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn synthetic_mouse_click_preactivation_rolls_back_and_traces_control_state"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.58"
         },
         {
@@ -866,13 +889,13 @@
         }
       ],
       "points": 34,
-      "completed": 6,
-      "in_progress": 2,
+      "completed": 7,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "2.55",
-      "percent": "63.97",
-      "verified_percent": "52.94",
-      "partial_percent": "11.03"
+      "contribution": "2.85",
+      "percent": "71.32",
+      "verified_percent": "67.64",
+      "partial_percent": "3.68"
     },
     {
       "id": "html",

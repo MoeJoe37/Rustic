@@ -14,7 +14,11 @@ use crate::webidl::coerce_string;
 
 use super::{identity, install_interface, prototype, read_node, required_arg, with_page, wrap};
 
+mod input;
 mod state;
+mod ui;
+pub use input::{InputEvent, KeyInput, Modifiers};
+pub(super) use input::{connected, deliver, install_controls};
 
 use state::{Event, Phase};
 
@@ -29,6 +33,8 @@ pub(super) struct Events {
     is_trusted: Value,
     started: Instant,
     listener_errors: Cell<u64>,
+    controls: ObjectId,
+    pressed_space: Cell<Option<rustic_dom::NodeId>>,
 }
 
 impl Events {
@@ -36,9 +42,15 @@ impl Events {
         let targets = agent.new_weak_map()?;
         let states = agent.new_weak_map()?;
         let is_trusted = state::trusted_getter(agent)?;
+        let controls = agent.new_weak_map()?;
         let storage = PrivateArray::new(
             agent,
-            &[Value::object(targets), Value::object(states), is_trusted],
+            &[
+                Value::object(targets),
+                Value::object(states),
+                is_trusted,
+                Value::object(controls),
+            ],
         )?;
         agent.root(storage.value())?;
         Ok(Self {
@@ -47,6 +59,8 @@ impl Events {
             is_trusted,
             started: Instant::now(),
             listener_errors: Cell::new(0),
+            controls,
+            pressed_space: Cell::new(None),
         })
     }
 
@@ -79,7 +93,8 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
             Ok(())
         },
     )?;
-    state::install(agent)
+    state::install(agent)?;
+    ui::install(agent)
 }
 
 fn define_method(
@@ -576,15 +591,42 @@ fn dispatch_event(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
             "event is already dispatching",
         ));
     }
+    event.untrust(agent)?;
+    fire(agent, target, value, event).map(Value::boolean)
+}
+
+fn fire(agent: &mut Agent, target: Target, value: Value, event: Event) -> JsResult<bool> {
     let event_type = event.event_type(agent)?;
     let path = event_path(agent, target, event_type)?;
-    let key = type_key(agent, event_type)?;
-    with_root(agent, key, |agent| {
-        event.begin(agent, target.value, path)?;
-        let result = dispatch(agent, event, value, key, path);
-        event.finish(agent)?;
-        result?;
-        Ok(Value::boolean(!event.canceled(agent)?))
+    with_root(agent, path.value(), |agent| {
+        let key = type_key(agent, event_type)?;
+        with_root(agent, key, |agent| {
+            let click = target.node
+                && event.has(agent, Event::MOUSE)?
+                && agent
+                    .heap
+                    .string(event_type.as_string().expect("event type"))
+                    .units()
+                    .eq("click".encode_utf16());
+            let checkbox = if click {
+                let bubbles = event.bubbles(agent)?;
+                input::activation_target(agent, path, bubbles)?
+            } else {
+                None
+            };
+            let previous = checkbox
+                .map(|target| input::preactivate(agent, target))
+                .transpose()?;
+            event.begin(agent, target.value, path)?;
+            let result = dispatch(agent, event, value, key, path);
+            event.finish(agent)?;
+            let canceled = event.canceled(agent)?;
+            if let Some((activation, previous)) = checkbox.zip(previous) {
+                input::finish_activation(agent, activation, previous, canceled || result.is_err())?;
+            }
+            result?;
+            Ok(!canceled)
+        })
     })
 }
 

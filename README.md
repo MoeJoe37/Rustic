@@ -15,18 +15,22 @@ RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets
 Device shells, rendering, input, and runtime validation are still planned. See
 [platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: M4 JavaScript runtime.** M1–M3 are complete for their declared
-scope: Rustic's own pipeline turns a local HTML file into a PNG through parsing,
-the CSS cascade, block/inline/flex layout, OpenType text, image decoding and a
-CPU rasterizer, with resize/zoom and hit testing. M4 is in progress: Rustic's
-own ECMAScript parser, garbage-collected heap and bytecode interpreter run
-scripts with classes, generators, promises, async functions, regular
-expressions and the core standard library, designed around memory use and
-interpreter speed ([plan](docs/ROADMAP.md#memory-and-performance-design)); the
-[JavaScript notes](docs/JS.md) list what is still missing and the measured
-Test262 results. M5 has host-queued script tasks, one-shot timers, microtask
-checkpoints and scheduled rendering turns. HTML script loading and web-page
-bindings are still planned.
+**Current stage: M5 scripted documents.** M1–M4 are complete for their
+declared scope. Rustic's own pipeline turns a local HTML file into a PNG
+through parsing, the CSS cascade, block/inline/flex layout, OpenType text,
+image decoding and a CPU rasterizer, with resize/zoom and hit testing. M4
+added Rustic's own ECMAScript engine: parser, garbage-collected heap and
+bytecode interpreter with the full standard library, realms, modules, BigInt,
+Proxy, typed arrays and Atomics, and ECMA-402 Intl (number, date and time,
+relative time, duration, list, plural, collation, display names and
+segmentation) over pinned CLDR and time zone data. It is designed around
+memory use and interpreter speed
+([plan](docs/ROADMAP.md#memory-and-performance-design)); the
+[JavaScript notes](docs/JS.md) give the Test262 results, the benchmark corpus
+and what is left for later milestones. M5 has host-queued script tasks,
+one-shot timers, microtask checkpoints, scheduled rendering turns and the first
+DOM bindings with joint DOM/JS garbage collection. HTML script loading is
+still planned.
 Networking and native app hosts are later milestones. See the
 [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
@@ -123,7 +127,7 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-paint` | Display lists and paint order |
 | `rustic-raster` | CPU rasterizer and PNG output |
 | `rustic-codecs` | Bounded inflate, PNG, JPEG, GIF and WebP decoders |
-| `rustic-js` | ECMAScript parser, garbage-collected heap, bytecode interpreter and standard library (M4 in progress) |
+| `rustic-js` | ECMAScript parser, garbage-collected heap, bytecode interpreter, standard library and Intl |
 | `rustic-bindings` | Node wrappers and the shared DOM/JS garbage collection |
 | `rustic-engine` | Viewport configuration |
 | `rustic-cli` | The `rustic` development tool |

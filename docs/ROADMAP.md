@@ -7,11 +7,13 @@ Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 
-**Status (2026-11-11).** M0 has a verified baseline; only the repository-rules
-follow-up is open. M1, M2 and M3 are complete for their declared catalog scope
-(28, 8 and 17 capabilities): local HTML parses, styles, lays out, shapes text,
-paints and rasterizes to PNG on the CPU. M4 is the current milestone: JS-01
-(lexer and parser, [JS.md](JS.md)) and JS-02 (the runtime data model) and JS-03 (the garbage collector, shared with the DOM) are done, and JS-04 runs scripts including classes and `eval`, with generators, async functions, async generators and regular expressions (JS-06 part 1, JS-08 parts 1-3). M5–M13 are
+**Status (2026-11-16).** M0 has a verified baseline; only the repository-rules
+follow-up is open. M1, M2, M3 and M4 are complete for their declared catalog
+scope: local HTML parses, styles, lays out, shapes text, paints and rasterizes
+to PNG on the CPU, and Rustic's own ECMAScript engine (JS-01 to JS-09, with
+Intl) runs scripts ([JS.md](JS.md)). The M4 ARM64 benchmark record is from
+QEMU emulation; native ARM64 timings are TD-125. M5 is the current milestone,
+with the task scheduler and the first DOM bindings in place. M6–M13 are
 unstarted. Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are
 carried forward (see [§6](#6-m3--static-document-renderer)). The
 [progress summary](progress/summary.md) is the measured status and

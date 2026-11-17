@@ -150,6 +150,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-05 — Document readiness and scripted CLI](#web-05--document-readiness-and-scripted-cli)
 - [WEB-05 — Processing-instruction nodes](#web-05--processing-instruction-nodes)
 - [WEB-06 — Frame validity across script turns](#web-06--frame-validity-across-script-turns)
+- [WEB-09 — Initial Window conformance baseline](#web-09--initial-window-conformance-baseline)
 
 </details>
 
@@ -554,6 +555,14 @@ tree if admitting a replacement fails. Scripted reftests exercise a changed
 stylesheet and replacement node, a counter, a timer and capture/bubble order.
 The fuzz smoke job covers the event/timer pump and compares scripted pixels to
 a freshly parsed reference.
+
+## WEB-09 — Initial Window conformance baseline
+
+The headless CLI runs a pinned upstream `testharness.js` with an exact
+baseline for 16 Window WPT files. It reports 69 subtests, including 47 passes
+and 22 expected failures. The runner checks vendored files by digest and
+fails if a subtest name, result or failure diagnosis changes.
+[Pinned Window WPT results](SCRIPTING.md#pinned-window-web-platform-tests)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

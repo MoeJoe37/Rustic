@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "feeb82d6e94d179b951b2ba9cb767125c8f49e1ba6c277cc1747b9b42431614c",
-  "percent": "32.64",
+  "source_fingerprint": "605c77471b9e8b5d1f446db90cb9318a0ad7308e1b9134543f74020093f00e97",
+  "percent": "32.82",
   "verified_percent": "31.48",
-  "partial_percent": "1.16",
+  "partial_percent": "1.34",
   "completed": 72,
-  "in_progress": 6,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 6,
       "total": 12,
-      "percent": "61.05",
+      "percent": "64.59",
       "verified_percent": "52.41",
-      "partial_percent": "8.64"
+      "partial_percent": "12.18"
     },
     {
       "id": "M6",
@@ -4923,9 +4923,32 @@
           "label": "Exposed web API conformance and reentry gate",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Pinned upstream Window WPT selection and exact expectation ratchet",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/run_wpt_web_tests.py",
+                  "marker": "def run_case"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+                  "marker": "dom/nodes/CharacterData-data.html"
+                }
+              ]
+            },
+            {
+              "label": "Conformance, reentry and teardown review across the full M5 surface",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.37"
         },
         {
@@ -4951,12 +4974,12 @@
       ],
       "points": 40,
       "completed": 4,
-      "in_progress": 1,
+      "in_progress": 2,
       "total": 10,
-      "contribution": "2.18",
-      "percent": "43.75",
+      "contribution": "2.37",
+      "percent": "47.50",
       "verified_percent": "40.00",
-      "partial_percent": "3.75"
+      "partial_percent": "7.50"
     },
     {
       "id": "media",

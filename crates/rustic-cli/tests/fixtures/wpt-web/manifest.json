@@ -1,0 +1,43 @@
+{
+  "upstream_repository": "web-platform-tests/wpt",
+  "upstream_revision": "cb97c571c3b1947e08b8615eeb4028a2794b23a4",
+  "variant": "top-level local Window",
+  "cases": [
+    "dom/collections/HTMLCollection-empty-name.html",
+    "dom/collections/HTMLCollection-iterator.html",
+    "dom/collections/HTMLCollection-live-item-removal.html",
+    "dom/events/AddEventListenerOptions-once.any.js",
+    "dom/events/Event-dispatch-bubbles-true.html",
+    "dom/events/Event-dispatch-reenter.html",
+    "dom/events/EventTarget-dispatchEvent-returnvalue.html",
+    "dom/nodes/CharacterData-data.html",
+    "dom/nodes/Document-getElementById.html",
+    "dom/nodes/DocumentFragment-querySelectorAll-after-modification.html",
+    "html/webappapis/animation-frames/callback-handle.html",
+    "html/webappapis/animation-frames/callback-invoked.html",
+    "html/webappapis/animation-frames/cancel-invoked.html",
+    "html/webappapis/timers/cleartimeout-clearinterval.any.js",
+    "html/webappapis/timers/type-long-settimeout.any.js",
+    "html/webappapis/timers/zero-settimeout.any.js"
+  ],
+  "sha256": {
+    "LICENSE.md": "5fac07febb0e2a97fb0d7b0def149ec08b642e1ba4b9c345283ab1cbd2af6570",
+    "dom/collections/HTMLCollection-empty-name.html": "9837e0235b129c58fb0bb0332245d5f881fafa771c7052a564c5d9870e967ecc",
+    "dom/collections/HTMLCollection-iterator.html": "bb8f7c95f0eda0085ab3aa7e73c2e62a5de2c0cff877bdd5fdcb323c9d89d9cf",
+    "dom/collections/HTMLCollection-live-item-removal.html": "b29d3647471a263c25b88223e2099e4429112190bad7ebae4654dcd8aab6b4b9",
+    "dom/events/AddEventListenerOptions-once.any.js": "9446ac20ed90dba10bb2cad56ae9fb67e57677b8930ce1703218564e172cd302",
+    "dom/events/Event-dispatch-bubbles-true.html": "5b5dd38907cb8edda62a2c4ec909009c9648e6fd586a5ebc4e5fadc24ca400eb",
+    "dom/events/Event-dispatch-reenter.html": "f0da38c1b27415c9f374b0923b766ab4e416cf0539f1d734a9aaebd45aa06483",
+    "dom/events/EventTarget-dispatchEvent-returnvalue.html": "a1892b3d3f67f32c7c623768ac3d080e92fa3138b42fa52e8a4f0f4a2ece29e6",
+    "dom/nodes/CharacterData-data.html": "598c6c56e1b33f16d659a7345bfdfece5a2f1a6dc35455a5f3d3a8425aff7d8f",
+    "dom/nodes/Document-getElementById.html": "30ede0f548ce8a925e84606bac0cd2d5233f0380f31054bea5c585ea896ccccd",
+    "dom/nodes/DocumentFragment-querySelectorAll-after-modification.html": "22d51b1306a2f32023a01f9905af80d5945e4b8ac2a6420c14e457d369485263",
+    "html/webappapis/animation-frames/callback-handle.html": "2c607974886b6bf5f17fc8af90bcf014e2040ea1c8d5defb8e239df4086ed7ba",
+    "html/webappapis/animation-frames/callback-invoked.html": "d361ecd270ea8e44fa40469c9554b41d46b0092a23cf21572df7cb709ee76916",
+    "html/webappapis/animation-frames/cancel-invoked.html": "681efdeea85c65a0e21ac6e0d77b727eac4fea1b7e212f89132cdf97622e1d85",
+    "html/webappapis/timers/cleartimeout-clearinterval.any.js": "88249c3de681efa1db0c3a6ca39cdc74b657b052eeb96ca7d43b2971d5327985",
+    "html/webappapis/timers/type-long-settimeout.any.js": "32135939cf01765305e5dee33c5c3eef0783bacd41e7320080b1c763850e2e8e",
+    "html/webappapis/timers/zero-settimeout.any.js": "9498ad3fa54110a71d24feffbd2bba25fbe0dad4fc8d67fd56cff960f060fe27",
+    "resources/testharness.js": "7a108d7cfa98ac413ddb38f82fd509fb2037dfcc25ccf466567520cbb6bdf1fa"
+  }
+}

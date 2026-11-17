@@ -112,6 +112,9 @@ jobs:
         run: cargo test --locked --workspace --doc
       - name: CLI smoke test
         run: cargo run --locked -p rustic-cli -- info
+      - name: Run the pinned Window WPT selection
+        if: runner.os == 'Linux'
+        run: python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
       - name: Record native ARM64 JavaScript benchmarks
         if: matrix.os == 'ubuntu-24.04-arm'
         run: |

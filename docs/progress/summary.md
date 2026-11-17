@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 32.64%** = 31.48% verified complete + 1.16% partial credit. 72/221 capabilities complete, 6 in progress.
+**Overall completion: 32.82%** = 31.48% verified complete + 1.34% partial credit. 72/221 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `feeb82d6e94d179b951b2ba9cb767125c8f49e1ba6c277cc1747b9b42431614c`.
+Catalog: `engine-v4`. Source fingerprint: `605c77471b9e8b5d1f446db90cb9318a0ad7308e1b9134543f74020093f00e97`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `feeb82d6e94d179b951b2ba9cb767125c8f49
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 6/12 | 61.05% | 52.41% | 5.29% |
+| M5 Scripted documents | 6/12 | 64.59% | 52.41% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `feeb82d6e94d179b951b2ba9cb767125c8f49
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 4/10 | 1 | 43.75% | 40.00% | 5% | 2.18 |
+| Bindings & web APIs | 4/10 | 2 | 47.50% | 40.00% | 5% | 2.37 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -219,7 +219,9 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Window timers and renderer-driven animation callbacks ([source](../../crates/rustic-bindings/src/page/window.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/src/window_tasks.rs))
   - [ ] Observer APIs integrated with document and rendering turns
 - **planned** `web.streams` — Streams, messaging and structured clone · size 5 · M9 · 0.62% of engine
-- **planned** `web.conformance` — Exposed web API conformance and reentry gate · size 3 · M5 · 0.37% of engine
+- **in progress 50.00%** `web.conformance` — Exposed web API conformance and reentry gate · size 3 · M5 · 0.37% of engine
+  - [x] Pinned upstream Window WPT selection and exact expectation ratchet ([source](../../tools/run_wpt_web_tests.py), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json))
+  - [ ] Conformance, reentry and teardown review across the full M5 surface
 - **planned** `web.platform` — Remaining HTML/DOM APIs: Navigation API, drag and drop, selection, pointer events, fullscreen and file APIs · size 5 · M9 · 0.62% of engine
 - **planned** `web.performance` — Performance timeline, Navigation/Resource Timing and Reporting APIs · size 3 · M11 · 0.37% of engine
 

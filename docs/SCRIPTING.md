@@ -76,7 +76,7 @@ What does **not** work yet:
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
 | Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
 | Network, storage, workers | Not present | M6, M9 |
-| WPT results | No web-platform-tests have been run against the bindings | WEB-09 |
+| Expanded WPT coverage | The initial Window baseline covers nodes, events, collections, timers and animation callbacks. New APIs need their own coverage as they land. | WEB-09 |
 
 A property that is missing is absent, not stubbed: `typeof window.fetch` is
 `"undefined"`. That rule is part of the M5 gate.
@@ -246,7 +246,7 @@ and `AbortSignal` listener removal are TD-131.
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
 
 These tests use a manual clock and run on CI tiers including the 32-bit and
-big-endian ones. WEB-09 tracks the upstream web-platform-tests evidence.
+big-endian ones.
 
 The smoke job runs two scripted targets. `script-event-pump` checks trusted
 bubbling input, checkpoint order, timer order and cancellation against a
@@ -256,6 +256,31 @@ markup. Both targets replay 128 deterministic seeds before mutations.
 The scripted reftests cover the counter, timer, event bubbling and stylesheet
 and tree updates at device scales one and two. The form-validation fixture
 depends on WEB-07.
+
+### Pinned Window web-platform-tests
+
+The headless CLI runs upstream `testharness.js` unchanged at WPT revision
+`cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The initial selection covers
+`dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
+and `html/webappapis/animation-frames`. Linux CI is configured to require
+an exact match to the checked-in **16 files, 69 subtests, 47 passes and
+22 expected failures**. The expectations record the names and diagnoses
+so changes in either direction require review.
+[Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
+[Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
+
+The adapter maps the two standard harness URLs to local resources and
+wraps selected `.any.js` files in their Window variant. A completion
+callback records results for the runner. The CLI supplies the manual
+clock and one rendering opportunity. The candidate
+`ParentNode-querySelectorAll-removed-elements.html` depends on
+`innerHTML`, and `clearinterval-from-callback.any.js` leaves an interval
+running after completion. Both remain outside the initial selection.
+
+```sh
+cargo build --locked -p rustic-cli
+python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
+```
 
 ## Open debt
 

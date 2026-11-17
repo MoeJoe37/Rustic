@@ -328,7 +328,7 @@ stays local and deterministic; no network, no native window.
 | WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | Local script and parser checks pass. Encoding restart remains open in `html.scripts`. [ADR 0041](adr/0041-scripted-document-readiness.md) |
 | WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **In progress.** Frame tickets validate the DOM revision. [ADR 0042](adr/0042-scripted-render-state.md) |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | Not started |
-| WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | Not started |
+| WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | **In progress.** Initial Window suite and exact baseline are checked in. [Results](SCRIPTING.md#pinned-window-web-platform-tests) |
 | PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | Not started; runs in parallel |
 | MOB-03/04 | Android/iOS local-fixture CPU surfaces (carried over from M3) | evidence for `platform.android`, `platform.ios` (M8) | REN-05; hosted CI or a machine with the NDK and Xcode | Blocked on CI; runs in parallel |
 
@@ -377,12 +377,11 @@ ADR is accepted.
      `ResizeObserver` or `IntersectionObserver` integrated with rendering
      turns) is delivered or its scope is narrowed in the catalog with a
      reason.
-4. **WEB-09 — conformance gate.** Pin a WPT revision and select directories
-   that match the implemented surface (`dom/nodes`, `dom/events`,
-   `dom/collections`, `html/webappapis/timers`, `html/webappapis/animation-frames`).
-   Run them with the upstream `testharness.js` and keep an exact
-   expectation list with a ratchet, as CSS-08 and JS-07 do. The denominator
-   and every expected failure are published.
+4. **WEB-09 — conformance gate.** The initial pinned Window WPT selection
+   covers nodes, events, collections, timers and animation frames through
+   upstream `testharness.js`. The denominator and failures are recorded in
+   the exact expectation list. Expand coverage for the remaining WEB-06
+   and WEB-07 surface and finish the integration and teardown review.
 5. **PERF-01, M5 slice (parallel).** A harness that runs the JS-09 corpus and
    a small DOM corpus (create/append/query/dispatch) in Rustic and in the
    released V8, SpiderMonkey and JavaScriptCore shells, on x86-64 and ARM64,
@@ -413,7 +412,7 @@ presence of a property does not count as correct API support.
 - [ ] `web.scripts`, `html.scripts`, `dom.observers`, `web.input`,
       `web.observers` and `web.conformance` are complete in the catalog with
       source and test evidence.
-- [ ] The WEB-09 expectation list, its WPT revision and its counts are in
+- [x] The WEB-09 expectation list, its WPT revision and its counts are in
       [SCRIPTING.md](SCRIPTING.md) and the [evidence table](README.md#evidence-at-a-glance).
 - [ ] The first PERF-01 report is committed under `docs/reviews/`.
 - [x] Fuzz targets exist for script-driven mutation with rendering and for
@@ -751,7 +750,7 @@ JS-09) are complete.
 | 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | Local lifecycle, CLI and all pinned html5lib records verified. |
 | 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
 | 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Planned |
-| 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Planned; needs WEB-05 |
+| 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Initial 16-file Window baseline verified locally. |
 | 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS and encoding ADRs accepted | Planned |
 | — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Parallel; not started |
 | — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | Parallel; blocked on hosted CI |

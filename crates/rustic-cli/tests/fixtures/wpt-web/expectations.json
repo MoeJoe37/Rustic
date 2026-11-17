@@ -1,0 +1,332 @@
+{
+  "dom/collections/HTMLCollection-empty-name.html": [
+    {
+      "name": "Empty string as a name for Document.getElementsByTagName",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty string as a name for Element.getElementsByTagName",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty string as a name for Document.getElementsByTagNameNS",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty string as a name for Element.getElementsByTagNameNS",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty string as a name for Document.getElementsByClassName",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty string as a name for Element.getElementsByClassName",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty string as a name for Element.children",
+      "status": "PASS"
+    }
+  ],
+  "dom/collections/HTMLCollection-iterator.html": [
+    {
+      "name": "HTMLCollection has length method.",
+      "status": "PASS"
+    },
+    {
+      "name": "HTMLCollection does not have iterable's values method.",
+      "status": "PASS"
+    },
+    {
+      "name": "HTMLCollection does not have iterable's entries method.",
+      "status": "PASS"
+    },
+    {
+      "name": "HTMLCollection does not have iterable's forEach method.",
+      "status": "PASS"
+    },
+    {
+      "name": "HTMLCollection has Symbol.iterator.",
+      "status": "PASS"
+    },
+    {
+      "name": "HTMLCollection is iterable via for-of loop.",
+      "status": "PASS"
+    }
+  ],
+  "dom/collections/HTMLCollection-live-item-removal.html": [
+    {
+      "name": "getElementsByClassName collection should update live when removing item(0)",
+      "status": "PASS"
+    },
+    {
+      "name": "document.body.getElementsByClassName collection should update live when removing item(0)",
+      "status": "FAIL",
+      "message": "cannot access property getElementsByClassName of undefined or null"
+    }
+  ],
+  "dom/events/AddEventListenerOptions-once.any.js": [
+    {
+      "name": "Once listener should be invoked only once",
+      "status": "PASS"
+    },
+    {
+      "name": "Once listener should be invoked only once even if the event is nested",
+      "status": "PASS"
+    },
+    {
+      "name": "Once listener should be added / removed like normal listeners",
+      "status": "PASS"
+    },
+    {
+      "name": "Multiple once listeners should be invoked even if the stopImmediatePropagation is set",
+      "status": "PASS"
+    }
+  ],
+  "dom/events/Event-dispatch-bubbles-true.html": [
+    {
+      "name": "In window.document with click event",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "In window.document with load event",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "In window.document.cloneNode(true)",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "In new Document()",
+      "status": "FAIL",
+      "message": "cannot adopt nodes out of the document during parsing"
+    },
+    {
+      "name": "In DOMImplementation.createHTMLDocument()",
+      "status": "FAIL",
+      "message": "cannot access property appendChild of undefined or null"
+    }
+  ],
+  "dom/events/Event-dispatch-reenter.html": [
+    {
+      "name": " Dispatch additional events inside an event listener ",
+      "status": "FAIL",
+      "message": "cannot access property addEventListener of undefined or null"
+    }
+  ],
+  "dom/events/EventTarget-dispatchEvent-returnvalue.html": [
+    {
+      "name": "Return value of EventTarget.dispatchEvent() affected by preventDefault().",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "Return value of EventTarget.dispatchEvent() affected by returnValue.",
+      "status": "FAIL",
+      "message": "value is not a function"
+    }
+  ],
+  "dom/nodes/CharacterData-data.html": [
+    {
+      "name": "Text.data initial value",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = null",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = 0",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = ''",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = '--'",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = '\u8cc7\u6599'",
+      "status": "PASS"
+    },
+    {
+      "name": "Text.data = '\ud83c\udf20 test \ud83c\udf20 TEST'",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data initial value",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = null",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = 0",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = ''",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = '--'",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = '\u8cc7\u6599'",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.data = '\ud83c\udf20 test \ud83c\udf20 TEST'",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Document-getElementById.html": [
+    {
+      "name": "Calling document.getElementById with an empty string argument.",
+      "status": "PASS"
+    },
+    {
+      "name": "Calling document.getElementById with a null argument.",
+      "status": "FAIL",
+      "message": "cannot access property appendChild of undefined or null"
+    },
+    {
+      "name": "Calling document.getElementById with an undefined argument.",
+      "status": "FAIL",
+      "message": "cannot access property appendChild of undefined or null"
+    },
+    {
+      "name": "on static page",
+      "status": "FAIL",
+      "message": "HTMLDivElement is not defined"
+    },
+    {
+      "name": "Document.getElementById with a script-inserted element",
+      "status": "FAIL",
+      "message": "HTMLDivElement is not defined"
+    },
+    {
+      "name": "update `id` attribute via setAttribute/removeAttribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Ensure that the id attribute only affects elements present in a document",
+      "status": "FAIL",
+      "message": "cannot access property appendChild of undefined or null"
+    },
+    {
+      "name": "in tree order, within the context object's tree",
+      "status": "PASS"
+    },
+    {
+      "name": "Modern browsers optimize this method with using internal id cache. This test checks that their optimization should effect only append to `Document`, not append to `Node`.",
+      "status": "PASS"
+    },
+    {
+      "name": "changing attribute's value via `Attr` gotten from `Element.attribute`.",
+      "status": "FAIL",
+      "message": "cannot access a property of undefined or null"
+    },
+    {
+      "name": "add id attribute via innerHTML",
+      "status": "FAIL",
+      "message": "cannot access property tagName of undefined or null"
+    },
+    {
+      "name": "remove id attribute via innerHTML",
+      "status": "FAIL",
+      "message": "assert_equals: should be null. expected null but got object \"[object Element]\""
+    },
+    {
+      "name": "add id attribute via outerHTML",
+      "status": "FAIL",
+      "message": "assert_not_equals: should not be null got disallowed value null"
+    },
+    {
+      "name": "remove id attribute via outerHTML",
+      "status": "FAIL",
+      "message": "assert_equals: should be null. expected null but got object \"[object Element]\""
+    },
+    {
+      "name": "update `id` attribute via element.id",
+      "status": "FAIL",
+      "message": "assert_equals: should get the element with id. expected object \"[object Element]\" but got null"
+    },
+    {
+      "name": "where insertion order and tree order don't match",
+      "status": "PASS"
+    },
+    {
+      "name": "Inserting an id by inserting its parent node",
+      "status": "FAIL",
+      "message": "assert_equals: expected object \"[object Element]\" but got null"
+    },
+    {
+      "name": "Document.getElementById must not return nodes not present in document",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/DocumentFragment-querySelectorAll-after-modification.html": [
+    {
+      "name": "querySelectorAll should still work on DocumentFragments after they are modified",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/animation-frames/callback-handle.html": [
+    {
+      "name": "Check window.requestAnimationFrame can return a valid callback handle",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/animation-frames/callback-invoked.html": [
+    {
+      "name": "requestAnimationFrame callback is invoked at least once before the timeout",
+      "status": "FAIL",
+      "message": "assert_false: document.hidden must exist and be false to run this test properly expected false got undefined"
+    }
+  ],
+  "html/webappapis/animation-frames/cancel-invoked.html": [
+    {
+      "name": "cancelAnimationFrame does nothing if there is no callback with the given handle",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/timers/cleartimeout-clearinterval.any.js": [
+    {
+      "name": "Clear timeout with clearInterval",
+      "status": "PASS"
+    },
+    {
+      "name": "Clear interval with clearTimeout",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/timers/type-long-settimeout.any.js": [
+    {
+      "name": "Untitled",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/timers/zero-settimeout.any.js": [
+    {
+      "name": "A 0ms timeout should not be clamped to 1ms",
+      "status": "PASS"
+    }
+  ]
+}

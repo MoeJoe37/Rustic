@@ -15,6 +15,7 @@ import import_html_tree_tests
 import import_css_tests
 import import_wpt_css_tests
 import import_wpt_flexbox_tests
+import run_wpt_web_tests
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -330,6 +331,11 @@ def main() -> int:
         import_wpt_flexbox_tests.check()
     except (OSError, ValueError, KeyError) as exc:
         error(import_wpt_flexbox_tests.MANIFEST, str(exc))
+
+    try:
+        run_wpt_web_tests.read_expectations(run_wpt_web_tests.pinned_cases())
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        error(run_wpt_web_tests.MANIFEST, str(exc))
 
     try:
         import_html_tree_tests.check()

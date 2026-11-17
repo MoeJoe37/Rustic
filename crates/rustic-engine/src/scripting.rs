@@ -1,18 +1,20 @@
 //! WEB-01 document-owned script tasks and microtask checkpoints.
 
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use rustic_base::{Clock, SystemClock};
+use rustic_base::{CancellationToken, Clock, SystemClock};
 use rustic_bindings::dom_exception;
 use rustic_bindings::page::{self, PageTree};
 use rustic_dom::{Document, NodeId};
-use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES, Value};
+use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
+use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES, OutOfMemory, Value};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::frames::{RenderFrame, Rendering};
+use crate::lifecycle::DocumentScope;
 use crate::tasks::{ScriptQueue, Task, TimerId};
 use crate::window_tasks::WindowWork;
 use crate::{EngineDocument, InputEvent};
@@ -23,6 +25,7 @@ pub struct TaskLimits {
     /// Maximum number of scripts, timers, input tasks and animation callbacks waiting to run.
     pub pending_scripts: usize,
     /// Maximum total UTF-16 units in waiting script sources and keyboard input.
+    /// This also bounds each inline script evaluated directly by the parser host.
     pub pending_source_units: usize,
     /// VM safe points shared by a task and its microtask checkpoint.
     pub steps_per_turn: u64,
@@ -147,25 +150,66 @@ pub enum DocumentTurn<T> {
 }
 
 #[derive(Debug)]
-struct ScriptTree(RefCell<EngineDocument>);
+enum ScriptTreeState {
+    Parsing(Box<HtmlDocumentParser>),
+    Ready(EngineDocument),
+}
+
+#[derive(Debug)]
+struct ScriptTree {
+    state: RefCell<ScriptTreeState>,
+    current_script: Cell<Option<NodeId>>,
+}
 
 impl PageTree for ScriptTree {
     fn read(&self) -> Option<Ref<'_, Document>> {
-        self.0
-            .try_borrow()
-            .ok()
-            .map(|owner| Ref::map(owner, |owner| owner.parsed().document()))
+        Ref::filter_map(self.state.try_borrow().ok()?, |state| match state {
+            ScriptTreeState::Parsing(parser) => parser.live_document(),
+            ScriptTreeState::Ready(owner) => Some(owner.parsed().document()),
+        })
+        .ok()
     }
 
     fn write(&self) -> Option<RefMut<'_, Document>> {
-        self.0
-            .try_borrow_mut()
-            .ok()
-            .map(|owner| RefMut::map(owner, |owner| owner.parsed_mut().document_mut()))
+        RefMut::filter_map(self.state.try_borrow_mut().ok()?, |state| match state {
+            ScriptTreeState::Parsing(parser) => parser.live_document_mut(),
+            ScriptTreeState::Ready(owner) => Some(owner.parsed_mut().document_mut()),
+        })
+        .ok()
     }
 
     fn quirks_mode(&self) -> bool {
-        self.0.borrow().parsed().mode() == rustic_html::DocumentMode::Quirks
+        let mode = match &*self.state.borrow() {
+            ScriptTreeState::Parsing(parser) => parser.live_document_mode(),
+            ScriptTreeState::Ready(owner) => Some(owner.parsed().mode()),
+        };
+        mode == Some(DocumentMode::Quirks)
+    }
+
+    fn retained_nodes(&self) -> Result<Vec<NodeId>, OutOfMemory> {
+        let mut roots = Vec::new();
+        if let ScriptTreeState::Parsing(parser) =
+            &*self.state.try_borrow().map_err(|_| OutOfMemory)?
+        {
+            for node in self
+                .current_script
+                .get()
+                .into_iter()
+                .chain(parser.retained_nodes())
+            {
+                roots.try_reserve(1).map_err(|_| OutOfMemory)?;
+                roots.push(node);
+            }
+        }
+        Ok(roots)
+    }
+
+    fn current_script(&self) -> Option<NodeId> {
+        self.current_script.get()
+    }
+
+    fn allows_adoption_from_main(&self) -> bool {
+        matches!(&*self.state.borrow(), ScriptTreeState::Ready(_))
     }
 }
 
@@ -175,9 +219,11 @@ impl PageTree for ScriptTree {
 /// move together, with the document's existing token shared by the VM.
 pub struct ScriptedDocument<C = SystemClock> {
     document: Rc<ScriptTree>,
+    cancellation: CancellationToken,
     agent: Result<Agent, ScriptStop>,
     pending: Rc<WindowWork>,
     animation_errors: u64,
+    inline_script_errors: u64,
     rendering: Rendering,
     clock: C,
     limits: TaskLimits,
@@ -200,37 +246,117 @@ impl EngineDocument {
         limits: TaskLimits,
         clock: C,
     ) -> Result<ScriptedDocument<C>, ScriptStop> {
-        if self.cancellation().is_cancelled() {
+        let cancellation = self.cancellation().clone();
+        ScriptedDocument::new(ScriptTreeState::Ready(self), cancellation, limits, clock)
+    }
+}
+
+impl<C: Clock> ScriptedDocument<C> {
+    pub(crate) fn with_parser(
+        mut parser: HtmlDocumentParser,
+        cancellation: CancellationToken,
+        limits: TaskLimits,
+        clock: C,
+    ) -> Result<Self, ScriptStop> {
+        // Publish the document to the bindings before scripts can acquire wrappers.
+        parser
+            .live_document_mut()
+            .expect("new parser owns a document");
+        Self::new(
+            ScriptTreeState::Parsing(Box::new(parser)),
+            cancellation,
+            limits,
+            clock,
+        )
+    }
+
+    fn new(
+        state: ScriptTreeState,
+        cancellation: CancellationToken,
+        limits: TaskLimits,
+        clock: C,
+    ) -> Result<Self, ScriptStop> {
+        if cancellation.is_cancelled() {
             return Err(ScriptStop::DocumentCancelled);
         }
         let mut agent =
             Agent::with_heap_limit(limits.heap_bytes).map_err(|_| ScriptStop::OutOfMemory)?;
-        agent.set_cancellation(Some(self.cancellation().clone()));
+        agent.set_cancellation(Some(cancellation.clone()));
         agent.set_can_block(false);
         dom_exception::install(&mut agent).map_err(|_| ScriptStop::OutOfMemory)?;
-        let owner = self.parsed().document().id();
-        let document = Rc::new(ScriptTree(RefCell::new(self)));
+        let document = Rc::new(ScriptTree {
+            state: RefCell::new(state),
+            current_script: Cell::new(None),
+        });
+        let owner = document
+            .read()
+            .expect("new script tree owns its document")
+            .id();
         let pending = Rc::new(WindowWork {
             queue: RefCell::new(ScriptQueue::new(owner, limits)),
         });
         page::install_with_scheduler(&mut agent, document.clone(), pending.clone())
             .map_err(|_| ScriptStop::OutOfMemory)?;
-        Ok(ScriptedDocument {
+        Ok(Self {
             document,
+            cancellation,
             agent: Ok(agent),
             pending,
             animation_errors: 0,
+            inline_script_errors: 0,
             rendering: Rendering::new(owner),
             clock,
             limits,
         })
     }
-}
-
-impl<C: Clock> ScriptedDocument<C> {
     /// Inspect the parsed document and its lifetime token.
     pub fn document(&self) -> Ref<'_, EngineDocument> {
-        self.document.0.borrow()
+        Ref::map(self.document.state.borrow(), |state| match state {
+            ScriptTreeState::Ready(document) => document,
+            ScriptTreeState::Parsing(_) => {
+                unreachable!("the host receives only finished documents")
+            }
+        })
+    }
+
+    pub(crate) fn with_active_parser<T>(
+        &self,
+        operation: impl FnOnce(&mut HtmlDocumentParser) -> T,
+    ) -> T {
+        let mut state = self.document.state.borrow_mut();
+        let ScriptTreeState::Parsing(parser) = &mut *state else {
+            unreachable!("only pending loads can drive a parser");
+        };
+        operation(parser)
+    }
+
+    pub(crate) fn finish_parsing(&mut self, scope: DocumentScope) -> Result<(), HtmlParseError> {
+        let parsed = self.with_active_parser(HtmlDocumentParser::finish)?;
+        *self.document.state.borrow_mut() =
+            ScriptTreeState::Ready(EngineDocument::new(scope, parsed));
+        Ok(())
+    }
+
+    pub(crate) fn run_inline_script(
+        &mut self,
+        element: NodeId,
+        source: &Source,
+    ) -> Result<(), ScriptStop> {
+        self.check_live()?;
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        agent.set_step_budget(Some(self.limits.steps_per_turn));
+        self.document.current_script.set(Some(element));
+        let result = agent.evaluate_source(source).map(|_| ());
+        self.document.current_script.set(None);
+        if matches!(self.finish_script_turn(result)?, ScriptTurn::Failed(_)) {
+            self.inline_script_errors = self.inline_script_errors.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    /// Read and clear recoverable errors from parser-inserted inline classics.
+    pub fn take_inline_script_error_count(&mut self) -> u64 {
+        std::mem::take(&mut self.inline_script_errors)
     }
 
     /// Read and clear the number of listener exceptions reported by the page.
@@ -369,6 +495,13 @@ impl<C: Clock> ScriptedDocument<C> {
                 page::deliver_input(agent, target, &event).map_err(EvalError::from)
             }
         };
+        self.finish_script_turn(result).map(Some)
+    }
+
+    fn finish_script_turn(
+        &mut self,
+        result: Result<(), EvalError>,
+    ) -> Result<ScriptTurn, ScriptStop> {
         let turn = match result {
             Ok(_) => ScriptTurn::Completed,
             Err(EvalError::Parse(error)) => ScriptTurn::Failed(ScriptFailure::Parse(error)),
@@ -384,7 +517,7 @@ impl<C: Clock> ScriptedDocument<C> {
             .borrow_mut()
             .publish_timers(self.clock.now());
         self.rendering.after_script();
-        Ok(Some(turn))
+        Ok(turn)
     }
 
     fn run_animation_callbacks(&mut self, frame: RenderFrame) -> Result<(), ScriptStop> {
@@ -439,14 +572,14 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     fn check_live(&mut self) -> Result<(), ScriptStop> {
-        if self.document().cancellation().is_cancelled() {
+        if self.cancellation.is_cancelled() {
             return Err(self.stop(ScriptStop::DocumentCancelled));
         }
         self.agent.as_ref().map(|_| ()).map_err(|reason| *reason)
     }
 
     fn stop_after_cancellation(&mut self) -> ScriptStop {
-        if self.document().cancellation().is_cancelled() {
+        if self.cancellation.is_cancelled() {
             self.stop(ScriptStop::DocumentCancelled)
         } else {
             self.stop(ScriptStop::StepLimit)

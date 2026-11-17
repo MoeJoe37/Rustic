@@ -15,9 +15,9 @@ Intl) runs scripts ([JS.md](JS.md)). The M4 ARM64 benchmark record is from
 QEMU emulation; native ARM64 timings are TD-125. **M5 is the current
 milestone**: the scheduler, Web IDL layer, `Window`/`Document`/node bindings,
 events, trusted input, timers and animation callbacks are done (WEB-01 to
-WEB-04, [SCRIPTING.md](SCRIPTING.md)). WEB-05 has a parser suspension point
-and scripting-enabled tree construction. Script execution, invalidation from
-script, forms, observers, the conformance gate and the first benchmark report
+WEB-04, [SCRIPTING.md](SCRIPTING.md)). WEB-05 runs inline classics during
+opt-in HTML construction. External and module loading, script-driven invalidation,
+forms, observers, the conformance gate and the first benchmark report
 are open ([§8](#8-m5--scripted-document-integration)). M6–M13 are unstarted.
 Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are carried
 forward (see [§8](#8-m5--scripted-document-integration)). The
@@ -325,7 +325,7 @@ stays local and deterministic; no network, no native window.
 | WEB-02 | Web IDL subset generator and conversions, wrapper identity, DOM/JS tracing and exceptions | `web.idl` | DOC-09, JS-03 | **Done** (ADR 0024–0027); generated metadata covers the character-data interfaces, other interfaces are hand-bound (TD-126), `DOMException` extras are TD-124 |
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | `web.window` | WEB-02, CSS-02 | **Done** for the declared scope (ADR 0028–0033): live `window`/`document`, node creation and mutation, selectors, NodeLists and HTMLCollections, detached documents and adoption. Open debt: TD-126, TD-127, TD-129, TD-130 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
-| WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **In progress.** [ADR 0037](adr/0037-parser-script-boundary.md) and the parser suspension point are implemented. Live script execution is next. |
+| WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **In progress.** Inline classic execution is available to hosts. Local external classics are next. [ADR 0038](adr/0038-parser-inserted-inline-classics.md) |
 | WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | Not started; needs an ADR first |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | Not started |
 | WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | Not started |
@@ -338,21 +338,18 @@ Each item lists the test that completes it. Split an item into several
 commits, but do not start the next one's bindings before the current one's
 ADR is accepted.
 
-1. **WEB-05 — scripts in documents.** The parser boundary follows
-   [ADR 0037](adr/0037-parser-script-boundary.md). Eight scripting-on records
-   now run. Continue with the engine handoff and the remaining integration:
-   - Inline and local external classic scripts run at the parser's insertion
-     point. Resolve the eight remaining html5lib processing-instruction cases
-     in TD-10.
+1. **WEB-05 — scripts in documents.** Inline classics run at the parser's
+   insertion point. The engine checkpoints promise jobs before continuing,
+   exposes `currentScript` during evaluation, and reports recoverable failures.
+   HTML `document.write` and `document.writeln` throw explicitly.
+   [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
+   - Local external classic scripts run at the parser's insertion point.
+     Resolve the eight remaining html5lib processing-instruction cases in TD-10.
    - `async`, `defer` and module scripts run in the specified order, proven on
      the manual clock with external files that "arrive" in every order.
-   - `document.readyState`, `DOMContentLoaded` and `load` fire in order;
-     `document.currentScript` is correct; a script error does not stop later
-     scripts.
-   - `document.write` during parsing either works for the declared cases or
-     throws an explicit, documented error. It must not be silently ignored.
-   - A script that never ends, nests parsers or writes without bound stops
-     within the document's budgets and leaves the engine usable.
+   - `document.readyState`, `DOMContentLoaded` and `load` fire in order.
+     Extend `document.currentScript` and error-recovery tests to external
+     classics. Check the same fatal-limit behavior across script kinds.
    - `rustic render` and the dumps run page scripts when asked (off by
      default, so existing fixtures stay byte-identical).
 2. **WEB-06 — invalidation from script.** Write the ADR for who owns style
@@ -751,7 +748,7 @@ JS-09) are complete.
 | Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
 | done | WEB-01 to WEB-04: scheduler, Web IDL, bindings, events, input, timers | See [SCRIPTING.md](SCRIPTING.md) | Done |
-| 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | In progress. Connect the engine to the parser boundary. |
+| 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | In progress. Add bounded local external classic loading. |
 | 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
 | 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Planned |
 | 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Planned; needs WEB-05 |

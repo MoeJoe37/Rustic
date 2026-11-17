@@ -32,6 +32,15 @@ impl Engine {
         &mut self,
         limits: ParserLimits,
     ) -> Result<DocumentLoad, DocumentStartError> {
+        let scope = self.open_document_scope()?;
+        let parser = HtmlDocumentParser::new(limits, scope.cancellation().clone())
+            .map_err(DocumentStartError::Parser)?;
+        Ok(DocumentLoad {
+            pending: Some(PendingDocument { scope, parser }),
+        })
+    }
+
+    pub(crate) fn open_document_scope(&mut self) -> Result<DocumentScope, DocumentStartError> {
         if self.shutting_down {
             return Err(DocumentStartError::Shutdown);
         }
@@ -44,12 +53,8 @@ impl Engine {
             .try_reserve(1)
             .map_err(|_| DocumentStartError::Capacity)?;
         let scope = DocumentScope(Arc::new(CancellationToken::default()));
-        let parser = HtmlDocumentParser::new(limits, scope.0.as_ref().clone())
-            .map_err(DocumentStartError::Parser)?;
         self.documents.push(Arc::downgrade(&scope.0));
-        Ok(DocumentLoad {
-            pending: Some(PendingDocument { scope, parser }),
-        })
+        Ok(scope)
     }
 
     /// Close admission and signal every pending and live document to stop.
@@ -104,7 +109,13 @@ impl std::error::Error for DocumentStartError {
 }
 
 #[derive(Debug)]
-struct DocumentScope(Arc<CancellationToken>);
+pub(crate) struct DocumentScope(Arc<CancellationToken>);
+
+impl DocumentScope {
+    pub(crate) fn cancellation(&self) -> &CancellationToken {
+        &self.0
+    }
+}
 
 impl Drop for DocumentScope {
     fn drop(&mut self) {
@@ -129,7 +140,7 @@ impl DocumentLoad {
     pub fn cancellation(&self) -> Option<&CancellationToken> {
         self.pending
             .as_ref()
-            .map(|pending| pending.scope.0.as_ref())
+            .map(|pending| pending.scope.cancellation())
     }
 
     /// Feed another chunk. A fatal error discards the load and releases its slot.
@@ -146,11 +157,11 @@ impl DocumentLoad {
     pub fn finish(self) -> Result<EngineDocument, ParseError> {
         let PendingDocument { scope, mut parser } = self.pending.ok_or(ParseError::Poisoned)?;
         let parsed = parser.finish()?;
-        Ok(EngineDocument { scope, parsed })
+        Ok(EngineDocument::new(scope, parsed))
     }
 }
 
-/// An inert document whose owner controls the lifetime of its tree and work.
+/// A completed tree whose owner controls the lifetime of its associated work.
 #[derive(Debug)]
 pub struct EngineDocument {
     scope: DocumentScope,
@@ -158,6 +169,10 @@ pub struct EngineDocument {
 }
 
 impl EngineDocument {
+    pub(crate) fn new(scope: DocumentScope, parsed: ParsedDocument) -> Self {
+        Self { scope, parsed }
+    }
+
     /// Inspect the completed document and its parse diagnostics.
     pub fn parsed(&self) -> &ParsedDocument {
         &self.parsed
@@ -171,6 +186,6 @@ impl EngineDocument {
     ///
     /// Dropping the document or shutting down its engine signals all clones.
     pub fn cancellation(&self) -> &CancellationToken {
-        &self.scope.0
+        self.scope.cancellation()
     }
 }

@@ -120,6 +120,7 @@ pub(super) struct TreeBuilder {
     document: Document,
     document_mode: DocumentMode,
     scripting: Scripting,
+    exposed_document: bool,
     insertion_mode: InsertionMode,
     original_mode: InsertionMode,
     template_modes: Vec<InsertionMode>,
@@ -158,6 +159,7 @@ impl TreeBuilder {
             document: Document::new(limits)?,
             document_mode: DocumentMode::NoQuirks,
             scripting,
+            exposed_document: false,
             insertion_mode: InsertionMode::Initial,
             original_mode: InsertionMode::Initial,
             template_modes: Vec::new(),
@@ -248,6 +250,35 @@ impl TreeBuilder {
 
     pub(super) fn document(&self) -> &Document {
         &self.document
+    }
+
+    pub(super) fn document_mut(&mut self) -> &mut Document {
+        self.exposed_document = true;
+        &mut self.document
+    }
+
+    pub(super) fn document_mode(&self) -> DocumentMode {
+        self.document_mode
+    }
+
+    pub(super) fn retained_nodes(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.open
+            .iter()
+            .copied()
+            .chain(self.head)
+            .chain(self.form)
+            .chain(self.context)
+            .chain(self.formatting.iter().filter_map(|entry| match entry {
+                Entry::Element(node, _) => Some(*node),
+                Entry::Marker => None,
+            }))
+            .chain(
+                self.selected_options
+                    .iter()
+                    .chain(&self.pending_options)
+                    .flat_map(|&(select, option)| [select, option]),
+            )
+            .filter(|&node| self.document.node(node).is_ok())
     }
 
     pub(super) fn process(&mut self, token: &Token) -> Result<TreeFeedback, ParseError> {

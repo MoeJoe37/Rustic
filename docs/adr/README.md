@@ -45,6 +45,7 @@ instead of rewriting the history of a decision.
 | [0035](0035-trusted-input-and-activation.md) | Trusted host input and control activation | Accepted for WEB-04 |
 | [0036](0036-window-timers-and-animation-callbacks.md) | Window timers and animation callbacks in document turns | Accepted for WEB-04 |
 | [0037](0037-parser-script-boundary.md) | Parser suspension and script preparation order | Accepted for the WEB-05 parser boundary |
+| [0038](0038-parser-inserted-inline-classics.md) | Inline classic execution, parser roots and adoption during construction | Accepted for the WEB-05 inline classic slice |
 
 ## Records by area
 
@@ -59,7 +60,7 @@ instead of rewriting the history of a decision.
 | Web IDL and wrappers (M5, WEB-02) | 0024, 0025, 0026, 0027 |
 | Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
-| Script loading (M5, WEB-05) | 0037 |
+| Script loading (M5, WEB-05) | 0037, 0038 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

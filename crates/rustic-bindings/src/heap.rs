@@ -407,6 +407,17 @@ impl DomHeap {
         documents: &mut [&mut Document],
         roots: Roots<'_>,
     ) -> Result<DomGcStats, DomGcError> {
+        self.collect_documents_with_nodes(agent, documents, roots, &[])
+    }
+
+    /// Collect while also retaining document nodes referenced by native state.
+    pub(crate) fn collect_documents_with_nodes(
+        &mut self,
+        agent: &mut Agent,
+        documents: &mut [&mut Document],
+        roots: Roots<'_>,
+        native_nodes: &[NodeId],
+    ) -> Result<DomGcStats, DomGcError> {
         self.check_agent(agent)?;
         for document in documents.iter() {
             self.check_document(document)?;
@@ -426,6 +437,12 @@ impl DomHeap {
                 return Err(DomGcError::DocumentSet);
             }
         }
+        for &node in native_nodes {
+            let entry = marked
+                .get(&node.document())
+                .ok_or(DomGcError::DocumentSet)?;
+            entry.document.node(node)?;
+        }
 
         // An earlier JavaScript-only collection may have recycled an object slot.
         self.prune_wrappers(agent);
@@ -433,6 +450,7 @@ impl DomHeap {
         let mut tracer = Tracer {
             documents: &mut marked,
             heap: self,
+            native_nodes,
             error: None,
         };
         let js = agent.collect_garbage_with(roots, &mut tracer);
@@ -493,6 +511,7 @@ struct MarkedDocument<'a> {
 struct Tracer<'a, 'doc> {
     documents: &'a mut HashMap<DocumentId, MarkedDocument<'doc>>,
     heap: &'a DomHeap,
+    native_nodes: &'a [NodeId],
     error: Option<DomError>,
 }
 
@@ -504,6 +523,18 @@ impl HostTracer for Tracer<'_, '_> {
             }
             let root = entry.document.root();
             if let Err(error) = mark(self.heap, entry, root, sink) {
+                self.error.get_or_insert(error);
+            }
+        }
+        for &node in self.native_nodes {
+            let entry = self
+                .documents
+                .get_mut(&node.document())
+                .expect("registered native root");
+            let root = entry.document.root();
+            if let Err(error) =
+                mark(self.heap, entry, root, sink).and_then(|()| mark(self.heap, entry, node, sink))
+            {
                 self.error.get_or_insert(error);
             }
         }

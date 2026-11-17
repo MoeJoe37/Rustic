@@ -4,12 +4,14 @@ use std::error::Error;
 use std::fmt;
 
 mod frames;
+mod inline_scripts;
 mod lifecycle;
 mod scripting;
 mod tasks;
 mod window_tasks;
 
 pub use frames::RenderFrame;
+pub use inline_scripts::{InlineLoadError, InlineScriptLoad};
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use rustic_bindings::page::{InputEvent, KeyInput, Modifiers};
 pub use scripting::{

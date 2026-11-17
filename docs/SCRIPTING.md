@@ -2,7 +2,7 @@
 
 This is the guide to how JavaScript and a document meet in Rustic. It ties
 together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
-to [ADR 0037](adr/0037-parser-script-boundary.md)), which each
+to [ADR 0038](adr/0038-parser-inserted-inline-classics.md)), which each
 describe one step, and says plainly what is not built yet. The tested contract
 of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
 WEB-01 to WEB-05; the plan for the rest is
@@ -20,6 +20,12 @@ A host (a test, or later the CLI and the app shells) can:
 4. Pump the document one turn at a time with `run_next` or
    `run_next_with_render`, on a real or a manual clock.
 
+A host can also use `Engine::begin_inline_scripted_document` to opt into
+running parser-inserted inline classics. The parser pauses at each script.
+The script sees markup already processed, can edit it, and completes its
+promise checkpoint before the parser advances. At EOF the host receives
+the same document and realm with any queued timers or animation callbacks.
+
 Inside a turn, script can walk and change the tree, create nodes and whole
 detached documents, query with CSS selectors, hold live collections, add
 listeners, dispatch events and schedule timers and animation callbacks.
@@ -28,7 +34,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| `<script>` execution | The parser can suspend at a closed script in opt-in mode. The engine's existing load path stays inert and can run host-queued scripts after parsing. | WEB-05 |
+| External scripts, modules and readiness | The opt-in loader runs only inline classics. Script and readiness events are pending. | WEB-05 |
 | Engine-owned style and layout for scripted documents | A rendering turn hands the host the live tree and the host renders it from scratch; nothing is invalidated incrementally and script cannot read layout | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
@@ -74,6 +80,10 @@ A property that is missing is absent, not stubbed: `typeof window.fetch` is
   finds the tree unreachable. Adoption into another document keeps wrapper
   identity, expandos, listeners and live collections
   ([ADR 0033](adr/0033-detached-documents-and-adoption.md)).
+- During an inline classic load, the parser's pending node identities and
+  the current script remain visible to collection. Outward adoption raises
+  `NotSupportedError` until EOF. Same-document edits and inward adoption
+  are available throughout construction. [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
 - A fatal stop (cancellation, heap exhaustion, a turn over budget) drops the
   agent and all pending work and invalidates outstanding frame tickets. The
   tree stays readable for inspection. Script cannot catch a fatal stop.
@@ -116,7 +126,7 @@ nothing. `TaskLimits::default()` is:
 | Limit | Default | Exceeding it |
 | --- | --- | --- |
 | Pending tasks (scripts, input and timers together) | 128 | The queue call returns an error |
-| Pending source text | 512 × 1024 UTF-16 code units | The queue call returns an error |
+| Pending source text and each parser-inserted inline classic | 512 × 1024 UTF-16 code units | Admission fails or the inline load stops |
 | Safe points per turn (script and its jobs share them) | 1,000,000 | Fatal stop |
 | Jobs per microtask checkpoint | 4,096 | Fatal stop |
 | JavaScript heap | The agent default | Fatal stop |
@@ -157,6 +167,10 @@ same turn budget, so a single call cannot run unmetered.
 - **Window** ([ADR 0032](adr/0032-top-level-window-realm.md)). The global
   `this` is a `WindowProxy` distinct from the `Window` that stores global
   properties, as navigation will later require.
+- **Inline classics.** `document.currentScript` identifies the element
+  during evaluation and returns null during promise jobs. The host can clear
+  the recoverable-error count with `take_inline_script_error_count`.
+  HTML `document.write` and `document.writeln` raise `NotSupportedError`.
 
 ## Events and input
 
@@ -184,6 +198,7 @@ and `AbortSignal` listener removal are TD-131.
 | Timers and clamping | `crates/rustic-engine/tests/timers.rs` |
 | Rendering turns, animation callbacks, frame tickets | `crates/rustic-engine/tests/frames.rs` |
 | HTML script suspension and scripting-enabled trees | `crates/rustic-html/tests/document.rs`, `fragment.rs`, `tree_construction.rs` |
+| Parser-inserted inline classic execution | `crates/rustic-engine/tests/inline_scripts.rs` |
 | Trusted input and activation | `crates/rustic-engine/tests/input.rs` |
 | Conversions and generated metadata | `crates/rustic-bindings/tests/webidl.rs`, `metadata.rs` |
 | Wrapper identity, adoption, joint collection | `crates/rustic-bindings/tests/dom_gc.rs`, `page.rs` |
@@ -200,7 +215,7 @@ drives the pump or the bindings yet. Both are on the
 
 | Entry | What | Due |
 | --- | --- | --- |
-| TD-10 | Tree builder with scripting on | WEB-05 |
+| TD-10 | Processing-instruction tree construction | WEB-05 |
 | TD-31 | Form owners ignore the parser's form pointer | WEB-07 |
 | TD-118 | A realm is never freed while its agent lives | Before frames (M6) |
 | TD-124 | `DOMException` extras | M9 |
@@ -210,6 +225,7 @@ drives the pump or the bindings yet. Both are on the
 | TD-130 | One top-level Window | M6 navigation |
 | TD-131 | Extended event delivery and error reporting | WEB-07, M9 |
 | TD-132 | Timer and frame integration details | WEB-06, WEB-07 |
+| TD-133 | Outward adoption during parsing and dynamic markup | WEB-09 and M9 |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

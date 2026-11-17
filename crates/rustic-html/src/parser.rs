@@ -189,6 +189,33 @@ impl HtmlDocumentParser {
         }))
     }
 
+    /// Read the active document between parser calls.
+    pub fn live_document(&self) -> Option<&Document> {
+        self.driver.tree.as_ref().map(TreeBuilder::document)
+    }
+
+    /// Lend the active document to the script host between parser calls.
+    ///
+    /// Checked same-document DOM mutations may detach or move nodes. The host
+    /// must retain parser roots during collection and preserve their IDs
+    /// until construction ends.
+    pub fn live_document_mut(&mut self) -> Option<&mut Document> {
+        self.driver.tree.as_mut().map(TreeBuilder::document_mut)
+    }
+
+    /// Current compatibility mode, including before construction is complete.
+    pub fn live_document_mode(&self) -> Option<DocumentMode> {
+        self.driver.tree.as_ref().map(TreeBuilder::document_mode)
+    }
+
+    /// Node identities retained by live construction state for joint collection.
+    pub fn retained_nodes(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.driver
+            .tree
+            .iter()
+            .flat_map(TreeBuilder::retained_nodes)
+    }
+
     /// Close input, construct implied nodes and return the completed owned tree.
     /// Any remaining script boundaries are skipped.
     pub fn finish(&mut self) -> Result<ParsedDocument, ParseError> {

@@ -52,20 +52,20 @@ applies and wins if it fires earlier. An entry that reaches its row unpaid is
 either paid then or moved to a later row in the same change, with the reason
 added to the entry. Entries are never left on a row whose milestone has closed.
 
-Scheduled 2026-11-17, after M4 closed, for all 89 open entries.
+Scheduled 2026-11-17, updated as M5 gains scripted document support.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-05 (page scripts first run) | TD-10, TD-99, TD-106, TD-108 | Review processing instructions, Annex B functions in blocks, function source text and local time zones before page scripts run. Pay each entry or record its next trigger. |
+| M5, with WEB-05 | TD-10 | Resolve the processing-instruction expectations before closing WEB-05. |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
-| M5 exit | TD-125, TD-126, TD-129 | Native ARM64 timings come with the first PERF-01 report; the hand-bound interface subset and collection scans are reviewed against the WEB-09 results |
-| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-110, TD-118, TD-130 | Real pages exceed parse budgets, use non-UTF-8 encodings, relative `url()` values, `\p{…}` and frames. These are on the [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M5 exit | TD-125, TD-126, TD-129, TD-133 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. |
+| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130 | Review large pages, encodings, relative URLs, local time, regular expressions and browsing contexts before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-105, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127 | Test262 full-rate work (`js.conformance`), Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114 | Reviewed whenever the guarded code changes |
 
@@ -164,16 +164,16 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 | TD-97 | Deliberate | JS | Syntax the bytecode compiler rejected; asynchronous module execution, dynamic imports and host-provided module metadata (what remains is TD-105 and TD-110) | Paid |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
-| TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, review with WEB-05 (M5) |
+| TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, `js.conformance` (M9) |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
 | TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Paid |
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
 | TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, `js.conformance` (M9) |
-| TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, review with WEB-05 (M5) |
+| TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, `js.conformance` (M9) |
 | TD-107 | Deliberate | JS | CLDR collation still needs full tailorings, implicit weights and conformance evidence | Open, `js.conformance` (M9) |
-| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, review with WEB-05 (M5) |
+| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, M6 entry |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, M6 entry |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
@@ -198,6 +198,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, WEB-07 and M9 |
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, WEB-06, WEB-07 and M9 |
+| TD-133 | Deliberate | HTML scripting | Outward adoption during parsing and dynamic document markup have explicit exceptions | Open, review with WEB-09 (M5), pay in M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1485,14 +1486,15 @@ does not change `arguments[i]`), and it is an ordinary object without the
 arguments class. Function declarations in blocks follow the strict rules
 only; the Annex B hoisting to the function scope is missing.
 
-Pay with the exotic objects of JS-05. Trigger: a Test262 selection or real
-script that depends on either.
-
 **Arguments part paid** by JS-08 part 5: a sloppy function with a simple
 parameter list that names `arguments` gets a mapped arguments object
 (§10.4.4), every arguments object has the `Arguments` class and a `callee`,
 and unmapped ones throw from it. The Annex B hoisting of function declarations
 in blocks is still missing.
+
+The WEB-05 local inline fixtures use the existing function semantics.
+Schedule Annex B block hoisting with the expanded M9 Test262 gate, or
+earlier if a selected page or WPT fixture depends on it.
 
 ### TD-100 — Destructuring does not close iterators on error (Paid)
 
@@ -1583,8 +1585,10 @@ defaults rule and async or generator bodies (JS-08).
 Still open: `Function.prototype.toString` prints every function in the
 `NativeFunction` form because source text is not kept. The specification
 allows that only for built-in and host functions. Pay with: a source span per
-function so `toString` can return its text. Trigger: the first page script
-or Test262 group that needs it.
+function so `toString` can return its text. The WEB-05 inline fixtures
+exercise execution and ordering without function source introspection.
+Schedule source text with the expanded M9 Test262 gate, or earlier if a
+selected page or WPT fixture depends on it.
 
 ### TD-107 — Complete collation data and matching
 
@@ -1619,7 +1623,9 @@ Pay with: a `LocalTimeZone` hook on the agent that maps a UTC time value
 to an offset (and a local time to its candidate offsets for
 `UTC(t)`, §21.4.1.26), filled by the shell from the OS or from a compact
 TZif reader in `rustic-base`; Intl.DateTimeFormat (JS-08) shares it.
-Trigger: the shell first runs page script, or JS-08.
+The WEB-05 local fixtures use the default UTC offset for deterministic
+headless runs. Review the local-time hook at M6 entry before loading broader
+page workloads, or earlier if a selected test depends on transition rules.
 
 ### TD-109 — Unhandled promise rejections are not reported (Paid)
 
@@ -2015,3 +2021,18 @@ Until then the engine reports uncaught animation errors through a host
 counter. Test the integrated event loop against the matching Web Platform
 Tests when these facilities are present.
 [ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
+
+### TD-133 — Outward adoption during parsing and dynamic document markup
+
+The parser keeps stable node identities while a script can edit the tree.
+An outward cross-document move during that time throws `NotSupportedError`
+before touching either document. The main document supports normal outward
+adoption after EOF. HTML `document.write` and `document.writeln` raise
+`NotSupportedError` because the parser has no bounded insertion-point stack
+for reentrant writes and no document-open replacement lifecycle.
+
+Review the exact exceptions against the WEB-09 selection. Pay with the M9
+HTML lifecycle work, or earlier if a selected test requires it. Cover
+identity-preserving adoption of parser-held nodes, nested insertion and
+reentry limits, and the lifetime of a document replaced by `document.open`.
+[ADR 0038](adr/0038-parser-inserted-inline-classics.md)

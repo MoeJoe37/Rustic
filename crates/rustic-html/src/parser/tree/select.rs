@@ -122,7 +122,9 @@ impl TreeBuilder {
         let old: Vec<NodeId> = self.document.children(target)?.collect();
         for child in old {
             self.document.detach(child)?;
-            self.document.destroy_subtree(child)?;
+            if !self.exposed_document {
+                self.document.destroy_subtree(child)?;
+            }
         }
         let sources: Vec<NodeId> = self.document.children(option)?.collect();
         for source in sources {

@@ -34,11 +34,12 @@ trusted input against a parsed document: script sees a live `window` and
 `document`, creates, moves and queries nodes, dispatches events, and uses
 timers and `requestAnimationFrame`, with one garbage collector tracing the DOM
 and the JavaScript heap together ([scripted documents](docs/SCRIPTING.md)).
-A rendering turn gives the host the live tree to render again in full.
-`<script>` elements do not run yet, the engine does not yet track which styles
-and boxes a script change invalidates, and forms, focus and mutation observers
-are still to come; the [roadmap](docs/ROADMAP.md#8-m5--scripted-document-integration)
-lists what closes M5. Networking and native app hosts are later milestones.
+A rendering turn gives the host the live tree to render again in full. Hosts
+can opt into running inline classic `<script>` elements during parsing.
+External scripts, readiness events, style and layout invalidation, forms,
+focus and mutation observers are still on the
+[M5 roadmap](docs/ROADMAP.md#8-m5--scripted-document-integration).
+Networking and native app hosts are later milestones.
 See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 <!-- rustic-progress:start -->
@@ -47,7 +48,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 32.13%** (31.11% verified complete + 1.02% partial credit) — 71/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 51.42% done.
+**Overall engine completion: 32.35%** (31.11% verified complete + 1.24% partial credit) — 71/221 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 55.74% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

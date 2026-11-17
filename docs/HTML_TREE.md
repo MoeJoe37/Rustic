@@ -66,7 +66,11 @@ foster-parented locations.
 With `Scripting::Enabled`, `noscript` uses RAWTEXT in head and body. The
 document pull interface pauses after a closed HTML `script` outside template
 content. Script classification, execution and subresource loading belong to
-the engine, and fragment scripts remain inert. Processing-instruction tokens
+the engine. The opt-in engine load runs inline classics on the partial tree
+and traces parser-held nodes during collection. Fragment scripts remain inert.
+[ADR 0038](adr/0038-parser-inserted-inline-classics.md)
+
+Processing-instruction tokens
 still return `Unsupported(ProcessingInstructions)`. Input is fixed UTF-8.
 
 Template contents are a separate `DocumentFragment` root owned by the template

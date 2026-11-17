@@ -38,6 +38,18 @@ pub trait PageTree: Debug {
     fn quirks_mode(&self) -> bool {
         false
     }
+    /// Nodes retained by the host independently of their JavaScript wrappers.
+    fn retained_nodes(&self) -> Result<Vec<NodeId>, OutOfMemory> {
+        Ok(Vec::new())
+    }
+    /// The classic script currently executing, if any.
+    fn current_script(&self) -> Option<NodeId> {
+        None
+    }
+    /// Whether main-document node identities may move to another document.
+    fn allows_adoption_from_main(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug)]
@@ -62,6 +74,7 @@ struct Page {
 
 impl ExecutionHost for Page {
     fn collect(&self, agent: &mut Agent) -> Result<(), OutOfMemory> {
+        let native_nodes = self.tree.retained_nodes()?;
         let mut document = self.tree.write().ok_or(OutOfMemory)?;
         let mut wrappers = self.wrappers.try_borrow_mut().map_err(|_| OutOfMemory)?;
         let mut additional = self.additional.try_borrow_mut().map_err(|_| OutOfMemory)?;
@@ -74,7 +87,7 @@ impl ExecutionHost for Page {
             trees.push(cell.tree.get_mut());
         }
         wrappers
-            .collect_documents(agent, &mut trees, Roots::default())
+            .collect_documents_with_nodes(agent, &mut trees, Roots::default(), &native_nodes)
             .map_err(|_| OutOfMemory)?;
         additional.retain(|&id, _| wrappers.has_document(id));
         self.child_lists
@@ -106,6 +119,22 @@ impl ExecutionHost for Page {
 }
 
 impl Page {
+    fn write_adoption_source<T>(
+        &self,
+        agent: &mut Agent,
+        id: DocumentId,
+        operation: impl FnOnce(&mut Agent, &mut Document) -> JsResult<T>,
+    ) -> JsResult<T> {
+        if id == self.main && !self.tree.allows_adoption_from_main() {
+            return Err(creation::exception(
+                agent,
+                "NotSupportedError",
+                "cannot adopt nodes out of the document during parsing",
+            ));
+        }
+        self.write(agent, id, operation)
+    }
+
     fn read<T>(
         &self,
         agent: &mut Agent,
@@ -241,6 +270,11 @@ fn install_page(
             ),
             ("contentType", "get contentType", documents::content_type),
             ("doctype", "get doctype", documents::doctype),
+            (
+                "currentScript",
+                "get currentScript",
+                documents::current_script,
+            ),
             (
                 "children",
                 "get children",
@@ -716,7 +750,7 @@ fn insert_child(
                 .map_err(|error| append_error(agent, error))?;
         } else {
             with_page(agent, |agent, page| {
-                page.write(agent, child.document(), |agent, source| {
+                page.write_adoption_source(agent, child.document(), |agent, source| {
                     documents::charge_copy(agent, source, child, true, true)?;
                     wrappers
                         .insert_adopted(target, source, child, parent, before)

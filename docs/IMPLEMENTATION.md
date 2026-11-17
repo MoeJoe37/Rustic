@@ -136,7 +136,7 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Scripted documents (M5, in progress): 6 sections</summary>
+<summary>Scripted documents (M5, in progress): 7 sections</summary>
 
 - [Engine lifecycle — Bounded document ownership and shutdown](#engine-lifecycle--bounded-document-ownership-and-shutdown)
 - [WEB-01 — Document script turns and microtask checkpoints](#web-01--document-script-turns-and-microtask-checkpoints)
@@ -144,6 +144,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-03 — Live document wrappers and script collection](#web-03--live-document-wrappers-and-script-collection)
 - [WEB-04 — DOM dispatch and host input](#web-04--dom-dispatch-and-host-input)
 - [WEB-05 — Parser suspension at script boundaries](#web-05--parser-suspension-at-script-boundaries)
+- [WEB-05 — Parser-inserted inline classics](#web-05--parser-inserted-inline-classics)
 
 </details>
 
@@ -440,6 +441,30 @@ records total at every split. Eight legacy processing-instruction cases stay
 open under TD-10. Live DOM edits across suspension, source loading, evaluation
 order and readiness events remain WEB-05 work.
 [ADR 0037](adr/0037-parser-script-boundary.md)
+
+## WEB-05 — Parser-inserted inline classics
+
+`Engine::begin_inline_scripted_document` admits an opt-in streaming load.
+Eligible inline classics run in the same realm against the partially built
+DOM. The engine filters type, language, connectivity and legacy attributes
+before taking bounded UTF-16 source. It exposes `document.currentScript`
+during evaluation and clears it before the promise checkpoint. Recoverable
+errors increment the host counter. Job, step, heap and source limits stop
+the load and release its slot. `document.write` and `document.writeln` throw
+`NotSupportedError` on HTML documents.
+
+Joint collection keeps detached parser anchors and the executing element
+alive during construction. Same-document edits and inward adoption use
+the normal DOM operations. Adoption out of the active document throws
+before moving any node. EOF transfers the same DOM, wrappers, realm and
+queued work to the normal turn pump. The default HTML load and CLI remain
+inert. External and module preparation, readiness, and CLI opt-in are
+tracked in the [roadmap](ROADMAP.md#8-m5--scripted-document-integration).
+
+The [engine integration tests](../crates/rustic-engine/tests/inline_scripts.rs)
+cover parsing across every input split, promise and timer order, recovery,
+detachment through collection, adoption and resource-limit failures.
+[ADR 0038](adr/0038-parser-inserted-inline-classics.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

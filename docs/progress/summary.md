@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 32.13%** = 31.11% verified complete + 1.02% partial credit. 71/221 capabilities complete, 6 in progress.
+**Overall completion: 32.35%** = 31.11% verified complete + 1.24% partial credit. 71/221 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `4febf4e7e43d22bb1f13ea51cadd162c4c6c111579d992442a3d6281bb1dac96`.
+Catalog: `engine-v4`. Source fingerprint: `5b501242c31bdad23464ba5173f284f373b12a980041c05506a7fd9c0858beb8`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `4febf4e7e43d22bb1f13ea51cadd162c4c6c1
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 5/12 | 51.42% | 45.32% | 5.29% |
+| M5 Scripted documents | 5/12 | 55.74% | 45.32% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -31,14 +31,14 @@ Catalog: `engine-v4`. Source fingerprint: `4febf4e7e43d22bb1f13ea51cadd162c4c6c1
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 2% | 0.86 |
 | DOM | 7/10 | 1 | 71.32% | 67.64% | 4% | 2.85 |
-| HTML | 9/11 | 1 | 72.97% | 70.27% | 5% | 3.64 |
+| HTML | 9/11 | 1 | 75.67% | 70.27% | 5% | 3.78 |
 | CSS & style | 8/10 | 2 | 84.18% | 79.59% | 6% | 5.05 |
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 3/10 | 1 | 36.25% | 32.50% | 5% | 1.81 |
+| Bindings & web APIs | 3/10 | 2 | 38.12% | 32.50% | 5% | 1.90 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -110,9 +110,9 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes · size 2 · M1 · 0.27% of engine ([source](../../crates/rustic-html/src/tokenizer/text.rs), [source](../../crates/rustic-html/src/tokenizer/driver.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.tree` — Core insertion modes and malformed-tree recovery · size 5 · M1 · 0.67% of engine ([source](../../crates/rustic-html/src/parser/tree.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
 - **complete** `html.tables` — Table, formatting, template and foreign content rules · size 5 · M1 · 0.67% of engine ([source](../../crates/rustic-html/src/parser/tree/formatting.rs), [source](../../crates/rustic-html/src/parser/tree/table.rs), [source](../../crates/rustic-html/src/parser/tree/foreign.rs), [test](../../crates/rustic-html/tests/tree_rules.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
-- **in progress 33.33%** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.40% of engine
+- **in progress 66.66%** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.40% of engine
   - [x] Scripting-enabled tree construction and script suspension ([source](../../crates/rustic-html/src/parser.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
-  - [ ] Live document handoff and bounded parser reentry
+  - [x] Live document handoff and bounded parser reentry ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs))
   - [ ] Encoding restart
 - **complete** `html.loader` — Bounded local loader and dump-dom command · size 2 · M1 · 0.27% of engine ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **complete** `html.conformance` — Parser corpora, chunk invariance and fuzz gate · size 3 · M1 · 0.40% of engine ([source](../../tools/import_html_tests.py), [test](../../crates/rustic-html/tests/corpus.rs), [source](../../crates/rustic-html/src/parser/fragment.rs), [test](../../crates/rustic-html/tests/tree_construction.rs), [test](../../crates/rustic-html/tests/fragment.rs), [source](../../crates/rustic-fuzz/src/targets.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
@@ -213,7 +213,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `web.idl` — Web IDL tooling, conversions and rooted wrappers · size 5 · M5 · 0.62% of engine ([source](../../crates/rustic-bindings/src/webidl.rs), [source](../../crates/rustic-bindings/src/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [test](../../crates/rustic-bindings/tests/webidl.rs), [source](../../tools/generate_dom_idl.py), [source](../../crates/rustic-bindings/src/metadata.rs), [test](../../tools/tests/test_generate_dom_idl.py), [test](../../crates/rustic-bindings/tests/metadata.rs), [test](../../crates/rustic-bindings/tests/metadata.rs), [source](../../crates/rustic-bindings/src/heap.rs), [source](../../crates/rustic-bindings/src/heap.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [test](../../crates/rustic-bindings/tests/dom_gc.rs), [source](../../crates/rustic-bindings/src/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-bindings/tests/dom_exception.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
 - **complete** `web.window` — Window/Document/Element bindings and identity · size 5 · M5 · 0.62% of engine ([source](../../crates/rustic-js/src/runtime/host.rs), [source](../../crates/rustic-bindings/src/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-bindings/src/page/creation.rs), [source](../../crates/rustic-dom/src/document/character_data.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-bindings/src/page/window.rs), [source](../../crates/rustic-js/src/runtime/host.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-style/src/dom.rs), [source](../../crates/rustic-bindings/src/page/collections.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-bindings/src/page/html_collections.rs), [source](../../crates/rustic-js/src/runtime/host_indexed.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-bindings/src/page/documents.rs), [source](../../crates/rustic-bindings/src/page/creation.rs), [source](../../crates/rustic-dom/src/document/adoption.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-bindings/tests/page.rs), [test](../../crates/rustic-dom/tests/adoption.rs), [test](../../crates/rustic-dom/tests/adoption.rs), [test](../../crates/rustic-engine/tests/scripting.rs))
 - **complete** `web.scheduler` — Tasks, microtasks and rendering opportunities · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-engine/src/tasks.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [source](../../crates/rustic-engine/src/scripting.rs), [source](../../crates/rustic-engine/src/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-cli/src/loader.rs))
-- **planned** `web.scripts` — Classic/module script lifecycle and readiness · size 3 · M5 · 0.37% of engine
+- **in progress 25.00%** `web.scripts` — Classic/module script lifecycle and readiness · size 3 · M5 · 0.37% of engine
+  - [x] Inline classic preparation, evaluation and checkpoint ([source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs))
+  - [ ] Bounded local classic loading with parser blocking, async and defer order
+  - [ ] Module graph loading and execution order
+  - [ ] Document readiness, lifecycle events and CLI opt-in
 - **planned** `web.input` — Forms, focus, editing and user input · size 5 · M5 · 0.62% of engine
 - **in progress 50.00%** `web.observers` — Timers, animation frames and observer APIs · size 3 · M5 · 0.37% of engine
   - [x] Window timers and renderer-driven animation callbacks ([source](../../crates/rustic-bindings/src/page/window.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/src/window_tasks.rs))

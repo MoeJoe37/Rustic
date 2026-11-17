@@ -54,14 +54,53 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
 }
 
 pub(super) fn install_methods(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
-    for (name, operation) in [
-        ("adoptNode", adopt_node as NativeFn),
-        ("importNode", import_node),
+    for (name, operation, length) in [
+        ("adoptNode", adopt_node as NativeFn, 1),
+        ("importNode", import_node, 1),
+        ("write", write_document, 0),
+        ("writeln", write_document, 0),
     ] {
         let key = agent.heap.key(name)?;
-        agent.define_method(prototype, key, operation, name, 1)?;
+        agent.define_method(prototype, key, operation, name, length)?;
     }
     Ok(())
+}
+
+fn write_document(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    read_node(agent, receiver, |agent, _, document, _, node| {
+        if !matches!(node.kind(), NodeKind::Document) {
+            return agent.type_error("expected a Document receiver");
+        }
+        let name = if document.is_html() {
+            "NotSupportedError"
+        } else {
+            "InvalidStateError"
+        };
+        Err(exception(
+            agent,
+            name,
+            "dynamic document markup is unavailable",
+        ))
+    })
+}
+
+pub(super) fn current_script(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    let owner = document_receiver(agent, receiver)?;
+    with_page(agent, |agent, page| {
+        let Some(node) = page
+            .tree
+            .current_script()
+            .filter(|_| owner.document() == page.main)
+        else {
+            return Ok(Value::NULL);
+        };
+        let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
+            return agent.type_error("DOM bindings are busy");
+        };
+        page.read(agent, page.main, |agent, document| {
+            wrap(&mut wrappers, agent, document, node)
+        })
+    })
 }
 
 pub(super) fn implementation(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
@@ -299,7 +338,7 @@ fn register(
                 None => wrap(&mut wrappers, agent, &document, root)?,
             };
             if let Some((node, before)) = doctype {
-                page.write(agent, node.document(), |agent, source| {
+                page.write_adoption_source(agent, node.document(), |agent, source| {
                     charge_copy(agent, source, node, false, false)?;
                     wrappers
                         .insert_adopted(&mut document, source, node, root, before)
@@ -336,7 +375,7 @@ fn adopt_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Va
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         } else {
             with_page(agent, |agent, page| {
-                page.write(agent, node.document(), |agent, source| {
+                page.write_adoption_source(agent, node.document(), |agent, source| {
                     charge_copy(agent, source, node, true, true)?;
                     wrappers
                         .adopt_node(target, source, node)

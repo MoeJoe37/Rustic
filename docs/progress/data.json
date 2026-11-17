@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "4febf4e7e43d22bb1f13ea51cadd162c4c6c111579d992442a3d6281bb1dac96",
-  "percent": "32.13",
+  "source_fingerprint": "5b501242c31bdad23464ba5173f284f373b12a980041c05506a7fd9c0858beb8",
+  "percent": "32.35",
   "verified_percent": "31.11",
-  "partial_percent": "1.02",
+  "partial_percent": "1.24",
   "completed": 71,
-  "in_progress": 6,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 5,
       "total": 12,
-      "percent": "51.42",
+      "percent": "55.74",
       "verified_percent": "45.32",
-      "partial_percent": "6.10"
+      "partial_percent": "10.42"
     },
     {
       "id": "M6",
@@ -1155,8 +1155,24 @@
             },
             {
               "label": "Live document handoff and bounded parser reentry",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "pub(crate) fn with_active_parser"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn parser_retains_detached_open_nodes_and_current_script_through_collection"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn outward_adoption_is_atomic_during_parsing_and_preserves_existing_behavior_after_eof"
+                }
+              ]
             },
             {
               "label": "Encoding restart",
@@ -1164,7 +1180,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.40"
         },
         {
@@ -1249,10 +1265,10 @@
       "completed": 9,
       "in_progress": 1,
       "total": 11,
-      "contribution": "3.64",
-      "percent": "72.97",
+      "contribution": "3.78",
+      "percent": "75.67",
       "verified_percent": "70.27",
-      "partial_percent": "2.70"
+      "partial_percent": "5.40"
     },
     {
       "id": "css",
@@ -4743,9 +4759,47 @@
           "label": "Classic/module script lifecycle and readiness",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Inline classic preparation, evaluation and checkpoint",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/inline_scripts.rs",
+                  "marker": "pub fn begin_inline_scripted_document"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn inline_classics_observe_and_edit_the_partial_document_at_every_split"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn inline_errors_allow_later_scripts_and_dynamic_markup_reports_an_exception"
+                }
+              ]
+            },
+            {
+              "label": "Bounded local classic loading with parser blocking, async and defer order",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Module graph loading and execution order",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Document readiness, lifecycle events and CLI opt-in",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.37"
         },
         {
@@ -4864,12 +4918,12 @@
       ],
       "points": 40,
       "completed": 3,
-      "in_progress": 1,
+      "in_progress": 2,
       "total": 10,
-      "contribution": "1.81",
-      "percent": "36.25",
+      "contribution": "1.90",
+      "percent": "38.12",
       "verified_percent": "32.50",
-      "partial_percent": "3.75"
+      "partial_percent": "5.62"
     },
     {
       "id": "media",

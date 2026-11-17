@@ -204,8 +204,16 @@ The inert document parser owns a checked DOM while driving an explicit subset of
 initial/head/body insertion modes. Failed partial trees are discarded; only EOF
 transfers ownership. [ADR 0009](adr/0009-parser-owned-construction.md) records the
 construction boundary and [HTML tree scope](HTML_TREE.md) lists accepted/rejected
-constructs. See [HTML.md](HTML.md) for tokenization. The following broader pipeline
-describes the target architecture.
+constructs. See [HTML.md](HTML.md) for tokenization.
+
+An opt-in scripted load borrows the parser's live DOM through the page host
+between tokens. The engine ends its mutable parser borrow before running a
+classic or its promise jobs. Joint collection traces parser-held identities
+and the current script alongside ordinary DOM and JavaScript roots. EOF
+publishes the same document and agent to the turn pump.
+[ADR 0037](adr/0037-parser-script-boundary.md), [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
+
+The following broader pipeline describes the target architecture.
 
 The loader produces byte chunks plus response metadata. Encoding detection and
 decoder state precede HTML tokenization; charset changes may require a bounded

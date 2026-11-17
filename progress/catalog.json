@@ -971,8 +971,24 @@
             },
             {
               "label": "Live document handoff and bounded parser reentry",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "pub(crate) fn with_active_parser"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn parser_retains_detached_open_nodes_and_current_script_through_collection"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn outward_adoption_is_atomic_during_parsing_and_preserves_existing_behavior_after_eof"
+                }
+              ]
             },
             {
               "label": "Encoding restart",
@@ -4373,8 +4389,46 @@
           "label": "Classic/module script lifecycle and readiness",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Inline classic preparation, evaluation and checkpoint",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/inline_scripts.rs",
+                  "marker": "pub fn begin_inline_scripted_document"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn inline_classics_observe_and_edit_the_partial_document_at_every_split"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
+                  "marker": "fn inline_errors_allow_later_scripts_and_dynamic_markup_reports_an_exception"
+                }
+              ]
+            },
+            {
+              "label": "Bounded local classic loading with parser blocking, async and defer order",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Module graph loading and execution order",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Document readiness, lifecycle events and CLI opt-in",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "web.input",

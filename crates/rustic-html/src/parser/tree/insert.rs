@@ -3,7 +3,7 @@ use rustic_dom::{DomError, MATHML_NAMESPACE, NodeId, NodeKind, QualifiedName, SV
 use super::foreign::{
     adjust_mathml_attribute, adjust_svg_attribute, adjust_svg_tag, foreign_attribute,
 };
-use super::{Ns, ParseError, Tag, TreeBuilder};
+use super::{Annotation, Ns, ParseError, Tag, TreeBuilder};
 
 /// An insertion location: before a child of `parent`, or after its last child.
 #[derive(Clone, Copy, Debug)]
@@ -189,8 +189,12 @@ impl TreeBuilder {
         Ok(())
     }
 
-    /// Insert a comment at an explicit parent, or the appropriate place.
-    pub(super) fn comment(&mut self, parent: Option<NodeId>, text: &str) -> Result<(), ParseError> {
+    /// Insert a comment or instruction at an explicit parent or the appropriate place.
+    pub(super) fn insert_annotation(
+        &mut self,
+        parent: Option<NodeId>,
+        annotation: Annotation<'_>,
+    ) -> Result<(), ParseError> {
         let place = match parent {
             Some(parent) => Place {
                 parent,
@@ -198,7 +202,12 @@ impl TreeBuilder {
             },
             None => self.place(None),
         };
-        let id = self.document.create_comment(text)?;
+        let id = match annotation {
+            Annotation::Comment(text) => self.document.create_comment(text)?,
+            Annotation::Instruction(instruction) => self
+                .document
+                .create_processing_instruction(instruction.target(), instruction.data())?,
+        };
         self.attach_or_destroy(place.parent, place.before, id)
     }
 

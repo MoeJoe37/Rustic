@@ -28,7 +28,7 @@ impl TreeBuilder {
                 self.insertion_mode = InsertionMode::InTableText;
                 return Ok(Step::Reprocess);
             }
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) => match tag.name() {
                 "caption" => {
@@ -194,7 +194,7 @@ impl TreeBuilder {
     pub(super) fn in_column_group(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, text) => self.insert_text(text)?,
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
             Tok::Start(tag) if tag.name() == "col" => self.insert_void(tag)?,
@@ -381,7 +381,7 @@ impl TreeBuilder {
 
     pub(super) fn in_template(&mut self, token: Tok) -> Result<Step, ParseError> {
         let mode = match token {
-            Tok::Text(..) | Tok::Comment(_) | Tok::Doctype(_) => return self.in_body(token),
+            Tok::Text(..) | Tok::Annotation(_) | Tok::Doctype(_) => return self.in_body(token),
             Tok::Start(tag) => match tag.name() {
                 "base" | "basefont" | "bgsound" | "link" | "meta" | "noframes" | "script"
                 | "style" | "template" | "title" => return self.in_head(token),

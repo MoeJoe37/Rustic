@@ -931,12 +931,10 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_markup_fails_without_a_partial_tree() {
+    fn processing_instructions_survive_the_local_load() {
         let file = TempFile::new(b"<p>before<?target data?>after");
-        assert!(matches!(
-            dump(&file, LoaderLimits::default()),
-            Err(LoadError::Parse(ParseError::Unsupported(_)))
-        ));
+        let output = dump(&file, LoaderLimits::default()).unwrap();
+        assert!(output.contains("processing-instruction target=\"target\" data=\"data\""));
     }
 
     #[test]

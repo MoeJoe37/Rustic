@@ -100,7 +100,7 @@ an earlier one's "remaining" notes.
 | Area | Evidence |
 | --- | --- |
 | URL | 887 pinned WPT URL records; all 6,389 Unicode IdnaTestV2 cases |
-| HTML | 1,079 declaration, 4,626 character-reference and 282 text-mode tokenizer cases, plus all 1,784 runnable html5lib tree records at every two-chunk split |
+| HTML | 1,079 declaration, 4,626 character-reference and 282 text-mode tokenizer cases, plus all 1,792 html5lib tree records at every two-chunk split with four expectations adapted to current HTML |
 | DOM | 25,230 pre-insert combinations against a specification oracle; seeded model tests |
 | CSS | 8,041 color cases; 1,115 of 1,455 in-scope pinned WPT parsing cases with a reasoned ratchet |
 | Layout and paint | Exact-geometry tests, checked reftests, 38 of 91 static css-flexbox WPT pages |

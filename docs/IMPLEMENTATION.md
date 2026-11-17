@@ -148,6 +148,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-05 — Local external classics](#web-05--local-external-classics)
 - [WEB-05 — Local static JavaScript modules](#web-05--local-static-javascript-modules)
 - [WEB-05 — Document readiness and scripted CLI](#web-05--document-readiness-and-scripted-cli)
+- [WEB-05 — Processing-instruction nodes](#web-05--processing-instruction-nodes)
 
 </details>
 
@@ -439,7 +440,7 @@ that order. Cancelling while suspended discards the partial tree. Template
 contents, SVG scripts and an EOF in script text do not cause suspension.
 Default engine and CLI loads still use the inert parser.
 
-The html5lib tree runner now passes all eight scripting-on records and 1,784
+The html5lib tree runner at this stage passed all eight scripting-on records and 1,784
 records total at every split. Eight legacy processing-instruction cases stay
 open under TD-10. Live DOM edits across suspension, source loading, evaluation
 order and readiness events remain WEB-05 work.
@@ -525,6 +526,15 @@ failure and the checkpoint between lifecycle events.
 module reftest compares the scripted output pixels to a static reference and
 checks that the result is independent of the HTML input chunk size.
 [ADR 0041](adr/0041-scripted-document-readiness.md)
+
+## WEB-05 — Processing-instruction nodes
+
+Accepted processing-instruction tokens become inert DOM nodes using the
+tree builder's insertion rules, including the explicit document locations
+and template contents. Their checked creation uses the same node and data
+budgets as other markup. The pinned html5lib runner passes all 1,792 records,
+with four exact expectations updated for the current HTML tokenizer.
+[HTML tree construction evidence](HTML_TREE.md#standards-and-reference-data)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 
@@ -886,7 +896,7 @@ tree. No network, script, subresource, encoding sniffing or base-URL resolution 
 
 Nine loader unit tests cover URL/path classification, exact file and dump byte
 limits, chunk-size invariance at every size up to the input length, parser
-budgets, unsupported markup, directories, `/dev/zero`, missing files, zero limits
+budgets, directories, `/dev/zero`, missing files, zero limits
 and cancellation. Eight CLI tests compare a malformed fixture against a checked
 snapshot for 19 chunk sizes and check URL rejection, usage errors, exact budgets,
 configurable depth/diagnostic/node limits and clean failures. `html.loader` is complete for this scope; tree coverage

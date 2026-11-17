@@ -8,7 +8,7 @@ mod fragment;
 mod mode;
 mod tree;
 
-pub use error::{ParseError, TreeDiagnostic, TreeDiagnosticKind, UnsupportedFeature};
+pub use error::{ParseError, TreeDiagnostic, TreeDiagnosticKind};
 pub use fragment::{ContextNamespace, FragmentContext, HtmlFragmentParser, ParsedFragment};
 pub use mode::DocumentMode;
 use tree::TreeBuilder;

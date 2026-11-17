@@ -3,12 +3,11 @@ use rustic_dom::{
     ReadyState, SVG_NAMESPACE,
 };
 
-use crate::{Doctype, Tag, Token, TokenizerMode};
+use crate::{Doctype, ProcessingInstruction, Tag, Token, TokenizerMode};
 
 use super::{
     ContextNamespace, DocumentMode, FragmentContext, ParseError, ParsedDocument, ParsedFragment,
     Scripting, TokenizerDiagnostics, TreeDiagnostic, TreeDiagnosticKind as ErrorKind,
-    UnsupportedFeature,
 };
 
 mod body;
@@ -70,9 +69,16 @@ enum Tok<'a> {
     Text(Chars, &'a str),
     Start(&'a Tag),
     End(&'a str),
-    Comment(&'a str),
+    Annotation(Annotation<'a>),
     Doctype(&'a Doctype),
     Eof,
+}
+
+/// Tokens with the same placement rules and distinct DOM node kinds.
+#[derive(Clone, Copy, Debug)]
+enum Annotation<'a> {
+    Comment(&'a str),
+    Instruction(&'a ProcessingInstruction),
 }
 
 enum Step {
@@ -304,12 +310,10 @@ impl TreeBuilder {
             }
             Token::StartTag(tag) => self.dispatch(Tok::Start(tag))?,
             Token::EndTag(name) => self.dispatch(Tok::End(name))?,
-            Token::Comment(text) => self.dispatch(Tok::Comment(text))?,
+            Token::Comment(text) => self.dispatch(Tok::Annotation(Annotation::Comment(text)))?,
             Token::Doctype(doctype) => self.dispatch(Tok::Doctype(doctype))?,
-            Token::ProcessingInstruction(_) => {
-                return Err(ParseError::Unsupported(
-                    UnsupportedFeature::ProcessingInstructions,
-                ));
+            Token::ProcessingInstruction(instruction) => {
+                self.dispatch(Tok::Annotation(Annotation::Instruction(instruction)))?;
             }
             Token::Eof => self.dispatch(Tok::Eof)?,
         }

@@ -7,7 +7,9 @@ impl TreeBuilder {
     pub(super) fn initial(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, _) => {}
-            Tok::Comment(text) => self.comment(Some(self.document.root()), text)?,
+            Tok::Annotation(annotation) => {
+                self.insert_annotation(Some(self.document.root()), annotation)?
+            }
             Tok::Doctype(doctype) => {
                 self.doctype(doctype)?;
                 self.insertion_mode = InsertionMode::BeforeHtml;
@@ -25,7 +27,9 @@ impl TreeBuilder {
     pub(super) fn before_html(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Doctype(_) => return self.ignore(),
-            Tok::Comment(text) => self.comment(Some(self.document.root()), text)?,
+            Tok::Annotation(annotation) => {
+                self.insert_annotation(Some(self.document.root()), annotation)?
+            }
             Tok::Text(Chars::Space, _) => {}
             Tok::Start(tag) if tag.name() == "html" => {
                 self.insert_html(tag)?;
@@ -46,7 +50,7 @@ impl TreeBuilder {
     pub(super) fn before_head(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, _) => {}
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
             Tok::Start(tag) if tag.name() == "head" => {
@@ -81,7 +85,7 @@ impl TreeBuilder {
     pub(super) fn in_head(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, text) => self.insert_text(text)?,
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) => match tag.name() {
                 "html" => return self.in_body(token),
@@ -147,7 +151,7 @@ impl TreeBuilder {
                 self.open.pop();
                 self.insertion_mode = InsertionMode::InHead;
             }
-            Tok::Text(Chars::Space, _) | Tok::Comment(_) => return self.in_head(token),
+            Tok::Text(Chars::Space, _) | Tok::Annotation(_) => return self.in_head(token),
             Tok::Start(tag)
                 if matches!(
                     tag.name(),
@@ -171,7 +175,7 @@ impl TreeBuilder {
     pub(super) fn after_head(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, text) => self.insert_text(text)?,
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) => match tag.name() {
                 "html" => return self.in_body(token),
@@ -245,7 +249,9 @@ impl TreeBuilder {
     pub(super) fn after_body(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, _) => return self.in_body(token),
-            Tok::Comment(text) => self.comment(Some(self.open[0]), text)?,
+            Tok::Annotation(annotation) => {
+                self.insert_annotation(Some(self.open[0]), annotation)?
+            }
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
             Tok::End("html") if self.fragment() => return self.ignore(),
@@ -263,7 +269,7 @@ impl TreeBuilder {
     pub(super) fn in_frameset(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, text) => self.insert_text(text)?,
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Start(tag) => match tag.name() {
                 "html" => return self.in_body(token),
                 "frameset" => {
@@ -296,7 +302,7 @@ impl TreeBuilder {
     pub(super) fn after_frameset(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
             Tok::Text(Chars::Space, text) => self.insert_text(text)?,
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
             Tok::Start(tag) if tag.name() == "noframes" => return self.in_head(token),
             Tok::End("html") => self.insertion_mode = InsertionMode::AfterAfterFrameset,
@@ -308,7 +314,9 @@ impl TreeBuilder {
 
     pub(super) fn after_after_body(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
-            Tok::Comment(text) => self.comment(Some(self.document.root()), text)?,
+            Tok::Annotation(annotation) => {
+                self.insert_annotation(Some(self.document.root()), annotation)?
+            }
             Tok::Doctype(_) | Tok::Text(Chars::Space, _) => return self.in_body(token),
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
             Tok::Eof => self.done = true,
@@ -323,7 +331,9 @@ impl TreeBuilder {
 
     pub(super) fn after_after_frameset(&mut self, token: Tok) -> Result<Step, ParseError> {
         match token {
-            Tok::Comment(text) => self.comment(Some(self.document.root()), text)?,
+            Tok::Annotation(annotation) => {
+                self.insert_annotation(Some(self.document.root()), annotation)?
+            }
             Tok::Doctype(_) | Tok::Text(Chars::Space, _) => return self.in_body(token),
             Tok::Start(tag) if tag.name() == "html" => return self.in_body(token),
             Tok::Start(tag) if tag.name() == "noframes" => return self.in_head(token),

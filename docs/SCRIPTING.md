@@ -253,7 +253,6 @@ drives the pump or the bindings yet. Both are on the
 
 | Entry | What | Due |
 | --- | --- | --- |
-| TD-10 | Processing-instruction tree construction | WEB-05 |
 | TD-31 | Form owners ignore the parser's form pointer | WEB-07 |
 | TD-118 | A realm is never freed while its agent lives | Before frames (M6) |
 | TD-124 | `DOMException` extras | M9 |

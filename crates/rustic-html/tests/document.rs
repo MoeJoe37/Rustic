@@ -2,7 +2,7 @@ use rustic_base::CancellationToken;
 use rustic_dom::{Document, DomError, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_html::{
     DocumentMode, HtmlDocumentParser, HtmlError, ParseError, ParsedDocument, ParserLimits,
-    Scripting, TreeDiagnosticKind as D, UnsupportedFeature as U,
+    Scripting, TreeDiagnosticKind as D,
 };
 
 fn parse(bytes: &[u8], limits: ParserLimits) -> Result<ParsedDocument, ParseError> {
@@ -347,20 +347,71 @@ fn compatibility_modes_cover_legacy_ids_case_and_missing_vs_empty_system_id() {
 }
 
 #[test]
-fn unsupported_constructs_drop_partial_documents_and_poison_the_stream() {
-    for (source, unsupported) in [
-        ("<?target value?>", U::ProcessingInstructions),
-        ("<body><table><b><?target?>", U::ProcessingInstructions),
-        ("<svg><?target?>", U::ProcessingInstructions),
-    ] {
-        let mut parser = HtmlDocumentParser::default();
-        assert_eq!(
-            parser.feed(source.as_bytes()),
-            Err(ParseError::Unsupported(unsupported))
-        );
-        assert_eq!(parser.feed(b""), Err(ParseError::Poisoned));
-        assert_eq!(parser.finish().unwrap_err(), ParseError::Poisoned);
-    }
+fn processing_instructions_preserve_data_and_use_tree_insertion_rules() {
+    let source = concat!(
+        "<?before?><!doctype html><html><?html?><head><noscript><?noscript?></noscript></head>",
+        "<body><table><?table data?></table><svg><?foreign α??></svg>",
+        "<template><?template nul\0?></template></body><?afterBody?></html><?afterHtml?>"
+    );
+    let parsed = parse(source.as_bytes(), ParserLimits::default()).unwrap();
+    let doc = parsed.document();
+    let template = elements(doc, "template")[0];
+    let contents = match doc.node(template).unwrap().kind() {
+        NodeKind::Element(element) => element.template_contents().unwrap(),
+        _ => unreachable!(),
+    };
+    let actual = doc
+        .walk(doc.root())
+        .unwrap()
+        .chain(doc.walk(contents).unwrap())
+        .filter_map(|(node, _)| {
+            let node = doc.node(node).unwrap();
+            let NodeKind::ProcessingInstruction(value) = node.kind() else {
+                return None;
+            };
+            let parent = match doc.node(node.parent().unwrap()).unwrap().kind() {
+                NodeKind::Document => "#document",
+                NodeKind::DocumentFragment => "#fragment",
+                NodeKind::Element(element) => element.name().local(),
+                _ => unreachable!(),
+            };
+            Some((
+                String::from_utf16(value.target().as_units()).unwrap(),
+                parent,
+                String::from_utf16(value.data().as_units()).unwrap(),
+            ))
+        })
+        .collect::<Vec<_>>();
+    let actual = actual
+        .iter()
+        .map(|(target, parent, data)| (target.as_str(), *parent, data.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [
+            ("before", "#document", ""),
+            ("html", "html", ""),
+            ("noscript", "noscript", ""),
+            ("table", "table", "data"),
+            ("foreign", "svg", "α?"),
+            ("afterBody", "html", ""),
+            ("afterHtml", "#document", ""),
+            ("template", "#fragment", "nul\0"),
+        ]
+    );
+}
+
+#[test]
+fn processing_instruction_node_limit_poisons_the_stream() {
+    let mut limits = ParserLimits::default();
+    limits.document.max_nodes = 1;
+    let mut parser = HtmlDocumentParser::new(limits, CancellationToken::default()).unwrap();
+    assert_eq!(
+        parser.feed(b"<?target value?>"),
+        Err(ParseError::Document(DomError::NodeLimit))
+    );
+    assert_eq!(parser.feed(b""), Err(ParseError::Poisoned));
+    assert_eq!(parser.finish().unwrap_err(), ParseError::Poisoned);
 }
 
 #[test]

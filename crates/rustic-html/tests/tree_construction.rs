@@ -1,8 +1,9 @@
 //! Complete html5lib tree-construction documents, run against the pinned corpus.
 //!
 //! Document and fragment records run in their selected scripting mode.
-//! Processing-instruction cases are counted and skipped. Expected
-//! failures must be listed explicitly in `KNOWN_FAILURES` with a reason.
+//! The pinned corpus predates HTML processing instructions. Exact updates for
+//! affected records are listed in `CURRENT_HTML_TREES`. Expected failures
+//! must be listed explicitly in `KNOWN_FAILURES` with a reason.
 
 use std::fmt::Write;
 
@@ -79,6 +80,27 @@ const FILES: &[(&str, &str)] = corpus![
 
 /// `(file, zero-based record index, reason)` for records expected to differ.
 const KNOWN_FAILURES: &[(&str, usize, &str)] = &[];
+
+/// Trees changed by the current HTML processing-instruction tokenizer rules.
+/// The remaining four formerly excluded records still recover as comments.
+const CURRENT_HTML_TREES: &[(&str, usize, &str)] = &[
+    (
+        "html5test-com.dat",
+        11,
+        "| <?import namespace=\"foo\" implementation=\"#bar\"?>\n| <html>\n|   <head>\n|   <body>\n",
+    ),
+    ("tests1.dat", 39, "| <html>\n|   <head>\n|   <body>\n"),
+    (
+        "tests1.dat",
+        43,
+        "| <?COMMENT?>\n| <html>\n|   <head>\n|   <body>\n",
+    ),
+    (
+        "tests1.dat",
+        46,
+        "| <?COM--MENT?>\n| <html>\n|   <head>\n|   <body>\n",
+    ),
+];
 
 struct Record {
     data: String,
@@ -200,6 +222,13 @@ fn serialize(document: &Document, parent: NodeId) -> String {
             NodeKind::Comment(value) => {
                 writeln!(output, "{prefix}<!-- {} -->", utf8(value)).unwrap()
             }
+            NodeKind::ProcessingInstruction(value) => {
+                write!(output, "{prefix}<?{}", utf8(value.target())).unwrap();
+                if !value.data().as_units().is_empty() {
+                    write!(output, " {}", utf8(value.data())).unwrap();
+                }
+                writeln!(output, "?>").unwrap();
+            }
             NodeKind::DocumentType(value) => {
                 let (name, public, system) = (
                     utf8(&value.name),
@@ -216,10 +245,9 @@ fn serialize(document: &Document, parent: NodeId) -> String {
                     .unwrap();
                 }
             }
-            NodeKind::Document
-            | NodeKind::DocumentFragment
-            | NodeKind::ProcessingInstruction(_)
-            | NodeKind::CdataSection(_) => unreachable!("not produced by the HTML parser"),
+            NodeKind::Document | NodeKind::DocumentFragment | NodeKind::CdataSection(_) => {
+                unreachable!("not produced by the HTML parser")
+            }
         }
     }
     output
@@ -291,29 +319,32 @@ fn parse(
     }
 }
 
-fn runnable(record: &Record) -> bool {
-    !record.data.contains("<?")
-}
-
 #[test]
 fn html5lib_tree_construction_documents() {
     let mut passed = 0;
     let mut fragments = 0;
-    let mut skipped = 0;
+    let mut adapted = 0;
     let mut splits = 0;
     let mut failures = Vec::new();
     for (file, source) in FILES {
         for (index, record) in records(source).iter().enumerate() {
-            if !runnable(record) {
-                skipped += 1;
-                continue;
-            }
             let bytes = record.data.as_bytes();
             let actual = parse(record, bytes, [bytes.len()]);
+            let expected = CURRENT_HTML_TREES
+                .iter()
+                .find(|(f, i, _)| f == file && *i == index)
+                .map_or(record.document.as_str(), |&(_, _, expected)| {
+                    assert_ne!(
+                        expected, record.document,
+                        "obsolete adapter for {file} #{index}"
+                    );
+                    adapted += 1;
+                    expected
+                });
             let known = KNOWN_FAILURES
                 .iter()
                 .any(|(f, i, _)| f == file && *i == index);
-            match (actual.as_deref() == Ok(record.document.as_str()), known) {
+            match (actual.as_deref() == Ok(expected), known) {
                 (true, false) => {
                     passed += 1;
                     fragments += usize::from(record.context.is_some());
@@ -335,15 +366,16 @@ fn html5lib_tree_construction_documents() {
                 (false, false) => failures.push(format!(
                     "{file} #{index}\n--- input\n{}\n--- expected\n{}--- actual\n{}",
                     record.data,
-                    record.document,
+                    expected,
                     actual.unwrap_or_else(|e| format!("error: {e}\n"))
                 )),
             }
         }
     }
+    assert_eq!(adapted, CURRENT_HTML_TREES.len());
     eprintln!(
         "html5lib tree records: {passed} passed ({fragments} fragments), {} known failures, \
-         {skipped} skipped, {splits} two-chunk splits",
+         {adapted} adapted expectations, {splits} two-chunk splits",
         KNOWN_FAILURES.len()
     );
     if !failures.is_empty() {

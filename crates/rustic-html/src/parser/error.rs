@@ -4,14 +4,6 @@ use rustic_dom::DomError;
 
 use crate::HtmlError;
 
-/// Construction families deliberately rejected until their tree rules exist.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum UnsupportedFeature {
-    /// HTML tree construction does not yet insert processing instructions.
-    ProcessingInstructions,
-}
-
 /// Fatal parser condition, distinct from recoverable HTML syntax errors.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParseError {
@@ -19,8 +11,6 @@ pub enum ParseError {
     Tokenizer(HtmlError),
     /// A checked document operation or allocation failed.
     Document(DomError),
-    /// Required tree-construction behavior is outside the implemented subset.
-    Unsupported(UnsupportedFeature),
     /// Input has closed, but the completed tree has not been transferred.
     InputClosed,
     /// A successful EOF already transferred the document to the caller.
@@ -46,9 +36,6 @@ impl fmt::Display for ParseError {
         match self {
             Self::Tokenizer(error) => write!(f, "HTML tokenizer: {error}"),
             Self::Document(error) => write!(f, "HTML document: {error}"),
-            Self::Unsupported(feature) => {
-                write!(f, "unsupported HTML tree construction: {feature:?}")
-            }
             Self::InputClosed => f.write_str("HTML document parser input is closed"),
             Self::AlreadyFinished => f.write_str("HTML document parser already finished"),
             Self::Poisoned => f.write_str("HTML document parser previously failed"),

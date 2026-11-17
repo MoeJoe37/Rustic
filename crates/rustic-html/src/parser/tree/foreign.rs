@@ -206,7 +206,7 @@ impl TreeBuilder {
                     self.frameset_ok = false;
                 }
             }
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag)
                 if BREAKOUT.contains(&tag.name())

@@ -56,7 +56,6 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-05 | TD-10 | Resolve processing-instruction expectations. |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129, TD-133 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
@@ -91,7 +90,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-07 | Deliberate | Process | Progress bot commits to `main`, so `feature` drifts | Open |
 | TD-08 | Watch | Docs | Hard-coded corpus and test counts repeated across docs | Open, rule 8 |
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
-| TD-10 | Deliberate | HTML parser | Processing-instruction tree construction remains. Scripting-on trees and `selectedcontent` are covered. | Open, WEB-05 (M5) |
+| TD-10 | Deliberate | HTML parser | Processing-instruction tree construction, scripting-on trees and `selectedcontent` are covered. | Paid |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, `url.blob` (M9) |
 | TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
@@ -312,14 +311,12 @@ document lifecycle) or fold `Viewport` into its first real consumer.
 bounded document admission and shutdown contract. The CLI uses the facade
 from HTML loading through rendering.
 
-### TD-10 — Scripting-on and processing instructions pending
+### TD-10 — Scripting-on trees and processing instructions (Paid)
 
-Document and fragment parsing pass all 1,784 runnable html5lib tree records,
-including eight scripting-on records enabled by WEB-05. DOC-06d paid the
-`selectedcontent` part (four former known failures). The DOM already supports
-processing instructions. The parser still rejects their tokens, and the eight
-excluded legacy records expect comment recovery. Reconcile those expectations
-with the current HTML algorithm during WEB-05.
+Document and fragment parsing pass all 1,792 html5lib tree records. DOC-06d
+paid the `selectedcontent` part, and WEB-05 enabled the scripting-on fixtures
+and inserted processing instructions as inert DOM nodes. The runner records
+four exact changes to legacy expectations for the current HTML tokenizer.
 [HTML_TREE.md](HTML_TREE.md)
 
 ### TD-11 — `blob:` URLs return unsupported

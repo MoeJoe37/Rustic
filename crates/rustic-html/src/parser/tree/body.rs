@@ -87,7 +87,7 @@ impl TreeBuilder {
                     self.frameset_ok = false;
                 }
             }
-            Tok::Comment(text) => self.comment(None, text)?,
+            Tok::Annotation(annotation) => self.insert_annotation(None, annotation)?,
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) => return self.body_start(tag),
             Tok::End(name) => return self.body_end(name),

@@ -20,6 +20,7 @@ opt into scripting-enabled tree construction.
 | Templates | Template contents fragments, the template insertion-mode stack, and template-aware form/body/html handling |
 | Framesets | `frameset-ok` tracking, body replacement and frameset/noframes modes |
 | Foreign content | SVG and MathML namespaces, adjusted SVG tag/attribute case, MathML `definitionURL`, xlink/xml/xmlns attribute namespaces, integration points, breakout tags and allowed CDATA sections |
+| Processing instructions | Inert DOM nodes with case-preserved targets and data, using the insertion mode's document, element or template placement |
 | Text modes | RCDATA (title, textarea), RAWTEXT (style, xmp, iframe, noembed, noframes), script data and plaintext, selected at the start-tag delivery boundary |
 
 ## Fragment parsing
@@ -70,8 +71,7 @@ the engine. The opt-in engine load runs inline classics on the partial tree
 and traces parser-held nodes during collection. Fragment scripts remain inert.
 [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
 
-Processing-instruction tokens
-still return `Unsupported(ProcessingInstructions)`. Input is fixed UTF-8.
+Input is fixed UTF-8.
 
 Template contents are a separate `DocumentFragment` root owned by the template
 element ([ADR 0010](adr/0010-template-contents.md)). They are not children,
@@ -105,7 +105,7 @@ The result exposes document/mode/diagnostic views; `into_document` transfers
 ownership for later checked mutations.
 [ADR 0009](adr/0009-parser-owned-construction.md), [ADR 0037](adr/0037-parser-script-boundary.md)
 
-Resource, cancellation and unsupported-feature errors discard the partial tree
+Resource and cancellation errors discard the partial tree
 and poison the stream; subsequent calls return `Poisoned`. A successfully finished
 parser returns `AlreadyFinished` for later feeds/finishes. Cancellation is
 cooperative through the tokenizer between processing steps and tokens.
@@ -129,16 +129,18 @@ open `select`.
 All 57 top-level html5lib `tree-construction/*.dat` files at revision
 `9329e64694e7835d0dcff9811e22856ef6ad16f9` are vendored with the existing MIT
 notice and a per-file digest [manifest](../crates/rustic-html/tests/fixtures/tree/manifest.json).
-The runner passes **1,784 of 1,792 records**, including all 192 fragment
+The runner passes **1,792 of 1,792 records**, including all 192 fragment
 records and all eight marked scripting-on. Complete trees, namespaces,
 sorted attributes and template contents match the pinned expectations in
-**75,332 two-chunk byte splits** and one-byte feeds. The eight excluded
-records cover processing-instruction syntax. The runner compares trees.
+**75,471 two-chunk byte splits** and one-byte feeds. The pinned files are
+unchanged. Four exact expectations in the runner account for changes in
+[WHATWG HTML processing-instruction tokenization](https://html.spec.whatwg.org/multipage/parsing.html#processing-instruction-open-state).
+Three now produce instruction nodes and one discards an unfinished instruction.
 
 Focused Rust tests additionally cover template contents ownership and deep
 nesting, CDATA permission, foreign name/attribute adjustment, foster parenting,
 adoption, framesets, newline skipping, mode selection, attribute merge order,
-exact budgets, cancellation, processing-instruction rejection and lifecycle.
+exact budgets, cancellation, processing-instruction placement and lifecycle.
 Eight fragment tests cover context tokenizer states, the absent context node,
 table/template/select/form contexts, foreign contexts and integration points,
 CDATA before the first token, every split, budgets, cancellation and lifecycle.

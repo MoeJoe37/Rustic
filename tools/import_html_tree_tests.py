@@ -2,7 +2,6 @@
 """Vendor and verify the pinned html5lib tree-construction corpus, offline."""
 
 import argparse
-from collections import Counter
 import hashlib
 import json
 from pathlib import Path
@@ -44,37 +43,29 @@ def records(source: str) -> list[dict[str, str]]:
     return result
 
 
-def exclusion(case: dict[str, str]) -> str | None:
-    """Mirror the Rust runner's skip rule; it never depends on parser results."""
-    if "<?" in case["#data"]:
-        return "processing_instruction"
-    return None
-
-
 def manifest() -> str:
     files = []
     for path in sorted(CORPUS.glob("*.dat")):
         raw = path.read_bytes()
         cases = records(raw.decode("utf-8"))
-        excluded = Counter(reason for reason in map(exclusion, cases) if reason)
         files.append({
             "path": path.name,
             "sha256": hashlib.sha256(raw).hexdigest(),
             "upstream_cases": len(cases),
-            "runnable_cases": len(cases) - sum(excluded.values()),
-            "exclusion_reasons": dict(sorted(excluded.items())),
+            "runnable_cases": len(cases),
         })
     metadata = {
         "upstream_repository": "https://github.com/html5lib/html5lib-tests",
         "upstream_revision": REVISION,
         "upstream_path": "tree-construction/*.dat (scripted/ not vendored)",
         "license": "MIT; ../HTML5LIB-LICENSE.md",
-        "selection_policy": "all-document-and-fragment-records-with-scripting-mode-no-processing-instructions-v3",
+        "selection_policy": "all-document-and-fragment-records-with-scripting-mode-v4",
         "files": files,
         "upstream_cases": sum(f["upstream_cases"] for f in files),
         "runnable_cases": sum(f["runnable_cases"] for f in files),
         "checked": ["complete tree, namespaces, attributes and template contents", "every two-chunk byte split", "one-byte feeds"],
-        "not_checked": ["upstream parse errors/positions", "compatibility mode", "processing-instruction records"],
+        "not_checked": ["upstream parse errors/positions", "compatibility mode"],
+        "expectation_adapter": "CURRENT_HTML_TREES in tree_construction.rs, for legacy processing-instruction trees",
         "input_adapter": "Unicode fixture stream encoded as UTF-8 after an explicit transport BOM",
     }
     return json.dumps(metadata, indent=2, sort_keys=True) + "\n"

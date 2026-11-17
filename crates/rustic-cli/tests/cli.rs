@@ -154,16 +154,13 @@ fn dump_dom_enforces_input_and_output_budgets() {
 }
 
 #[test]
-fn dump_dom_fails_cleanly_on_missing_files_directories_and_unsupported_markup() {
+fn dump_dom_fails_cleanly_on_missing_files_and_directories() {
     let directory = env!("CARGO_TARGET_TMPDIR");
-    let unsupported = Path::new(directory).join("rustic-cli-unsupported.html");
-    fs::write(&unsupported, "<p>before<?target data?>after").expect("write fixture");
     let missing = Path::new(directory).join("rustic-cli-missing.html");
     let _ = fs::remove_file(&missing);
     for (path, message) in [
         (missing.as_path(), "cannot read file"),
         (Path::new(directory), "not a regular file"),
-        (unsupported.as_path(), "unsupported HTML"),
     ] {
         let output = rustic(&["dump-dom", path.to_str().expect("UTF-8 path")]);
         assert_eq!(output.status.code(), Some(1), "{path:?}");

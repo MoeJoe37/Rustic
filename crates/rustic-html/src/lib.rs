@@ -63,7 +63,7 @@ pub use input::Utf8Input;
 pub use parser::{
     ContextNamespace, DocumentMode, FragmentContext, HtmlDocumentParser, HtmlFragmentParser,
     ParseError, ParsedDocument, ParsedFragment, ParserLimits, ScriptBoundary, Scripting,
-    TreeDiagnostic, TreeDiagnosticKind, UnsupportedFeature,
+    TreeDiagnostic, TreeDiagnosticKind,
 };
 pub use token::{Attribute, Doctype, ProcessingInstruction, Tag, Token};
 pub use tokenizer::{HtmlTokenizer, TokenizerLimits, TokenizerMode};

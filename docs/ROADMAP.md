@@ -420,8 +420,8 @@ presence of a property does not count as correct API support.
 - [ ] The full suite passes on every tier that can run: native x86-64, the
       four emulated tiers, MSRV and the cross-checks; and on native Windows,
       macOS and Linux aarch64 if hosted CI is back.
-- [ ] Every open TD entry whose trigger is M5 work (TD-10, TD-31, TD-118,
-      TD-126, TD-129 to TD-132) is paid or given a later, named trigger.
+- [ ] Every open TD entry whose trigger is M5 work (TD-31, TD-118, TD-126,
+      TD-129 to TD-134) is paid or given a later, named trigger (TD-10 paid).
 - [ ] A completion review is written (`docs/reviews/YYYY-MM-DD-m5-completion.md`)
       and the status tables in this file, [README.md](README.md) and the root
       README are updated in the same change.

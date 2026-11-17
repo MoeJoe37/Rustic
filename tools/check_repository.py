@@ -207,6 +207,30 @@ def check_debt_markers(files: list[Path]) -> None:
                     error(path, f"line {number}: {debt_id} is not recorded in docs/TECH_DEBT.md")
 
 
+def check_debt_schedule() -> None:
+    """Every open ledger entry sits on exactly one payoff-schedule row; paid ones on none."""
+    ledger = ROOT / "docs/TECH_DEBT.md"
+    text = ledger.read_text(encoding="utf-8")
+    try:
+        schedule = text.split("## Payoff schedule", 1)[1].split("\n## ", 1)[0]
+    except IndexError:
+        error(ledger, "missing the Payoff schedule section")
+        return
+    scheduled: dict[str, int] = {}
+    for line in schedule.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) >= 2 and line.startswith("|"):
+            for debt_id in DEBT_ID.findall(cells[1]):
+                scheduled[debt_id] = scheduled.get(debt_id, 0) + 1
+    for match in re.finditer(r"^\| (TD-\d+) \|(?:[^|\n]*\|){3} ([^|\n]*) \|$", text, re.MULTILINE):
+        debt_id, status = match.group(1), match.group(2)
+        count = scheduled.get(debt_id, 0)
+        if status.startswith("Paid") and count:
+            error(ledger, f"{debt_id} is paid but still on the payoff schedule")
+        elif not status.startswith("Paid") and count != 1:
+            error(ledger, f"open {debt_id} must appear on exactly one payoff-schedule row (found {count})")
+
+
 def main() -> int:
     files = [
         path
@@ -308,6 +332,7 @@ def main() -> int:
             error(intl_manifest, f"invalid Intl data manifest: {exc}")
 
     check_debt_markers(files)
+    check_debt_schedule()
     check_html_fixture("html5lib")
     check_html_fixture("references")
     check_html_fixture("text")

@@ -56,7 +56,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
+| M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129, TD-133 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |

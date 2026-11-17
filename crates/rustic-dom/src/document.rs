@@ -348,6 +348,40 @@ impl Document {
         self.insert_before(parent, child, None)
     }
 
+    /// Replace the children of an element or fragment with a single text node.
+    /// An empty value detaches all children. Removed nodes retain their identity.
+    pub fn replace_children_with_text(
+        &mut self,
+        parent: NodeId,
+        value: DomString,
+    ) -> Result<(), DomError> {
+        if !matches!(
+            self.node(parent)?.kind(),
+            NodeKind::Element(_) | NodeKind::DocumentFragment
+        ) {
+            return Err(DomError::WrongNodeKind);
+        }
+        // Append first, so any budget or depth failure preserves every original child.
+        let replacement = if value.as_units().is_empty() {
+            None
+        } else {
+            let node = self.create_text(value)?;
+            if let Err(error) = self.append_child(parent, node) {
+                self.destroy_unchecked(node);
+                return Err(error);
+            }
+            Some(node)
+        };
+        while let Some(child) = self
+            .live(parent)
+            .first_child()
+            .filter(|id| Some(*id) != replacement)
+        {
+            self.unlink(child);
+        }
+        Ok(())
+    }
+
     /// Move a node before a direct child, or append when `before` is absent.
     ///
     /// When `child` is a document fragment (including template contents), its

@@ -547,6 +547,14 @@ another frame. The regression covers character data, attributes and
 child removal, including an unchanged attribute and a promise-driven edit.
 [ADR 0042](adr/0042-scripted-render-state.md)
 
+`Node.textContent` concatenates descendant text without comments and preserves
+UTF-16 code units. Its setter converts before borrowing the document, leaves
+removed nodes reachable through their existing wrappers and preserves the old
+tree if admitting a replacement fails. Scripted reftests exercise a changed
+stylesheet and replacement node, a counter, a timer and capture/bubble order.
+The fuzz smoke job covers the event/timer pump and compares scripted pixels to
+a freshly parsed reference.
+
 ## DOC-03 and DOC-04a — Document-owned tree core
 
 Implemented in `rustic-dom`, depending only on `rustic-base`:

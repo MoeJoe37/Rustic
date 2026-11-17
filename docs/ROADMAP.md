@@ -355,9 +355,9 @@ ADR is accepted.
      `--run-scripts`. [ADR 0041](adr/0041-scripted-document-readiness.md)
 2. **WEB-06 — invalidation from script.** [ADR 0042](adr/0042-scripted-render-state.md)
    defines ownership of style and layout state between turns and updates ADR 0023.
-   - A rendering turn after any script mutation produces the same pixels as
-     rendering the mutated document from scratch. This is a differential
-     test and a fuzz target, reusing the M2 invalidation parity machinery.
+   - The differential fuzz target compares the pixels of scripted attribute
+     and child changes to a fresh document. Extend parity to the cached
+     snapshot and resource changes as those paths land.
    - Reading layout from script (`getBoundingClientRect`, `offsetWidth`,
      `getComputedStyle`) flushes exactly once per dirty state; the number of
      flushes per turn is observable to the host and bounded.
@@ -416,7 +416,7 @@ presence of a property does not count as correct API support.
 - [ ] The WEB-09 expectation list, its WPT revision and its counts are in
       [SCRIPTING.md](SCRIPTING.md) and the [evidence table](README.md#evidence-at-a-glance).
 - [ ] The first PERF-01 report is committed under `docs/reviews/`.
-- [ ] Fuzz targets exist for script-driven mutation with rendering and for
+- [x] Fuzz targets exist for script-driven mutation with rendering and for
       the event/timer pump, and run in the smoke job.
 - [ ] The full suite passes on every tier that can run: native x86-64, the
       four emulated tiers, MSRV and the cross-checks; and on native Windows,

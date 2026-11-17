@@ -4,7 +4,7 @@ use rustic_dom::{Document, DomError, DomString, NodeId, NodeKind};
 use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
 
 use crate::metadata::{self, Argument, ConvertedValue, Member};
-use crate::webidl::from_dom_units;
+use crate::webidl::{from_dom_units, to_nullable_dom_string};
 use crate::{DomGcError, dom_exception};
 
 use super::{
@@ -15,6 +15,62 @@ use super::{
 const CHARACTER_DATA: &str = "CharacterData";
 const TEXT: &str = "Text";
 const COMMENT: &str = "Comment";
+
+pub(super) fn install_text_content(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
+    let get = Value::object(agent.new_native_function(text_content, "get textContent", 0)?);
+    let set = Value::object(agent.new_native_function(set_text_content, "set textContent", 1)?);
+    let key = agent.heap.key("textContent")?;
+    agent.define_property_or_throw(
+        prototype,
+        key,
+        PropertyDescriptor::accessor(get, set, true, true),
+    )
+}
+
+fn text_content(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    read_node(agent, receiver, |agent, _, document, id, node| {
+        match node.kind() {
+            NodeKind::Element(_) | NodeKind::DocumentFragment => {
+                let mut content = Vec::new();
+                let descendants = document
+                    .walk(id)
+                    .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+                for (child, _) in descendants.skip(1) {
+                    let node = document
+                        .node(child)
+                        .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+                    if let NodeKind::Text(data) | NodeKind::CdataSection(data) = node.kind() {
+                        content
+                            .try_reserve(data.as_units().len())
+                            .map_err(|_| Abrupt::OutOfMemory)?;
+                        content.extend_from_slice(data.as_units());
+                    }
+                }
+                from_dom_units(agent, &content)
+            }
+            NodeKind::Document | NodeKind::DocumentType(_) => Ok(Value::NULL),
+            _ => {
+                let units = payload(agent, document, id)?;
+                from_dom_units(agent, units)
+            }
+        }
+    })
+}
+
+fn set_text_content(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
+    require_receiver(agent, receiver, |_| true, "expected a Node receiver")?;
+    let value = args.first().copied().unwrap_or(Value::UNDEFINED);
+    let value = to_nullable_dom_string(agent, value)?.unwrap_or_default();
+    mutate(agent, receiver, |document, id| {
+        match document.node(id)?.kind() {
+            NodeKind::Element(_) | NodeKind::DocumentFragment => {
+                document.replace_children_with_text(id, value)
+            }
+            NodeKind::Document | NodeKind::DocumentType(_) => Ok(()),
+            _ => document.set_character_data(id, value).map(drop),
+        }
+    })
+}
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_interface(

@@ -189,6 +189,7 @@ dependencies = [
  "rustic-codecs",
  "rustic-css",
  "rustic-dom",
+ "rustic-engine",
  "rustic-html",
  "rustic-js",
  "rustic-layout",

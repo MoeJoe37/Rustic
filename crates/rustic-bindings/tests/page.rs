@@ -20,6 +20,37 @@ impl PageTree for Tree {
 }
 
 #[test]
+fn text_content_preserves_code_units_and_reentrant_conversion() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let tree = Rc::new(Tree(RefCell::new(document)));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent
+        .evaluate(
+            r#"
+        const parent = document.createElement('div');
+        const child = document.createElement('span');
+        const units = 'a' + String.fromCharCode(0xd800);
+        child.appendChild(document.createTextNode(units));
+        parent.appendChild(child);
+        parent.appendChild(document.createComment('ignored'));
+        if (parent.textContent !== units || document.textContent !== null) throw 1;
+        parent.textContent = { toString() {
+            child.textContent = 'changed during conversion';
+            return units;
+        } };
+        if (parent.childNodes.length !== 1 || parent.firstChild.data !== units ||
+            child.parentNode !== null || child.textContent !== 'changed during conversion') throw 2;
+        parent.textContent = null;
+        if (parent.textContent !== '' || parent.firstChild !== null) throw 3;
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
 fn automatic_collection_preserves_attached_wrappers_and_sweeps_detached_cycles() {
     let mut document = Document::new(DocumentLimits::default()).unwrap();
     let [root, retained, unreachable] = ["main", "p", "em"].map(|name| {

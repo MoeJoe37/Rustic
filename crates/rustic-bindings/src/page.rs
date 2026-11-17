@@ -243,6 +243,7 @@ fn install_page(
             ("childNodes", "get childNodes", collections::child_nodes),
         ],
         |agent, prototype| {
+            character_data::install_text_content(agent, prototype)?;
             for (name, behavior, length) in [
                 ("appendChild", append_child as NativeFn, 1),
                 ("insertBefore", insert_before, 2),

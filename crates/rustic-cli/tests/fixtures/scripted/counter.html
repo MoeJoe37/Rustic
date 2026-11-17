@@ -1,0 +1,15 @@
+<!doctype html>
+<link rel="match" href="counter-ref.html">
+<style>#count { display: block; height: 12px; width: 3px; background: blue }</style>
+<div id="count"></div>
+<script>
+  const meter = document.getElementById('count');
+  let count = 0;
+  meter.addEventListener('click', () => {
+    count++;
+    meter.setAttribute('style', 'width: ' + count * 6 + 'px');
+  });
+  meter.dispatchEvent(new Event('click'));
+  meter.dispatchEvent(new Event('click'));
+  meter.dispatchEvent(new Event('click'));
+</script>

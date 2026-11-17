@@ -29,6 +29,30 @@ fn children(document: &Document, parent: NodeId) -> Vec<NodeId> {
 }
 
 #[test]
+fn replacing_children_with_text_preserves_the_tree_when_admission_fails() {
+    let mut doc = Document::new(DocumentLimits {
+        max_nodes: 3,
+        ..DocumentLimits::default()
+    })
+    .unwrap();
+    let parent = element(&mut doc, "parent");
+    let child = doc.create_text("old").unwrap();
+    doc.append_child(doc.root(), parent).unwrap();
+    doc.append_child(parent, child).unwrap();
+    let before = doc.mutation_revision();
+    assert_eq!(
+        doc.replace_children_with_text(parent, "new".into()),
+        Err(DomError::NodeLimit)
+    );
+    assert_eq!(children(&doc, parent), [child]);
+    assert_eq!(doc.mutation_revision(), before);
+    doc.replace_children_with_text(parent, DomString::default())
+        .unwrap();
+    assert!(children(&doc, parent).is_empty());
+    assert_eq!(doc.node(child).unwrap().parent(), None);
+}
+
+#[test]
 fn stale_forged_and_foreign_handles_cannot_access_a_live_node() {
     let mut doc = document();
     let other = document();

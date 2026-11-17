@@ -63,6 +63,8 @@ before capturing the output. Scripting defaults to off.
 Inside a turn, script can walk and change the tree, create nodes and whole
 detached documents, query with CSS selectors, hold live collections, add
 listeners, dispatch events and schedule timers and animation callbacks.
+Reading `Node.textContent` preserves UTF-16 code units. Writing it replaces
+children or updates character data and can update a live stylesheet.
 
 What does **not** work yet:
 
@@ -243,11 +245,17 @@ and `AbortSignal` listener removal are TD-131.
 | Events | `crates/rustic-bindings/tests/events.rs` |
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
 
-All of these run on a manual clock with no sleeps, on every CI tier including
-the 32-bit and big-endian ones. They are Rustic's own tests: there is no
-web-platform-tests evidence for the bindings until WEB-09, and no fuzz target
-drives the pump or the bindings yet. Both are on the
-[M5 exit checklist](ROADMAP.md#m5-exit-checklist).
+These tests use a manual clock and run on CI tiers including the 32-bit and
+big-endian ones. WEB-09 tracks the upstream web-platform-tests evidence.
+
+The smoke job runs two scripted targets. `script-event-pump` checks trusted
+bubbling input, checkpoint order, timer order and cancellation against a
+Rust oracle. `script-mutation-render` checks frame invalidation, then compares
+the updated pixels to an independently parsed document containing the expected
+markup. Both targets replay 128 deterministic seeds before mutations.
+The scripted reftests cover the counter, timer, event bubbling and stylesheet
+and tree updates at device scales one and two. The form-validation fixture
+depends on WEB-07.
 
 ## Open debt
 

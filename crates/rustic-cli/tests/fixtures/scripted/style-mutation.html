@@ -1,0 +1,13 @@
+<!doctype html>
+<link rel="match" href="style-mutation-ref.html">
+<style id="rules">.panel { display: block; width: 14px; height: 14px; background: red }</style>
+<div id="original" class="panel"></div>
+<script>
+  const classRule = '.panel { display: block; width: 22px; height: 10px; background: purple }';
+  document.getElementById('rules').textContent = classRule;
+  const original = document.getElementById('original');
+  const replacement = document.createElement('div');
+  replacement.setAttribute('class', 'panel');
+  original.parentNode.appendChild(replacement);
+  original.parentNode.removeChild(original);
+</script>

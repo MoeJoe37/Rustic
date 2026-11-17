@@ -1,0 +1,17 @@
+<!doctype html>
+<link rel="match" href="event-bubbling-ref.html">
+<style>#outer { display: block; width: 20px; height: 20px; background: red }</style>
+<div id="outer"><div id="inner"></div></div>
+<script>
+  const outer = document.getElementById('outer');
+  const inner = document.getElementById('inner');
+  let trace = '';
+  outer.addEventListener('click', () => trace += 'capture ', true);
+  inner.addEventListener('click', () => trace += 'target ');
+  outer.addEventListener('click', event => {
+    if (trace === 'capture target ' && event.target === inner && event.currentTarget === outer) {
+      outer.setAttribute('style', 'background: green');
+    }
+  });
+  inner.dispatchEvent(new Event('click', { bubbles: true }));
+</script>

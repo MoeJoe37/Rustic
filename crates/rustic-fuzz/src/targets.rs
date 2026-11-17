@@ -48,6 +48,8 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(CssInvalidationTarget),
         Box::new(crate::formatting::FormattingTarget),
         Box::new(crate::paint::PaintTarget),
+        Box::new(crate::scripted::EventPumpTarget),
+        Box::new(crate::scripted::MutationRenderTarget),
         Box::new(crate::png::PngTarget),
         Box::new(crate::images::JPEG),
         Box::new(crate::images::GIF),

@@ -25,6 +25,7 @@ mod mutate;
 mod paint;
 mod png;
 mod rng;
+mod scripted;
 mod sfnt;
 mod shaping;
 mod targets;

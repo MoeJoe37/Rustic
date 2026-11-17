@@ -346,11 +346,12 @@ WEB-04 covers synchronous EventTarget dispatch, capture and bubble phases,
 listener options, cancellation, and reentrant callbacks against the live DOM.
 The host can queue trusted primary clicks and key input for connected
 targets. Buttons support Enter and Space activation. Checkboxes support click
-and Space activation with rollback and input/change delivery. Script-visible
-timers and animation callbacks remain open. WEB-07 covers focus, editing,
-forms, and further control defaults.
+and Space activation with rollback and input/change delivery. Window timers
+share the document scheduler and animation callbacks run before the renderer.
+WEB-07 covers focus, editing, forms, observers and further control defaults.
 [ADR 0034](adr/0034-dom-event-dispatch.md),
-[ADR 0035](adr/0035-trusted-input-and-activation.md)
+[ADR 0035](adr/0035-trusted-input-and-activation.md),
+[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
 
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.

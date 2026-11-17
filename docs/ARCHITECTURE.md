@@ -312,18 +312,21 @@ generate the text interface metadata consumed by these conversion paths.
 [ADR 0025](adr/0025-pinned-dom-idl-metadata.md)
 
 The headless coordinator now offers an explicit scripted document owner.
-It runs immediate scripts, timed scripts, and host-selected input with bounded
+It runs immediate scripts, timers and host-selected input with bounded
 microtask checkpoints and one cancellation scope. Input uses the immediate
 FIFO. Pointer hit testing and keyboard targeting belong to the host, and the
 coordinator validates the supplied node when it queues and delivers the input.
-The host clock governs timer
-eligibility and supplies rendering opportunity timestamps. A renderer-aware
-pump orders rendering turns with script work and gives the host
-document-scoped tickets to validate before presentation.
+Window timers use the deadline heap shared with host timers. Window timer and
+frame callbacks keep their JavaScript values in the agent's host roots
+while pending. The renderer-aware pump runs frame callbacks and their
+checkpoints before the renderer, then gives the host document-scoped tickets
+to validate before presentation. The host clock supplies timer eligibility
+and rendering opportunity timestamps.
 [ADR 0021](adr/0021-document-script-turns.md),
 [ADR 0022](adr/0022-document-task-sources-and-timers.md),
 [ADR 0023](adr/0023-document-rendering-turns.md),
-[ADR 0035](adr/0035-trusted-input-and-activation.md)
+[ADR 0035](adr/0035-trusted-input-and-activation.md),
+[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
 
 ## 6. Navigation, resources, and persistence
 

@@ -105,8 +105,8 @@ against its document and the latest started frame before presentation.
 The document token cancels script, timer and rendering work. Cancellation
 and fatal budget failures clear pending work, drop the agent and invalidate
 frame tickets at a safe point. The headless CPU rendering integration test
-compares the scheduled PNG with the directly rendered reference. Page timer
-and animation APIs, parser-scheduled scripts and layout invalidation remain open.
+compares the scheduled PNG with the directly rendered reference.
+Parser-scheduled scripts and layout invalidation remain open.
 [ADR 0021](adr/0021-document-script-turns.md),
 [ADR 0022](adr/0022-document-task-sources-and-timers.md),
 [ADR 0023](adr/0023-document-rendering-turns.md)
@@ -257,11 +257,26 @@ activation of a connected checkbox emits input and change before the turn's
 microtask checkpoint. HTMLInputElement exposes checked, defaultChecked, and
 indeterminate. Script-created MouseEvents can exercise checkbox activation.
 
-Form actions, focus, editing, and additional input types are tracked under
-WEB-07. Script-visible timers and animation callbacks remain open. TD-131
-tracks extended event delivery.
+Window exposes `setTimeout`, `setInterval` and their shared cancellation
+methods. A timer can invoke a function with retained arguments or evaluate
+UTF-16 source in the page realm. Window and host timers share admission
+limits, deadline ordering, cancellation scope and turn checkpoints.
+Window delays start when their registering turn completes. Nested timers
+apply the four-millisecond clamp after six levels.
+
+Window also exposes `requestAnimationFrame` and `cancelAnimationFrame`.
+The renderer-aware pump invokes eligible callbacks with the offered
+timestamp in milliseconds. A callback completes its microtask checkpoint
+before the next callback or the renderer. Callbacks can cancel other
+callbacks in that frame, and new registrations wait for a later offer.
+The host can read and clear the count of uncaught animation callback errors.
+
+Form actions, focus, editing and additional input types are tracked under
+WEB-07. TD-131 tracks extended event delivery. TD-132 tracks remaining
+timer and frame integration.
 [ADR 0034](adr/0034-dom-event-dispatch.md),
-[ADR 0035](adr/0035-trusted-input-and-activation.md)
+[ADR 0035](adr/0035-trusted-input-and-activation.md),
+[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

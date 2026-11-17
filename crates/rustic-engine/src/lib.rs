@@ -7,6 +7,7 @@ mod frames;
 mod lifecycle;
 mod scripting;
 mod tasks;
+mod window_tasks;
 
 pub use frames::RenderFrame;
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};

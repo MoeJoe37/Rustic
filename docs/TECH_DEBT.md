@@ -163,6 +163,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
 | TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, WEB-07 and M9 |
+| TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, WEB-06, WEB-07 and M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1958,3 +1959,22 @@ Listener registration and matching walk the current target's list under the
 script budget. Consider indexing when measured listener workloads warrant it.
 [ADR 0034](adr/0034-dom-event-dispatch.md),
 [ADR 0035](adr/0035-trusted-input-and-activation.md)
+
+
+### TD-132 — Timer and frame integration with page policy
+
+Window timers start after the registering task's or frame's completed
+checkpoint. Use registration-time monotonic deadlines when the browser
+event loop owns an injectable clock for both registration and pumping.
+Apply document activity and background throttling when adding visibility
+and suspension. Route string timer source through the page's CSP and
+Trusted Types policies when those policies are available. Frame timestamps
+currently use the host's clock origin. Unify them with the page Performance
+time origin and its precision policy when that API lands.
+
+Frame callbacks run before the renderer. WEB-06 adds layout and style
+flush ordering, and WEB-07 adds HTML error events and observer delivery.
+Until then the engine reports uncaught animation errors through a host
+counter. Test the integrated event loop against the matching Web Platform
+Tests when these facilities are present.
+[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)

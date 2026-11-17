@@ -39,8 +39,10 @@ An engine-owned display loop would couple document execution to a
 particular platform. Passing the renderer through the pump places the
 ordering contract in the engine while the host chooses the rasterization
 and presentation path. The script-only pump remains available to hosts
-that only drive scripts and timers. Page animation callbacks, layout
-invalidation and resource completion ordering are separate roadmap work.
+that only drive scripts and timers.
+[ADR 0036](0036-window-timers-and-animation-callbacks.md) adds page animation
+callbacks before rendering. WEB-06 covers layout invalidation and resource
+completion ordering.
 
 ## Validation and revisit trigger
 
@@ -48,5 +50,4 @@ Engine tests cover timestamp coalescing, script and timer checkpoints,
 interleaving, cross-document and superseded tickets, sequence exhaustion,
 and cancellation during rendering. The headless CPU renderer produces
 the same PNG through the scheduled turn as through the direct path.
-Revisit the interface when WEB-04 supplies animation callbacks or WEB-06
-adds layout and resource epochs.
+Revisit the interface when WEB-06 adds layout and resource epochs.

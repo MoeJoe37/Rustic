@@ -158,3 +158,101 @@ fn shutdown_during_rendering_discards_the_output_and_ticket() {
         Err(ScriptStop::DocumentCancelled)
     );
 }
+
+#[test]
+fn animation_callbacks_run_before_render_with_live_cancellation_and_per_callback_jobs() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts
+        .queue_script(source(
+            r#"
+        const body = document.querySelector("body");
+        let trace = "";
+        let cancelled;
+        requestAnimationFrame(function (timestamp) {
+            "use strict";
+            if (timestamp !== 7.5 || this !== undefined) throw "frame arguments";
+            trace += "a";
+            Promise.resolve().then(() => {
+                trace += "b";
+                cancelAnimationFrame(cancelled);
+                requestAnimationFrame(next => {
+                    if (next !== 12) throw "next timestamp";
+                    body.firstChild.data = trace + "e";
+                });
+            });
+        });
+        cancelled = requestAnimationFrame(() => trace += "x");
+        requestAnimationFrame(timestamp => {
+            if (timestamp !== 7.5 || trace !== "ab") throw "callback order";
+            trace += "c";
+            throw "uncaught callback";
+        });
+        requestAnimationFrame(() => {
+            trace += "d";
+            body.appendChild(document.createTextNode(trace));
+        });
+    "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.run_next(), Ok(None));
+    scripts
+        .clock()
+        .advance(Duration::from_micros(7500))
+        .unwrap();
+    scripts.offer_rendering_opportunity().unwrap();
+    for (expected, clock_step) in [
+        ("abcd", Duration::ZERO),
+        ("abcde", Duration::from_micros(4500)),
+    ] {
+        if clock_step != Duration::ZERO {
+            scripts.clock().advance(clock_step).unwrap();
+            scripts.offer_rendering_opportunity().unwrap();
+        }
+        let Some(DocumentTurn::Rendered { frame, output }) = scripts
+            .run_next_with_render(|document, _| {
+                let tree = document.parsed().document();
+                tree.dump_tree(tree.root(), 4096).unwrap()
+            })
+            .unwrap()
+        else {
+            panic!("expected rendering");
+        };
+        assert!(output.contains(&format!("\"{expected}\"")), "{output}");
+        assert_eq!(scripts.accept_rendered_frame(frame), Ok(true));
+    }
+    assert_eq!(scripts.take_animation_error_count(), 1);
+    assert_eq!(scripts.take_animation_error_count(), 0);
+}
+
+#[test]
+fn a_failed_animation_checkpoint_prevents_rendering_and_discards_callbacks() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(
+        &mut engine,
+        TaskLimits {
+            jobs_per_checkpoint: 0,
+            ..TaskLimits::default()
+        },
+    );
+    scripts
+        .queue_script(source(
+            r#"
+        requestAnimationFrame(() => { Promise.resolve().then(() => 0); });
+        requestAnimationFrame(() => { throw "after the failed callback"; });
+    "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    scripts.offer_rendering_opportunity().unwrap();
+    assert_eq!(
+        scripts.run_next_with_render(unexpected_render),
+        Err(ScriptStop::JobLimit)
+    );
+    assert_eq!(scripts.take_animation_error_count(), 0);
+    assert_eq!(
+        scripts.offer_rendering_opportunity(),
+        Err(ScriptStop::JobLimit)
+    );
+}

@@ -40,7 +40,7 @@ Networking and native app hosts are later milestones. See the
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 31.80%** (31.11% verified complete + 0.69% partial credit) — 71/221 capabilities complete and 4 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 45.32% done.
+**Overall engine completion: 31.99%** (31.11% verified complete + 0.88% partial credit) — 71/221 capabilities complete and 5 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 48.86% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

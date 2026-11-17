@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d44646e07478270e23d7f9f9ca6b1b1bac78fda0523573649c3d42f87d458106",
-  "percent": "31.80",
+  "source_fingerprint": "5bb98230cdbd68d4dbea49020b6e2b86b7741e0832bd5701b980a6f58de1d25b",
+  "percent": "31.99",
   "verified_percent": "31.11",
-  "partial_percent": "0.69",
+  "partial_percent": "0.88",
   "completed": 71,
-  "in_progress": 4,
+  "in_progress": 5,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 5,
       "total": 12,
-      "percent": "45.32",
+      "percent": "48.86",
       "verified_percent": "45.32",
-      "partial_percent": "0.00"
+      "partial_percent": "3.54"
     },
     {
       "id": "M6",
@@ -4730,9 +4730,62 @@
           "label": "Timers, animation frames and observer APIs",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Window timers and renderer-driven animation callbacks",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/window.rs",
+                  "marker": "pub trait WindowScheduler"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "fn run_animation_callbacks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn window_timers_share_host_deadlines_and_keep_arguments_and_checkpoint_order"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn nested_timeouts_and_intervals_clamp_after_six_timer_turns"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/timers.rs",
+                  "marker": "fn script_callbacks_share_pending_slots_and_text_budget_with_host_tasks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/frames.rs",
+                  "marker": "fn animation_callbacks_run_before_render_with_live_cancellation_and_per_callback_jobs"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/frames.rs",
+                  "marker": "fn a_failed_animation_checkpoint_prevents_rendering_and_discards_callbacks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/src/window_tasks.rs",
+                  "marker": "fn queued_timer_retains_its_callback_and_arguments_through_collection"
+                }
+              ]
+            },
+            {
+              "label": "Observer APIs integrated with document and rendering turns",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.37"
         },
         {
@@ -4778,12 +4831,12 @@
       ],
       "points": 40,
       "completed": 3,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "1.62",
-      "percent": "32.50",
+      "contribution": "1.81",
+      "percent": "36.25",
       "verified_percent": "32.50",
-      "partial_percent": "0.00"
+      "partial_percent": "3.75"
     },
     {
       "id": "media",

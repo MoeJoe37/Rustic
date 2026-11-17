@@ -9,17 +9,18 @@ use rustic_base::{Clock, SystemClock};
 use rustic_bindings::dom_exception;
 use rustic_bindings::page::{self, PageTree};
 use rustic_dom::{Document, NodeId};
-use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES};
+use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES, Value};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::frames::{RenderFrame, Rendering};
 use crate::tasks::{ScriptQueue, Task, TimerId};
+use crate::window_tasks::WindowWork;
 use crate::{EngineDocument, InputEvent};
 
 /// Resource limits for one scripted document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TaskLimits {
-    /// Maximum number of script, timer and input tasks waiting to run.
+    /// Maximum number of scripts, timers, input tasks and animation callbacks waiting to run.
     pub pending_scripts: usize,
     /// Maximum total UTF-16 units in waiting script sources and keyboard input.
     pub pending_source_units: usize,
@@ -58,6 +59,8 @@ pub enum ScriptQueueError {
     InvalidInputTarget,
     /// This document has exhausted its non-reusable timer identities.
     TimerIdsExhausted,
+    /// This document has exhausted its animation callback identities.
+    AnimationIdsExhausted,
 }
 
 impl fmt::Display for ScriptQueueError {
@@ -71,6 +74,9 @@ impl fmt::Display for ScriptQueueError {
             }
             Self::DeadlineOverflow => f.write_str("script timer deadline exceeds the clock range"),
             Self::TimerIdsExhausted => f.write_str("script timer identity space exhausted"),
+            Self::AnimationIdsExhausted => {
+                f.write_str("animation callback identity space exhausted")
+            }
         }
     }
 }
@@ -170,7 +176,8 @@ impl PageTree for ScriptTree {
 pub struct ScriptedDocument<C = SystemClock> {
     document: Rc<ScriptTree>,
     agent: Result<Agent, ScriptStop>,
-    pending: ScriptQueue,
+    pending: Rc<WindowWork>,
+    animation_errors: u64,
     rendering: Rendering,
     clock: C,
     limits: TaskLimits,
@@ -203,11 +210,16 @@ impl EngineDocument {
         dom_exception::install(&mut agent).map_err(|_| ScriptStop::OutOfMemory)?;
         let owner = self.parsed().document().id();
         let document = Rc::new(ScriptTree(RefCell::new(self)));
-        page::install(&mut agent, document.clone()).map_err(|_| ScriptStop::OutOfMemory)?;
+        let pending = Rc::new(WindowWork {
+            queue: RefCell::new(ScriptQueue::new(owner, limits)),
+        });
+        page::install_with_scheduler(&mut agent, document.clone(), pending.clone())
+            .map_err(|_| ScriptStop::OutOfMemory)?;
         Ok(ScriptedDocument {
             document,
             agent: Ok(agent),
-            pending: ScriptQueue::new(owner, limits),
+            pending,
+            animation_errors: 0,
             rendering: Rendering::new(owner),
             clock,
             limits,
@@ -228,10 +240,15 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or(0, page::take_listener_error_count)
     }
 
+    /// Read and clear uncaught exceptions from animation frame callbacks.
+    pub fn take_animation_error_count(&mut self) -> u64 {
+        std::mem::take(&mut self.animation_errors)
+    }
+
     /// Queue a host-supplied script after checking both pending-work limits.
     pub fn queue_script(&mut self, source: Source) -> Result<(), ScriptQueueError> {
         self.check_live().map_err(ScriptQueueError::Stopped)?;
-        self.pending.queue(Task::Script(source))
+        self.pending.queue.borrow_mut().queue(Task::Script(source))
     }
 
     /// Queue host input for a connected target in this document.
@@ -247,7 +264,10 @@ impl<C: Clock> ScriptedDocument<C> {
         if !page::connected_input_target(self.document().parsed().document(), target) {
             return Err(ScriptQueueError::InvalidInputTarget);
         }
-        self.pending.queue(Task::Input { target, event })
+        self.pending
+            .queue
+            .borrow_mut()
+            .queue(Task::Input { target, event })
     }
 
     /// Access the host-selected timer clock, for example to advance a manual clock.
@@ -268,21 +288,21 @@ impl<C: Clock> ScriptedDocument<C> {
             .now()
             .checked_add(delay)
             .ok_or(ScriptQueueError::DeadlineOverflow)?;
-        self.pending.schedule(deadline, source)
+        self.pending.queue.borrow_mut().schedule(deadline, source)
     }
 
     /// Remove a pending timer and release its queue budget.
     /// Returns `false` for a foreign timer or one that has already run or been removed.
     pub fn cancel_timer(&mut self, timer: TimerId) -> Result<bool, ScriptStop> {
         self.check_live()?;
-        Ok(self.pending.cancel(timer))
+        Ok(self.pending.queue.borrow_mut().cancel(timer))
     }
 
     /// Delay until the earliest pending timer, or zero if already eligible.
     /// Returns `None` if no timers are pending.
     pub fn time_until_next_timer(&mut self) -> Result<Option<Duration>, ScriptStop> {
         self.check_live()?;
-        Ok(self.pending.delay(self.clock.now()))
+        Ok(self.pending.queue.borrow().delay(self.clock.now()))
     }
 
     /// Offer this document a rendering opportunity at the current clock time.
@@ -297,6 +317,7 @@ impl<C: Clock> ScriptedDocument<C> {
     ///
     /// A ready task and an offered frame alternate when both can
     /// run. Each task completes its checkpoint before a later rendering turn.
+    /// Animation callbacks and their checkpoints run before the renderer.
     /// The renderer receives the completed document and a ticket for its output.
     pub fn run_next_with_render<T>(
         &mut self,
@@ -311,6 +332,7 @@ impl<C: Clock> ScriptedDocument<C> {
         let Some(frame) = self.rendering.begin().map_err(|reason| self.stop(reason))? else {
             return Ok(None);
         };
+        self.run_animation_callbacks(frame)?;
         let output = render(&self.document(), frame);
         self.check_live()?;
         Ok(Some(DocumentTurn::Rendered { frame, output }))
@@ -334,7 +356,7 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     fn run_script(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
-        let Some(task) = self.pending.pop_ready(self.clock.now()) else {
+        let Some(task) = self.pending.queue.borrow_mut().pop_ready(self.clock.now()) else {
             return Ok(None);
         };
 
@@ -342,6 +364,7 @@ impl<C: Clock> ScriptedDocument<C> {
         agent.set_step_budget(Some(self.limits.steps_per_turn));
         let result = match task {
             Task::Script(source) => agent.evaluate_source(&source).map(|_| ()),
+            Task::Timer(timer) => timer.run(agent, &self.pending),
             Task::Input { target, event } => {
                 page::deliver_input(agent, target, &event).map_err(EvalError::from)
             }
@@ -355,14 +378,58 @@ impl<C: Clock> ScriptedDocument<C> {
             Err(EvalError::Cancelled) => return Err(self.stop_after_cancellation()),
             Err(EvalError::SourceTooLong) => unreachable!("Source already bounds its length"),
         };
+        self.checkpoint()?;
+        self.pending
+            .queue
+            .borrow_mut()
+            .publish_timers(self.clock.now());
+        self.rendering.after_script();
+        Ok(Some(turn))
+    }
+
+    fn run_animation_callbacks(&mut self, frame: RenderFrame) -> Result<(), ScriptStop> {
+        let cursor = self.pending.queue.borrow().frame_cursor();
+        let timestamp = Value::number(frame.timestamp().as_secs_f64() * 1_000.0);
+        self.agent
+            .as_mut()
+            .map_err(|reason| *reason)?
+            .set_step_budget(Some(self.limits.steps_per_turn));
+        loop {
+            let root = self.pending.queue.borrow_mut().pop_frame(cursor);
+            let Some(root) = root else {
+                break;
+            };
+            let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+            let callback = agent.rooted(root).expect("retained animation callback");
+            let result = agent
+                .check_native_work()
+                .and_then(|()| agent.call(callback, Value::UNDEFINED, &[timestamp]));
+            agent.unroot(root);
+            match result {
+                Ok(_) => {}
+                Err(Abrupt::Throw(_)) => {
+                    self.animation_errors = self.animation_errors.saturating_add(1)
+                }
+                Err(Abrupt::OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
+                Err(Abrupt::Cancelled) => return Err(self.stop_after_cancellation()),
+            }
+            self.checkpoint()?;
+        }
+        self.pending
+            .queue
+            .borrow_mut()
+            .publish_timers(self.clock.now());
+        Ok(())
+    }
+
+    fn checkpoint(&mut self) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         match agent.run_jobs_limited(self.limits.jobs_per_checkpoint) {
             Ok(true) => {
                 // Release the rejection report's roots at the checkpoint.
                 // Web rejection-event dispatch belongs to the later event layer.
                 agent.take_rejection_events();
-                self.check_live()?;
-                self.rendering.after_script();
-                Ok(Some(turn))
+                self.check_live()
             }
             Ok(false) => Err(self.stop(ScriptStop::JobLimit)),
             Err(Abrupt::OutOfMemory) => Err(self.stop(ScriptStop::OutOfMemory)),
@@ -388,7 +455,7 @@ impl<C: Clock> ScriptedDocument<C> {
 
     fn stop(&mut self, reason: ScriptStop) -> ScriptStop {
         self.agent = Err(reason);
-        self.pending.clear();
+        self.pending.queue.borrow_mut().clear();
         self.rendering.clear();
         reason
     }

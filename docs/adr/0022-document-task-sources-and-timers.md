@@ -20,8 +20,9 @@ immediate scripts have priority.
 
 This is the headless host's selection policy for the two implemented task
 sources. The HTML event loop selects a runnable task queue and performs a
-microtask checkpoint after running its task. Future Web timer bindings will
-define callback registration, nesting and repeat behavior.
+microtask checkpoint after running its task.
+[ADR 0036](0036-window-timers-and-animation-callbacks.md) extends the
+scheduler with Window timer registration, nesting and repeat behavior.
 [HTML event loop](https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model),
 [HTML timers](https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timers)
 
@@ -50,5 +51,5 @@ task limit.
 
 Tests check deadline boundaries, equal-deadline ordering, the checkpoint
 between timer and script turns, readiness fairness, document-scoped
-identities, queue limits, overflow and shutdown. Extend the selection
-policy when rendering opportunities and page timer APIs join the scheduler.
+identities, queue limits, overflow and shutdown. Rendering opportunities
+and Window timers extend the selection policy in ADR 0023 and ADR 0036.

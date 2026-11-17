@@ -26,6 +26,7 @@ mod selectors;
 mod window;
 
 pub use events::{InputEvent, KeyInput, Modifiers};
+pub use window::{TimerHandler, WindowScheduler};
 
 /// Shared access to the real document rendered by the host.
 pub trait PageTree: Debug {
@@ -52,6 +53,7 @@ struct Page {
     additional: RefCell<HashMap<DocumentId, AuxiliaryDocument>>,
     root: Value,
     window: Value,
+    scheduler: Option<Rc<dyn WindowScheduler>>,
     events: events::Events,
     wrappers: RefCell<DomHeap>,
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
@@ -170,6 +172,23 @@ fn quirks_mode(agent: &mut Agent, node: NodeId) -> JsResult<bool> {
 /// Attach joint collection and install the root of a host's document in the
 /// running realm. The host installs [`dom_exception`] before this entry point.
 pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
+    install_page(agent, tree, None)
+}
+
+/// Install the page with Window timers and animation frame callbacks.
+pub fn install_with_scheduler(
+    agent: &mut Agent,
+    tree: Rc<dyn PageTree>,
+    scheduler: Rc<dyn WindowScheduler>,
+) -> JsResult<()> {
+    install_page(agent, tree, Some(scheduler))
+}
+
+fn install_page(
+    agent: &mut Agent,
+    tree: Rc<dyn PageTree>,
+    scheduler: Option<Rc<dyn WindowScheduler>>,
+) -> JsResult<()> {
     if agent.execution_host().is_some() {
         return agent.type_error("an execution host is already attached");
     }
@@ -307,7 +326,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
     let root = wrap(&mut wrappers, agent, &document, document.root())?;
     let main = document.id();
     drop(document);
-    let window = window::install(agent)?;
+    let window = window::install(agent, scheduler.is_some())?;
     let events = events::Events::new(agent)?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
@@ -315,6 +334,7 @@ pub fn install(agent: &mut Agent, tree: Rc<dyn PageTree>) -> JsResult<()> {
         additional: RefCell::new(HashMap::new()),
         root,
         window,
+        scheduler,
         events,
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),

@@ -149,6 +149,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-05 — Local static JavaScript modules](#web-05--local-static-javascript-modules)
 - [WEB-05 — Document readiness and scripted CLI](#web-05--document-readiness-and-scripted-cli)
 - [WEB-05 — Processing-instruction nodes](#web-05--processing-instruction-nodes)
+- [WEB-06 — Frame validity across script turns](#web-06--frame-validity-across-script-turns)
 
 </details>
 
@@ -535,6 +536,16 @@ and template contents. Their checked creation uses the same node and data
 budgets as other markup. The pinned html5lib runner passes all 1,792 records,
 with four exact expectations updated for the current HTML tokenizer.
 [HTML tree construction evidence](HTML_TREE.md#standards-and-reference-data)
+
+## WEB-06 — Frame validity across script turns
+
+The document tracks successful child-link, attribute and character-data
+changes. A frame records that revision after animation callbacks and their
+promise jobs. A script or checkpoint that changes the document then makes
+the ticket ineligible for presentation, even if the host has yet to offer
+another frame. The regression covers character data, attributes and
+child removal, including an unchanged attribute and a promise-driven edit.
+[ADR 0042](adr/0042-scripted-render-state.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

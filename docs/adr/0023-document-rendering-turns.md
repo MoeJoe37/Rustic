@@ -50,4 +50,5 @@ Engine tests cover timestamp coalescing, script and timer checkpoints,
 interleaving, cross-document and superseded tickets, sequence exhaustion,
 and cancellation during rendering. The headless CPU renderer produces
 the same PNG through the scheduled turn as through the direct path.
-Revisit the interface when WEB-06 adds layout and resource epochs.
+[ADR 0042](0042-scripted-render-state.md) adds the WEB-06 DOM epoch to
+ticket validation and defines the style and layout ownership boundary.

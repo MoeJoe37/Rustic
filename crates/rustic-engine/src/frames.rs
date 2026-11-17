@@ -32,7 +32,7 @@ pub(crate) struct Rendering {
     owner: DocumentId,
     sequence: u64,
     pending: Option<Duration>,
-    outstanding: Option<RenderFrame>,
+    outstanding: Option<(RenderFrame, u64)>,
     preferred: bool,
 }
 
@@ -74,15 +74,21 @@ impl Rendering {
         };
         self.sequence = sequence;
         self.pending = None;
-        self.outstanding = Some(frame);
+        self.outstanding = None;
         self.preferred = false;
         Ok(Some(frame))
     }
 
-    pub(crate) fn accept(&mut self, frame: RenderFrame) -> bool {
-        if self.outstanding == Some(frame) {
-            self.outstanding = None;
-            return true;
+    pub(crate) fn record(&mut self, frame: RenderFrame, revision: Option<u64>) {
+        self.outstanding = revision.map(|revision| (frame, revision));
+    }
+
+    pub(crate) fn accept(&mut self, frame: RenderFrame, revision: Option<u64>) -> bool {
+        if let Some((outstanding, rendered_revision)) = self.outstanding {
+            if outstanding == frame {
+                self.outstanding = None;
+                return revision == Some(rendered_revision);
+            }
         }
         false
     }
@@ -104,9 +110,10 @@ mod tests {
         rendering.offer(Duration::ZERO);
         let last = rendering.begin().unwrap().unwrap();
         assert_eq!(last.sequence(), u64::MAX);
+        rendering.record(last, Some(0));
 
         rendering.offer(Duration::from_nanos(1));
         assert_eq!(rendering.begin(), Err(ScriptStop::FrameIdsExhausted));
-        assert!(rendering.accept(last));
+        assert!(rendering.accept(last, Some(0)));
     }
 }

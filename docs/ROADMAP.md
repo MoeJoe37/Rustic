@@ -326,7 +326,7 @@ stays local and deterministic; no network, no native window.
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | `web.window` | WEB-02, CSS-02 | **Done** for the declared scope (ADR 0028–0033): live `window`/`document`, node creation and mutation, selectors, NodeLists and HTMLCollections, detached documents and adoption. Open debt: TD-126, TD-127, TD-129, TD-130 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
 | WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | Local script and parser checks pass. Encoding restart remains open in `html.scripts`. [ADR 0041](adr/0041-scripted-document-readiness.md) |
-| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | Not started; needs an ADR first |
+| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **In progress.** Frame tickets validate the DOM revision. [ADR 0042](adr/0042-scripted-render-state.md) |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | Not started |
 | WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | Not started |
 | PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | Not started; runs in parallel |
@@ -353,17 +353,16 @@ ADR is accepted.
      Script element events are tested with pending async sources, defer and
      modules. `rustic render` and the dumps run page scripts with
      `--run-scripts`. [ADR 0041](adr/0041-scripted-document-readiness.md)
-2. **WEB-06 — invalidation from script.** Write the ADR for who owns style
-   and layout state between turns (it changes ADR 0023). Then:
+2. **WEB-06 — invalidation from script.** [ADR 0042](adr/0042-scripted-render-state.md)
+   defines ownership of style and layout state between turns and updates ADR 0023.
    - A rendering turn after any script mutation produces the same pixels as
      rendering the mutated document from scratch. This is a differential
      test and a fuzz target, reusing the M2 invalidation parity machinery.
    - Reading layout from script (`getBoundingClientRect`, `offsetWidth`,
      `getComputedStyle`) flushes exactly once per dirty state; the number of
      flushes per turn is observable to the host and bounded.
-   - A frame started before a mutation cannot be presented after it (frame
-     epochs), and a stylesheet or image that completes later lands in the
-     right order.
+   - A changed DOM revision already invalidates its frame. Extend the epoch
+     check to stylesheets and images as their results enter the page pump.
 3. **WEB-07 — observers, errors, focus and forms.**
    - `MutationObserver` records are delivered at the microtask checkpoint in
      the specified order relative to promise jobs (`dom.observers`).

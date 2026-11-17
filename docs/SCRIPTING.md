@@ -2,7 +2,7 @@
 
 This is the guide to how JavaScript and a document meet in Rustic. It ties
 together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
-to [ADR 0041](adr/0041-scripted-document-readiness.md)), which each
+to [ADR 0042](adr/0042-scripted-render-state.md)), which each
 describe one step, and says plainly what is not built yet. The tested contract
 of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
 WEB-01 to WEB-05; the plan for the rest is
@@ -68,7 +68,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Engine-owned style and layout for scripted documents | A rendering turn hands the host the live tree and the host renders it from scratch; nothing is invalidated incrementally and script cannot read layout | WEB-06 |
+| Synchronous layout reads and resource ordering | DOM changes invalidate frame tickets. The host still rebuilds style and layout, and script cannot read layout. | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |

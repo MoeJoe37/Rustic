@@ -92,6 +92,7 @@ pub struct Document {
     ready_state: ReadyState,
     format: DocumentFormat,
     child_revision: u64,
+    mutation_revision: u64,
 }
 
 impl Document {
@@ -137,6 +138,7 @@ impl Document {
             ready_state,
             format: DocumentFormat::Html,
             child_revision: 0,
+            mutation_revision: 0,
         })
     }
 
@@ -220,6 +222,7 @@ impl Document {
         let root = self.arena.insert(NodeKind::DocumentFragment)?;
         self.live_mut(root).shadow_host = Some(host);
         self.element_mut(host).shadow_root = Some((root, mode));
+        self.note_mutation();
         Ok(root)
     }
 
@@ -306,6 +309,21 @@ impl Document {
     /// Returns `None` if the counter has saturated and caching must stop.
     pub fn child_revision(&self) -> Option<u64> {
         (self.child_revision != u64::MAX).then_some(self.child_revision)
+    }
+
+    /// Version of tree links and content, for consumers of a document snapshot.
+    /// Returns `None` after saturation, when snapshots cannot be reused.
+    pub fn mutation_revision(&self) -> Option<u64> {
+        (self.mutation_revision != u64::MAX).then_some(self.mutation_revision)
+    }
+
+    fn note_mutation(&mut self) {
+        self.mutation_revision = self.mutation_revision.saturating_add(1);
+    }
+
+    fn note_child_change(&mut self) {
+        self.child_revision = self.child_revision.saturating_add(1);
+        self.note_mutation();
     }
 
     /// Visit direct children in order, without copying IDs or allocating a stack.
@@ -446,7 +464,7 @@ impl Document {
 
     /// Unchecked link of a detached node before `before` (or last).
     fn link_before(&mut self, parent: NodeId, child: NodeId, before: Option<NodeId>) {
-        self.child_revision = self.child_revision.saturating_add(1);
+        self.note_child_change();
         let previous = before
             .map(|id| self.live(id).previous_sibling())
             .unwrap_or_else(|| self.live(parent).last_child());
@@ -546,6 +564,7 @@ impl Document {
             name,
             value: value.into(),
         };
+        let changed = position.is_none_or(|index| element.attributes[index] != attribute);
         let attribute_bytes = attribute.data_bytes()?;
         let bytes = self
             .node(id)?
@@ -560,6 +579,9 @@ impl Document {
                 .map_err(|_| DomError::AllocationFailed)?;
         }
         self.arena.resize_data(id, bytes)?;
+        if changed {
+            self.note_mutation();
+        }
         let attributes = &mut self.element_mut(id).attributes;
         Ok(if let Some(index) = position {
             Some(std::mem::replace(&mut attributes[index], attribute).value)
@@ -585,6 +607,7 @@ impl Document {
         };
         let bytes = self.node(id)?.data_bytes - element.attributes[index].data_bytes()?;
         self.arena.resize_data(id, bytes)?;
+        self.note_mutation();
         Ok(Some(self.element_mut(id).attributes.remove(index).value))
     }
 
@@ -613,7 +636,7 @@ impl Document {
 
     /// Unchecked append of a detached node, used only during destruction.
     fn link_last_child(&mut self, parent: NodeId, child: NodeId) {
-        self.child_revision = self.child_revision.saturating_add(1);
+        self.note_child_change();
         let previous = self.live(parent).last_child();
         if let Some(id) = previous {
             self.live_mut(id).next_sibling = Some(child);
@@ -633,7 +656,7 @@ impl Document {
         else {
             return;
         };
-        self.child_revision = self.child_revision.saturating_add(1);
+        self.note_child_change();
         if let Some(previous) = previous {
             self.live_mut(previous).next_sibling = next;
         } else {

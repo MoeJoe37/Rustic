@@ -49,6 +49,7 @@ instead of rewriting the history of a decision.
 | [0039](0039-local-external-classics.md) | Host-supplied local sources and blocking, async and defer ordering | Accepted for the WEB-05 external classic slice |
 | [0040](0040-local-module-scripts.md) | Local static module graphs, shared instances and evaluation order | Accepted for the WEB-05 local module slice |
 | [0041](0041-scripted-document-readiness.md) | Document readiness, script events and CLI lifecycle | Accepted for the WEB-05 local host |
+| [0042](0042-scripted-render-state.md) | Style, layout and frame validity in scripted documents | Accepted for WEB-06 |
 
 ## Records by area
 
@@ -64,6 +65,7 @@ instead of rewriting the history of a decision.
 | Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041 |
+| Scripted rendering (M5, WEB-06) | 0023, 0042 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

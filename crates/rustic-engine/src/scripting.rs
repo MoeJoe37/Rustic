@@ -157,7 +157,7 @@ pub enum DocumentTurn<T> {
 #[derive(Debug)]
 enum ScriptTreeState {
     Parsing(Box<HtmlDocumentParser>),
-    Ready(EngineDocument),
+    Ready(Box<EngineDocument>),
 }
 
 #[derive(Debug)]
@@ -262,7 +262,12 @@ impl EngineDocument {
         clock: C,
     ) -> Result<ScriptedDocument<C>, ScriptStop> {
         let cancellation = self.cancellation().clone();
-        ScriptedDocument::new(ScriptTreeState::Ready(self), cancellation, limits, clock)
+        ScriptedDocument::new(
+            ScriptTreeState::Ready(Box::new(self)),
+            cancellation,
+            limits,
+            clock,
+        )
     }
 }
 
@@ -332,7 +337,7 @@ impl<C: Clock> ScriptedDocument<C> {
     /// Inspect the parsed document and its lifetime token.
     pub fn document(&self) -> Ref<'_, EngineDocument> {
         Ref::map(self.document.state.borrow(), |state| match state {
-            ScriptTreeState::Ready(document) => document,
+            ScriptTreeState::Ready(document) => document.as_ref(),
             ScriptTreeState::Parsing(_) => {
                 unreachable!("the host receives only finished documents")
             }
@@ -348,7 +353,7 @@ impl<C: Clock> ScriptedDocument<C> {
         let tree = Rc::try_unwrap(document)
             .unwrap_or_else(|_| unreachable!("only the realm shares the document tree"));
         match tree.state.into_inner() {
-            ScriptTreeState::Ready(document) => document,
+            ScriptTreeState::Ready(document) => *document,
             ScriptTreeState::Parsing(_) => {
                 unreachable!("the host receives only finished documents")
             }
@@ -369,7 +374,7 @@ impl<C: Clock> ScriptedDocument<C> {
     pub(crate) fn finish_parsing(&mut self, scope: DocumentScope) -> Result<(), HtmlParseError> {
         let parsed = self.with_active_parser(HtmlDocumentParser::finish)?;
         *self.document.state.borrow_mut() =
-            ScriptTreeState::Ready(EngineDocument::new(scope, parsed));
+            ScriptTreeState::Ready(Box::new(EngineDocument::new(scope, parsed)));
         Ok(())
     }
 
@@ -633,16 +638,22 @@ impl<C: Clock> ScriptedDocument<C> {
             return Ok(None);
         };
         self.run_animation_callbacks(frame)?;
-        let output = render(&self.document(), frame);
+        let (output, revision) = {
+            let document = self.document();
+            let revision = document.parsed().document().mutation_revision();
+            (render(&document, frame), revision)
+        };
         self.check_live()?;
+        self.rendering.record(frame, revision);
         Ok(Some(DocumentTurn::Rendered { frame, output }))
     }
 
     /// Accept the current frame once before presenting its output.
-    /// A later rendering turn invalidates earlier tickets.
+    /// A later rendering turn or document mutation invalidates earlier tickets.
     pub fn accept_rendered_frame(&mut self, frame: RenderFrame) -> Result<bool, ScriptStop> {
         self.check_live()?;
-        Ok(self.rendering.accept(frame))
+        let revision = self.document().parsed().document().mutation_revision();
+        Ok(self.rendering.accept(frame, revision))
     }
 
     /// Run one eligible task and drain its promise jobs before a later task.

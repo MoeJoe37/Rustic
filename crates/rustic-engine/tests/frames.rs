@@ -112,6 +112,49 @@ fn frames_are_document_scoped_and_script_only_pumping_keeps_offers_pending() {
 }
 
 #[test]
+fn mutations_invalidate_frame_tickets_after_animation_and_promise_work() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts
+        .queue_script(source(
+            "var item = document.createElement('p');
+         var text = document.createTextNode('before');
+         item.appendChild(text);
+         document.querySelector('body').appendChild(item);
+         requestAnimationFrame(() => {
+             Promise.resolve().then(() => item.setAttribute('data-frame', 'ready'));
+         });",
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    scripts.offer_rendering_opportunity().unwrap();
+    let from_callback = render_turn(&mut scripts);
+    scripts
+        .queue_script(source(
+            "if (item.getAttribute('data-frame') !== 'ready') throw 1;
+         item.setAttribute('data-frame', 'ready');",
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.accept_rendered_frame(from_callback), Ok(true));
+
+    for mutation in [
+        "Promise.resolve().then(() => text.data = 'updated');",
+        "item.setAttribute('class', 'updated');",
+        "item.removeChild(text);",
+    ] {
+        scripts.offer_rendering_opportunity().unwrap();
+        let stale = render_turn(&mut scripts);
+        scripts.queue_script(source(mutation)).unwrap();
+        assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+        assert_eq!(scripts.accept_rendered_frame(stale), Ok(false));
+        scripts.offer_rendering_opportunity().unwrap();
+        let fresh = render_turn(&mut scripts);
+        assert_eq!(scripts.accept_rendered_frame(fresh), Ok(true));
+    }
+}
+
+#[test]
 fn a_failed_checkpoint_discards_the_rendering_offer() {
     let mut engine = Engine::new(1);
     let mut scripts = document(

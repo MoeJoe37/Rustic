@@ -43,10 +43,14 @@ impl Document {
     ) -> Result<DomString, DomError> {
         let fixed = self.fixed_bytes(id)?;
         let value = value.into();
+        let changed = self.character_data(id)? != &value;
         let bytes = fixed
             .checked_add(value.data_bytes())
             .ok_or(DomError::DataLimit)?;
         self.arena.resize_data(id, bytes)?;
+        if changed {
+            self.note_mutation();
+        }
         Ok(std::mem::replace(self.character_data_mut(id), value))
     }
 
@@ -63,11 +67,16 @@ impl Document {
         count: usize,
         value: &[u16],
     ) -> Result<(), DomError> {
-        let len = self.character_data(id)?.as_units().len();
+        let units = self.character_data(id)?.as_units();
+        let len = units.len();
         let plan = EditPlan::new(len, offset, count, value.len())?;
+        if units[offset..plan.end] == *value {
+            return Ok(());
+        }
         self.prepare_character_edit(id, len, &plan)?;
         self.character_data_mut(id)
             .replace_reserved(offset..plan.end, value, plan.new_len);
+        self.note_mutation();
         Ok(())
     }
 
@@ -84,9 +93,13 @@ impl Document {
     /// and accounting changes; repeated appends reuse capacity with amortized growth.
     pub fn append_utf8_character_data(&mut self, id: NodeId, value: &str) -> Result<(), DomError> {
         let len = self.character_data(id)?.as_units().len();
+        if value.is_empty() {
+            return Ok(());
+        }
         let plan = EditPlan::new(len, len, 0, value.encode_utf16().count())?;
         self.prepare_character_edit(id, len, &plan)?;
         self.character_data_mut(id).append_utf8_reserved(value);
+        self.note_mutation();
         Ok(())
     }
 
@@ -147,6 +160,8 @@ impl Document {
             // The existing sibling establishes the parent, legal child kind,
             // and depth for another text leaf at this position.
             self.link_before(parent, new, next);
+        } else if offset != len {
+            self.note_mutation();
         }
         Ok(handle)
     }

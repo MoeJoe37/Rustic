@@ -8,7 +8,7 @@ use crate::HtmlError;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum UnsupportedFeature {
-    /// The DOM storage layer does not yet have processing-instruction nodes.
+    /// HTML tree construction does not yet insert processing instructions.
     ProcessingInstructions,
 }
 
@@ -21,6 +21,8 @@ pub enum ParseError {
     Document(DomError),
     /// Required tree-construction behavior is outside the implemented subset.
     Unsupported(UnsupportedFeature),
+    /// Input has closed, but the completed tree has not been transferred.
+    InputClosed,
     /// A successful EOF already transferred the document to the caller.
     AlreadyFinished,
     /// A previous fatal condition discarded this parser's partial document.
@@ -47,6 +49,7 @@ impl fmt::Display for ParseError {
             Self::Unsupported(feature) => {
                 write!(f, "unsupported HTML tree construction: {feature:?}")
             }
+            Self::InputClosed => f.write_str("HTML document parser input is closed"),
             Self::AlreadyFinished => f.write_str("HTML document parser already finished"),
             Self::Poisoned => f.write_str("HTML document parser previously failed"),
         }

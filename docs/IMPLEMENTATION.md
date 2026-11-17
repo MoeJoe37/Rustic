@@ -136,13 +136,14 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Scripted documents (M5, in progress): 5 sections</summary>
+<summary>Scripted documents (M5, in progress): 6 sections</summary>
 
 - [Engine lifecycle — Bounded document ownership and shutdown](#engine-lifecycle--bounded-document-ownership-and-shutdown)
 - [WEB-01 — Document script turns and microtask checkpoints](#web-01--document-script-turns-and-microtask-checkpoints)
 - [WEB-02 — Web IDL conversion and DOM wrapper foundation](#web-02--web-idl-conversion-and-dom-wrapper-foundation)
 - [WEB-03 — Live document wrappers and script collection](#web-03--live-document-wrappers-and-script-collection)
 - [WEB-04 — DOM dispatch and host input](#web-04--dom-dispatch-and-host-input)
+- [WEB-05 — Parser suspension at script boundaries](#web-05--parser-suspension-at-script-boundaries)
 
 </details>
 
@@ -419,6 +420,26 @@ timer and frame integration.
 [ADR 0034](adr/0034-dom-event-dispatch.md),
 [ADR 0035](adr/0035-trusted-input-and-activation.md),
 [ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
+
+## WEB-05 — Parser suspension at script boundaries
+
+`HtmlDocumentParser::new_with_scripting` enables raw-text parsing for
+`noscript` in the head and body. The fragment parser applies the same setting
+to `noscript` contents and contexts while keeping scripts inert.
+
+The document parser's pull interface queues input with `write` and stops at
+each closed HTML script eligible for preparation. `advance_to_script` returns
+the element and a read-only view after the script was popped and before the
+next token. The host can resume on the same parser. Closing input preserves
+that order. Cancelling while suspended discards the partial tree. Template
+contents, SVG scripts and an EOF in script text do not cause suspension.
+Default engine and CLI loads still use the inert parser.
+
+The html5lib tree runner now passes all eight scripting-on records and 1,784
+records total at every split. Eight legacy processing-instruction cases stay
+open under TD-10. Live DOM edits across suspension, source loading, evaluation
+order and readiness events remain WEB-05 work.
+[ADR 0037](adr/0037-parser-script-boundary.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

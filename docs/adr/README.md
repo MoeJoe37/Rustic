@@ -44,6 +44,7 @@ instead of rewriting the history of a decision.
 | [0034](0034-dom-event-dispatch.md) | Scripted DOM event delivery and listener ownership | Accepted for WEB-04 |
 | [0035](0035-trusted-input-and-activation.md) | Trusted host input and control activation | Accepted for WEB-04 |
 | [0036](0036-window-timers-and-animation-callbacks.md) | Window timers and animation callbacks in document turns | Accepted for WEB-04 |
+| [0037](0037-parser-script-boundary.md) | Parser suspension and script preparation order | Accepted for the WEB-05 parser boundary |
 
 ## Records by area
 
@@ -58,6 +59,7 @@ instead of rewriting the history of a decision.
 | Web IDL and wrappers (M5, WEB-02) | 0024, 0025, 0026, 0027 |
 | Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
+| Script loading (M5, WEB-05) | 0037 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -69,7 +71,6 @@ authority boundary or `unsafe` code.
 
 | Decision | Needed before | Why it needs a record |
 | --- | --- | --- |
-| Parser/script reentry and the script loading order | WEB-05 (M5) | Changes parser ownership (ADR 0009 says script integration is pending) |
 | Style and layout invalidation from script, and forced layout flushes | WEB-06 (M5) | Changes the rendering-turn contract of ADR 0023 |
 | Transport and TLS library, certificate verification and the fixture server | NET-01 (M6) | First network dependency and first native/crypto boundary |
 | Legacy text encodings: own decoders or a reviewed crate | `url.encoding` (M6) | Dependency or large generated tables |

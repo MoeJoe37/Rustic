@@ -113,6 +113,9 @@ impl TreeBuilder {
             }
             "base" | "basefont" | "bgsound" | "link" | "meta" | "noframes" | "script" | "style"
             | "template" | "title" => return self.in_head(Tok::Start(tag)),
+            "noscript" if self.scripting == super::Scripting::Enabled => {
+                self.insert_text_element(tag, TokenizerMode::Rawtext)?;
+            }
             "body" => {
                 self.diagnostic(ErrorKind::UnexpectedToken)?;
                 if self.open.len() > 1

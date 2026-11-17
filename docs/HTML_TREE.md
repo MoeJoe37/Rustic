@@ -4,8 +4,8 @@
 the WHATWG tree-construction algorithm for complete documents, and
 `HtmlFragmentParser` runs the fragment parsing algorithm for a context element
 (as `innerHTML` would). Both use Rustic's original tokenizer and the checked
-`rustic-dom` mutation API. No existing engine or JavaScript VM is embedded. These
-are inert parsers with scripting disabled; neither is a browser or script host.
+`rustic-dom` mutation API. Both default to scripting disabled. A caller can
+opt into scripting-enabled tree construction.
 
 ## Implemented rules
 
@@ -34,7 +34,7 @@ is parsed in no-quirks mode.
 The parser creates a scratch document with a root `html` element and a detached
 context element. The context selects the initial tokenizer state (RCDATA for
 title/textarea, RAWTEXT for style/xmp/iframe/noembed/noframes, script data,
-plaintext; `noscript` stays data because scripting is disabled) with no last
+plaintext, and RAWTEXT for `noscript` when scripting is enabled) with no last
 start tag. A `template` context pushes "in template"; a `form` context becomes
 the form element pointer. The insertion mode is reset using the context in place
 of the root, and the adjusted current node (the context while only the root is
@@ -63,12 +63,11 @@ foster-parented locations.
 
 ## Boundaries
 
-Scripting is always disabled: `noscript` uses the scripting-disabled rules and
-script end tags never prepare, run or block. There is no network, encoding sniff
-or restart, custom-element construction, form-owner
-association, shadow tree, sanitizer, event dispatch
-or rendering. Processing-instruction tokens still return
-`Unsupported(ProcessingInstructions)` because the DOM has no instruction nodes.
+With `Scripting::Enabled`, `noscript` uses RAWTEXT in head and body. The
+document pull interface pauses after a closed HTML `script` outside template
+content. Script classification, execution and subresource loading belong to
+the engine, and fragment scripts remain inert. Processing-instruction tokens
+still return `Unsupported(ProcessingInstructions)`. Input is fixed UTF-8.
 
 Template contents are a separate `DocumentFragment` root owned by the template
 element ([ADR 0010](adr/0010-template-contents.md)). They are not children,
@@ -93,11 +92,14 @@ and recoveries past `max_tree_diagnostics` or the tokenizer's `max_diagnostics`
 are counted by `dropped_diagnostics()` on the parsed document or fragment. The
 tree is identical whatever the retention limits are.
 
-The parser owns all construction state and exposes no partial DOM. `feed` pumps
-available tokens, pausing to apply mode changes before more tokenization.
-`finish` closes input and returns `ParsedDocument` only after successful EOF.
+The parser owns all construction state. `feed` pumps available tokens.
+`write` queues bytes and `advance_to_script` returns the script element and a
+read-only view of the tree before the parser consumes the next token.
+`close_input` lets a pull caller drain outstanding boundaries before
+`finish` returns `ParsedDocument` after successful EOF.
 The result exposes document/mode/diagnostic views; `into_document` transfers
-ownership for later checked mutations ([ADR 0009](adr/0009-parser-owned-construction.md)).
+ownership for later checked mutations.
+[ADR 0009](adr/0009-parser-owned-construction.md), [ADR 0037](adr/0037-parser-script-boundary.md)
 
 Resource, cancellation and unsupported-feature errors discard the partial tree
 and poison the stream; subsequent calls return `Poisoned`. A successfully finished
@@ -123,20 +125,17 @@ open `select`.
 All 57 top-level html5lib `tree-construction/*.dat` files at revision
 `9329e64694e7835d0dcff9811e22856ef6ad16f9` are vendored with the existing MIT
 notice and a per-file digest [manifest](../crates/rustic-html/tests/fixtures/tree/manifest.json).
-Of 1,792 records, **1,776 are runnable** (1,584 document and 192 fragment
-records) without scripting or processing instructions. The runner passes
-**all 1,776**, including all 192 fragment records, with no known failures:
-complete trees, namespaces, sorted attributes and template contents match the
-unchanged expectations for the unbroken input, **all 74,661 two-chunk byte
-splits** and one-byte feeds. The 16 skipped records need scripting (8) or
-instruction nodes (8). Parse-error IDs/positions and compatibility-mode metadata
-are not compared. This is not a WPT conformance result.
+The runner passes **1,784 of 1,792 records**, including all 192 fragment
+records and all eight marked scripting-on. Complete trees, namespaces,
+sorted attributes and template contents match the pinned expectations in
+**75,332 two-chunk byte splits** and one-byte feeds. The eight excluded
+records cover processing-instruction syntax. The runner compares trees.
 
 Focused Rust tests additionally cover template contents ownership and deep
 nesting, CDATA permission, foreign name/attribute adjustment, foster parenting,
 adoption, framesets, newline skipping, mode selection, attribute merge order,
 exact budgets, cancellation, processing-instruction rejection and lifecycle.
-Seven fragment tests cover context tokenizer states, the absent context node,
+Eight fragment tests cover context tokenizer states, the absent context node,
 table/template/select/form contexts, foreign contexts and integration points,
 CDATA before the first token, every split, budgets, cancellation and lifecycle.
 The `html-fragment` fuzz target picks one of 28 contexts per input.

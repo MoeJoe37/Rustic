@@ -7,7 +7,8 @@ use crate::{Doctype, Tag, Token, TokenizerMode};
 
 use super::{
     ContextNamespace, DocumentMode, FragmentContext, ParseError, ParsedDocument, ParsedFragment,
-    TokenizerDiagnostics, TreeDiagnostic, TreeDiagnosticKind as ErrorKind, UnsupportedFeature,
+    Scripting, TokenizerDiagnostics, TreeDiagnostic, TreeDiagnosticKind as ErrorKind,
+    UnsupportedFeature,
 };
 
 mod body;
@@ -79,6 +80,11 @@ enum Step {
     Reprocess,
 }
 
+pub(super) struct TreeFeedback {
+    pub(super) text_mode: Option<TokenizerMode>,
+    pub(super) script: Option<NodeId>,
+}
+
 fn space(value: char) -> bool {
     matches!(value, '\t' | '\n' | '\u{c}' | '\r' | ' ')
 }
@@ -113,6 +119,7 @@ fn runs(text: &str) -> impl Iterator<Item = (Chars, &str)> {
 pub(super) struct TreeBuilder {
     document: Document,
     document_mode: DocumentMode,
+    scripting: Scripting,
     insertion_mode: InsertionMode,
     original_mode: InsertionMode,
     template_modes: Vec<InsertionMode>,
@@ -126,6 +133,7 @@ pub(super) struct TreeBuilder {
     pending_table_text_other: bool,
     skip_newline: bool,
     text_mode: Option<TokenizerMode>,
+    script_boundary: Option<NodeId>,
     diagnostics: Vec<TreeDiagnostic>,
     max_diagnostics: usize,
     dropped_diagnostics: usize,
@@ -141,10 +149,15 @@ pub(super) struct TreeBuilder {
 }
 
 impl TreeBuilder {
-    pub(super) fn new(limits: DocumentLimits, max_diagnostics: usize) -> Result<Self, ParseError> {
+    pub(super) fn new(
+        limits: DocumentLimits,
+        max_diagnostics: usize,
+        scripting: Scripting,
+    ) -> Result<Self, ParseError> {
         Ok(Self {
             document: Document::new(limits)?,
             document_mode: DocumentMode::NoQuirks,
+            scripting,
             insertion_mode: InsertionMode::Initial,
             original_mode: InsertionMode::Initial,
             template_modes: Vec::new(),
@@ -158,6 +171,7 @@ impl TreeBuilder {
             pending_table_text_other: false,
             skip_newline: false,
             text_mode: None,
+            script_boundary: None,
             diagnostics: Vec::new(),
             max_diagnostics,
             dropped_diagnostics: 0,
@@ -175,13 +189,14 @@ impl TreeBuilder {
     /// The document gets a root `html` element whose children become the
     /// fragment. The context element is created detached (it is never part of
     /// the result) so namespace and integration-point checks can inspect it.
-    /// Returns the tokenizer state the context selects (scripting disabled).
+    /// Returns the tokenizer state the context and scripting mode select.
     pub(super) fn new_fragment(
         limits: DocumentLimits,
         max_diagnostics: usize,
         context: &FragmentContext,
+        scripting: Scripting,
     ) -> Result<(Self, TokenizerMode), ParseError> {
-        let mut builder = Self::new(limits, max_diagnostics)?;
+        let mut builder = Self::new(limits, max_diagnostics, scripting)?;
         let html = builder.create_element(&Tag::implied("html"), Ns::Html)?;
         let root = builder.document.root();
         builder.attach_or_destroy(root, None, html)?;
@@ -204,9 +219,9 @@ impl TreeBuilder {
         let mode = match name.as_deref() {
             Some("title" | "textarea") => TokenizerMode::Rcdata,
             Some("style" | "xmp" | "iframe" | "noembed" | "noframes") => TokenizerMode::Rawtext,
+            Some("noscript") if scripting == Scripting::Enabled => TokenizerMode::Rawtext,
             Some("script") => TokenizerMode::ScriptData,
             Some("plaintext") => TokenizerMode::Plaintext,
-            // `noscript` stays in data: scripting is disabled.
             _ => TokenizerMode::Data,
         };
         Ok((builder, mode))
@@ -231,7 +246,11 @@ impl TreeBuilder {
         }
     }
 
-    pub(super) fn process(&mut self, token: &Token) -> Result<Option<TokenizerMode>, ParseError> {
+    pub(super) fn document(&self) -> &Document {
+        &self.document
+    }
+
+    pub(super) fn process(&mut self, token: &Token) -> Result<TreeFeedback, ParseError> {
         self.self_closing_acknowledged = false;
         self.text_mode = None;
         let skip_newline = std::mem::take(&mut self.skip_newline);
@@ -267,7 +286,10 @@ impl TreeBuilder {
             .token_index
             .checked_add(1)
             .ok_or(ParseError::Tokenizer(crate::HtmlError::TokenLimit))?;
-        Ok(self.text_mode.take())
+        Ok(TreeFeedback {
+            text_mode: self.text_mode.take(),
+            script: self.script_boundary.take(),
+        })
     }
 
     /// Whether the tokenizer may recognize CDATA sections before the next token.

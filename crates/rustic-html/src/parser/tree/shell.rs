@@ -1,6 +1,6 @@
 use super::{
-    Chars, DocumentMode, ErrorKind, InsertionMode, ParseError, Step, Tag, Tok, TokenizerMode,
-    TreeBuilder,
+    Chars, DocumentMode, ErrorKind, InsertionMode, ParseError, Scripting, Step, Tag, Tok,
+    TokenizerMode, TreeBuilder,
 };
 
 impl TreeBuilder {
@@ -87,7 +87,9 @@ impl TreeBuilder {
                 "html" => return self.in_body(token),
                 "base" | "basefont" | "bgsound" | "link" | "meta" => self.insert_void(tag)?,
                 "title" => self.insert_text_element(tag, TokenizerMode::Rcdata)?,
-                // This inert parser always uses the scripting-disabled rules.
+                "noscript" if self.scripting == Scripting::Enabled => {
+                    self.insert_text_element(tag, TokenizerMode::Rawtext)?;
+                }
                 "noscript" => {
                     self.insert_html(tag)?;
                     self.insertion_mode = InsertionMode::InHeadNoscript;
@@ -225,10 +227,16 @@ impl TreeBuilder {
                 self.insertion_mode = self.original_mode;
                 Ok(Step::Reprocess)
             }
-            // Scripting is disabled: a script end tag never prepares or runs it.
             _ => {
-                self.open.pop();
+                let closed = self.open.pop();
                 self.insertion_mode = self.original_mode;
+                if matches!(token, Tok::End("script"))
+                    && self.scripting == Scripting::Enabled
+                    && !self.fragment()
+                    && self.template_modes.is_empty()
+                {
+                    self.script_boundary = closed;
+                }
                 Ok(Step::Consumed)
             }
         }

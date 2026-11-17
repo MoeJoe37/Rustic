@@ -2,10 +2,10 @@
 
 This is the guide to how JavaScript and a document meet in Rustic. It ties
 together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
-to [ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)), which each
+to [ADR 0037](adr/0037-parser-script-boundary.md)), which each
 describe one step, and says plainly what is not built yet. The tested contract
 of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
-WEB-01 to WEB-04; the plan for the rest is
+WEB-01 to WEB-05; the plan for the rest is
 [ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration).
 
 ## What works today
@@ -28,7 +28,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| `<script>` elements | The parser runs with scripting off; only the host can queue a script | WEB-05 |
+| `<script>` execution | The parser can suspend at a closed script in opt-in mode. The engine's existing load path stays inert and can run host-queued scripts after parsing. | WEB-05 |
 | Engine-owned style and layout for scripted documents | A rendering turn hands the host the live tree and the host renders it from scratch; nothing is invalidated incrementally and script cannot read layout | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
@@ -183,6 +183,7 @@ and `AbortSignal` listener removal are TD-131.
 | Turn order, checkpoints, budgets, shutdown | `crates/rustic-engine/tests/scripting.rs`, `lifecycle.rs` |
 | Timers and clamping | `crates/rustic-engine/tests/timers.rs` |
 | Rendering turns, animation callbacks, frame tickets | `crates/rustic-engine/tests/frames.rs` |
+| HTML script suspension and scripting-enabled trees | `crates/rustic-html/tests/document.rs`, `fragment.rs`, `tree_construction.rs` |
 | Trusted input and activation | `crates/rustic-engine/tests/input.rs` |
 | Conversions and generated metadata | `crates/rustic-bindings/tests/webidl.rs`, `metadata.rs` |
 | Wrapper identity, adoption, joint collection | `crates/rustic-bindings/tests/dom_gc.rs`, `page.rs` |

@@ -1,4 +1,4 @@
-//! The HTML fragment parsing algorithm (scripting disabled).
+//! The HTML fragment parsing algorithm.
 //!
 //! Specification: WHATWG HTML, "Parsing HTML fragments", reviewed 2026-11-08.
 //! <https://html.spec.whatwg.org/multipage/parsing.html#parsing-html-fragments>
@@ -6,7 +6,7 @@
 use rustic_base::CancellationToken;
 use rustic_dom::{Document, NodeId};
 
-use super::{Driver, Lifecycle, ParseError, ParserLimits, TreeBuilder, TreeDiagnostic};
+use super::{Driver, ParseError, ParserLimits, Scripting, TreeBuilder, TreeDiagnostic};
 use crate::{Attribute, Diagnostic, HtmlTokenizer, Tag};
 
 /// Namespace of a fragment-parsing context element.
@@ -149,19 +149,29 @@ impl HtmlFragmentParser {
         limits: ParserLimits,
         cancellation: CancellationToken,
     ) -> Result<Self, ParseError> {
-        let (tree, mode) =
-            TreeBuilder::new_fragment(limits.document, limits.max_tree_diagnostics, context)?;
+        Self::new_with_scripting(context, limits, cancellation, Scripting::Disabled)
+    }
+
+    /// Create an inert fragment parser that uses the given `noscript` rules.
+    pub fn new_with_scripting(
+        context: &FragmentContext,
+        limits: ParserLimits,
+        cancellation: CancellationToken,
+        scripting: Scripting,
+    ) -> Result<Self, ParseError> {
+        let (tree, mode) = TreeBuilder::new_fragment(
+            limits.document,
+            limits.max_tree_diagnostics,
+            context,
+            scripting,
+        )?;
         // No last start tag: the context's own end tag is not "appropriate".
         let mut tokenizer =
             HtmlTokenizer::with_context(limits.tokenizer, cancellation, mode, None)?;
         // A foreign context allows CDATA before the first token.
         tokenizer.set_cdata_allowed(tree.cdata_allowed());
         Ok(Self {
-            driver: Driver {
-                tokenizer,
-                tree: Some(tree),
-                lifecycle: Lifecycle::Active,
-            },
+            driver: Driver::new(tokenizer, tree),
         })
     }
 

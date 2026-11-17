@@ -223,7 +223,7 @@ impl TreeBuilder {
                 let ns = self.ns(self.adjusted_current().expect("foreign content has a node"));
                 self.insert_element(tag, ns)?;
                 if tag.self_closing() {
-                    // Scripting is disabled: an SVG script is never processed.
+                    // The script boundary currently covers HTML scripts.
                     self.open.pop();
                     self.self_closing_acknowledged = true;
                 }

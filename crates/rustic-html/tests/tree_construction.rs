@@ -1,13 +1,13 @@
 //! Complete html5lib tree-construction documents, run against the pinned corpus.
 //!
-//! Every document and fragment record is run unless it needs scripting or
-//! processing-instruction nodes; those are counted and skipped. Expected
+//! Document and fragment records run in their selected scripting mode.
+//! Processing-instruction cases are counted and skipped. Expected
 //! failures must be listed explicitly in `KNOWN_FAILURES` with a reason.
 
 use std::fmt::Write;
 
 use rustic_dom::{Document, DomString, NodeId, NodeKind};
-use rustic_html::{FragmentContext, HtmlDocumentParser, HtmlFragmentParser};
+use rustic_html::{FragmentContext, HtmlDocumentParser, HtmlFragmentParser, Scripting};
 
 macro_rules! corpus {
     ($($name:literal),* $(,)?) => {
@@ -243,11 +243,28 @@ fn parse(
         Document(HtmlDocumentParser),
         Fragment(HtmlFragmentParser),
     }
+    let scripting = if record.script_on {
+        Scripting::Enabled
+    } else {
+        Scripting::Disabled
+    };
     let mut parser = match &record.context {
-        None => Parser::Document(HtmlDocumentParser::default()),
+        None => Parser::Document(
+            HtmlDocumentParser::new_with_scripting(
+                Default::default(),
+                Default::default(),
+                scripting,
+            )
+            .map_err(|e| e.to_string())?,
+        ),
         Some(name) => Parser::Fragment(
-            HtmlFragmentParser::new(&context(name), Default::default(), Default::default())
-                .map_err(|e| e.to_string())?,
+            HtmlFragmentParser::new_with_scripting(
+                &context(name),
+                Default::default(),
+                Default::default(),
+                scripting,
+            )
+            .map_err(|e| e.to_string())?,
         ),
     };
     let mut feed = |bytes: &[u8]| match &mut parser {
@@ -275,7 +292,7 @@ fn parse(
 }
 
 fn runnable(record: &Record) -> bool {
-    !record.script_on && !record.data.contains("<?")
+    !record.data.contains("<?")
 }
 
 #[test]

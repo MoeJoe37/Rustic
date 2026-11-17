@@ -1,5 +1,5 @@
 use rustic_base::CancellationToken;
-use rustic_dom::{Document, DocumentLimits};
+use rustic_dom::{Document, DocumentLimits, NodeId};
 
 use crate::{Diagnostic, HtmlTokenizer, Token, TokenizerLimits};
 
@@ -35,7 +35,7 @@ impl Default for ParserLimits {
     }
 }
 
-/// A completed inert document built with scripting disabled.
+/// A completed document and its HTML parse diagnostics.
 #[derive(Debug)]
 pub struct ParsedDocument {
     document: Document,
@@ -97,12 +97,32 @@ enum Lifecycle {
     Failed,
 }
 
+/// Select how tree construction parses `noscript` and handles closed scripts.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Scripting {
+    /// Parse without a script host.
+    #[default]
+    Disabled,
+    /// Parse `noscript` as raw text and surface HTML document script boundaries.
+    /// Fragment parsers use the raw-text rules but do not surface boundaries.
+    Enabled,
+}
+
+/// A closed HTML script element at its parser insertion point.
+#[derive(Debug)]
+pub struct ScriptBoundary<'a> {
+    /// The partially built document, before the next token is processed.
+    pub document: &'a Document,
+    /// The script element whose end tag was just processed.
+    pub element: NodeId,
+}
+
 /// Incremental UTF-8 parser implementing WHATWG document tree construction.
 ///
-/// Scripting is disabled; no script, network request or subresource is executed.
-/// Processing-instruction tokens, which have no DOM node yet, fail explicitly. The parser owns its document
-/// until successful EOF; any fatal error discards the partial tree and poisons
-/// the parser. Rejected calls after successful completion preserve that state.
+/// The default parser is inert. A host can opt into scripting-enabled tree
+/// construction and inspect the document at script boundaries. Processing
+/// instruction tokens fail explicitly. The parser owns its document until
+/// successful EOF; any fatal error discards the partial tree and poisons it.
 #[derive(Debug)]
 pub struct HtmlDocumentParser {
     driver: Driver,
@@ -118,24 +138,59 @@ impl Default for HtmlDocumentParser {
 impl HtmlDocumentParser {
     /// Create a parser with explicit independent budgets and cancellation.
     pub fn new(limits: ParserLimits, cancellation: CancellationToken) -> Result<Self, ParseError> {
+        Self::new_with_scripting(limits, cancellation, Scripting::Disabled)
+    }
+
+    /// Create a parser with an explicit scripting mode.
+    pub fn new_with_scripting(
+        limits: ParserLimits,
+        cancellation: CancellationToken,
+        scripting: Scripting,
+    ) -> Result<Self, ParseError> {
         Ok(Self {
-            driver: Driver {
-                tokenizer: HtmlTokenizer::new(limits.tokenizer, cancellation)?,
-                tree: Some(TreeBuilder::new(
-                    limits.document,
-                    limits.max_tree_diagnostics,
-                )?),
-                lifecycle: Lifecycle::Active,
-            },
+            driver: Driver::new(
+                HtmlTokenizer::new(limits.tokenizer, cancellation)?,
+                TreeBuilder::new(limits.document, limits.max_tree_diagnostics, scripting)?,
+            ),
         })
     }
 
     /// Consume bytes through token/tree boundaries; feed splits do not change trees.
+    /// This convenience method skips script boundaries. Use [`Self::write`] and
+    /// [`Self::advance_to_script`] to observe them.
     pub fn feed(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
         self.driver.feed(bytes)
     }
 
+    /// Queue bytes without running tree construction.
+    pub fn write(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
+        self.driver.write(bytes)
+    }
+
+    /// Close the input stream without advancing tree construction.
+    pub fn close_input(&mut self) -> Result<(), ParseError> {
+        self.driver.close_input()
+    }
+
+    /// Process available input up to the next script that can be prepared.
+    ///
+    /// The host decides whether and how to prepare the element. Each boundary
+    /// is returned once; calling this again resumes immediately after it.
+    /// `None` means this parser needs more input, or has reached EOF if input
+    /// is closed. Call [`Self::finish`] to obtain the completed document.
+    pub fn advance_to_script(&mut self) -> Result<Option<ScriptBoundary<'_>>, ParseError> {
+        let Some(element) = self.driver.advance()? else {
+            return Ok(None);
+        };
+        let tree = self.driver.tree.as_ref().expect("active parser owns tree");
+        Ok(Some(ScriptBoundary {
+            document: tree.document(),
+            element,
+        }))
+    }
+
     /// Close input, construct implied nodes and return the completed owned tree.
+    /// Any remaining script boundaries are skipped.
     pub fn finish(&mut self) -> Result<ParsedDocument, ParseError> {
         let (tree, diagnostics) = self.driver.finish()?;
         Ok(tree.into_result(diagnostics))
@@ -148,27 +203,44 @@ struct Driver {
     tokenizer: HtmlTokenizer,
     tree: Option<TreeBuilder>,
     lifecycle: Lifecycle,
+    input_closed: bool,
 }
 
 impl Driver {
+    fn new(tokenizer: HtmlTokenizer, tree: TreeBuilder) -> Self {
+        Self {
+            tokenizer,
+            tree: Some(tree),
+            lifecycle: Lifecycle::Active,
+            input_closed: false,
+        }
+    }
+
     fn feed(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
-        self.ensure_active()?;
-        let result = self
-            .tokenizer
-            .write(bytes)
-            .map_err(ParseError::from)
-            .and_then(|()| self.pump());
+        self.write(bytes)?;
+        self.drain()
+    }
+
+    fn write(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
+        self.ensure_writable()?;
+        let result = self.tokenizer.write(bytes).map_err(ParseError::from);
         self.record_failure(result)
+    }
+
+    fn close_input(&mut self) -> Result<(), ParseError> {
+        self.ensure_writable()?;
+        let result = self.tokenizer.end().map_err(ParseError::from);
+        self.record_failure(result)?;
+        self.input_closed = true;
+        Ok(())
     }
 
     fn finish(&mut self) -> Result<(TreeBuilder, TokenizerDiagnostics), ParseError> {
         self.ensure_active()?;
-        let result = self
-            .tokenizer
-            .end()
-            .map_err(ParseError::from)
-            .and_then(|()| self.pump());
-        self.record_failure(result)?;
+        if !self.input_closed {
+            self.close_input()?;
+        }
+        self.drain()?;
         self.lifecycle = Lifecycle::Finished;
         let tree = self.tree.take().expect("active tree after successful EOF");
         let diagnostics = TokenizerDiagnostics {
@@ -178,16 +250,39 @@ impl Driver {
         Ok((tree, diagnostics))
     }
 
-    fn pump(&mut self) -> Result<(), ParseError> {
+    fn drain(&mut self) -> Result<(), ParseError> {
+        while self.advance()?.is_some() {}
+        Ok(())
+    }
+
+    fn advance(&mut self) -> Result<Option<NodeId>, ParseError> {
+        self.ensure_active()?;
+        let result = self.pump();
+        self.record_failure(result)
+    }
+
+    fn pump(&mut self) -> Result<Option<NodeId>, ParseError> {
         while let Some(token) = self.tokenizer.next_token()? {
             let tree = self.tree.as_mut().expect("active parser owns tree");
-            if let Some(mode) = tree.process(&token)? {
+            let feedback = tree.process(&token)?;
+            if let Some(mode) = feedback.text_mode {
                 self.tokenizer.set_text_mode(mode)?;
             }
             self.tokenizer.set_cdata_allowed(tree.cdata_allowed());
+            if let Some(element) = feedback.script {
+                return Ok(Some(element));
+            }
             if matches!(token, Token::Eof) {
                 break;
             }
+        }
+        Ok(None)
+    }
+
+    fn ensure_writable(&self) -> Result<(), ParseError> {
+        self.ensure_active()?;
+        if self.input_closed {
+            return Err(ParseError::InputClosed);
         }
         Ok(())
     }

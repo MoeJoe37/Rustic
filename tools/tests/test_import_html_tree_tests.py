@@ -17,8 +17,8 @@ class TreeImporterTests(unittest.TestCase):
     def test_exclusions_depend_only_on_record_metadata(self):
         for data, reason in [('<table>', None), ('<svg>', None), ('<?target?>', 'processing_instruction')]:
             self.assertEqual(importer.exclusion({'#data': data, '#document': '| <html>\n'}), reason)
-        self.assertEqual(importer.exclusion({'#data': '', '#document': '| <html>\n', '#document-fragment': 'div'}), 'fragment_context')
-        self.assertEqual(importer.exclusion({'#data': '', '#document': '| <html>\n', '#script-on': ''}), 'scripting_enabled')
+        self.assertIsNone(importer.exclusion({'#data': '', '#document': '| <html>\n', '#document-fragment': 'div'}))
+        self.assertIsNone(importer.exclusion({'#data': '', '#document': '| <html>\n', '#script-on': ''}))
         self.assertIsNone(importer.exclusion({'#data': '', '#document': '| <html>\n', '#script-off': ''}))
 
     def test_malformed_records_are_rejected_instead_of_dropped(self):
@@ -35,7 +35,7 @@ class TreeImporterTests(unittest.TestCase):
             excluded = sum(entry['exclusion_reasons'].values())
             self.assertEqual(entry['runnable_cases'] + excluded, entry['upstream_cases'])
         self.assertEqual(metadata['runnable_cases'], sum(f['runnable_cases'] for f in metadata['files']))
-        self.assertEqual(metadata['runnable_cases'], 1584)
+        self.assertEqual(metadata['runnable_cases'], 1784)
 
 
 if __name__ == '__main__':

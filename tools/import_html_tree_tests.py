@@ -46,10 +46,6 @@ def records(source: str) -> list[dict[str, str]]:
 
 def exclusion(case: dict[str, str]) -> str | None:
     """Mirror the Rust runner's skip rule; it never depends on parser results."""
-    if "#document-fragment" in case:
-        return "fragment_context"
-    if "#script-on" in case:
-        return "scripting_enabled"
     if "<?" in case["#data"]:
         return "processing_instruction"
     return None
@@ -73,12 +69,12 @@ def manifest() -> str:
         "upstream_revision": REVISION,
         "upstream_path": "tree-construction/*.dat (scripted/ not vendored)",
         "license": "MIT; ../HTML5LIB-LICENSE.md",
-        "selection_policy": "all-document-records-scripting-disabled-no-fragments-no-processing-instructions-v2",
+        "selection_policy": "all-document-and-fragment-records-with-scripting-mode-no-processing-instructions-v3",
         "files": files,
         "upstream_cases": sum(f["upstream_cases"] for f in files),
         "runnable_cases": sum(f["runnable_cases"] for f in files),
         "checked": ["complete tree, namespaces, attributes and template contents", "every two-chunk byte split", "one-byte feeds"],
-        "not_checked": ["upstream parse errors/positions", "compatibility mode", "fragment and scripting-enabled records", "processing-instruction records"],
+        "not_checked": ["upstream parse errors/positions", "compatibility mode", "processing-instruction records"],
         "input_adapter": "Unicode fixture stream encoded as UTF-8 after an explicit transport BOM",
     }
     return json.dumps(metadata, indent=2, sort_keys=True) + "\n"

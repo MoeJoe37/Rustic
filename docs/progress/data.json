@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "836030c63e5bfd55c5eb4ee8738c959d64f809cb238d51fc4cd78472d9133fcd",
-  "percent": "31.99",
+  "source_fingerprint": "4febf4e7e43d22bb1f13ea51cadd162c4c6c111579d992442a3d6281bb1dac96",
+  "percent": "32.13",
   "verified_percent": "31.11",
-  "partial_percent": "0.88",
+  "partial_percent": "1.02",
   "completed": 71,
-  "in_progress": 5,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -57,9 +57,9 @@
       "share": "5.29",
       "completed": 5,
       "total": 12,
-      "percent": "48.86",
+      "percent": "51.42",
       "verified_percent": "45.32",
-      "partial_percent": "3.54"
+      "partial_percent": "6.10"
     },
     {
       "id": "M6",
@@ -1129,9 +1129,42 @@
           "label": "Parser/script reentry and encoding restart",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Scripting-enabled tree construction and script suspension",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-html/src/parser.rs",
+                  "marker": "pub fn advance_to_script"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/document.rs",
+                  "marker": "fn script_boundaries_precede_later_markup_at_every_split"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/tree_construction.rs",
+                  "marker": "fn html5lib_tree_construction_documents"
+                }
+              ]
+            },
+            {
+              "label": "Live document handoff and bounded parser reentry",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Encoding restart",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.40"
         },
         {
@@ -1214,12 +1247,12 @@
       ],
       "points": 37,
       "completed": 9,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 11,
-      "contribution": "3.51",
-      "percent": "70.27",
+      "contribution": "3.64",
+      "percent": "72.97",
       "verified_percent": "70.27",
-      "partial_percent": "0.00"
+      "partial_percent": "2.70"
     },
     {
       "id": "css",

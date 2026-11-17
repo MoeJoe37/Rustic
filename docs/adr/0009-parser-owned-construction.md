@@ -1,7 +1,7 @@
 # ADR 0009: Parser-owned inert document construction
 
 - Date: 2026-11-08
-- Status: Accepted internal subset; broader tree and script integration pending
+- Status: Accepted for inert construction. [ADR 0037](0037-parser-script-boundary.md) adds an opt-in script boundary.
 
 ## Context
 

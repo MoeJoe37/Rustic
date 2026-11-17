@@ -2,7 +2,7 @@ use rustic_base::CancellationToken;
 use rustic_dom::{Document, DomError, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_html::{
     DocumentMode, HtmlDocumentParser, HtmlError, ParseError, ParsedDocument, ParserLimits,
-    TreeDiagnosticKind as D, UnsupportedFeature as U,
+    Scripting, TreeDiagnosticKind as D, UnsupportedFeature as U,
 };
 
 fn parse(bytes: &[u8], limits: ParserLimits) -> Result<ParsedDocument, ParseError> {
@@ -43,6 +43,68 @@ fn elements(doc: &Document, local: &str) -> Vec<NodeId> {
     doc.walk(doc.root()).unwrap().filter_map(|(id, _)| {
         matches!(doc.node(id).unwrap().kind(), NodeKind::Element(e) if e.name().local() == local).then_some(id)
     }).collect()
+}
+
+#[test]
+fn script_boundaries_precede_later_markup_at_every_split() {
+    let source = "<script>const text = 'é';</script><body><template><script>inert</script></template><svg><script/></svg><script>second</script><p>later<script>unfinished";
+    let bytes = source.as_bytes();
+
+    for split in 0..=bytes.len() {
+        let mut parser = HtmlDocumentParser::new_with_scripting(
+            Default::default(),
+            Default::default(),
+            Scripting::Enabled,
+        )
+        .unwrap();
+        let mut scripts = Vec::new();
+        for chunk in [&bytes[..split], &bytes[split..]] {
+            parser.write(chunk).unwrap();
+            while let Some(boundary) = parser.advance_to_script().unwrap() {
+                let doc = boundary.document;
+                let child = doc.node(boundary.element).unwrap().first_child().unwrap();
+                let NodeKind::Text(text) = doc.node(child).unwrap().kind() else {
+                    panic!("script child must be text");
+                };
+                assert!(elements(doc, "p").is_empty(), "split {split}");
+                assert_eq!(elements(doc, "body").len(), scripts.len(), "split {split}");
+                scripts.push(String::from_utf16(text.as_units()).unwrap());
+            }
+        }
+        parser.close_input().unwrap();
+        assert!(parser.advance_to_script().unwrap().is_none());
+        assert_eq!(scripts, ["const text = 'é';", "second"], "split {split}");
+        let parsed = parser.finish().unwrap();
+        assert_eq!(elements(parsed.document(), "p").len(), 1);
+    }
+}
+
+#[test]
+fn closed_input_can_resume_and_cancellation_discards_the_partial_tree() {
+    let token = CancellationToken::default();
+    let mut parser = HtmlDocumentParser::new_with_scripting(
+        Default::default(),
+        token.clone(),
+        Scripting::Enabled,
+    )
+    .unwrap();
+    parser.write(b"<script></script><script></script>").unwrap();
+    parser.close_input().unwrap();
+    assert_eq!(parser.write(b"x"), Err(ParseError::InputClosed));
+    assert_eq!(parser.close_input(), Err(ParseError::InputClosed));
+    assert!(parser.advance_to_script().unwrap().is_some());
+    token.cancel();
+    assert!(matches!(
+        parser.advance_to_script(),
+        Err(ParseError::Tokenizer(HtmlError::Cancelled))
+    ));
+    assert!(matches!(parser.finish(), Err(ParseError::Poisoned)));
+
+    let mut inert = HtmlDocumentParser::default();
+    inert.write(b"<script></script>").unwrap();
+    assert!(inert.advance_to_script().unwrap().is_none());
+    let parsed = inert.finish().unwrap();
+    assert_eq!(elements(parsed.document(), "script").len(), 1);
 }
 
 #[test]

@@ -56,7 +56,7 @@ Scheduled 2026-11-17, after M4 closed, for all 89 open entries.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-05 (page scripts first run) | TD-10, TD-99, TD-106, TD-108 | Page scripts are the trigger these entries name: scripting-on tree construction, Annex B functions in blocks, function source text and local time zones. Pay, or record why a later point is safe |
+| M5, with WEB-05 (page scripts first run) | TD-10, TD-99, TD-106, TD-108 | Review processing instructions, Annex B functions in blocks, function source text and local time zones before page scripts run. Pay each entry or record its next trigger. |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Native ARM64 timings come with the first PERF-01 report; the hand-bound interface subset and collection scans are reviewed against the WEB-09 results |
 | M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-110, TD-118, TD-130 | Real pages exceed parse budgets, use non-UTF-8 encodings, relative `url()` values, `\p{…}` and frames. These are on the [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
@@ -91,7 +91,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-07 | Deliberate | Process | Progress bot commits to `main`, so `feature` drifts | Open |
 | TD-08 | Watch | Docs | Hard-coded corpus and test counts repeated across docs | Open, rule 8 |
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
-| TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, WEB-05 (M5) |
+| TD-10 | Deliberate | HTML parser | Processing-instruction tree construction remains. Scripting-on trees and `selectedcontent` are covered. | Open, WEB-05 (M5) |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, `url.blob` (M9) |
 | TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
@@ -311,10 +311,13 @@ from HTML loading through rendering.
 
 ### TD-10 — Scripting-on and processing instructions pending
 
-Document and fragment parsing pass all 1,776 runnable html5lib tree records;
-DOC-06d paid the `selectedcontent` part (the 4 former known failures). Sixteen
-records are still skipped because they need scripting or processing-instruction
-nodes, each with a reason in the corpus runner ([HTML_TREE.md](HTML_TREE.md)).
+Document and fragment parsing pass all 1,784 runnable html5lib tree records,
+including eight scripting-on records enabled by WEB-05. DOC-06d paid the
+`selectedcontent` part (four former known failures). The DOM already supports
+processing instructions. The parser still rejects their tokens, and the eight
+excluded legacy records expect comment recovery. Reconcile those expectations
+with the current HTML algorithm during WEB-05.
+[HTML_TREE.md](HTML_TREE.md)
 
 ### TD-11 — `blob:` URLs return unsupported
 

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 31.99%** = 31.11% verified complete + 0.88% partial credit. 71/221 capabilities complete, 5 in progress.
+**Overall completion: 32.13%** = 31.11% verified complete + 1.02% partial credit. 71/221 capabilities complete, 6 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `836030c63e5bfd55c5eb4ee8738c959d64f809cb238d51fc4cd78472d9133fcd`.
+Catalog: `engine-v4`. Source fingerprint: `4febf4e7e43d22bb1f13ea51cadd162c4c6c111579d992442a3d6281bb1dac96`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `836030c63e5bfd55c5eb4ee8738c959d64f80
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 5/12 | 48.86% | 45.32% | 5.29% |
+| M5 Scripted documents | 5/12 | 51.42% | 45.32% | 5.29% |
 | M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -31,7 +31,7 @@ Catalog: `engine-v4`. Source fingerprint: `836030c63e5bfd55c5eb4ee8738c959d64f80
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 2% | 0.86 |
 | DOM | 7/10 | 1 | 71.32% | 67.64% | 4% | 2.85 |
-| HTML | 9/11 | 0 | 70.27% | 70.27% | 5% | 3.51 |
+| HTML | 9/11 | 1 | 72.97% | 70.27% | 5% | 3.64 |
 | CSS & style | 8/10 | 2 | 84.18% | 79.59% | 6% | 5.05 |
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
@@ -110,7 +110,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `html.textmodes` — RCDATA, RAWTEXT, script and plaintext modes · size 2 · M1 · 0.27% of engine ([source](../../crates/rustic-html/src/tokenizer/text.rs), [source](../../crates/rustic-html/src/tokenizer/driver.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/text_modes.rs), [test](../../crates/rustic-html/tests/corpus.rs))
 - **complete** `html.tree` — Core insertion modes and malformed-tree recovery · size 5 · M1 · 0.67% of engine ([source](../../crates/rustic-html/src/parser/tree.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
 - **complete** `html.tables` — Table, formatting, template and foreign content rules · size 5 · M1 · 0.67% of engine ([source](../../crates/rustic-html/src/parser/tree/formatting.rs), [source](../../crates/rustic-html/src/parser/tree/table.rs), [source](../../crates/rustic-html/src/parser/tree/foreign.rs), [test](../../crates/rustic-html/tests/tree_rules.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
-- **planned** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.40% of engine
+- **in progress 33.33%** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.40% of engine
+  - [x] Scripting-enabled tree construction and script suspension ([source](../../crates/rustic-html/src/parser.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs))
+  - [ ] Live document handoff and bounded parser reentry
+  - [ ] Encoding restart
 - **complete** `html.loader` — Bounded local loader and dump-dom command · size 2 · M1 · 0.27% of engine ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **complete** `html.conformance` — Parser corpora, chunk invariance and fuzz gate · size 3 · M1 · 0.40% of engine ([source](../../tools/import_html_tests.py), [test](../../crates/rustic-html/tests/corpus.rs), [source](../../crates/rustic-html/src/parser/fragment.rs), [test](../../crates/rustic-html/tests/tree_construction.rs), [test](../../crates/rustic-html/tests/fragment.rs), [source](../../crates/rustic-fuzz/src/targets.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
 - **planned** `html.elements` — Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading · size 8 · M9 · 1.08% of engine

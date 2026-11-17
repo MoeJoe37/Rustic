@@ -4,7 +4,7 @@ use rustic_base::CancellationToken;
 use rustic_dom::{DomError, NodeKind, SVG_NAMESPACE};
 use rustic_html::{
     ContextNamespace, FragmentContext, HtmlError, HtmlFragmentParser, ParseError, ParsedFragment,
-    ParserLimits,
+    ParserLimits, Scripting,
 };
 
 fn parse_with(context: &FragmentContext, chunks: &[&str]) -> Result<ParsedFragment, ParseError> {
@@ -43,6 +43,23 @@ fn outline(result: &ParsedFragment) -> Vec<String> {
 
 fn fragment(context: &FragmentContext, source: &str) -> Vec<String> {
     outline(&parse_with(context, &[source]).unwrap())
+}
+
+#[test]
+fn scripting_enabled_fragments_treat_noscript_as_raw_text() {
+    let mut parser = HtmlFragmentParser::new_with_scripting(
+        &FragmentContext::html("noscript"),
+        Default::default(),
+        Default::default(),
+        Scripting::Enabled,
+    )
+    .unwrap();
+    parser.feed(b"<b>&amp;</b>").unwrap();
+    assert_eq!(outline(&parser.finish().unwrap()), ["\"<b>&amp;</b>\""]);
+    assert_eq!(
+        fragment(&FragmentContext::html("noscript"), "<b>&amp;</b>"),
+        ["b", "  \"&\""]
+    );
 }
 
 #[test]

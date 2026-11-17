@@ -6,11 +6,9 @@
   ],
   "files": [
     {
-      "exclusion_reasons": {
-        "fragment_context": 1
-      },
+      "exclusion_reasons": {},
       "path": "adoption01.dat",
-      "runnable_cases": 17,
+      "runnable_cases": 18,
       "sha256": "b2aba05bd1d832f73a0c6103b3c8b151b283bab7c56887274d81f3a062c4963e",
       "upstream_cases": 18
     },
@@ -66,11 +64,9 @@
       "upstream_cases": 26
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 66
-      },
+      "exclusion_reasons": {},
       "path": "foreign-fragment.dat",
-      "runnable_cases": 0,
+      "runnable_cases": 66,
       "sha256": "73e1785753c66420c067e5b29f89b17e7ebe1079687a512040ef19c6d42ac2c2",
       "upstream_cases": 66
     },
@@ -105,11 +101,9 @@
       "upstream_cases": 3
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 8
-      },
+      "exclusion_reasons": {},
       "path": "math.dat",
-      "runnable_cases": 0,
+      "runnable_cases": 8,
       "sha256": "3c2ecc07272c175676ecfafa0cf6e18e74c3293075703702a4b7929fcb0d07bd",
       "upstream_cases": 8
     },
@@ -184,11 +178,9 @@
       "upstream_cases": 3
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 8
-      },
+      "exclusion_reasons": {},
       "path": "svg.dat",
-      "runnable_cases": 0,
+      "runnable_cases": 8,
       "sha256": "4c819b8dbdfbd98cfbce9a535a304b0a16597eb29ccc04077131a62810f309cd",
       "upstream_cases": 8
     },
@@ -200,11 +192,9 @@
       "upstream_cases": 19
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 1
-      },
+      "exclusion_reasons": {},
       "path": "template.dat",
-      "runnable_cases": 111,
+      "runnable_cases": 112,
       "sha256": "74bc8308e673589d81b63eb71411a6f8ecea6fd6af649b5802c22615b7102a03",
       "upstream_cases": 112
     },
@@ -253,11 +243,9 @@
       "upstream_cases": 14
     },
     {
-      "exclusion_reasons": {
-        "scripting_enabled": 6
-      },
+      "exclusion_reasons": {},
       "path": "tests16.dat",
-      "runnable_cases": 191,
+      "runnable_cases": 197,
       "sha256": "3350be682713afc1f6dad37059f2551709497a3643c38c26e1fe36fd07d23745",
       "upstream_cases": 197
     },
@@ -346,38 +334,30 @@
       "upstream_cases": 24
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 9
-      },
+      "exclusion_reasons": {},
       "path": "tests4.dat",
-      "runnable_cases": 0,
+      "runnable_cases": 9,
       "sha256": "e6003a52e1cbffc361eca7c739cdd4459074ac8c59766d1eb171b9c9eb42f517",
       "upstream_cases": 9
     },
     {
-      "exclusion_reasons": {
-        "scripting_enabled": 1
-      },
+      "exclusion_reasons": {},
       "path": "tests5.dat",
-      "runnable_cases": 16,
+      "runnable_cases": 17,
       "sha256": "bf80b927082290541781844906abdcb72f091488f7a11e8b7d9ac00076dd4fce",
       "upstream_cases": 17
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 13
-      },
+      "exclusion_reasons": {},
       "path": "tests6.dat",
-      "runnable_cases": 39,
+      "runnable_cases": 52,
       "sha256": "be16c74d2a9862283262968439c95b9bfce6182ea61055a3c886c28d14f3e01a",
       "upstream_cases": 52
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 1
-      },
+      "exclusion_reasons": {},
       "path": "tests7.dat",
-      "runnable_cases": 33,
+      "runnable_cases": 34,
       "sha256": "aeb9569589c809b1a563c0b163173e8cf980a6a4028cb7c210f19c181b56999a",
       "upstream_cases": 34
     },
@@ -396,11 +376,9 @@
       "upstream_cases": 27
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 81
-      },
+      "exclusion_reasons": {},
       "path": "tests_innerHTML_1.dat",
-      "runnable_cases": 0,
+      "runnable_cases": 81,
       "sha256": "acb9f835119e302d33204f437d54637a84ae26608ccb7bc961c6f7f44202a44c",
       "upstream_cases": 81
     },
@@ -426,12 +404,9 @@
       "upstream_cases": 52
     },
     {
-      "exclusion_reasons": {
-        "fragment_context": 4,
-        "scripting_enabled": 1
-      },
+      "exclusion_reasons": {},
       "path": "webkit02.dat",
-      "runnable_cases": 44,
+      "runnable_cases": 49,
       "sha256": "03b215350d352faf110df2cc6eac23a44a7f70945b4ea962f0b17bed103459f7",
       "upstream_cases": 49
     }
@@ -441,11 +416,10 @@
   "not_checked": [
     "upstream parse errors/positions",
     "compatibility mode",
-    "fragment and scripting-enabled records",
     "processing-instruction records"
   ],
-  "runnable_cases": 1584,
-  "selection_policy": "all-document-records-scripting-disabled-no-fragments-no-processing-instructions-v2",
+  "runnable_cases": 1784,
+  "selection_policy": "all-document-and-fragment-records-with-scripting-mode-no-processing-instructions-v3",
   "upstream_cases": 1792,
   "upstream_path": "tree-construction/*.dat (scripted/ not vendored)",
   "upstream_repository": "https://github.com/html5lib/html5lib-tests",

@@ -2,7 +2,9 @@
 
 This ledger records known shortcuts in committed code, why each exists, and
 when it must be paid. It is reviewed against everything merged to `main`; the
-first full review covered `main` at `b9595a5` (2026-11-08).
+first full review covered `main` at `b9595a5` (2026-11-08), and the open
+entries were rescheduled after M4 closed (2026-11-17, see the
+[payoff schedule](#payoff-schedule)).
 
 Debt is not automatically bad. Rustic takes **deliberate debt** to ship small,
 tested slices: a documented limit, an unsupported feature that fails honestly,
@@ -41,6 +43,38 @@ These are enforced by CI where marked; the rest are review rules in
 8. **Counts in prose go stale.** When a change alters a test or corpus count,
    search the docs for the old number in the same change.
 
+## Payoff schedule
+
+The ledger below is in the order debt was taken. This table is the same open
+debt in the order it comes due, so a milestone's entry and exit reviews can
+check one row instead of reading every entry. Each entry's own trigger still
+applies and wins if it fires earlier. An entry that reaches its row unpaid is
+either paid then or moved to a later row in the same change, with the reason
+added to the entry. Entries are never left on a row whose milestone has closed.
+
+Scheduled 2026-11-17, after M4 closed, for all 89 open entries.
+
+| Due | Entries | Why then |
+| --- | --- | --- |
+| M5, with WEB-05 (page scripts first run) | TD-10, TD-99, TD-106, TD-108 | Page scripts are the trigger these entries name: scripting-on tree construction, Annex B functions in blocks, function source text and local time zones. Pay, or record why a later point is safe |
+| M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
+| M5 exit | TD-125, TD-126, TD-129 | Native ARM64 timings come with the first PERF-01 report; the hand-bound interface subset and collection scans are reviewed against the WEB-09 results |
+| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-110, TD-118, TD-130 | Real pages exceed parse budgets, use non-UTF-8 encodings, relative `url()` values, `\p{…}` and frames. These are on the [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| When hosted CI returns | TD-07, TD-12, TD-14, TD-22 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
+| M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
+| M9, language and web APIs | TD-11, TD-89, TD-105, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127 | Test262 full-rate work (`js.conformance`), Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114 | Reviewed whenever the guarded code changes |
+
+The largest risks in that list are not the long M9 rows, which are honest
+scope limits, but the short ones before them: TD-02 (a large page fails to
+load at all), TD-12 (no native Windows, macOS or ARM64 test evidence since
+2026-11-08) and TD-111 (a regular expression can run for exponential time
+until the step budget stops it).
+
 ## Ledger
 
 Status values: **Open** (accepted, has a payoff trigger), **Fixing** (in
@@ -57,8 +91,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-07 | Deliberate | Process | Progress bot commits to `main`, so `feature` drifts | Open |
 | TD-08 | Watch | Docs | Hard-coded corpus and test counts repeated across docs | Open, rule 8 |
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
-| TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, M1 queue |
-| TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, M1 queue |
+| TD-10 | Deliberate | HTML parser | Scripting-on and processing instructions pending (`selectedcontent` paid by DOC-06d) | Open, WEB-05 (M5) |
+| TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, `url.blob` (M9) |
 | TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
@@ -120,28 +154,28 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
 | TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
 | TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Paid |
-| TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, M4 |
+| TD-89 | Deliberate | JS | Decorators, explicit resource management and import phases are unsupported syntax | Open, per ECMAScript edition (M9) |
 | TD-90 | Watch | JS | The parser's stack guard makes the deepest accepted nesting depend on the build | Guarded |
 | TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
 | TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and the other numeric conversions are missing | Paid |
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Paid |
-| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, JS-05 |
+| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, review at M6 entry |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, `perf.gc` (M12); measured by JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
-| TD-97 | Deliberate | JS | Asynchronous module execution, dynamic imports and host-provided module metadata remain open | Open, JS-06 |
+| TD-97 | Deliberate | JS | Syntax the bytecode compiler rejected; asynchronous module execution, dynamic imports and host-provided module metadata (what remains is TD-105 and TD-110) | Paid |
 | TD-98 | Deliberate | JS | Every `function` allocates its `prototype` object eagerly, so a closure costs 200 bytes | Paid |
-| TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, JS-05 |
+| TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, review with WEB-05 (M5) |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
 | TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Paid |
 | TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
-| TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, JS-06 |
-| TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, JS-05 |
-| TD-107 | Deliberate | JS | CLDR collation still needs full tailorings, implicit weights and conformance evidence | Open, JS-08 |
-| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, JS-08 |
+| TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, `js.conformance` (M9) |
+| TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, review with WEB-05 (M5) |
+| TD-107 | Deliberate | JS | CLDR collation still needs full tailorings, implicit weights and conformance evidence | Open, `js.conformance` (M9) |
+| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, review with WEB-05 (M5) |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
-| TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, JS-08 |
+| TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, M6 entry |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, `perf.interpreter` (M12) |
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
@@ -149,11 +183,11 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-115 | Deliberate | JS | A `SharedArrayBuffer` is shared within one agent only (no cross-agent byte store until workers); typed array elements are read through the generic property path | Open, M9 workers / `perf.interpreter` |
 | TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
-| TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, WEB-02 |
+| TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, before frames (M6) |
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
 | TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 | TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
-| TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, JS-08 |
+| TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, `js.conformance` (M9) |
 | TD-123 | Deliberate | DOM / JS | Interpreter safe points used JS-only collection | Paid |
 | TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
 | TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Open, `perf.interpreter` (M12) |
@@ -1406,7 +1440,7 @@ registries in `runtime/weak.rs`; host objects and `HostTracer`; and
 `rustic-bindings::DomHeap`, which replaced the DOC-09 `HostHeap` and now
 traces multiple documents (TD-17 paid).
 
-### TD-97 — Syntax the bytecode compiler rejects
+### TD-97 — Syntax the bytecode compiler rejects (Paid)
 
 JS-04 compiles functions, closures, control flow, destructuring, iteration,
 exceptions and classes (with `extends`, `super`, fields, static blocks and
@@ -1471,7 +1505,7 @@ the iterator and rethrows (keeping the original error over one from
 or `value` marks it done first, so nothing closes it, as for `for-of`.
 `destructuring_closes_iterators_on_abrupt_completion` covers it.
 
-### TD-101 — Strings concatenate by copying
+### TD-101 — Strings concatenate by copying (Paid)
 
 `a + b` allocates a new flat string. A loop that appends to one string copies
 it every time, which is quadratic in the final length.

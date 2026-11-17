@@ -2,17 +2,26 @@
 
 ## Current and planned coverage
 
-Today's suite covers M1–M3 and the M4 parser: focused unit and negative tests in
-every crate, seeded mutation tests against independent models (DOM tree,
-margin adjacency, `:has()` and invalidation, tracing), pinned upstream corpora
-(WPT URL and CSS parsing selections, html5lib tokenizer and tree records at
-every chunk split, Unicode IDNA and segmentation data, a css-flexbox WPT
-selection, HarfBuzz shaping references and the Test262 parse phase), CLI
-snapshot and reftests, and 18 deterministic fuzz targets. The
+Today's suite covers M1–M4 and the finished part of M5: focused unit and
+negative tests in every crate, seeded mutation tests against independent models
+(DOM tree, margin adjacency, `:has()` and invalidation, tracing), pinned
+upstream corpora (WPT URL and CSS parsing selections, html5lib tokenizer and
+tree records at every chunk split, Unicode IDNA and segmentation data, a
+css-flexbox WPT selection, HarfBuzz shaping references, and Test262 parse,
+execution, module and Intl gates with exact passing lists), garbage-collection
+stress runs (a collection at every safe point), the JavaScript limits,
+benchmark-checksum and heap-size gates, scripted-document tests on a manual
+clock (turn order, timers, input, frames, wrapper identity and DOM/JS cycle
+collection), CLI snapshot and reftests, and 21 deterministic fuzz targets. The
 [evidence table](README.md#evidence-at-a-glance) lists the counts and each
-subsystem document records its revision. Browser-hosted WPT, Test262 runtime
-execution, GC stress, integration servers, sanitizers and benchmark gates are
-planned; add each harness with the subsystem it tests.
+subsystem document records its revision. Browser-hosted WPT, integration
+servers, sanitizers and cross-engine benchmark runs are planned; add each
+harness with the subsystem it tests.
+
+Test262 is not vendored, so its gates are `#[ignore]` tests that need a pinned
+checkout ([JS.md](JS.md#conformance)). They are not part of `cargo test` or the
+hosted CI jobs: run them for every change to `rustic-js`, and record the counts
+when a passing list changes.
 
 | Layer | What it proves | First milestone / execution |
 | --- | --- | --- |
@@ -21,9 +30,9 @@ planned; add each harness with the subsystem it tests.
 | Pinned upstream parser data | Token/tree recovery against known fixtures | M1; selected required corpus |
 | Style/layout structural dumps | Cascade and box/fragment correctness | M2/M3; every relevant PR |
 | CPU image/reftests | Paint order, text, clips, geometry, resize | M3; small required suite plus scheduled broad suite |
-| Test262 | Language semantics and host-independent runtime behavior | M4; parse-phase gate today (manual, pinned checkout), runtime runner in JS-07 |
+| Test262 | Language semantics and host-independent runtime behavior | M4; parse, execution, module and Intl gates with exact passing lists (manual, pinned checkout) |
 | JS heap and benchmarks | Bytes per value kind, GC pause and throughput regressions | M4 (JS-09); see [PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) |
-| Scripted document fixtures | Bindings, GC edges, tasks/events, reentry and invalidation | M5; every relevant PR |
+| Scripted document fixtures | Bindings, GC edges, tasks/events, reentry and invalidation | M5; engine and bindings tests run today, invalidation with WEB-06, WPT `dom/` selection with `web.conformance` |
 | Network/profile integration | Redirects, policy, cancellation, partitioning and persistence | M6; loopback servers in PR jobs |
 | Hostile-peer/isolation tests | Broker and OS restrictions, process recovery | M7; supported-platform required gates |
 | WPT testharness/reftests | Exposed platform behavior through a real host/adapter | Incremental from M3/M5, integrated M8 |

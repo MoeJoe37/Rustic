@@ -1,18 +1,29 @@
-# JavaScript engine (JS-01 to JS-05)
+# JavaScript engine (M4, JS-01 to JS-09)
 
-`rustic-js` is Rustic's own ECMAScript implementation (M4, ADR 0001: no
-existing JavaScript engine is used or embedded). JS-01 provides the front end:
-UTF-16 source text, the lexical grammar, and a parser from scripts and modules
-to an abstract syntax tree with source spans. JS-02 adds the runtime data
-model (see [Runtime data model](#runtime-data-model-js-02)) and JS-03 its
-garbage collector (see [Garbage collection](#garbage-collection-js-03)).
-JS-04 compiles scripts to bytecode and runs them (see
-[Bytecode and interpreter](#bytecode-and-interpreter-js-04)), including
-generators (JS-08 part 1), promises with a job queue and async functions
-(JS-06 part 1), async generators with `for await` (JS-08 part 2) and
-regular expressions (JS-08 part 3), BigInt (JS-08 part 4), proxies with
-mapped `arguments` objects (JS-08 part 5) and typed arrays (JS-08 part 6);
-modules do not run yet.
+`rustic-js` is Rustic's own ECMAScript implementation (ADR 0001: no existing
+JavaScript engine is used or embedded). M4 closed on 2026-11-16 with every
+task done for its declared scope:
+
+| Task | What it provides | Section |
+| --- | --- | --- |
+| JS-01 | UTF-16 source text, the lexical grammar and a parser to an AST with source spans | [API](#api), [Scope](#scope), [Limits](#limits) |
+| JS-02 | 8-byte values, strings and atoms, shapes and objects | [Runtime data model](#runtime-data-model-js-02) |
+| JS-03 | Arena heap, roots, mark/sweep collection, weak references, host tracing | [Garbage collection](#garbage-collection-js-03) |
+| JS-04 | Register bytecode and the interpreter: functions, classes, generators, async functions, exceptions, inline caches | [Bytecode and interpreter](#bytecode-and-interpreter-js-04) |
+| JS-05 | The standard library | [Built-ins](#built-ins-js-05) |
+| JS-06 | Promises and jobs, realms, static modules, top-level await and dynamic imports | [Realms](#realms-js-06), [Static module loading](#static-module-loading-js-06) |
+| JS-07 | The Test262 runner and its exact passing lists | [Conformance](#conformance) |
+| JS-08 | RegExp, BigInt, Proxy, typed arrays, SharedArrayBuffer and Atomics, and ECMA-402 Intl | [Built-ins](#built-ins-js-05) and the Intl sections |
+| JS-09 | Limits, the benchmark corpus and the heap-size report | [Limits and performance gate](#limits-and-performance-gate-js-09) |
+
+What M4 left for later is recorded as technical debt, not hidden: proposal
+syntax (TD-89), Annex B functions in blocks (TD-99), function source text
+(TD-106), RegExp Unicode property escapes (TD-110), full collation tailorings
+(TD-107), calendars and zone names (TD-122), the fixed local time offset
+(TD-108), stop-the-world collection (TD-95) and native ARM64 timings (TD-125).
+The [payoff schedule](TECH_DEBT.md#payoff-schedule) says when each is due.
+The engine is used by documents through `rustic-bindings` and `rustic-engine`;
+see [SCRIPTING.md](SCRIPTING.md).
 
 ## API
 
@@ -598,8 +609,9 @@ calls a function value. The design is recorded in
     runner honors `CanBlockIsFalse` and expires `waitAsync` timeouts after
     the job queue drains.
 - **Not yet compiled** (rejected with `CompileError::Unsupported` before
-  anything runs, TD-97): modules and regular expression
-  literals that use a property escape (TD-110).
+  anything runs): regular expression literals that use a Unicode property
+  escape (TD-110). Modules compile and run; see
+  [Static module loading](#static-module-loading-js-06).
 - **Calls** never recurse in Rust between script functions: frames and
   registers live on vectors in the agent. `VmLimits` bounds frames (10,000),
   stack values (2²⁰, 8 bytes each) and script nested through native code

@@ -7,18 +7,31 @@ Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 
-**Status (2026-11-16).** M0 has a verified baseline; only the repository-rules
+**Status (2026-11-17).** M0 has a verified baseline; only the repository-rules
 follow-up is open. M1, M2, M3 and M4 are complete for their declared catalog
 scope: local HTML parses, styles, lays out, shapes text, paints and rasterizes
 to PNG on the CPU, and Rustic's own ECMAScript engine (JS-01 to JS-09, with
 Intl) runs scripts ([JS.md](JS.md)). The M4 ARM64 benchmark record is from
-QEMU emulation; native ARM64 timings are TD-125. M5 is the current milestone,
-with the task scheduler and the first DOM bindings in place. M6–M13 are
-unstarted. Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are
-carried forward (see [§6](#6-m3--static-document-renderer)). The
+QEMU emulation; native ARM64 timings are TD-125. **M5 is the current
+milestone**: the scheduler, Web IDL layer, `Window`/`Document`/node bindings,
+events, trusted input, timers and animation callbacks are done (WEB-01 to
+WEB-04, [SCRIPTING.md](SCRIPTING.md)); script loading, invalidation from
+script, forms, observers, the conformance gate and the first benchmark report
+are open ([§8](#8-m5--scripted-document-integration)). M6–M13 are unstarted.
+Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are carried
+forward (see [§8](#8-m5--scripted-document-integration)). The
 [progress summary](progress/summary.md) is the measured status and
 [implementation progress](IMPLEMENTATION.md) records each completed contract;
 neither implies more than its declared scope.
+
+**Verification status.** Hosted CI has been blocked by a billing limit since
+2026-11-08. Until it returns, every merge is checked in a Linux sandbox
+(native x86-64; emulated 32-bit ARM, 32-bit x86, RISC-V and big-endian s390x;
+compile checks for Linux aarch64, Windows, Android and iOS). No change since
+that date has run its tests natively on Windows x64/ARM64, macOS x64/ARM64 or
+Linux aarch64 ([TD-12](TECH_DEBT.md)). This does not block M5 or M6, whose
+code is platform-independent, but it blocks M7 and M8, which need those
+machines ([§10](#10-m7--isolation-and-security-gate)).
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
 coverage, GPU acceleration, WebAssembly, Rustic-only Manifest V2 extensions and
@@ -185,7 +198,7 @@ CSS compatibility is M9 work.
 | REN-06 | **Done**: `render` headless command, PNG output, layout/display-list dumps, resize/zoom and `hit-test` | REN-05 |
 | REN-07 | **Done for the declared gate**: `reftest` harness with fuzzy tolerances, checked fixtures, deterministic fonts; the `frame_budget` example measures repaint time | REN-06 |
 | REN-08 | **Done for the declared scope** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): block, text and `inline-flex` items; 38 of 91 pinned static css-flexbox WPT pages pass (TD-72). Grid and tables are M9 work | REN-07 |
-| MOB-03/04 | **Not done; carried forward.** Android/iOS local-fixture CPU surfaces through narrow native bridges. They need NDK/Xcode link and device runs that the current CI cannot provide. Target: land before M5 closes, as a parallel platform track that does not block M4 | REN-05; mobile core checks |
+| MOB-03/04 | **Not done; carried forward.** Android/iOS local-fixture CPU surfaces through narrow native bridges. They need NDK/Xcode link and emulator/simulator runs that only hosted CI runners (or a local machine with those SDKs) can provide. Scheduled as the parallel platform track of M5; see [§8](#8-m5--scripted-document-integration) for its completion test and what happens if CI is still blocked | REN-05; mobile core checks |
 
 **Status:** the M3 catalog gate (17 capabilities) is complete: block, inline and
 flex layout, positioned/replaced content, glyph/image paint, CPU raster,
@@ -218,10 +231,10 @@ interpreter speed and heap size are the performance of the product everywhere.
 | JS-02 | 8-byte values, coercions, references, completion records, strings and atoms, shapes, object internal methods/descriptors and elements | `js.values`, `js.objects` | JS-01 | **Done** for the data model ([JS.md](JS.md#runtime-data-model-js-02), ADR 0015); collection is JS-03, BigInt conversions came with JS-08 part 4 |
 | JS-03 | Heap: typed arenas with `u32` indices charged to a budget, handle scopes/roots, nonmoving mark/sweep, weak references, allocation-triggered collection, host-object tracing that replaces the DOC-09 `HostHeap` stand-in | `js.heap` | JS-02, DOC-09 (done) | **Done**: mark/sweep, roots, free lists, shape/atom collection, policy and stress mode, weak references, host tracing and the shared DOM/JS collection ([ADR 0016](adr/0016-js-garbage-collection.md)); allocation-triggered collection is at safe points only (TD-94) |
 | JS-04 | Bytecode compiler and interpreter: AST to register bytecode, control flow, functions, closures, calls/new, exceptions, property inline caches | `js.interpreter`, `js.functions` | JS-02, JS-03 | **Done**: scripts compile to register bytecode and run with functions, closures, calls/`new`, exceptions, iteration, limits, cancellation and inline caches ([ADR 0017](adr/0017-js-bytecode-interpreter.md)); classes with `extends`, `super`, fields, static blocks and private names; object-literal `super`, tagged templates and optional calls; generators, async functions and RegExp literals run (JS-06/JS-08); static modules, top-level await and dynamic imports run (JS-06) |
-| JS-05 | Core built-ins, arrays, strings, numbers, symbols, iterators, JSON, collections | `js.builtins` | JS-04 | **In progress**: Error and the native errors, `Object`, `Function` (constructor, `call`/`apply`/`bind`), `Array`, `String`, `Number`, `Math`, `JSON`, `Map`, `Set`, weak collections, `Reflect`, `Date`, iterator helpers, `eval`, `Symbol` statics, global functions and the primitive wrapper constructors ([JS.md](JS.md#built-ins-js-05)), 88.9% of the Test262 built-ins tests for those areas; function source text follows (TD-106, TD-107) |
+| JS-05 | Core built-ins, arrays, strings, numbers, symbols, iterators, JSON, collections | `js.builtins` | JS-04 | **Done** for M4: Error and the native errors, `Object`, `Function` (constructor, `call`/`apply`/`bind`), `Array`, `String`, `Number`, `Math`, `JSON`, `Map`, `Set`, weak collections, `Reflect`, `Date`, iterator helpers, `eval`, `Symbol` statics, global functions and the primitive wrapper constructors ([JS.md](JS.md#built-ins-js-05)). Open debt: function source text (TD-106), Annex B functions in blocks (TD-99), collection inside long native loops (TD-94) |
 | JS-06 | Promise jobs, realms, module records/loading hooks and dynamic imports without ambient I/O | `js.jobs`, `js.modules` | JS-04 | **Done**: `Promise`, the job queue and async functions run (part 1, [JS.md](JS.md)); promise rejection tracking (part 2) and [static module records and graph resolution](JS.md#static-module-loading-js-06) are implemented; module environments, live bindings, namespaces and synchronous evaluation, host-provided string metadata and top-level await and dynamic imports run; [realms](JS.md#realms-js-06) with per-realm intrinsics and `$262.createRealm` are implemented |
-| JS-07 | Standalone runner and pinned Test262 harness: strict/raw/module/negative/async metadata, per-test time and memory limits | evidence for `js.conformance` (M9) | JS-04 | **In progress**: the runner executes `test/language` with deterministic step and heap limits and an exact passing list (21,939 of 22,427 run files, 97.8%) and the JS-05/JS-06/JS-08 areas of `test/built-ins` (17,291 of 18,574, 93.1%); the separate module gate has 696 passes of 696 executed, with 121 proposal skips; `$262.evalScript` runs in the current global environment; the rest of `test/built-ins` follow (TD-105) |
-| JS-08 | BigInt, RegExp (own backtracking-bounded engine, pays TD-88), proxies, generators/async, typed arrays/buffers, Intl, in measured increments | `js.advanced`, `js.buffers`, `js.intl` | JS-05–JS-07 | **In progress**: generators (part 1), async generators with `for await` (part 2) and RegExp (part 3, TD-88 paid; property escapes are TD-110), BigInt (part 4, TD-92 paid) and proxies with mapped `arguments` objects (part 5) and ArrayBuffer, DataView and typed arrays (part 6) and SharedArrayBuffer and Atomics within one agent (part 7; cross-agent sharing is TD-115) run ([JS.md](JS.md)); Unicode normalization, locale identifiers, locale-sensitive casing, `Intl.Locale`, `Intl.ListFormat`, shared locale negotiation and [`Intl.Collator` with `localeCompare`](JS.md#intl-collation-js-08) [`Intl.PluralRules`](JS.md#intl-plural-rules-js-08) [`Intl.NumberFormat` with number `toLocaleString`](JS.md#intl-number-formatting-js-08) [`Intl.RelativeTimeFormat`](JS.md#intl-relative-time-formatting-js-08) [`Intl.DisplayNames`](JS.md#intl-display-names-js-08) [`Intl.DurationFormat`](JS.md#intl-duration-formatting-js-08) and [`Intl.Segmenter`](JS.md#intl-segmentation-js-08) are implemented. [`Intl.DateTimeFormat` and `Intl.supportedValuesOf`](JS.md#intl-date-and-time-formatting-js-08) are implemented for the supported calendars and data. Full collation tailorings (TD-107) and remaining calendar, zone-name and date-pattern work (TD-122) are open |
+| JS-07 | Standalone runner and pinned Test262 harness: strict/raw/module/negative/async metadata, per-test time and memory limits | evidence for `js.conformance` (M9) | JS-04 | **Done** for M4: the runner executes `test/language` with deterministic step and heap limits and an exact passing list (21,939 of 22,427 run files, 97.8%), the implemented areas of `test/built-ins` (17,291 of 18,574, 93.1%) and of `test/intl402` (1,240 of 1,326, 93.5%); the separate module gate has 696 passes of 696 executed, with 121 proposal skips; `$262.evalScript` and `$262.createRealm` work. `$262.gc`, `$262.agent` and the declared full pass rate are TD-105 and `js.conformance` (M9) |
+| JS-08 | BigInt, RegExp (own backtracking-bounded engine, pays TD-88), proxies, generators/async, typed arrays/buffers, Intl, in measured increments | `js.advanced`, `js.buffers`, `js.intl` | JS-05–JS-07 | **Done** for M4: generators (part 1), async generators with `for await` (part 2) and RegExp (part 3, TD-88 paid; property escapes are TD-110), BigInt (part 4, TD-92 paid) and proxies with mapped `arguments` objects (part 5) and ArrayBuffer, DataView and typed arrays (part 6) and SharedArrayBuffer and Atomics within one agent (part 7; cross-agent sharing is TD-115) run ([JS.md](JS.md)); Unicode normalization, locale identifiers, locale-sensitive casing, `Intl.Locale`, `Intl.ListFormat`, shared locale negotiation and [`Intl.Collator` with `localeCompare`](JS.md#intl-collation-js-08) [`Intl.PluralRules`](JS.md#intl-plural-rules-js-08) [`Intl.NumberFormat` with number `toLocaleString`](JS.md#intl-number-formatting-js-08) [`Intl.RelativeTimeFormat`](JS.md#intl-relative-time-formatting-js-08) [`Intl.DisplayNames`](JS.md#intl-display-names-js-08) [`Intl.DurationFormat`](JS.md#intl-duration-formatting-js-08) and [`Intl.Segmenter`](JS.md#intl-segmentation-js-08) are implemented. [`Intl.DateTimeFormat` and `Intl.supportedValuesOf`](JS.md#intl-date-and-time-formatting-js-08) are implemented for the supported calendars and data. Open debt: RegExp property escapes (TD-110), full collation tailorings (TD-107), calendars, zone names and date patterns (TD-122), the fixed local time offset of `Date` (TD-108), and the size of the embedded locale data (TD-120) |
 | JS-09 | Limits and performance gate: cancellation, JS stack and heap limits, GC stress mode, the JS benchmark corpus and heap-size report (see below) | `js.limits` | JS-04; grows with JS-05–JS-08 | **Done**: limits, ropes (TD-101 paid), the eight-workload corpus with its runner and deterministic gates, the committed heap-size report and recorded x86-64 results ([JS.md](JS.md#limits-and-performance-gate-js-09)); the ARM64 record is from QEMU emulation, native ARM64 timings are TD-125 |
 
 ### Memory and performance design
@@ -292,66 +305,100 @@ decoder/validator/interpreter can be tested independently and should reuse the
 JS-03 heap, budgets and cancellation; full JS/Web binding, baseline feature and
 mobile gates remain mandatory through M9.
 
+**Status:** complete on 2026-11-16 (13 of 13 catalog capabilities). The gate
+was met with one recorded exception: the ARM64 benchmark record comes from QEMU
+emulation, accepted by the maintainer, with native timings owed as TD-125.
+The debt M4 left open is listed per task above and scheduled in the
+[payoff schedule](TECH_DEBT.md#payoff-schedule); none of it blocks M5.
+
 ## 8. M5 — Scripted document integration
 
-| Task | Work and deliverable | Prerequisite |
-| --- | --- | --- |
-| WEB-01 | Agent/task sources, microtask checkpoints, safe points, fake clock/timers, rendering opportunities and cancellation | JS-06, [engine lifecycle](adr/0020-document-lifecycle.md) |
-| WEB-02 | Web IDL subset generator and conversions, wrapper identity, DOM/JS tracing and exceptions | DOC-09, JS-03 |
-| WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | WEB-02, CSS-02 |
-| WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | WEB-01, WEB-03 |
-| WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | DOC-06, WEB-01–WEB-03 |
-| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | M3, WEB-03 |
-| WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | WEB-04–WEB-06 |
+M5 joins the static renderer (M3) and the JavaScript engine (M4): scripts in a
+local page run, change the document and see the result rendered. Everything
+stays local and deterministic; no network, no native window.
+[SCRIPTING.md](SCRIPTING.md) describes what is built.
 
-WEB-01 is complete for the host scheduler. The document pump selects
-immediate scripts, due timers and offered rendering opportunities. It
-bounds microtask checkpoints, shares lifecycle cancellation and orders
-rendered output with document-scoped tickets.
-[ADR 0021](adr/0021-document-script-turns.md),
-[ADR 0022](adr/0022-document-task-sources-and-timers.md),
-[ADR 0023](adr/0023-document-rendering-turns.md)
+| Task | Work and deliverable | Catalog | Prerequisite | Status |
+| --- | --- | --- | --- | --- |
+| WEB-01 | Agent/task sources, microtask checkpoints, safe points, fake clock/timers, rendering opportunities and cancellation | `base.lifecycle`, `web.scheduler` | JS-06, [engine lifecycle](adr/0020-document-lifecycle.md) | **Done** (ADR 0020–0023) |
+| WEB-02 | Web IDL subset generator and conversions, wrapper identity, DOM/JS tracing and exceptions | `web.idl` | DOC-09, JS-03 | **Done** (ADR 0024–0027); generated metadata covers the character-data interfaces, other interfaces are hand-bound (TD-126), `DOMException` extras are TD-124 |
+| WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | `web.window` | WEB-02, CSS-02 | **Done** for the declared scope (ADR 0028–0033): live `window`/`document`, node creation and mutation, selectors, NodeLists and HTMLCollections, detached documents and adoption. Open debt: TD-126, TD-127, TD-129, TD-130 |
+| WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
+| WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **Next.** Not started; needs an ADR first |
+| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | Not started; needs an ADR first |
+| WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | Not started |
+| WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | Not started |
+| PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | Not started; runs in parallel |
+| MOB-03/04 | Android/iOS local-fixture CPU surfaces (carried over from M3) | evidence for `platform.android`, `platform.ios` (M8) | REN-05; hosted CI or a machine with the NDK and Xcode | Blocked on CI; runs in parallel |
 
-WEB-02 has string and 32-bit integer conversion helpers with rooted
-coercion and JavaScript exception propagation. A pinned generator emits
-binding metadata for the initial DOM text interfaces. Its wrapper cache
-preserves realm identity across adoption and traces all registered
-documents together. Document scripts can construct `DOMException` and
-host bindings can throw it for document failures. WEB-03 now exposes
-the live document, initial node traversal and child mutation operations.
-Document script and promise-job safe points use the joint collector.
-The document can create nodes, and scripts can edit UTF-16 character data
-and element content attributes. Scoped selectors use the CSS matcher.
-`querySelectorAll` and `childNodes` provide static and live NodeLists.
-`children` and the descendant name, namespace, and class methods return live
-HTMLCollections with indexed and named properties. A top-level WindowProxy
-gives document scripts and callbacks a stable global identity, including
-`document.defaultView`. WEB-03 also covers detached HTML/XML documents,
-namespace-aware element and attribute operations, cloning, importing, and
-cross-document adoption and insertion. The shared collector reclaims
-unreachable documents. Named windows and frame, navigation, and origin
-integration are tracked as TD-130.
-[ADR 0028](adr/0028-scripted-document-collection.md),
-[ADR 0029](adr/0029-scripted-node-creation.md),
-[ADR 0030](adr/0030-dom-selectors-and-node-lists.md),
-[ADR 0031](adr/0031-live-html-collections.md),
-[ADR 0032](adr/0032-top-level-window-realm.md),
-[ADR 0033](adr/0033-detached-documents-and-adoption.md)
-[ADR 0024](adr/0024-web-idl-conversions.md),
-[ADR 0025](adr/0025-pinned-dom-idl-metadata.md),
-[ADR 0026](adr/0026-realm-dom-wrappers.md),
-[ADR 0027](adr/0027-host-exception-bindings.md)
+### Remaining work, in order
 
-WEB-04 covers synchronous EventTarget dispatch, capture and bubble phases,
-listener options, cancellation, and reentrant callbacks against the live DOM.
-The host can queue trusted primary clicks and key input for connected
-targets. Buttons support Enter and Space activation. Checkboxes support click
-and Space activation with rollback and input/change delivery. Window timers
-share the document scheduler and animation callbacks run before the renderer.
-WEB-07 covers focus, editing, forms, observers and further control defaults.
-[ADR 0034](adr/0034-dom-event-dispatch.md),
-[ADR 0035](adr/0035-trusted-input-and-activation.md),
-[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
+Each item lists the test that completes it. Split an item into several
+commits, but do not start the next one's bindings before the current one's
+ADR is accepted.
+
+1. **WEB-05 — scripts in documents.** Write the ADR for parser/script reentry
+   (ADR 0009 left it pending). Then:
+   - Inline and local external classic scripts run at the parser's insertion
+     point; the tree builder runs with scripting on, and the 16 html5lib
+     records skipped for scripting (TD-10) join the corpus.
+   - `async`, `defer` and module scripts run in the specified order, proven on
+     the manual clock with external files that "arrive" in every order.
+   - `document.readyState`, `DOMContentLoaded` and `load` fire in order;
+     `document.currentScript` is correct; a script error does not stop later
+     scripts.
+   - `document.write` during parsing either works for the declared cases or
+     throws an explicit, documented error. It must not be silently ignored.
+   - A script that never ends, nests parsers or writes without bound stops
+     within the document's budgets and leaves the engine usable.
+   - `rustic render` and the dumps run page scripts when asked (off by
+     default, so existing fixtures stay byte-identical).
+2. **WEB-06 — invalidation from script.** Write the ADR for who owns style
+   and layout state between turns (it changes ADR 0023). Then:
+   - A rendering turn after any script mutation produces the same pixels as
+     rendering the mutated document from scratch. This is a differential
+     test and a fuzz target, reusing the M2 invalidation parity machinery.
+   - Reading layout from script (`getBoundingClientRect`, `offsetWidth`,
+     `getComputedStyle`) flushes exactly once per dirty state; the number of
+     flushes per turn is observable to the host and bounded.
+   - A frame started before a mutation cannot be presented after it (frame
+     epochs), and a stylesheet or image that completes later lands in the
+     right order.
+3. **WEB-07 — observers, errors, focus and forms.**
+   - `MutationObserver` records are delivered at the microtask checkpoint in
+     the specified order relative to promise jobs (`dom.observers`).
+   - Uncaught errors and unhandled rejections reach `window.onerror`,
+     `error` and `unhandledrejection` events and a host console sink
+     (pays the error-reporting part of TD-131).
+   - Focus: `focus()`, `blur()`, `document.activeElement`, focus events and
+     sequential focus navigation by Tab.
+   - Forms: text input and editing of `value`, form owners (pays TD-31),
+     `submit` and constraint validation without navigation (`web.input`).
+   - The remaining observer step of `web.observers` (at least
+     `ResizeObserver` or `IntersectionObserver` integrated with rendering
+     turns) is delivered or its scope is narrowed in the catalog with a
+     reason.
+4. **WEB-09 — conformance gate.** Pin a WPT revision and select directories
+   that match the implemented surface (`dom/nodes`, `dom/events`,
+   `dom/collections`, `html/webappapis/timers`, `html/webappapis/animation-frames`).
+   Run them with the upstream `testharness.js` and keep an exact
+   expectation list with a ratchet, as CSS-08 and JS-07 do. The denominator
+   and every expected failure are published.
+5. **PERF-01, M5 slice (parallel).** A harness that runs the JS-09 corpus and
+   a small DOM corpus (create/append/query/dispatch) in Rustic and in the
+   released V8, SpiderMonkey and JavaScriptCore shells, on x86-64 and ARM64,
+   and writes a report with exact versions, medians and confidence intervals.
+   Speedometer, JetStream and MotionMark are listed as "not runnable" until
+   the engine can load them. This also pays TD-125 if the ARM64 run is on
+   native hardware. The `perf.harness` capability as a whole needs reference
+   devices on all five platform families, so it stays open until M8; M5
+   needs only this first report.
+6. **MOB-03/04 (parallel, blocked).** Pixels from a headless render on an
+   Android emulator (ARM64 and x86-64) and an iOS simulator match the desktop
+   CPU output for the M3 fixtures. This needs NDK and Xcode runners. If
+   hosted CI is still blocked when items 1–5 are done, M5 closes without it
+   and MOB-03/04 becomes the first task of the M8 mobile hosts; record that
+   decision in the M5 completion review rather than leaving it implied.
 
 **Demo:** a local scripted counter, form validation fixture, timer, event bubbling,
 and DOM/style mutation update the rendered surface deterministically.
@@ -360,6 +407,26 @@ and DOM/style mutation update the rendered surface deterministically.
 without borrow failures, detached DOM cycles are collected, and navigation/close
 cancels pending work. API exposure is driven by implemented bindings. The mere
 presence of a property does not count as correct API support.
+
+### M5 exit checklist
+
+- [ ] The five demo fixtures are checked-in reftests that pass with scripts on.
+- [ ] `web.scripts`, `html.scripts`, `dom.observers`, `web.input`,
+      `web.observers` and `web.conformance` are complete in the catalog with
+      source and test evidence.
+- [ ] The WEB-09 expectation list, its WPT revision and its counts are in
+      [SCRIPTING.md](SCRIPTING.md) and the [evidence table](README.md#evidence-at-a-glance).
+- [ ] The first PERF-01 report is committed under `docs/reviews/`.
+- [ ] Fuzz targets exist for script-driven mutation with rendering and for
+      the event/timer pump, and run in the smoke job.
+- [ ] The full suite passes on every tier that can run: native x86-64, the
+      four emulated tiers, MSRV and the cross-checks; and on native Windows,
+      macOS and Linux aarch64 if hosted CI is back.
+- [ ] Every open TD entry whose trigger is M5 work (TD-10, TD-31, TD-118,
+      TD-126, TD-129 to TD-132) is paid or given a later, named trigger.
+- [ ] A completion review is written (`docs/reviews/YYYY-MM-DD-m5-completion.md`)
+      and the status tables in this file, [README.md](README.md) and the root
+      README are updated in the same change.
 
 ## 9. M6 — Controlled networking and browser services
 
@@ -381,6 +448,38 @@ fixture is denied. Tests use an isolated profile, not personal browsing data.
 are rechecked, origin/storage/cache separation and response filtering tests pass,
 and parser/resource limits cover streaming/decompression. This is a development
 network prototype. General remote browsing is still gated on M7.
+
+### M6 entry checklist
+
+M6 adds Rustic's first network code and probably its first non-font
+dependency, so these are settled before NET-01 starts:
+
+- [ ] **Transport and TLS ADR.** Which reviewed library (or libraries)
+      provides TLS and certificate verification, and whether HTTP/1.1 is
+      Rustic's own code on top. The choice must build and verify certificates
+      on every release platform: Windows x64 and ARM64, macOS x64 and ARM64,
+      Linux x64 and aarch64, Android (ARM64, 32-bit ARM, x86-64) and
+      iOS/iPadOS, using each platform's trust store, and must also compile on
+      the 32-bit x86, RISC-V and big-endian tiers. A library that needs a C
+      toolchain or assembly per target is a cost to state in the ADR, not a
+      surprise in CI. [DEPENDENCIES.md](DEPENDENCIES.md) gives the review steps.
+- [ ] **Encoding ADR** (`url.encoding`, `url.restart`): own decoders
+      generated from the pinned Encoding Standard indexes, or a reviewed
+      crate. Pays TD-28.
+- [ ] **Parse budgets stop being fatal** (TD-02): a page over a node or depth
+      budget must degrade visibly, not fail to load. Its trigger is "before
+      real-page loading", which is NET-02.
+- [ ] **Base URLs reach stylesheets** (TD-26) so `url()` values resolve.
+- [ ] **Loopback fixture server design.** Tests never touch the public
+      internet; the server is in-process, binds to loopback only and works
+      under the emulated tiers.
+- [ ] **Async model.** Whether network I/O uses a reviewed runtime or
+      Rustic's own poll loop behind the existing task sources. The scheduler
+      of ADR 0021–0023 stays the only place page-visible ordering is decided.
+
+Suggested order inside M6: NET-01, then `url.encoding` with NET-02 (a real
+response needs both), NET-03, NET-05 (policy before more features), NET-04,
+NET-06, NET-07.
 
 ## 10. M7 — Isolation and security gate
 
@@ -409,6 +508,25 @@ file/network/other-site operations fail at the OS or broker boundary.
 and focused external review where available. Unresolved sandbox escapes, origin
 confusion, or native memory issues block remote browsing. A failed sandbox setup
 is an explicit error, not a reason to launch an unsandboxed renderer silently.
+
+### M7 entry checklist
+
+- [ ] **Native runners for every platform family exist and are green.** A
+      sandbox cannot be verified by cross-compiling. ISO-03 needs Linux x64
+      and aarch64, ISO-04 needs Windows x64 and ARM64 and macOS x64 and ARM64,
+      and ISO-08/MOB-07 need an Android emulator or device and an iOS
+      simulator or device. Restoring hosted CI (or replacing it with
+      self-hosted runners) is therefore a hard prerequisite of M7, not a
+      convenience ([TD-12](TECH_DEBT.md)).
+- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format, each
+      with the threat it answers in [SECURITY.md](SECURITY.md).
+- [ ] **The engine already runs split.** Before OS restrictions are added,
+      the renderer runs in a child process over the ISO-02 IPC on Linux with
+      no restrictions, and the M5/M6 suites pass through it. Isolation bugs
+      are then separable from IPC bugs.
+- [ ] **Fuzz targets for every M6 parser and policy decision** (HTTP
+      framing, cookies, CSP, CORS) run in the smoke job, because M7 treats
+      the network process as a hostile peer.
 
 ## 11. M8 — Reference desktop and mobile alpha
 
@@ -623,20 +741,27 @@ it is fixed or a reviewed exception is published.
 ## 17. Current implementation queue
 
 Work in order unless a row says it runs in parallel. Status is as of
-2026-11-11; [implementation progress](IMPLEMENTATION.md) records each finished
-contract. The original twelve-item M1 queue (DOC-01a to DOC-09) is complete.
+2026-11-17; [implementation progress](IMPLEMENTATION.md) records each finished
+contract, and [§8](#8-m5--scripted-document-integration) has the detailed
+completion tests. The M1 queue (DOC-01a to DOC-09) and the M4 queue (JS-01 to
+JS-09) are complete.
 
 | Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
-| 1 | JS-02: values, coercions, strings/atoms, shapes and objects | Abstract-operation unit tests against the specification; 8-byte `Value` size asserted on every CI target | Done |
-| 2 | JS-03: arena heap, roots and mark/sweep with host tracing | DOC-09's detached-tree and listener-cycle tests pass against the real heap; GC-at-every-allocation stress mode; budget exhaustion is atomic | Done |
-| 3 | JS-04: register bytecode, interpreter, functions and inline caches | Closures, exceptions and calls run; deep recursion fails with `RangeError` without Rust stack growth; cancellation stops `for(;;){}` | Done (modules follow with JS-06) |
-| 4 | JS-07: standalone runner and Test262 harness | Published counts at a pinned revision with exact expected failures | In progress: `test/language` counts published in [JS.md](JS.md#test262-execution-js-07) with an exact passing list |
-| 5 | JS-09: benchmark corpus and heap report | Recorded time and bytes per workload on x64 and ARM64; regressions over 10% need an explanation | Recorded for M4: x64 native, ARM64 under QEMU emulation (TD-125) |
-| 6 | JS-05, JS-06, JS-08 | Their Test262 selections, each with an exact expected list | Planned |
-| — | MOB-03/04: Android/iOS CPU surfaces (parallel platform track) | Headless pixels match on device/emulator/simulator | Carried over from M3 |
-| — | PERF-01: cross-engine benchmark harness (Speedometer, JetStream, MotionMark and Rustic's corpus against Blink, Gecko and WebKit) | First recorded report on x64 and ARM64 with exact browser versions | Starts with M5; JS-09 feeds it |
-| — | M0 follow-up: require the `CI` check on `main` | Repository ruleset active | Waiting for GitHub Actions billing to be restored |
+| done | WEB-01 to WEB-04: scheduler, Web IDL, bindings, events, input, timers | See [SCRIPTING.md](SCRIPTING.md) | Done |
+| 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass; async/defer/module order holds for every arrival order; `rustic render` runs a scripted fixture | Next; ADR first |
+| 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
+| 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Planned |
+| 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Planned; needs WEB-05 |
+| 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS and encoding ADRs accepted | Planned |
+| — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Parallel; not started |
+| — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | Parallel; blocked on hosted CI |
+| — | Restore hosted CI | A green run on the full native matrix; then require the `CI` check on `main` (M0 follow-up) and re-verify the merges made since 2026-11-08 on Windows, macOS and Linux aarch64 | Waiting for GitHub Actions billing; hard prerequisite of M7 |
+| — | Debt due now | The "Due in M5" rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule) | With the tasks above |
+
+Update this table in the same change that finishes a task. When it and the
+[progress summary](progress/summary.md) disagree, the summary is the measured
+state and this table is stale.
 
 For every task record its ID, dependencies, specification section/revision,
 in/out scope, input/output contract, acceptance fixtures, budget behavior, and
@@ -668,4 +793,9 @@ review and a threat-model update; dependency additions get a boundary review.
 | Upstream standards/tests change | Baseline shifts without code changes | Pin revisions; update in reviewed changes with before/after counts |
 | Parity target keeps moving | Other engines ship features faster than Rustic adds them | Inventory refresh every release; prioritize features shipped by all three and by measured site breakage |
 | Leadership gap stays wide | Ratchet misses at M8/M10 | Profile the biggest gap first; fix representation before adding tiers; no gate is lowered without a reviewed plan update |
+| Native platforms go unverified | Hosted CI stays blocked; merges are checked only on Linux (native x86-64 plus emulation) and compile-checked elsewhere | Keep the sandbox gate strict; restore or replace CI before M7; when it returns, run the whole suite on Windows, macOS and Linux aarch64 before any new feature work and fix what it finds first |
+| Docs drift from code | Status tables, counts or "next task" pointers contradict the progress summary | Every finishing change updates [§17](#17-current-implementation-queue) and the docs index; a milestone cannot close without its completion review; prefer links to generated numbers over copied ones (TD-08) |
+| Hand-written bindings do not scale | Each new interface repeats conversion and brand-check code; fixes are applied to one interface and missed in others | Extend the pinned IDL generator (ADR 0025) to each interface family before binding it; TD-126 tracks the hand-bound surface |
+| Script-driven layout thrash | Flush counts per turn grow with page size in WEB-06 tests | Count and bound flushes; keep the from-scratch render as the reference; no caching without the differential test |
+| First network dependency widens the trusted base | Transitive crates, C code or per-target assembly appear with the TLS choice | Decide by ADR before NET-01; `cargo deny` and the dependency review gate; all platforms and tiers must build before adoption |
 | JIT weakens memory safety | Fuzzing finds miscompiles or code-memory misuse | Interpreter fallback, W^X, confined `unsafe` crate, differential fuzzing; JIT off by policy where it cannot be verified |

@@ -50,6 +50,32 @@ behavior evidence, not device support: device support still requires the
 native host, rendering, input, lifecycle and performance gates in the
 [roadmap](ROADMAP.md) and [mobile plan](MOBILE.md).
 
+## Current verification status (2026-11-17)
+
+The tiers above describe the configured CI. GitHub has not started hosted
+jobs since 2026-11-08 because of an account billing limit. Merges since then
+are checked by the sandbox gate of
+[DEVELOPMENT.md](DEVELOPMENT.md#branches-and-merging), which runs on one Linux
+x64 machine and can therefore cover less:
+
+| Platform | What the sandbox gate can show |
+| --- | --- |
+| Linux x64 | Full suite, native |
+| Linux 32-bit ARM, 32-bit x86, RISC-V, big-endian s390x | Full suite under QEMU |
+| Linux aarch64 | Compile check. The JavaScript benchmark corpus was also run once under QEMU for M4 (TD-125) |
+| Windows x64 and ARM64 | Compile check at most (GNU-ABI targets); no test run, nothing for the MSVC targets |
+| macOS x64 and ARM64 | Nothing: these targets cannot be built or run from a Linux sandbox |
+| Android (ARM64, 32-bit ARM, x86-64, x86) | Compile check, as in hosted CI |
+| iOS/iPadOS (device and simulator) | Compile check of the shared libraries, as in hosted CI |
+
+Each merge records the scope it actually ran. The shared engine is safe, portable Rust with no OS-specific code yet, which
+keeps the risk of an undetected break low, but it is not zero: path handling,
+line endings, file system behavior and thread stack sizes differ on Windows
+and macOS. When hosted CI returns, the first job is a full native run on
+every tier and fixing whatever it finds, before new feature work
+([TD-12](TECH_DEBT.md), [ROADMAP §17](ROADMAP.md#17-current-implementation-queue)).
+Native runners are a hard prerequisite of M7 (sandboxes) and M8 (hosts).
+
 ## Reproducing locally
 
 Native: `cargo test --locked --workspace --all-targets` on the device.

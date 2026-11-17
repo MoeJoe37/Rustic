@@ -27,12 +27,19 @@ segmentation) over pinned CLDR and time zone data. It is designed around
 memory use and interpreter speed
 ([plan](docs/ROADMAP.md#memory-and-performance-design)); the
 [JavaScript notes](docs/JS.md) give the Test262 results, the benchmark corpus
-and what is left for later milestones. M5 has host-queued script tasks,
-one-shot timers, microtask checkpoints, scheduled rendering turns and the first
-DOM bindings with joint DOM/JS garbage collection. HTML script loading is
-still planned.
-Networking and native app hosts are later milestones. See the
-[implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
+and what is left for later milestones.
+
+M5 connects that engine to documents. A host can already queue scripts and
+trusted input against a parsed document: script sees a live `window` and
+`document`, creates, moves and queries nodes, dispatches events, and uses
+timers and `requestAnimationFrame`, with one garbage collector tracing the DOM
+and the JavaScript heap together ([scripted documents](docs/SCRIPTING.md)).
+A rendering turn gives the host the live tree to render again in full.
+`<script>` elements do not run yet, the engine does not yet track which styles
+and boxes a script change invalidates, and forms, focus and mutation observers
+are still to come; the [roadmap](docs/ROADMAP.md#8-m5--scripted-document-integration)
+lists what closes M5. Networking and native app hosts are later milestones.
+See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 <!-- rustic-progress:start -->
 
@@ -60,7 +67,8 @@ Networking and native app hosts are later milestones. See the
 | [DOM](docs/DOM.md) | Node storage, mutation, adoption and the tracing prototype |
 | [CSS](docs/CSS.md) | Syntax, selectors, values, cascade, queries, invalidation and computed style |
 | [Layout](docs/LAYOUT.md), [text](docs/TEXT.md) and [paint](docs/PAINT.md) | The M3 static renderer |
-| [JavaScript](docs/JS.md) | The M4 engine, starting with the parser |
+| [JavaScript](docs/JS.md) | The M4 engine: parser, heap, interpreter, standard library, Intl and its Test262 results |
+| [Scripted documents](docs/SCRIPTING.md) | The M5 integration: script turns, bindings, events, timers and what is still open |
 | [Technical debt](docs/TECH_DEBT.md) | Known shortcuts and the rules that keep them safe |
 | [Platform and device support](docs/PLATFORMS.md) | Any device that can run a browser: portability rules and the CI target matrix |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |
@@ -128,8 +136,8 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-raster` | CPU rasterizer and PNG output |
 | `rustic-codecs` | Bounded inflate, PNG, JPEG, GIF and WebP decoders |
 | `rustic-js` | ECMAScript parser, garbage-collected heap, bytecode interpreter, standard library and Intl |
-| `rustic-bindings` | Node wrappers and the shared DOM/JS garbage collection |
-| `rustic-engine` | Viewport configuration |
+| `rustic-bindings` | Web IDL conversions, `Window`/`Document`/node wrappers, events, and the shared DOM/JS garbage collection |
+| `rustic-engine` | Document lifecycle, script, input, timer and rendering turns, viewport configuration |
 | `rustic-cli` | The `rustic` development tool |
 | `rustic-fuzz` | Deterministic mutation fuzzing (21 targets) |
 

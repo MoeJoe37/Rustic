@@ -627,7 +627,7 @@ retries and line breaking:
   `white-space` of the nearest common ancestor of the two sides deciding
   whether wrapping is allowed. `break-spaces` breaks after each space.
 - **Shaping.** Runs split at bidi level, style and box boundaries are shaped
-  with each style's `font-family` fallback chain ([TEXT.md](TEXT.md#shaping)).
+  with each style's `font-family` fallback chain ([TEXT.md](TEXT.md#opentype-shaping-and-positions)).
   Inline box margins, borders and padding become zero-height edge pieces.
 
 ### Line boxes

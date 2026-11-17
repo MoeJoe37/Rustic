@@ -6,7 +6,7 @@ the [progress summary](progress/summary.md) describe working code, and every
 status there is backed by tests. Update the relevant document (and a decision
 record when a boundary changes) in the same change as the code.
 
-## Where things stand (2026-11-11)
+## Where things stand (2026-11-17)
 
 | Milestone | State | Read |
 | --- | --- | --- |
@@ -14,21 +14,36 @@ record when a boundary changes) in the same change as the code.
 | M1 Document core | Done (28/28 capabilities): URL, HTML tokenizer and tree builder, DOM, local `dump-dom` | [URL.md](URL.md), [HTML.md](HTML.md), [HTML_TREE.md](HTML_TREE.md), [DOM.md](DOM.md) |
 | M2 Styles | Done (8/8): CSS syntax, selectors, values, cascade with layers, media/container queries, invalidation | [CSS.md](CSS.md) |
 | M3 Static rendering | Done (17/17): block/inline/flex layout, OpenType text, images, CPU raster, `render`, reftests, hit testing | [LAYOUT.md](LAYOUT.md), [TEXT.md](TEXT.md), [PAINT.md](PAINT.md) |
-| M4 JavaScript | Current: parser done, values/objects in progress, nothing executes yet | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
-| M5–M10 | Not started: scripted pages, networking, isolation, desktop/mobile alpha, compatibility, beta | [ROADMAP.md](ROADMAP.md) |
+| M4 JavaScript | Done (13/13) on 2026-11-16: parser, collected heap, bytecode interpreter, standard library, modules, realms, Intl, limits and benchmark gate. The ARM64 benchmark record is from emulation (TD-125) | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
+| M5 Scripted documents | Current (5/12): script, timer, input and rendering turns, Web IDL conversions, `Window`/`Document`/node bindings and events are done. Open: `<script>` loading, invalidation from script, forms and focus, observers, the conformance gate and the first benchmark report | [SCRIPTING.md](SCRIPTING.md), [ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration) |
+| M6–M10 | Not started: networking, isolation, desktop/mobile alpha, compatibility, beta. M6 and M7 have entry checklists | [ROADMAP.md](ROADMAP.md) |
 | M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, full engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
 
 The [progress summary](progress/summary.md) is regenerated from
 `progress/catalog.json` and is the measured status. Done means done for the
 milestone's declared scope; broad web compatibility is M9 work and native
-Android/iOS host acceptance is M8 work.
+Android/iOS host acceptance is M8 work. The capability counts in this table
+come from that summary; when they disagree, the summary is right and this
+table needs an update.
+
+Two things are true of every milestone so far and are easy to miss:
+
+- **Platform evidence is uneven.** Hosted CI has been blocked by a billing
+  limit since 2026-11-08, so recent merges are verified in a Linux sandbox:
+  native x86-64, emulated 32-bit ARM, 32-bit x86, RISC-V and big-endian, and
+  compile checks for Linux aarch64, Windows, Android and iOS. Native Windows
+  (x64 and ARM64), macOS (x64 and ARM64) and Linux aarch64 test runs are
+  waiting for CI to come back ([TD-12](TECH_DEBT.md), [PLATFORMS.md](PLATFORMS.md)).
+- **Nothing runs on a phone yet.** Android and iOS are compile-checked only;
+  the first on-device surface is MOB-03/04, scheduled in
+  [ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration).
 
 ## Reading order
 
 New to the project? Read these in order:
 
 1. [Architecture](ARCHITECTURE.md): components, ownership, execution and data flow.
-2. [Roadmap](ROADMAP.md): milestones, task IDs, gates, the current queue and risks.
+2. [Roadmap](ROADMAP.md): milestones, task IDs, gates, the [current queue](ROADMAP.md#17-current-implementation-queue) and risks.
 3. [Implementation progress](IMPLEMENTATION.md): every finished task and its tested contract.
 4. [Technical debt](TECH_DEBT.md): known shortcuts (TD-NN) and the rules that keep them safe.
 5. [Platform support](PLATFORMS.md): the any-device rule and the CI target matrix.
@@ -58,7 +73,7 @@ New to the project? Read these in order:
 | [MOBILE.md](MOBILE.md) | Android and iOS architecture, MOB-01–10 |
 | [DEPENDENCIES.md](DEPENDENCIES.md) | What "from scratch" means, the dependency policy and the reviewed crates |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Toolchain, local checks, CI jobs and failure diagnosis |
-| [adr/](adr/README.md) | Architecture decision records |
+| [adr/](adr/README.md) | Architecture decision records, grouped by area, and the decisions still to be written |
 
 **Implemented subsystems** (each states its scope, limits and evidence)
 
@@ -72,7 +87,8 @@ New to the project? Read these in order:
 | [LAYOUT.md](LAYOUT.md) | Box tree, block/inline/flex layout, floats and positioning |
 | [TEXT.md](TEXT.md) | Unicode data, fonts, shaping, bidi and line breaking |
 | [PAINT.md](PAINT.md) | Display lists, CPU raster, image decoding and hit testing |
-| [JS.md](JS.md) | The JavaScript lexer and parser (more as M4 lands) |
+| [JS.md](JS.md) | The JavaScript engine: parser, heap and collector, bytecode interpreter, built-ins, modules, realms, Intl, Test262 gates and benchmarks |
+| [SCRIPTING.md](SCRIPTING.md) | Scripted documents: lifecycle, script/timer/input/rendering turns, Web IDL, DOM bindings, events and the open M5 work |
 
 **History:** [reviews/](reviews/) holds dated milestone and checkpoint reviews.
 [IMPLEMENTATION.md](IMPLEMENTATION.md) and [PROGRESS.md](PROGRESS.md) keep
@@ -89,12 +105,15 @@ an earlier one's "remaining" notes.
 | CSS | 8,041 color cases; 1,115 of 1,455 in-scope pinned WPT parsing cases with a reasoned ratchet |
 | Layout and paint | Exact-geometry tests, checked reftests, 38 of 91 static css-flexbox WPT pages |
 | Text | Shaping compared against 30 committed HarfBuzz reference cases |
-| JavaScript | 22,956 of 23,123 Test262 `test/language` files parse correctly (parse phase only) |
-| Robustness | 18 deterministic fuzz targets with a required smoke job and a nightly campaign |
+| JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required; 21,939 of the 22,427 that run pass (97.8%); 17,291 of 18,574 in the gated `test/built-ins` areas pass (93.1%); 1,240 of 1,326 in the gated `test/intl402` areas pass (93.5%); all 696 executed module files pass. Eight benchmark workloads with pinned checksums and a committed heap-size report |
+| Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock; binding tests for identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles. No WPT `dom/` or `html/` results yet (`web.conformance`) |
+| Robustness | 21 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
 | Platforms | Native tests on x64/ARM64 Linux, Windows and macOS; emulated 32-bit ARM/x86, RISC-V and big-endian; cross-checks for Android, iOS and eight more targets |
 
-There are no whole-WPT or full Test262 pass rates, sandbox guarantees,
-comparative performance results or releases yet. The only third-party Rust
+There are no whole-WPT pass rates, no Test262 rate over the whole suite
+(each gate covers the implemented areas, and proposal features are skipped),
+no sandbox guarantees, no comparison with another engine's performance and no
+releases yet. The only third-party Rust
 crates are the reviewed font adapters of [ADR 0014](adr/0014-reviewed-font-adapters.md).
 Configuration in the repository is distinct from a successful hosted run;
 inspect the [Actions page](https://github.com/MoeJoe37/Rustic/actions) for run

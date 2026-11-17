@@ -1,0 +1,226 @@
+# Scripted documents (M5)
+
+This is the guide to how JavaScript and a document meet in Rustic. It ties
+together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
+to [ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)), which each
+describe one step, and says plainly what is not built yet. The tested contract
+of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
+WEB-01 to WEB-04; the plan for the rest is
+[ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration).
+
+## What works today
+
+A host (a test, or later the CLI and the app shells) can:
+
+1. Parse a local HTML document through `Engine::begin_document`.
+2. Turn the finished document into a `ScriptedDocument`, which owns one
+   JavaScript agent with a `window` and a live `document`.
+3. Queue scripts, trusted clicks and key presses, and timers, and offer
+   rendering opportunities.
+4. Pump the document one turn at a time with `run_next` or
+   `run_next_with_render`, on a real or a manual clock.
+
+Inside a turn, script can walk and change the tree, create nodes and whole
+detached documents, query with CSS selectors, hold live collections, add
+listeners, dispatch events and schedule timers and animation callbacks.
+
+What does **not** work yet:
+
+| Missing | Consequence today | Planned in |
+| --- | --- | --- |
+| `<script>` elements | The parser runs with scripting off; only the host can queue a script | WEB-05 |
+| Engine-owned style and layout for scripted documents | A rendering turn hands the host the live tree and the host renders it from scratch; nothing is invalidated incrementally and script cannot read layout | WEB-06 |
+| Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
+| Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
+| Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
+| Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
+| Network, storage, workers | Not present | M6, M9 |
+| A CLI command that runs page scripts | `rustic` commands all run with scripting off | WEB-05 |
+| WPT results | No web-platform-tests have been run against the bindings | WEB-09 |
+
+A property that is missing is absent, not stubbed: `typeof window.fetch` is
+`"undefined"`. That rule is part of the M5 gate.
+
+## Crates
+
+| Crate | Role here |
+| --- | --- |
+| `rustic-js` | The agent, heap, interpreter and job queue. It knows nothing about the DOM; it offers host objects, an execution-host hook at safe points and a native work budget |
+| `rustic-dom` | The tree. It knows nothing about JavaScript; it exposes checked mutation and marking for collection |
+| `rustic-bindings` | Everything that knows both: Web IDL conversions (`webidl`), the wrapper table and joint collector (`heap`), and the page interfaces (`page`: window, documents, creation, attributes, character data, selectors, collections, events) |
+| `rustic-engine` | The host-facing owner: document admission and shutdown (`lifecycle`), the turn pump (`scripting`), timers and task sources (`tasks`, `window_tasks`) and frame tickets (`frames`) |
+
+## Ownership and lifetime
+
+- The `Engine` admits a bounded number of documents and gives each a
+  cancellation token. `Engine::shutdown` cancels all of them and closes
+  admission ([ADR 0020](adr/0020-document-lifecycle.md)).
+- A `ScriptedDocument` owns the parsed tree, one agent and the pending work.
+  The tree is shared between the bindings and the renderer through a checked
+  borrow that is held for one binding operation and released before any
+  script callback runs, so script that reenters the DOM from a getter or
+  listener cannot hit a borrow failure
+  ([ADR 0028](adr/0028-scripted-document-collection.md)).
+- Every node has at most one wrapper per realm, so `a === b` holds for the
+  same node, and properties script puts on a wrapper survive as long as the
+  node is reachable ([ADR 0026](adr/0026-realm-dom-wrappers.md)).
+- **One collector traces both graphs.** At a safe point the joint collector
+  marks from the agent's roots and from every registered document. A
+  reachable wrapper keeps its node's whole tree alive; a node keeps its
+  wrappers and listeners alive. A detached tree that only script holds stays;
+  a detached tree in a cycle with its own listeners is freed. There is no
+  JavaScript-only fallback: if joint collection fails, the turn fails.
+- Removing a node detaches it; destruction happens only when the collector
+  finds the tree unreachable. Adoption into another document keeps wrapper
+  identity, expandos, listeners and live collections
+  ([ADR 0033](adr/0033-detached-documents-and-adoption.md)).
+- A fatal stop (cancellation, heap exhaustion, a turn over budget) drops the
+  agent and all pending work and invalidates outstanding frame tickets. The
+  tree stays readable for inspection. Script cannot catch a fatal stop.
+
+## Turns
+
+All page-visible ordering is decided in one place, the pump in
+`rustic-engine`. Nothing runs between the host's calls.
+
+| Source | Queued by | Order |
+| --- | --- | --- |
+| Immediate tasks | `queue_script`, `queue_input` | One FIFO shared by scripts and input |
+| Timers | `schedule_script` (host), `setTimeout`/`setInterval` (script) | By deadline on the injected monotonic clock; ties by admission order |
+| Rendering | `offer_rendering_opportunity` | Offers coalesce to the latest timestamp |
+
+`run_next` alternates between ready immediate work and ready timers so neither
+starves the other; `run_next_with_render` also alternates rendering with
+script work. Each turn ends with a microtask checkpoint that drains promise
+jobs, including jobs queued by jobs, under a job-count limit
+([ADR 0021](adr/0021-document-script-turns.md),
+[ADR 0022](adr/0022-document-task-sources-and-timers.md)).
+
+A rendering turn runs the due `requestAnimationFrame` callbacks first, each
+followed by its own checkpoint, then calls the host's render function and
+returns its output with a frame ticket. `accept_rendered_frame` tells the host
+whether that output is still the newest for its document, so a late frame is
+never presented over a newer one
+([ADR 0023](adr/0023-document-rendering-turns.md),
+[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)).
+
+Window timers follow the HTML rules that tests can observe: a delay starts
+when the registering turn completes, and nested timers are clamped to four
+milliseconds after six levels. Remaining differences are TD-132.
+
+### Limits
+
+Every queue and every turn is bounded, and a rejected admission changes
+nothing. `TaskLimits::default()` is:
+
+| Limit | Default | Exceeding it |
+| --- | --- | --- |
+| Pending tasks (scripts, input and timers together) | 128 | The queue call returns an error |
+| Pending source text | 512 × 1024 UTF-16 code units | The queue call returns an error |
+| Safe points per turn (script and its jobs share them) | 1,000,000 | Fatal stop |
+| Jobs per microtask checkpoint | 4,096 | Fatal stop |
+| JavaScript heap | The agent default | Fatal stop |
+| Live detached documents per agent | 16 | Creating another one fails |
+
+Native work that script can make arbitrarily large (selector matching,
+subtree copies, collection scans, event path collection) is charged to the
+same turn budget, so a single call cannot run unmetered.
+
+## Bindings
+
+- **Conversions** ([ADR 0024](adr/0024-web-idl-conversions.md)). Web IDL
+  string and 32-bit integer conversions reuse the engine's `ToString` and
+  `ToNumber`, keep their input rooted while user code runs, and pass user
+  exceptions through unchanged. All of an operation's arguments are converted
+  before the tree is touched, even when a conversion calls back into the DOM
+  ([ADR 0029](adr/0029-scripted-node-creation.md)).
+- **Generated metadata** ([ADR 0025](adr/0025-pinned-dom-idl-metadata.md)).
+  `tools/generate_dom_idl.py` reads the pinned DOM Standard IDL and emits
+  metadata for `CharacterData`, `Text`, `CDATASection` and `Comment`. The
+  other interfaces are bound by hand (TD-126). Extending the generator before
+  binding each new interface family is the plan, because hand-written
+  conversions are where bindings usually go wrong.
+- **Exceptions** ([ADR 0027](adr/0027-host-exception-bindings.md)). DOM
+  failures become `DOMException` objects of the right name. Running out of
+  memory or identities stays fatal. Extras are TD-124.
+- **Interfaces exposed.** `EventTarget`, `Node`, `Document`, `DocumentFragment`,
+  `DocumentType`, `Element`, `CharacterData`, `Text`, `CDATASection`, `Comment`,
+  `ProcessingInstruction`, `XMLDocument`, `DOMImplementation`, `NodeList`,
+  `HTMLCollection`, `Window`, `Event`, `CustomEvent`, `UIEvent`, `MouseEvent`,
+  `PointerEvent`, `KeyboardEvent`, `DOMException` and the checkbox state of
+  `HTMLInputElement`. IMPLEMENTATION.md lists the members of each; treat that
+  list, not this one, as the contract.
+- **Selectors** ([ADR 0030](adr/0030-dom-selectors-and-node-lists.md)).
+  `querySelector`, `querySelectorAll`, `matches` and `closest` use the same
+  matcher as the cascade, so a selector means the same thing to script and to
+  style.
+- **Window** ([ADR 0032](adr/0032-top-level-window-realm.md)). The global
+  `this` is a `WindowProxy` distinct from the `Window` that stores global
+  properties, as navigation will later require.
+
+## Events and input
+
+Dispatch collects the path before any listener runs, snapshots the listeners
+of each target at the start of each phase, and honors `capture`, `once`,
+`passive`, `stopPropagation`, `stopImmediatePropagation` and `preventDefault`.
+A listener that throws does not stop the dispatch; the host can read how many
+did ([ADR 0034](adr/0034-dom-event-dispatch.md)).
+
+Trusted input comes only from the host, which names a target node it has
+hit-tested: a primary click or a key press or release. The target is checked
+again at delivery and the task is dropped if the node left the document.
+Events that script creates or redispatches are never trusted. Trust records
+where an event came from; it is not yet a permission signal
+([ADR 0035](adr/0035-trusted-input-and-activation.md)). Activation behavior
+exists for buttons and checkboxes, including keyboard activation and the
+checkbox's cancel-and-restore rule. Shadow-tree retargeting, more input types
+and `AbortSignal` listener removal are TD-131.
+
+## Evidence
+
+| Area | Tests |
+| --- | --- |
+| Turn order, checkpoints, budgets, shutdown | `crates/rustic-engine/tests/scripting.rs`, `lifecycle.rs` |
+| Timers and clamping | `crates/rustic-engine/tests/timers.rs` |
+| Rendering turns, animation callbacks, frame tickets | `crates/rustic-engine/tests/frames.rs` |
+| Trusted input and activation | `crates/rustic-engine/tests/input.rs` |
+| Conversions and generated metadata | `crates/rustic-bindings/tests/webidl.rs`, `metadata.rs` |
+| Wrapper identity, adoption, joint collection | `crates/rustic-bindings/tests/dom_gc.rs`, `page.rs` |
+| Events | `crates/rustic-bindings/tests/events.rs` |
+| `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
+
+All of these run on a manual clock with no sleeps, on every CI tier including
+the 32-bit and big-endian ones. They are Rustic's own tests: there is no
+web-platform-tests evidence for the bindings until WEB-09, and no fuzz target
+drives the pump or the bindings yet. Both are on the
+[M5 exit checklist](ROADMAP.md#m5-exit-checklist).
+
+## Open debt
+
+| Entry | What | Due |
+| --- | --- | --- |
+| TD-10 | Tree builder with scripting on | WEB-05 |
+| TD-31 | Form owners ignore the parser's form pointer | WEB-07 |
+| TD-118 | A realm is never freed while its agent lives | Before frames (M6) |
+| TD-124 | `DOMException` extras | M9 |
+| TD-126 | Hand-bound subset of interfaces | Each new interface family |
+| TD-127 | UTF-8 storage for element and attribute names | M9 |
+| TD-129 | Collection reads scan live nodes | First profile that shows it |
+| TD-130 | One top-level Window | M6 navigation |
+| TD-131 | Extended event delivery and error reporting | WEB-07, M9 |
+| TD-132 | Timer and frame integration details | WEB-06, WEB-07 |
+
+See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
+
+## Adding an interface
+
+1. Find the interface in the pinned IDL; extend `tools/generate_dom_idl.py`
+   if its family is not generated yet, and commit the regenerated metadata.
+2. Bind it in `rustic-bindings::page`. Convert every argument first, borrow
+   the tree for one operation, and release the borrow before calling script.
+3. Charge any loop whose length script controls to the native work budget.
+4. Make every failure atomic: validate, reserve, then commit.
+5. Test identity, reentrancy from a getter, failure atomicity, collection of
+   a detached cycle, and the exact budget boundary.
+6. Add the members to IMPLEMENTATION.md, update this file's interface list,
+   and record anything left out as a TD entry.

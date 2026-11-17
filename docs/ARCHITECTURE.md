@@ -48,7 +48,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
 | `rustic-wasm` | Original bounded Wasm decoder, validator, interpreter and reviewed acceleration | base; JS/Web integration through explicit adapters | M4 foundations, M5/M9 integration |
 | `rustic-bindings` | Web IDL tooling, JS/DOM wrappers, exception conversion, selector queries, tracing edges | JS, DOM, CSS parser, style matcher; generated from pinned IDL | M5 |
-| `rustic-web` | Window, agents, tasks/microtasks, timers, script loading, browser APIs | JS, bindings, DOM, service interfaces | M5 |
+| `rustic-web` | Browser APIs beyond the DOM core (fetch, storage, workers, messaging). Not created: in M5 the Window, events and timers live in `rustic-bindings` and the task pump in `rustic-engine` ([SCRIPTING.md](SCRIPTING.md)). Split this crate out when M6 adds APIs that need service interfaces | JS, bindings, DOM, service interfaces | M6 |
 | `rustic-net` | Fetch policy, HTTP adapter, redirects, cookies, cache, TLS integration | URL, base, audited protocol libraries | M6 |
 | `rustic-storage` | Partitioned profile data, quotas, transactions, eviction/private mode | base, origin/storage keys, database adapter | M6/M9 |
 | `rustic-extensions` | Rustic MV2 package/identity, isolated worlds, APIs, lifecycle and permissions | JS/web, broker/service interfaces; no ambient page authority | M5/M6 prototypes, M8/M9 delivery |

@@ -4,6 +4,148 @@ This ledger describes completed code, not a promise of web compatibility. The
 [roadmap](ROADMAP.md) remains the full plan. Each finished unit is committed and
 pushed with focused tests and updated contracts.
 
+## How to read this ledger
+
+Sections are in the order the work landed, except that the newest milestone's
+sections sit near the top. A later section can supersede an earlier one's
+"remaining" notes, so read a subsystem's sections in order, or start from its
+guide ([URL](URL.md), [HTML](HTML.md), [tree construction](HTML_TREE.md),
+[DOM](DOM.md), [CSS](CSS.md), [layout](LAYOUT.md), [text](TEXT.md),
+[paint](PAINT.md), [JavaScript](JS.md), [scripted documents](SCRIPTING.md)),
+which describes the current state in one place. What is next is in the
+[roadmap queue](ROADMAP.md#17-current-implementation-queue), and the measured
+status is the [progress summary](progress/summary.md).
+
+<details>
+<summary>Foundation, URL, HTML and DOM (M1): 18 sections</summary>
+
+- [DOC-01 — Shared document-core primitives](#doc-01--shared-document-core-primitives)
+- [DOC-01c — Structured diagnostics and redaction](#doc-01c--structured-diagnostics-and-redaction)
+- [DOC-03 and DOC-04a — Document-owned tree core](#doc-03-and-doc-04a--document-owned-tree-core)
+- [DOC-04b — Checked character-data storage edits](#doc-04b--checked-character-data-storage-edits)
+- [DOC-04c — Full node kinds, cloning, adoption and lifecycle](#doc-04c--full-node-kinds-cloning-adoption-and-lifecycle)
+- [DOC-04a — Deterministic inspection](#doc-04a--deterministic-inspection)
+- [DOC-02a — URL records, parsing and origins](#doc-02a--url-records-parsing-and-origins)
+- [DOC-02b — File URLs and URL validation diagnostics](#doc-02b--file-urls-and-url-validation-diagnostics)
+- [DOC-05a — Incremental HTML input, tag and declaration states](#doc-05a--incremental-html-input-tag-and-declaration-states)
+- [DOC-05b (partial) — Character references](#doc-05b-partial--character-references)
+- [DOC-05b — Text modes and token-at-a-time drive](#doc-05b--text-modes-and-token-at-a-time-drive)
+- [DOC-06a — Initial document construction subset](#doc-06a--initial-document-construction-subset)
+- [DOC-06b — Complete document tree construction](#doc-06b--complete-document-tree-construction)
+- [DOC-06c — HTML fragment parsing algorithm](#doc-06c--html-fragment-parsing-algorithm)
+- [DOC-06d — `selectedcontent` mirroring](#doc-06d--selectedcontent-mirroring)
+- [DOC-07 — Bounded local loader and `dump-dom`](#doc-07--bounded-local-loader-and-dump-dom)
+- [DOC-08 — Parser fuzz targets and CI smoke job](#doc-08--parser-fuzz-targets-and-ci-smoke-job)
+- [DOC-09 — DOM/host tracing prototype and DOM conformance gate](#doc-09--domhost-tracing-prototype-and-dom-conformance-gate)
+
+</details>
+
+<details>
+<summary>CSS and style (M2): 14 sections</summary>
+
+- [CSS-01 — CSS syntax tokenizer and parser](#css-01--css-syntax-tokenizer-and-parser)
+- [CSS-02 — Selectors, specificity and matching](#css-02--selectors-specificity-and-matching)
+- [CSS-03 — Typed property values](#css-03--typed-property-values)
+- [CSS-03b — Math functions](#css-03b--math-functions)
+- [CSS-03c — Property catalog](#css-03c--property-catalog)
+- [CSS-04 — Cascade and inheritance](#css-04--cascade-and-inheritance)
+- [CSS-07b — Cascade layers, shadow-tree contexts and animation origins](#css-07b--cascade-layers-shadow-tree-contexts-and-animation-origins)
+- [CSS-08 — Declared CSS conformance gate](#css-08--declared-css-conformance-gate)
+- [CSS-05 — Computed values, stylesheet attachment and style dump](#css-05--computed-values-stylesheet-attachment-and-style-dump)
+- [CSS-06 — Media queries, invalidation, custom properties and container queries](#css-06--media-queries-invalidation-custom-properties-and-container-queries)
+- [External stylesheets — `<link rel=stylesheet>` and `@import`](#external-stylesheets--link-relstylesheet-and-import)
+- [M2 review — structural invalidation](#m2-review--structural-invalidation)
+- [CSS-09 — Animation and transition easing](#css-09--animation-and-transition-easing)
+- [CSS-09a — Explicit stylesheet scopes](#css-09a--explicit-stylesheet-scopes)
+
+</details>
+
+<details>
+<summary>Layout, text, paint and codecs (M3): 24 sections</summary>
+
+- [REN-01a — Checked geometry, principal boxes and block widths](#ren-01a--checked-geometry-principal-boxes-and-block-widths)
+- [REN-01b — Initial block-only used geometry (partial)](#ren-01b--initial-block-only-used-geometry-partial)
+- [REN-02a — Static block margin collapse](#ren-02a--static-block-margin-collapse)
+- [REN-01c — Anonymous flow boxes and inline continuations](#ren-01c--anonymous-flow-boxes-and-inline-continuations)
+- [REN-04a/REN-05a — First display list, CPU raster and PNG output](#ren-04aren-05a--first-display-list-cpu-raster-and-png-output)
+- [REN-03a — Font adapter and font-relative units](#ren-03a--font-adapter-and-font-relative-units)
+- [REN-02b — Floats, positioning and overflow](#ren-02b--floats-positioning-and-overflow)
+- [REN-03b (part 1) — Unicode segmentation and bidi](#ren-03b-part-1--unicode-segmentation-and-bidi)
+- [REN-03b (part 2) — Shaping, line boxes and text fragments](#ren-03b-part-2--shaping-line-boxes-and-text-fragments)
+- [REN-04b — Paint order, stacking contexts, overflow clips and opacity](#ren-04b--paint-order-stacking-contexts-overflow-clips-and-opacity)
+- [REN-05b — Bounded inflate and PNG decoding](#ren-05b--bounded-inflate-and-png-decoding)
+- [REN-05d — JPEG, GIF and WebP decoding and the image store](#ren-05d--jpeg-gif-and-webp-decoding-and-the-image-store)
+- [REN-07a — Reftest harness](#ren-07a--reftest-harness)
+- [REN-06a — Hit testing](#ren-06a--hit-testing)
+- [REN-04c — Text painting](#ren-04c--text-painting)
+- [REN-05c — Image painting](#ren-05c--image-painting)
+- [REN-04d — Text decorations](#ren-04d--text-decorations)
+- [REN-04e — Outlines](#ren-04e--outlines)
+- [REN-04f — Rounded corners](#ren-04f--rounded-corners)
+- [REN-04g — Clip paths](#ren-04g--clip-paths)
+- [REN-04h — Transforms](#ren-04h--transforms)
+- [REN-04i — Shadows, blending and filters](#ren-04i--shadows-blending-and-filters)
+- [REN-04j — Tiled raster, damage, resize and zoom](#ren-04j--tiled-raster-damage-resize-and-zoom)
+- [REN-03 completion: font formats, shaping and text policies](#ren-03-completion-font-formats-shaping-and-text-policies)
+
+</details>
+
+<details>
+<summary>JavaScript (M4): 39 sections</summary>
+
+- [JS-01 — ECMAScript lexer and parser](#js-01--ecmascript-lexer-and-parser)
+- [JS-02 — Runtime data model](#js-02--runtime-data-model)
+- [JS-03 — Garbage collector (first part)](#js-03--garbage-collector-first-part)
+- [JS-03 — Weak references and DOM collection (second part)](#js-03--weak-references-and-dom-collection-second-part)
+- [JS-04 — Bytecode compiler and interpreter (first part)](#js-04--bytecode-compiler-and-interpreter-first-part)
+- [JS-07 — Test262 runner (first part)](#js-07--test262-runner-first-part)
+- [JS-05 — Core built-ins (part 1)](#js-05--core-built-ins-part-1)
+- [JS-08 part 1: generators](#js-08-part-1-generators)
+- [JS-06 part 1: promises, jobs and async functions](#js-06-part-1-promises-jobs-and-async-functions)
+- [JS-08 part 2: async generators and `for await`](#js-08-part-2-async-generators-and-for-await)
+- [JS-08 part 3: regular expressions](#js-08-part-3-regular-expressions)
+- [JS-08 part 4: BigInt](#js-08-part-4-bigint)
+- [JS-08 part 5: Proxy and mapped arguments objects](#js-08-part-5-proxy-and-mapped-arguments-objects)
+- [JS-08 part 6: ArrayBuffer, DataView and typed arrays](#js-08-part-6-arraybuffer-dataview-and-typed-arrays)
+- [JS-08 part 7: SharedArrayBuffer and Atomics](#js-08-part-7-sharedarraybuffer-and-atomics)
+- [JS-06 part 2: promise rejection tracking](#js-06-part-2-promise-rejection-tracking)
+- [JS-09: limits and performance gate](#js-09-limits-and-performance-gate)
+- [JS-06 — Static module records and graph resolution](#js-06--static-module-records-and-graph-resolution)
+- [JS-06 — Synchronous module evaluation](#js-06--synchronous-module-evaluation)
+- [JS-07 — Static module Test262 baseline](#js-07--static-module-test262-baseline)
+- [JS-08 — Unicode string normalization](#js-08--unicode-string-normalization)
+- [JS-07 — Test262 script evaluation in the current global environment](#js-07--test262-script-evaluation-in-the-current-global-environment)
+- [JS-06 — Host-provided module metadata](#js-06--host-provided-module-metadata)
+- [JS-06 — Top-level await in static graphs](#js-06--top-level-await-in-static-graphs)
+- [JS-06 — Synthetic JSON and text modules](#js-06--synthetic-json-and-text-modules)
+- [JS-06 — Host-driven dynamic imports](#js-06--host-driven-dynamic-imports)
+- [JS-06 — Byte modules](#js-06--byte-modules)
+- [JS-06 — Realms](#js-06--realms)
+- [JS-08 — Locale identifiers and language-sensitive case conversion](#js-08--locale-identifiers-and-language-sensitive-case-conversion)
+- [JS-08 — Intl.Locale and locale preferences](#js-08--intllocale-and-locale-preferences)
+- [JS-08 — Intl.ListFormat and locale lookup](#js-08--intllistformat-and-locale-lookup)
+- [JS-08 — Intl.Collator and String locale comparison](#js-08--intlcollator-and-string-locale-comparison)
+- [JS-08 — Intl.PluralRules](#js-08--intlpluralrules)
+- [JS-08 — Intl.NumberFormat and number `toLocaleString`](#js-08--intlnumberformat-and-number-tolocalestring)
+- [JS-08 — Intl.RelativeTimeFormat](#js-08--intlrelativetimeformat)
+- [JS-08 — Intl.DisplayNames](#js-08--intldisplaynames)
+- [JS-08 — Intl.DurationFormat](#js-08--intldurationformat)
+- [JS-08 — Intl.Segmenter](#js-08--intlsegmenter)
+- [JS-08 — Intl.DateTimeFormat and supported-value enumeration](#js-08--intldatetimeformat-and-supported-value-enumeration)
+
+</details>
+
+<details>
+<summary>Scripted documents (M5, in progress): 5 sections</summary>
+
+- [Engine lifecycle — Bounded document ownership and shutdown](#engine-lifecycle--bounded-document-ownership-and-shutdown)
+- [WEB-01 — Document script turns and microtask checkpoints](#web-01--document-script-turns-and-microtask-checkpoints)
+- [WEB-02 — Web IDL conversion and DOM wrapper foundation](#web-02--web-idl-conversion-and-dom-wrapper-foundation)
+- [WEB-03 — Live document wrappers and script collection](#web-03--live-document-wrappers-and-script-collection)
+- [WEB-04 — DOM dispatch and host input](#web-04--dom-dispatch-and-host-input)
+
+</details>
+
 ## DOC-01 — Shared document-core primitives
 
 Implemented in `rustic-base`, with no external dependencies and no unsafe code:
@@ -1115,7 +1257,7 @@ contexts (`inline.rs`), line boxes (`lines.rs`) and public `LineFragment`,
 text-align/indent/justify, line-height and vertical-align, and text-based
 shrink-to-fit. OpenType shaping, atomic inlines and the other gaps are TD-50.
 See [LAYOUT.md](LAYOUT.md#inline-formatting-and-text-fragments-ren-03b) and
-[TEXT.md](TEXT.md#shaping).
+[TEXT.md](TEXT.md#opentype-shaping-and-positions).
 ## REN-04b — Paint order, stacking contexts, overflow clips and opacity
 
 The display list now follows CSS 2.2 Appendix E for the block reference:
@@ -1306,6 +1448,12 @@ switching, and that a resize reflows. `paint.conformance` is complete and
 [PAINT.md](PAINT.md#resize-and-zoom).
 
 ## Queue status
+
+*Historical section, written between 2026-11-08 and 2026-11-10. The catalog
+is now `engine-v4` (25 subsystems, 221 capabilities, M1–M13; see
+[PROGRESS.md](PROGRESS.md)), and the current queue is
+[ROADMAP §17](ROADMAP.md#17-current-implementation-queue). The paragraphs
+below record how the scope grew and are kept for that history.*
 
 The README now includes an automatically regenerated engine progress map. Its
 21-subsystem, 172-capability engine-v3 catalog (sized capabilities, roadmap

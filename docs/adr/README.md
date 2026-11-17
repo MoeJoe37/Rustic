@@ -26,7 +26,6 @@ instead of rewriting the history of a decision.
 | [0016](0016-js-garbage-collection.md) | Nonmoving mark/sweep at safe points, side mark bits, free lists, collected shapes and atoms, ephemerons, host-object tracing shared with the DOM | Accepted for JS-03 |
 | [0017](0017-js-bytecode-interpreter.md) | Register bytecode compiled per function, frames on agent stacks instead of Rust recursion, safe points, shape-and-epoch inline caches | Accepted for JS-04 |
 | [0018](0018-parity-and-performance-leadership.md) | Feature parity with Blink/Gecko/WebKit through a pinned inventory, performance leadership gates against all three, milestones M11–M13, `engine-v4` catalog | Accepted scope update; implementation pending |
-
 | [0019](0019-static-module-evaluation.md) | Traced environments, import slots and namespaces for source text modules | Accepted for synchronous evaluation |
 | [0020](0020-document-lifecycle.md) | Host-owned document lifetimes with bounded admission and coordinated cancellation | Accepted for the headless pipeline |
 | [0021](0021-document-script-turns.md) | Document-owned script tasks and bounded microtask checkpoints | Accepted for the initial WEB-01 scheduler |
@@ -39,14 +38,50 @@ instead of rewriting the history of a decision.
 | [0028](0028-scripted-document-collection.md) | Joint safe-point collection and live document bindings | Accepted for the first WEB-03 interfaces |
 | [0029](0029-scripted-node-creation.md) | Reentrant conversions and transactional node factories and text splits | Accepted for WEB-03 |
 | [0030](0030-dom-selectors-and-node-lists.md) | Scoped CSS queries and traced static and live NodeLists | Accepted for WEB-03 |
-
-For a new record, use the next four-digit ID and include date, status, context,
-decision, alternatives considered, consequences, validation and revisit trigger.
-Changes to public API stability, native/unsafe boundaries, runtime replacement,
-process authority, GC, or a major platform dependency require an ADR.
 | [0031](0031-live-html-collections.md) | Live HTMLCollections, named property visibility, and direct-child indexing | Accepted for WEB-03 |
 | [0032](0032-top-level-window-realm.md) | Top-level WindowProxy and realm global identity | Accepted for WEB-03 |
 | [0033](0033-detached-documents-and-adoption.md) | Detached document ownership and transactional cross-document insertion | Accepted for WEB-03 |
 | [0034](0034-dom-event-dispatch.md) | Scripted DOM event delivery and listener ownership | Accepted for WEB-04 |
 | [0035](0035-trusted-input-and-activation.md) | Trusted host input and control activation | Accepted for WEB-04 |
 | [0036](0036-window-timers-and-animation-callbacks.md) | Window timers and animation callbacks in document turns | Accepted for WEB-04 |
+
+## Records by area
+
+| Area | Records |
+| --- | --- |
+| Scope, product and platforms | 0001, 0006, 0007, 0013, 0018 |
+| Ownership, isolation and tooling | 0002, 0004, 0005 |
+| HTML and DOM (M1) | 0008, 0009, 0010, 0011, 0012 |
+| Rendering and text (M3) | 0003, 0014 |
+| JavaScript engine (M4) | 0015, 0016, 0017, 0019 |
+| Document lifecycle and scheduling (M5, WEB-01) | 0020, 0021, 0022, 0023 |
+| Web IDL and wrappers (M5, WEB-02) | 0024, 0025, 0026, 0027 |
+| Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
+| Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
+
+[SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
+
+## Decisions still to be written
+
+These boundaries have no record yet. Each must be accepted before the first
+code of the task that needs it, because each one adds a dependency, an
+authority boundary or `unsafe` code.
+
+| Decision | Needed before | Why it needs a record |
+| --- | --- | --- |
+| Parser/script reentry and the script loading order | WEB-05 (M5) | Changes parser ownership (ADR 0009 says script integration is pending) |
+| Style and layout invalidation from script, and forced layout flushes | WEB-06 (M5) | Changes the rendering-turn contract of ADR 0023 |
+| Transport and TLS library, certificate verification and the fixture server | NET-01 (M6) | First network dependency and first native/crypto boundary |
+| Legacy text encodings: own decoders or a reviewed crate | `url.encoding` (M6) | Dependency or large generated tables |
+| Profile and storage format, partition keys and schema versions | NET-06 (M6) | Persistent on-disk compatibility promise |
+| IPC format and broker capabilities | ISO-02 (M7) | Process authority |
+| Sandbox mechanism per OS: Windows, macOS, Linux, Android, iOS | ISO-03/04/08 (M7) | Platform security boundary; ADR 0004 only fixes the order |
+| GPU abstraction and backends (Direct3D 12, Metal, Vulkan, GL ES) | UI-05 (M8) | Major platform dependency and `unsafe`/FFI surface |
+| Windowing, input and accessibility bridges per platform | UI-02/03 (M8) | Platform dependencies on five OS families |
+| WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
+| Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | First `unsafe` in project code |
+
+For a new record, use the next four-digit ID and include date, status, context,
+decision, alternatives considered, consequences, validation and revisit trigger.
+Changes to public API stability, native/unsafe boundaries, runtime replacement,
+process authority, GC, or a major platform dependency require an ADR.

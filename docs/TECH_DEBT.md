@@ -57,16 +57,16 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
-| M5 exit | TD-125, TD-126, TD-129, TD-133 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M5 exit | TD-125, TD-126, TD-129, TD-133, TD-136 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. Pages loaded in M5 already call the URI functions. |
+| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| When hosted CI returns | TD-07, TD-12, TD-14, TD-22 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
+| When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-141, TD-143 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
-| Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114 | Reviewed whenever the guarded code changes |
+| Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
 scope limits, but the short ones before them: TD-02 (a large page fails to
@@ -200,6 +200,16 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-133 | Deliberate | HTML scripting | Outward adoption during parsing and dynamic document markup have explicit exceptions | Open, review with WEB-09 (M5), pay in M9 |
 | TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, WEB-06 |
 | TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M6 and M9 |
+| TD-136 | Bad | JS | The URI functions (`encodeURI`, `decodeURI`, `encodeURIComponent`, `decodeURIComponent`) are missing, and the Test262 built-in gate never ran their directories | Open, M5 exit |
+| TD-137 | Deliberate | JS | Web-legacy library surface is missing: Annex B `escape`/`unescape` and String HTML methods, `__defineGetter__` and its siblings, legacy RegExp statics and `Error.prototype.stack`; `test/annexB` is not run | Open, M6 entry |
+| TD-138 | Bad | JS | Some statement completion values are wrong, and parameter defaults and `for-in`/`for-of` heads miss their TDZ errors | Open, M6 entry |
+| TD-139 | Bad | JS | Reference evaluation order deviates in compound, update and logical assignment, `with` over proxies, destructuring targets and `super` properties; `delete super.x` does not throw | Open, M6 entry |
+| TD-140 | Bad | JS | Array destructuring assignment steps the iterator before evaluating a target and does not close it when the target reference throws (TD-100 paid the binding form only) | Open, M6 entry |
+| TD-141 | Bad | JS | Class, function and direct-eval edge semantics: derived-constructor return override in `catch`/`finally`, inferred names for symbol keys, private names on non-extensible objects, `super` and private names inside direct eval in class bodies | Open, `js.conformance` (M9) |
+| TD-142 | Bad | JS | Built-in edge bugs: registered symbols are accepted as weak keys, the String Iterator reports `Array Iterator`, `Object.fromEntries` does not close its iterator, and a few buffer and length checks are missing | Open, M6 entry |
+| TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (`Array.fromAsync`, `Math.sumPrecise`, base64 on `Uint8Array`, JSON source text, iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
+| TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
+| TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1577,7 +1587,7 @@ when new library areas land. Trigger on each implementation.
 **eval: Paid** (JS-05 part 2f). Direct and indirect `eval` run: a sloppy
 direct eval makes the calling function's scope dynamic, so names it does not
 declare resolve by name at run time, and the declaration checks of
-EvalDeclarationInstantiation run before any binding is made. About 150
+EvalDeclarationInstantiation run before any binding is made. About 140
 eval-code Test262 files still fail, mostly the `arguments` in parameter
 defaults rule and async or generator bodies (JS-08).
 
@@ -2055,3 +2065,161 @@ can deliver results independently of the parser. Add import-map resolution,
 data module types and MIME checks with the corresponding conformance
 selection. The mixed-host tests cover local JavaScript only.
 [ADR 0040](adr/0040-local-module-scripts.md)
+
+### TD-136 — The URI functions are missing
+
+The global object has no `encodeURI`, `decodeURI`, `encodeURIComponent` or
+`decodeURIComponent`. Scripts that build query strings or read
+`location`-style data throw a `ReferenceError`. Test262 never caught it,
+because `BUILT_IN_DIRS` in `crates/rustic-js/tests/test262.rs` leaves out
+their four directories (173 files, 4 of which pass without the functions). It also leaves out
+`Infinity`, `NaN`, `undefined`, `eval` and `ThrowTypeError`, which pass
+today but are not pinned, and `Uint8Array` (TD-143). Three `global` and four
+`Object` files fail for the same reason.
+
+Found by the M4 debt audit (2026-11-17). Pay before M5 exit: implement the
+four functions over the UTF-16 string model (with the `URIError` cases for
+lone surrogates and bad escapes), add every standard global directory to
+`BUILT_IN_DIRS`, and bless the list.
+
+### TD-137 — Web-legacy library surface
+
+Browsers keep a layer of library features that pages still use and that
+the specification puts in Annex B or that are de facto standards. Rustic
+has the Annex B pieces the parser and `Date` need (`substr`, `getYear`,
+`RegExp.prototype.compile`, HTML-like comments) but not:
+
+- `escape` and `unescape` (§B.2.1);
+- the String HTML methods `anchor`, `big`, `blink`, `bold`, `fixed`,
+  `fontcolor`, `fontsize`, `italics`, `link`, `small`, `strike`, `sub` and
+  `sup` (§B.2.2);
+- `Object.prototype.__defineGetter__`, `__defineSetter__`,
+  `__lookupGetter__` and `__lookupSetter__` (§B.2.2.2–5, 54 Test262 files in
+  `Object/prototype`);
+- the legacy RegExp statics (`RegExp.$1`–`$9`, `lastMatch`, `input` and
+  the rest), a stage 3 proposal that documents what every engine ships;
+- `Error.prototype.stack` (34 Test262 files, `error-stack-accessor`). TD-124
+  covers DOMException stacks only.
+
+The gates run `test/language` and selected `test/built-ins`, never
+`test/annexB`, so nothing measures this. Pay before M6 entry: add the
+missing pieces, run `test/annexB` as a pinned passing list, and give
+`stack` a format shared with error reporting (TD-131).
+
+### TD-138 — Completion values and binding TDZ
+
+The audit's run of `test/language` at the pinned revision found two groups
+of wrong results with no error:
+
+- **Completion values** (57 files, `cptn-*` and
+  `statements/try/completion-values.js`). Loops, `if`, `switch` and `try`
+  do not reset the completion value to `undefined` where §14 requires, so
+  `eval("1; for (var i = 0; i < 2; i++) {}")` returns 1 instead of
+  `undefined`, and `break`/`continue` out of an empty `catch` or `finally`
+  leak an older value. It only shows through `eval` and the console.
+- **Missing TDZ errors** (56 files). A parameter default that reads a later
+  parameter or itself (`function f(a = b, b) {}`) reads `undefined`, and a
+  `for (let x of x)` head reads the outer binding instead of throwing a
+  `ReferenceError`.
+
+Pay before M6 entry, with compiler tests for each statement kind.
+
+### TD-139 — Reference evaluation order
+
+The compiler evaluates some operand pieces in a different order from the
+specification (65 `test/language` files):
+
+- compound, update and logical assignment (`o[k] += v`, `o[k]++`,
+  `o[k] ??= v`) convert the key or read the binding at the wrong step, so a
+  throwing `toString`, a `null` base or a binding removed from a `with`
+  object show the wrong error or value (`S11.13.2_A6/A7`, `S11.3.x_A6`,
+  `S11.4.x_A6`, `lhs-before-rhs`);
+- `with` over a proxy calls `has` and `@@unscopables` more often than
+  required;
+- keyed destructuring targets and `super[expr]` bases are evaluated after
+  the source value instead of before;
+- `delete super.x` must throw a `ReferenceError` and does not, and assigning
+  through `super` to a non-writable property in sloppy code throws.
+
+Pay before M6 entry: real pages mostly cannot observe this, but proxies,
+getters and `with` libraries can.
+
+### TD-140 — Destructuring assignment does not close iterators on target errors
+
+TD-100 paid the binding form. The assignment form (`[o[f()]] = iterable`,
+and `for ([a.b] of …)` heads) calls `next` before evaluating the target
+reference and does not call `return` when evaluating that reference
+throws, so iterators and generators are left open (32 Test262 files under
+`expressions/assignment/dstr` and `statements/for-of/dstr`). Pay before M6
+entry by giving assignment targets the same close handler as bindings and
+evaluating the reference first.
+
+### TD-141 — Class, function and direct-eval edge semantics
+
+Remaining `test/language` failures outside `eval-code`, modules and TD-138
+to TD-140:
+
+- a derived constructor whose `return` override runs inside `catch`,
+  `finally` or `for-of` reports the wrong error (11 files);
+- method and function names from symbol keys and cover grammars
+  (`fn-name-*`, `name-prop-symbol`, 16 files);
+- private fields added to non-extensible objects (the 2025 rule) and
+  private accessors that are not own properties;
+- direct `eval` inside class field initializers and methods cannot see
+  `super`, private names or the `arguments` restriction (66 files), and
+  `eval` var-scope early errors in parameter scopes are not raised. TD-106
+  covers the `eval-code` directory itself.
+
+Pay with the `js.conformance` (M9) Test262 full-rate work, or earlier if a
+selected page needs one.
+
+### TD-142 — Built-in edge bugs
+
+Wrong behavior in shipped built-ins, found in the `test/built-ins` run:
+
+- `WeakMap`, `WeakSet`, `WeakRef` and `FinalizationRegistry` accept
+  registered symbols (`Symbol.for`), which `CanBeHeldWeakly` forbids. Those
+  symbols never die, so entries keyed by them are never collected (8 files).
+- `%StringIteratorPrototype%[@@toStringTag]` is `"Array Iterator"`.
+- `Object.fromEntries` does not close its iterator when an entry is not an
+  object or its `next`/`done` throws (11 files).
+- `Object.setPrototypeOf(Object.prototype, x)` succeeds for a non-circular
+  `x`; `Object.prototype` is an immutable prototype exotic object.
+- `length` definitions on arrays convert the value in the wrong order; a
+  `DataView` over a resizable buffer reports bounds errors from
+  `byteLength`/`byteOffset`; `Object.freeze` accepts a length-tracking typed
+  array.
+
+Pay before M6 entry, the weak-key check first since it leaks memory.
+
+### TD-143 — Recent-edition and stage 3 library features
+
+TD-89 covers proposal syntax. The library has no `Array.fromAsync` (95
+files), `Math.sumPrecise` (10), base64 and hex on `Uint8Array` (62),
+JSON.parse source text access (27), iterator chunking, joint iteration,
+`includes` and `join` (about 170), immutable `ArrayBuffer` (43),
+`ShadowRealm` (60) or Temporal (4,614 built-in and 2,111 `intl402` files).
+None of these files are skipped: they fail and stay out of the passing
+lists. Pay per ECMAScript edition as each reaches stage 4, with the M9
+`js.conformance` work; Temporal also settles the DurationFormat and
+DateTimeFormat gaps in TD-122.
+
+### TD-144 — No proper tail calls
+
+The specification requires calls in tail position of strict code not to
+grow the stack. Rustic, like V8 and SpiderMonkey, keeps a frame per call,
+so the 34 `tco` Test262 files throw a `RangeError` at the frame limit.
+Kept by design: proper tail calls would hide frames from error stacks and
+devtools. Revisit only if the committee drops the requirement or other
+engines ship it.
+
+### TD-145 — Test262 gates are manual and x86-64 only
+
+The parse, script, module and Intl gates need a Test262 checkout, so no
+workflow runs them. They run by hand in the sandbox (x86-64, release), and
+`docs/JS.md` says the lists are not checked on other targets. Nothing shows
+the passing lists hold on 32-bit, ARM64 or big-endian (s390x) builds, where
+NaN-boxing, `libm` results for `Math` (allowed to differ in the last bit)
+and endian-sensitive buffer code differ. Pay when hosted CI returns: add a
+job that fetches the pinned revision, runs the gates on x86-64 and ARM64,
+and runs at least the built-in gate under the emulated tiers.

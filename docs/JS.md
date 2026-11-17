@@ -183,18 +183,22 @@ file that stops passing fails the gate, and so does one that starts passing
 until the lists are regenerated with `RUSTIC_TEST262_BLESS=1`. Run the gate in
 release mode on a 64-bit host; the lists are not checked on other targets.
 
-Most `test/language` failures are not interpreter bugs yet:
+The `test/language` failures (488 at the pinned revision) are recorded in
+the debt ledger:
 
-- About 150 `eval-code` files still fail: most declare `arguments` from an
-  `eval` in parameter defaults, or are async.
-- Modules account for most of the rest. The real assertion failures left are mostly parameter TDZ in
-  defaults (`dflt-params-ref-later`) and function names from computed symbol
-  keys.
+- About 140 `eval-code` files still fail: most declare `arguments` from an
+  `eval` in parameter defaults, or are async (TD-106).
+- Statement completion values and missing TDZ errors (TD-138), reference
+  evaluation order (TD-139), destructuring assignment that does not close
+  its iterator (TD-140), class and direct-eval edge cases (TD-141), and 34
+  proper tail call files (TD-144).
 
 In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
-Temporal or `$262.agent` (112 `Atomics` files). Skipped files are never
+Temporal or `$262.agent` (112 `Atomics` files). The rest are recorded as TD-142 (built-in edge
+bugs) and TD-143 (recent-edition library features). The gate leaves out
+the URI function directories, where every function is missing (TD-136). Skipped files are never
 counted as passing. The script gate continues to report module files as
 skipped. Their execution classifications are recorded by the separate module
 gate below.

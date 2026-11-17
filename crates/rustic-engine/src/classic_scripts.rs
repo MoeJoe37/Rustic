@@ -1,20 +1,24 @@
-//! Request admission and execution order for external classic scripts.
+//! Local script resource admission and execution order.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::num::NonZeroU64;
+use std::sync::Arc;
 
-use rustic_base::Budget;
+use rustic_base::{Budget, CancellationToken, DocumentId, IdSequence};
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
-use rustic_html::ParseError;
-use rustic_js::Source;
+use rustic_html::{ParseError, ScriptBoundary};
+use rustic_js::module::ModuleRecord;
+use rustic_js::{ParseLimits, Source};
 use rustic_url::{Url, UrlPath};
 
 use crate::inline_scripts::attribute;
+use crate::local_modules::{LocalModules, ModuleKey, ModuleState, resolve_import};
 use crate::{ScriptLoadError, ScriptStop};
 
 /// Lifetime request and response budgets for an opt-in local script load.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ClassicScriptLimits {
-    /// Maximum external classic preparation attempts, including rejected URLs.
+    /// Maximum external classic and module preparation attempts, plus new dependencies.
     pub max_requests: usize,
     /// Maximum raw bytes in one source response.
     pub max_response_bytes: usize,
@@ -32,11 +36,14 @@ impl Default for ClassicScriptLimits {
     }
 }
 
-/// Opaque request identity tied to the requesting document and element.
+/// Opaque request identity tied to the requesting document.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ClassicRequestId(NodeId);
+pub struct ClassicRequestId {
+    document: DocumentId,
+    sequence: NonZeroU64,
+}
 
-/// HTML ordering selected by a parser-inserted external classic.
+/// HTML ordering selected by the script element that first requests a resource.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClassicScriptMode {
     /// The parser waits for the result.
@@ -45,6 +52,15 @@ pub enum ClassicScriptMode {
     Async,
     /// Execute in parser order after the input finishes.
     Defer,
+}
+
+/// Kind of source expected from the local resource provider.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScriptResourceKind {
+    /// Source text for a classic script element.
+    Classic,
+    /// Source text for a JavaScript module in the document's module map.
+    JavaScriptModule,
 }
 
 /// A request that an embedder can fulfill from its local resource provider.
@@ -56,6 +72,8 @@ pub struct ClassicScriptRequest {
     pub url: Url,
     /// The script's execution ordering.
     pub mode: ClassicScriptMode,
+    /// Whether these bytes are for a classic or a module.
+    pub kind: ScriptResourceKind,
     /// Maximum bytes the host should read for this request.
     pub max_bytes: usize,
 }
@@ -79,14 +97,30 @@ pub(crate) struct ExternalScripts {
     total_bytes: Budget,
     max_response_bytes: usize,
     requests: VecDeque<ClassicScriptRequest>,
+    ids: IdSequence,
     entries: HashMap<ClassicRequestId, Entry>,
     blocker: Option<ClassicRequestId>,
-    deferred: VecDeque<ClassicRequestId>,
+    deferred: VecDeque<Deferred>,
+    async_modules: VecDeque<ModuleKey>,
+    module_requests: HashMap<ClassicRequestId, ModuleFetch>,
+    pub(crate) modules: LocalModules,
 }
 
 struct Entry {
+    element: NodeId,
     mode: ClassicScriptMode,
     state: State,
+}
+
+enum Deferred {
+    Classic(ClassicRequestId),
+    Module(ModuleKey),
+}
+
+struct ModuleFetch {
+    url: Url,
+    mode: ClassicScriptMode,
+    dispatched: bool,
 }
 
 enum State {
@@ -100,6 +134,11 @@ pub(crate) struct ReadyClassic {
     pub(crate) source: Option<Source>,
 }
 
+pub(crate) enum ReadyScript {
+    Classic(ReadyClassic),
+    Module(ModuleKey),
+}
+
 impl ExternalScripts {
     pub(crate) fn new(url: Url, limits: ClassicScriptLimits) -> Result<Self, ScriptLoadError> {
         local_file_path(&url).ok_or(ScriptLoadError::InvalidDocumentUrl)?;
@@ -109,9 +148,13 @@ impl ExternalScripts {
             total_bytes: Budget::new(limits.max_total_bytes),
             max_response_bytes: limits.max_response_bytes,
             requests: VecDeque::new(),
+            ids: IdSequence::new(),
             entries: HashMap::new(),
             blocker: None,
             deferred: VecDeque::new(),
+            async_modules: VecDeque::new(),
+            module_requests: HashMap::new(),
+            modules: LocalModules::default(),
         })
     }
 
@@ -128,7 +171,7 @@ impl ExternalScripts {
         let Some(url) = self.resolve(document, src)? else {
             return Ok(false);
         };
-        let id = ClassicRequestId(element);
+        let id = self.new_request(element.document())?;
         self.entries
             .try_reserve(1)
             .map_err(|_| ScriptStop::OutOfMemory)?;
@@ -145,12 +188,13 @@ impl ExternalScripts {
                 self.deferred
                     .try_reserve(1)
                     .map_err(|_| ScriptStop::OutOfMemory)?;
-                self.deferred.push_back(id);
+                self.deferred.push_back(Deferred::Classic(id));
             }
         }
         self.entries.insert(
             id,
             Entry {
+                element,
                 mode,
                 state: State::Undispatched,
             },
@@ -159,18 +203,169 @@ impl ExternalScripts {
             id,
             url,
             mode,
+            kind: ScriptResourceKind::Classic,
             max_bytes: self.max_bytes(),
         });
         Ok(true)
     }
 
+    pub(crate) fn admit_module(
+        &mut self,
+        boundary: &ScriptBoundary<'_>,
+        mode: ClassicScriptMode,
+        src: Option<&[u16]>,
+        inline_source: impl FnOnce() -> Result<Option<Source>, ScriptLoadError>,
+        cancellation: &CancellationToken,
+    ) -> Result<bool, ScriptLoadError> {
+        if self.attempts.charge(1).is_err() {
+            return Ok(false);
+        }
+        let owner = boundary.element.document();
+        let key = if let Some(src) = src {
+            let Some(url) = self.resolve(boundary.document, src)? else {
+                return Ok(false);
+            };
+            self.fetch_module(owner, url, mode)?
+        } else {
+            let key = ModuleKey::Inline(boundary.element);
+            let base = document_base(boundary.document, &self.document_url)?;
+            let source = match inline_source() {
+                Ok(source) => source,
+                Err(ScriptLoadError::SourceLimit { .. }) => return Ok(false),
+                Err(error) => return Err(error),
+            };
+            let source =
+                source.unwrap_or_else(|| Source::from_str_limited("", 0).expect("empty source"));
+            self.parse_module_source(key.clone(), base, source, owner, mode, cancellation)?;
+            key
+        };
+        if mode == ClassicScriptMode::Async {
+            self.async_modules
+                .try_reserve(1)
+                .map_err(|_| ScriptStop::OutOfMemory)?;
+            self.async_modules.push_back(key);
+        } else {
+            self.deferred
+                .try_reserve(1)
+                .map_err(|_| ScriptStop::OutOfMemory)?;
+            self.deferred.push_back(Deferred::Module(key));
+        }
+        Ok(true)
+    }
+
+    fn new_request(&self, document: DocumentId) -> Result<ClassicRequestId, ScriptStop> {
+        let sequence = self.ids.allocate().map_err(|_| ScriptStop::OutOfMemory)?;
+        Ok(ClassicRequestId { document, sequence })
+    }
+
+    fn fetch_module(
+        &mut self,
+        document: DocumentId,
+        url: Url,
+        mode: ClassicScriptMode,
+    ) -> Result<ModuleKey, ScriptStop> {
+        let key = ModuleKey::External(url.clone());
+        if self.modules.contains(&key) {
+            return Ok(key);
+        }
+        self.module_requests
+            .try_reserve(1)
+            .map_err(|_| ScriptStop::OutOfMemory)?;
+        self.requests
+            .try_reserve(1)
+            .map_err(|_| ScriptStop::OutOfMemory)?;
+        let id = self.new_request(document)?;
+        self.modules.set(key.clone(), ModuleState::Fetching)?;
+        self.module_requests.insert(
+            id,
+            ModuleFetch {
+                url: url.clone(),
+                mode,
+                dispatched: false,
+            },
+        );
+        self.requests.push_back(ClassicScriptRequest {
+            id,
+            url,
+            mode,
+            kind: ScriptResourceKind::JavaScriptModule,
+            max_bytes: self.max_bytes(),
+        });
+        Ok(key)
+    }
+
+    fn parse_module_source(
+        &mut self,
+        key: ModuleKey,
+        base: Url,
+        source: Source,
+        document: DocumentId,
+        mode: ClassicScriptMode,
+        cancellation: &CancellationToken,
+    ) -> Result<(), ScriptLoadError> {
+        let limits = ParseLimits {
+            cancellation: cancellation.clone(),
+            ..ParseLimits::default()
+        };
+        let record = match ModuleRecord::parse(&source, &limits) {
+            Ok(record) => record,
+            Err(rustic_js::ParseError::Cancelled) => {
+                return Err(ScriptStop::DocumentCancelled.into());
+            }
+            Err(_) => return Ok(self.modules.set(key, ModuleState::Failed)?),
+        };
+        let mut dependencies = Vec::new();
+        dependencies
+            .try_reserve(record.requests().len())
+            .map_err(|_| ScriptStop::OutOfMemory)?;
+        for request in record.requests() {
+            let Some(url) = resolve_import(&base, request).filter(|url| self.in_grant(url)) else {
+                return Ok(self.modules.set(key, ModuleState::Failed)?);
+            };
+            dependencies.push(ModuleKey::External(url));
+        }
+        let mut missing = HashSet::new();
+        missing
+            .try_reserve(dependencies.len())
+            .map_err(|_| ScriptStop::OutOfMemory)?;
+        for dependency in &dependencies {
+            if *dependency != key && !self.modules.contains(dependency) {
+                missing.insert(dependency);
+            }
+        }
+        if self.attempts.charge(missing.len()).is_err() {
+            return Ok(self.modules.set(key, ModuleState::Failed)?);
+        }
+        let inline_base = matches!(key, ModuleKey::Inline(_)).then(|| Box::new(base));
+        self.modules.set(
+            key,
+            ModuleState::Parsed {
+                inline_base,
+                record: Arc::new(record),
+                units: source.len(),
+                dependencies: dependencies.clone(),
+            },
+        )?;
+        for dependency in dependencies {
+            let ModuleKey::External(url) = dependency else {
+                unreachable!("imports resolve to URLs")
+            };
+            self.fetch_module(document, url, mode)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn next_request(&mut self) -> Option<ClassicScriptRequest> {
         let mut request = self.requests.pop_front()?;
         request.max_bytes = self.max_bytes();
-        self.entries
-            .get_mut(&request.id)
-            .expect("queued request has entry")
-            .state = State::Requested;
+        if let Some(entry) = self.entries.get_mut(&request.id) {
+            entry.state = State::Requested;
+        } else {
+            self.module_requests
+                .get_mut(&request.id)
+                .expect("queued module request")
+                .dispatched = true;
+        }
         Some(request)
     }
 
@@ -179,7 +374,34 @@ impl ExternalScripts {
         id: ClassicRequestId,
         result: Result<&[u8], ClassicFetchError>,
         source_limit: usize,
+        cancellation: &CancellationToken,
     ) -> Result<Option<ReadyClassic>, ScriptLoadError> {
+        if let Some(fetch) = self.module_requests.get(&id) {
+            if !fetch.dispatched {
+                return Err(ScriptLoadError::UnknownScriptRequest);
+            }
+            let fetch = self
+                .module_requests
+                .remove(&id)
+                .expect("dispatched module request");
+            let key = ModuleKey::External(fetch.url.clone());
+            if let Some(source) = result
+                .ok()
+                .and_then(|bytes| self.decode(bytes, source_limit))
+            {
+                self.parse_module_source(
+                    key,
+                    fetch.url,
+                    source,
+                    id.document,
+                    fetch.mode,
+                    cancellation,
+                )?;
+            } else {
+                self.modules.set(key, ModuleState::Failed)?;
+            }
+            return Ok(None);
+        }
         let Some(entry) = self
             .entries
             .get(&id)
@@ -188,33 +410,45 @@ impl ExternalScripts {
             return Err(ScriptLoadError::UnknownScriptRequest);
         };
         let mode = entry.mode;
+        let element = entry.element;
         let source = result
             .ok()
             .and_then(|bytes| self.decode(bytes, source_limit));
         if mode == ClassicScriptMode::Async {
             self.entries.remove(&id);
-            return Ok(Some(ReadyClassic {
-                element: id.0,
-                source,
-            }));
+            return Ok(Some(ReadyClassic { element, source }));
         }
         self.entries.get_mut(&id).expect("validated request").state = State::Ready(source);
         Ok(None)
     }
 
-    pub(crate) fn take_runnable(&mut self, eof: bool) -> Option<ReadyClassic> {
+    pub(crate) fn take_runnable(&mut self, eof: bool) -> Result<Option<ReadyScript>, ScriptStop> {
+        for (index, key) in self.async_modules.iter().enumerate() {
+            if self.modules.ready(key)? {
+                return Ok(self.async_modules.remove(index).map(ReadyScript::Module));
+            }
+        }
         if let Some(id) = self.blocker {
-            let result = self.take_ready(id)?;
-            self.blocker = None;
-            return Some(result);
+            let result = self.take_ready(id);
+            if result.is_some() {
+                self.blocker = None;
+            }
+            return Ok(result.map(ReadyScript::Classic));
         }
         if eof {
-            let id = *self.deferred.front()?;
-            let result = self.take_ready(id)?;
-            self.deferred.pop_front();
-            return Some(result);
+            let result = match self.deferred.front() {
+                Some(Deferred::Classic(id)) => self.take_ready(*id).map(ReadyScript::Classic),
+                Some(Deferred::Module(key)) if self.modules.ready(key)? => {
+                    Some(ReadyScript::Module(key.clone()))
+                }
+                _ => None,
+            };
+            if result.is_some() {
+                self.deferred.pop_front();
+            }
+            return Ok(result);
         }
-        None
+        Ok(None)
     }
 
     pub(crate) fn blocks_parser(&self) -> bool {
@@ -223,19 +457,24 @@ impl ExternalScripts {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.entries.is_empty()
+            && self.module_requests.is_empty()
+            && self.async_modules.is_empty()
+            && self.deferred.is_empty()
     }
 
     fn take_ready(&mut self, id: ClassicRequestId) -> Option<ReadyClassic> {
         if !matches!(self.entries.get(&id)?.state, State::Ready(_)) {
             return None;
         }
-        let State::Ready(source) = self.entries.remove(&id)?.state else {
+        let Entry {
+            element,
+            state: State::Ready(source),
+            ..
+        } = self.entries.remove(&id)?
+        else {
             unreachable!("ready request state checked");
         };
-        Some(ReadyClassic {
-            element: id.0,
-            source,
-        })
+        Some(ReadyClassic { element, source })
     }
 
     fn max_bytes(&self) -> usize {
@@ -258,13 +497,17 @@ impl ExternalScripts {
         let Ok(url) = Url::parse(&String::from_utf16_lossy(src), Some(&base)) else {
             return Ok(None);
         };
-        let Some(path) = local_file_path(&url) else {
-            return Ok(None);
+        Ok(self.in_grant(&url).then_some(url))
+    }
+
+    fn in_grant(&self, url: &Url) -> bool {
+        let Some(path) = local_file_path(url) else {
+            return false;
         };
         let directory = local_file_path(&self.document_url)
             .and_then(|path| path.split_last().map(|(_, directory)| directory))
             .expect("local document URL validated at admission");
-        Ok((path.len() > directory.len() && path.starts_with(directory)).then_some(url))
+        path.len() > directory.len() && path.starts_with(directory)
     }
 }
 

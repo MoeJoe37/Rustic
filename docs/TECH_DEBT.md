@@ -59,7 +59,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | M5, with WEB-05 | TD-10, TD-134 | Resolve processing-instruction expectations and integrate readiness and script element tasks. |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129, TD-133 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130 | Review large pages, encodings, relative URLs, local time, regular expressions and browsing contexts before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -200,6 +200,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, WEB-06, WEB-07 and M9 |
 | TD-133 | Deliberate | HTML scripting | Outward adoption during parsing and dynamic document markup have explicit exceptions | Open, review with WEB-09 (M5), pay in M9 |
 | TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Readiness events, stylesheet dependencies and task interleaving remain open. | Open, WEB-05 and WEB-06 |
+| TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M6 and M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2047,3 +2048,12 @@ Integrate stylesheet readiness as a blocker and order timers with pending
 fetches when WEB-06 connects the rendering lifecycle. Add tests where a
 stylesheet, script or timer becomes ready while the parser is suspended.
 [ADR 0039](adr/0039-local-external-classics.md)
+
+### TD-135 — Dynamic page imports, import maps and data modules
+
+The local page host accepts static JavaScript imports using URL specifiers.
+Connect dynamic import to the shared page module map when the M6 fetch layer
+can deliver results independently of the parser. Add import-map resolution,
+data module types and MIME checks with the corresponding conformance
+selection. The mixed-host tests cover local JavaScript only.
+[ADR 0040](adr/0040-local-module-scripts.md)

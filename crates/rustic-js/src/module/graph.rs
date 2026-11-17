@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::{ParseError, ParseLimits, Source};
 
@@ -111,14 +112,14 @@ pub struct ModuleGraph<K> {
 
 struct Node<K> {
     key: K,
-    record: ModuleRecord,
+    record: Arc<ModuleRecord>,
     dependencies: Vec<usize>,
     exports: HashMap<Vec<u16>, usize>,
     data: Option<ModuleSource>,
 }
 
 impl<K> Node<K> {
-    fn new(key: K, record: ModuleRecord, data: Option<ModuleSource>) -> Self {
+    fn new(key: K, record: Arc<ModuleRecord>, data: Option<ModuleSource>) -> Self {
         let exports = record
             .exports()
             .iter()
@@ -134,6 +135,8 @@ impl<K> Node<K> {
         }
     }
 }
+
+type RecordInput = (Arc<ModuleRecord>, Option<ModuleSource>, usize);
 
 impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
     /// Load and validate the static graph from an entry key.
@@ -156,8 +159,52 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
     pub fn load_sources<E>(
         entry: K,
         limits: &GraphLimits,
-        mut resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
         mut source: impl FnMut(&K) -> Result<ModuleSource, E>,
+    ) -> Result<Self, GraphError<E>> {
+        Self::load_with(entry, limits, resolve, |key, remaining| {
+            let input = source(key).map_err(GraphError::Host)?;
+            let units = input.len();
+            if units > remaining {
+                return Err(GraphError::GraphLimit);
+            }
+            let (record, data) = match input {
+                ModuleSource::JavaScript(source) => {
+                    let record =
+                        ModuleRecord::parse(&source, &limits.parse).map_err(
+                            |error| match error {
+                                ParseError::Cancelled => GraphError::Cancelled,
+                                other => GraphError::Parse(other),
+                            },
+                        )?;
+                    (record, None)
+                }
+                data => (ModuleRecord::synthetic_default(), Some(data)),
+            };
+            Ok((Arc::new(record), data, units))
+        })
+    }
+
+    /// Build and validate a graph from cached JavaScript records. The provider
+    /// pairs each immutable record with its original UTF-16 source length.
+    pub fn load_records<E>(
+        entry: K,
+        limits: &GraphLimits,
+        resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        mut record: impl FnMut(&K) -> Result<(Arc<ModuleRecord>, usize), E>,
+    ) -> Result<Self, GraphError<E>> {
+        Self::load_with(entry, limits, resolve, |key, _| {
+            record(key)
+                .map(|(record, units)| (record, None, units))
+                .map_err(GraphError::Host)
+        })
+    }
+
+    fn load_with<E>(
+        entry: K,
+        limits: &GraphLimits,
+        mut resolve: impl FnMut(&K, &ModuleRequest) -> Result<K, E>,
+        mut source: impl FnMut(&K, usize) -> Result<RecordInput, GraphError<E>>,
     ) -> Result<Self, GraphError<E>> {
         let mut graph = Self {
             modules: Vec::new(),
@@ -195,29 +242,18 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
         &mut self,
         key: K,
         limits: &GraphLimits,
-        source: &mut impl FnMut(&K) -> Result<ModuleSource, E>,
+        source: &mut impl FnMut(&K, usize) -> Result<RecordInput, GraphError<E>>,
     ) -> Result<(), GraphError<E>> {
         check(limits)?;
         if self.modules.len() == limits.max_modules {
             return Err(GraphError::GraphLimit);
         }
-        let input = source(&key).map_err(GraphError::Host)?;
+        let (record, data, units) = source(&key, limits.max_source_units - self.source_units)?;
         self.source_units = self
             .source_units
-            .checked_add(input.len())
+            .checked_add(units)
             .filter(|total| *total <= limits.max_source_units)
             .ok_or(GraphError::GraphLimit)?;
-        let (record, data) = match input {
-            ModuleSource::JavaScript(source) => {
-                let record =
-                    ModuleRecord::parse(&source, &limits.parse).map_err(|error| match error {
-                        ParseError::Cancelled => GraphError::Cancelled,
-                        other => GraphError::Parse(other),
-                    })?;
-                (record, None)
-            }
-            data => (ModuleRecord::synthetic_default(), Some(data)),
-        };
         self.modules.push(Node::new(key, record, data));
         Ok(())
     }
@@ -242,7 +278,7 @@ impl<K: Clone + Eq + std::hash::Hash> ModuleGraph<K> {
     pub fn module(&self, index: usize) -> Option<(&K, &ModuleRecord)> {
         self.modules
             .get(index)
-            .map(|node| (&node.key, &node.record))
+            .map(|node| (&node.key, node.record.as_ref()))
     }
 
     /// Graph index of the module selected by a record-local request.

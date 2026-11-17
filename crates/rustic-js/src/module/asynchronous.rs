@@ -20,6 +20,8 @@ struct Evaluation {
     order: Option<usize>,
     failed: bool,
     completion: Option<ObjectId>,
+    body_started: bool,
+    body_returned: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +86,8 @@ impl Agent {
                 order: None,
                 failed: false,
                 completion: None,
+                body_started: false,
+                body_returned: false,
             })
             .collect();
         let evaluation = AsyncModuleGraph {
@@ -132,6 +136,22 @@ impl Agent {
                         entry.failed = true;
                     }
                     reject_promise(agent, completion, reason);
+                    if let Some(mut observer) = observer {
+                        for index in 0..graph.module_count() {
+                            let entry = &agent.async_modules(state).entries[index];
+                            if !entry.body_started || entry.module.prior_completion.is_some() {
+                                continue;
+                            }
+                            let namespace = entry.module.namespace;
+                            if entry.body_returned && !entry.module.has_await && !entry.on_stack {
+                                let promise = new_intrinsic_promise(agent)?;
+                                resolve_promise(agent, promise, Value::UNDEFINED)?;
+                                observer(agent, index, namespace, promise)?;
+                            } else {
+                                observer(agent, index, namespace, completion)?;
+                            }
+                        }
+                    }
                 }
                 Err(error) => {
                     for entry in &mut agent.async_modules(state).entries {
@@ -243,8 +263,10 @@ impl Agent {
     }
 
     fn run_module_body(&mut self, state: ObjectId, index: usize) -> JsResult<()> {
+        self.async_modules(state).entries[index].body_started = true;
         let module = self.async_modules(state).entries[index].module;
         let value = self.run_in_environment(module.body, module.env, Value::UNDEFINED)?;
+        self.async_modules(state).entries[index].body_returned = true;
         if module.has_await {
             let promise = value
                 .as_object()

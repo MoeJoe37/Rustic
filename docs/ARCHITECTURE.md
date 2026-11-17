@@ -213,9 +213,12 @@ and the current script alongside ordinary DOM and JavaScript roots. EOF
 publishes the same document and agent to the turn pump once local sources
 settle. The engine resolves in-grant external script URLs with `rustic-url`.
 The embedder owns file access and delivers each result against a request ID.
-The engine sequences the parser and classics around those completions.
+The engine sequences the parser and scripts around those completions.
+Local JavaScript modules share parsed records, namespace objects and
+completion promises within the page realm. The same after-EOF queue orders
+modules and deferred classics.
 [ADR 0037](adr/0037-parser-script-boundary.md), [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
-and [ADR 0039](adr/0039-local-external-classics.md).
+[ADR 0039](adr/0039-local-external-classics.md) and [ADR 0040](adr/0040-local-module-scripts.md).
 
 The following broader pipeline describes the target architecture.
 

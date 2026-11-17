@@ -2,7 +2,7 @@
 
 This is the guide to how JavaScript and a document meet in Rustic. It ties
 together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
-to [ADR 0039](adr/0039-local-external-classics.md)), which each
+to [ADR 0040](adr/0040-local-module-scripts.md)), which each
 describe one step, and says plainly what is not built yet. The tested contract
 of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
 WEB-01 to WEB-05; the plan for the rest is
@@ -36,6 +36,15 @@ defer scripts. The host opens only a requested local file within its canonical
 grant and honors the request's byte limit.
 [ADR 0039](adr/0039-local-external-classics.md)
 
+Local `type="module"` elements use the same host API. External entry points
+and static imports appear as `ScriptResourceKind::JavaScriptModule` requests.
+Deliver dependency results as they appear, and call the load's `run_next()`
+when a timer awaited by module code becomes due. Async graphs can start as
+soon as their dependencies settle. Other modules start in document order
+with deferred classics after EOF. Module exceptions and failed static graphs
+are counted by `take_module_script_error_count()`.
+[ADR 0040](adr/0040-local-module-scripts.md)
+
 Inside a turn, script can walk and change the tree, create nodes and whole
 detached documents, query with CSS selectors, hold live collections, add
 listeners, dispatch events and schedule timers and animation callbacks.
@@ -44,7 +53,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Modules and readiness | The opt-in loader runs inline and local external classics. Module and readiness events are pending. | WEB-05 |
+| Script and document readiness | The host can run local classics and static JavaScript modules. Readiness and element events are pending. | WEB-05 |
 | Engine-owned style and layout for scripted documents | A rendering turn hands the host the live tree and the host renders it from scratch; nothing is invalidated incrementally and script cannot read layout | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
@@ -214,6 +223,7 @@ and `AbortSignal` listener removal are TD-131.
 | HTML script suspension and scripting-enabled trees | `crates/rustic-html/tests/document.rs`, `fragment.rs`, `tree_construction.rs` |
 | Parser-inserted inline classic execution | `crates/rustic-engine/tests/inline_scripts.rs` |
 | Local external script results and execution order | `crates/rustic-engine/tests/classic_scripts.rs` |
+| Local modules, shared imports and top-level await | `crates/rustic-engine/tests/module_scripts.rs` |
 | Trusted input and activation | `crates/rustic-engine/tests/input.rs` |
 | Conversions and generated metadata | `crates/rustic-bindings/tests/webidl.rs`, `metadata.rs` |
 | Wrapper identity, adoption, joint collection | `crates/rustic-bindings/tests/dom_gc.rs`, `page.rs` |
@@ -242,6 +252,7 @@ drives the pump or the bindings yet. Both are on the
 | TD-132 | Timer and frame integration details | WEB-06, WEB-07 |
 | TD-133 | Outward adoption during parsing and dynamic markup | WEB-09 and M9 |
 | TD-134 | Classic-script ordering with stylesheet, timer and readiness tasks | WEB-05 and WEB-06 |
+| TD-135 | Dynamic page imports, import maps and data module types | M6 and M9 |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

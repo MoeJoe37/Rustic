@@ -1,4 +1,4 @@
-//! Opt-in HTML loads that execute parser-inserted classics.
+//! Opt-in HTML loads that execute parser-inserted classics and local modules.
 
 use std::fmt;
 
@@ -7,17 +7,20 @@ use rustic_dom::{Document, Element, NodeId, NodeKind};
 use rustic_html::{
     HtmlDocumentParser, HtmlError, ParseError, ParserLimits, ScriptBoundary, Scripting,
 };
+use rustic_js::module::{GraphError, GraphLimits};
 use rustic_js::{MAX_SOURCE_UNITS, Source};
 use rustic_url::Url;
 
-use crate::classic_scripts::{ExternalScripts, ReadyClassic};
+use crate::classic_scripts::{ExternalScripts, ReadyClassic, ReadyScript};
 use crate::lifecycle::DocumentScope;
+use crate::local_modules::ModuleKey;
 use crate::{
     ClassicFetchError, ClassicRequestId, ClassicScriptLimits, ClassicScriptMode,
-    ClassicScriptRequest, DocumentStartError, Engine, ScriptStop, ScriptedDocument, TaskLimits,
+    ClassicScriptRequest, DocumentStartError, Engine, ScriptStop, ScriptTurn, ScriptedDocument,
+    TaskLimits,
 };
 
-/// Failure of an opt-in classic-script document load.
+/// Failure of an opt-in scripted document load.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ScriptLoadError {
     /// Engine document admission failed.
@@ -94,7 +97,7 @@ pub struct InlineScriptLoad<C = SystemClock> {
     pending: Option<Pending<C>>,
 }
 
-/// An active HTML load with host-supplied local external classics.
+/// An active HTML load with host-supplied local script resources.
 pub struct ClassicScriptLoad<C = SystemClock> {
     inner: InlineScriptLoad<C>,
 }
@@ -132,7 +135,7 @@ impl Engine {
         self.begin_classic_load(parser_limits, task_limits, clock, None)
     }
 
-    /// Admit a scripted HTML load that can request local external classics.
+    /// Admit a scripted HTML load that can request local classics and JavaScript modules.
     pub fn begin_local_scripted_document(
         &mut self,
         parser_limits: ParserLimits,
@@ -276,7 +279,7 @@ impl<C: Clock> ClassicScriptLoad<C> {
     }
 
     /// Deliver one requested source or a recoverable acquisition failure.
-    /// The load runs any newly eligible classics before returning.
+    /// The load runs any newly eligible scripts before returning.
     pub fn complete_script(
         &mut self,
         id: ClassicRequestId,
@@ -290,14 +293,25 @@ impl<C: Clock> ClassicScriptLoad<C> {
                 .external
                 .as_mut()
                 .expect("local script load has a queue");
-            if let Some(ready) = external.complete(id, result, pending.source_limit)? {
+            if let Some(ready) = external.complete(
+                id,
+                result,
+                pending.source_limit,
+                pending.scope.cancellation(),
+            )? {
                 pending.run_external(ready)?;
             }
             pending.run_available_scripts()
         })
     }
 
-    /// Take the completed document once EOF and all requests have settled.
+    /// Pump one eligible page task, for example a timer awaited by a module.
+    pub fn run_next(&mut self) -> Result<Option<ScriptTurn>, ScriptLoadError> {
+        self.inner
+            .with_pending(|pending| Ok(pending.document.run_next()?))
+    }
+
+    /// Take the completed document once EOF and all scripts have settled.
     pub fn take_document(&mut self) -> Result<Option<ScriptedDocument<C>>, ScriptLoadError> {
         if self.inner.pending.is_none()
             || !self.inner.with_pending(|pending| Ok(pending.ready()))?
@@ -330,7 +344,9 @@ impl<C: Clock> Pending<C> {
     }
 
     fn ready(&self) -> bool {
-        self.eof && self.external.as_ref().is_none_or(ExternalScripts::is_empty)
+        self.eof
+            && self.external.as_ref().is_none_or(ExternalScripts::is_empty)
+            && !self.document.has_pending_modules()
     }
 
     fn into_document(mut self) -> Result<ScriptedDocument<C>, ScriptLoadError> {
@@ -346,12 +362,31 @@ impl<C: Clock> Pending<C> {
         Ok(())
     }
 
+    fn run_module(&mut self, entry: ModuleKey) -> Result<(), ScriptLoadError> {
+        let modules = &self
+            .external
+            .as_ref()
+            .expect("module load has a queue")
+            .modules;
+        let mut limits = GraphLimits::default();
+        limits.parse.cancellation = self.scope.cancellation().clone();
+        match modules.graph(entry, &limits) {
+            Ok(graph) => self.document.run_module_graph(&graph, &limits, modules)?,
+            Err(GraphError::Cancelled) => return Err(ScriptStop::DocumentCancelled.into()),
+            Err(_) => self.document.note_module_script_error(),
+        }
+        Ok(())
+    }
+
     fn run_available_scripts(&mut self) -> Result<(), ScriptLoadError> {
         loop {
             self.check_live()?;
             if let Some(external) = self.external.as_mut() {
-                if let Some(ready) = external.take_runnable(self.eof) {
-                    self.run_external(ready)?;
+                if let Some(ready) = external.take_runnable(self.eof)? {
+                    match ready {
+                        ReadyScript::Classic(ready) => self.run_external(ready)?,
+                        ReadyScript::Module(entry) => self.run_module(entry)?,
+                    }
                     continue;
                 }
                 if external.blocks_parser() {
@@ -363,6 +398,26 @@ impl<C: Clock> Pending<C> {
             }
             let next = self.document.with_active_parser(|parser| {
                 while let Some(boundary) = parser.advance_to_script()? {
+                    if let Some(external) = &mut self.external {
+                        if let Some(element) = module_element(&boundary)? {
+                            let mode = if attribute(element, "async").is_some() {
+                                ClassicScriptMode::Async
+                            } else {
+                                ClassicScriptMode::Defer
+                            };
+                            let admitted = external.admit_module(
+                                &boundary,
+                                mode,
+                                attribute(element, "src").map(trim_ascii_space),
+                                || inline_classic_source(&boundary, self.source_limit),
+                                self.scope.cancellation(),
+                            )?;
+                            if !admitted {
+                                return Ok::<_, ScriptLoadError>(Some(Prepared::ModuleRejected));
+                            }
+                            return Ok(Some(Prepared::ModuleQueued));
+                        }
+                    }
                     let Some(element) = eligible_classic(&boundary)? else {
                         continue;
                     };
@@ -397,6 +452,8 @@ impl<C: Clock> Pending<C> {
                     self.document.retain_external_classic(element)?
                 }
                 Some(Prepared::ExternalRejected) => self.document.note_external_script_error(),
+                Some(Prepared::ModuleQueued) => {}
+                Some(Prepared::ModuleRejected) => self.document.note_module_script_error(),
                 None if self.input_closed => self.eof = true,
                 None => return Ok(()),
             }
@@ -408,6 +465,21 @@ enum Prepared {
     Inline(NodeId, Source),
     ExternalPending(NodeId),
     ExternalRejected,
+    ModuleQueued,
+    ModuleRejected,
+}
+
+fn module_element<'a>(boundary: &ScriptBoundary<'a>) -> Result<Option<&'a Element>, ParseError> {
+    let id = boundary.element;
+    let NodeKind::Element(element) = boundary.document.node(id)?.kind() else {
+        return Ok(None);
+    };
+    if attribute(element, "type").is_some_and(|value| ascii_matches(value, "module"))
+        && connected(boundary.document, id)?
+    {
+        return Ok(Some(element));
+    }
+    Ok(None)
 }
 
 fn eligible_classic<'a>(boundary: &ScriptBoundary<'a>) -> Result<Option<&'a Element>, ParseError> {

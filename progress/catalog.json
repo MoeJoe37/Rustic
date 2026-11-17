@@ -4441,8 +4441,29 @@
             },
             {
               "label": "Module graph loading and execution order",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/local_modules.rs",
+                  "marker": "pub(crate) fn graph"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/module_scripts.rs",
+                  "marker": "fn mixed_async_and_deferred_modules_share_sources_and_evaluate_once"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/module_scripts.rs",
+                  "marker": "fn top_level_await_can_settle_through_the_document_task_pump"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/module_scripts.rs",
+                  "marker": "fn failed_modules_release_order_and_keep_evaluated_dependencies_cached"
+                }
+              ]
             },
             {
               "label": "Document readiness, lifecycle events and CLI opt-in",

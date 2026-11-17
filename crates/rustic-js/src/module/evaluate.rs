@@ -164,17 +164,38 @@ impl Agent {
             impl FnMut(&mut Self, usize, ObjectId, ObjectId) -> crate::runtime::JsResult<()>,
         >,
     ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
+        self.start_module_graph(graph, limits, referrer, reuse, observer, |_| None)
+    }
+
+    /// Evaluate a graph using the host's module map. The host owns roots
+    /// for observed or reused handles. A URL also populates `import.meta.url`.
+    pub fn start_cached_module_evaluation<K: Clone + Eq + Hash>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+        url: impl Fn(&K) -> Option<JsStr>,
+        reuse: impl FnMut(&Self, &K) -> Option<(ObjectId, ObjectId)>,
+        observe: impl FnMut(&mut Self, usize, ObjectId, ObjectId) -> crate::runtime::JsResult<()>,
+    ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
+        self.start_module_graph(graph, limits, &url, reuse, Some(observe), |key| {
+            url(key).map(|url| (JsStr::from_text("url"), url))
+        })
+    }
+
+    fn start_module_graph<K: Clone + Eq + Hash>(
+        &mut self,
+        graph: &ModuleGraph<K>,
+        limits: &GraphLimits,
+        referrer: impl FnMut(&K) -> Option<JsStr>,
+        reuse: impl FnMut(&Self, &K) -> Option<(ObjectId, ObjectId)>,
+        observer: Option<
+            impl FnMut(&mut Self, usize, ObjectId, ObjectId) -> crate::runtime::JsResult<()>,
+        >,
+        metadata: impl FnMut(&K) -> Option<(JsStr, JsStr)>,
+    ) -> Result<(ObjectId, ObjectId), ModuleEvalError> {
         let start = self.vm.modules.len();
         let result = self
-            .link_modules(
-                graph,
-                limits,
-                start,
-                |_| std::iter::empty(),
-                true,
-                referrer,
-                reuse,
-            )
+            .link_modules(graph, limits, start, metadata, true, referrer, reuse)
             .and_then(|()| self.run_async_modules(graph, limits, start, observer));
         self.vm.modules.truncate(start);
         result

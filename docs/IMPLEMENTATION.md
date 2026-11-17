@@ -136,7 +136,7 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Scripted documents (M5, in progress): 8 sections</summary>
+<summary>Scripted documents (M5, in progress): 9 sections</summary>
 
 - [Engine lifecycle — Bounded document ownership and shutdown](#engine-lifecycle--bounded-document-ownership-and-shutdown)
 - [WEB-01 — Document script turns and microtask checkpoints](#web-01--document-script-turns-and-microtask-checkpoints)
@@ -146,6 +146,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-05 — Parser suspension at script boundaries](#web-05--parser-suspension-at-script-boundaries)
 - [WEB-05 — Parser-inserted inline classics](#web-05--parser-inserted-inline-classics)
 - [WEB-05 — Local external classics](#web-05--local-external-classics)
+- [WEB-05 — Local static JavaScript modules](#web-05--local-static-javascript-modules)
 
 </details>
 
@@ -488,6 +489,26 @@ cover all 24 response permutations for two async and two defer scripts, with
 five placements of EOF, as well as parser blocking, path and response limits,
 invalid completions and collection of detached nodes.
 [ADR 0039](adr/0039-local-external-classics.md)
+
+## WEB-05 — Local static JavaScript modules
+
+The opt-in local loader accepts parser-inserted inline and external
+`type="module"` scripts. Hosts deliver static dependency sources through
+the same request and byte budgets as classics. A module URL shares its
+parsed record and evaluated instance within the document. Import requests
+resolve against the importing module's URL. Import metadata exposes that URL
+through `import.meta.url`.
+
+Async module graphs start on readiness. Other module elements start after
+EOF in the same order as deferred classics. The host can pump tasks while
+evaluation awaits a promise. Document publication waits for pending
+evaluations, and `document.currentScript` remains null in module code.
+Recoverable failures release the affected queue position.
+
+The [module loader tests](../crates/rustic-engine/tests/module_scripts.rs)
+exercise mixed scheduling, shared dependencies, cycles, top-level await,
+failed graphs and budget enforcement.
+[ADR 0040](adr/0040-local-module-scripts.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

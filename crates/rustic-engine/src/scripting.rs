@@ -1,7 +1,7 @@
 //! WEB-01 document-owned script tasks and microtask checkpoints.
 
 use std::cell::{Cell, Ref, RefCell, RefMut};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
@@ -11,11 +11,15 @@ use rustic_bindings::dom_exception;
 use rustic_bindings::page::{self, PageTree};
 use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
-use rustic_js::runtime::{Abrupt, Agent, DEFAULT_HEAP_BYTES, OutOfMemory, Value};
+use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
+use rustic_js::runtime::{
+    Abrupt, Agent, DEFAULT_HEAP_BYTES, HostRoot, JsStr, ObjectId, OutOfMemory, Value,
+};
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::frames::{RenderFrame, Rendering};
 use crate::lifecycle::DocumentScope;
+use crate::local_modules::{LocalModules, ModuleKey};
 use crate::tasks::{ScriptQueue, Task, TimerId};
 use crate::window_tasks::WindowWork;
 use crate::{EngineDocument, InputEvent};
@@ -232,6 +236,9 @@ pub struct ScriptedDocument<C = SystemClock> {
     animation_errors: u64,
     inline_script_errors: u64,
     external_script_errors: u64,
+    module_script_errors: u64,
+    module_map: RefCell<HashMap<ModuleKey, ModuleRoots>>,
+    pending_modules: Vec<HostRoot>,
     rendering: Rendering,
     clock: C,
     limits: TaskLimits,
@@ -314,6 +321,9 @@ impl<C: Clock> ScriptedDocument<C> {
             animation_errors: 0,
             inline_script_errors: 0,
             external_script_errors: 0,
+            module_script_errors: 0,
+            module_map: RefCell::default(),
+            pending_modules: Vec::new(),
             rendering: Rendering::new(owner),
             clock,
             limits,
@@ -410,6 +420,80 @@ impl<C: Clock> ScriptedDocument<C> {
     /// Read and clear recoverable preparation, fetch or evaluation errors from external classics.
     pub fn take_external_script_error_count(&mut self) -> u64 {
         std::mem::take(&mut self.external_script_errors)
+    }
+
+    pub(crate) fn run_module_graph(
+        &mut self,
+        graph: &ModuleGraph<ModuleKey>,
+        limits: &GraphLimits,
+        sources: &LocalModules,
+    ) -> Result<(), ScriptStop> {
+        self.check_live()?;
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        agent.set_step_budget(Some(self.limits.steps_per_turn));
+        let cache = &self.module_map;
+        let (entry, _) = graph.module(0).expect("module graph has an entry");
+        let cached = cache.borrow().get(entry).copied();
+        let evaluation = if let Some(root) = cached {
+            Ok(root.objects(agent))
+        } else {
+            agent.start_cached_module_evaluation(
+                graph,
+                limits,
+                |key| {
+                    sources
+                        .base(key)
+                        .map(|url| JsStr::from_text(&url.serialize()))
+                },
+                |agent, key| cache.borrow().get(key).map(|root| root.objects(agent)),
+                |agent, index, namespace, completion| {
+                    let (key, _) = graph.module(index).expect("evaluated graph module");
+                    store_module(agent, &mut cache.borrow_mut(), key, namespace, completion)?;
+                    Ok(())
+                },
+            )
+        };
+        match evaluation {
+            Ok((namespace, completion)) => {
+                let root = store_module(
+                    agent,
+                    &mut self.module_map.borrow_mut(),
+                    entry,
+                    namespace,
+                    completion,
+                )
+                .map_err(|_| ScriptStop::OutOfMemory)?;
+                self.pending_modules
+                    .try_reserve(1)
+                    .map_err(|_| ScriptStop::OutOfMemory)?;
+                self.pending_modules.push(root.completion);
+            }
+            Err(ModuleEvalError::Runtime(Abrupt::OutOfMemory)) => {
+                return Err(self.stop(ScriptStop::OutOfMemory));
+            }
+            Err(ModuleEvalError::Runtime(Abrupt::Cancelled)) => {
+                return Err(self.stop_after_cancellation());
+            }
+            Err(ModuleEvalError::Graph(GraphError::Cancelled)) => {
+                return Err(self.stop(ScriptStop::DocumentCancelled));
+            }
+            Err(_) => self.note_module_script_error(),
+        }
+        self.finish_script_turn(Ok(()))?;
+        Ok(())
+    }
+
+    pub(crate) fn has_pending_modules(&self) -> bool {
+        !self.pending_modules.is_empty()
+    }
+
+    pub(crate) fn note_module_script_error(&mut self) {
+        self.module_script_errors = self.module_script_errors.saturating_add(1);
+    }
+
+    /// Read and clear recoverable module graph or evaluation errors.
+    pub fn take_module_script_error_count(&mut self) -> u64 {
+        std::mem::take(&mut self.module_script_errors)
     }
 
     /// Read and clear the number of listener exceptions reported by the page.
@@ -615,6 +699,21 @@ impl<C: Clock> ScriptedDocument<C> {
                 // Release the rejection report's roots at the checkpoint.
                 // Web rejection-event dispatch belongs to the later event layer.
                 agent.take_rejection_events();
+                self.pending_modules.retain(|&root| {
+                    let promise = agent
+                        .rooted(root)
+                        .and_then(Value::as_object)
+                        .expect("retained module completion");
+                    match agent.promise_rejected(promise) {
+                        Some(rejected) => {
+                            self.module_script_errors = self
+                                .module_script_errors
+                                .saturating_add(u64::from(rejected));
+                            false
+                        }
+                        None => true,
+                    }
+                });
                 self.check_live()
             }
             Ok(false) => Err(self.stop(ScriptStop::JobLimit)),
@@ -642,7 +741,55 @@ impl<C: Clock> ScriptedDocument<C> {
     fn stop(&mut self, reason: ScriptStop) -> ScriptStop {
         self.agent = Err(reason);
         self.pending.queue.borrow_mut().clear();
+        self.module_map.get_mut().clear();
+        self.pending_modules.clear();
         self.rendering.clear();
         reason
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ModuleRoots {
+    namespace: HostRoot,
+    completion: HostRoot,
+}
+
+impl ModuleRoots {
+    fn objects(self, agent: &Agent) -> (ObjectId, ObjectId) {
+        let object = |root| {
+            agent
+                .rooted(root)
+                .and_then(Value::as_object)
+                .expect("module map root")
+        };
+        (object(self.namespace), object(self.completion))
+    }
+}
+
+fn store_module(
+    agent: &mut Agent,
+    cache: &mut HashMap<ModuleKey, ModuleRoots>,
+    key: &ModuleKey,
+    namespace: ObjectId,
+    completion: ObjectId,
+) -> Result<ModuleRoots, OutOfMemory> {
+    if let Some(&existing) = cache.get(key) {
+        return Ok(existing);
+    }
+    cache.try_reserve(1).map_err(|_| OutOfMemory)?;
+    let namespace = agent.root(Value::object(namespace))?;
+    match agent.root(Value::object(completion)) {
+        Ok(completion) => {
+            let roots = ModuleRoots {
+                namespace,
+                completion,
+            };
+            cache.insert(key.clone(), roots);
+            Ok(roots)
+        }
+        Err(error) => {
+            agent.unroot(namespace);
+            Err(error)
+        }
     }
 }

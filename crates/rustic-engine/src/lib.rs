@@ -7,13 +7,14 @@ mod classic_scripts;
 mod frames;
 mod inline_scripts;
 mod lifecycle;
+mod local_modules;
 mod scripting;
 mod tasks;
 mod window_tasks;
 
 pub use classic_scripts::{
     ClassicFetchError, ClassicRequestId, ClassicScriptLimits, ClassicScriptMode,
-    ClassicScriptRequest,
+    ClassicScriptRequest, ScriptResourceKind,
 };
 pub use frames::RenderFrame;
 pub use inline_scripts::ScriptLoadError as InlineLoadError;

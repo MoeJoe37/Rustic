@@ -134,6 +134,18 @@ pub(super) fn content_type(agent: &mut Agent, receiver: Value, _: &[Value]) -> J
     })
 }
 
+pub(super) fn ready_state(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    document_receiver(agent, receiver)?;
+    read_node(agent, receiver, |agent, _, document, _, _| {
+        let state = match document.ready_state() {
+            rustic_dom::ReadyState::Loading => "loading",
+            rustic_dom::ReadyState::Interactive => "interactive",
+            rustic_dom::ReadyState::Complete => "complete",
+        };
+        agent.string(state)
+    })
+}
+
 pub(super) fn doctype(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
     read_node(agent, receiver, |agent, wrappers, document, id, node| {
         if !matches!(node.kind(), NodeKind::Document) {

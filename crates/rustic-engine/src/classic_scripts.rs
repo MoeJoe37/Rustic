@@ -101,7 +101,7 @@ pub(crate) struct ExternalScripts {
     entries: HashMap<ClassicRequestId, Entry>,
     blocker: Option<ClassicRequestId>,
     deferred: VecDeque<Deferred>,
-    async_modules: VecDeque<ModuleKey>,
+    async_modules: VecDeque<ModuleJob>,
     module_requests: HashMap<ClassicRequestId, ModuleFetch>,
     pub(crate) modules: LocalModules,
 }
@@ -114,7 +114,7 @@ struct Entry {
 
 enum Deferred {
     Classic(ClassicRequestId),
-    Module(ModuleKey),
+    Module(Box<ModuleJob>),
 }
 
 struct ModuleFetch {
@@ -136,7 +136,14 @@ pub(crate) struct ReadyClassic {
 
 pub(crate) enum ReadyScript {
     Classic(ReadyClassic),
-    Module(ModuleKey),
+    Module(ModuleJob),
+}
+
+#[derive(Clone)]
+pub(crate) struct ModuleJob {
+    pub(crate) key: ModuleKey,
+    pub(crate) element: NodeId,
+    pub(crate) external: bool,
 }
 
 impl ExternalScripts {
@@ -239,16 +246,21 @@ impl ExternalScripts {
             self.parse_module_source(key.clone(), base, source, owner, mode, cancellation)?;
             key
         };
+        let job = ModuleJob {
+            key,
+            element: boundary.element,
+            external: src.is_some(),
+        };
         if mode == ClassicScriptMode::Async {
             self.async_modules
                 .try_reserve(1)
                 .map_err(|_| ScriptStop::OutOfMemory)?;
-            self.async_modules.push_back(key);
+            self.async_modules.push_back(job);
         } else {
             self.deferred
                 .try_reserve(1)
                 .map_err(|_| ScriptStop::OutOfMemory)?;
-            self.deferred.push_back(Deferred::Module(key));
+            self.deferred.push_back(Deferred::Module(Box::new(job)));
         }
         Ok(true)
     }
@@ -423,8 +435,8 @@ impl ExternalScripts {
     }
 
     pub(crate) fn take_runnable(&mut self, eof: bool) -> Result<Option<ReadyScript>, ScriptStop> {
-        for (index, key) in self.async_modules.iter().enumerate() {
-            if self.modules.ready(key)? {
+        for (index, job) in self.async_modules.iter().enumerate() {
+            if self.modules.ready(&job.key)? {
                 return Ok(self.async_modules.remove(index).map(ReadyScript::Module));
             }
         }
@@ -438,8 +450,8 @@ impl ExternalScripts {
         if eof {
             let result = match self.deferred.front() {
                 Some(Deferred::Classic(id)) => self.take_ready(*id).map(ReadyScript::Classic),
-                Some(Deferred::Module(key)) if self.modules.ready(key)? => {
-                    Some(ReadyScript::Module(key.clone()))
+                Some(Deferred::Module(job)) if self.modules.ready(&job.key)? => {
+                    Some(ReadyScript::Module(job.as_ref().clone()))
                 }
                 _ => None,
             };
@@ -460,6 +472,10 @@ impl ExternalScripts {
             && self.module_requests.is_empty()
             && self.async_modules.is_empty()
             && self.deferred.is_empty()
+    }
+
+    pub(crate) fn deferred_is_empty(&self) -> bool {
+        self.deferred.is_empty()
     }
 
     fn take_ready(&mut self, id: ClassicRequestId) -> Option<ReadyClassic> {

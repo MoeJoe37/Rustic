@@ -48,6 +48,7 @@ instead of rewriting the history of a decision.
 | [0038](0038-parser-inserted-inline-classics.md) | Inline classic execution, parser roots and adoption during construction | Accepted for the WEB-05 inline classic slice |
 | [0039](0039-local-external-classics.md) | Host-supplied local sources and blocking, async and defer ordering | Accepted for the WEB-05 external classic slice |
 | [0040](0040-local-module-scripts.md) | Local static module graphs, shared instances and evaluation order | Accepted for the WEB-05 local module slice |
+| [0041](0041-scripted-document-readiness.md) | Document readiness, script events and CLI lifecycle | Accepted for the WEB-05 local host |
 
 ## Records by area
 
@@ -62,7 +63,7 @@ instead of rewriting the history of a decision.
 | Web IDL and wrappers (M5, WEB-02) | 0024, 0025, 0026, 0027 |
 | Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
-| Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040 |
+| Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

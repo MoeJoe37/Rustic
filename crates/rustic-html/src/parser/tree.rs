@@ -1,6 +1,6 @@
 use rustic_dom::{
     Document, DocumentLimits, DocumentType, DomError, Element, MATHML_NAMESPACE, NodeId, NodeKind,
-    SVG_NAMESPACE,
+    ReadyState, SVG_NAMESPACE,
 };
 
 use crate::{Doctype, Tag, Token, TokenizerMode};
@@ -156,7 +156,10 @@ impl TreeBuilder {
         scripting: Scripting,
     ) -> Result<Self, ParseError> {
         Ok(Self {
-            document: Document::new(limits)?,
+            document: match scripting {
+                Scripting::Disabled => Document::new(limits)?,
+                Scripting::Enabled => Document::new_for_parsing(limits)?,
+            },
             document_mode: DocumentMode::NoQuirks,
             scripting,
             exposed_document: false,
@@ -199,6 +202,9 @@ impl TreeBuilder {
         scripting: Scripting,
     ) -> Result<(Self, TokenizerMode), ParseError> {
         let mut builder = Self::new(limits, max_diagnostics, scripting)?;
+        if scripting == Scripting::Enabled {
+            builder.document.advance_ready_state(ReadyState::Complete)?;
+        }
         let html = builder.create_element(&Tag::implied("html"), Ns::Html)?;
         let root = builder.document.root();
         builder.attach_or_destroy(root, None, html)?;
@@ -329,7 +335,12 @@ impl TreeBuilder {
             .is_some_and(|id| self.ns(id) != Ns::Html)
     }
 
-    pub(super) fn into_result(self, tokenizer: TokenizerDiagnostics) -> ParsedDocument {
+    pub(super) fn into_result(mut self, tokenizer: TokenizerDiagnostics) -> ParsedDocument {
+        if self.document.ready_state() != ReadyState::Complete {
+            self.document
+                .advance_ready_state(ReadyState::Complete)
+                .expect("readiness advances");
+        }
         assert!(self.done, "result requires successfully processed EOF");
         ParsedDocument {
             document: self.document,

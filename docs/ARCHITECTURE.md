@@ -216,9 +216,11 @@ The embedder owns file access and delivers each result against a request ID.
 The engine sequences the parser and scripts around those completions.
 Local JavaScript modules share parsed records, namespace objects and
 completion promises within the page realm. The same after-EOF queue orders
-modules and deferred classics.
+modules and deferred classics. The engine owns document readiness transitions
+and publishes only after document and script lifecycle events are delivered.
 [ADR 0037](adr/0037-parser-script-boundary.md), [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
-[ADR 0039](adr/0039-local-external-classics.md) and [ADR 0040](adr/0040-local-module-scripts.md).
+[ADR 0039](adr/0039-local-external-classics.md), [ADR 0040](adr/0040-local-module-scripts.md)
+and [ADR 0041](adr/0041-scripted-document-readiness.md).
 
 The following broader pipeline describes the target architecture.
 

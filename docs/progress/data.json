@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "c0e1ea9765939fdd652a71e03d5fb6a86cdf7b4ed723f753495cf477bacb6a8e",
-  "percent": "32.54",
-  "verified_percent": "31.11",
-  "partial_percent": "1.43",
-  "completed": 71,
-  "in_progress": 7,
+  "source_fingerprint": "88125f71ed77ce37998150a256ecfb876727be59100fede823ee140bdbbee2fe",
+  "percent": "32.64",
+  "verified_percent": "31.48",
+  "partial_percent": "1.16",
+  "completed": 72,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -55,11 +55,11 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 5,
+      "completed": 6,
       "total": 12,
-      "percent": "59.28",
-      "verified_percent": "45.32",
-      "partial_percent": "13.96"
+      "percent": "61.05",
+      "verified_percent": "52.41",
+      "partial_percent": "8.64"
     },
     {
       "id": "M6",
@@ -4759,89 +4759,80 @@
           "label": "Classic/module script lifecycle and readiness",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Inline classic preparation, evaluation and checkpoint",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/inline_scripts.rs",
-                  "marker": "pub fn begin_inline_scripted_document"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn inline_classics_observe_and_edit_the_partial_document_at_every_split"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn inline_errors_allow_later_scripts_and_dynamic_markup_reports_an_exception"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-engine/src/inline_scripts.rs",
+              "marker": "pub fn begin_inline_scripted_document"
             },
             {
-              "label": "Bounded local classic loading with parser blocking, async and defer order",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/inline_scripts.rs",
-                  "marker": "pub fn complete_script"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/classic_scripts.rs",
-                  "marker": "fn blocking_classics_hold_the_parser_and_checkpoint_before_later_markup"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/classic_scripts.rs",
-                  "marker": "fn async_and_defer_follow_all_arrival_orders_on_the_manual_clock"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/classic_scripts.rs",
-                  "marker": "fn local_base_authority_and_response_budgets_preserve_later_scripts"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/inline_scripts.rs",
+              "marker": "fn inline_classics_observe_and_edit_the_partial_document_at_every_split"
             },
             {
-              "label": "Module graph loading and execution order",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/local_modules.rs",
-                  "marker": "pub(crate) fn graph"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/module_scripts.rs",
-                  "marker": "fn mixed_async_and_deferred_modules_share_sources_and_evaluate_once"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/module_scripts.rs",
-                  "marker": "fn top_level_await_can_settle_through_the_document_task_pump"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/module_scripts.rs",
-                  "marker": "fn failed_modules_release_order_and_keep_evaluated_dependencies_cached"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/inline_scripts.rs",
+              "marker": "fn inline_errors_allow_later_scripts_and_dynamic_markup_reports_an_exception"
             },
             {
-              "label": "Document readiness, lifecycle events and CLI opt-in",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-engine/src/inline_scripts.rs",
+              "marker": "pub fn complete_script"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/classic_scripts.rs",
+              "marker": "fn blocking_classics_hold_the_parser_and_checkpoint_before_later_markup"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/classic_scripts.rs",
+              "marker": "fn async_and_defer_follow_all_arrival_orders_on_the_manual_clock"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/classic_scripts.rs",
+              "marker": "fn local_base_authority_and_response_budgets_preserve_later_scripts"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/local_modules.rs",
+              "marker": "pub(crate) fn graph"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/module_scripts.rs",
+              "marker": "fn mixed_async_and_deferred_modules_share_sources_and_evaluate_once"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/module_scripts.rs",
+              "marker": "fn top_level_await_can_settle_through_the_document_task_pump"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/module_scripts.rs",
+              "marker": "fn failed_modules_release_order_and_keep_evaluated_dependencies_cached"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/inline_scripts.rs",
+              "marker": "fn advance_lifecycle"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/classic_scripts.rs",
+              "marker": "fn readiness_and_script_events_order_deferred_and_outstanding_async_work"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn scripts_are_opt_in_and_local_module_timers_render_deterministically"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.37"
         },
         {
@@ -4959,13 +4950,13 @@
         }
       ],
       "points": 40,
-      "completed": 3,
-      "in_progress": 2,
+      "completed": 4,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "2.09",
-      "percent": "41.87",
-      "verified_percent": "32.50",
-      "partial_percent": "9.37"
+      "contribution": "2.18",
+      "percent": "43.75",
+      "verified_percent": "40.00",
+      "partial_percent": "3.75"
     },
     {
       "id": "media",

@@ -36,6 +36,33 @@ fn rejects_navigation_and_extra_arguments() {
 }
 
 #[test]
+fn scripts_are_opt_in_and_local_module_timers_render_deterministically() {
+    let file = fixture("scripted/timer.html");
+    let file = file.to_str().unwrap();
+    let inert = rustic(&["dump-dom", file]);
+    assert!(inert.status.success(), "{}", stderr(&inert));
+    assert!(!String::from_utf8_lossy(&inert.stdout).contains("@class="));
+
+    let whole = rustic(&["dump-dom", "--run-scripts", file]);
+    let split = rustic(&["dump-dom", "--run-scripts", "--chunk-bytes", "1", file]);
+    for output in [&whole, &split] {
+        assert!(output.status.success(), "{}", stderr(output));
+        assert_ne!(output.stdout, inert.stdout);
+    }
+    assert_eq!(whole.stdout, split.stdout);
+
+    let output = rustic(&["reftest", "--viewport", "100x100", "--run-scripts", file]);
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        stderr(&output)
+    );
+    let inert_pixels = rustic(&["reftest", "--viewport", "100x100", file]);
+    assert_eq!(inert_pixels.status.code(), Some(1));
+}
+
+#[test]
 fn dump_dom_matches_the_checked_snapshot_for_every_chunk_size() {
     let input = fixture("malformed.html");
     let expected = fs::read(fixture("malformed.dump")).expect("read snapshot");

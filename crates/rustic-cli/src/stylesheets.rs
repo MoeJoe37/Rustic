@@ -188,12 +188,20 @@ impl LocalStylesheetFetcher {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(_) => return Err(FetchError::Failed),
             };
-            if bytes.len() + read > max_bytes {
+            if read > max_bytes - bytes.len() {
                 return Err(FetchError::TooLarge);
             }
             bytes.extend_from_slice(&buffer[..read]);
         }
         Ok(bytes)
+    }
+
+    pub(crate) fn fetch_bytes(&self, url: &Url, max_bytes: usize) -> Result<Vec<u8>, FetchError> {
+        if self.cancellation.check().is_err() {
+            return Err(FetchError::Cancelled);
+        }
+        let path = url_path(url).ok_or(FetchError::Blocked)?;
+        self.read(&path, max_bytes)
     }
 }
 
@@ -203,11 +211,7 @@ impl StylesheetFetcher for LocalStylesheetFetcher {
     /// sequences become U+FFFD. `@charset` and legacy encodings are not
     /// supported yet (TD-28).
     fn fetch(&mut self, url: &Url, max_bytes: usize) -> Result<String, FetchError> {
-        if self.cancellation.check().is_err() {
-            return Err(FetchError::Cancelled);
-        }
-        let path = url_path(url).ok_or(FetchError::Blocked)?;
-        let bytes = self.read(&path, max_bytes)?;
+        let bytes = self.fetch_bytes(url, max_bytes)?;
         let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
         let text = String::from_utf8_lossy(bytes).into_owned();
         // Replacement characters can make the text longer than the bytes.

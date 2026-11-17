@@ -30,7 +30,7 @@ Usage:
   rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
   rustic --help | --version
 
-dump-dom reads one local HTML file (UTF-8, scripting disabled, no network) and
+dump-dom reads one local HTML file (UTF-8, scripting disabled by default) and
 prints a deterministic DOM tree dump. dump-style loads the file the same way,
 applies the HTML user-agent stylesheet, the document's <style> elements and
 its <link rel=stylesheet> and @import sheets, and prints each element's
@@ -71,7 +71,12 @@ CSS pixels, the topmost box there in paint order (honoring overflow clips and
 visibility; the root element when no box is hit), or none outside the
 1280x720 viewport.
 
-Options for all dump commands (positive integers; exceeding any limit except
+Use --run-scripts with any document command to run inline classics, local
+external classics and static JavaScript modules before producing output.
+The snapshot uses a manual clock for at most 256 timer turns and offers
+one animation frame.
+
+Limits for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
   --font FILE            explicit TTF/OTF/WOFF/WOFF2 (repeat up to 64; bounded local files)
   --max-input-bytes N    file and tokenizer input bytes (default 8388608)
@@ -500,6 +505,10 @@ fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String
             let target = match arg.to_str() {
                 Some("--") => {
                     options_done = true;
+                    continue;
+                }
+                Some("--run-scripts") => {
+                    limits.run_scripts = true;
                     continue;
                 }
                 Some("--max-input-bytes") => Some(&mut limits.max_file_bytes),

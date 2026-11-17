@@ -1,10 +1,9 @@
 //! Local-only bounded HTML loading for development commands.
 //!
 //! The command line grants exactly one file path. Page content may name other
-//! files only as stylesheets for `dump-style`, which load solely from that
-//! file's directory tree (see [`crate::stylesheets`]). Nothing here performs
-//! network access, script execution, other subresource loading or encoding
-//! detection. Input is read in fixed
+//! local subresources only inside that file's directory tree. Scripts run
+//! only when the caller opts in. There is no network or encoding detection.
+//! Input is read in fixed
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
@@ -14,11 +13,15 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
-use rustic_base::{CancellationToken, EscapedText};
+use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
 use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment};
 use rustic_dom::DumpError;
-use rustic_engine::{DocumentStartError, Engine, EngineDocument};
+use rustic_engine::{
+    ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
+    EngineDocument, ScriptLoadError, ScriptStop, TaskLimits,
+};
 use rustic_html::{DocumentMode, ParseError, ParserLimits};
 use rustic_style::{
     ComputeContext, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader,
@@ -33,6 +36,7 @@ pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
 pub const DEFAULT_READ_CHUNK_BYTES: usize = 64 * 1024;
 /// Default maximum UTF-8 bytes of dump output.
 pub const DEFAULT_MAX_DUMP_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SCRIPT_TIMER_TURNS: usize = 256;
 
 /// Independent budgets for one local load and its diagnostic dump.
 #[derive(Clone, Copy, Debug)]
@@ -45,6 +49,8 @@ pub struct LoaderLimits {
     pub max_dump_bytes: usize,
     /// Token, document and diagnostic limits for the document parser.
     pub parser: ParserLimits,
+    /// Execute the page's supported scripts before producing output.
+    pub run_scripts: bool,
     /// External stylesheet budgets for `dump-style`.
     pub stylesheets: StyleLoadLimits,
     /// Anonymous flow normalization budgets for `dump-formatting`.
@@ -60,6 +66,7 @@ impl Default for LoaderLimits {
             read_chunk_bytes: DEFAULT_READ_CHUNK_BYTES,
             max_dump_bytes: DEFAULT_MAX_DUMP_BYTES,
             parser: ParserLimits::default(),
+            run_scripts: false,
             stylesheets: StyleLoadLimits::default(),
             formatting: rustic_layout::FormattingLimits::default(),
             images: crate::images::ImageLimits::default(),
@@ -87,6 +94,14 @@ pub enum LoadError {
     Cancelled,
     /// The engine could not admit a new document.
     Engine(DocumentStartError),
+    /// The scripted parser or realm stopped.
+    Script(ScriptLoadError),
+    /// A script is still waiting with no local request or timer to service.
+    ScriptStalled,
+    /// Pending timers exceeded the scripted snapshot's turn budget.
+    ScriptTurnLimit,
+    /// The scripted snapshot's monotonic clock overflowed.
+    ScriptClock(ClockOverflow),
     /// The CSS parser could not be initialized.
     Css(CssError),
     /// The parser rejected the input or exceeded one of its budgets.
@@ -119,6 +134,15 @@ impl fmt::Display for LoadError {
             Self::Io(error) => write!(f, "cannot read file: {error}"),
             Self::Cancelled => f.write_str("load cancelled"),
             Self::Engine(error) => error.fmt(f),
+            Self::Script(error) => error.fmt(f),
+            Self::ScriptStalled => {
+                f.write_str("page scripts are still waiting with no pending local request or timer")
+            }
+            Self::ScriptTurnLimit => write!(
+                f,
+                "page scripts exceeded the {MAX_SCRIPT_TIMER_TURNS}-timer-turn limit"
+            ),
+            Self::ScriptClock(error) => error.fmt(f),
             Self::Css(error) => error.fmt(f),
             Self::Parse(error) => error.fmt(f),
             Self::Dump(error) => error.fmt(f),
@@ -137,6 +161,8 @@ impl Error for LoadError {
         match self {
             Self::Io(error) => Some(error),
             Self::Engine(error) => Some(error),
+            Self::Script(error) => Some(error),
+            Self::ScriptClock(error) => Some(error),
             Self::Css(error) => Some(error),
             Self::Parse(error) => Some(error),
             Self::Dump(error) => Some(error),
@@ -154,6 +180,21 @@ impl Error for LoadError {
 impl From<ParseError> for LoadError {
     fn from(value: ParseError) -> Self {
         Self::Parse(value)
+    }
+}
+
+impl From<ScriptLoadError> for LoadError {
+    fn from(error: ScriptLoadError) -> Self {
+        match error {
+            ScriptLoadError::Stopped(ScriptStop::DocumentCancelled) => Self::Cancelled,
+            error => Self::Script(error),
+        }
+    }
+}
+
+impl From<ScriptStop> for LoadError {
+    fn from(error: ScriptStop) -> Self {
+        ScriptLoadError::from(error).into()
     }
 }
 
@@ -183,7 +224,7 @@ fn looks_like_url(argument: &OsStr) -> bool {
             .all(|&byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
 }
 
-/// Read one regular file in bounded chunks and build its inert document.
+/// Read one regular file in bounded chunks and build its document.
 ///
 /// The file is checked before opening (so FIFOs and devices are never opened)
 /// and again through the open handle. Its size is enforced while reading, so a
@@ -199,6 +240,9 @@ pub fn load_document(
     }
     let mut parser_limits = limits.parser;
     parser_limits.tokenizer.max_input_bytes = limits.max_file_bytes;
+    if limits.run_scripts {
+        return load_scripted_document(engine, path, limits, parser_limits);
+    }
     let mut load = engine
         .begin_document(parser_limits)
         .map_err(|error| match error {
@@ -206,7 +250,103 @@ pub fn load_document(
             other => LoadError::Engine(other),
         })?;
     let cancellation = load.cancellation().expect("admitted load").clone();
-    check_cancelled(&cancellation)?;
+    read_document_file(path, limits, &cancellation, |bytes| Ok(load.feed(bytes)?))?;
+    Ok(load.finish()?)
+}
+
+fn load_scripted_document(
+    engine: &mut Engine,
+    path: &Path,
+    limits: LoaderLimits,
+    parser_limits: ParserLimits,
+) -> Result<EngineDocument, LoadError> {
+    let path = fs::canonicalize(path).map_err(LoadError::Io)?;
+    check_regular_file(fs::metadata(&path).map_err(LoadError::Io)?, limits)?;
+    let url = file_url(&path).ok_or(ScriptLoadError::InvalidDocumentUrl)?;
+    let mut load = engine.begin_local_scripted_document_with_clock(
+        parser_limits,
+        TaskLimits::default(),
+        url,
+        ClassicScriptLimits::default(),
+        ManualClock::default(),
+    )?;
+    let cancellation = load.cancellation().expect("admitted load").clone();
+    let root = path
+        .parent()
+        .expect("a canonical regular file has a parent");
+    let fetch = LocalStylesheetFetcher::new(
+        root.to_owned(),
+        limits.read_chunk_bytes,
+        cancellation.clone(),
+    )
+    .ok_or(ScriptLoadError::InvalidDocumentUrl)?;
+    read_document_file(&path, limits, &cancellation, |bytes| {
+        load.feed(bytes)?;
+        // Service requests at parser barriers and EOF, independent of file chunks.
+        while load.is_parser_blocked() && complete_next_script_request(&mut load, &fetch)? {}
+        Ok(())
+    })?;
+    load.close_input()?;
+    let mut turns = 0;
+    let mut document = loop {
+        while complete_next_script_request(&mut load, &fetch)? {}
+        if let Some(document) = load.take_document()? {
+            break document;
+        }
+        let delay = load
+            .time_until_next_timer()?
+            .ok_or(LoadError::ScriptStalled)?;
+        advance_script_timer(load.clock().expect("active load"), delay, &mut turns)?;
+        load.run_next()?;
+    };
+    while let Some(delay) = document.time_until_next_timer()? {
+        advance_script_timer(document.clock(), delay, &mut turns)?;
+        document.run_next()?;
+    }
+    document.offer_rendering_opportunity()?;
+    document.run_next_with_render(|_, _| ())?;
+    Ok(document.into_document())
+}
+
+fn advance_script_timer(
+    clock: &ManualClock,
+    delay: Duration,
+    turns: &mut usize,
+) -> Result<(), LoadError> {
+    if *turns == MAX_SCRIPT_TIMER_TURNS {
+        return Err(LoadError::ScriptTurnLimit);
+    }
+    clock.advance(delay).map_err(LoadError::ScriptClock)?;
+    *turns += 1;
+    Ok(())
+}
+
+fn complete_next_script_request(
+    load: &mut ClassicScriptLoad<ManualClock>,
+    fetch: &LocalStylesheetFetcher,
+) -> Result<bool, LoadError> {
+    let Some(request) = load.next_request() else {
+        return Ok(false);
+    };
+    let source = match fetch.fetch_bytes(&request.url, request.max_bytes) {
+        Ok(source) => Ok(source),
+        Err(FetchError::Blocked) => Err(ClassicFetchError::Blocked),
+        Err(FetchError::NotFound) => Err(ClassicFetchError::NotFound),
+        Err(FetchError::TooLarge) => Err(ClassicFetchError::TooLarge),
+        Err(FetchError::Failed) => Err(ClassicFetchError::Failed),
+        Err(FetchError::Cancelled) => return Err(LoadError::Cancelled),
+    };
+    load.complete_script(request.id, source.as_deref().map_err(|error| *error))?;
+    Ok(true)
+}
+
+fn read_document_file(
+    path: &Path,
+    limits: LoaderLimits,
+    cancellation: &CancellationToken,
+    mut feed: impl FnMut(&[u8]) -> Result<(), LoadError>,
+) -> Result<(), LoadError> {
+    check_cancelled(cancellation)?;
     check_regular_file(fs::metadata(path).map_err(LoadError::Io)?, limits)?;
     let mut file = File::open(path).map_err(LoadError::Io)?;
     check_regular_file(file.metadata().map_err(LoadError::Io)?, limits)?;
@@ -214,7 +354,7 @@ pub fn load_document(
     let mut buffer = vec![0; limits.read_chunk_bytes.min(limits.max_file_bytes)];
     let mut total = 0usize;
     loop {
-        check_cancelled(&cancellation)?;
+        check_cancelled(cancellation)?;
         let read = match file.read(&mut buffer) {
             Ok(0) => break,
             Ok(read) => read,
@@ -227,10 +367,9 @@ pub fn load_document(
             .ok_or(LoadError::FileTooLarge {
                 limit: limits.max_file_bytes,
             })?;
-        load.feed(&buffer[..read])?;
+        feed(&buffer[..read])?;
     }
-    check_cancelled(&cancellation)?;
-    Ok(load.finish()?)
+    check_cancelled(cancellation)
 }
 
 pub fn check_cancelled(cancellation: &CancellationToken) -> Result<(), LoadError> {

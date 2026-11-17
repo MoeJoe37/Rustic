@@ -36,7 +36,8 @@ timers and `requestAnimationFrame`, with one garbage collector tracing the DOM
 and the JavaScript heap together ([scripted documents](docs/SCRIPTING.md)).
 A rendering turn gives the host the live tree to render again in full. Hosts
 can opt into running inline and local external classics and static JavaScript
-modules. Readiness events, style and layout invalidation, forms,
+modules, with document and script readiness events. `rustic render --run-scripts`
+can render the resulting page. Style and layout invalidation, forms,
 focus and mutation observers are still on the
 [M5 roadmap](docs/ROADMAP.md#8-m5--scripted-document-integration).
 Networking and native app hosts are later milestones.
@@ -48,7 +49,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 32.54%** (31.11% verified complete + 1.43% partial credit) — 71/221 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 59.28% done.
+**Overall engine completion: 32.64%** (31.48% verified complete + 1.16% partial credit) — 72/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 61.05% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

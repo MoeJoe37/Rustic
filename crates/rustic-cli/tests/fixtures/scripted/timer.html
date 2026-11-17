@@ -1,0 +1,9 @@
+<!doctype html>
+<link rel="match" href="timer-ref.html">
+<style>#result { display: block; width: 20px; height: 20px; background: red }</style>
+<style>#result.pass { background: green }</style>
+<div id="result"></div>
+<script>var order = 'first';</script>
+<script async src="timer.js"></script>
+<script>order += ':inline';</script>
+<script type="module" src="timer.mjs"></script>

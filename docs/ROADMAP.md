@@ -16,8 +16,8 @@ QEMU emulation; native ARM64 timings are TD-125. **M5 is the current
 milestone**: the scheduler, Web IDL layer, `Window`/`Document`/node bindings,
 events, trusted input, timers and animation callbacks are done (WEB-01 to
 WEB-04, [SCRIPTING.md](SCRIPTING.md)). WEB-05 runs inline and local external
-classics and static JavaScript modules in opt-in HTML construction. Readiness events,
-script-driven invalidation, forms, observers, the conformance gate and the first benchmark report
+classics and static JavaScript modules with readiness events in the opt-in CLI.
+Script-driven invalidation, forms, observers, the conformance gate and the first benchmark report
 are open ([§8](#8-m5--scripted-document-integration)). M6–M13 are unstarted.
 Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are carried
 forward (see [§8](#8-m5--scripted-document-integration)). The
@@ -325,7 +325,7 @@ stays local and deterministic; no network, no native window.
 | WEB-02 | Web IDL subset generator and conversions, wrapper identity, DOM/JS tracing and exceptions | `web.idl` | DOC-09, JS-03 | **Done** (ADR 0024–0027); generated metadata covers the character-data interfaces, other interfaces are hand-bound (TD-126), `DOMException` extras are TD-124 |
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | `web.window` | WEB-02, CSS-02 | **Done** for the declared scope (ADR 0028–0033): live `window`/`document`, node creation and mutation, selectors, NodeLists and HTMLCollections, detached documents and adoption. Open debt: TD-126, TD-127, TD-129, TD-130 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
-| WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **In progress.** Opt-in hosts can run local classics and static JavaScript modules. Readiness events and CLI integration are next. [ADR 0040](adr/0040-local-module-scripts.md) |
+| WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **In progress.** The CLI runs local classics and static modules with readiness events. Processing-instruction tree construction remains. [ADR 0041](adr/0041-scripted-document-readiness.md) |
 | WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | Not started; needs an ADR first |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | Not started |
 | WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | Not started |
@@ -349,10 +349,9 @@ ADR is accepted.
      module ordering tests. [ADR 0040](adr/0040-local-module-scripts.md)
    - Resolve the remaining html5lib processing-instruction cases in TD-10.
    - `document.readyState`, `DOMContentLoaded` and `load` fire in order.
-     Deliver script element events and check ordering with pending async
-     sources, defer and modules.
-   - `rustic render` and the dumps run page scripts when asked (off by
-     default, so existing fixtures stay byte-identical).
+     Script element events are tested with pending async sources, defer and
+     modules. `rustic render` and the dumps run page scripts with
+     `--run-scripts`. [ADR 0041](adr/0041-scripted-document-readiness.md)
 2. **WEB-06 — invalidation from script.** Write the ADR for who owns style
    and layout state between turns (it changes ADR 0023). Then:
    - A rendering turn after any script mutation produces the same pixels as
@@ -749,7 +748,7 @@ JS-09) are complete.
 | Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
 | done | WEB-01 to WEB-04: scheduler, Web IDL, bindings, events, input, timers | See [SCRIPTING.md](SCRIPTING.md) | Done |
-| 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | In progress. Add script and document readiness events and CLI opt-in. |
+| 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | Local lifecycle and CLI verified. Processing-instruction tree construction remains. |
 | 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
 | 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Planned |
 | 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Planned; needs WEB-05 |

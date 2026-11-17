@@ -25,6 +25,7 @@ mod html_collections;
 mod selectors;
 mod window;
 
+pub use events::LifecycleEvent;
 pub use events::{InputEvent, KeyInput, Modifiers};
 pub use window::{TimerHandler, WindowScheduler};
 
@@ -270,6 +271,7 @@ fn install_page(
             ),
             ("contentType", "get contentType", documents::content_type),
             ("doctype", "get doctype", documents::doctype),
+            ("readyState", "get readyState", documents::ready_state),
             (
                 "currentScript",
                 "get currentScript",
@@ -384,6 +386,11 @@ pub fn connected_input_target(document: &Document, target: NodeId) -> bool {
 /// Deliver host input in the active page. A target that went away is skipped.
 pub fn deliver_input(agent: &mut Agent, target: NodeId, input: &InputEvent) -> JsResult<()> {
     events::deliver(agent, target, input)
+}
+
+/// Deliver a trusted event owned by the scripted document lifecycle.
+pub fn deliver_lifecycle(agent: &mut Agent, event: LifecycleEvent) -> JsResult<()> {
+    events::deliver_lifecycle(agent, event)
 }
 
 /// Read and clear the number of exceptions reported by event listeners.

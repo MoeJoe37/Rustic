@@ -147,6 +147,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-05 — Parser-inserted inline classics](#web-05--parser-inserted-inline-classics)
 - [WEB-05 — Local external classics](#web-05--local-external-classics)
 - [WEB-05 — Local static JavaScript modules](#web-05--local-static-javascript-modules)
+- [WEB-05 — Document readiness and scripted CLI](#web-05--document-readiness-and-scripted-cli)
 
 </details>
 
@@ -509,6 +510,21 @@ The [module loader tests](../crates/rustic-engine/tests/module_scripts.rs)
 exercise mixed scheduling, shared dependencies, cycles, top-level await,
 failed graphs and budget enforcement.
 [ADR 0040](adr/0040-local-module-scripts.md)
+
+## WEB-05 — Document readiness and scripted CLI
+
+Scripted loads expose the live `document.readyState`. EOF makes the document
+interactive before deferred scripts begin. Trusted `DOMContentLoaded` bubbles
+once the deferred queue drains, and trusted Window `load` fires after the
+document becomes complete and pending scripts settle. External script `load`
+and acquisition `error` dispatch at the script element. The lifecycle tests
+cover pending async scripts, ordered deferred classics and modules, fetch
+failure and the checkpoint between lifecycle events.
+
+`--run-scripts` selects this lifecycle for CLI document commands. A timer and
+module reftest compares the scripted output pixels to a static reference and
+checks that the result is independent of the HTML input chunk size.
+[ADR 0041](adr/0041-scripted-document-readiness.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

@@ -33,6 +33,71 @@ fn check<C: rustic_base::Clock>(document: &mut ScriptedDocument<C>, script: &str
 }
 
 #[test]
+fn readiness_and_script_events_order_deferred_and_outstanding_async_work() {
+    let mut engine = Engine::new(1);
+    let mut load = load(&mut engine, ManualClock::default());
+    load.feed(
+        br#"<!doctype html>
+      <script id="async" async src="async.js"></script>
+      <script id="defer" defer src="defer.js"></script>
+      <script id="module" type="module" src="module.js"></script>
+      <script id="missing" defer src="missing.js"></script>
+      <script>
+        var trace = [document.readyState];
+        document.addEventListener('readystatechange', e => {
+          if (e.isTrusted && e.target === document) trace.push(document.readyState);
+        });
+        window.addEventListener('DOMContentLoaded', e => {
+          if (e.isTrusted && e.target === document && e.bubbles)
+            trace.push('dom:' + document.readyState);
+          Promise.resolve().then(() => trace.push('dom-job'));
+        });
+        window.addEventListener('load', e => {
+          if (e.isTrusted && e.currentTarget === window && e.target === document)
+            trace.push('window:' + document.readyState);
+        });
+        for (const id of ['async', 'defer', 'module', 'missing']) {
+          const element = document.getElementById(id);
+          for (const kind of ['load', 'error']) {
+            element.addEventListener(kind, e => {
+              if (e.isTrusted && !e.bubbles && e.target === element)
+                trace.push(id + ':' + kind);
+            });
+          }
+        }
+      </script>"#,
+    )
+    .unwrap();
+    let asynchronous = load.next_request().unwrap();
+    let deferred = load.next_request().unwrap();
+    let module = load.next_request().unwrap();
+    let missing = load.next_request().unwrap();
+    load.complete_script(module.id, Ok(b"trace.push('module-run')"))
+        .unwrap();
+    load.complete_script(missing.id, Err(ClassicFetchError::NotFound))
+        .unwrap();
+    load.close_input().unwrap();
+    assert!(load.take_document().unwrap().is_none());
+    load.complete_script(deferred.id, Ok(b"trace.push('defer-run'); throw 1"))
+        .unwrap();
+    assert!(load.take_document().unwrap().is_none());
+    load.complete_script(
+        asynchronous.id,
+        Ok(b"trace.push('async:' + document.readyState)"),
+    )
+    .unwrap();
+    let mut document = load.take_document().unwrap().unwrap();
+    assert!(load.take_document().unwrap().is_none());
+    check(
+        &mut document,
+        r#"
+      if (trace.join(',') !== 'loading,interactive,defer-run,defer:load,module-run,module:load,missing:error,dom:interactive,dom-job,async:interactive,async:load,complete,window:complete')
+        throw trace.join(',');
+    "#,
+    );
+}
+
+#[test]
 fn blocking_classics_hold_the_parser_and_checkpoint_before_later_markup() {
     let mut engine = Engine::new(1);
     let mut load = load(&mut engine, ManualClock::default());

@@ -2,7 +2,7 @@
 
 This is the guide to how JavaScript and a document meet in Rustic. It ties
 together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
-to [ADR 0040](adr/0040-local-module-scripts.md)), which each
+to [ADR 0041](adr/0041-scripted-document-readiness.md)), which each
 describe one step, and says plainly what is not built yet. The tested contract
 of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
 WEB-01 to WEB-05; the plan for the rest is
@@ -10,7 +10,7 @@ WEB-01 to WEB-05; the plan for the rest is
 
 ## What works today
 
-A host (a test, or later the CLI and the app shells) can:
+A host can:
 
 1. Parse a local HTML document through `Engine::begin_document`.
 2. Turn the finished document into a `ScriptedDocument`, which owns one
@@ -45,6 +45,21 @@ with deferred classics after EOF. Module exceptions and failed static graphs
 are counted by `take_module_script_error_count()`.
 [ADR 0040](adr/0040-local-module-scripts.md)
 
+`document.readyState` starts at `loading`, becomes `interactive` before
+deferred scripts start, and becomes `complete` before Window `load`.
+`DOMContentLoaded` bubbles from Document once the deferred script queue
+has drained. Pending async sources and module evaluations can delay
+Window `load`. External script elements receive a trusted `load` when their
+source is acquired and evaluation starts, or an `error` on acquisition
+or module graph failure.
+[ADR 0041](adr/0041-scripted-document-readiness.md)
+
+Use `rustic render --run-scripts --output page.png page.html` to render a
+scripted page. The option also works for dumps, hit testing and reftests.
+The CLI services local script requests at parser barriers and EOF, advances
+the manual clock for up to 256 timer turns and offers one animation frame
+before capturing the output. Scripting defaults to off.
+
 Inside a turn, script can walk and change the tree, create nodes and whole
 detached documents, query with CSS selectors, hold live collections, add
 listeners, dispatch events and schedule timers and animation callbacks.
@@ -53,14 +68,12 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Script and document readiness | The host can run local classics and static JavaScript modules. Readiness and element events are pending. | WEB-05 |
 | Engine-owned style and layout for scripted documents | A rendering turn hands the host the live tree and the host renders it from scratch; nothing is invalidated incrementally and script cannot read layout | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
 | Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
 | Network, storage, workers | Not present | M6, M9 |
-| A CLI command that runs page scripts | `rustic` commands all run with scripting off | WEB-05 |
 | WPT results | No web-platform-tests have been run against the bindings | WEB-09 |
 
 A property that is missing is absent, not stubbed: `typeof window.fetch` is
@@ -251,7 +264,7 @@ drives the pump or the bindings yet. Both are on the
 | TD-131 | Extended event delivery and error reporting | WEB-07, M9 |
 | TD-132 | Timer and frame integration details | WEB-06, WEB-07 |
 | TD-133 | Outward adoption during parsing and dynamic markup | WEB-09 and M9 |
-| TD-134 | Classic-script ordering with stylesheet, timer and readiness tasks | WEB-05 and WEB-06 |
+| TD-134 | Classic-script ordering with stylesheet and timer tasks | WEB-06 |
 | TD-135 | Dynamic page imports, import maps and data module types | M6 and M9 |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.

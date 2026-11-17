@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use rustic_base::{CancellationToken, Clock, SystemClock};
 use rustic_bindings::dom_exception;
-use rustic_bindings::page::{self, PageTree};
+use rustic_bindings::page::{self, LifecycleEvent, PageTree};
 use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
 use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
@@ -339,6 +339,22 @@ impl<C: Clock> ScriptedDocument<C> {
         })
     }
 
+    /// Drop the realm and its pending work, keeping the modified document.
+    pub fn into_document(self) -> EngineDocument {
+        let Self {
+            document, agent, ..
+        } = self;
+        drop(agent);
+        let tree = Rc::try_unwrap(document)
+            .unwrap_or_else(|_| unreachable!("only the realm shares the document tree"));
+        match tree.state.into_inner() {
+            ScriptTreeState::Ready(document) => document,
+            ScriptTreeState::Parsing(_) => {
+                unreachable!("the host receives only finished documents")
+            }
+        }
+    }
+
     pub(crate) fn with_active_parser<T>(
         &self,
         operation: impl FnOnce(&mut HtmlDocumentParser) -> T,
@@ -387,11 +403,32 @@ impl<C: Clock> ScriptedDocument<C> {
         let turn = source
             .map(|source| self.run_parser_classic(element, source))
             .transpose();
-        self.document.pending_classics.borrow_mut().remove(&element);
         if !matches!(turn?, Some(ScriptTurn::Completed)) {
             self.note_external_script_error();
         }
-        Ok(())
+        self.finish_element_script(element, Some(source.is_some()))
+    }
+
+    pub(crate) fn finish_element_script(
+        &mut self,
+        element: NodeId,
+        loaded: Option<bool>,
+    ) -> Result<(), ScriptStop> {
+        let result = match loaded {
+            Some(true) => self.deliver_lifecycle(LifecycleEvent::ScriptLoad(element)),
+            Some(false) => self.deliver_lifecycle(LifecycleEvent::ScriptError(element)),
+            None => Ok(()),
+        };
+        self.document.pending_classics.borrow_mut().remove(&element);
+        result
+    }
+
+    pub(crate) fn deliver_lifecycle(&mut self, event: LifecycleEvent) -> Result<(), ScriptStop> {
+        self.check_live()?;
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        agent.set_step_budget(Some(self.limits.steps_per_turn));
+        let result = page::deliver_lifecycle(agent, event).map_err(EvalError::from);
+        self.finish_script_turn(result).map(|_| ())
     }
 
     fn run_parser_classic(

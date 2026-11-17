@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::time::Instant;
 
-use rustic_dom::{HTML_NAMESPACE, NodeKind};
+use rustic_dom::{HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_js::runtime::{
     Abrupt, Agent, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor, PropertyKey,
     Value,
@@ -596,6 +596,16 @@ fn dispatch_event(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
 }
 
 fn fire(agent: &mut Agent, target: Target, value: Value, event: Event) -> JsResult<bool> {
+    fire_with_target(agent, target, value, event, target.value)
+}
+
+fn fire_with_target(
+    agent: &mut Agent,
+    target: Target,
+    value: Value,
+    event: Event,
+    event_target: Value,
+) -> JsResult<bool> {
     let event_type = event.event_type(agent)?;
     let path = event_path(agent, target, event_type)?;
     with_root(agent, path.value(), |agent| {
@@ -617,7 +627,7 @@ fn fire(agent: &mut Agent, target: Target, value: Value, event: Event) -> JsResu
             let previous = checkbox
                 .map(|target| input::preactivate(agent, target))
                 .transpose()?;
-            event.begin(agent, target.value, path)?;
+            event.begin(agent, event_target, path)?;
             let result = dispatch(agent, event, value, key, path);
             event.finish(agent)?;
             let canceled = event.canceled(agent)?;
@@ -626,6 +636,84 @@ fn fire(agent: &mut Agent, target: Target, value: Value, event: Event) -> JsResu
             }
             result?;
             Ok(!canceled)
+        })
+    })
+}
+
+/// Trusted events produced by the local script host and parser.
+#[derive(Clone, Copy, Debug)]
+pub enum LifecycleEvent {
+    /// The document's readiness changed.
+    ReadyStateChange,
+    /// Deferred execution reached the end of its ordered queue.
+    DomContentLoaded,
+    /// The document has finished loading.
+    WindowLoad,
+    /// An external script acquired executable source.
+    ScriptLoad(NodeId),
+    /// Script source or its dependency graph failed to load.
+    ScriptError(NodeId),
+}
+
+pub(super) fn deliver_lifecycle(agent: &mut Agent, event: LifecycleEvent) -> JsResult<()> {
+    with_page(agent, |agent, page| {
+        let (target, kind, flags) = match event {
+            LifecycleEvent::ReadyStateChange => (
+                Target {
+                    value: page.root,
+                    node: true,
+                },
+                "readystatechange",
+                0,
+            ),
+            LifecycleEvent::DomContentLoaded => (
+                Target {
+                    value: page.root,
+                    node: true,
+                },
+                "DOMContentLoaded",
+                Event::BUBBLES,
+            ),
+            LifecycleEvent::WindowLoad => (
+                Target {
+                    value: page.window,
+                    node: false,
+                },
+                "load",
+                0,
+            ),
+            LifecycleEvent::ScriptLoad(node) | LifecycleEvent::ScriptError(node) => {
+                let mut wrappers = page.wrappers.borrow_mut();
+                let target = page.read(agent, node.document(), |agent, document| {
+                    wrap(&mut wrappers, agent, document, node)
+                })?;
+                let kind = if matches!(event, LifecycleEvent::ScriptLoad(_)) {
+                    "load"
+                } else {
+                    "error"
+                };
+                (
+                    Target {
+                        value: target,
+                        node: true,
+                    },
+                    kind,
+                    0,
+                )
+            }
+        };
+        let exposed_target = if matches!(event, LifecycleEvent::WindowLoad) {
+            page.root
+        } else {
+            target.value
+        };
+        with_root(agent, target.value, |agent| {
+            let value =
+                state::trusted_event(agent, "Event", kind, flags, Value::NULL, Value::NULL)?;
+            with_root(agent, value, |agent| {
+                let state = Event::receiver(agent, value)?;
+                fire_with_target(agent, target, value, state, exposed_target).map(|_| ())
+            })
         })
     })
 }

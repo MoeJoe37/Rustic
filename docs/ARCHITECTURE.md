@@ -210,8 +210,12 @@ An opt-in scripted load borrows the parser's live DOM through the page host
 between tokens. The engine ends its mutable parser borrow before running a
 classic or its promise jobs. Joint collection traces parser-held identities
 and the current script alongside ordinary DOM and JavaScript roots. EOF
-publishes the same document and agent to the turn pump.
+publishes the same document and agent to the turn pump once local sources
+settle. The engine resolves in-grant external script URLs with `rustic-url`.
+The embedder owns file access and delivers each result against a request ID.
+The engine sequences the parser and classics around those completions.
 [ADR 0037](adr/0037-parser-script-boundary.md), [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
+and [ADR 0039](adr/0039-local-external-classics.md).
 
 The following broader pipeline describes the target architecture.
 

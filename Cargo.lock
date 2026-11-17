@@ -178,6 +178,7 @@ dependencies = [
  "rustic-dom",
  "rustic-html",
  "rustic-js",
+ "rustic-url",
 ]
 
 [[package]]

@@ -4415,8 +4415,29 @@
             },
             {
               "label": "Bounded local classic loading with parser blocking, async and defer order",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/inline_scripts.rs",
+                  "marker": "pub fn complete_script"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/classic_scripts.rs",
+                  "marker": "fn blocking_classics_hold_the_parser_and_checkpoint_before_later_markup"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/classic_scripts.rs",
+                  "marker": "fn async_and_defer_follow_all_arrival_orders_on_the_manual_clock"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/classic_scripts.rs",
+                  "marker": "fn local_base_authority_and_response_budgets_preserve_later_scripts"
+                }
+              ]
             },
             {
               "label": "Module graph loading and execution order",

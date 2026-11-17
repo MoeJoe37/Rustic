@@ -3,6 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
+mod classic_scripts;
 mod frames;
 mod inline_scripts;
 mod lifecycle;
@@ -10,8 +11,13 @@ mod scripting;
 mod tasks;
 mod window_tasks;
 
+pub use classic_scripts::{
+    ClassicFetchError, ClassicRequestId, ClassicScriptLimits, ClassicScriptMode,
+    ClassicScriptRequest,
+};
 pub use frames::RenderFrame;
-pub use inline_scripts::{InlineLoadError, InlineScriptLoad};
+pub use inline_scripts::ScriptLoadError as InlineLoadError;
+pub use inline_scripts::{ClassicScriptLoad, InlineScriptLoad, ScriptLoadError};
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use rustic_bindings::page::{InputEvent, KeyInput, Modifiers};
 pub use scripting::{

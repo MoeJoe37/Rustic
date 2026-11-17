@@ -1,6 +1,7 @@
 //! WEB-01 document-owned script tasks and microtask checkpoints.
 
 use std::cell::{Cell, Ref, RefCell, RefMut};
+use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
@@ -159,6 +160,7 @@ enum ScriptTreeState {
 struct ScriptTree {
     state: RefCell<ScriptTreeState>,
     current_script: Cell<Option<NodeId>>,
+    pending_classics: RefCell<HashSet<NodeId>>,
 }
 
 impl PageTree for ScriptTree {
@@ -191,11 +193,16 @@ impl PageTree for ScriptTree {
         if let ScriptTreeState::Parsing(parser) =
             &*self.state.try_borrow().map_err(|_| OutOfMemory)?
         {
+            let pending = self
+                .pending_classics
+                .try_borrow()
+                .map_err(|_| OutOfMemory)?;
             for node in self
                 .current_script
                 .get()
                 .into_iter()
                 .chain(parser.retained_nodes())
+                .chain(pending.iter().copied())
             {
                 roots.try_reserve(1).map_err(|_| OutOfMemory)?;
                 roots.push(node);
@@ -224,6 +231,7 @@ pub struct ScriptedDocument<C = SystemClock> {
     pending: Rc<WindowWork>,
     animation_errors: u64,
     inline_script_errors: u64,
+    external_script_errors: u64,
     rendering: Rendering,
     clock: C,
     limits: TaskLimits,
@@ -287,6 +295,7 @@ impl<C: Clock> ScriptedDocument<C> {
         let document = Rc::new(ScriptTree {
             state: RefCell::new(state),
             current_script: Cell::new(None),
+            pending_classics: RefCell::default(),
         });
         let owner = document
             .read()
@@ -304,6 +313,7 @@ impl<C: Clock> ScriptedDocument<C> {
             pending,
             animation_errors: 0,
             inline_script_errors: 0,
+            external_script_errors: 0,
             rendering: Rendering::new(owner),
             clock,
             limits,
@@ -342,21 +352,64 @@ impl<C: Clock> ScriptedDocument<C> {
         element: NodeId,
         source: &Source,
     ) -> Result<(), ScriptStop> {
+        if matches!(
+            self.run_parser_classic(element, source)?,
+            ScriptTurn::Failed(_)
+        ) {
+            self.inline_script_errors = self.inline_script_errors.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn retain_external_classic(&self, element: NodeId) -> Result<(), ScriptStop> {
+        let mut roots = self.document.pending_classics.borrow_mut();
+        roots.try_reserve(1).map_err(|_| ScriptStop::OutOfMemory)?;
+        let inserted = roots.insert(element);
+        debug_assert!(inserted, "one request per parser-inserted element");
+        Ok(())
+    }
+
+    pub(crate) fn run_external_classic(
+        &mut self,
+        element: NodeId,
+        source: Option<&Source>,
+    ) -> Result<(), ScriptStop> {
+        let turn = source
+            .map(|source| self.run_parser_classic(element, source))
+            .transpose();
+        self.document.pending_classics.borrow_mut().remove(&element);
+        if !matches!(turn?, Some(ScriptTurn::Completed)) {
+            self.note_external_script_error();
+        }
+        Ok(())
+    }
+
+    fn run_parser_classic(
+        &mut self,
+        element: NodeId,
+        source: &Source,
+    ) -> Result<ScriptTurn, ScriptStop> {
         self.check_live()?;
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         agent.set_step_budget(Some(self.limits.steps_per_turn));
         self.document.current_script.set(Some(element));
         let result = agent.evaluate_source(source).map(|_| ());
         self.document.current_script.set(None);
-        if matches!(self.finish_script_turn(result)?, ScriptTurn::Failed(_)) {
-            self.inline_script_errors = self.inline_script_errors.saturating_add(1);
-        }
-        Ok(())
+        self.finish_script_turn(result)
     }
 
     /// Read and clear recoverable errors from parser-inserted inline classics.
     pub fn take_inline_script_error_count(&mut self) -> u64 {
         std::mem::take(&mut self.inline_script_errors)
+    }
+
+    pub(crate) fn note_external_script_error(&mut self) {
+        self.external_script_errors = self.external_script_errors.saturating_add(1);
+    }
+
+    /// Read and clear recoverable preparation, fetch or evaluation errors from external classics.
+    pub fn take_external_script_error_count(&mut self) -> u64 {
+        std::mem::take(&mut self.external_script_errors)
     }
 
     /// Read and clear the number of listener exceptions reported by the page.

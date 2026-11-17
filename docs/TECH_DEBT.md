@@ -56,7 +56,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-05 | TD-10 | Resolve the processing-instruction expectations before closing WEB-05. |
+| M5, with WEB-05 | TD-10, TD-134 | Resolve processing-instruction expectations and integrate readiness and script element tasks. |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132 | Form owners, error reporting and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129, TD-133 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130 | Review large pages, encodings, relative URLs, local time, regular expressions and browsing contexts before broadening the host. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
@@ -199,6 +199,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, WEB-07 and M9 |
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, WEB-06, WEB-07 and M9 |
 | TD-133 | Deliberate | HTML scripting | Outward adoption during parsing and dynamic document markup have explicit exceptions | Open, review with WEB-09 (M5), pay in M9 |
+| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Readiness events, stylesheet dependencies and task interleaving remain open. | Open, WEB-05 and WEB-06 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2027,7 +2028,7 @@ Tests when these facilities are present.
 The parser keeps stable node identities while a script can edit the tree.
 An outward cross-document move during that time throws `NotSupportedError`
 before touching either document. The main document supports normal outward
-adoption after EOF. HTML `document.write` and `document.writeln` raise
+adoption once EOF and all external requests settle. HTML `document.write` and `document.writeln` raise
 `NotSupportedError` because the parser has no bounded insertion-point stack
 for reentrant writes and no document-open replacement lifecycle.
 
@@ -2036,3 +2037,13 @@ HTML lifecycle work, or earlier if a selected test requires it. Cover
 identity-preserving adoption of parser-held nodes, nested insertion and
 reentry limits, and the lifetime of a document replaced by `document.open`.
 [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
+
+### TD-134 — Classic completion and the page event loop
+
+The opt-in local host delivers request completions explicitly. Async classics
+execute when delivered, and document publication waits for EOF and all
+results. Add script element events and readiness transitions during WEB-05.
+Integrate stylesheet readiness as a blocker and order timers with pending
+fetches when WEB-06 connects the rendering lifecycle. Add tests where a
+stylesheet, script or timer becomes ready while the parser is suspended.
+[ADR 0039](adr/0039-local-external-classics.md)

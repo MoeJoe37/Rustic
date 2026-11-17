@@ -14,6 +14,7 @@ rustic-bindings = { path = "../rustic-bindings" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-html = { path = "../rustic-html" }
 rustic-js = { path = "../rustic-js" }
+rustic-url = { path = "../rustic-url" }
 
 [lints]
 workspace = true

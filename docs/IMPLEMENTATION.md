@@ -136,7 +136,7 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Scripted documents (M5, in progress): 7 sections</summary>
+<summary>Scripted documents (M5, in progress): 8 sections</summary>
 
 - [Engine lifecycle — Bounded document ownership and shutdown](#engine-lifecycle--bounded-document-ownership-and-shutdown)
 - [WEB-01 — Document script turns and microtask checkpoints](#web-01--document-script-turns-and-microtask-checkpoints)
@@ -145,6 +145,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-04 — DOM dispatch and host input](#web-04--dom-dispatch-and-host-input)
 - [WEB-05 — Parser suspension at script boundaries](#web-05--parser-suspension-at-script-boundaries)
 - [WEB-05 — Parser-inserted inline classics](#web-05--parser-inserted-inline-classics)
+- [WEB-05 — Local external classics](#web-05--local-external-classics)
 
 </details>
 
@@ -465,6 +466,28 @@ The [engine integration tests](../crates/rustic-engine/tests/inline_scripts.rs)
 cover parsing across every input split, promise and timer order, recovery,
 detachment through collection, adoption and resource-limit failures.
 [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
+
+## WEB-05 — Local external classics
+
+`Engine::begin_local_scripted_document` accepts a document file URL and
+limits for requests and responses. The engine resolves `src` against the
+active base in the partial DOM, confines the result to the document's local
+directory, and emits a typed request. Hosts return bytes or a fetch failure
+under its identity. File opening and canonical path checks belong to the
+host. Source handling accepts UTF-8 with a BOM and replacement decoding.
+
+A blocking request suspends tree construction until its classic and promise
+checkpoint finish. Async executes on arrival. Defer runs after EOF in parser
+order, including when results arrive in reverse order. Async takes precedence
+over defer. Pending elements remain collection roots through evaluation.
+Recoverable load or evaluation errors release the queue position. Fatal VM
+limits and cancellation drop the document and outstanding requests.
+
+The [external classic tests](../crates/rustic-engine/tests/classic_scripts.rs)
+cover all 24 response permutations for two async and two defer scripts, with
+five placements of EOF, as well as parser blocking, path and response limits,
+invalid completions and collection of detached nodes.
+[ADR 0039](adr/0039-local-external-classics.md)
 
 ## DOC-03 and DOC-04a — Document-owned tree core
 

@@ -241,6 +241,60 @@ fn layout_flushes_once_per_revision_with_a_shared_turn_budget() {
 }
 
 #[test]
+fn rendering_input_revisions_are_scoped_to_their_document() {
+    let mut engine = Engine::new(2);
+    let mut first = document(&mut engine, TaskLimits::default());
+    let mut second = document(&mut engine, TaskLimits::default());
+    let first_width = Rc::new(Cell::new(30));
+    let second_width = Rc::new(Cell::new(80));
+    first
+        .set_layout_source(Box::new(LayoutFixture(first_width.clone())))
+        .unwrap();
+    second
+        .set_layout_source(Box::new(LayoutFixture(second_width.clone())))
+        .unwrap();
+
+    for (scripts, width) in [(&mut first, 30), (&mut second, 80)] {
+        scripts
+            .queue_script(source(&format!(
+                "if (document.body.offsetWidth !== {width}) throw 'initial geometry';"
+            )))
+            .unwrap();
+        assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+        assert_eq!(scripts.take_layout_flush_count(), 1);
+        scripts.offer_rendering_opportunity().unwrap();
+    }
+    let first_frame = render_turn(&mut first);
+    let second_frame = render_turn(&mut second);
+
+    first_width.set(50);
+    first.rendering_inputs_changed().unwrap();
+    assert_eq!(first.accept_rendered_frame(first_frame), Ok(false));
+    assert_eq!(second.accept_rendered_frame(second_frame), Ok(true));
+
+    first
+        .queue_script(source(
+            "if (document.body.getBoundingClientRect().width !== 50) throw 'stale first geometry';",
+        ))
+        .unwrap();
+    second
+        .queue_script(source(
+            "if (document.body.getBoundingClientRect().width !== 80) throw 'changed second geometry';",
+        ))
+        .unwrap();
+    assert_eq!(first.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(second.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(first.take_layout_flush_count(), 1);
+    assert_eq!(second.take_layout_flush_count(), 0);
+
+    first.offer_rendering_opportunity().unwrap();
+    let fresh_first = render_turn(&mut first);
+    second_width.set(90);
+    second.rendering_inputs_changed().unwrap();
+    assert_eq!(first.accept_rendered_frame(fresh_first), Ok(true));
+}
+
+#[test]
 fn a_failed_checkpoint_discards_the_rendering_offer() {
     let mut engine = Engine::new(1);
     let mut scripts = document(

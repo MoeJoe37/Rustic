@@ -444,6 +444,32 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(())
     }
 
+    /// Commit a completed stylesheet, image or font result into this document.
+    ///
+    /// The host must stage the result before entering this method. `apply`
+    /// publishes only a successfully validated resource into the renderer's
+    /// applied state; it must not run JavaScript, perform a fetch, or mutate
+    /// state before returning an error. A successful commit invalidates the
+    /// shared style/layout snapshot and any outstanding frame ticket, then
+    /// offers a rendering opportunity. A failed commit does none of those.
+    ///
+    /// The outer error is a stopped document; the inner error comes from the
+    /// host's resource application. Neither the host nor scripts can observe
+    /// the new resource under an old rendering-input revision after success.
+    pub fn apply_resource_completion<T, E>(
+        &mut self,
+        apply: impl FnOnce() -> Result<T, E>,
+    ) -> Result<Result<T, E>, ScriptStop> {
+        self.check_live()?;
+        let result = apply();
+        if result.is_ok() {
+            self.check_live()?;
+            self.document.layout.borrow_mut().inputs_changed();
+            self.rendering.offer(self.clock.now());
+        }
+        Ok(result)
+    }
+
     /// Read and clear the number of layout flushes attempted by script.
     pub fn take_layout_flush_count(&mut self) -> u64 {
         self.document.layout.borrow_mut().take_flush_count()

@@ -104,8 +104,11 @@ additional snapshot inputs.
 
 The first implementation exposes `getComputedStyle(element)` and a live,
 read-only `CSSStyleDeclaration` with `getPropertyValue`,
-`getPropertyPriority`, `item` and `length`. Supported longhands and
-custom properties come from the same CLI cascade pass that builds layout;
+`getPropertyPriority`, `item`, `length` and an empty `cssText` getter.
+`setProperty`, `removeProperty` and `cssText` assignment throw
+`NoModificationAllowedError`. A connected declaration without an installed
+renderer reports `InvalidStateError`; detached declarations return empty
+values. Supported longhands and custom properties come from the same CLI cascade pass that builds layout;
 reads share the existing revision key and eight-flush budget. Declarations
 hold their element wrappers through the page's rooted weak map. Nonempty
 pseudo-element arguments fail explicitly rather than return fabricated styles.

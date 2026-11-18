@@ -1080,29 +1080,42 @@ mod tests {
                     const detached = document.createElement('span');
                     const detachedStyle = getComputedStyle(detached);
                     const before = held.getPropertyValue('width');
+                    const namedBefore = held.width;
+                    const backgroundAlias = held.backgroundColor ===
+                        held.getPropertyValue('background-color');
+                    const floatAlias = held.cssFloat === held.getPropertyValue('float');
+                    const fontAlias = held.fontSize === held.getPropertyValue('font-size');
                     const inherited = held.getPropertyValue('color');
                     const originalTheme = held.getPropertyValue('--Theme');
                     const missing = held.getPropertyValue('--theme');
                     box.className = 'wide';
                     box.setAttribute('class', 'wide');
                     const after = held.getPropertyValue('width');
+                    const namedAfter = held.width;
                     const updatedTheme = held.getPropertyValue('--Theme');
                     document.querySelector('style').firstChild.data =
                         '#box { width: 63px; color: red; --Theme: autumn }';
                     const afterSheetEdit = held.getPropertyValue('width');
+                    const namedAfterSheetEdit = held.width;
                     const property = { toString() {
                         box.setAttribute('style', 'width: 84px');
                         return 'width';
                     } };
                     const afterReentry = held.getPropertyValue(property);
+                    const namedAfterReentry = held.width;
                     const good = [
                         held instanceof CSSStyleDeclaration,
                         held.length > 0,
                         held.item(0) === 'display',
                         before === '21px',
+                        namedBefore === before,
                         after === '42px',
+                        namedAfter === after,
                         afterSheetEdit === '63px',
+                        namedAfterSheetEdit === afterSheetEdit,
                         afterReentry === '84px',
+                        namedAfterReentry === afterReentry,
+                        backgroundAlias, floatAlias, fontAlias,
                         inherited !== '',
                         originalTheme.includes('winter'),
                         updatedTheme.includes('summer'),

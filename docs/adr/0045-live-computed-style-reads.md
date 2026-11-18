@@ -119,7 +119,14 @@ hold their element wrappers through the page's rooted weak map and the
 indexed host object's GC-traced source. Nonempty
 pseudo-element arguments fail explicitly rather than return fabricated styles.
 
+The host-facing `apply_resource_completion` API publishes a staged resource
+result before advancing the applied-input epoch and offering a frame. Failed
+applications leave the epoch and frame ticket unchanged. A dedicated engine
+fixture tests both stylesheet and image changes against geometry and held
+computed style in the same snapshot. This is not yet wired to the local CLI's
+synchronous resource loader, nor does it implement asynchronous fetch tasks.
+
 This is **not** the full decision: CSSOM serialization edge cases,
 pseudo-elements, DOM adoption/GC stress,
-WPT expansion and applied stylesheet/image completion ordering still need
-implementation and passing tests. Until those arrive WEB-06 remains open.
+WPT expansion, immutable applied-resource snapshots and real stylesheet/image
+completion delivery still need implementation and passing tests. Until those arrive WEB-06 remains open.

@@ -329,23 +329,31 @@ fn shared_nth_positions_agree_with_fresh_matching() {
 
 #[test]
 fn nth_matching_over_long_sibling_lists_stays_linear() {
-    // TD-20: counting siblings on every test made this O(n²).
-    let page = document(&format!("<ul>{}</ul>", "<li class=x><li>".repeat(10_000)));
-    let doc = page.document();
-    let started = std::time::Instant::now();
-    for (source, expected) in [
-        ("li:nth-child(2n+1)", 10_000),
-        ("li:nth-last-of-type(-n+3)", 3),
-        ("li:nth-child(odd of .x)", 5_000),
-        ("li:nth-last-child(1 of .x)", 1),
-    ] {
-        let list = selectors(source, &NamespaceMap::new());
-        let found = query_selector_all(doc, doc.root(), &list, &MatchContext::html()).unwrap();
-        assert_eq!(found.len(), expected, "{source}");
-    }
-    assert!(
-        started.elapsed().as_secs() < 5,
-        "nth matching took {:?}",
+    // TD-20: counting siblings on every test made this O(n²). Compare a list
+    // four times longer instead of using a fixed wall-clock bound, so the
+    // check holds on slow emulated targets (s390x debug takes about 12 s):
+    // linear work grows about 4x, quadratic work 16x.
+    let run = |pairs: usize| {
+        let page = document(&format!("<ul>{}</ul>", "<li class=x><li>".repeat(pairs)));
+        let doc = page.document();
+        let started = std::time::Instant::now();
+        for (source, expected) in [
+            ("li:nth-child(2n+1)", pairs),
+            ("li:nth-last-of-type(-n+3)", 3),
+            ("li:nth-child(odd of .x)", pairs / 2),
+            ("li:nth-last-child(1 of .x)", 1),
+        ] {
+            let list = selectors(source, &NamespaceMap::new());
+            let found = query_selector_all(doc, doc.root(), &list, &MatchContext::html()).unwrap();
+            assert_eq!(found.len(), expected, "{source}");
+        }
         started.elapsed()
+    };
+    let small = run(2_500);
+    let large = run(10_000);
+    // Allow 10x (not 16x) plus a fixed margin for timer noise on fast hosts.
+    assert!(
+        large <= small * 10 + std::time::Duration::from_millis(250),
+        "nth matching grew from {small:?} to {large:?} for 4x the siblings"
     );
 }

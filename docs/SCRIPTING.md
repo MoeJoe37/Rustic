@@ -98,14 +98,21 @@ nodes use the defined empty result. The `cssText` getter is empty, while
 `setProperty`, `removeProperty` and `cssText` assignment throw
 `NoModificationAllowedError`.
 The CLI derives properties from the renderer's existing style cascade, not
-from a separate binding-side parser. This is a partial CSSOM surface and its
+from a separate binding-side parser. Hosts may publish a staged stylesheet,
+image or font completion through `ScriptedDocument::apply_resource_completion`:
+a successful application bumps the applied-input revision, invalidates old
+frame tickets and offers the next rendering opportunity; a rejected completion
+does none of those. The supplied closure must apply only a fully validated
+result and must not run JavaScript. The current CLI still loads local resources
+synchronously inside layout; its loader is **not** yet wired to an asynchronous
+resource-completion pump. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
 
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and stylesheet/image completion ordering remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
+| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and wiring real stylesheet/image completions into the page pump remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |

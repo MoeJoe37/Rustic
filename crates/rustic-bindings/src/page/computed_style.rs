@@ -5,7 +5,9 @@
 
 use rustic_css::PropertyId;
 use rustic_dom::NodeKind;
-use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
+use rustic_js::runtime::{
+    Abrupt, Agent, JsResult, LiveIndexAccess, NativeFn, ObjectId, PropertyDescriptor, Value,
+};
 
 use crate::dom_exception;
 
@@ -17,6 +19,24 @@ use super::{
 };
 
 const INTERFACE: &str = "CSSStyleDeclaration";
+
+static STYLE_INDEX: LiveIndexAccess = LiveIndexAccess {
+    length: indexed_length,
+    item: indexed_item,
+    named: None,
+};
+
+fn indexed_length(agent: &mut Agent, source: Value) -> JsResult<u32> {
+    u32::try_from(snapshot_from_element(agent, source)?.len()).map_err(|_| Abrupt::OutOfMemory)
+}
+
+fn indexed_item(agent: &mut Agent, source: Value, index: u32) -> JsResult<Option<Value>> {
+    let style = snapshot_from_element(agent, source)?;
+    style
+        .name_at(index as usize)
+        .map(|name| value(agent, name))
+        .transpose()
+}
 
 // Every longhand has the same bounded snapshot read. A new supported
 // property makes the getter table fail to compile until it is included.
@@ -272,7 +292,11 @@ pub(super) fn get_computed_style(
             }
         }
         let prototype = prototype(agent, INTERFACE)?;
-        let declaration = Value::object(agent.new_object_with(Some(prototype))?);
+        // The live indexed host traces its source element and implements
+        // own-key discovery, descriptors and read-only numeric indices.
+        let declaration = Value::object(
+            agent.new_indexed_view(INTERFACE, prototype, element, &STYLE_INDEX)?,
+        );
         // The weak-map write may allocate; keep its key rooted until insertion.
         let declaration_root = agent.root(declaration)?;
         let result = with_page(agent, |agent, page| {
@@ -296,11 +320,15 @@ fn element(agent: &mut Agent, declaration: Value) -> JsResult<Value> {
     })
 }
 
-fn snapshot(agent: &mut Agent, declaration: Value) -> JsResult<ComputedStyleSnapshot> {
-    let element = element(agent, declaration)?;
+fn snapshot_from_element(agent: &mut Agent, element: Value) -> JsResult<ComputedStyleSnapshot> {
     read_layout(agent, element, false, ComputedStyleSnapshot::default(), |tree, id| {
         tree.computed_style(id)
     })
+}
+
+fn snapshot(agent: &mut Agent, declaration: Value) -> JsResult<ComputedStyleSnapshot> {
+    let source = element(agent, declaration)?;
+    snapshot_from_element(agent, source)
 }
 
 fn value(agent: &mut Agent, text: &str) -> JsResult<Value> {

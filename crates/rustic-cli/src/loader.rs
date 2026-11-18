@@ -21,7 +21,8 @@ use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment, PropertyId};
 use rustic_dom::{Document, DumpError};
 use rustic_engine::{
     ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
-    ComputedStyleSnapshot, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop,
+    ComputedStyleSnapshot, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource,
+    ScriptLoadError, ScriptStop,
     TaskLimits,
 };
 use rustic_html::{

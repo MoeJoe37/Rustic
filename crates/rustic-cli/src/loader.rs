@@ -1063,6 +1063,65 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parser_scripts_get_live_cssom_values_from_the_renderers_cascade() {
+        let file = TempFile::new(
+            br#"<!doctype html>
+                <style>
+                    body { color: navy; --Theme: winter }
+                    #box { width: 21px }
+                    #box.wide { width: 42px; --Theme: summer }
+                </style>
+                <div id="box"></div>
+                <script>
+                    const box = document.querySelector('#box');
+                    const held = getComputedStyle(box);
+                    const detached = document.createElement('span');
+                    const detachedStyle = getComputedStyle(detached);
+                    const before = held.getPropertyValue('width');
+                    const inherited = held.getPropertyValue('color');
+                    const originalTheme = held.getPropertyValue('--Theme');
+                    const missing = held.getPropertyValue('--theme');
+                    box.className = 'wide';
+                    box.setAttribute('class', 'wide');
+                    const after = held.getPropertyValue('width');
+                    const updatedTheme = held.getPropertyValue('--Theme');
+                    document.querySelector('style').firstChild.data =
+                        '#box { width: 63px; color: red; --Theme: autumn }';
+                    const afterSheetEdit = held.getPropertyValue('width');
+                    const property = { toString() {
+                        box.setAttribute('style', 'width: 84px');
+                        return 'width';
+                    } };
+                    const afterReentry = held.getPropertyValue(property);
+                    const good = [
+                        held instanceof CSSStyleDeclaration,
+                        held.length > 0,
+                        held.item(0) === 'display',
+                        before === '21px',
+                        after === '42px',
+                        afterSheetEdit === '63px',
+                        afterReentry === '84px',
+                        inherited !== '',
+                        originalTheme.includes('winter'),
+                        updatedTheme.includes('summer'),
+                        missing === '',
+                        held.getPropertyValue('nonexistent') === '',
+                        detachedStyle.getPropertyValue('color') === '',
+                        getComputedStyle(document.body).getPropertyValue('width') !== '',
+                    ].every(Boolean);
+                    document.body.setAttribute('data-cssom', good ? 'ok' : 'wrong');
+                </script>"#,
+        );
+        let limits = LoaderLimits {
+            run_scripts: true,
+            ..LoaderLimits::default()
+        };
+        let parsed = load_document(&mut Engine::new(1), &file.0, limits).unwrap();
+        let output = dump_dom(&parsed, &file.0, limits).unwrap();
+        assert!(output.contains("local=\"data-cssom\" value=\"ok\""), "{output}");
+    }
+
     impl TempFile {
         fn new(contents: &[u8]) -> Self {
             static NEXT: AtomicUsize = AtomicUsize::new(0);

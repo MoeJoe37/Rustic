@@ -62,7 +62,7 @@ pub(in crate::page) fn connected(document: &Document, target: NodeId) -> bool {
     reaches_root(document, target, || Ok(())).expect("unmetered ancestry walk")
 }
 
-fn reaches_root(
+pub(in crate::page) fn reaches_root(
     document: &Document,
     target: NodeId,
     mut charge: impl FnMut() -> JsResult<()>,
@@ -361,7 +361,7 @@ pub(in crate::page) fn install_controls(agent: &mut Agent) -> JsResult<()> {
     install_interface(
         agent,
         "HTMLInputElement",
-        Some("Element"),
+        Some("HTMLElement"),
         illegal_constructor,
         0,
         &[],

@@ -308,7 +308,8 @@ fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     }
     let view = rustic_layout::View::new(window.0, window.1, scale, zoom)
         .map_err(|_| "--scale times --zoom must be at most 64")?;
-    let (limits, path) = parse_dump_args(&rest)?;
+    let (mut limits, path) = parse_dump_args(&rest)?;
+    limits.script_view = view;
     Ok(RenderArgs {
         output,
         view,

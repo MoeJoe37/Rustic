@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use rustic_dom::{Document, DocumentFormat, DocumentId, DomError, Node, NodeId, NodeKind};
 use rustic_js::runtime::{
-    Agent, ExecutionHost, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor,
+    Abrupt, Agent, ExecutionHost, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor,
     PropertyKey, Roots, Value,
 };
 
@@ -29,6 +29,15 @@ pub use events::LifecycleEvent;
 pub use events::{InputEvent, KeyInput, Modifiers};
 pub use window::{TimerHandler, WindowScheduler};
 
+/// A rendered layout read could not produce a result.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LayoutReadError {
+    /// The current turn has spent its layout flush budget.
+    Limit,
+    /// The host could not compute a bounded layout snapshot.
+    Unavailable,
+}
+
 /// Shared access to the real document rendered by the host.
 pub trait PageTree: Debug {
     /// Borrow the document for reading.
@@ -46,6 +55,10 @@ pub trait PageTree: Debug {
     /// The classic script currently executing, if any.
     fn current_script(&self) -> Option<NodeId> {
         None
+    }
+    /// The untransformed rounded border-fragment width in CSS pixels.
+    fn offset_width(&self, _node: NodeId) -> Result<i32, LayoutReadError> {
+        Ok(0)
     }
     /// Whether a subtree may move out of the main document, within the turn budget.
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
@@ -325,6 +338,15 @@ fn install_page(
             html_collections::install_lookup::<false>(agent, proto)
         },
     )?;
+    install_interface(
+        agent,
+        "HTMLElement",
+        Some("Element"),
+        illegal_constructor,
+        0,
+        &[("offsetWidth", "get offsetWidth", offset_width)],
+        |_, _| Ok(()),
+    )?;
     events::install_controls(agent)?;
     install_interface(
         agent,
@@ -489,6 +511,11 @@ fn wrap(
         {
             "HTMLInputElement"
         }
+        NodeKind::Element(element)
+            if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
+        {
+            "HTMLElement"
+        }
         NodeKind::Element(_) => "Element",
         NodeKind::Text(_) => "Text",
         NodeKind::Comment(_) => "Comment",
@@ -560,6 +587,38 @@ fn require_receiver(
             Ok(id)
         } else {
             agent.type_error(interface)
+        }
+    })
+}
+
+fn offset_width(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    let element = read_node(agent, receiver, |agent, _, document, id, node| {
+        if !matches!(node.kind(), NodeKind::Element(element)
+            if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE))
+        {
+            return agent.type_error("expected HTMLElement");
+        }
+        events::reaches_root(document, id, || agent.check_native_work())
+            .map(|connected| connected.then_some(id))
+    })?;
+    with_page(agent, |agent, page| {
+        let Some(id) = element.filter(|id| id.document() == page.main) else {
+            return Ok(Value::number(0.0));
+        };
+        let width = page.tree.offset_width(id);
+        agent.check_native_work()?;
+        match width {
+            Ok(width) => Ok(Value::number(f64::from(width))),
+            Err(LayoutReadError::Limit) => Err(Abrupt::Throw(dom_exception::new(
+                agent,
+                "QuotaExceededError",
+                "layout flush budget exhausted",
+            )?)),
+            Err(LayoutReadError::Unavailable) => Err(Abrupt::Throw(dom_exception::new(
+                agent,
+                "InvalidStateError",
+                "layout snapshot unavailable",
+            )?)),
         }
     })
 }

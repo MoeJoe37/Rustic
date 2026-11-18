@@ -72,11 +72,16 @@ During parsing, scripts can move completed subtrees to another document.
 Subtrees that contain parser or pending script identities stay with the
 original document while those identities are in use.
 
+With `--run-scripts`, `HTMLElement.offsetWidth` reads the rounded,
+untransformed border-fragment width through the same layout pipeline as
+the output renderer. Hidden and detached elements read as zero.
+[CSSOM View](https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsetwidth)
+
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Synchronous layout reads and resource ordering | DOM changes invalidate frame tickets. The host still rebuilds style and layout, and script cannot read layout. | WEB-06 |
+| Additional layout reads and resource ordering | `getBoundingClientRect`, `getComputedStyle` and stylesheet/image completion ordering remain open. | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
@@ -153,7 +158,15 @@ returns its output with a frame ticket. `accept_rendered_frame` tells the host
 whether that output is still the newest for its document, so a late frame is
 never presented over a newer one
 ([ADR 0023](adr/0023-document-rendering-turns.md),
-[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)).
+[ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)). DOM mutations
+and applied rendering-input changes can also invalidate a frame.
+`rendering_inputs_changed` publishes the latter at a host turn boundary.
+
+A script layout read reuses its snapshot while the DOM and rendering-input
+revisions match. A turn can flush up to eight dirty snapshots, including
+reads made during its promise jobs. An additional dirty read throws
+`QuotaExceededError`. The host can observe the number of flush attempts
+through `take_layout_flush_count`.
 
 Window timers follow the HTML rules that tests can observe: a delay starts
 when the registering turn completes, and nested timers are clamped to four
@@ -246,7 +259,8 @@ and `AbortSignal` listener removal are TD-131.
 | --- | --- |
 | Turn order, checkpoints, budgets, shutdown | `crates/rustic-engine/tests/scripting.rs`, `lifecycle.rs` |
 | Timers and clamping | `crates/rustic-engine/tests/timers.rs` |
-| Rendering turns, animation callbacks, frame tickets | `crates/rustic-engine/tests/frames.rs` |
+| Rendering turns, animation callbacks, frame tickets and layout flushes | `crates/rustic-engine/tests/frames.rs` |
+| Script reads of CLI layout geometry | `crates/rustic-cli/src/loader.rs` |
 | HTML script suspension and scripting-enabled trees | `crates/rustic-html/tests/document.rs`, `fragment.rs`, `tree_construction.rs` |
 | Parser-inserted inline classic execution | `crates/rustic-engine/tests/inline_scripts.rs` |
 | Local external script results and execution order | `crates/rustic-engine/tests/classic_scripts.rs` |

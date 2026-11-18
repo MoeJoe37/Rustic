@@ -1,11 +1,15 @@
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::time::Duration;
 
 use rustic_base::ManualClock;
+use rustic_dom::{Document, NodeId};
 use rustic_engine::{
-    DocumentTurn, Engine, EngineDocument, RenderFrame, ScriptStop, ScriptTurn, ScriptedDocument,
-    TaskLimits,
+    DocumentTurn, Engine, EngineDocument, LayoutReadError, LayoutSource,
+    MAX_LAYOUT_FLUSHES_PER_TURN, RenderFrame, ScriptStop, ScriptTurn, ScriptedDocument, TaskLimits,
 };
-use rustic_html::ParserLimits;
+use rustic_html::{DocumentMode, ParserLimits};
 use rustic_js::Source;
 
 fn document(engine: &mut Engine, limits: TaskLimits) -> ScriptedDocument<ManualClock> {
@@ -152,6 +156,86 @@ fn mutations_invalidate_frame_tickets_after_animation_and_promise_work() {
         let fresh = render_turn(&mut scripts);
         assert_eq!(scripts.accept_rendered_frame(fresh), Ok(true));
     }
+}
+
+#[derive(Debug)]
+struct LayoutFixture(Rc<Cell<i32>>);
+
+impl LayoutSource for LayoutFixture {
+    fn measure_widths(
+        &self,
+        document: &Document,
+        _: DocumentMode,
+    ) -> Result<HashMap<NodeId, i32>, LayoutReadError> {
+        let mut widths = HashMap::new();
+        for (node, _) in document.walk(document.root()).unwrap() {
+            widths.insert(node, self.0.get());
+        }
+        Ok(widths)
+    }
+}
+
+#[test]
+fn layout_flushes_once_per_revision_with_a_shared_turn_budget() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    let width = Rc::new(Cell::new(30));
+    scripts
+        .set_layout_source(Box::new(LayoutFixture(width.clone())))
+        .unwrap();
+    let run = |scripts: &mut ScriptedDocument<ManualClock>, code: &str| {
+        scripts.queue_script(source(code)).unwrap();
+        assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    };
+    run(
+        &mut scripts,
+        "
+        var body = document.body;
+        if (body.offsetWidth !== 30 || body.offsetWidth !== 30) throw 'first snapshot';
+        Promise.resolve().then(() => {
+            if (body.offsetWidth !== 30) throw 'checkpoint snapshot';
+        });
+        ",
+    );
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+    scripts.offer_rendering_opportunity().unwrap();
+    let stale = render_turn(&mut scripts);
+    width.set(70);
+    scripts.rendering_inputs_changed().unwrap();
+    assert_eq!(scripts.accept_rendered_frame(stale), Ok(false));
+    run(
+        &mut scripts,
+        &format!(
+            "
+            if (body.offsetWidth !== 70) throw 'applied inputs';
+            for (let i = 1; i < {MAX_LAYOUT_FLUSHES_PER_TURN}; ++i) {{
+                body.setAttribute('data-state', String(i));
+                if (body.offsetWidth !== 70 || body.offsetWidth !== 70) throw 'dirty snapshot';
+            }}
+            Promise.resolve().then(() => {{
+                body.setAttribute('data-state', 'from promise');
+                try {{ body.offsetWidth; }} catch (error) {{ globalThis.limit = error.name; }}
+            }});
+            "
+        ),
+    );
+    assert_eq!(
+        scripts.take_layout_flush_count(),
+        MAX_LAYOUT_FLUSHES_PER_TURN as u64
+    );
+    run(
+        &mut scripts,
+        "if (limit !== 'QuotaExceededError' || body.offsetWidth !== 70) throw 'next turn';",
+    );
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+    scripts.offer_rendering_opportunity().unwrap();
+    let fresh = render_turn(&mut scripts);
+    run(
+        &mut scripts,
+        "if (body.offsetWidth !== 70) throw 'same snapshot';",
+    );
+    assert_eq!(scripts.take_layout_flush_count(), 0);
+    assert_eq!(scripts.accept_rendered_frame(fresh), Ok(true));
 }
 
 #[test]

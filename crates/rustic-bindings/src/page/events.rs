@@ -18,7 +18,7 @@ mod input;
 mod state;
 mod ui;
 pub use input::{InputEvent, KeyInput, Modifiers};
-pub(super) use input::{connected, deliver, install_controls};
+pub(super) use input::{connected, deliver, install_controls, reaches_root};
 
 use state::{Event, Phase};
 

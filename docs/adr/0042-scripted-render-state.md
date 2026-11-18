@@ -28,6 +28,11 @@ borrow. The engine may recompute once for each dirty snapshot, within a
 per-turn budget, and records each recomputation for the host. Resource
 delivery and drawing remain separate from the synchronous read.
 
-The first implementation verifies the DOM component of frame validity.
-Resource delivery, viewport revisions, cached layout reads and differential
-pixel evidence are subsequent WEB-06 work.
+`HTMLElement.offsetWidth` is the first synchronous read. The CLI builds its
+offset widths with the same style, image and block/inline layout functions
+used for rendering. Width snapshots depend on both revisions. The engine
+allows eight flush attempts per turn, shared with that turn's promise jobs.
+The same input revision invalidates frame tickets when the host publishes
+viewport or resource changes. Applying stylesheet and image completions in
+the pump, reusing layout for pixels and adding the remaining reads are
+subsequent WEB-06 work.

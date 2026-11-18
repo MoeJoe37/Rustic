@@ -239,7 +239,7 @@
     {
       "name": "remove id attribute via innerHTML",
       "status": "FAIL",
-      "message": "assert_equals: should be null. expected null but got object \"[object Element]\""
+      "message": "assert_equals: should be null. expected null but got object \"[object HTMLElement]\""
     },
     {
       "name": "add id attribute via outerHTML",
@@ -249,12 +249,12 @@
     {
       "name": "remove id attribute via outerHTML",
       "status": "FAIL",
-      "message": "assert_equals: should be null. expected null but got object \"[object Element]\""
+      "message": "assert_equals: should be null. expected null but got object \"[object HTMLElement]\""
     },
     {
       "name": "update `id` attribute via element.id",
       "status": "FAIL",
-      "message": "assert_equals: should get the element with id. expected object \"[object Element]\" but got null"
+      "message": "assert_equals: should get the element with id. expected object \"[object HTMLElement]\" but got null"
     },
     {
       "name": "where insertion order and tree order don't match",
@@ -263,7 +263,7 @@
     {
       "name": "Inserting an id by inserting its parent node",
       "status": "FAIL",
-      "message": "assert_equals: expected object \"[object Element]\" but got null"
+      "message": "assert_equals: expected object \"[object HTMLElement]\" but got null"
     },
     {
       "name": "Document.getElementById must not return nodes not present in document",

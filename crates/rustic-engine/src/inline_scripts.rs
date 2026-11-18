@@ -17,8 +17,8 @@ use crate::classic_scripts::{ExternalScripts, ModuleJob, ReadyClassic, ReadyScri
 use crate::lifecycle::DocumentScope;
 use crate::{
     ClassicFetchError, ClassicRequestId, ClassicScriptLimits, ClassicScriptMode,
-    ClassicScriptRequest, DocumentStartError, Engine, ScriptStop, ScriptTurn, ScriptedDocument,
-    TaskLimits,
+    ClassicScriptRequest, DocumentStartError, Engine, LayoutSource, ScriptStop, ScriptTurn,
+    ScriptedDocument, TaskLimits,
 };
 
 /// Failure of an opt-in scripted document load.
@@ -247,6 +247,17 @@ impl<C: Clock> InlineScriptLoad<C> {
 }
 
 impl<C: Clock> ClassicScriptLoad<C> {
+    /// Supply the layout pipeline before feeding HTML so parser scripts can read layout.
+    pub fn set_layout_source(
+        &mut self,
+        source: Box<dyn LayoutSource>,
+    ) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending.document.set_layout_source(source)?;
+            Ok(())
+        })
+    }
+
     /// The shared work token while the load is active.
     pub fn cancellation(&self) -> Option<&CancellationToken> {
         self.inner.cancellation()

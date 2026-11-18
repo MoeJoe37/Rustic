@@ -17,7 +17,7 @@ use rustic_css::{
 };
 use rustic_dom::NodeId;
 use rustic_style::ComputedStyle;
-use std::{error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt};
 
 mod flex;
 
@@ -2161,6 +2161,65 @@ impl BlockLayout {
     /// Inline box fragments (one per box per line), by line, in box preorder.
     pub fn inlines(&self) -> &[InlineFragment] {
         &self.inlines
+    }
+
+    /// Rounded widths of the untransformed border-box unions for CSSOM View.
+    /// For a split inline, include the nonempty block fragments that split it.
+    pub fn offset_widths(
+        &self,
+        tree: &BoxTree,
+        cancellation: &CancellationToken,
+    ) -> Result<HashMap<NodeId, i32>, FlowError> {
+        let mut work = Work {
+            spent: 0,
+            cancellation,
+        };
+        work.charge(0)?;
+        let mut bounds = HashMap::<NodeId, (f64, f64)>::new();
+        let mut include = |node, rect: CssRect| {
+            let left = rect.origin().x.get();
+            let right = left + rect.size().width().get();
+            let span = bounds.entry(node).or_insert((left, right));
+            span.0 = span.0.min(left);
+            span.1 = span.1.max(right);
+        };
+        let boxes = tree.boxes();
+        for fragment in &self.fragments {
+            work.charge(1)?;
+            let rect = fragment.border();
+            include(fragment.node(), rect);
+            if fragment.line().is_some()
+                || rect.size().width().get() == 0.0
+                || rect.size().height().get() == 0.0
+            {
+                continue;
+            }
+            let mut parent = boxes
+                .get(fragment.source_box())
+                .ok_or(FlowError::InvalidSnapshot)?
+                .parent();
+            while let Some(index) = parent {
+                work.charge(1)?;
+                let source = boxes.get(index).ok_or(FlowError::InvalidSnapshot)?;
+                if source.kind() != BoxKind::Element(Display::Inline)
+                    || inline::is_atomic(source)
+                    || participation(source, cancellation)? != Participation::Inline
+                {
+                    break;
+                }
+                include(source.node(), rect);
+                parent = source.parent();
+            }
+        }
+        for fragment in &self.inlines {
+            work.charge(1)?;
+            include(fragment.node(), fragment.border());
+        }
+        cancellation.check().map_err(|_| FlowError::Cancelled)?;
+        Ok(bounds
+            .into_iter()
+            .map(|(node, (left, right))| (node, (right - left).round() as i32))
+            .collect())
     }
 
     /// Used viewport overflow (CSS Overflow 3 §3.3); `visible` becomes `auto`.

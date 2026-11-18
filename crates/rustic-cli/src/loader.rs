@@ -7,6 +7,7 @@
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
@@ -17,10 +18,10 @@ use std::time::Duration;
 
 use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
 use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment};
-use rustic_dom::DumpError;
+use rustic_dom::{Document, DumpError, NodeId};
 use rustic_engine::{
     ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
-    EngineDocument, ScriptLoadError, ScriptStop, TaskLimits,
+    EngineDocument, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop, TaskLimits,
 };
 use rustic_html::{DocumentMode, ParseError, ParserLimits};
 use rustic_style::{
@@ -51,6 +52,8 @@ pub struct LoaderLimits {
     pub parser: ParserLimits,
     /// Execute the page's supported scripts before producing output.
     pub run_scripts: bool,
+    /// View used by scripts that read layout during parsing and callbacks.
+    pub script_view: rustic_layout::View,
     /// External stylesheet budgets for `dump-style`.
     pub stylesheets: StyleLoadLimits,
     /// Anonymous flow normalization budgets for `dump-formatting`.
@@ -67,6 +70,7 @@ impl Default for LoaderLimits {
             max_dump_bytes: DEFAULT_MAX_DUMP_BYTES,
             parser: ParserLimits::default(),
             run_scripts: false,
+            script_view: default_view(),
             stylesheets: StyleLoadLimits::default(),
             formatting: rustic_layout::FormattingLimits::default(),
             images: crate::images::ImageLimits::default(),
@@ -271,6 +275,11 @@ fn load_scripted_document(
         ManualClock::default(),
     )?;
     let cancellation = load.cancellation().expect("admitted load").clone();
+    load.set_layout_source(Box::new(LocalLayout {
+        path: path.clone(),
+        limits,
+        cancellation: cancellation.clone(),
+    }))?;
     let root = path
         .parent()
         .expect("a canonical regular file has a parent");
@@ -447,7 +456,7 @@ pub fn dump_style(
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
     let document = parsed.parsed().document();
-    let (styles, sheets) = compute_styles(parsed, path, limits, default_view())?;
+    let (styles, sheets) = compute_styles(LayoutInput::new(parsed, path, limits, default_view()))?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
         let status = status_text(sheet.status);
@@ -485,10 +494,7 @@ pub fn dump_style(
 
 /// Share the same local stylesheet policy and M2 reference cascade in all dumps.
 fn compute_styles(
-    parsed: &EngineDocument,
-    path: &Path,
-    limits: LoaderLimits,
-    view: rustic_layout::View,
+    input: LayoutInput<'_>,
 ) -> Result<
     (
         Vec<rustic_style::ElementStyle>,
@@ -496,9 +502,15 @@ fn compute_styles(
     ),
     LoadError,
 > {
-    let document = parsed.parsed().document();
+    let LayoutInput {
+        document,
+        mode,
+        path,
+        limits,
+        view,
+        cancellation,
+    } = input;
     let node_error = |error| LoadError::Dump(DumpError::Node(error));
-    let cancellation = parsed.cancellation();
     check_cancelled(cancellation)?;
     let parser =
         CssParser::new(CssLimits::default(), cancellation.clone()).map_err(LoadError::Css)?;
@@ -536,7 +548,7 @@ fn compute_styles(
     environment.initial_font = compute.initial_font_ratios();
     cascade.set_environment(environment);
     let mut cx = MatchContext::html();
-    cx.quirks = parsed.parsed().mode() == DocumentMode::Quirks;
+    cx.quirks = mode == DocumentMode::Quirks;
     let styles = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)
         .map_err(node_error)?;
     check_cancelled(cancellation)?;
@@ -550,7 +562,7 @@ pub fn dump_boxes(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    box_tree(parsed, path, limits, default_view())?
+    box_tree(LayoutInput::new(parsed, path, limits, default_view()))?
         .dump(limits.max_dump_bytes)
         .map_err(LoadError::Layout)
 }
@@ -561,25 +573,20 @@ pub fn dump_formatting(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let principal = box_tree(parsed, path, limits, default_view())?;
+    let principal = box_tree(LayoutInput::new(parsed, path, limits, default_view()))?;
     rustic_layout::FormattingTree::build(&principal, limits.formatting, parsed.cancellation())
         .and_then(|tree| tree.dump(limits.max_dump_bytes))
         .map_err(LoadError::Formatting)
 }
 
-fn box_tree(
-    parsed: &EngineDocument,
-    path: &Path,
-    limits: LoaderLimits,
-    view: rustic_layout::View,
-) -> Result<rustic_layout::BoxTree, LoadError> {
-    let (styles, _) = compute_styles(parsed, path, limits, view)?;
+fn box_tree(input: LayoutInput<'_>) -> Result<rustic_layout::BoxTree, LoadError> {
+    let (styles, _) = compute_styles(input)?;
     rustic_layout::BoxTree::build(
-        parsed.parsed().document(),
-        parsed.parsed().document().root(),
+        input.document,
+        input.document.root(),
         &styles,
-        layout_limits(limits),
-        parsed.cancellation(),
+        layout_limits(input.limits),
+        input.cancellation,
     )
     .map_err(LoadError::Layout)
 }
@@ -606,7 +613,7 @@ pub fn dump_layout(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let (_, layout, _, _) = block_layout(parsed, path, limits, default_view())?;
+    let (_, layout, _, _) = block_layout(LayoutInput::new(parsed, path, limits, default_view()))?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
@@ -617,11 +624,64 @@ fn fonts() -> &'static rustic_text::FontDatabase {
     crate::fonts::database()
 }
 
-fn block_layout(
-    parsed: &EngineDocument,
-    path: &Path,
+#[derive(Clone, Copy)]
+struct LayoutInput<'a> {
+    document: &'a Document,
+    mode: DocumentMode,
+    path: &'a Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
+    cancellation: &'a CancellationToken,
+}
+
+impl<'a> LayoutInput<'a> {
+    fn new(
+        parsed: &'a EngineDocument,
+        path: &'a Path,
+        limits: LoaderLimits,
+        view: rustic_layout::View,
+    ) -> Self {
+        Self {
+            document: parsed.parsed().document(),
+            mode: parsed.parsed().mode(),
+            path,
+            limits,
+            view,
+            cancellation: parsed.cancellation(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LocalLayout {
+    path: PathBuf,
+    limits: LoaderLimits,
+    cancellation: CancellationToken,
+}
+
+impl LayoutSource for LocalLayout {
+    fn measure_widths(
+        &self,
+        document: &Document,
+        mode: DocumentMode,
+    ) -> Result<HashMap<NodeId, i32>, LayoutReadError> {
+        let (tree, layout, _, _) = block_layout(LayoutInput {
+            document,
+            mode,
+            path: &self.path,
+            limits: self.limits,
+            view: self.limits.script_view,
+            cancellation: &self.cancellation,
+        })
+        .map_err(|_| LayoutReadError::Unavailable)?;
+        layout
+            .offset_widths(&tree, &self.cancellation)
+            .map_err(|_| LayoutReadError::Unavailable)
+    }
+}
+
+fn block_layout(
+    input: LayoutInput<'_>,
 ) -> Result<
     (
         rustic_layout::BoxTree,
@@ -631,15 +691,23 @@ fn block_layout(
     ),
     LoadError,
 > {
-    let mut tree = box_tree(parsed, path, limits, view)?;
+    let mut tree = box_tree(input)?;
+    let LayoutInput {
+        document,
+        path,
+        limits,
+        view,
+        cancellation,
+        ..
+    } = input;
     let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
     let images = crate::images::load(
-        parsed.parsed().document(),
+        document,
         &tree,
         &canonical,
         limits.images,
         limits.read_chunk_bytes,
-        parsed.cancellation(),
+        cancellation,
     );
     if !images.sizes.is_empty() {
         tree.set_natural_sizes(&images.sizes)
@@ -651,7 +719,7 @@ fn block_layout(
         viewport,
         layout_limits(limits),
         fonts(),
-        parsed.cancellation(),
+        cancellation,
     )
     .map_err(LoadError::Flow)?;
     Ok((tree, layout, viewport, images))
@@ -663,7 +731,8 @@ fn display_list(
     limits: LoaderLimits,
     view: rustic_layout::View,
 ) -> Result<rustic_paint::DisplayList, LoadError> {
-    let (tree, layout, viewport, images) = block_layout(parsed, path, limits, view)?;
+    let (tree, layout, viewport, images) =
+        block_layout(LayoutInput::new(parsed, path, limits, view))?;
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),
         images: images.images,
@@ -803,6 +872,45 @@ mod tests {
     use super::*;
 
     struct TempFile(PathBuf);
+
+    #[test]
+    fn parser_scripts_read_the_renderers_layout_at_the_selected_view() {
+        let file = TempFile::new(
+            br#"<!DOCTYPE html>
+                <style>
+                    #box { width: 25vw; height: 10px; border: 2px solid }
+                    #box.wide { width: 50vw; transform: scale(2) }
+                    #hidden { display: none }
+                    #inline { padding: 2px; border: 1px solid }
+                </style>
+                <div id="box"></div>
+                <div id="hidden"></div>
+                <span id="inline">text</span>
+                <script>
+                    const box = document.querySelector('#box');
+                    const hidden = document.querySelector('#hidden');
+                    const inline = document.querySelector('#inline');
+                    const detached = document.implementation.createHTMLDocument('').body;
+                    const width = box.offsetWidth;
+                    box.setAttribute('class', 'wide');
+                    document.body.setAttribute('data-layout', [
+                        width, box.offsetWidth, hidden.offsetWidth, detached.offsetWidth,
+                        inline.offsetWidth > 6, box instanceof HTMLElement,
+                    ].join(','));
+                </script>"#,
+        );
+        let limits = LoaderLimits {
+            run_scripts: true,
+            script_view: rustic_layout::View::new(320.0, 240.0, 1.0, 1.0).unwrap(),
+            ..LoaderLimits::default()
+        };
+        let parsed = load_document(&mut Engine::new(1), &file.0, limits).unwrap();
+        let tree = dump_dom(&parsed, &file.0, limits).unwrap();
+        assert!(
+            tree.contains("local=\"data-layout\" value=\"84,164,0,0,true,true\""),
+            "{tree}"
+        );
+    }
 
     impl TempFile {
         fn new(contents: &[u8]) -> Self {

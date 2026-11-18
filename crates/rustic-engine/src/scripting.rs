@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use rustic_base::{CancellationToken, Clock, SystemClock};
 use rustic_bindings::dom_exception;
-use rustic_bindings::page::{self, LifecycleEvent, PageTree};
+use rustic_bindings::page::{self, LayoutReadError, LifecycleEvent, PageTree};
 use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
 use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
@@ -18,6 +18,7 @@ use rustic_js::runtime::{
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::frames::{RenderFrame, Rendering};
+use crate::layout_reads::{LayoutReads, LayoutSource};
 use crate::lifecycle::DocumentScope;
 use crate::local_modules::{LocalModules, ModuleKey};
 use crate::tasks::{ScriptQueue, Task, TimerId};
@@ -166,9 +167,17 @@ struct ScriptTree {
     current_script: Cell<Option<NodeId>>,
     // Keep root checks in a deterministic order under the native work budget.
     pending_classics: RefCell<Vec<NodeId>>,
+    layout: RefCell<LayoutReads>,
 }
 
 impl ScriptTree {
+    fn mode(&self) -> Option<DocumentMode> {
+        match &*self.state.borrow() {
+            ScriptTreeState::Parsing(parser) => parser.live_document_mode(),
+            ScriptTreeState::Ready(owner) => Some(owner.parsed().mode()),
+        }
+    }
+
     fn parser_roots<'a>(
         &'a self,
         parser: &'a HtmlDocumentParser,
@@ -200,11 +209,7 @@ impl PageTree for ScriptTree {
     }
 
     fn quirks_mode(&self) -> bool {
-        let mode = match &*self.state.borrow() {
-            ScriptTreeState::Parsing(parser) => parser.live_document_mode(),
-            ScriptTreeState::Ready(owner) => Some(owner.parsed().mode()),
-        };
-        mode == Some(DocumentMode::Quirks)
+        self.mode() == Some(DocumentMode::Quirks)
     }
 
     fn retained_nodes(&self) -> Result<Vec<NodeId>, OutOfMemory> {
@@ -226,6 +231,12 @@ impl PageTree for ScriptTree {
 
     fn current_script(&self) -> Option<NodeId> {
         self.current_script.get()
+    }
+
+    fn offset_width(&self, id: NodeId) -> Result<i32, LayoutReadError> {
+        let document = self.read().ok_or(LayoutReadError::Unavailable)?;
+        let mode = self.mode().ok_or(LayoutReadError::Unavailable)?;
+        self.layout.borrow_mut().width(&document, mode, id)
     }
 
     fn allows_adoption_from_main(&self, agent: &mut Agent, subtree: NodeId) -> JsResult<bool> {
@@ -342,6 +353,7 @@ impl<C: Clock> ScriptedDocument<C> {
             state: RefCell::new(state),
             current_script: Cell::new(None),
             pending_classics: RefCell::default(),
+            layout: RefCell::default(),
         });
         let owner = document
             .read()
@@ -376,6 +388,27 @@ impl<C: Clock> ScriptedDocument<C> {
                 unreachable!("the host receives only finished documents")
             }
         })
+    }
+
+    /// Supply the bounded layout pipeline serving synchronous script reads.
+    /// Replacing it also invalidates any outstanding render ticket.
+    pub fn set_layout_source(&mut self, source: Box<dyn LayoutSource>) -> Result<(), ScriptStop> {
+        self.check_live()?;
+        self.document.layout.borrow_mut().set_source(source);
+        Ok(())
+    }
+
+    /// Publish a change to the renderer's viewport or applied resource data.
+    /// Call at a host turn boundary once the new inputs are available.
+    pub fn rendering_inputs_changed(&mut self) -> Result<(), ScriptStop> {
+        self.check_live()?;
+        self.document.layout.borrow_mut().inputs_changed();
+        Ok(())
+    }
+
+    /// Read and clear the number of layout flushes attempted by script.
+    pub fn take_layout_flush_count(&mut self) -> u64 {
+        self.document.layout.borrow_mut().take_flush_count()
     }
 
     /// Drop the realm and its pending work, keeping the modified document.
@@ -470,8 +503,8 @@ impl<C: Clock> ScriptedDocument<C> {
 
     pub(crate) fn deliver_lifecycle(&mut self, event: LifecycleEvent) -> Result<(), ScriptStop> {
         self.check_live()?;
+        self.begin_turn()?;
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        agent.set_step_budget(Some(self.limits.steps_per_turn));
         let result = page::deliver_lifecycle(agent, event).map_err(EvalError::from);
         self.finish_script_turn(result).map(|_| ())
     }
@@ -482,9 +515,9 @@ impl<C: Clock> ScriptedDocument<C> {
         source: &Source,
     ) -> Result<ScriptTurn, ScriptStop> {
         self.check_live()?;
-        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        agent.set_step_budget(Some(self.limits.steps_per_turn));
+        self.begin_turn()?;
         self.document.current_script.set(Some(element));
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         let result = agent.evaluate_source(source).map(|_| ());
         self.document.current_script.set(None);
         self.finish_script_turn(result)
@@ -511,8 +544,8 @@ impl<C: Clock> ScriptedDocument<C> {
         sources: &LocalModules,
     ) -> Result<(), ScriptStop> {
         self.check_live()?;
+        self.begin_turn()?;
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        agent.set_step_budget(Some(self.limits.steps_per_turn));
         let cache = &self.module_map;
         let (entry, _) = graph.module(0).expect("module graph has an entry");
         let cached = cache.borrow().get(entry).copied();
@@ -680,7 +713,11 @@ impl<C: Clock> ScriptedDocument<C> {
         self.run_animation_callbacks(frame)?;
         let (output, revision) = {
             let document = self.document();
-            let revision = document.parsed().document().mutation_revision();
+            let revision = self
+                .document
+                .layout
+                .borrow()
+                .revision(document.parsed().document());
             (render(&document, frame), revision)
         };
         self.check_live()?;
@@ -689,10 +726,14 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     /// Accept the current frame once before presenting its output.
-    /// A later rendering turn or document mutation invalidates earlier tickets.
+    /// A later rendering turn, DOM mutation or applied input change invalidates earlier tickets.
     pub fn accept_rendered_frame(&mut self, frame: RenderFrame) -> Result<bool, ScriptStop> {
         self.check_live()?;
-        let revision = self.document().parsed().document().mutation_revision();
+        let revision = self
+            .document
+            .layout
+            .borrow()
+            .revision(self.document().parsed().document());
         Ok(self.rendering.accept(frame, revision))
     }
 
@@ -711,8 +752,8 @@ impl<C: Clock> ScriptedDocument<C> {
             return Ok(None);
         };
 
+        self.begin_turn()?;
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        agent.set_step_budget(Some(self.limits.steps_per_turn));
         let result = match task {
             Task::Script(source) => agent.evaluate_source(&source).map(|_| ()),
             Task::Timer(timer) => timer.run(agent, &self.pending),
@@ -748,10 +789,7 @@ impl<C: Clock> ScriptedDocument<C> {
     fn run_animation_callbacks(&mut self, frame: RenderFrame) -> Result<(), ScriptStop> {
         let cursor = self.pending.queue.borrow().frame_cursor();
         let timestamp = Value::number(frame.timestamp().as_secs_f64() * 1_000.0);
-        self.agent
-            .as_mut()
-            .map_err(|reason| *reason)?
-            .set_step_budget(Some(self.limits.steps_per_turn));
+        self.begin_turn()?;
         loop {
             let root = self.pending.queue.borrow_mut().pop_frame(cursor);
             let Some(root) = root else {
@@ -811,6 +849,13 @@ impl<C: Clock> ScriptedDocument<C> {
         }
     }
 
+    fn begin_turn(&mut self) -> Result<(), ScriptStop> {
+        self.document.layout.borrow_mut().begin_turn();
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        agent.set_step_budget(Some(self.limits.steps_per_turn));
+        Ok(())
+    }
+
     fn check_live(&mut self) -> Result<(), ScriptStop> {
         if self.cancellation.is_cancelled() {
             return Err(self.stop(ScriptStop::DocumentCancelled));
@@ -831,6 +876,7 @@ impl<C: Clock> ScriptedDocument<C> {
         self.pending.queue.borrow_mut().clear();
         self.module_map.get_mut().clear();
         self.pending_modules.clear();
+        self.document.layout.borrow_mut().clear();
         self.rendering.clear();
         reason
     }

@@ -3,6 +3,7 @@
 //! The weak-map association traces the element wrapper while the declaration
 //! remains reachable, without keeping dead declarations or detached nodes alive.
 
+use rustic_css::PropertyId;
 use rustic_dom::NodeKind;
 use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, PropertyDescriptor, Value};
 
@@ -17,6 +18,174 @@ use super::{
 
 const INTERFACE: &str = "CSSStyleDeclaration";
 
+ // Every longhand has the same bounded snapshot read. A new supported
+ // property makes the getter table fail to compile until it is included.
+ const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
+    get_longhand::<0> as NativeFn,
+    get_longhand::<1> as NativeFn,
+    get_longhand::<2> as NativeFn,
+    get_longhand::<3> as NativeFn,
+    get_longhand::<4> as NativeFn,
+    get_longhand::<5> as NativeFn,
+    get_longhand::<6> as NativeFn,
+    get_longhand::<7> as NativeFn,
+    get_longhand::<8> as NativeFn,
+    get_longhand::<9> as NativeFn,
+    get_longhand::<10> as NativeFn,
+    get_longhand::<11> as NativeFn,
+    get_longhand::<12> as NativeFn,
+    get_longhand::<13> as NativeFn,
+    get_longhand::<14> as NativeFn,
+    get_longhand::<15> as NativeFn,
+    get_longhand::<16> as NativeFn,
+    get_longhand::<17> as NativeFn,
+    get_longhand::<18> as NativeFn,
+    get_longhand::<19> as NativeFn,
+    get_longhand::<20> as NativeFn,
+    get_longhand::<21> as NativeFn,
+    get_longhand::<22> as NativeFn,
+    get_longhand::<23> as NativeFn,
+    get_longhand::<24> as NativeFn,
+    get_longhand::<25> as NativeFn,
+    get_longhand::<26> as NativeFn,
+    get_longhand::<27> as NativeFn,
+    get_longhand::<28> as NativeFn,
+    get_longhand::<29> as NativeFn,
+    get_longhand::<30> as NativeFn,
+    get_longhand::<31> as NativeFn,
+    get_longhand::<32> as NativeFn,
+    get_longhand::<33> as NativeFn,
+    get_longhand::<34> as NativeFn,
+    get_longhand::<35> as NativeFn,
+    get_longhand::<36> as NativeFn,
+    get_longhand::<37> as NativeFn,
+    get_longhand::<38> as NativeFn,
+    get_longhand::<39> as NativeFn,
+    get_longhand::<40> as NativeFn,
+    get_longhand::<41> as NativeFn,
+    get_longhand::<42> as NativeFn,
+    get_longhand::<43> as NativeFn,
+    get_longhand::<44> as NativeFn,
+    get_longhand::<45> as NativeFn,
+    get_longhand::<46> as NativeFn,
+    get_longhand::<47> as NativeFn,
+    get_longhand::<48> as NativeFn,
+    get_longhand::<49> as NativeFn,
+    get_longhand::<50> as NativeFn,
+    get_longhand::<51> as NativeFn,
+    get_longhand::<52> as NativeFn,
+    get_longhand::<53> as NativeFn,
+    get_longhand::<54> as NativeFn,
+    get_longhand::<55> as NativeFn,
+    get_longhand::<56> as NativeFn,
+    get_longhand::<57> as NativeFn,
+    get_longhand::<58> as NativeFn,
+    get_longhand::<59> as NativeFn,
+    get_longhand::<60> as NativeFn,
+    get_longhand::<61> as NativeFn,
+    get_longhand::<62> as NativeFn,
+    get_longhand::<63> as NativeFn,
+    get_longhand::<64> as NativeFn,
+    get_longhand::<65> as NativeFn,
+    get_longhand::<66> as NativeFn,
+    get_longhand::<67> as NativeFn,
+    get_longhand::<68> as NativeFn,
+    get_longhand::<69> as NativeFn,
+    get_longhand::<70> as NativeFn,
+    get_longhand::<71> as NativeFn,
+    get_longhand::<72> as NativeFn,
+    get_longhand::<73> as NativeFn,
+    get_longhand::<74> as NativeFn,
+    get_longhand::<75> as NativeFn,
+    get_longhand::<76> as NativeFn,
+    get_longhand::<77> as NativeFn,
+    get_longhand::<78> as NativeFn,
+    get_longhand::<79> as NativeFn,
+    get_longhand::<80> as NativeFn,
+    get_longhand::<81> as NativeFn,
+    get_longhand::<82> as NativeFn,
+    get_longhand::<83> as NativeFn,
+    get_longhand::<84> as NativeFn,
+    get_longhand::<85> as NativeFn,
+    get_longhand::<86> as NativeFn,
+    get_longhand::<87> as NativeFn,
+    get_longhand::<88> as NativeFn,
+    get_longhand::<89> as NativeFn,
+    get_longhand::<90> as NativeFn,
+    get_longhand::<91> as NativeFn,
+    get_longhand::<92> as NativeFn,
+    get_longhand::<93> as NativeFn,
+    get_longhand::<94> as NativeFn,
+    get_longhand::<95> as NativeFn,
+    get_longhand::<96> as NativeFn,
+    get_longhand::<97> as NativeFn,
+    get_longhand::<98> as NativeFn,
+    get_longhand::<99> as NativeFn,
+    get_longhand::<100> as NativeFn,
+    get_longhand::<101> as NativeFn,
+    get_longhand::<102> as NativeFn,
+    get_longhand::<103> as NativeFn,
+    get_longhand::<104> as NativeFn,
+    get_longhand::<105> as NativeFn,
+    get_longhand::<106> as NativeFn,
+    get_longhand::<107> as NativeFn,
+    get_longhand::<108> as NativeFn,
+    get_longhand::<109> as NativeFn,
+ ];
+
+ fn get_longhand<const INDEX: usize>(
+     agent: &mut Agent,
+     declaration: Value,
+     _: &[Value],
+ ) -> JsResult<Value> {
+     let style = snapshot(agent, declaration)?;
+     let name = PropertyId::ALL[INDEX].name();
+     value(agent, style.get(name).unwrap_or(""))
+ }
+
+ fn camel_name(name: &str) -> String {
+     if name == "float" {
+         return String::from("cssFloat");
+     }
+     let mut camel = String::with_capacity(name.len());
+     let mut upper = false;
+     for ch in name.chars() {
+         if ch == '-' {
+             upper = true;
+         } else {
+             camel.push(if upper { ch.to_ascii_uppercase() } else { ch });
+             upper = false;
+         }
+     }
+     camel
+ }
+
+ fn install_longhand_getters(
+     agent: &mut Agent,
+     prototype: rustic_js::runtime::ObjectId,
+ ) -> JsResult<()> {
+     for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
+         let canonical = property.name();
+         let camel = camel_name(canonical);
+         let getter = Value::object(
+             agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
+         );
+         for name in [canonical, camel.as_str()] {
+             if name == canonical && canonical == camel {
+                 continue;
+             }
+             let key = agent.heap.key(name)?;
+             agent.define_property_or_throw(
+                 prototype,
+                 key,
+                 PropertyDescriptor::accessor(getter, Value::UNDEFINED, true, true),
+             )?;
+         }
+     }
+     Ok(())
+ }
+
+
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_interface(
         agent,
@@ -26,6 +195,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         0,
         &[("length", "get length", length)],
         |agent, proto| {
+            install_longhand_getters(agent, proto)?;
             let getter = Value::object(agent.new_native_function(css_text, "get cssText", 0)?);
             let setter = Value::object(agent.new_native_function(set_css_text, "set cssText", 1)?);
             let key = agent.heap.key("cssText")?;
@@ -77,10 +247,14 @@ pub(super) fn get_computed_style(
         }
         let prototype = prototype(agent, INTERFACE)?;
         let declaration = Value::object(agent.new_object_with(Some(prototype))?);
-        with_page(agent, |agent, page| {
+        // The weak-map write may allocate; keep its key rooted until insertion.
+        let declaration_root = agent.root(declaration)?;
+        let result = with_page(agent, |agent, page| {
             agent.weak_map_set(page.computed_styles, declaration, element)?;
             Ok(declaration)
-        })
+        });
+        agent.unroot(declaration_root);
+        result
     })();
     agent.unroot(root);
     result

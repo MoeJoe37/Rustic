@@ -22,7 +22,7 @@ pub use inline_scripts::ScriptLoadError as InlineLoadError;
 pub use inline_scripts::{ClassicScriptLoad, InlineScriptLoad, ScriptLoadError};
 pub use layout_reads::{LayoutGeometry, LayoutSource, MAX_LAYOUT_FLUSHES_PER_TURN};
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
-pub use rustic_bindings::page::{InputEvent, KeyInput, LayoutReadError, Modifiers};
+pub use rustic_bindings::page::{ComputedStyleSnapshot, InputEvent, KeyInput, LayoutReadError, Modifiers};
 pub use scripting::{
     DocumentTurn, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument,
     TaskLimits,

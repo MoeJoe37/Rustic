@@ -269,6 +269,9 @@ impl PageTree for ScriptTree {
     }
 
     fn computed_style(&self, id: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
+        if !self.layout.borrow().has_source() {
+            return Err(LayoutReadError::Unavailable);
+        }
         self.read_layout(ComputedStyleSnapshot::default(), |geometry| {
             Ok(geometry.computed_styles.get(&id).cloned().unwrap_or_default())
         })

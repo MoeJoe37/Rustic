@@ -105,7 +105,8 @@ fn length(agent: &mut Agent, declaration: Value, _: &[Value]) -> JsResult<Value>
 
 fn get_property_value(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
     // ToString may invoke a getter or callback. Finish before borrowing layout.
-    let property = creation::string(agent, required_arg(agent, args, 0)?)?;
+    let argument = required_arg(agent, args, 0)?;
+    let property = creation::string(agent, argument)?;
     let name = creation::scalar_name(&property)?;
     let style = snapshot(agent, declaration)?;
     value(agent, name.as_deref().and_then(|name| style.get(name)).unwrap_or(""))
@@ -117,17 +118,15 @@ fn get_property_priority(
     args: &[Value],
 ) -> JsResult<Value> {
     // Computed declarations have no author-specified priority.
-    let _ = creation::string(agent, required_arg(agent, args, 0)?)?;
+    let argument = required_arg(agent, args, 0)?;
+    let _ = creation::string(agent, argument)?;
     element(agent, declaration)?;
     value(agent, "")
 }
 
 fn item(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
-    let index = to_unsigned_long(
-        agent,
-        required_arg(agent, args, 0)?,
-        IntegerConversion::Wrap,
-    )?;
+    let argument = required_arg(agent, args, 0)?;
+    let index = to_unsigned_long(agent, argument, IntegerConversion::Wrap)?;
     let style = snapshot(agent, declaration)?;
     value(
         agent,

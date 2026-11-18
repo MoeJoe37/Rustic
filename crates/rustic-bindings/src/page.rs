@@ -117,7 +117,7 @@ pub trait PageTree: Debug {
     }
     /// Compute the supported CSS properties from the same layout inputs as geometry.
     fn computed_style(&self, _node: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
-        Ok(ComputedStyleSnapshot::default())
+        Err(LayoutReadError::Unavailable)
     }
     /// Whether a subtree may move out of the main document, within the turn budget.
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {

@@ -129,28 +129,42 @@ if (document.querySelector('#branch') !== null ||
 }
 
 #[test]
-fn outward_adoption_is_atomic_during_parsing_and_preserves_existing_behavior_after_eof() {
+fn outward_adoption_during_parsing_protects_only_retained_subtrees() {
     let mut engine = Engine::new(1);
     let mut load = engine
         .begin_inline_scripted_document(ParserLimits::default(), TaskLimits::default())
         .unwrap();
     load.feed(
-        br#"<!doctype html><div id="open"><script>
+        br#"<!doctype html><div id="open"><span id="closed"></span><script>
 var other = document.implementation.createHTMLDocument('');
 var open = document.querySelector('#open');
 var operations = [
     () => other.adoptNode(open),
     () => other.documentElement.appendChild(open),
-    () => document.implementation.createDocument(null, '', document.doctype)
+    () => other.adoptNode(document.currentScript)
 ];
 for (var operation of operations) {
     try { operation(); throw 'adopted'; }
     catch (error) { if (error.name !== 'NotSupportedError') throw error; }
 }
 if (open !== document.querySelector('#open') || open.ownerDocument !== document) throw 'lost owner';
+var finishedChild = document.querySelector('#closed');
+if (other.adoptNode(finishedChild) !== finishedChild || finishedChild.ownerDocument !== other ||
+    document.querySelector('#closed') !== null) throw 'closed child stayed in the parser tree';
+var doctype = document.doctype;
+var xml = document.implementation.createDocument(null, '', doctype);
+if (document.doctype !== null || xml.doctype !== doctype || doctype.ownerDocument !== xml)
+    throw 'doctype relocation';
 var incoming = other.createElement('em');
 open.appendChild(incoming);
 if (incoming.ownerDocument !== document) throw 'inward adoption';
+var relocatedAtEof = false;
+document.addEventListener('DOMContentLoaded', () => {
+    var tail = document.querySelector('#tail');
+    if (tail.parentNode !== open || incoming.nextSibling !== tail)
+        throw 'failed to resume in the right element';
+    relocatedAtEof = other.adoptNode(open) === open && open.ownerDocument === other;
+});
 </script><span id="tail"></span></div>"#,
     )
     .unwrap();
@@ -158,12 +172,7 @@ if (incoming.ownerDocument !== document) throw 'inward adoption';
     assert_eq!(document.take_inline_script_error_count(), 0);
     check_after_load(
         &mut document,
-        r#"
-if (document.querySelector('#tail').parentNode !== open ||
-    incoming.nextSibling !== document.querySelector('#tail'))
-    throw 'failed to resume in the right element';
-if (other.adoptNode(open) !== open || open.ownerDocument !== other) throw 'post-EOF adoption';
-"#,
+        "if (!relocatedAtEof || document.querySelector('#tail') !== null) throw 'EOF adoption';",
     );
 }
 

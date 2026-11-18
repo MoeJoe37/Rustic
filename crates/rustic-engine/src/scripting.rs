@@ -1,7 +1,7 @@
 //! WEB-01 document-owned script tasks and microtask checkpoints.
 
 use std::cell::{Cell, Ref, RefCell, RefMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
@@ -13,7 +13,7 @@ use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
 use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
 use rustic_js::runtime::{
-    Abrupt, Agent, DEFAULT_HEAP_BYTES, HostRoot, JsStr, ObjectId, OutOfMemory, Value,
+    Abrupt, Agent, DEFAULT_HEAP_BYTES, HostRoot, JsResult, JsStr, ObjectId, OutOfMemory, Value,
 };
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
@@ -164,7 +164,22 @@ enum ScriptTreeState {
 struct ScriptTree {
     state: RefCell<ScriptTreeState>,
     current_script: Cell<Option<NodeId>>,
-    pending_classics: RefCell<HashSet<NodeId>>,
+    // Keep root checks in a deterministic order under the native work budget.
+    pending_classics: RefCell<Vec<NodeId>>,
+}
+
+impl ScriptTree {
+    fn parser_roots<'a>(
+        &'a self,
+        parser: &'a HtmlDocumentParser,
+        pending: &'a [NodeId],
+    ) -> impl Iterator<Item = NodeId> + 'a {
+        self.current_script
+            .get()
+            .into_iter()
+            .chain(parser.retained_nodes())
+            .chain(pending.iter().copied())
+    }
 }
 
 impl PageTree for ScriptTree {
@@ -201,13 +216,7 @@ impl PageTree for ScriptTree {
                 .pending_classics
                 .try_borrow()
                 .map_err(|_| OutOfMemory)?;
-            for node in self
-                .current_script
-                .get()
-                .into_iter()
-                .chain(parser.retained_nodes())
-                .chain(pending.iter().copied())
-            {
+            for node in self.parser_roots(parser, &pending) {
                 roots.try_reserve(1).map_err(|_| OutOfMemory)?;
                 roots.push(node);
             }
@@ -219,8 +228,33 @@ impl PageTree for ScriptTree {
         self.current_script.get()
     }
 
-    fn allows_adoption_from_main(&self) -> bool {
-        matches!(&*self.state.borrow(), ScriptTreeState::Ready(_))
+    fn allows_adoption_from_main(&self, agent: &mut Agent, subtree: NodeId) -> JsResult<bool> {
+        let state = self.state.try_borrow().map_err(|_| OutOfMemory)?;
+        let ScriptTreeState::Parsing(parser) = &*state else {
+            return Ok(true);
+        };
+        let Some(document) = parser.live_document() else {
+            return Ok(false);
+        };
+        let pending = self
+            .pending_classics
+            .try_borrow()
+            .map_err(|_| OutOfMemory)?;
+        for root in self.parser_roots(parser, &pending) {
+            let mut current = Some(root);
+            while let Some(id) = current {
+                agent.check_native_work()?;
+                if id == subtree {
+                    return Ok(false);
+                }
+                current = document.node(id).ok().and_then(|node| {
+                    node.parent()
+                        .or(node.template_host())
+                        .or(node.shadow_host())
+                });
+            }
+        }
+        Ok(true)
     }
 }
 
@@ -394,9 +428,12 @@ impl<C: Clock> ScriptedDocument<C> {
 
     pub(crate) fn retain_external_classic(&self, element: NodeId) -> Result<(), ScriptStop> {
         let mut roots = self.document.pending_classics.borrow_mut();
-        roots.try_reserve(1).map_err(|_| ScriptStop::OutOfMemory)?;
-        let inserted = roots.insert(element);
-        debug_assert!(inserted, "one request per parser-inserted element");
+        let index = roots.binary_search(&element);
+        debug_assert!(index.is_err(), "one request per parser-inserted element");
+        if let Err(index) = index {
+            roots.try_reserve(1).map_err(|_| ScriptStop::OutOfMemory)?;
+            roots.insert(index, element);
+        }
         Ok(())
     }
 
@@ -424,7 +461,10 @@ impl<C: Clock> ScriptedDocument<C> {
             Some(false) => self.deliver_lifecycle(LifecycleEvent::ScriptError(element)),
             None => Ok(()),
         };
-        self.document.pending_classics.borrow_mut().remove(&element);
+        let mut roots = self.document.pending_classics.borrow_mut();
+        if let Ok(index) = roots.binary_search(&element) {
+            roots.remove(index);
+        }
         result
     }
 

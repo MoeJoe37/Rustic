@@ -68,6 +68,9 @@ children or updates character data and can update a live stylesheet.
 `document.body` resolves the current HTML body or frameset. Assignment
 uses the checked insertion and adoption path to replace that child.
 [HTML DOM tree accessors](https://html.spec.whatwg.org/multipage/dom.html#dom-tree-accessors)
+During parsing, scripts can move completed subtrees to another document.
+Subtrees that contain parser or pending script identities stay with the
+original document while those identities are in use.
 
 What does **not** work yet:
 
@@ -272,8 +275,8 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The initial selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 and `html/webappapis/animation-frames`. Linux CI is configured to require
-an exact match to the checked-in **16 files, 69 subtests, 58 passes and
-11 expected failures**. The expectations record the names and diagnoses
+an exact match to the checked-in **16 files, 69 subtests, 60 passes and
+9 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -304,7 +307,7 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 | TD-130 | One top-level Window | M6 navigation |
 | TD-131 | Extended event delivery and error reporting | WEB-07, M9 |
 | TD-132 | Timer and frame integration details | WEB-06, WEB-07 |
-| TD-133 | Outward adoption during parsing and dynamic markup | WEB-09 and M9 |
+| TD-133 | Adoption of retained parser nodes and dynamic markup | M9 HTML lifecycle |
 | TD-134 | Classic-script ordering with stylesheet and timer tasks | WEB-06 |
 | TD-135 | Dynamic page imports, import maps and data module types | M6 and M9 |
 

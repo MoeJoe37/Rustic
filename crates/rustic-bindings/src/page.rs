@@ -47,9 +47,9 @@ pub trait PageTree: Debug {
     fn current_script(&self) -> Option<NodeId> {
         None
     }
-    /// Whether main-document node identities may move to another document.
-    fn allows_adoption_from_main(&self) -> bool {
-        true
+    /// Whether a subtree may move out of the main document, within the turn budget.
+    fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
+        Ok(true)
     }
 }
 
@@ -123,14 +123,15 @@ impl Page {
     fn write_adoption_source<T>(
         &self,
         agent: &mut Agent,
-        id: DocumentId,
+        node: NodeId,
         operation: impl FnOnce(&mut Agent, &mut Document) -> JsResult<T>,
     ) -> JsResult<T> {
-        if id == self.main && !self.tree.allows_adoption_from_main() {
+        let id = node.document();
+        if id == self.main && !self.tree.allows_adoption_from_main(agent, node)? {
             return Err(creation::exception(
                 agent,
                 "NotSupportedError",
-                "cannot adopt nodes out of the document during parsing",
+                "cannot adopt a subtree retained by the parser or a pending script",
             ));
         }
         self.write(agent, id, operation)
@@ -784,7 +785,7 @@ fn insert_node(
             .map_err(|error| append_error(agent, error));
     }
     with_page(agent, |agent, page| {
-        page.write_adoption_source(agent, child.document(), |agent, source| {
+        page.write_adoption_source(agent, child, |agent, source| {
             documents::charge_copy(agent, source, child, true, true)?;
             wrappers
                 .insert_adopted(target, source, child, parent, before)

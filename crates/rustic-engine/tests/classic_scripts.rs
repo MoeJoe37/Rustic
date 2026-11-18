@@ -328,6 +328,13 @@ fn pending_detached_scripts_keep_current_script_during_evaluation() {
         (function () {
             var node = document.querySelector('#detached');
             node.parentNode.removeChild(node);
+            var other = new Document();
+            try {
+                other.adoptNode(node);
+                throw 'adopted a pending script';
+            } catch (error) {
+                if (error.name !== 'NotSupportedError') throw error;
+            }
         })();
         for (var i = 0; i < 12000; i++) ({one: [], two: [], three: [], four: []});
         </script>"#,
@@ -346,6 +353,7 @@ fn pending_detached_scripts_keep_current_script_during_evaluation() {
     )
     .unwrap();
     let mut document = load.take_document().unwrap().unwrap();
+    assert_eq!(document.take_inline_script_error_count(), 0);
     assert_eq!(document.take_external_script_error_count(), 1);
     check(
         &mut document,

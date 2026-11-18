@@ -460,9 +460,10 @@ the load and release its slot. `document.write` and `document.writeln` throw
 `NotSupportedError` on HTML documents.
 
 Joint collection keeps detached parser anchors and the executing element
-alive during construction. Same-document edits and inward adoption use
-the normal DOM operations. Adoption out of the active document throws
-before moving any node. EOF transfers the same DOM, wrappers, realm and
+alive during construction. Same-document edits and cross-document adoption use
+the normal DOM operations. Moving a subtree that contains a retained parser or
+script identity throws before either document changes. EOF retires construction
+roots and transfers the same DOM, wrappers, realm and
 queued work to the normal turn pump. The default HTML load and CLI remain
 inert. External and module preparation, readiness, and CLI opt-in are
 tracked in the [roadmap](ROADMAP.md#8-m5--scripted-document-integration).
@@ -559,13 +560,15 @@ a freshly parsed reference.
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 16 Window WPT files. It reports 69 subtests, including 58 passes
-and 11 expected failures. The runner checks vendored files by digest and
+baseline for 16 Window WPT files. It reports 69 subtests, including 60 passes
+and 9 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.
 Native regressions cover body adoption, failure atomicity, event initialization
 and visibility for detached documents.
+Checked outward adoption of completed or detached subtrees resolves the two
+detached-document event propagation cases without moving parser-held identities.
 [Pinned Window WPT results](SCRIPTING.md#pinned-window-web-platform-tests)
 
 ## DOC-03 and DOC-04a — Document-owned tree core

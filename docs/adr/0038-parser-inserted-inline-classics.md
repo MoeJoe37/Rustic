@@ -19,10 +19,12 @@ and realm move into the normal turn pump. Default loads still use inert parsing.
 
 Parser-held IDs are roots of the joint collector while construction is active,
 including open elements, formatting entries and form, head and select state.
-A script may detach or reparent nodes in the same document. Cross-document
-adoption out of the active document throws before mutation. This protects
-parser IDs from rehoming until construction ends. Cross-document adoption into
-the document continues to use the existing checked binding path. Once a
+A script may detach or reparent nodes in the same document. Outward adoption
+uses the checked cross-document path unless the subtree contains an identity
+retained by the parser, a running classic or a pending script. The engine checks
+the retained nodes' ancestor chains, including template and shadow hosts, before
+either document changes. EOF retires construction roots. Pending script roots
+stay live until their work settles. Once a
 script can see the tree, parser-driven selected-content replacement detaches old
 children so their wrappers remain usable.
 
@@ -44,7 +46,8 @@ encoding restart and CLI opt-in are subsequent slices.
 
 Exercise trees at each input split, edits to the partial document, wrapper
 identity before and after EOF, detached parser roots under joint collection,
-cross-document adoption, `currentScript` in evaluation and jobs, recoverable
+cross-document adoption of closed and retained nodes, `currentScript` in
+evaluation and jobs, recoverable
 failures, source and turn limits, and shutdown.
 
 [WHATWG HTML script preparation](https://html.spec.whatwg.org/multipage/scripting.html#prepare-the-script-element)

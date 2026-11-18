@@ -98,13 +98,11 @@
     },
     {
       "name": "In new Document()",
-      "status": "FAIL",
-      "message": "cannot adopt nodes out of the document during parsing"
+      "status": "PASS"
     },
     {
       "name": "In DOMImplementation.createHTMLDocument()",
-      "status": "FAIL",
-      "message": "cannot adopt nodes out of the document during parsing"
+      "status": "PASS"
     }
   ],
   "dom/events/Event-dispatch-reenter.html": [

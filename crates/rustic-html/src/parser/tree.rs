@@ -290,6 +290,7 @@ impl TreeBuilder {
                     .chain(&self.pending_options)
                     .flat_map(|&(select, option)| [select, option]),
             )
+            .take_while(|_| !self.done)
             .filter(|&node| self.document.node(node).is_ok())
     }
 

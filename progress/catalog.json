@@ -986,7 +986,7 @@
                 {
                   "kind": "test",
                   "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn outward_adoption_is_atomic_during_parsing_and_preserves_existing_behavior_after_eof"
+                  "marker": "fn outward_adoption_during_parsing_protects_only_retained_subtrees"
                 }
               ]
             },

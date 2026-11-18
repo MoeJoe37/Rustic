@@ -57,14 +57,14 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
-| M5 exit | TD-125, TD-126, TD-129, TD-133, TD-136 | Review interface coverage, collection scans and parsing-time DOM behavior with the WEB-09 results. Record native ARM64 timings when hardware is available. Pages loaded in M5 already call the URI functions. |
+| M5 exit | TD-125, TD-126, TD-129, TD-136 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. Pages loaded in M5 already call the URI functions. |
 | M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-141, TD-143 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -197,7 +197,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, WEB-07 and M9 |
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, WEB-06, WEB-07 and M9 |
-| TD-133 | Deliberate | HTML scripting | Outward adoption during parsing and dynamic document markup have explicit exceptions | Open, review with WEB-09 (M5), pay in M9 |
+| TD-133 | Deliberate | HTML scripting | Adoption of subtrees containing retained parser or script nodes and dynamic document markup have explicit exceptions | Open, M9 HTML lifecycle |
 | TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, WEB-06 |
 | TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M6 and M9 |
 | TD-136 | Bad | JS | The URI functions (`encodeURI`, `decodeURI`, `encodeURIComponent`, `decodeURIComponent`) are missing, and the Test262 built-in gate never ran their directories | Open, M5 exit |
@@ -2034,15 +2034,15 @@ Tests when these facilities are present.
 
 ### TD-133 — Outward adoption during parsing and dynamic document markup
 
-The parser keeps stable node identities while a script can edit the tree.
-An outward cross-document move during that time throws `NotSupportedError`
-before touching either document. The main document supports normal outward
-adoption once EOF and all external requests settle. HTML `document.write` and `document.writeln` raise
+The WEB-09 review narrowed the adoption restriction to subtrees containing
+identities retained by the parser or running or pending scripts. Both pinned
+detached-document event propagation cases now pass. An adoption that would
+move retained identities throws `NotSupportedError` before touching either
+document. HTML `document.write` and `document.writeln` raise
 `NotSupportedError` because the parser has no bounded insertion-point stack
 for reentrant writes and no document-open replacement lifecycle.
 
-Review the exact exceptions against the WEB-09 selection. Pay with the M9
-HTML lifecycle work, or earlier if a selected test requires it. Cover
+Pay with the M9 HTML lifecycle work. Cover
 identity-preserving adoption of parser-held nodes, nested insertion and
 reentry limits, and the lifetime of a document replaced by `document.open`.
 [ADR 0038](adr/0038-parser-inserted-inline-classics.md)

@@ -478,7 +478,7 @@ fn register(
                 None => wrap(&mut wrappers, agent, &document, root)?,
             };
             if let Some((node, before)) = doctype {
-                page.write_adoption_source(agent, node.document(), |agent, source| {
+                page.write_adoption_source(agent, node, |agent, source| {
                     charge_copy(agent, source, node, false, false)?;
                     wrappers
                         .insert_adopted(&mut document, source, node, root, before)
@@ -515,7 +515,7 @@ fn adopt_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Va
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         } else {
             with_page(agent, |agent, page| {
-                page.write_adoption_source(agent, node.document(), |agent, source| {
+                page.write_adoption_source(agent, node, |agent, source| {
                     charge_copy(agent, source, node, true, true)?;
                     wrappers
                         .adopt_node(target, source, node)

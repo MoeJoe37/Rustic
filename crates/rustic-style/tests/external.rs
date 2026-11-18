@@ -587,3 +587,31 @@ fn media_lists_restrict_the_whole_import_tree() {
     assert_eq!(computed(&loaded, "p", PropertyId::Color), "rgb(0, 0, 255)");
     assert_eq!(computed(&loaded, "p", PropertyId::MarginTop), "16px");
 }
+
+#[test]
+fn link_and_base_urls_use_the_document_encoding_for_queries() {
+    let page = document(
+        "<base href='https://site.test/dir/?b=\u{E9}'>\
+         <link rel=stylesheet href='a.css?q=\u{E9}\u{2603}'>\
+         <style>@import 'i.css?q=\u{E9}';</style>",
+    );
+    let mut fetcher = MapFetcher::default();
+    let mut loader = StyleLoader::new(&mut fetcher, StyleLoadLimits::default())
+        .with_document_encoding(rustic_encoding::Encoding::Windows1252);
+    let url = page_url();
+    document_cascade_with(
+        page.document(),
+        &CssParser::default(),
+        Some(&url),
+        &mut loader,
+    )
+    .unwrap();
+    assert_eq!(
+        fetcher.log,
+        [
+            "https://site.test/dir/a.css?q=%E9%26%239731%3B",
+            // @import resolves in UTF-8.
+            "https://site.test/dir/i.css?q=%C3%A9",
+        ]
+    );
+}

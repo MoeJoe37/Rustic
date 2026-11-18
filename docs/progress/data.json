@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "7cc0676e90e3f1f0087cd08b7d39b479e3c5824c7a578221d323b49c3512b77c",
-  "percent": "33.12",
+  "source_fingerprint": "72553d330e608d4a435f49fed7bc895f8ea9d15a09860e521b3b935316c4396d",
+  "percent": "33.21",
   "verified_percent": "31.89",
-  "partial_percent": "1.23",
+  "partial_percent": "1.32",
   "completed": 73,
   "in_progress": 7,
   "total": 221,
@@ -67,9 +67,9 @@
       "share": "4.38",
       "completed": 0,
       "total": 12,
-      "percent": "3.79",
+      "percent": "5.69",
       "verified_percent": "0.00",
-      "partial_percent": "3.79"
+      "partial_percent": "5.69"
     },
     {
       "id": "M7",
@@ -537,9 +537,20 @@
               ]
             },
             {
-              "label": "URL query encoding in the document's encoding",
-              "status": "planned",
-              "evidence": []
+              "label": "URL query encoding in the document's encoding (parser and stylesheet links)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-url/src/encoding.rs",
+                  "marker": "pub(crate) fn encode_legacy_query"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-url/tests/query_encoding.rs",
+                  "marker": "fn special_queries_use_the_document_encoding"
+                }
+              ]
             },
             {
               "label": "Response charset from Content-Type for documents, scripts and stylesheets",
@@ -547,7 +558,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.33"
         },
         {
@@ -606,10 +617,10 @@
       "completed": 6,
       "in_progress": 1,
       "total": 12,
-      "contribution": "1.03",
-      "percent": "51.66",
+      "contribution": "1.11",
+      "percent": "55.83",
       "verified_percent": "43.33",
-      "partial_percent": "8.33"
+      "partial_percent": "12.50"
     },
     {
       "id": "dom",

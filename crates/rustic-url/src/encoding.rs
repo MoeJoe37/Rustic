@@ -41,6 +41,39 @@ pub(crate) fn encode(input: &str, set: EncodeSet) -> String {
     output
 }
 
+/// "Percent-encode after encoding" with the special-query percent-encode set:
+/// encode `input` with `encoding`, percent-encode the bytes that need it, and
+/// write each unmappable scalar value as `%26%23` + decimal + `%3B`.
+pub(crate) fn encode_legacy_query(input: &str, encoding: rustic_encoding::Encoding) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoder = encoding.new_encoder();
+    let mut bytes = Vec::with_capacity(input.len());
+    let mut output = String::with_capacity(input.len());
+    let flush = |bytes: &mut Vec<u8>, output: &mut String| {
+        for &byte in bytes.iter() {
+            if should_encode(byte, EncodeSet::SpecialQuery) {
+                output.push('%');
+                output.push(char::from(HEX[usize::from(byte >> 4)]));
+                output.push(char::from(HEX[usize::from(byte & 15)]));
+            } else {
+                output.push(char::from(byte));
+            }
+        }
+        bytes.clear();
+    };
+    for character in input.chars() {
+        if let Err(unmappable) = encoder.encode_char(character, &mut bytes) {
+            flush(&mut bytes, &mut output);
+            output.push_str("%26%23");
+            output.push_str(&u32::from(unmappable).to_string());
+            output.push_str("%3B");
+        }
+    }
+    encoder.finish(&mut bytes);
+    flush(&mut bytes, &mut output);
+    output
+}
+
 pub(crate) fn decode_host(input: &str) -> Result<String, ParseError> {
     let bytes = input.as_bytes();
     let mut output = Vec::with_capacity(bytes.len());

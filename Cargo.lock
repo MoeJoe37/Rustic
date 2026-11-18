@@ -270,6 +270,7 @@ dependencies = [
  "rustic-base",
  "rustic-css",
  "rustic-dom",
+ "rustic-encoding",
  "rustic-html",
  "rustic-text",
  "rustic-url",
@@ -291,6 +292,7 @@ name = "rustic-url"
 version = "0.1.0"
 dependencies = [
  "rustic-base",
+ "rustic-encoding",
 ]
 
 [[package]]

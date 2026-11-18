@@ -12,7 +12,8 @@ use std::collections::HashMap;
 
 use rustic_base::SourceSpan;
 use rustic_css::{CssParser, MediaQueryList};
-use rustic_url::Url;
+use rustic_encoding::Encoding;
+use rustic_url::{Url, UrlParser};
 
 use crate::{ImportRule, Origin, StyleDiagnostic, StyleSheet};
 
@@ -133,6 +134,7 @@ pub struct StyleLoader<'a> {
     sheets_used: usize,
     bytes_used: usize,
     cache: HashMap<String, Result<String, FetchError>>,
+    document_encoding: Encoding,
 }
 
 impl std::fmt::Debug for StyleLoader<'_> {
@@ -174,7 +176,26 @@ impl<'a> StyleLoader<'a> {
             sheets_used: 0,
             bytes_used: 0,
             cache: HashMap::new(),
+            document_encoding: Encoding::Utf8,
         }
+    }
+
+    /// Resolve the document's `<base href>` and `<link href>` URLs with
+    /// `encoding`, the document's character encoding, as HTML's "encoding-parse
+    /// a URL" requires: it applies to the query of special URLs (see
+    /// [`UrlParser::with_query_encoding`]). `@import` URLs stay UTF-8. The
+    /// default is UTF-8.
+    pub fn with_document_encoding(mut self, encoding: Encoding) -> Self {
+        self.document_encoding = encoding;
+        self
+    }
+
+    /// Parse a URL from document markup in the document's encoding.
+    pub(crate) fn parse_document_url(&self, input: &str, base: Option<&Url>) -> Option<Url> {
+        UrlParser::default()
+            .with_query_encoding(self.document_encoding)
+            .parse(input, base)
+            .ok()
     }
 
     /// External sheets fetched so far, including failed fetches.

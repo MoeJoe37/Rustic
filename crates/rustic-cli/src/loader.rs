@@ -590,7 +590,7 @@ fn compute_styles(
         Some(local) => local,
         None => &mut no_fetch,
     };
-    let mut loader = StyleLoader::new(fetcher, limits.stylesheets);
+    let mut loader = StyleLoader::new(fetcher, limits.stylesheets).with_document_encoding(encoding);
     let (mut cascade, sheets) =
         document_cascade_with(document, &parser, document_url.as_ref(), &mut loader)
             .map_err(node_error)?;

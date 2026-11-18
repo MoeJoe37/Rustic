@@ -176,14 +176,18 @@ fn is_html(element: DomElement<'_>, name: &str) -> bool {
 
 /// The document base URL (HTML §2.4.1): the first `<base href>` in tree
 /// order resolved against `document_url`, or `document_url` itself.
-fn base_url(document: &Document, document_url: Option<&Url>) -> Result<Option<Url>, DomError> {
+fn base_url(
+    document: &Document,
+    document_url: Option<&Url>,
+    loader: &StyleLoader<'_>,
+) -> Result<Option<Url>, DomError> {
     for (id, _) in document.walk(document.root())? {
         let Some(element) = DomElement::new(document, id) else {
             continue;
         };
         if is_html(element, "base") {
             if let Some(href) = attribute(element, "href") {
-                if let Ok(url) = Url::parse(&href, document_url) {
+                if let Some(url) = loader.parse_document_url(&href, document_url) {
                     return Ok(Some(url));
                 }
                 break;
@@ -211,7 +215,7 @@ pub fn document_cascade_with(
     document_url: Option<&Url>,
     loader: &mut StyleLoader<'_>,
 ) -> Result<(Cascade, Vec<StyleElementSheet>), DomError> {
-    let base = base_url(document, document_url)?;
+    let base = base_url(document, document_url, loader)?;
     let mut cascade = Cascade::new();
     cascade.push(html_user_agent_sheet(parser));
     let mut reports = Vec::new();
@@ -281,10 +285,10 @@ pub fn document_cascade_with(
             } else if !css_type {
                 Err(SheetStatus::NotCss)
             } else {
-                match (Url::parse(&href, base.as_ref()), media) {
-                    (Err(_), _) => Err(SheetStatus::InvalidUrl),
+                match (loader.parse_document_url(&href, base.as_ref()), media) {
+                    (None, _) => Err(SheetStatus::InvalidUrl),
                     (_, Err(_)) => Err(SheetStatus::ResourceLimit),
-                    (Ok(url), Ok(media)) => loader.fetch(&url).and_then(|text| {
+                    (Some(url), Ok(media)) => loader.fetch(&url).and_then(|text| {
                         loader
                             .load_tree(parser, &text, Some(&url), Some(&url), media)
                             .map_err(|_| SheetStatus::ResourceLimit)

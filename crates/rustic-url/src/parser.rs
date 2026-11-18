@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use rustic_base::CancellationToken;
 
+use rustic_encoding::Encoding;
+
 use crate::diagnostics::{Diagnostic, MAX_DIAGNOSTICS, ParseReport};
 use crate::encoding::{self, EncodeSet};
 use crate::record::default_port;
@@ -39,6 +41,7 @@ impl Default for UrlLimits {
 pub struct UrlParser {
     limits: UrlLimits,
     cancellation: CancellationToken,
+    query_encoding: Option<Encoding>,
 }
 
 impl UrlParser {
@@ -47,7 +50,20 @@ impl UrlParser {
         Self {
             limits,
             cancellation,
+            query_encoding: None,
         }
+    }
+
+    /// Use `encoding` (its output encoding) for the queries of special URLs
+    /// other than `ws:` and `wss:`, as the URL Standard's "percent-encode
+    /// after encoding" requires when a document in a legacy encoding parses
+    /// a URL. A scalar value the encoding cannot represent becomes
+    /// `%26%23NNN%3B`. Every other component, and every other URL, stays
+    /// UTF-8. The default is UTF-8 everywhere.
+    pub fn with_query_encoding(mut self, encoding: Encoding) -> Self {
+        let output = encoding.output_encoding();
+        self.query_encoding = (output != Encoding::Utf8).then_some(output);
+        self
     }
 
     /// Parse without changing the supplied base, including when validation fails.
@@ -107,6 +123,10 @@ struct Run<'p> {
     limits: &'p UrlLimits,
     cancellation: &'p CancellationToken,
     sink: Option<Sink>,
+    query_encoding: Option<Encoding>,
+    /// The query as the parser saw it, kept only when a legacy query
+    /// encoding may apply once the scheme of the result is known.
+    raw_query: Option<String>,
 }
 
 impl<'p> Run<'p> {
@@ -115,6 +135,8 @@ impl<'p> Run<'p> {
             limits: &parser.limits,
             cancellation: &parser.cancellation,
             sink,
+            query_encoding: parser.query_encoding,
+            raw_query: None,
         }
     }
 
@@ -128,7 +150,16 @@ impl<'p> Run<'p> {
             sink.start = input.as_ptr().addr();
             sink.len = input.len();
         }
-        let url = self.dispatch(&input, base)?;
+        let mut url = self.dispatch(&input, base)?;
+        if let (Some(encoding), Some(raw)) = (self.query_encoding, self.raw_query.take()) {
+            // "If encoding is not UTF-8 and url is not special or url's scheme
+            // is ws or wss, set encoding to UTF-8": only these keep it.
+            if url.query.is_some()
+                && matches!(url.scheme.as_str(), "ftp" | "file" | "http" | "https")
+            {
+                url.query = Some(encoding::encode_legacy_query(&raw, encoding));
+            }
+        }
         self.checkpoint()?;
         if url.serialized_len()? > self.limits.max_serialized_bytes {
             return Err(ParseError::LimitExceeded);
@@ -615,6 +646,9 @@ impl<'p> Run<'p> {
 
     fn query(&mut self, input: &str, special: bool) -> String {
         self.scan_units(input);
+        if self.query_encoding.is_some() {
+            self.raw_query = Some(input.to_owned());
+        }
         encoding::encode(input, query_set(special))
     }
 

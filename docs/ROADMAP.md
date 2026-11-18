@@ -490,10 +490,10 @@ NET-06, NET-07.
 
 **Started early, alongside M5 (2026-11-18).** M6 entry work that does not
 depend on unfinished M5 tasks runs in parallel with WEB-05 to WEB-09. Done
-so far: the Encoding Standard layer and the stylesheet fallback chain. Next
-candidates with no M5 dependency: HTML encoding sniffing and `<meta>`
-prescan without the restart (`url.restart` step 1), URL query encoding
-(`url.encoding` step 2), base URLs on stylesheets (TD-26), the TD-02
+so far: the Encoding Standard layer, the stylesheet fallback chain, local
+HTML encoding selection and replay, and URL query encoding in the
+document's encoding. Next candidates with no M5 dependency: base URLs on
+stylesheets (TD-26), the TD-02
 degradation ADR, and the JavaScript fixes due at M6 entry (TD-137 to
 TD-140, TD-142). The transport/TLS ADR and NET-01 wait for the M5
 completion review, since NET-02 depends on M5.
@@ -772,7 +772,7 @@ JS-09) are complete.
 | 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Initial 16-file Window baseline verified locally. |
 | 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | Planned |
 | — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Parallel; not started |
-| — | M6 entry, early (parallel): encodings | All 40 Encoding Standard encodings, stylesheet decoding (TD-28) | Done 2026-11-18: [ENCODING.md](ENCODING.md), [ADR 0043](adr/0043-encoding-standard.md). Next: HTML sniffing, URL query encoding, TD-26 |
+| — | M6 entry, early (parallel): encodings | All 40 Encoding Standard encodings, stylesheet decoding (TD-28) | Done 2026-11-18: [ENCODING.md](ENCODING.md), [ADR 0043](adr/0043-encoding-standard.md). URL query encoding done 2026-11-18. Next: TD-26, TD-02 ADR, JS fixes due at M6 entry |
 | — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | Parallel; blocked on hosted CI |
 | — | Restore hosted CI | A green run on the full native matrix; then require the `CI` check on `main` (M0 follow-up) and re-verify the merges made since 2026-11-08 on Windows, macOS and Linux aarch64 | Waiting for GitHub Actions billing; hard prerequisite of M7 |
 | — | Debt due now | The "Due in M5" rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule) | With the tasks above |

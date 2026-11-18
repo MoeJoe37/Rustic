@@ -2312,3 +2312,12 @@ The parser reports it through the Document encoding getters and the
 local host uses it to decode stylesheets and classic sources. The test
 places a Windows-1252 declaration after an inline script and checks the
 script's decoded text and single execution. [ADR 0044](adr/0044-local-html-encoding-replay.md)
+
+URL query encoding (same day): `UrlParser::with_query_encoding` implements
+the URL Standard's "percent-encode after encoding" for the queries of
+special, non-WebSocket URLs, writing unmappable characters as
+`%26%23NNN%3B`; `StyleLoader::with_document_encoding` uses it for `<base
+href>` and `<link href>`, and `dump-style`/`render` pass the document's
+selected encoding. Evidence: `crates/rustic-url/tests/query_encoding.rs`
+(Shift_JIS, ISO-2022-JP escapes, ws/wss and non-special URLs, base queries)
+and `link_and_base_urls_use_the_document_encoding_for_queries`.

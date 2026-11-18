@@ -413,9 +413,20 @@
               ]
             },
             {
-              "label": "URL query encoding in the document's encoding",
-              "status": "planned",
-              "evidence": []
+              "label": "URL query encoding in the document's encoding (parser and stylesheet links)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-url/src/encoding.rs",
+                  "marker": "pub(crate) fn encode_legacy_query"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-url/tests/query_encoding.rs",
+                  "marker": "fn special_queries_use_the_document_encoding"
+                }
+              ]
             },
             {
               "label": "Response charset from Content-Type for documents, scripts and stylesheets",

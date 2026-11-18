@@ -5,7 +5,7 @@
 
 use rustic_css::PropertyId;
 use rustic_dom::NodeKind;
-use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, PropertyDescriptor, Value};
+use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
 
 use crate::dom_exception;
 
@@ -160,10 +160,7 @@ fn camel_name(name: &str) -> String {
     camel
 }
 
-fn install_longhand_getters(
-    agent: &mut Agent,
-    prototype: rustic_js::runtime::ObjectId,
-) -> JsResult<()> {
+fn install_longhand_getters(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
     // The interface prototype is not installed on the realm until this
     // initializer returns; protect it throughout the allocating loop.
     let prototype_root = agent.root(Value::object(prototype))?;

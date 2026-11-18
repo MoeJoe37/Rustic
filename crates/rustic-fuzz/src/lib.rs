@@ -14,6 +14,7 @@
 #![warn(missing_docs)]
 
 mod corpus;
+mod encoding;
 mod formatting;
 mod harness;
 mod images;

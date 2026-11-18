@@ -138,6 +138,7 @@ dependencies = [
  "rustic-codecs",
  "rustic-css",
  "rustic-dom",
+ "rustic-encoding",
  "rustic-engine",
  "rustic-html",
  "rustic-layout",
@@ -160,6 +161,7 @@ name = "rustic-css"
 version = "0.1.0"
 dependencies = [
  "rustic-base",
+ "rustic-encoding",
 ]
 
 [[package]]
@@ -168,6 +170,10 @@ version = "0.1.0"
 dependencies = [
  "rustic-base",
 ]
+
+[[package]]
+name = "rustic-encoding"
+version = "0.1.0"
 
 [[package]]
 name = "rustic-engine"
@@ -189,6 +195,7 @@ dependencies = [
  "rustic-codecs",
  "rustic-css",
  "rustic-dom",
+ "rustic-encoding",
  "rustic-engine",
  "rustic-html",
  "rustic-js",

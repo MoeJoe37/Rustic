@@ -27,6 +27,7 @@ mod calc;
 mod color;
 mod container;
 mod custom;
+mod decode;
 mod easing;
 mod effects;
 mod error;
@@ -60,6 +61,7 @@ pub use custom::{
     CustomValue, MAX_SUBSTITUTED_VALUES, MAX_SUBSTITUTION_DEPTH, UnparsedValue,
     is_custom_property_name,
 };
+pub use decode::{decode_stylesheet, stylesheet_fallback_encoding};
 pub use easing::{EasingFunction, EasingList};
 pub use effects::{BlendMode, FilterFunction, Isolation, Shadow};
 pub use error::{CssError, Diagnostic, DiagnosticKind};

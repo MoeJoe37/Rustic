@@ -16,6 +16,7 @@ path = "src/main.rs"
 rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
+rustic-encoding = { path = "../rustic-encoding" }
 rustic-engine = { path = "../rustic-engine" }
 rustic-html = { path = "../rustic-html" }
 rustic-style = { path = "../rustic-style" }

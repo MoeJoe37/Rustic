@@ -206,14 +206,15 @@ impl LocalStylesheetFetcher {
 }
 
 impl StylesheetFetcher for LocalStylesheetFetcher {
-    /// Read a stylesheet and decode it as UTF-8 (CSS Syntax §3.2 with a UTF-8
-    /// fallback encoding): a UTF-8 byte order mark is removed and invalid
-    /// sequences become U+FFFD. `@charset` and legacy encodings are not
-    /// supported yet (TD-28).
+    /// Read a stylesheet and decode it with CSS Syntax §3.2: a byte order
+    /// mark, then a leading `@charset` rule, then the referring document's
+    /// encoding select the decoder, and errors become U+FFFD. Local files
+    /// have no transport `charset`, and documents are UTF-8 until HTML
+    /// encoding sniffing lands (`url.restart`).
     fn fetch(&mut self, url: &Url, max_bytes: usize) -> Result<String, FetchError> {
         let bytes = self.fetch_bytes(url, max_bytes)?;
-        let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
-        let text = String::from_utf8_lossy(bytes).into_owned();
+        let text =
+            rustic_css::decode_stylesheet(&bytes, None, Some(rustic_encoding::Encoding::Utf8));
         // Replacement characters can make the text longer than the bytes.
         if text.len() > max_bytes {
             return Err(FetchError::TooLarge);

@@ -883,3 +883,37 @@ fn explicit_font_formats_feed_computed_metrics_and_identical_pixels() {
     }
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn stylesheets_decode_with_their_charset_rule() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-charset-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    // "é" in ISO-8859-1 (windows-1252) is the single byte 0xE9.
+    fs::write(
+        base.join("latin1.css"),
+        b"@charset \"iso-8859-1\"; main.\xE9 {height:15px;width:100px}",
+    )
+    .unwrap();
+    fs::write(
+        base.join("plain.css"),
+        b"main.\xE9 {height:15px;width:100px}",
+    )
+    .unwrap();
+    let path = base.join("page.html");
+    let page = |sheet: &str| {
+        format!(
+            "<meta charset=utf-8><link rel=stylesheet href={sheet}><style>* {{margin:0}}</style><main class=\u{E9}></main>"
+        )
+    };
+    fs::write(&path, page("latin1.css")).unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("content=(0,0,100,15)"));
+    // Without the rule the sheet decodes as UTF-8, 0xE9 becomes U+FFFD and
+    // the selector no longer matches.
+    fs::write(&path, page("plain.css")).unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    let _ = fs::remove_dir_all(&base);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("content=(0,0,100,15)"));
+}

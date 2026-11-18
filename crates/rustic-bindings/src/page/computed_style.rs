@@ -4,9 +4,7 @@
 //! remains reachable, without keeping dead declarations or detached nodes alive.
 
 use rustic_dom::NodeKind;
-use rustic_js::runtime::{
-    Abrupt, Agent, JsResult, ObjectId, PropertyDescriptor, Value,
-};
+use rustic_js::runtime::{Abrupt, Agent, JsResult, Value};
 
 use crate::webidl::{IntegerConversion, to_unsigned_long};
 

@@ -175,30 +175,30 @@ fn install_longhand_getters(
         )?);
         let setter_root = agent.root(setter)?;
         let result = (|| {
-        for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
-            let canonical = property.name();
-            let camel = camel_name(canonical);
-            let getter = Value::object(
-                agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
-            );
-            let getter_root = agent.root(getter)?;
-            let installed = (|| {
-                for name in [canonical, camel.as_str()] {
-                    if name == canonical && canonical == camel.as_str() {
-                        continue;
+            for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
+                let canonical = property.name();
+                let camel = camel_name(canonical);
+                let getter = Value::object(
+                    agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
+                );
+                let getter_root = agent.root(getter)?;
+                let installed = (|| {
+                    for name in [canonical, camel.as_str()] {
+                        if name == canonical && canonical == camel.as_str() {
+                            continue;
+                        }
+                        let key = agent.heap.key(name)?;
+                        agent.define_property_or_throw(
+                            prototype,
+                            key,
+                            PropertyDescriptor::accessor(getter, setter, true, true),
+                        )?;
                     }
-                    let key = agent.heap.key(name)?;
-                    agent.define_property_or_throw(
-                        prototype,
-                        key,
-                        PropertyDescriptor::accessor(getter, setter, true, true),
-                    )?;
-                }
-                Ok(())
-            })();
-            agent.unroot(getter_root);
-            installed?;
-        }
+                    Ok(())
+                })();
+                agent.unroot(getter_root);
+                installed?;
+            }
             Ok(())
         })();
         agent.unroot(setter_root);

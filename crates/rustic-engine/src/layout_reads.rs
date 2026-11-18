@@ -50,6 +50,10 @@ pub(crate) struct LayoutReads {
 }
 
 impl LayoutReads {
+    pub(crate) fn has_source(&self) -> bool {
+        self.source.is_some()
+    }
+
     pub(crate) fn set_source(&mut self, source: Box<dyn LayoutSource>) {
         self.source = Some(source);
         self.inputs_changed();

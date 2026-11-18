@@ -1,14 +1,14 @@
 # ADR 0045 — Live computed-style reads in scripted documents
 
 Date: 2026-11-18
-Status: Accepted design for WEB-06; implementation pending
+Status: Accepted design for WEB-06; initial read-only method slice implemented, gate pending
 
 ## Context
 
-WEB-06 currently gives scripts `offsetWidth` and
+At the time of this decision, WEB-06 gave scripts `offsetWidth` and
 `getBoundingClientRect()` through one bounded geometry snapshot. The CLI
 constructs these values from the same DOM, CSS, viewport, images and font
-inputs as its CPU renderer. `getComputedStyle()` is still absent. Returning
+inputs as its CPU renderer. `getComputedStyle()` was still absent. Returning
 a plain copied map of CSS values would be misleading: computed-style
 declarations are read-only but live, and a script can hold one across DOM
 mutations, microtask checkpoints and resource deliveries.
@@ -99,3 +99,18 @@ WEB-06's implementation must exercise:
 Revisit when WEB-06 introduces a separate incremental layout cache (M9),
 or when CSSOM pseudo-element and stylesheet mutation support requires
 additional snapshot inputs.
+
+## Implementation status (2026-11-18)
+
+The first implementation exposes `getComputedStyle(element)` and a live,
+read-only `CSSStyleDeclaration` with `getPropertyValue`,
+`getPropertyPriority`, `item` and `length`. Supported longhands and
+custom properties come from the same CLI cascade pass that builds layout;
+reads share the existing revision key and eight-flush budget. Declarations
+hold their element wrappers through the page's rooted weak map. Nonempty
+pseudo-element arguments fail explicitly rather than return fabricated styles.
+
+This is **not** the full decision: named camel-cased getters, bracketed
+indexed properties, CSSOM serialization edge cases, DOM adoption/GC stress,
+WPT expansion and applied stylesheet/image completion ordering still need
+implementation and passing tests. Until those arrive WEB-06 remains open.

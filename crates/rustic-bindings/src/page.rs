@@ -18,6 +18,7 @@ use crate::{DomGcError, DomHeap, dom_exception};
 mod attributes;
 mod character_data;
 mod collections;
+mod computed_style;
 mod creation;
 mod documents;
 mod dom_rect;
@@ -37,6 +38,51 @@ pub enum LayoutReadError {
     Limit,
     /// The host could not compute a bounded layout snapshot.
     Unavailable,
+}
+
+/// Owned supported longhand and custom-property values at one layout revision.
+///
+/// No JavaScript object owns this record: a held CSSStyleDeclaration reads a
+/// fresh record through the shared revision-keyed layout cache on each access.
+#[derive(Clone, Debug, Default)]
+pub struct ComputedStyleSnapshot {
+    /// Supported CSS longhands in canonical property-name order.
+    pub longhands: Vec<(&'static str, String)>,
+    /// Computed custom properties in name order (case-sensitive).
+    pub custom_properties: Vec<(String, String)>,
+}
+
+impl ComputedStyleSnapshot {
+    fn get(&self, name: &str) -> Option<&str> {
+        if name.starts_with("--") {
+            return self
+                .custom_properties
+                .iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value.as_str());
+        }
+        let property = rustic_css::PropertyId::from_name(name)?;
+        self.longhands
+            .iter()
+            .find(|(key, _)| *key == property.name())
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn name_at(&self, index: usize) -> Option<&str> {
+        self.longhands
+            .get(index)
+            .map(|(name, _)| *name)
+            .or_else(|| {
+                index
+                    .checked_sub(self.longhands.len())
+                    .and_then(|offset| self.custom_properties.get(offset))
+                    .map(|(name, _)| name.as_str())
+            })
+    }
+
+    fn len(&self) -> usize {
+        self.longhands.len() + self.custom_properties.len()
+    }
 }
 
 /// Shared access to the real document rendered by the host.
@@ -69,6 +115,10 @@ pub trait PageTree: Debug {
     fn client_rect(&self, _node: NodeId) -> Result<[f64; 4], LayoutReadError> {
         Ok([0.0; 4])
     }
+    /// Compute the supported CSS properties from the same layout inputs as geometry.
+    fn computed_style(&self, _node: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
+        Ok(ComputedStyleSnapshot::default())
+    }
     /// Whether a subtree may move out of the main document, within the turn budget.
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
         Ok(true)
@@ -91,6 +141,7 @@ struct Page {
     scheduler: Option<Rc<dyn WindowScheduler>>,
     events: events::Events,
     rects: ObjectId,
+    computed_styles: ObjectId,
     wrappers: RefCell<DomHeap>,
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
@@ -251,6 +302,7 @@ fn install_page(
     };
     events::install(agent)?;
     dom_rect::install(agent)?;
+    computed_style::install(agent)?;
     collections::install(agent)?;
     html_collections::install(agent)?;
     install_interface(
@@ -422,6 +474,8 @@ fn install_page(
     let events = events::Events::new(agent)?;
     let rects = agent.new_weak_map()?;
     agent.root(Value::object(rects))?;
+    let computed_styles = agent.new_weak_map()?;
+    agent.root(Value::object(computed_styles))?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
         main,
@@ -431,6 +485,7 @@ fn install_page(
         scheduler,
         events,
         rects,
+        computed_styles,
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),

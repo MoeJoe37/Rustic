@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use rustic_bindings::page::LayoutReadError;
+use rustic_bindings::page::{ComputedStyleSnapshot, LayoutReadError};
 use rustic_dom::{Document, NodeId};
 use rustic_html::DocumentMode;
 
@@ -28,6 +28,8 @@ pub struct LayoutGeometry {
     pub offset_widths: HashMap<NodeId, i32>,
     /// Transformed client bounds. `None` values describe unprojectable geometry.
     pub client_rects: HashMap<NodeId, Option<[f64; 4]>>,
+    /// Computed values for every styled element, including elements without boxes.
+    pub computed_styles: HashMap<NodeId, ComputedStyleSnapshot>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

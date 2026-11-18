@@ -53,6 +53,7 @@ instead of rewriting the history of a decision.
 | [0043](0043-encoding-standard.md) | Original Encoding Standard decoders and encoders over pinned, generated indexes | Accepted for `url.encoding` (M6 entry) |
 | [0044](0044-local-html-encoding-replay.md) | Bounded local HTML encoding replay before author script | Accepted for WEB-05 |
 | [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted design for WEB-06; implementation pending |
+| [0046](0046-parse-budget-degradation.md) | Parse budgets degrade: Chromium's depth cap and truncation at the node budget | Accepted for TD-02 (M6 entry) |
 
 ## Records by area
 
@@ -60,7 +61,7 @@ instead of rewriting the history of a decision.
 | --- | --- |
 | Scope, product and platforms | 0001, 0006, 0007, 0013, 0018 |
 | Ownership, isolation and tooling | 0002, 0004, 0005 |
-| HTML and DOM (M1) | 0008, 0009, 0010, 0011, 0012 |
+| HTML and DOM (M1) | 0008, 0009, 0010, 0011, 0012, 0046 |
 | Rendering and text (M3) | 0003, 0014 |
 | JavaScript engine (M4) | 0015, 0016, 0017, 0019 |
 | Document lifecycle and scheduling (M5, WEB-01) | 0020, 0021, 0022, 0023 |

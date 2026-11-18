@@ -89,8 +89,15 @@ caller-created nodes. Template contents are separate roots, so their nesting is
 bounded by node and token budgets rather than edge depth; construction,
 completion, dumps and destruction are iterative.
 
-Exceeding a resource budget is fatal: a document deeper than `max_depth` fails
-rather than being truncated ([TD-02](TECH_DEBT.md#td-02--depth-and-node-budgets-abort-the-whole-parse)).
+Document budgets degrade instead of failing ([ADR 0046](adr/0046-parse-budget-degradation.md)).
+Past `max_depth`, a node is inserted into its would-be parent's parent, as
+Chromium does: elements and comments keep one edge free for their text, so
+a 514-edge limit reproduces Chromium's trees. Each such insertion is a
+`NestingTooDeep` diagnostic. At `max_nodes` or `max_data_bytes` a document
+parser truncates: it keeps the tree built so far, ignores later input,
+and reports `ParsedDocument::truncated()` and a `Truncated` diagnostic.
+Fragment parsers still fail at these budgets; tokenizer budgets,
+cancellation and allocation failure stay fatal everywhere.
 Diagnostic limits only bound what is retained: parse errors never stop parsing,
 and recoveries past `max_tree_diagnostics` or the tokenizer's `max_diagnostics`
 are counted by `dropped_diagnostics()` on the parsed document or fragment. The

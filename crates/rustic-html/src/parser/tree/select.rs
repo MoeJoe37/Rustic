@@ -129,7 +129,12 @@ impl TreeBuilder {
         let sources: Vec<NodeId> = self.document.children(option)?.collect();
         for source in sources {
             let copy = self.document.clone_node(source, true)?;
-            self.attach_or_destroy(target, None, copy)?;
+            if let Err(error) = self.move_capped(target, None, copy) {
+                self.document
+                    .destroy_subtree(copy)
+                    .expect("new unattached clone");
+                return Err(error);
+            }
         }
         Ok(())
     }

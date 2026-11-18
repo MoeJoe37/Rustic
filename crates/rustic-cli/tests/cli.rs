@@ -179,11 +179,13 @@ fn dump_dom_parser_limits_are_configurable() {
     let deep = Path::new(directory).join("rustic-cli-deep.html");
     fs::write(&deep, "<div>".repeat(300)).expect("write fixture");
     let deep = deep.to_str().expect("UTF-8 path");
-    let output = rustic(&["dump-dom", deep]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(output.stdout.is_empty());
+    // Past the depth limit, elements become siblings instead of failing
+    // the load (ADR 0046).
+    let capped = rustic(&["dump-dom", deep]);
+    assert!(capped.status.success(), "{}", stderr(&capped));
     let output = rustic(&["dump-dom", "--max-depth", "400", deep]);
     assert!(output.status.success(), "{}", stderr(&output));
+    assert_ne!(output.stdout, capped.stdout);
 
     let noisy = Path::new(directory).join("rustic-cli-noisy.html");
     fs::write(&noisy, "<!doctype html>".to_owned() + &"</span>".repeat(20)).expect("write fixture");
@@ -197,9 +199,11 @@ fn dump_dom_parser_limits_are_configurable() {
 
     let path = fixture("malformed.html");
     let path = path.to_str().expect("UTF-8 fixture path");
+    // Past the node limit the document is truncated, and says so.
     let output = rustic(&["dump-dom", "--max-nodes", "5", path]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(output.stdout.is_empty());
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(!output.stdout.is_empty());
+    assert!(stderr(&output).contains("warning: document truncated"));
 }
 
 #[test]

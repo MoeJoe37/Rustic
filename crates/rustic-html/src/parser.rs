@@ -1,5 +1,5 @@
 use rustic_base::CancellationToken;
-use rustic_dom::{Document, DocumentLimits, NodeId};
+use rustic_dom::{Document, DocumentLimits, DomError, NodeId};
 
 use crate::{Diagnostic, Encoding, HtmlTokenizer, Token, TokenizerLimits};
 
@@ -44,6 +44,7 @@ pub struct ParsedDocument {
     tokenizer_diagnostics: Vec<Diagnostic>,
     tree_diagnostics: Vec<TreeDiagnostic>,
     dropped_diagnostics: usize,
+    truncated: bool,
 }
 
 /// Tokenizer diagnostics handed from the driver to a finished tree builder.
@@ -55,7 +56,8 @@ pub(crate) struct TokenizerDiagnostics {
 }
 
 impl ParsedDocument {
-    /// Read the completed document; partial failed trees are never returned.
+    /// Read the completed document. A failed parse returns no tree; a
+    /// [truncated](Self::truncated) one keeps the content before its budget.
     pub fn document(&self) -> &Document {
         &self.document
     }
@@ -95,6 +97,13 @@ impl ParsedDocument {
     pub fn dropped_diagnostics(&self) -> usize {
         self.dropped_diagnostics
     }
+
+    /// Whether the document reached its node or payload budget, so the
+    /// tree holds only the content before that point (ADR 0046). Hosts
+    /// must show this; it is never silent.
+    pub fn truncated(&self) -> bool {
+        self.truncated
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -129,7 +138,9 @@ pub struct ScriptBoundary<'a> {
 /// The default parser is inert. A host can opt into scripting-enabled tree
 /// construction and inspect the document at script boundaries. Processing
 /// instruction tokens fail explicitly. The parser owns its document until
-/// successful EOF; any fatal error discards the partial tree and poisons it.
+/// successful EOF. Past the depth limit nodes are inserted higher up, and
+/// at the node or payload budget the document is truncated (ADR 0046); any
+/// other fatal error discards the partial tree and poisons the parser.
 #[derive(Debug)]
 pub struct HtmlDocumentParser {
     driver: Driver,
@@ -154,12 +165,12 @@ impl HtmlDocumentParser {
         cancellation: CancellationToken,
         scripting: Scripting,
     ) -> Result<Self, ParseError> {
-        Ok(Self {
-            driver: Driver::new(
-                HtmlTokenizer::new(limits.tokenizer, cancellation)?,
-                TreeBuilder::new(limits.document, limits.max_tree_diagnostics, scripting)?,
-            ),
-        })
+        let mut driver = Driver::new(
+            HtmlTokenizer::new(limits.tokenizer, cancellation)?,
+            TreeBuilder::new(limits.document, limits.max_tree_diagnostics, scripting)?,
+        );
+        driver.truncate_on_budget = true;
+        Ok(Self { driver })
     }
 
     /// Consume bytes through token/tree boundaries; feed splits do not change trees.
@@ -269,6 +280,9 @@ struct Driver {
     lifecycle: Lifecycle,
     input_closed: bool,
     encoding: Encoding,
+    /// Document parsers truncate at the node and payload budgets; fragment
+    /// parsers fail, so DOM APIs can report the error.
+    truncate_on_budget: bool,
 }
 
 impl Driver {
@@ -279,6 +293,7 @@ impl Driver {
             lifecycle: Lifecycle::Active,
             input_closed: false,
             encoding: Encoding::Utf8,
+            truncate_on_budget: false,
         }
     }
 
@@ -289,6 +304,9 @@ impl Driver {
 
     fn write(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
         self.ensure_writable()?;
+        if self.truncated() {
+            return Ok(()); // Construction stopped; later input is ignored.
+        }
         let result = self.tokenizer.write(bytes).map_err(ParseError::from);
         self.record_failure(result)
     }
@@ -328,10 +346,25 @@ impl Driver {
         self.record_failure(result)
     }
 
+    fn truncated(&self) -> bool {
+        self.tree.as_ref().is_some_and(TreeBuilder::truncated)
+    }
+
     fn pump(&mut self) -> Result<Option<NodeId>, ParseError> {
+        if self.truncated() {
+            return Ok(None);
+        }
         while let Some(token) = self.tokenizer.next_token()? {
             let tree = self.tree.as_mut().expect("active parser owns tree");
-            let feedback = tree.process(&token)?;
+            let feedback = match tree.process(&token) {
+                Err(ParseError::Document(DomError::NodeLimit | DomError::DataLimit))
+                    if self.truncate_on_budget =>
+                {
+                    tree.truncate()?;
+                    return Ok(None);
+                }
+                result => result?,
+            };
             if let Some(mode) = feedback.text_mode {
                 self.tokenizer.set_text_mode(mode)?;
             }

@@ -189,17 +189,11 @@ fn selectedcontent_clones_consume_the_document_budget() {
     let mut limits = ParserLimits::default();
     limits.document.max_nodes = 9;
     let mut parser = HtmlDocumentParser::new(limits, Default::default()).unwrap();
-    let result = parser
-        .feed(source.as_bytes())
-        .and_then(|()| parser.finish().map(drop));
-    assert_eq!(
-        result,
-        Err(rustic_html::ParseError::Document(
-            rustic_dom::DomError::NodeLimit
-        ))
-    );
+    parser.feed(source.as_bytes()).unwrap();
+    // The clone does not fit, so the document stops there (ADR 0046).
+    assert!(parser.finish().unwrap().truncated());
     limits.document.max_nodes = 10;
     let mut parser = HtmlDocumentParser::new(limits, Default::default()).unwrap();
     parser.feed(source.as_bytes()).unwrap();
-    assert!(parser.finish().is_ok());
+    assert!(!parser.finish().unwrap().truncated());
 }

@@ -342,7 +342,10 @@ fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
         if (!(style instanceof CSSStyleDeclaration)) throw 'declaration brand';
         if (style.length !== 3 || style.item(0) !== 'display' ||
             style.item(2) !== '--Case' || style.item(3) !== '') throw 'indexes';
-        if (style.getPropertyValue('COLOR') !== 'red' ||
+        if (style.color !== 'red' || style.display !== 'block' ||
+            style['color'] !== style.getPropertyValue('color') ||
+            style.backgroundColor !== '' ||
+            style.getPropertyValue('COLOR') !== 'red' ||
             style.getPropertyValue('--Case') !== 'preserved' ||
             style.getPropertyValue('--case') !== '' ||
             style.getPropertyValue('unknown-property') !== '' ||
@@ -353,10 +356,19 @@ fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
                 return 'color';
             }
         };
-        if (style.getPropertyValue(property) !== 'blue') throw 'reentrant lookup';
+        if (style.getPropertyValue(property) !== 'blue' || style.color !== 'blue') {
+            throw 'reentrant lookup';
+        }
+        try { style.color = 'green'; throw 'named setter allowed'; }
+        catch (error) {
+            if (error.name !== 'NoModificationAllowedError') throw 'wrong setter error';
+        }
+        if (style.color !== 'blue') throw 'named write changed style';
         Promise.resolve().then(() => {
             body.removeAttribute('data-next');
-            if (style.getPropertyValue('color') !== 'red') throw 'microtask lookup';
+            if (style.getPropertyValue('color') !== 'red' || style.color !== 'red') {
+                throw 'microtask lookup';
+            }
         });
         try { getComputedStyle(body, '::before'); throw 'pseudo accepted'; }
         catch (error) {

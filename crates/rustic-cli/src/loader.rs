@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
-use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment};
+use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment, PropertyId};
 use rustic_dom::{Document, DumpError};
 use rustic_engine::{
     ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
@@ -34,6 +34,7 @@ use rustic_style::{
 };
 
 use crate::stylesheets::{LocalStylesheetFetcher, file_url};
+use rustic_bindings::page::ComputedStyleSnapshot;
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -642,15 +643,22 @@ pub fn dump_formatting(
 }
 
 fn box_tree(input: LayoutInput<'_>) -> Result<rustic_layout::BoxTree, LoadError> {
+    box_tree_with_styles(input).map(|(tree, _)| tree)
+}
+
+fn box_tree_with_styles(
+    input: LayoutInput<'_>,
+) -> Result<(rustic_layout::BoxTree, Vec<rustic_style::ElementStyle>), LoadError> {
     let (styles, _) = compute_styles(input)?;
-    rustic_layout::BoxTree::build(
+    let tree = rustic_layout::BoxTree::build(
         input.document,
         input.document.root(),
         &styles,
         layout_limits(input.limits),
         input.cancellation,
     )
-    .map_err(LoadError::Layout)
+    .map_err(LoadError::Layout)?;
+    Ok((tree, styles))
 }
 
 /// The view every dump command uses: a 1280×720 window at ratio 1 and
@@ -675,7 +683,7 @@ pub fn dump_layout(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let (_, layout, _, _) = block_layout(LayoutInput::new(parsed, path, limits, default_view()))?;
+    let (_, layout, _, _, _) = block_layout(LayoutInput::new(parsed, path, limits, default_view()))?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
@@ -730,7 +738,7 @@ impl LayoutSource for LocalLayout {
         document: &Document,
         mode: DocumentMode,
     ) -> Result<LayoutGeometry, LayoutReadError> {
-        let (tree, layout, _, _) = block_layout(LayoutInput {
+        let (tree, layout, _, _, styles) = block_layout(LayoutInput {
             document,
             mode,
             encoding: self.encoding,
@@ -746,6 +754,24 @@ impl LayoutSource for LocalLayout {
                 .map_err(|_| LayoutReadError::Unavailable)?,
             client_rects: rustic_paint::client_rects(&tree, &layout, &self.cancellation)
                 .map_err(|_| LayoutReadError::Unavailable)?,
+            computed_styles: styles
+                .into_iter()
+                .map(|style| {
+                    let longhands = PropertyId::ALL
+                        .iter()
+                        .map(|&property| {
+                            (property.name(), style.computed.get(property).to_string())
+                        })
+                        .collect();
+                    let custom_properties = style
+                        .computed
+                        .custom_properties()
+                        .iter()
+                        .map(|(name, value)| (name.to_owned(), value.to_string()))
+                        .collect();
+                    (style.node, ComputedStyleSnapshot { longhands, custom_properties })
+                })
+                .collect(),
         })
     }
 }
@@ -758,10 +784,11 @@ fn block_layout(
         rustic_layout::BlockLayout,
         rustic_layout::CssSize,
         crate::images::LoadedImages,
+        Vec<rustic_style::ElementStyle>,
     ),
     LoadError,
 > {
-    let mut tree = box_tree(input)?;
+    let (mut tree, styles) = box_tree_with_styles(input)?;
     let LayoutInput {
         document,
         path,
@@ -792,7 +819,7 @@ fn block_layout(
         cancellation,
     )
     .map_err(LoadError::Flow)?;
-    Ok((tree, layout, viewport, images))
+    Ok((tree, layout, viewport, images, styles))
 }
 
 fn display_list(
@@ -801,7 +828,7 @@ fn display_list(
     limits: LoaderLimits,
     view: rustic_layout::View,
 ) -> Result<rustic_paint::DisplayList, LoadError> {
-    let (tree, layout, viewport, images) =
+    let (tree, layout, viewport, images, _) =
         block_layout(LayoutInput::new(parsed, path, limits, view))?;
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),

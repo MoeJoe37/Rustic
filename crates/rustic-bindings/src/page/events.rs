@@ -591,8 +591,29 @@ fn dispatch_event(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
             "event is already dispatching",
         ));
     }
+    if event.has(agent, Event::UNINITIALIZED)? {
+        return Err(super::creation::exception(
+            agent,
+            "InvalidStateError",
+            "event must be initialized before dispatch",
+        ));
+    }
     event.untrust(agent)?;
     fire(agent, target, value, event).map(Value::boolean)
+}
+
+pub(super) fn create_legacy_event(agent: &mut Agent, name: &str) -> JsResult<Value> {
+    match name {
+        "event" | "events" | "htmlevents" | "svgevents" => state::legacy_event(agent, false),
+        "customevent" => state::legacy_event(agent, true),
+        name => ui::legacy_event(agent, name).unwrap_or_else(|| {
+            Err(super::creation::exception(
+                agent,
+                "NotSupportedError",
+                "event interface is unavailable",
+            ))
+        }),
+    }
 }
 
 fn fire(agent: &mut Agent, target: Target, value: Value, event: Event) -> JsResult<bool> {

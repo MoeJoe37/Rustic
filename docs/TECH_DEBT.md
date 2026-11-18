@@ -2018,8 +2018,9 @@ script budget. Consider indexing when measured listener workloads warrant it.
 Window timers start after the registering task's or frame's completed
 checkpoint. Use registration-time monotonic deadlines when the browser
 event loop owns an injectable clock for both registration and pumping.
-Apply document activity and background throttling when adding visibility
-and suspension. Route string timer source through the page's CSP and
+The headless visibility getters treat the active document as visible.
+Connect background throttling and visibility changes when the host adds
+activity and suspension. Route string timer source through the page's CSP and
 Trusted Types policies when those policies are available. Frame timestamps
 currently use the host's clock origin. Unify them with the page Performance
 time origin and its precision policy when that API lands.

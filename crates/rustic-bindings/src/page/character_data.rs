@@ -36,6 +36,7 @@ fn text_content(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Val
                     .walk(id)
                     .map_err(|error| dom_exception::from_dom_error(agent, error))?;
                 for (child, _) in descendants.skip(1) {
+                    agent.check_native_work()?;
                     let node = document
                         .node(child)
                         .map_err(|error| dom_exception::from_dom_error(agent, error))?;

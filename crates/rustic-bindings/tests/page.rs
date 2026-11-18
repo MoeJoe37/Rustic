@@ -51,6 +51,34 @@ fn text_content_preserves_code_units_and_reentrant_conversion() {
 }
 
 #[test]
+fn body_replacement_adopts_wrappers_and_preserves_old_children_on_error() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let tree = Rc::new(Tree(RefCell::new(document)));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        if (document.body !== null || document.hidden || document.visibilityState !== 'visible') throw 1;
+        document.appendChild(document.createElement('html'));
+        const body = document.createElement('body');
+        document.body = body;
+        if (document.body !== body || body.parentNode !== document.documentElement) throw 2;
+        try { document.body = document.createElement('div'); throw 3; }
+        catch (error) { if (error.name !== 'HierarchyRequestError') throw error; }
+        if (document.body !== body) throw 4;
+        const other = document.implementation.createHTMLDocument('other');
+        if (!other.hidden || other.visibilityState !== 'hidden') throw 'detached document visibility';
+        const foreign = other.body;
+        document.body = foreign;
+        if (document.body !== foreign || foreign.ownerDocument !== document ||
+            other.body !== null || body.parentNode !== null) throw 5;
+        document.body = foreign;
+        if (document.documentElement.childNodes.length !== 1) throw 6;
+    "#).unwrap();
+}
+
+#[test]
 fn automatic_collection_preserves_attached_wrappers_and_sweeps_detached_cycles() {
     let mut document = Document::new(DocumentLimits::default()).unwrap();
     let [root, retained, unreachable] = ["main", "p", "em"].map(|name| {

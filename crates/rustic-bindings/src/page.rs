@@ -273,6 +273,12 @@ fn install_page(
             ("contentType", "get contentType", documents::content_type),
             ("doctype", "get doctype", documents::doctype),
             ("readyState", "get readyState", documents::ready_state),
+            ("hidden", "get hidden", documents::hidden),
+            (
+                "visibilityState",
+                "get visibilityState",
+                documents::visibility_state,
+            ),
             (
                 "currentScript",
                 "get currentScript",
@@ -287,6 +293,7 @@ fn install_page(
         |agent, proto| {
             creation::install_factories(agent, proto)?;
             documents::install_methods(agent, proto)?;
+            documents::install_body(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
             selectors::install_non_element_parent(agent, proto)?;
             html_collections::install_lookup::<true>(agent, proto)
@@ -700,18 +707,24 @@ fn document_element(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult
         if !matches!(node.kind(), NodeKind::Document) {
             return agent.type_error("expected a Document receiver");
         }
-        let mut current = node.first_child();
-        while let Some(id) = current {
-            let child = document
-                .node(id)
-                .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-            if matches!(child.kind(), NodeKind::Element(_)) {
-                return wrap(wrappers, agent, document, id);
-            }
-            current = child.next_sibling();
+        match document_element_id(agent, document)? {
+            Some(id) => wrap(wrappers, agent, document, id),
+            None => Ok(Value::NULL),
         }
-        Ok(Value::NULL)
     })
+}
+
+fn document_element_id(agent: &mut Agent, document: &Document) -> JsResult<Option<NodeId>> {
+    let children = document
+        .children(document.root())
+        .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+    for id in children {
+        agent.check_native_work()?;
+        if matches!(document.node(id).map(Node::kind), Ok(NodeKind::Element(_))) {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
 }
 
 fn local_name(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
@@ -752,25 +765,35 @@ fn insert_child(
             }
             Some(node)
         };
-        if child.document() == parent.document() {
-            target
-                .insert_before(parent, child, before)
-                .map_err(|error| append_error(agent, error))?;
-        } else {
-            with_page(agent, |agent, page| {
-                page.write_adoption_source(agent, child.document(), |agent, source| {
-                    documents::charge_copy(agent, source, child, true, true)?;
-                    wrappers
-                        .insert_adopted(target, source, child, parent, before)
-                        .map_err(|error| match error {
-                            DomGcError::Dom(error) => append_error(agent, error),
-                            error => documents::binding_error(agent, error),
-                        })?;
-                    Ok(())
-                })
-            })?;
-        }
+        insert_node(agent, target, wrappers, child, parent, before)?;
         Ok(value)
+    })
+}
+
+fn insert_node(
+    agent: &mut Agent,
+    target: &mut Document,
+    wrappers: &mut DomHeap,
+    child: NodeId,
+    parent: NodeId,
+    before: Option<NodeId>,
+) -> JsResult<()> {
+    if child.document() == parent.document() {
+        return target
+            .insert_before(parent, child, before)
+            .map_err(|error| append_error(agent, error));
+    }
+    with_page(agent, |agent, page| {
+        page.write_adoption_source(agent, child.document(), |agent, source| {
+            documents::charge_copy(agent, source, child, true, true)?;
+            wrappers
+                .insert_adopted(target, source, child, parent, before)
+                .map_err(|error| match error {
+                    DomGcError::Dom(error) => append_error(agent, error),
+                    error => documents::binding_error(agent, error),
+                })?;
+            Ok(())
+        })
     })
 }
 

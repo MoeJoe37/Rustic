@@ -31,6 +31,35 @@ fn scripted_page() -> (Agent, Rc<Tree>) {
 }
 
 #[test]
+fn legacy_event_factory_requires_initialization_and_uses_installed_interfaces() {
+    let (mut agent, _) = scripted_page();
+    agent
+        .evaluate(
+            r#"
+        const target = new EventTarget();
+        const event = document.createEvent('hTmLeVeNtS');
+        if (!(event instanceof Event) || event.type !== '' || event.isTrusted) throw 1;
+        let called = 0;
+        target.addEventListener('legacy', e => { if (e === event) called++; });
+        try { target.dispatchEvent(event); throw 2; }
+        catch (error) { if (error.name !== 'InvalidStateError') throw error; }
+        event.initEvent('legacy', true, true);
+        if (!target.dispatchEvent(event) || called !== 1 || !event.cancelable) throw 3;
+        const mouse = document.createEvent('MouseEvents');
+        if (!(mouse instanceof MouseEvent) || mouse.view !== null || mouse.clientX !== 0) throw 4;
+        const keyboard = document.createEvent('KeyboardEvent');
+        if (!(keyboard instanceof KeyboardEvent) || keyboard.key !== '') throw 5;
+        const custom = document.createEvent('CustomEvent');
+        custom.initCustomEvent('custom', false, false, 17);
+        if (!(custom instanceof CustomEvent) || custom.detail !== 17) throw 6;
+        try { document.createEvent('PointerEvent'); throw 7; }
+        catch (error) { if (error.name !== 'NotSupportedError') throw error; }
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
 fn event_phases_follow_the_dom_and_top_level_window() {
     let (mut agent, _) = scripted_page();
     assert_eq!(agent.evaluate(r#"

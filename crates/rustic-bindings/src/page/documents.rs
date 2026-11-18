@@ -6,7 +6,9 @@ use rustic_dom::{
     Document, DocumentFormat, DocumentLimits, DocumentType, DomError, DomString, HTML_NAMESPACE,
     NodeId, NodeKind, QualifiedName, SVG_NAMESPACE,
 };
-use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, OutOfMemory, Value};
+use rustic_js::runtime::{
+    Abrupt, Agent, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor, Value,
+};
 
 use crate::dom_exception;
 use crate::heap::{DomGcError, WrapperKind};
@@ -14,8 +16,9 @@ use crate::webidl::to_nullable_dom_string;
 
 use super::creation::{document_receiver, element, exception, invalid_name, qualified, string};
 use super::{
-    AuxiliaryDocument, finish_creation, identity, illegal_constructor, install_interface,
-    prototype, quirks_mode, read_node, required_arg, with_mut_tree, with_page, wrap, wrap_using,
+    AuxiliaryDocument, document_element_id, finish_creation, identity, illegal_constructor,
+    insert_node, install_interface, prototype, quirks_mode, read_node, required_arg, with_mut_tree,
+    with_page, wrap, wrap_using,
 };
 
 const IMPLEMENTATION: &str = "DOMImplementation";
@@ -56,6 +59,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
 pub(super) fn install_methods(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
     for (name, operation, length) in [
         ("adoptNode", adopt_node as NativeFn, 1),
+        ("createEvent", create_event, 1),
         ("importNode", import_node, 1),
         ("write", write_document, 0),
         ("writeln", write_document, 0),
@@ -64,6 +68,112 @@ pub(super) fn install_methods(agent: &mut Agent, prototype: ObjectId) -> JsResul
         agent.define_method(prototype, key, operation, name, length)?;
     }
     Ok(())
+}
+
+pub(super) fn install_body(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
+    let key = agent.heap.key("body")?;
+    let get = Value::object(agent.new_native_function(body, "get body", 0)?);
+    let set = Value::object(agent.new_native_function(set_body, "set body", 1)?);
+    agent.define_property_or_throw(
+        prototype,
+        key,
+        PropertyDescriptor::accessor(get, set, true, true),
+    )
+}
+
+fn html_element_name(document: &Document, id: NodeId) -> Option<&str> {
+    let NodeKind::Element(element) = document.node(id).ok()?.kind() else {
+        return None;
+    };
+    (element.name().namespace() == Some(HTML_NAMESPACE)).then_some(element.name().local())
+}
+
+fn body_child(agent: &mut Agent, document: &Document, root: NodeId) -> JsResult<Option<NodeId>> {
+    if html_element_name(document, root) != Some("html") {
+        return Ok(None);
+    }
+    for child in document
+        .children(root)
+        .map_err(|error| dom_exception::from_dom_error(agent, error))?
+    {
+        agent.check_native_work()?;
+        if matches!(
+            html_element_name(document, child),
+            Some("body" | "frameset")
+        ) {
+            return Ok(Some(child));
+        }
+    }
+    Ok(None)
+}
+
+fn body(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    read_node(agent, receiver, |agent, wrappers, document, id, _| {
+        if id != document.root() {
+            return agent.type_error("expected a Document receiver");
+        }
+        let Some(root) = document_element_id(agent, document)? else {
+            return Ok(Value::NULL);
+        };
+        match body_child(agent, document, root)? {
+            Some(node) => wrap(wrappers, agent, document, node),
+            None => Ok(Value::NULL),
+        }
+    })
+}
+
+fn set_body(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
+    let value = args.first().copied().unwrap_or(Value::UNDEFINED);
+    with_mut_tree(agent, receiver, |agent, target, wrappers, id| {
+        if id != target.root() {
+            return agent.type_error("expected a Document receiver");
+        }
+        let hierarchy = |agent: &mut Agent| {
+            exception(
+                agent,
+                "HierarchyRequestError",
+                "expected a body or frameset",
+            )
+        };
+        if value.is_nullish() {
+            return Err(hierarchy(agent));
+        }
+        let node = identity(agent, wrappers, value, WrapperKind::Node)?;
+        let check_node =
+            |agent: &mut Agent, document: &Document| match html_element_name(document, node) {
+                Some("body" | "frameset") => Ok(()),
+                Some(_) => Err(hierarchy(agent)),
+                None => agent.type_error("expected an HTMLElement"),
+            };
+        if node.document() == target.id() {
+            check_node(agent, target)?;
+        } else {
+            with_page(agent, |agent, page| {
+                page.read(agent, node.document(), check_node)
+            })?;
+        }
+        let Some(root) = document_element_id(agent, target)? else {
+            return Err(hierarchy(agent));
+        };
+        let previous = body_child(agent, target, root)?;
+        if previous == Some(node) {
+            return Ok(Value::UNDEFINED);
+        }
+        insert_node(agent, target, wrappers, node, root, previous)?;
+        if let Some(previous) = previous {
+            target.detach(previous).expect("body is an ordinary child");
+        }
+        Ok(Value::UNDEFINED)
+    })
+}
+
+fn create_event(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
+    document_receiver(agent, receiver)?;
+    let value = required_arg(agent, args, 0)?;
+    let name = string(agent, value)?;
+    let mut name = String::from_utf16_lossy(name.as_units());
+    name.make_ascii_lowercase();
+    super::events::create_legacy_event(agent, &name)
 }
 
 fn write_document(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
@@ -144,6 +254,24 @@ pub(super) fn ready_state(agent: &mut Agent, receiver: Value, _: &[Value]) -> Js
         };
         agent.string(state)
     })
+}
+
+fn is_hidden(agent: &mut Agent, receiver: Value) -> JsResult<bool> {
+    let owner = document_receiver(agent, receiver)?;
+    with_page(agent, |_, page| Ok(owner.document() != page.main))
+}
+
+pub(super) fn hidden(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    Ok(Value::boolean(is_hidden(agent, receiver)?))
+}
+
+pub(super) fn visibility_state(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    let state = if is_hidden(agent, receiver)? {
+        "hidden"
+    } else {
+        "visible"
+    };
+    agent.string(state)
 }
 
 pub(super) fn doctype(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {

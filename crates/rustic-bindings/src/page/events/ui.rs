@@ -170,8 +170,31 @@ fn construct<const KIND: u16>(agent: &mut Agent, _: Value, args: &[Value]) -> Js
     };
     let event_type = required_arg(agent, args, 0)?;
     let event_type = Value::string(coerce_string(agent, event_type)?);
+    let input = args.get(1).copied().unwrap_or(Value::UNDEFINED);
+    create::<KIND>(agent, event_type, input, Some(new_target))
+}
+
+pub(super) fn legacy_event(agent: &mut Agent, name: &str) -> Option<JsResult<Value>> {
+    let construct: fn(&mut Agent, Value, Value, Option<ObjectId>) -> JsResult<Value> = match name {
+        "uievent" | "uievents" => create::<UI>,
+        "mouseevent" | "mouseevents" => create::<MOUSE>,
+        "keyboardevent" => create::<KEYBOARD>,
+        _ => return None,
+    };
+    Some(
+        agent
+            .string("")
+            .and_then(|event_type| construct(agent, event_type, Value::UNDEFINED, None)),
+    )
+}
+
+fn create<const KIND: u16>(
+    agent: &mut Agent,
+    event_type: Value,
+    input: Value,
+    new_target: Option<ObjectId>,
+) -> JsResult<Value> {
     with_root(agent, event_type, |agent| {
-        let input = args.get(1).copied().unwrap_or(Value::UNDEFINED);
         let (flags, _) = state::init_options::<false>(agent, input)?;
         let options = input.as_object();
         let detail = long(agent, options, "detail")?;
@@ -257,12 +280,21 @@ fn construct<const KIND: u16>(agent: &mut Agent, _: Value, args: &[Value]) -> Js
             _ => unreachable!("installed UI event constructor"),
         };
         with_root(agent, extra.value(), |agent| {
-            let prototype = agent.host_prototype_from_new_target(interface(KIND), new_target)?;
+            let (prototype, initial) = match new_target {
+                Some(target) => (
+                    agent.host_prototype_from_new_target(interface(KIND), target)?,
+                    0,
+                ),
+                None => (
+                    super::prototype(agent, interface(KIND))?,
+                    Event::UNINITIALIZED,
+                ),
+            };
             state::create(
                 agent,
                 prototype,
                 event_type,
-                flags | KIND,
+                flags | KIND | initial,
                 number(detail),
                 extra.value(),
             )

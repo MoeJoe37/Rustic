@@ -51,6 +51,7 @@ impl Event {
     pub(super) const MOUSE: u16 = 1 << 11;
     pub(super) const KEYBOARD: u16 = 1 << 12;
     pub(super) const POINTER: u16 = 1 << 13;
+    pub(super) const UNINITIALIZED: u16 = 1 << 14;
 
     pub(super) fn receiver(agent: &mut Agent, value: Value) -> JsResult<Self> {
         with_page(agent, |agent, page| {
@@ -360,6 +361,21 @@ pub(super) fn trusted_event(
         flags | Event::TRUSTED,
         detail,
         extra,
+    )
+}
+
+pub(super) fn legacy_event(agent: &mut Agent, custom: bool) -> JsResult<Value> {
+    let interface = if custom { "CustomEvent" } else { "Event" };
+    let prototype = super::prototype(agent, interface)?;
+    let event_type = agent.string("")?;
+    let flags = Event::UNINITIALIZED | if custom { Event::CUSTOM } else { 0 };
+    create(
+        agent,
+        prototype,
+        event_type,
+        flags,
+        Value::NULL,
+        Value::NULL,
     )
 }
 

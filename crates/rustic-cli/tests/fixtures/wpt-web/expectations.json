@@ -62,8 +62,7 @@
     },
     {
       "name": "document.body.getElementsByClassName collection should update live when removing item(0)",
-      "status": "FAIL",
-      "message": "cannot access property getElementsByClassName of undefined or null"
+      "status": "PASS"
     }
   ],
   "dom/events/AddEventListenerOptions-once.any.js": [
@@ -87,18 +86,15 @@
   "dom/events/Event-dispatch-bubbles-true.html": [
     {
       "name": "In window.document with click event",
-      "status": "FAIL",
-      "message": "value is not a function"
+      "status": "PASS"
     },
     {
       "name": "In window.document with load event",
-      "status": "FAIL",
-      "message": "value is not a function"
+      "status": "PASS"
     },
     {
       "name": "In window.document.cloneNode(true)",
-      "status": "FAIL",
-      "message": "value is not a function"
+      "status": "PASS"
     },
     {
       "name": "In new Document()",
@@ -108,26 +104,23 @@
     {
       "name": "In DOMImplementation.createHTMLDocument()",
       "status": "FAIL",
-      "message": "cannot access property appendChild of undefined or null"
+      "message": "cannot adopt nodes out of the document during parsing"
     }
   ],
   "dom/events/Event-dispatch-reenter.html": [
     {
       "name": " Dispatch additional events inside an event listener ",
-      "status": "FAIL",
-      "message": "cannot access property addEventListener of undefined or null"
+      "status": "PASS"
     }
   ],
   "dom/events/EventTarget-dispatchEvent-returnvalue.html": [
     {
       "name": "Return value of EventTarget.dispatchEvent() affected by preventDefault().",
-      "status": "FAIL",
-      "message": "value is not a function"
+      "status": "PASS"
     },
     {
       "name": "Return value of EventTarget.dispatchEvent() affected by returnValue.",
-      "status": "FAIL",
-      "message": "value is not a function"
+      "status": "PASS"
     }
   ],
   "dom/nodes/CharacterData-data.html": [
@@ -203,13 +196,11 @@
     },
     {
       "name": "Calling document.getElementById with a null argument.",
-      "status": "FAIL",
-      "message": "cannot access property appendChild of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "Calling document.getElementById with an undefined argument.",
-      "status": "FAIL",
-      "message": "cannot access property appendChild of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "on static page",
@@ -227,8 +218,7 @@
     },
     {
       "name": "Ensure that the id attribute only affects elements present in a document",
-      "status": "FAIL",
-      "message": "cannot access property appendChild of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "in tree order, within the context object's tree",
@@ -297,8 +287,7 @@
   "html/webappapis/animation-frames/callback-invoked.html": [
     {
       "name": "requestAnimationFrame callback is invoked at least once before the timeout",
-      "status": "FAIL",
-      "message": "assert_false: document.hidden must exist and be false to run this test properly expected false got undefined"
+      "status": "PASS"
     }
   ],
   "html/webappapis/animation-frames/cancel-invoked.html": [

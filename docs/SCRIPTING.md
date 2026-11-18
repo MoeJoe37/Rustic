@@ -65,6 +65,9 @@ detached documents, query with CSS selectors, hold live collections, add
 listeners, dispatch events and schedule timers and animation callbacks.
 Reading `Node.textContent` preserves UTF-16 code units. Writing it replaces
 children or updates character data and can update a live stylesheet.
+`document.body` resolves the current HTML body or frameset. Assignment
+uses the checked insertion and adoption path to replace that child.
+[HTML DOM tree accessors](https://html.spec.whatwg.org/multipage/dom.html#dom-tree-accessors)
 
 What does **not** work yet:
 
@@ -218,6 +221,12 @@ of each target at the start of each phase, and honors `capture`, `once`,
 A listener that throws does not stop the dispatch; the host can read how many
 did ([ADR 0034](adr/0034-dom-event-dispatch.md)).
 
+`document.createEvent()` supports the aliases for Event, CustomEvent, UIEvent,
+MouseEvent and KeyboardEvent. The returned event must be initialized before
+dispatch. The headless host exposes its active document as visible, and
+detached documents are hidden. [DOM event factory](https://dom.spec.whatwg.org/#dom-document-createevent)
+[HTML page visibility](https://html.spec.whatwg.org/multipage/interaction.html#page-visibility)
+
 Trusted input comes only from the host, which names a target node it has
 hit-tested: a primary click or a key press or release. The target is checked
 again at delivery and the task is dropped if the node left the document.
@@ -263,8 +272,8 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The initial selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 and `html/webappapis/animation-frames`. Linux CI is configured to require
-an exact match to the checked-in **16 files, 69 subtests, 47 passes and
-22 expected failures**. The expectations record the names and diagnoses
+an exact match to the checked-in **16 files, 69 subtests, 58 passes and
+11 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)

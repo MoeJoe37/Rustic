@@ -86,8 +86,9 @@ without layout boxes read as zero. Unprojectable bounds return
 [CSSOM View](https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsetwidth)
 
 A script may hold `getComputedStyle(element)` across DOM changes. Its
-`CSSStyleDeclaration.getPropertyValue(name)`, `item(index)`, `length` and
-supported longhand named getters (both CSS spelling and camelCase)
+`CSSStyleDeclaration.getPropertyValue(name)`, `item(index)`, `length`,
+numeric indexed properties (`style[0]`, `Object.keys`, property descriptors),
+and supported longhand named getters (both CSS spelling and camelCase)
 refresh from the same revision-keyed snapshot as geometry and respect the
 same flush budget. Custom names remain case-sensitive; unknown names return
 an empty value. Nonempty pseudo-element arguments are explicitly unsupported.
@@ -104,7 +105,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named getters and `cssText`, but numeric indexed properties, pseudo-elements and stylesheet/image completion ordering remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
+| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and stylesheet/image completion ordering remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |

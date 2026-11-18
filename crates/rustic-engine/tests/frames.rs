@@ -401,6 +401,39 @@ fn computed_style_and_geometry_share_the_dirty_flush_quota() {
     assert_eq!(scripts.take_layout_flush_count(), 1);
 }
 
+
+#[test]
+fn connected_computed_styles_require_a_renderer_but_detached_reads_are_empty() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts
+        .queue_script(source(
+            r#"
+            const connected = getComputedStyle(document.body);
+            try {
+                connected.getPropertyValue('display');
+                throw 'missing renderer silently returned a value';
+            } catch (error) {
+                if (error.name !== 'InvalidStateError') throw 'wrong error';
+            }
+            try {
+                connected.length;
+                throw 'length bypassed the renderer';
+            } catch (error) {
+                if (error.name !== 'InvalidStateError') throw 'wrong length error';
+            }
+            const detached = getComputedStyle(document.createElement('p'));
+            if (detached.getPropertyValue('display') !== '' ||
+                detached.length !== 0 ||
+                detached.item(0) !== '') throw 'detached style not empty';
+            if (document.body.offsetWidth !== 0) throw 'geometry fallback changed';
+            "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 0);
+}
+
 #[test]
 fn a_failed_checkpoint_discards_the_rendering_offer() {
     let mut engine = Engine::new(1);

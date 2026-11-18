@@ -579,14 +579,19 @@ a freshly parsed reference.
 
 A held `CSSStyleDeclaration` obtained from `Window.getComputedStyle` is
 associated with its element through a rooted weak map. Its `getPropertyValue`,
-`getPropertyPriority`, `item` and `length` methods ask the shared
-`LayoutReads` snapshot for the latest successful DOM and applied-input
+`getPropertyPriority`, `item` and `length` methods read from the declaration;
+value, item and length accesses ask the shared `LayoutReads` snapshot for the latest successful DOM and applied-input
 revisions. The CLI's `LocalLayout` attaches computed longhand and custom
 property values from the same `style_tree` call used to construct its layout
 boxes, so the style query and geometry do not run competing cascades.
+The `cssText` getter is empty and mutation methods and assignment throw
+`NoModificationAllowedError`. Connected computed-style reads without a host
+layout source throw `InvalidStateError`, while detached nodes retain their
+empty values and geometry's no-source fallback is unchanged.
 
 Regression sources: `crates/rustic-engine/tests/frames.rs` (held declarations,
-callback argument conversion, microtasks and shared eight-flush quota) and
+callback argument conversion, microtasks, shared eight-flush quota,
+read-only mutation errors, and absent-renderer/detached semantics) and
 `crates/rustic-cli/src/loader.rs` (live local style/class/inline mutations,
 custom names, inheritance and detached nodes). **Verification pending**:
 this environment has no Rust toolchain, and the hosted CI billing block remains.

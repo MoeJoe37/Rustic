@@ -150,6 +150,21 @@ fn collation_work_respects_the_step_budget() {
 }
 
 #[test]
+fn uri_work_respects_the_step_budget() {
+    let mut agent = Agent::new().unwrap();
+    agent
+        .evaluate("let text = '🚀'.repeat(4096); let escaped = '%61'.repeat(4096);")
+        .unwrap();
+    for source in ["encodeURIComponent(text)", "decodeURIComponent(escaped)"] {
+        agent.set_step_budget(Some(256));
+        assert_eq!(agent.evaluate(source), Err(EvalError::Cancelled));
+        assert_eq!(agent.step_budget(), Some(0));
+    }
+    agent.set_step_budget(None);
+    assert_eq!(text(&mut agent, "encodeURIComponent('é')"), "%C3%A9");
+}
+
+#[test]
 fn number_formatting_work_respects_the_step_budget() {
     let mut agent = Agent::new().expect("agent");
     agent

@@ -11,6 +11,10 @@ use crate::runtime::shape::PropertyKey;
 use crate::runtime::value::{Kind, ObjectId, Value};
 
 const GLOBAL_FUNCTIONS: &[Method] = &[
+    method("decodeURI", super::uri::decode::<false>, 1),
+    method("decodeURIComponent", super::uri::decode::<true>, 1),
+    method("encodeURI", super::uri::encode::<false>, 1),
+    method("encodeURIComponent", super::uri::encode::<true>, 1),
     method("isFinite", is_finite, 1),
     method("isNaN", is_nan, 1),
     method("parseFloat", parse_float, 1),

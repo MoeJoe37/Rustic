@@ -57,7 +57,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
-| M5 exit | TD-125, TD-126, TD-129, TD-136 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. Pages loaded in M5 already call the URI functions. |
+| M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
@@ -200,7 +200,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-133 | Deliberate | HTML scripting | Adoption of subtrees containing retained parser or script nodes and dynamic document markup have explicit exceptions | Open, M9 HTML lifecycle |
 | TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, WEB-06 |
 | TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M6 and M9 |
-| TD-136 | Bad | JS | The URI functions (`encodeURI`, `decodeURI`, `encodeURIComponent`, `decodeURIComponent`) are missing, and the Test262 built-in gate never ran their directories | Open, M5 exit |
+| TD-136 | Bad | JS | The four URI functions and the omitted standard globals are covered by the pinned Test262 gate | Paid |
 | TD-137 | Deliberate | JS | Web-legacy library surface is missing: Annex B `escape`/`unescape` and String HTML methods, `__defineGetter__` and its siblings, legacy RegExp statics and `Error.prototype.stack`; `test/annexB` is not run | Open, M6 entry |
 | TD-138 | Bad | JS | Some statement completion values are wrong, and parameter defaults and `for-in`/`for-of` heads miss their TDZ errors | Open, M6 entry |
 | TD-139 | Bad | JS | Reference evaluation order deviates in compound, update and logical assignment, `with` over proxies, destructuring targets and `super` properties; `delete super.x` does not throw | Open, M6 entry |
@@ -2067,21 +2067,17 @@ data module types and MIME checks with the corresponding conformance
 selection. The mixed-host tests cover local JavaScript only.
 [ADR 0040](adr/0040-local-module-scripts.md)
 
-### TD-136 — The URI functions are missing
+### TD-136 — URI functions and global Test262 coverage (Paid)
 
-The global object has no `encodeURI`, `decodeURI`, `encodeURIComponent` or
-`decodeURIComponent`. Scripts that build query strings or read
-`location`-style data throw a `ReferenceError`. Test262 never caught it,
-because `BUILT_IN_DIRS` in `crates/rustic-js/tests/test262.rs` leaves out
-their four directories (173 files, 4 of which pass without the functions). It also leaves out
-`Infinity`, `NaN`, `undefined`, `eval` and `ThrowTypeError`, which pass
-today but are not pinned, and `Uint8Array` (TD-143). Three `global` and four
-`Object` files fail for the same reason.
-
-Found by the M4 debt audit (2026-11-17). Pay before M5 exit: implement the
-four functions over the UTF-16 string model (with the `URIError` cases for
-lone surrogates and bad escapes), add every standard global directory to
-`BUILT_IN_DIRS`, and bless the list.
+The M4 audit found that `encodeURI`, `decodeURI`, `encodeURIComponent` and
+`decodeURIComponent` were missing. All four now work over UTF-16 strings
+and throw intrinsic `URIError` values for malformed sequences. The pinned
+built-ins gate adds all four URI directories, `Infinity`, `NaN`,
+`undefined`, `eval` and `ThrowTypeError`, with 222 additional passes and
+no previous passing files lost. The standard budget covers 171 of the 173
+URI files. The two exhaustive supplementary-plane cases pass in a separate
+test with a 400-million-step limit.
+[Test262 conformance](JS.md#conformance)
 
 ### TD-137 — Web-legacy library surface
 

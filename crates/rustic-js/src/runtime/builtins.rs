@@ -26,6 +26,7 @@ mod reflect;
 pub(crate) mod regexp;
 mod string_object;
 pub(crate) mod typed_array;
+mod uri;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
 use super::agent::{Agent, JsResult, NativeFn};
@@ -115,6 +116,7 @@ pub(crate) fn install(agent: &mut Agent) -> JsResult<()> {
         (i.range_error_prototype, "RangeError"),
         (i.reference_error_prototype, "ReferenceError"),
         (i.syntax_error_prototype, "SyntaxError"),
+        (i.uri_error_prototype, "URIError"),
     ] {
         let value = agent.string(text)?;
         agent.define_property_or_throw(

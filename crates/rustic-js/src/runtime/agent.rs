@@ -51,6 +51,8 @@ pub enum ErrorKind {
     ReferenceError,
     /// `SyntaxError`.
     SyntaxError,
+    /// `URIError`.
+    UriError,
 }
 
 macro_rules! names {
@@ -161,6 +163,8 @@ pub struct Intrinsics {
     pub reference_error_prototype: ObjectId,
     /// `%SyntaxError.prototype%`.
     pub syntax_error_prototype: ObjectId,
+    /// `%URIError.prototype%`.
+    pub uri_error_prototype: ObjectId,
     /// `%Boolean.prototype%`.
     pub boolean_prototype: ObjectId,
     /// `%Number.prototype%`.
@@ -263,6 +267,7 @@ impl Intrinsics {
             self.range_error_prototype,
             self.reference_error_prototype,
             self.syntax_error_prototype,
+            self.uri_error_prototype,
             self.boolean_prototype,
             self.number_prototype,
             self.string_prototype,
@@ -403,6 +408,7 @@ impl Agent {
                 range_error_prototype: placeholder,
                 reference_error_prototype: placeholder,
                 syntax_error_prototype: placeholder,
+                uri_error_prototype: placeholder,
                 boolean_prototype: placeholder,
                 number_prototype: placeholder,
                 string_prototype: placeholder,
@@ -636,7 +642,8 @@ impl Agent {
             range_error_prototype,
             reference_error_prototype,
             syntax_error_prototype,
-        ) = (sub()?, sub()?, sub()?, sub()?);
+            uri_error_prototype,
+        ) = (sub()?, sub()?, sub()?, sub()?, sub()?);
         let empty = self.names.empty;
         let mut wrapper = |class, primitive| {
             let mut object = Object::new(class, Some(object_prototype));
@@ -659,6 +666,7 @@ impl Agent {
             range_error_prototype,
             reference_error_prototype,
             syntax_error_prototype,
+            uri_error_prototype,
             boolean_prototype,
             number_prototype,
             string_prototype,
@@ -797,6 +805,7 @@ impl Agent {
             ErrorKind::RangeError => self.intrinsics.range_error_prototype,
             ErrorKind::ReferenceError => self.intrinsics.reference_error_prototype,
             ErrorKind::SyntaxError => self.intrinsics.syntax_error_prototype,
+            ErrorKind::UriError => self.intrinsics.uri_error_prototype,
         };
         let error = self.new_error_object_with(proto)?;
         let message = self.string(message)?;

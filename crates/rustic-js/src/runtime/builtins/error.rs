@@ -21,7 +21,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         ),
         ("SyntaxError", syntax_error, Some(i.syntax_error_prototype)),
         ("EvalError", eval_error, None),
-        ("URIError", uri_error, None),
+        ("URIError", uri_error, Some(i.uri_error_prototype)),
     ];
     for (name, behavior, prototype) in natives {
         let prototype = match prototype {
@@ -125,8 +125,7 @@ pub(crate) fn new_aggregate_error(agent: &mut Agent, errors: Value) -> JsResult<
 }
 
 /// The prototype a native error constructor uses: `name`'s, found
-/// through the global constructor for the two errors that have no
-/// intrinsic slot.
+/// through the global constructor for the error without an intrinsic slot.
 fn named_prototype(agent: &mut Agent, name: &str) -> JsResult<ObjectId> {
     let global = agent.intrinsics.global;
     let key = agent.heap.key(name)?;
@@ -204,6 +203,6 @@ fn eval_error(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn uri_error(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
-    let default = named_prototype(agent, "URIError")?;
+    let default = agent.intrinsics.uri_error_prototype;
     construct_error(agent, default, args)
 }

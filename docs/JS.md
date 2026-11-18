@@ -140,10 +140,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,939 | 17,291 |
-| Fail | 488 | 1,283 |
+| Pass | 21,939 | 17,513 |
+| Fail | 488 | 1,278 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 97.8% | 93.1% |
+| Pass rate of the files that run | 97.8% | 93.2% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -173,10 +173,11 @@ GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
 prototypes, BigInt, Iterator, JSON, Map, Math, NativeErrors, Number,
 Object, Proxy, Reflect, RegExp, Set, SharedArrayBuffer, String, Symbol, TypedArray, TypedArrayConstructors, WeakMap, WeakRef, WeakSet, the
-iterator prototypes and the global functions). A sparse checkout must include them:
+iterator prototypes, the standard global functions and the `ThrowTypeError`
+intrinsic). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
 
-Both runs take about 40 seconds on one core. The files that pass are listed
+These runs take longer than the workspace smoke tests. The files that pass are listed
 in `tests/fixtures/test262_language_passing.txt` and
 `tests/fixtures/test262_built_ins_passing.txt`. The gate compares exactly: a
 file that stops passing fails the gate, and so does one that starts passing
@@ -197,11 +198,22 @@ In the built-ins, the failures are mostly proposals not implemented yet
 (about 170 of the 217 `Iterator` failures), Unicode property escapes
 (about 570 of the 655 `RegExp` failures, TD-110), or tests that reach for
 Temporal or `$262.agent` (112 `Atomics` files). The rest are recorded as TD-142 (built-in edge
-bugs) and TD-143 (recent-edition library features). The gate leaves out
-the URI function directories, where every function is missing (TD-136). Skipped files are never
-counted as passing. The script gate continues to report module files as
+bugs) and TD-143 (recent-edition library features). The URI directories have
+171 passes at the standard five-million-step limit. Two exhaustive tests
+enumerate supplementary Unicode scalars and pass in the dedicated
+`test262_uri_decoders_cover_supplementary_scalars` gate at 400 million steps.
+The four global function objects and the intrinsic `URIError` objects add
+822 bytes to the charged size of an agent with the standard library.
+Skipped files are excluded from the pass count. The script gate reports module files as
 skipped. Their execution classifications are recorded by the separate module
 gate below.
+
+The four URI functions convert arguments with `ToString`, encode complete
+Unicode scalars as uppercase UTF-8 escapes and preserve the reserved escapes
+in `decodeURI`. Malformed escapes and lone surrogates during encoding throw
+the realm's intrinsic `URIError`. The functions charge native steps and
+preserve raw UTF-16 units while decoding.
+[ECMAScript URI handling](https://tc39.es/ecma262/multipage/global-object.html#sec-uri-handling-functions)
 
 `$262.evalScript` runs UTF-16 script source in the current global environment
 and preserves completion values and thrown objects. Its global declaration

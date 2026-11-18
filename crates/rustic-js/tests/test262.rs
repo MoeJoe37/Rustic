@@ -9,7 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use rustic_js::ParseLimits;
-use rustic_js::test262::{RunLimits, execute_module_tree, execute_tree, run_tree};
+use rustic_js::test262::{
+    Harness, RunLimits, Verdict, execute, execute_module_tree, execute_tree, metadata, run_tree,
+};
 
 const EXPECTED: &str = include_str!("fixtures/test262_expected_failures.txt");
 /// The `test/language` files that pass when executed, without that prefix.
@@ -183,11 +185,13 @@ const BUILT_IN_DIRS: &[&str] = &[
     "Function",
     "GeneratorFunction",
     "GeneratorPrototype",
+    "Infinity",
     "Iterator",
     "JSON",
     "Map",
     "MapIteratorPrototype",
     "Math",
+    "NaN",
     "NativeErrors",
     "Number",
     "Object",
@@ -202,16 +206,23 @@ const BUILT_IN_DIRS: &[&str] = &[
     "String",
     "StringIteratorPrototype",
     "Symbol",
+    "ThrowTypeError",
     "TypedArray",
     "TypedArrayConstructors",
     "WeakMap",
     "WeakRef",
     "WeakSet",
+    "decodeURI",
+    "decodeURIComponent",
+    "encodeURI",
+    "encodeURIComponent",
+    "eval",
     "global",
     "isFinite",
     "isNaN",
     "parseFloat",
     "parseInt",
+    "undefined",
 ];
 
 /// The same exact comparison for the built-ins JS-05 has installed.
@@ -230,6 +241,32 @@ fn test262_built_ins_execution_matches_the_passing_list() {
         "test262_built_ins_passing.txt",
         "Test262 test/built-ins files that pass when executed (JS-05).",
     );
+}
+
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_uri_decoders_cover_supplementary_scalars() {
+    let root = PathBuf::from(
+        std::env::var("RUSTIC_TEST262_DIR").expect("RUSTIC_TEST262_DIR names a Test262 checkout"),
+    );
+    let harness = Harness::load(&root).expect("Test262 harness files");
+    // The exhaustive loops in these files exceed the ordinary 5M-step gate.
+    let limits = RunLimits {
+        steps: 400_000_000,
+        ..RunLimits::default()
+    };
+    for path in [
+        "test/built-ins/decodeURI/S15.1.3.1_A2.5_T1.js",
+        "test/built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js",
+    ] {
+        let text = std::fs::read_to_string(root.join(path)).expect("pinned Test262 file");
+        let meta = metadata(&text).expect("Test262 front matter");
+        assert_eq!(
+            execute(&text, &meta, &harness, limits),
+            Verdict::Pass,
+            "{path}"
+        );
+    }
 }
 
 #[test]

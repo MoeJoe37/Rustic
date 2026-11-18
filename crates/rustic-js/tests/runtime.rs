@@ -41,6 +41,37 @@ fn names(agent: &Agent, keys: &[PropertyKey]) -> Vec<String> {
         .collect()
 }
 
+#[test]
+fn uri_functions_preserve_reserved_escapes_and_use_intrinsic_errors() {
+    let mut agent = agent();
+    agent
+        .evaluate(
+            r#"
+        if (encodeURI('https://a/é/🚀?x=#a') !== 'https://a/%C3%A9/%F0%9F%9A%80?x=#a')
+            throw 'whole URI';
+        if (encodeURIComponent('/#%') !== '%2F%23%25' ||
+            decodeURIComponent('%2f%23%25') !== '/#%' ||
+            decodeURI('%2f%23%25') !== '%2f%23%' ||
+            decodeURI('\udfff%00') !== '\udfff\0') throw 'component or raw units';
+        const expected = URIError.prototype;
+        Object.defineProperty(globalThis, 'URIError', {get() { throw 'global lookup'; }});
+        for (const call of [
+            () => encodeURI('\ud800'),
+            () => decodeURIComponent('%C0%AF'),
+            () => decodeURI('%ED%A0%80'),
+            () => decodeURI('%F4%90%80%80'),
+            () => decodeURI('%F0%9F%9A'),
+        ]) {
+            try { call(); throw 'accepted invalid data'; }
+            catch (error) {
+                if (Object.getPrototypeOf(error) !== expected) throw error;
+            }
+        }
+    "#,
+        )
+        .unwrap();
+}
+
 // ---- memory -----------------------------------------------------------
 
 #[test]
@@ -106,8 +137,8 @@ fn deleting_or_many_properties_switch_to_a_dictionary_without_losing_order() {
 
 #[test]
 fn the_heap_budget_fails_cleanly() {
-    // A new agent with every built-in takes about 71 KiB.
-    let mut a = Agent::with_heap_limit(128 * 1024).unwrap();
+    // Leave room for standard library installation before exhausting the heap.
+    let mut a = Agent::with_heap_limit(160 * 1024).unwrap();
     let mut result = Ok(());
     for _ in 0..10_000 {
         if let Err(e) = a.new_object() {

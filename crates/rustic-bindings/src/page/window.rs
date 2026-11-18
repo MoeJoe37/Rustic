@@ -85,6 +85,17 @@ pub(super) fn install(agent: &mut Agent, scheduler: bool) -> JsResult<Value> {
             PropertyDescriptor::accessor(get, set, true, configurable),
         )?;
     }
+    let computed_style = agent.new_native_function(
+        super::computed_style::get_computed_style,
+        "getComputedStyle",
+        1,
+    )?;
+    let key = agent.heap.key("getComputedStyle")?;
+    agent.define_property_or_throw(
+        global,
+        key,
+        PropertyDescriptor::data_with(Value::object(computed_style), true, true, true),
+    )?;
     if scheduler {
         for (name, function, length) in [
             ("setTimeout", set_timer::<false> as NativeFn, 1),
@@ -106,7 +117,7 @@ pub(super) fn install(agent: &mut Agent, scheduler: bool) -> JsResult<Value> {
     agent.install_window_proxy(prototype).map(Value::object)
 }
 
-fn receiver(agent: &mut Agent, value: Value) -> JsResult<ObjectId> {
+pub(super) fn receiver(agent: &mut Agent, value: Value) -> JsResult<ObjectId> {
     let global = agent.intrinsics.global;
     if value.is_nullish() {
         return Ok(global);

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use rustic_base::{CancellationToken, Clock, SystemClock};
 use rustic_bindings::dom_exception;
-use rustic_bindings::page::{self, LayoutReadError, LifecycleEvent, PageTree};
+use rustic_bindings::page::{self, ComputedStyleSnapshot, LayoutReadError, LifecycleEvent, PageTree};
 use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
 use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
@@ -265,6 +265,12 @@ impl PageTree for ScriptTree {
                 .copied()
                 .unwrap_or(Some([0.0; 4]))
                 .ok_or(LayoutReadError::Unavailable)
+        })
+    }
+
+    fn computed_style(&self, id: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
+        self.read_layout(ComputedStyleSnapshot::default(), |geometry| {
+            Ok(geometry.computed_styles.get(&id).cloned().unwrap_or_default())
         })
     }
 

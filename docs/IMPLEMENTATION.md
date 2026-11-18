@@ -150,6 +150,7 @@ status is the [progress summary](progress/summary.md).
 - [WEB-05 — Document readiness and scripted CLI](#web-05--document-readiness-and-scripted-cli)
 - [WEB-05 — Processing-instruction nodes](#web-05--processing-instruction-nodes)
 - [WEB-06 — Frame validity across script turns](#web-06--frame-validity-across-script-turns)
+- [WEB-06 — Live computed-style read methods (partial)](#web-06--live-computed-style-read-methods-partial)
 - [WEB-09 — Initial Window conformance baseline](#web-09--initial-window-conformance-baseline)
 
 </details>
@@ -573,6 +574,26 @@ tree if admitting a replacement fails. Scripted reftests exercise a changed
 stylesheet and replacement node, a counter, a timer and capture/bubble order.
 The fuzz smoke job covers the event/timer pump and compares scripted pixels to
 a freshly parsed reference.
+
+## WEB-06 — Live computed-style read methods (partial)
+
+A held `CSSStyleDeclaration` obtained from `Window.getComputedStyle` is
+associated with its element through a rooted weak map. Its `getPropertyValue`,
+`getPropertyPriority`, `item` and `length` methods ask the shared
+`LayoutReads` snapshot for the latest successful DOM and applied-input
+revisions. The CLI's `LocalLayout` attaches computed longhand and custom
+property values from the same `style_tree` call used to construct its layout
+boxes, so the style query and geometry do not run competing cascades.
+
+Regression sources: `crates/rustic-engine/tests/frames.rs` (held declarations,
+callback argument conversion, microtasks and shared eight-flush quota) and
+`crates/rustic-cli/src/loader.rs` (live local style/class/inline mutations,
+custom names, inheritance and detached nodes). **Verification pending**:
+this environment has no Rust toolchain, and the hosted CI billing block remains.
+Camel-cased getters, indexed properties, pseudo-elements, style serialization
+coverage and applied resource-completion tasks remain WEB-06 work under
+[ADR 0045](adr/0045-live-computed-style-reads.md). No new capability is
+marked complete by this slice.
 
 ## WEB-09 — Initial Window conformance baseline
 

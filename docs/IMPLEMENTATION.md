@@ -2299,5 +2299,16 @@ Compared with Chromium 157 (`tools/encoding_reference.js` and the
 `compare_reference` example): 44,469,888 cases agree, including every
 encoder on every scalar value. The 242 decoder differences are three
 documented places where Chromium departs from the standard's text.
-HTML encoding sniffing and restart (`url.restart`), URL query encoding and
-the TextDecoder/TextEncoder bindings remain.
+Transport encoding confidence and navigation replacement (`url.restart`),
+URL query encoding and the TextDecoder/TextEncoder bindings remain.
+
+## WEB-05 — Local HTML encoding replay
+
+The CLI retains a bounded prefix of file bytes. A private UTF-8 parse
+can find the first effective legacy declaration before the prefix is
+replayed into the admitted document. A BOM takes precedence. The
+encoding stays fixed after the definitive parser starts accepting bytes.
+The parser reports it through the Document encoding getters and the
+local host uses it to decode stylesheets and classic sources. The test
+places a Windows-1252 declaration after an inline script and checks the
+script's decoded text and single execution. [ADR 0044](adr/0044-local-html-encoding-replay.md)

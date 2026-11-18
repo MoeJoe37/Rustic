@@ -89,7 +89,13 @@ impl TreeBuilder {
             Tok::Doctype(_) => return self.ignore(),
             Tok::Start(tag) => match tag.name() {
                 "html" => return self.in_body(token),
-                "base" | "basefont" | "bgsound" | "link" | "meta" => self.insert_void(tag)?,
+                "base" | "basefont" | "bgsound" | "link" => self.insert_void(tag)?,
+                "meta" => {
+                    self.insert_void(tag)?;
+                    if self.detect_encoding && self.template_modes.is_empty() {
+                        self.declared_encoding = crate::local_encoding::meta_encoding(tag);
+                    }
+                }
                 "title" => self.insert_text_element(tag, TokenizerMode::Rcdata)?,
                 "noscript" if self.scripting == Scripting::Enabled => {
                     self.insert_text_element(tag, TokenizerMode::Rawtext)?;

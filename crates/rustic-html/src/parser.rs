@@ -1,7 +1,7 @@
 use rustic_base::CancellationToken;
 use rustic_dom::{Document, DocumentLimits, NodeId};
 
-use crate::{Diagnostic, HtmlTokenizer, Token, TokenizerLimits};
+use crate::{Diagnostic, Encoding, HtmlTokenizer, Token, TokenizerLimits};
 
 mod error;
 mod fragment;
@@ -40,6 +40,7 @@ impl Default for ParserLimits {
 pub struct ParsedDocument {
     document: Document,
     mode: DocumentMode,
+    encoding: Encoding,
     tokenizer_diagnostics: Vec<Diagnostic>,
     tree_diagnostics: Vec<TreeDiagnostic>,
     dropped_diagnostics: usize,
@@ -50,6 +51,7 @@ pub struct ParsedDocument {
 pub(crate) struct TokenizerDiagnostics {
     pub(crate) retained: Vec<Diagnostic>,
     pub(crate) dropped: usize,
+    pub(crate) encoding: Encoding,
 }
 
 impl ParsedDocument {
@@ -71,6 +73,11 @@ impl ParsedDocument {
     /// Doctype-derived compatibility mode; no layout behavior is implied yet.
     pub fn mode(&self) -> DocumentMode {
         self.mode
+    }
+
+    /// Encoding used to decode the original document bytes.
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     /// Bounded tokenizer recoveries with normalized code-point offsets.
@@ -167,6 +174,36 @@ impl HtmlDocumentParser {
         self.driver.write(bytes)
     }
 
+    /// Commit the decoder before the first byte is handed to this parser.
+    pub fn set_initial_encoding(&mut self, encoding: Encoding) -> Result<(), ParseError> {
+        self.driver.ensure_writable()?;
+        if !self.driver.tokenizer.set_initial_encoding(encoding) {
+            return Err(ParseError::EncodingLocked);
+        }
+        self.driver.encoding = encoding;
+        Ok(())
+    }
+
+    /// Encoding selected for the active parser.
+    pub fn encoding(&self) -> Encoding {
+        self.driver.encoding
+    }
+
+    pub(crate) fn probe_encoding(&mut self, prefix: &[u8]) -> Result<Option<Encoding>, ParseError> {
+        self.driver
+            .tree
+            .as_mut()
+            .expect("new parser owns tree")
+            .detect_encoding = true;
+        self.write(prefix)?;
+        while self.driver.advance()?.is_some() {}
+        Ok(self
+            .driver
+            .tree
+            .as_ref()
+            .and_then(|tree| tree.declared_encoding))
+    }
+
     /// Close the input stream without advancing tree construction.
     pub fn close_input(&mut self) -> Result<(), ParseError> {
         self.driver.close_input()
@@ -231,6 +268,7 @@ struct Driver {
     tree: Option<TreeBuilder>,
     lifecycle: Lifecycle,
     input_closed: bool,
+    encoding: Encoding,
 }
 
 impl Driver {
@@ -240,6 +278,7 @@ impl Driver {
             tree: Some(tree),
             lifecycle: Lifecycle::Active,
             input_closed: false,
+            encoding: Encoding::Utf8,
         }
     }
 
@@ -273,6 +312,7 @@ impl Driver {
         let diagnostics = TokenizerDiagnostics {
             retained: self.tokenizer.diagnostics().to_vec(),
             dropped: self.tokenizer.dropped_diagnostics(),
+            encoding: self.encoding,
         };
         Ok((tree, diagnostics))
     }
@@ -296,6 +336,9 @@ impl Driver {
                 self.tokenizer.set_text_mode(mode)?;
             }
             self.tokenizer.set_cdata_allowed(tree.cdata_allowed());
+            if tree.declared_encoding.is_some() {
+                break;
+            }
             if let Some(element) = feedback.script {
                 return Ok(Some(element));
             }

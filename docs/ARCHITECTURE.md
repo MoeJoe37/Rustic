@@ -37,7 +37,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-base` | Typed IDs, checked geometry, byte budgets, cancellation, clocks, diagnostics | std, reviewed utility crates | M1 |
 | `rustic-url` | WHATWG URL parsing/serialization, origin records, relative resolution, UTS #46 IDNA | base; generated Unicode IDNA/NFC tables | M1 |
 | `rustic-encoding` | Encoding Standard labels, decoders and encoders for all 40 encodings, BOM sniffing and the decode/encode hooks ([ENCODING.md](ENCODING.md)) | none; indexes generated from pinned whatwg/encoding data | M6 entry (started during M5) |
-| `rustic-html` | Encoding integration, incremental tokenizer, tree builder, recovery | base, DOM mutation interface | M1 |
+| `rustic-html` | Encoding integration, incremental tokenizer, tree builder, recovery | base, DOM mutation interface, encoding | M1 |
 | `rustic-dom` | Document/node graph, mutation, names, events, traversal, tracing integration | base, URL | M1 |
 | `rustic-css` | Syntax tokens, stylesheet/declaration parsing, selectors, value syntax | base | M2 |
 | `rustic-style` | Selector matching, cascade, inheritance, computed styles, invalidation, external sheet loading through an embedder fetcher | CSS, read-only DOM view, URL, text (font metrics, Bidi_Class) | M2 |
@@ -195,8 +195,8 @@ stride and bytes per pixel as well as the viewport pixel count present at M0.
 
 ## 4. Parsing, style, layout, and painting
 
-The current `rustic-html` crate depends on `rustic-base` and `rustic-dom`. It implements
-explicit UTF-8 input, data/tags, named/numeric references, comments, doctypes,
+The `rustic-html` crate depends on `rustic-base`, `rustic-dom` and `rustic-encoding`.
+It implements incremental decoded input, data/tags, named/numeric references, comments, doctypes,
 processing instructions and caller-controlled RCDATA/RAWTEXT/script/plaintext
 states. Syntax families have focused internal modules. The pull
 driver owns queued input and pauses at token boundaries for mode feedback; it

@@ -14,6 +14,7 @@ use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf, Prefix};
 
 use rustic_base::CancellationToken;
+use rustic_encoding::Encoding;
 use rustic_style::{FetchError, StylesheetFetcher};
 use rustic_url::{Url, UrlPath};
 
@@ -136,6 +137,7 @@ pub struct LocalStylesheetFetcher {
     url_root: PathBuf,
     chunk_bytes: usize,
     cancellation: CancellationToken,
+    environment_encoding: Encoding,
 }
 
 impl LocalStylesheetFetcher {
@@ -148,7 +150,13 @@ impl LocalStylesheetFetcher {
             url_root,
             chunk_bytes: chunk_bytes.max(1),
             cancellation,
+            environment_encoding: Encoding::Utf8,
         })
+    }
+
+    pub(crate) fn with_environment_encoding(mut self, encoding: Encoding) -> Self {
+        self.environment_encoding = encoding;
+        self
     }
 
     fn read(&self, path: &Path, max_bytes: usize) -> Result<Vec<u8>, FetchError> {
@@ -209,12 +217,10 @@ impl StylesheetFetcher for LocalStylesheetFetcher {
     /// Read a stylesheet and decode it with CSS Syntax §3.2: a byte order
     /// mark, then a leading `@charset` rule, then the referring document's
     /// encoding select the decoder, and errors become U+FFFD. Local files
-    /// have no transport `charset`, and documents are UTF-8 until HTML
-    /// encoding sniffing lands (`url.restart`).
+    /// have no transport `charset`.
     fn fetch(&mut self, url: &Url, max_bytes: usize) -> Result<String, FetchError> {
         let bytes = self.fetch_bytes(url, max_bytes)?;
-        let text =
-            rustic_css::decode_stylesheet(&bytes, None, Some(rustic_encoding::Encoding::Utf8));
+        let text = rustic_css::decode_stylesheet(&bytes, None, Some(self.environment_encoding));
         // Replacement characters can make the text longer than the bytes.
         if text.len() > max_bytes {
             return Err(FetchError::TooLarge);

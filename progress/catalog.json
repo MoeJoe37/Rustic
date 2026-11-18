@@ -786,7 +786,7 @@
             {
               "kind": "source",
               "path": "crates/rustic-html/src/input.rs",
-              "marker": "pub struct Utf8Input"
+              "marker": "pub struct HtmlInput"
             },
             {
               "kind": "test",
@@ -989,55 +989,47 @@
           "label": "Parser/script reentry and encoding restart",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Scripting-enabled tree construction and script suspension",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-html/src/parser.rs",
-                  "marker": "pub fn advance_to_script"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/document.rs",
-                  "marker": "fn script_boundaries_precede_later_markup_at_every_split"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/tree_construction.rs",
-                  "marker": "fn html5lib_tree_construction_documents"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser.rs",
+              "marker": "pub fn advance_to_script"
             },
             {
-              "label": "Live document handoff and bounded parser reentry",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "pub(crate) fn with_active_parser"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn parser_retains_detached_open_nodes_and_current_script_through_collection"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn outward_adoption_during_parsing_protects_only_retained_subtrees"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-html/src/local_encoding.rs",
+              "marker": "pub fn select_local_encoding"
             },
             {
-              "label": "Encoding restart",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/inline_scripts.rs",
+              "marker": "fn outward_adoption_during_parsing_protects_only_retained_subtrees"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn local_encoding_replays_before_the_first_script"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/document.rs",
+              "marker": "fn script_boundaries_precede_later_markup_at_every_split"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub(crate) fn with_active_parser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/inline_scripts.rs",
+              "marker": "fn parser_retains_detached_open_nodes_and_current_script_through_collection"
             }
           ]
         },

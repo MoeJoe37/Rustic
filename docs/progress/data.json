@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "9f115288fdac86f87b267a3fd5c9781f50a5ed25d872be16c7acb7ea4b79f273",
-  "percent": "32.99",
-  "verified_percent": "31.48",
-  "partial_percent": "1.51",
-  "completed": 72,
-  "in_progress": 8,
+  "source_fingerprint": "8800b88bd5fbb30acf5b5bce016622182e776cd9d72d123f6f976a27f9968f0d",
+  "percent": "33.12",
+  "verified_percent": "31.89",
+  "partial_percent": "1.23",
+  "completed": 73,
+  "in_progress": 7,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -55,11 +55,11 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 6,
+      "completed": 7,
       "total": 12,
-      "percent": "64.59",
-      "verified_percent": "52.41",
-      "partial_percent": "12.18"
+      "percent": "67.14",
+      "verified_percent": "60.06",
+      "partial_percent": "7.08"
     },
     {
       "id": "M6",
@@ -956,7 +956,7 @@
             {
               "kind": "source",
               "path": "crates/rustic-html/src/input.rs",
-              "marker": "pub struct Utf8Input"
+              "marker": "pub struct HtmlInput"
             },
             {
               "kind": "test",
@@ -1173,58 +1173,50 @@
           "label": "Parser/script reentry and encoding restart",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Scripting-enabled tree construction and script suspension",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-html/src/parser.rs",
-                  "marker": "pub fn advance_to_script"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/document.rs",
-                  "marker": "fn script_boundaries_precede_later_markup_at_every_split"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/tree_construction.rs",
-                  "marker": "fn html5lib_tree_construction_documents"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser.rs",
+              "marker": "pub fn advance_to_script"
             },
             {
-              "label": "Live document handoff and bounded parser reentry",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "pub(crate) fn with_active_parser"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn parser_retains_detached_open_nodes_and_current_script_through_collection"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/inline_scripts.rs",
-                  "marker": "fn outward_adoption_during_parsing_protects_only_retained_subtrees"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-html/src/local_encoding.rs",
+              "marker": "pub fn select_local_encoding"
             },
             {
-              "label": "Encoding restart",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/inline_scripts.rs",
+              "marker": "fn outward_adoption_during_parsing_protects_only_retained_subtrees"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn local_encoding_replays_before_the_first_script"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/document.rs",
+              "marker": "fn script_boundaries_precede_later_markup_at_every_split"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/tree_construction.rs",
+              "marker": "fn html5lib_tree_construction_documents"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub(crate) fn with_active_parser"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/inline_scripts.rs",
+              "marker": "fn parser_retains_detached_open_nodes_and_current_script_through_collection"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.40"
         },
         {
@@ -1306,13 +1298,13 @@
         }
       ],
       "points": 37,
-      "completed": 9,
-      "in_progress": 1,
+      "completed": 10,
+      "in_progress": 0,
       "total": 11,
-      "contribution": "3.78",
-      "percent": "75.67",
-      "verified_percent": "70.27",
-      "partial_percent": "5.40"
+      "contribution": "3.91",
+      "percent": "78.37",
+      "verified_percent": "78.37",
+      "partial_percent": "0.00"
     },
     {
       "id": "css",

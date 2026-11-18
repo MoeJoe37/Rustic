@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::{Arc, Weak};
 
 use rustic_base::CancellationToken;
-use rustic_html::{HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
+use rustic_html::{Encoding, HtmlDocumentParser, ParseError, ParsedDocument, ParserLimits};
 
 /// The host's coordinator for pending loads and live documents.
 ///
@@ -136,6 +136,12 @@ pub struct DocumentLoad {
 }
 
 impl DocumentLoad {
+    /// Select the original byte decoder before feeding HTML.
+    pub fn set_initial_encoding(&mut self, encoding: Encoding) -> Result<(), ParseError> {
+        let pending = self.pending.as_mut().ok_or(ParseError::Poisoned)?;
+        pending.parser.set_initial_encoding(encoding)
+    }
+
     /// The shared work token while the load is active.
     pub fn cancellation(&self) -> Option<&CancellationToken> {
         self.pending

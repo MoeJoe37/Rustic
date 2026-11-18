@@ -1,8 +1,8 @@
 # HTML input and tokenizer foundations
 
-`rustic-html` is an original, safe Rust implementation depending only on
-`rustic-base`. It tokenizes data, tags/attributes, declarations and text contexts. It
-does not construct a DOM, select encodings, load documents or render pages.
+`rustic-html` implements HTML tokenization and tree construction in safe
+Rust. It uses `rustic-encoding` for byte decoding and `rustic-dom` for
+the checked tree operations.
 
 ## Implemented behavior
 
@@ -165,9 +165,11 @@ stream; another feed/finish returns `AlreadyFinished`.
 
 The [inert document parser](HTML_TREE.md) now implements complete document tree
 construction with scripting disabled, including foreign content and CDATA.
-The fragment parsing algorithm is implemented over UTF-8 bytes. Encoding
-sniffing, legacy decoders, restart and parser/script execution/reentry remain
-planned. DOM-string/UTF-16 fragment input is separate from the UTF-8 interface.
+The fragment parsing algorithm is implemented over UTF-8 bytes.
+The local document loader can select a legacy encoding and replay its
+retained prefix before author code runs. Transport-level encoding
+confidence and navigation replacement remain part of `url.restart`.
+[ADR 0044](adr/0044-local-html-encoding-replay.md)
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
 DOC-05b now has reference expansion and all four text modes; broader encoding work
@@ -286,6 +288,6 @@ Text states follow [RCDATA](https://html.spec.whatwg.org/multipage/parsing.html#
 [RAWTEXT](https://html.spec.whatwg.org/multipage/parsing.html#rawtext-state),
 [script data](https://html.spec.whatwg.org/multipage/parsing.html#script-data-state) and
 [plaintext](https://html.spec.whatwg.org/multipage/parsing.html#plaintext-state).
-UTF-8 behavior uses the Rust standard library's validated decoding primitives;
-Rustic owns the incremental buffering and HTML preprocessing/state machine.
-No browser engine or external parser implementation is used.
+The shared encoding crate uses Rust's validated UTF-8 prefix checks and
+original streaming decoders. HTML applies its own input preprocessing.
+[ENCODING.md](ENCODING.md)

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use rustic_base::{Budget, CancellationToken, DocumentId, IdSequence};
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
+use rustic_encoding::{Encoding, decode, utf8_decode};
 use rustic_html::{ParseError, ScriptBoundary};
 use rustic_js::module::ModuleRecord;
 use rustic_js::{ParseLimits, Source};
@@ -109,6 +110,7 @@ pub(crate) struct ExternalScripts {
 struct Entry {
     element: NodeId,
     mode: ClassicScriptMode,
+    encoding: Encoding,
     state: State,
 }
 
@@ -171,6 +173,7 @@ impl ExternalScripts {
         element: NodeId,
         src: &[u16],
         mode: ClassicScriptMode,
+        encoding: Encoding,
     ) -> Result<bool, ScriptLoadError> {
         if self.attempts.charge(1).is_err() {
             return Ok(false);
@@ -203,6 +206,7 @@ impl ExternalScripts {
             Entry {
                 element,
                 mode,
+                encoding,
                 state: State::Undispatched,
             },
         );
@@ -399,7 +403,7 @@ impl ExternalScripts {
             let key = ModuleKey::External(fetch.url.clone());
             if let Some(source) = result
                 .ok()
-                .and_then(|bytes| self.decode(bytes, source_limit))
+                .and_then(|bytes| self.decode(bytes, source_limit, None))
             {
                 self.parse_module_source(
                     key,
@@ -423,9 +427,10 @@ impl ExternalScripts {
         };
         let mode = entry.mode;
         let element = entry.element;
+        let encoding = entry.encoding;
         let source = result
             .ok()
-            .and_then(|bytes| self.decode(bytes, source_limit));
+            .and_then(|bytes| self.decode(bytes, source_limit, Some(encoding)));
         if mode == ClassicScriptMode::Async {
             self.entries.remove(&id);
             return Ok(Some(ReadyClassic { element, source }));
@@ -497,12 +502,20 @@ impl ExternalScripts {
         self.max_response_bytes.min(self.total_bytes.remaining())
     }
 
-    fn decode(&mut self, bytes: &[u8], limit: usize) -> Option<Source> {
+    fn decode(
+        &mut self,
+        bytes: &[u8],
+        limit: usize,
+        classic_encoding: Option<Encoding>,
+    ) -> Option<Source> {
         if bytes.len() > self.max_response_bytes || self.total_bytes.charge(bytes.len()).is_err() {
             return None;
         }
-        let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
-        Source::from_str_limited(&String::from_utf8_lossy(bytes), limit).ok()
+        let source = match classic_encoding {
+            Some(encoding) => decode(bytes, encoding).text,
+            None => utf8_decode(bytes),
+        };
+        Source::from_str_limited(&source, limit).ok()
     }
 
     fn resolve(&self, document: &Document, src: &[u16]) -> Result<Option<Url>, ParseError> {

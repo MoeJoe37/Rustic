@@ -182,6 +182,7 @@ dependencies = [
  "rustic-base",
  "rustic-bindings",
  "rustic-dom",
+ "rustic-encoding",
  "rustic-html",
  "rustic-js",
  "rustic-url",
@@ -213,6 +214,7 @@ version = "0.1.0"
 dependencies = [
  "rustic-base",
  "rustic-dom",
+ "rustic-encoding",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ use rustic_base::{CancellationToken, Clock, SystemClock};
 use rustic_bindings::page::LifecycleEvent;
 use rustic_dom::{Document, Element, NodeId, NodeKind, ReadyState};
 use rustic_html::{
-    HtmlDocumentParser, HtmlError, ParseError, ParserLimits, ScriptBoundary, Scripting,
+    Encoding, HtmlDocumentParser, HtmlError, ParseError, ParserLimits, ScriptBoundary, Scripting,
 };
 use rustic_js::module::{GraphError, GraphLimits};
 use rustic_js::{MAX_SOURCE_UNITS, Source};
@@ -202,6 +202,19 @@ impl Engine {
 }
 
 impl<C: Clock> InlineScriptLoad<C> {
+    /// Commit the byte-stream encoding before any parser or author script runs.
+    pub fn set_initial_encoding(&mut self, encoding: Encoding) -> Result<(), ScriptLoadError> {
+        self.with_pending(|pending| {
+            if pending.input_closed {
+                return Err(ParseError::EncodingLocked.into());
+            }
+            pending
+                .document
+                .with_active_parser(|parser| parser.set_initial_encoding(encoding))?;
+            Ok(())
+        })
+    }
+
     /// The shared work token while the load is active.
     pub fn cancellation(&self) -> Option<&CancellationToken> {
         self.pending.as_ref().map(|load| load.scope.cancellation())
@@ -238,6 +251,7 @@ impl<C: Clock> InlineScriptLoad<C> {
                 error,
                 ScriptLoadError::UnknownScriptRequest
                     | ScriptLoadError::Parse(ParseError::InputClosed)
+                    | ScriptLoadError::Parse(ParseError::EncodingLocked)
             )
         }) {
             self.pending = None;
@@ -247,6 +261,11 @@ impl<C: Clock> InlineScriptLoad<C> {
 }
 
 impl<C: Clock> ClassicScriptLoad<C> {
+    /// Commit the byte-stream encoding before any parser or author script runs.
+    pub fn set_initial_encoding(&mut self, encoding: Encoding) -> Result<(), ScriptLoadError> {
+        self.inner.set_initial_encoding(encoding)
+    }
+
     /// Supply the layout pipeline before feeding HTML so parser scripts can read layout.
     pub fn set_layout_source(
         &mut self,
@@ -474,6 +493,7 @@ impl<C: Clock> Pending<C> {
                 return self.advance_lifecycle();
             }
             let next = self.document.with_active_parser(|parser| {
+                let document_encoding = parser.encoding();
                 while let Some(boundary) = parser.advance_to_script()? {
                     if let Some(external) = &mut self.external {
                         if let Some(element) = module_element(&boundary)? {
@@ -502,11 +522,16 @@ impl<C: Clock> Pending<C> {
                     };
                     if let Some(src) = attribute(element, "src") {
                         if let Some(external) = &mut self.external {
+                            let encoding = attribute(element, "charset")
+                                .and_then(|label| String::from_utf16(label).ok())
+                                .and_then(|label| Encoding::for_label(&label))
+                                .unwrap_or(document_encoding);
                             let admitted = external.admit(
                                 boundary.document,
                                 boundary.element,
                                 trim_ascii_space(src),
                                 external_mode(element),
+                                encoding,
                             )?;
                             let prepared = if admitted {
                                 Prepared::ExternalPending(boundary.element)

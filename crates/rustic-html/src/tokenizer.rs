@@ -1,9 +1,9 @@
 use rustic_base::{Budget, CancellationToken};
 use std::collections::VecDeque;
 
+use crate::input::HtmlInput;
 use crate::{
     Attribute, Diagnostic, DiagnosticKind, Doctype, HtmlError, ProcessingInstruction, Tag, Token,
-    Utf8Input,
 };
 
 mod cdata;
@@ -95,7 +95,7 @@ struct BuildingTag {
 /// fatal conditions poison the stream instead of allowing a retry.
 #[derive(Debug)]
 pub struct HtmlTokenizer {
-    input: Utf8Input,
+    input: HtmlInput,
     cancellation: CancellationToken,
     limits: TokenizerLimits,
     state: State,
@@ -131,6 +131,18 @@ impl Default for HtmlTokenizer {
 }
 
 impl HtmlTokenizer {
+    pub(crate) fn set_initial_encoding(&mut self, encoding: rustic_encoding::Encoding) -> bool {
+        if self.input.bytes_consumed() != 0 || self.input_closed {
+            return false;
+        }
+        self.input = HtmlInput::with_encoding(
+            self.limits.max_input_bytes,
+            self.cancellation.clone(),
+            encoding,
+        );
+        true
+    }
+
     /// Create a tokenizer with explicit budgets and cooperative cancellation.
     pub fn new(
         limits: TokenizerLimits,
@@ -141,7 +153,7 @@ impl HtmlTokenizer {
             return Err(HtmlError::InvalidLimits);
         }
         Ok(Self {
-            input: Utf8Input::new(limits.max_input_bytes, cancellation.clone()),
+            input: HtmlInput::new(limits.max_input_bytes, cancellation.clone()),
             cancellation,
             limits,
             state: State::Data,

@@ -49,6 +49,10 @@ pub trait PageTree: Debug {
     fn quirks_mode(&self) -> bool {
         false
     }
+    /// The canonical name of the decoder used for the main document.
+    fn encoding_name(&self) -> &'static str {
+        "UTF-8"
+    }
     /// Nodes retained by the host independently of their JavaScript wrappers.
     fn retained_nodes(&self) -> Result<Vec<NodeId>, OutOfMemory> {
         Ok(Vec::new())
@@ -292,6 +296,13 @@ fn install_page(
                 documents::implementation,
             ),
             ("contentType", "get contentType", documents::content_type),
+            ("characterSet", "get characterSet", documents::character_set),
+            ("charset", "get charset", documents::character_set),
+            (
+                "inputEncoding",
+                "get inputEncoding",
+                documents::character_set,
+            ),
             ("doctype", "get doctype", documents::doctype),
             ("readyState", "get readyState", documents::ready_state),
             ("hidden", "get hidden", documents::hidden),

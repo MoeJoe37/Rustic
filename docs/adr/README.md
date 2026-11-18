@@ -51,6 +51,7 @@ instead of rewriting the history of a decision.
 | [0041](0041-scripted-document-readiness.md) | Document readiness, script events and CLI lifecycle | Accepted for the WEB-05 local host |
 | [0042](0042-scripted-render-state.md) | Style, layout and frame validity in scripted documents | Accepted for WEB-06 |
 | [0043](0043-encoding-standard.md) | Original Encoding Standard decoders and encoders over pinned, generated indexes | Accepted for `url.encoding` (M6 entry) |
+| [0044](0044-local-html-encoding-replay.md) | Bounded local HTML encoding replay before author script | Accepted for WEB-05 |
 
 ## Records by area
 
@@ -65,7 +66,7 @@ instead of rewriting the history of a decision.
 | Web IDL and wrappers (M5, WEB-02) | 0024, 0025, 0026, 0027 |
 | Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
-| Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041 |
+| Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041, 0044 |
 | Scripted rendering (M5, WEB-06) | 0023, 0042 |
 | Networking and resources (M6) | 0043 |
 

@@ -16,13 +16,13 @@ was still in progress, because nothing in it depends on scripting.
 | Encoders | Every encoder one scalar value at a time; unmappable values go back to the caller ("encode or fail"); ISO-2022-JP's end-of-queue escape (`Encoder::finish`) |
 | Hooks | `decode` (BOM sniff, then the fallback encoding), `bom_sniff`, `encode` (HTML forms, `&#NNNN;`), `utf8_decode`, `utf8_decode_without_bom`, `utf8_decode_without_bom_or_fail`, "get an output encoding" |
 | Stylesheets | CSS Syntax §3.2: BOM, then the transport `charset`, then a leading `@charset "…";`, then the referring document's encoding, then UTF-8 (`rustic_css::decode_stylesheet`). `dump-style`, `dump-layout` and `render` load local sheets through it |
+| Local HTML | BOM or the first effective HTML charset declaration within the bounded 64 KiB prefix. The local host replays the prefix before executing scripts. The document's encoding supplies the environment fallback for local stylesheets and classic scripts. [ADR 0044](adr/0044-local-html-encoding-replay.md) |
 
 ## What does not work yet
 
 | Missing | Where it lands |
 | --- | --- |
-| HTML encoding sniffing: BOM, transport label, `<meta>` prescan, frequency-free fallback by locale, and restarting the parser when a later `<meta>` changes the encoding | `url.restart`, with NET-02 |
-| Documents in a legacy encoding. Documents are UTF-8, so the environment encoding passed to stylesheets is always UTF-8 | `url.restart` |
+| Transport charset confidence, locale-dependent fallback and navigation replacement after publishing a page | `url.restart`, with NET-02 |
 | URL query encoding in a document's encoding | `url.encoding` step 2, with `url.restart` |
 | `TextDecoder`, `TextEncoder` and their stream variants | Web IDL bindings (M9 platform APIs) |
 | Form submission encodings (`application/x-www-form-urlencoded`, `multipart/form-data` in a legacy encoding) | NET-07 |
@@ -94,6 +94,11 @@ and the reference comparison below.
   equals one-call decoding, fatal mode fails exactly when replacement mode
   reports an error, and decode(encode(text)) returns the text whenever every
   scalar value is encodable.
+
+- The local loader's `local_encoding_replays_before_the_first_script`
+  regression checks byte-at-a-time reads, a declaration beyond byte 1024,
+  an external classic, a stylesheet and a single execution of the script
+  that appears before the declaration.
 
 ### Reference comparison
 

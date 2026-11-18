@@ -1,16 +1,16 @@
 use rustic_base::{Budget, CancellationToken};
+use rustic_encoding::{Decoder, DecoderErrorMode, Encoding};
 
 use crate::HtmlError;
 
-/// Bounded incremental UTF-8 decoding with HTML input preprocessing.
+/// Bounded incremental decoding with HTML input preprocessing.
 ///
 /// Invalid sequences become U+FFFD, incomplete sequences wait for more bytes,
 /// one initial BOM is removed, and CR/CRLF become LF even across feed boundaries.
-/// This does not select encodings, decode legacy charsets, or restart a parser.
 #[derive(Debug)]
-pub struct Utf8Input {
+pub struct HtmlInput {
     bytes: Budget,
-    pending: Vec<u8>,
+    decoder: Decoder,
     at_start: bool,
     previous_cr: bool,
     finished: bool,
@@ -18,12 +18,20 @@ pub struct Utf8Input {
     cancellation: CancellationToken,
 }
 
-impl Utf8Input {
+impl HtmlInput {
     /// Create an explicitly UTF-8 stream and charge original bytes cumulatively.
     pub fn new(max_input_bytes: usize, cancellation: CancellationToken) -> Self {
+        Self::with_encoding(max_input_bytes, cancellation, Encoding::Utf8)
+    }
+
+    pub(crate) fn with_encoding(
+        max_input_bytes: usize,
+        cancellation: CancellationToken,
+        encoding: Encoding,
+    ) -> Self {
         Self {
             bytes: Budget::new(max_input_bytes),
-            pending: Vec::new(),
+            decoder: encoding.new_decoder(DecoderErrorMode::Replacement),
             at_start: true,
             previous_cr: false,
             finished: false,
@@ -54,35 +62,17 @@ impl Utf8Input {
         self.bytes
             .charge(chunk.len())
             .map_err(|_| HtmlError::InputLimit)?;
-        let mut bytes = std::mem::take(&mut self.pending);
-        bytes.extend_from_slice(chunk);
-        let mut rest = bytes.as_slice();
         let mut output = String::new();
-        while !rest.is_empty() {
+        let mut decoded = String::new();
+        for bytes in chunk.chunks(4096) {
             self.cancellation
                 .check()
                 .map_err(|_| HtmlError::Cancelled)?;
-            match std::str::from_utf8(rest) {
-                Ok(valid) => {
-                    self.preprocess(valid, &mut output)?;
-                    break;
-                }
-                Err(error) => {
-                    let valid = std::str::from_utf8(&rest[..error.valid_up_to()])
-                        .expect("validated UTF-8 prefix");
-                    self.preprocess(valid, &mut output)?;
-                    rest = &rest[error.valid_up_to()..];
-                    if let Some(length) = error.error_len() {
-                        self.scalar('\u{fffd}', &mut output);
-                        rest = &rest[length..];
-                    } else {
-                        // A UTF-8 scalar has at most four bytes, so at most three
-                        // incomplete bytes persist between chunks.
-                        self.pending.extend_from_slice(rest);
-                        break;
-                    }
-                }
-            }
+            self.decoder
+                .decode(bytes, false, &mut decoded)
+                .expect("replacement decoder");
+            self.preprocess(&decoded, &mut output)?;
+            decoded.clear();
         }
         Ok(output)
     }
@@ -94,13 +84,15 @@ impl Utf8Input {
             self.poisoned = true;
             return Err(HtmlError::Cancelled);
         }
+        let mut decoded = String::new();
+        self.decoder
+            .decode(&[], true, &mut decoded)
+            .expect("replacement decoder");
         let mut output = String::new();
-        if !self.pending.is_empty() {
-            self.pending.clear();
-            self.scalar('\u{fffd}', &mut output);
-        }
-        self.finished = true;
-        Ok(output)
+        let result = self.preprocess(&decoded, &mut output);
+        self.finished = result.is_ok();
+        self.poisoned = result.is_err();
+        result.map(|()| output)
     }
 
     fn ensure_active(&self) -> Result<(), HtmlError> {
@@ -126,7 +118,9 @@ impl Utf8Input {
     fn scalar(&mut self, value: char, output: &mut String) {
         if self.at_start {
             self.at_start = false;
-            if value == '\u{feff}' {
+            if value == '\u{feff}'
+                && (self.decoder.encoding() == Encoding::Utf8 || self.decoder.encoding().is_utf16())
+            {
                 return;
             }
         }

@@ -72,6 +72,11 @@ During parsing, scripts can move completed subtrees to another document.
 Subtrees that contain parser or pending script identities stay with the
 original document while those identities are in use.
 
+The local loader chooses the encoding before it runs author code. A
+tentative parse can discover a legacy charset later in the retained prefix
+and replay it without executing earlier scripts twice. The Document
+encoding getters expose the selected decoder. [ADR 0044](adr/0044-local-html-encoding-replay.md)
+
 With `--run-scripts`, `HTMLElement.offsetWidth` reads the rounded,
 untransformed border-fragment width through the same layout pipeline as
 the output renderer. `Element.getBoundingClientRect()` returns a new

@@ -244,6 +244,18 @@ pub(super) fn content_type(agent: &mut Agent, receiver: Value, _: &[Value]) -> J
     })
 }
 
+pub(super) fn character_set(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    let id = document_receiver(agent, receiver)?;
+    with_page(agent, |agent, page| {
+        let encoding = if id.document() == page.main {
+            page.tree.encoding_name()
+        } else {
+            "UTF-8"
+        };
+        agent.string(encoding)
+    })
+}
+
 pub(super) fn ready_state(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
     document_receiver(agent, receiver)?;
     read_node(agent, receiver, |agent, _, document, _, _| {

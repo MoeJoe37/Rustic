@@ -3,7 +3,7 @@ use rustic_dom::{
     ReadyState, SVG_NAMESPACE,
 };
 
-use crate::{Doctype, ProcessingInstruction, Tag, Token, TokenizerMode};
+use crate::{Doctype, Encoding, ProcessingInstruction, Tag, Token, TokenizerMode};
 
 use super::{
     ContextNamespace, DocumentMode, FragmentContext, ParseError, ParsedDocument, ParsedFragment,
@@ -127,6 +127,8 @@ pub(super) struct TreeBuilder {
     document_mode: DocumentMode,
     scripting: Scripting,
     exposed_document: bool,
+    pub(super) detect_encoding: bool,
+    pub(super) declared_encoding: Option<Encoding>,
     insertion_mode: InsertionMode,
     original_mode: InsertionMode,
     template_modes: Vec<InsertionMode>,
@@ -169,6 +171,8 @@ impl TreeBuilder {
             document_mode: DocumentMode::NoQuirks,
             scripting,
             exposed_document: false,
+            detect_encoding: false,
+            declared_encoding: None,
             insertion_mode: InsertionMode::Initial,
             original_mode: InsertionMode::Initial,
             template_modes: Vec::new(),
@@ -350,6 +354,7 @@ impl TreeBuilder {
         ParsedDocument {
             document: self.document,
             mode: self.document_mode,
+            encoding: tokenizer.encoding,
             tokenizer_diagnostics: tokenizer.retained,
             tree_diagnostics: self.diagnostics,
             dropped_diagnostics: tokenizer.dropped.saturating_add(self.dropped_diagnostics),

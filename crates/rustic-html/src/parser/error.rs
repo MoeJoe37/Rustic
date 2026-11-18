@@ -13,6 +13,8 @@ pub enum ParseError {
     Document(DomError),
     /// Input has closed, but the completed tree has not been transferred.
     InputClosed,
+    /// The parser has already begun reading bytes in its chosen encoding.
+    EncodingLocked,
     /// A successful EOF already transferred the document to the caller.
     AlreadyFinished,
     /// A previous fatal condition discarded this parser's partial document.
@@ -37,6 +39,7 @@ impl fmt::Display for ParseError {
             Self::Tokenizer(error) => write!(f, "HTML tokenizer: {error}"),
             Self::Document(error) => write!(f, "HTML document: {error}"),
             Self::InputClosed => f.write_str("HTML document parser input is closed"),
+            Self::EncodingLocked => f.write_str("HTML document parser encoding is locked"),
             Self::AlreadyFinished => f.write_str("HTML document parser already finished"),
             Self::Poisoned => f.write_str("HTML document parser previously failed"),
         }

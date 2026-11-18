@@ -222,6 +222,14 @@ impl PageTree for ScriptTree {
         self.mode() == Some(DocumentMode::Quirks)
     }
 
+    fn encoding_name(&self) -> &'static str {
+        let encoding = match &*self.state.borrow() {
+            ScriptTreeState::Parsing(parser) => parser.encoding(),
+            ScriptTreeState::Ready(owner) => owner.parsed().encoding(),
+        };
+        encoding.name()
+    }
+
     fn retained_nodes(&self) -> Result<Vec<NodeId>, OutOfMemory> {
         let mut roots = Vec::new();
         if let ScriptTreeState::Parsing(parser) =

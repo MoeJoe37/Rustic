@@ -2,7 +2,8 @@
 //!
 //! The command line grants exactly one file path. Page content may name other
 //! local subresources only inside that file's directory tree. Scripts run
-//! only when the caller opts in. There is no network or encoding detection.
+//! only when the caller opts in. Encoding selection uses a bounded local
+//! prefix. The loader has no network access.
 //! Input is read in fixed
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
@@ -23,7 +24,10 @@ use rustic_engine::{
     EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop,
     TaskLimits,
 };
-use rustic_html::{DocumentMode, ParseError, ParserLimits};
+use rustic_html::{
+    DocumentMode, Encoding, LOCAL_ENCODING_PREFIX_BYTES, ParseError, ParserLimits, Scripting,
+    select_local_encoding,
+};
 use rustic_style::{
     ComputeContext, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader,
     StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
@@ -254,7 +258,18 @@ pub fn load_document(
             other => LoadError::Engine(other),
         })?;
     let cancellation = load.cancellation().expect("admitted load").clone();
-    read_document_file(path, limits, &cancellation, |bytes| Ok(load.feed(bytes)?))?;
+    read_document_file(
+        path,
+        limits,
+        &cancellation,
+        Scripting::Disabled,
+        |bytes, encoding| {
+            if let Some(encoding) = encoding {
+                load.set_initial_encoding(encoding)?;
+            }
+            Ok(load.feed(bytes)?)
+        },
+    )?;
     Ok(load.finish()?)
 }
 
@@ -275,11 +290,6 @@ fn load_scripted_document(
         ManualClock::default(),
     )?;
     let cancellation = load.cancellation().expect("admitted load").clone();
-    load.set_layout_source(Box::new(LocalLayout {
-        path: path.clone(),
-        limits,
-        cancellation: cancellation.clone(),
-    }))?;
     let root = path
         .parent()
         .expect("a canonical regular file has a parent");
@@ -289,12 +299,27 @@ fn load_scripted_document(
         cancellation.clone(),
     )
     .ok_or(ScriptLoadError::InvalidDocumentUrl)?;
-    read_document_file(&path, limits, &cancellation, |bytes| {
-        load.feed(bytes)?;
-        // Service requests at parser barriers and EOF, independent of file chunks.
-        while load.is_parser_blocked() && complete_next_script_request(&mut load, &fetch)? {}
-        Ok(())
-    })?;
+    read_document_file(
+        &path,
+        limits,
+        &cancellation,
+        Scripting::Enabled,
+        |bytes, encoding| {
+            if let Some(encoding) = encoding {
+                load.set_initial_encoding(encoding)?;
+                load.set_layout_source(Box::new(LocalLayout {
+                    path: path.clone(),
+                    limits,
+                    cancellation: cancellation.clone(),
+                    encoding,
+                }))?;
+            }
+            load.feed(bytes)?;
+            // Service requests at parser barriers and EOF, independent of file chunks.
+            while load.is_parser_blocked() && complete_next_script_request(&mut load, &fetch)? {}
+            Ok(())
+        },
+    )?;
     load.close_input()?;
     let mut turns = 0;
     let mut document = loop {
@@ -353,32 +378,67 @@ fn read_document_file(
     path: &Path,
     limits: LoaderLimits,
     cancellation: &CancellationToken,
-    mut feed: impl FnMut(&[u8]) -> Result<(), LoadError>,
+    scripting: Scripting,
+    mut feed: impl FnMut(&[u8], Option<Encoding>) -> Result<(), LoadError>,
 ) -> Result<(), LoadError> {
     check_cancelled(cancellation)?;
     check_regular_file(fs::metadata(path).map_err(LoadError::Io)?, limits)?;
     let mut file = File::open(path).map_err(LoadError::Io)?;
     check_regular_file(file.metadata().map_err(LoadError::Io)?, limits)?;
 
-    let mut buffer = vec![0; limits.read_chunk_bytes.min(limits.max_file_bytes)];
-    let mut total = 0usize;
+    let mut prefix = vec![0; LOCAL_ENCODING_PREFIX_BYTES.min(limits.max_file_bytes)];
+    let chunk_bytes = limits.read_chunk_bytes.min(limits.max_file_bytes);
+    let mut total = 0;
+    while total < prefix.len() {
+        let end = total.saturating_add(chunk_bytes).min(prefix.len());
+        let read = read_document_chunk(&mut file, &mut prefix[total..end], cancellation)?;
+        if read == 0 {
+            break;
+        }
+        total += read;
+    }
+    prefix.truncate(total);
+    let mut encoding = Some(select_local_encoding(
+        &prefix,
+        scripting,
+        cancellation.clone(),
+    )?);
+    if prefix.is_empty() {
+        feed(&[], encoding.take())?;
+    }
+    for chunk in prefix.chunks(chunk_bytes) {
+        feed(chunk, encoding.take())?;
+    }
+    let mut buffer = vec![0; chunk_bytes];
     loop {
-        check_cancelled(cancellation)?;
-        let read = match file.read(&mut buffer) {
-            Ok(0) => break,
-            Ok(read) => read,
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-            Err(error) => return Err(LoadError::Io(error)),
-        };
+        let read = read_document_chunk(&mut file, &mut buffer, cancellation)?;
+        if read == 0 {
+            break;
+        }
         total = total
             .checked_add(read)
             .filter(|&total| total <= limits.max_file_bytes)
             .ok_or(LoadError::FileTooLarge {
                 limit: limits.max_file_bytes,
             })?;
-        feed(&buffer[..read])?;
+        feed(&buffer[..read], None)?;
     }
     check_cancelled(cancellation)
+}
+
+fn read_document_chunk(
+    file: &mut File,
+    buffer: &mut [u8],
+    cancellation: &CancellationToken,
+) -> Result<usize, LoadError> {
+    loop {
+        check_cancelled(cancellation)?;
+        match file.read(buffer) {
+            Ok(read) => return Ok(read),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(LoadError::Io(error)),
+        }
+    }
 }
 
 pub fn check_cancelled(cancellation: &CancellationToken) -> Result<(), LoadError> {
@@ -505,6 +565,7 @@ fn compute_styles(
     let LayoutInput {
         document,
         mode,
+        encoding,
         path,
         limits,
         view,
@@ -522,6 +583,7 @@ fn compute_styles(
             limits.read_chunk_bytes,
             cancellation.clone(),
         )
+        .map(|fetcher| fetcher.with_environment_encoding(encoding))
     });
     let mut no_fetch = NoFetch;
     let fetcher: &mut dyn StylesheetFetcher = match local.as_mut() {
@@ -628,6 +690,7 @@ fn fonts() -> &'static rustic_text::FontDatabase {
 struct LayoutInput<'a> {
     document: &'a Document,
     mode: DocumentMode,
+    encoding: Encoding,
     path: &'a Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -644,6 +707,7 @@ impl<'a> LayoutInput<'a> {
         Self {
             document: parsed.parsed().document(),
             mode: parsed.parsed().mode(),
+            encoding: parsed.parsed().encoding(),
             path,
             limits,
             view,
@@ -657,6 +721,7 @@ struct LocalLayout {
     path: PathBuf,
     limits: LoaderLimits,
     cancellation: CancellationToken,
+    encoding: Encoding,
 }
 
 impl LayoutSource for LocalLayout {
@@ -668,6 +733,7 @@ impl LayoutSource for LocalLayout {
         let (tree, layout, _, _) = block_layout(LayoutInput {
             document,
             mode,
+            encoding: self.encoding,
             path: &self.path,
             limits: self.limits,
             view: self.limits.script_view,
@@ -876,6 +942,51 @@ mod tests {
     use super::*;
 
     struct TempFile(PathBuf);
+
+    #[test]
+    fn local_encoding_replays_before_the_first_script() {
+        let stylesheet = TempFile::new(b".caf\xe9 { width: 41px; height: 5px }");
+        let classic = TempFile::new(b"var classic = 'r\xe9sum\xe9';");
+        let mut html = b"<!doctype html><body><div id=box class=caf\xe9></div>
+            <script>
+              var visits = (globalThis.visits || 0) + 1;
+              var word = 'caf\xe9';
+            </script><!--"
+            .to_vec();
+        html.extend(std::iter::repeat_n(b'x', 1500));
+        html.extend_from_slice(
+            b"--><meta http-equiv=content-type content=\"text/html; charset='latin1'\">",
+        );
+        html.extend_from_slice(
+            format!(
+                "<link rel=stylesheet href=\"{}\"><script src=\"{}\"></script>",
+                stylesheet.0.file_name().unwrap().to_str().unwrap(),
+                classic.0.file_name().unwrap().to_str().unwrap(),
+            )
+            .as_bytes(),
+        );
+        html.extend_from_slice(
+            br#"<script>
+            document.body.setAttribute('data-result', [
+                document.characterSet, document.charset, document.inputEncoding,
+                visits, word, classic, document.querySelector('#box').offsetWidth,
+                document.implementation.createHTMLDocument('').characterSet,
+            ].join('|'));
+        </script>"#,
+        );
+        let file = TempFile::new(&html);
+        for read_chunk_bytes in [1, 3, 999, 65536] {
+            let limits = LoaderLimits {
+                run_scripts: true,
+                read_chunk_bytes,
+                ..LoaderLimits::default()
+            };
+            let document = load_document(&mut Engine::new(1), &file.0, limits).unwrap();
+            assert_eq!(document.parsed().encoding(), Encoding::Windows1252);
+            let tree = dump_dom(&document, &file.0, limits).unwrap();
+            assert!(tree.contains("local=\"data-result\" value=\"windows-1252|windows-1252|windows-1252|1|café|résumé|41|UTF-8\""), "{tree}");
+        }
+    }
 
     #[test]
     fn parser_scripts_read_the_renderers_layout_at_the_selected_view() {

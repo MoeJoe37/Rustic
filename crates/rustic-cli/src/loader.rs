@@ -1088,13 +1088,23 @@ mod tests {
                     const inherited = held.getPropertyValue('color');
                     const originalTheme = held.getPropertyValue('--Theme');
                     const missing = held.getPropertyValue('--theme');
+                    const indexCountBefore = held.length;
+                    const initialIndices = held[0] === 'display' &&
+                        held[1] === 'color' &&
+                        held[2] === 'background-color' &&
+                        Object.keys(held).length === held.length;
                     box.className = 'wide';
                     box.setAttribute('class', 'wide');
                     const after = held.getPropertyValue('width');
                     const namedAfter = held.width;
                     const updatedTheme = held.getPropertyValue('--Theme');
                     document.querySelector('style').firstChild.data =
-                        '#box { width: 63px; color: red; --Theme: autumn }';
+                        '#box { width: 63px; color: red; --Theme: autumn; --extra: yes }';
+                    const indexCountAfter = held.length;
+                    const indicesUpdated = indexCountAfter === indexCountBefore + 1 &&
+                        held[indexCountAfter - 1] === '--extra' &&
+                        held.item(indexCountAfter - 1) === held[indexCountAfter - 1] &&
+                        Object.keys(held).length === held.length;
                     const afterSheetEdit = held.getPropertyValue('width');
                     const namedAfterSheetEdit = held.width;
                     const property = { toString() {
@@ -1116,6 +1126,7 @@ mod tests {
                         afterReentry === '84px',
                         namedAfterReentry === afterReentry,
                         backgroundAlias, floatAlias, fontAlias,
+                        initialIndices, indicesUpdated,
                         inherited !== '',
                         originalTheme.includes('winter'),
                         updatedTheme.includes('summer'),

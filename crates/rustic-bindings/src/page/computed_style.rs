@@ -18,9 +18,9 @@ use super::{
 
 const INTERFACE: &str = "CSSStyleDeclaration";
 
- // Every longhand has the same bounded snapshot read. A new supported
- // property makes the getter table fail to compile until it is included.
- const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
+// Every longhand has the same bounded snapshot read. A new supported
+// property makes the getter table fail to compile until it is included.
+const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
     get_longhand::<0> as NativeFn,
     get_longhand::<1> as NativeFn,
     get_longhand::<2> as NativeFn,
@@ -131,80 +131,89 @@ const INTERFACE: &str = "CSSStyleDeclaration";
     get_longhand::<107> as NativeFn,
     get_longhand::<108> as NativeFn,
     get_longhand::<109> as NativeFn,
- ];
+];
 
- fn get_longhand<const INDEX: usize>(
-     agent: &mut Agent,
-     declaration: Value,
-     _: &[Value],
- ) -> JsResult<Value> {
-     let style = snapshot(agent, declaration)?;
-     let name = PropertyId::ALL[INDEX].name();
-     value(agent, style.get(name).unwrap_or(""))
- }
+fn get_longhand<const INDEX: usize>(
+    agent: &mut Agent,
+    declaration: Value,
+    _: &[Value],
+) -> JsResult<Value> {
+    let style = snapshot(agent, declaration)?;
+    let name = PropertyId::ALL[INDEX].name();
+    value(agent, style.get(name).unwrap_or(""))
+}
 
- fn camel_name(name: &str) -> String {
-     if name == "float" {
-         return String::from("cssFloat");
-     }
-     let mut camel = String::with_capacity(name.len());
-     let mut upper = false;
-     for ch in name.chars() {
-         if ch == '-' {
-             upper = true;
-         } else {
-             camel.push(if upper { ch.to_ascii_uppercase() } else { ch });
-             upper = false;
-         }
-     }
-     camel
- }
+fn camel_name(name: &str) -> String {
+    if name == "float" {
+        return String::from("cssFloat");
+    }
+    let mut camel = String::with_capacity(name.len());
+    let mut upper = false;
+    for ch in name.chars() {
+        if ch == '-' {
+            upper = true;
+        } else {
+            camel.push(if upper { ch.to_ascii_uppercase() } else { ch });
+            upper = false;
+        }
+    }
+    camel
+}
 
- fn install_longhand_getters(
-     agent: &mut Agent,
-     prototype: rustic_js::runtime::ObjectId,
- ) -> JsResult<()> {
-     let setter = Value::object(agent.new_native_function(
-         set_named_longhand, "set computed property", 1,
-     )?);
-     let setter_root = agent.root(setter)?;
-     let result = (|| {
-         for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
-             let canonical = property.name();
-             let camel = camel_name(canonical);
-             let getter = Value::object(
-                 agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
-             );
-             let getter_root = agent.root(getter)?;
-             let installed = (|| {
-                 for name in [canonical, camel.as_str()] {
-                     if name == canonical && canonical == camel.as_str() {
-                         continue;
-                     }
-                     let key = agent.heap.key(name)?;
-                     agent.define_property_or_throw(
-                         prototype,
-                         key,
-                         PropertyDescriptor::accessor(getter, setter, true, true),
-                     )?;
-                 }
-                 Ok(())
-             })();
-             agent.unroot(getter_root);
-             installed?;
-         }
-         Ok(())
-     })();
-     agent.unroot(setter_root);
-     result
- }
+fn install_longhand_getters(
+    agent: &mut Agent,
+    prototype: rustic_js::runtime::ObjectId,
+) -> JsResult<()> {
+    // The interface prototype is not installed on the realm until this
+    // initializer returns; protect it throughout the allocating loop.
+    let prototype_root = agent.root(Value::object(prototype))?;
+    let result = (|| {
+        let setter = Value::object(agent.new_native_function(
+            set_named_longhand,
+            "set computed property",
+            1,
+        )?);
+        let setter_root = agent.root(setter)?;
+        let result = (|| {
+        for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
+            let canonical = property.name();
+            let camel = camel_name(canonical);
+            let getter = Value::object(
+                agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
+            );
+            let getter_root = agent.root(getter)?;
+            let installed = (|| {
+                for name in [canonical, camel.as_str()] {
+                    if name == canonical && canonical == camel.as_str() {
+                        continue;
+                    }
+                    let key = agent.heap.key(name)?;
+                    agent.define_property_or_throw(
+                        prototype,
+                        key,
+                        PropertyDescriptor::accessor(getter, setter, true, true),
+                    )?;
+                }
+                Ok(())
+            })();
+            agent.unroot(getter_root);
+            installed?;
+        }
+            Ok(())
+        })();
+        agent.unroot(setter_root);
+        result
+    })();
+    agent.unroot(prototype_root);
+    result
+}
 
- fn set_named_longhand(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
-     let argument = required_arg(agent, args, 0)?;
-     let _ = creation::string(agent, argument)?;
-     element(agent, declaration)?;
-     Err(read_only(agent))
- }
+fn set_named_longhand(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    let argument = required_arg(agent, args, 0)?;
+    let _ = creation::string(agent, argument)?;
+    element(agent, declaration)?;
+    Err(read_only(agent))
+}
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_interface(
@@ -381,4 +390,24 @@ fn remove_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsR
     let _ = creation::string(agent, name)?;
     element(agent, declaration)?;
     Err(read_only(agent))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn longhand_getter_names_cover_the_supported_catalog_without_collisions() {
+        assert_eq!(LONGHAND_GETTERS.len(), PropertyId::ALL.len());
+        let mut seen = HashSet::new();
+        for &property in PropertyId::ALL {
+            let alias = camel_name(property.name());
+            assert!(seen.insert(alias.clone()), "duplicate named getter: {alias}");
+        }
+        assert_eq!(camel_name("background-color"), "backgroundColor");
+        assert_eq!(camel_name("border-top-left-radius"), "borderTopLeftRadius");
+        assert_eq!(camel_name("float"), "cssFloat");
+    }
 }

@@ -99,6 +99,11 @@ class ProgressTests(unittest.TestCase):
         self.assertTrue(all(float(node.attrib["x"]) + float(node.attrib["width"]) <= 976.01
                             for node in tree.findall(".//svg:rect", ns) if node.attrib.get("width", "").replace(".", "").isdigit() and float(node.attrib["width"]) < 1000))
 
+    def test_worktree_metadata_does_not_change_the_source_fingerprint(self):
+        before = progress.source_fingerprint(self.root)
+        (self.root / ".git").write_text("gitdir: /repo/.git/worktrees/feature\n")
+        self.assertEqual(progress.source_fingerprint(self.root), before)
+
     def test_generated_files_do_not_change_fingerprint_but_source_changes_do(self):
         before = progress.source_fingerprint(self.root)
         for name in progress.OUTPUTS:

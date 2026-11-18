@@ -119,7 +119,7 @@ def source_fingerprint(root: Path) -> str:
     files = []
     for directory, dirs, names in os.walk(root):
         dirs[:] = [name for name in dirs if name not in IGNORED]
-        files.extend(Path(directory) / name for name in names if name != ".DS_Store")
+        files.extend(Path(directory) / name for name in names if name not in {".DS_Store", ".git"})
     for path in sorted(files):
         relative = path.relative_to(root).as_posix()
         if relative in OUTPUTS:

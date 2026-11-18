@@ -294,6 +294,113 @@ fn rendering_input_revisions_are_scoped_to_their_document() {
     assert_eq!(first.accept_rendered_frame(fresh_first), Ok(true));
 }
 
+
+#[derive(Debug)]
+struct LiveStyleFixture;
+
+impl LayoutSource for LiveStyleFixture {
+    fn measure_layout(
+        &self,
+        document: &Document,
+        _: DocumentMode,
+    ) -> Result<LayoutGeometry, LayoutReadError> {
+        let mut geometry = LayoutGeometry::default();
+        for (id, _) in document.walk(document.root()).unwrap() {
+            let Ok(node) = document.node(id) else {
+                continue;
+            };
+            let rustic_dom::NodeKind::Element(element) = node.kind() else {
+                continue;
+            };
+            let next = element.attributes().iter().any(|attribute| {
+                attribute.name().local() == "data-next"
+            });
+            geometry.computed_styles.insert(
+                id,
+                rustic_engine::ComputedStyleSnapshot {
+                    longhands: vec![
+                        ("display", "block".to_owned()),
+                        ("color", if next { "blue" } else { "red" }.to_owned()),
+                    ],
+                    custom_properties: vec![("--Case".to_owned(), "preserved".to_owned())],
+                },
+            );
+        }
+        Ok(geometry)
+    }
+}
+
+#[test]
+fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
+    scripts.queue_script(source(
+        r#"
+        const body = document.body;
+        const style = getComputedStyle(body);
+        if (!(style instanceof CSSStyleDeclaration)) throw 'declaration brand';
+        if (style.length !== 3 || style.item(0) !== 'display' ||
+            style.item(2) !== '--Case' || style.item(3) !== '') throw 'indexes';
+        if (style.getPropertyValue('COLOR') !== 'red' ||
+            style.getPropertyValue('--Case') !== 'preserved' ||
+            style.getPropertyValue('--case') !== '' ||
+            style.getPropertyValue('unknown-property') !== '' ||
+            style.getPropertyPriority('color') !== '') throw 'initial values';
+        const property = {
+            toString() {
+                body.setAttribute('data-next', 'yes');
+                return 'color';
+            }
+        };
+        if (style.getPropertyValue(property) !== 'blue') throw 'reentrant lookup';
+        Promise.resolve().then(() => {
+            body.removeAttribute('data-next');
+            if (style.getPropertyValue('color') !== 'red') throw 'microtask lookup';
+        });
+        try { getComputedStyle(body, '::before'); throw 'pseudo accepted'; }
+        catch (error) {
+            if (error.name !== 'TypeError') throw 'wrong pseudo error';
+        }
+        "#,
+    )).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 3);
+}
+
+#[test]
+fn computed_style_and_geometry_share_the_dirty_flush_quota() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
+    scripts.queue_script(source(&format!(
+        r#"
+        const body = document.body;
+        const style = getComputedStyle(body);
+        for (let i = 0; i < {MAX_LAYOUT_FLUSHES_PER_TURN}; i++) {{
+            body.setAttribute('data-next', String(i));
+            if (style.getPropertyValue('color') !== 'blue') throw 'style value';
+            if (body.offsetWidth !== 0) throw 'geometry value';
+        }}
+        body.removeAttribute('data-next');
+        try {{ style.getPropertyValue('color'); throw 'quota missing'; }}
+        catch (error) {{
+            if (error.name !== 'QuotaExceededError') throw 'wrong quota error';
+        }}
+        "#
+    ))).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(
+        scripts.take_layout_flush_count(),
+        MAX_LAYOUT_FLUSHES_PER_TURN as u64
+    );
+    scripts.queue_script(source(
+        "if (getComputedStyle(document.body).getPropertyValue('color') !== 'red') throw 'new turn';",
+    )).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+}
+
 #[test]
 fn a_failed_checkpoint_discards_the_rendering_offer() {
     let mut engine = Engine::new(1);

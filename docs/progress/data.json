@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "4abfbbf35cd8db2893e8e870359e3fd95b676ce339900d2d7fccb71faf58baeb",
-  "percent": "32.82",
+  "source_fingerprint": "9f115288fdac86f87b267a3fd5c9781f50a5ed25d872be16c7acb7ea4b79f273",
+  "percent": "32.99",
   "verified_percent": "31.48",
-  "partial_percent": "1.34",
+  "partial_percent": "1.51",
   "completed": 72,
-  "in_progress": 7,
+  "in_progress": 8,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -67,9 +67,9 @@
       "share": "4.38",
       "completed": 0,
       "total": 12,
-      "percent": "0.00",
+      "percent": "3.79",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "3.79"
     },
     {
       "id": "M7",
@@ -501,9 +501,53 @@
           "label": "Required legacy decoders and charset selection",
           "size": 5,
           "milestone": "M6",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Encoding Standard labels, decoders, encoders and hooks for all 40 encodings",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-encoding/src/decoder.rs",
+                  "marker": "impl Iso2022JpDecoder"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-encoding/tests/encoding.rs",
+                  "marker": "fn every_encodable_scalar_round_trips"
+                }
+              ]
+            },
+            {
+              "label": "Stylesheet charset selection (CSS Syntax 3.2: BOM, transport, @charset, document)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/decode.rs",
+                  "marker": "pub fn stylesheet_fallback_encoding"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn stylesheets_decode_with_their_charset_rule"
+                }
+              ]
+            },
+            {
+              "label": "URL query encoding in the document's encoding",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Response charset from Content-Type for documents, scripts and stylesheets",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.33"
         },
         {
@@ -560,12 +604,12 @@
       ],
       "points": 30,
       "completed": 6,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 12,
-      "contribution": "0.86",
-      "percent": "43.33",
+      "contribution": "1.03",
+      "percent": "51.66",
       "verified_percent": "43.33",
-      "partial_percent": "0.00"
+      "partial_percent": "8.33"
     },
     {
       "id": "dom",

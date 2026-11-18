@@ -47,7 +47,7 @@ not use IDNA.
 
 Pending: strict (`beStrict`) domain validation for conformance checkers and the
 `domain-to-ASCII` validation error, blob registry and origin rules,
-legacy document query encodings,
+legacy document query encodings (the encoders exist in `rustic-encoding`, see [ENCODING.md](ENCODING.md); the parser does not take an encoding yet),
 URL setters and URLSearchParams. There is no public browser `URL` binding yet.
 Successful parsing does not mean a scheme is navigable, secure, allowed by policy,
 or supported by the future network service. FTP syntax support is not an FTP client.

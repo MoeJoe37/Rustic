@@ -6,7 +6,7 @@ the [progress summary](progress/summary.md) describe working code, and every
 status there is backed by tests. Update the relevant document (and a decision
 record when a boundary changes) in the same change as the code.
 
-## Where things stand (2026-11-17)
+## Where things stand (2026-11-18)
 
 | Milestone | State | Read |
 | --- | --- | --- |
@@ -16,7 +16,8 @@ record when a boundary changes) in the same change as the code.
 | M3 Static rendering | Done (17/17): block/inline/flex layout, OpenType text, images, CPU raster, `render`, reftests, hit testing | [LAYOUT.md](LAYOUT.md), [TEXT.md](TEXT.md), [PAINT.md](PAINT.md) |
 | M4 JavaScript | Done (13/13) on 2026-11-16: parser, collected heap, bytecode interpreter, standard library, modules, realms, Intl, limits and benchmark gate. The ARM64 benchmark record is from emulation (TD-125) | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
 | M5 Scripted documents | Current (6/12). The local script scheduler, Web IDL conversions, DOM bindings, events and script readiness are in place. Remaining work includes encoding restart, synchronous style and geometry reads, forms, focus, observers, WPT expansion and the first benchmark report. | [SCRIPTING.md](SCRIPTING.md), [ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration) |
-| M6–M10 | Not started: networking, isolation, desktop/mobile alpha, compatibility, beta. M6 and M7 have entry checklists | [ROADMAP.md](ROADMAP.md) |
+| M6 Networking | Entry work started early, alongside M5: all 40 Encoding Standard encodings and stylesheet charset selection are done (ADR 0043, TD-28 paid). HTML sniffing, URL query encoding and the transport/TLS ADR are next | [ENCODING.md](ENCODING.md), [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services) |
+| M7–M10 | Not started: isolation, desktop/mobile alpha, compatibility, beta. M7 has an entry checklist | [ROADMAP.md](ROADMAP.md) |
 | M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, full engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
 
 The [progress summary](progress/summary.md) is regenerated from
@@ -80,6 +81,7 @@ New to the project? Read these in order:
 | Document | Subsystem |
 | --- | --- |
 | [URL.md](URL.md) | URL parsing, origins, file URLs, IDNA |
+| [ENCODING.md](ENCODING.md) | Encoding Standard decoders and encoders, stylesheet charset selection |
 | [HTML.md](HTML.md) | Byte decoding and the HTML tokenizer |
 | [HTML_TREE.md](HTML_TREE.md) | Tree construction, fragments and `dump-dom` |
 | [DOM.md](DOM.md) | Node storage, mutation, cloning/adoption and the tracing prototype |
@@ -100,6 +102,7 @@ an earlier one's "remaining" notes.
 | Area | Evidence |
 | --- | --- |
 | URL | 887 pinned WPT URL records; all 6,389 Unicode IdnaTestV2 cases |
+| Encodings | All 40 Encoding Standard encodings from pinned indexes; 44.5 million decoder and encoder cases compared with Chromium 157, differing only where Chromium departs from the standard (242 cases, [documented](ENCODING.md#reference-comparison)) |
 | HTML | 1,079 declaration, 4,626 character-reference and 282 text-mode tokenizer cases, plus all 1,792 html5lib tree records at every two-chunk split with four expectations adapted to current HTML |
 | Scripted Window | WPT revision `cb97c571c3b1947e08b8615eeb4028a2794b23a4` through upstream `testharness.js`. The 21 files report 67 passes and 11 expected failures across 78 subtests. [Exact baseline](SCRIPTING.md#pinned-window-web-platform-tests) |
 | DOM | 25,230 pre-insert combinations against a specification oracle; seeded model tests |
@@ -108,7 +111,7 @@ an earlier one's "remaining" notes.
 | Text | Shaping compared against 30 committed HarfBuzz reference cases |
 | JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required; 21,939 of the 22,427 that run pass (97.8%); 17,513 of 18,791 in the gated `test/built-ins` areas pass (93.2%); 1,240 of 1,326 in the gated `test/intl402` areas pass (93.5%); all 696 executed module files pass. Eight benchmark workloads with pinned checksums and a committed heap-size report |
 | Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock; binding tests for identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles. No WPT `dom/` or `html/` results yet (`web.conformance`) |
-| Robustness | 21 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
+| Robustness | 24 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
 | Platforms | Native tests on x64/ARM64 Linux, Windows and macOS; emulated 32-bit ARM/x86, RISC-V and big-endian; cross-checks for Android, iOS and eight more targets |
 
 There are no whole-WPT pass rates, no Test262 rate over the whole suite

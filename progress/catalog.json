@@ -377,8 +377,52 @@
           "label": "Required legacy decoders and charset selection",
           "size": 5,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Encoding Standard labels, decoders, encoders and hooks for all 40 encodings",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-encoding/src/decoder.rs",
+                  "marker": "impl Iso2022JpDecoder"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-encoding/tests/encoding.rs",
+                  "marker": "fn every_encodable_scalar_round_trips"
+                }
+              ]
+            },
+            {
+              "label": "Stylesheet charset selection (CSS Syntax 3.2: BOM, transport, @charset, document)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/decode.rs",
+                  "marker": "pub fn stylesheet_fallback_encoding"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/cli.rs",
+                  "marker": "fn stylesheets_decode_with_their_charset_rule"
+                }
+              ]
+            },
+            {
+              "label": "URL query encoding in the document's encoding",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Response charset from Content-Type for documents, scripts and stylesheets",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "url.restart",

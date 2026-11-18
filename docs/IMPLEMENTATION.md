@@ -154,6 +154,13 @@ status is the [progress summary](progress/summary.md).
 
 </details>
 
+<details>
+<summary>Networking and resources (M6, started early): 1 section</summary>
+
+- [M6 entry — Encoding Standard decoders and encoders](#m6-entry--encoding-standard-decoders-and-encoders)
+
+</details>
+
 ## DOC-01 — Shared document-core primitives
 
 Implemented in `rustic-base`, with no external dependencies and no unsafe code:
@@ -1221,8 +1228,8 @@ importing sheet, and orders imported sheets before their importer. Every
 refusal is a per-sheet status, never fatal. `rustic dump-style` now loads
 stylesheets with a local-only fetcher confined to the document's directory
 (lexical and symbolic-link checks), with three new budget options and a
-`linked.dump` snapshot. `rustic-style` now depends on `rustic-url`. UTF-8 is
-the only stylesheet encoding (TD-28). `css.queries` now has its
+`linked.dump` snapshot. `rustic-style` now depends on `rustic-url`. UTF-8 was
+the only stylesheet encoding until the M6 entry encoding work paid TD-28. `css.queries` now has its
 external-sheet step; import media lists restrict imported sheets. See
 [CSS.md](CSS.md#external-stylesheets).
 
@@ -1986,7 +1993,7 @@ lists the next tasks.
 | CSS-05: computed values, attachment and style dump | Complete for the declared longhands: computed values, HTML UA sheet subset, `<style>` attachment, `dump-style` and a cached full-restyle path; `var()` and media queries followed in CSS-06; font-metric units move to M3 (REN-03) |
 | CSS-03c: property catalog | Complete for the declared set: positioning, overflow, visibility, opacity, text, decoration, font shorthand and backgrounds with computed values; gradients and system fonts remain |
 | CSS-03b: math functions | Complete for lengths, length-percentages and numbers: parsing, type checking, simplification, serialization, computed values; typed division and the newer math functions remain |
-| External stylesheets (`css.queries` step 2) | Complete: `<link rel=stylesheet>` and `@import` over a policy-owning fetcher with budgets and cycle refusal; `dump-style` loads local files beside the document only; non-UTF-8 sheets (TD-28) and layer/supports imports remain |
+| External stylesheets (`css.queries` step 2) | Complete: `<link rel=stylesheet>` and `@import` over a policy-owning fetcher with budgets and cycle refusal; `dump-style` loads local files beside the document only; legacy-encoded sheets decode since the M6 entry encoding work (TD-28 paid); layer/supports imports remain |
 | CSS-03: typed property values | Complete for the declared set: colors (8,041/8,041 pinned cases), lengths and the box-model, display and font longhands with shorthands; math functions and the wider catalog remain |
 | CSS-02: selectors and specificity | Complete for the declared subset: selector syntax, specificity, serialization, An+B (128/128) and DOM matching in `rustic-style` |
 | CSS-07a: remaining required selectors | Complete: `:has()` (linear for single-compound arguments, TD-30), HTML form states, `:lang()`, `:dir()` (Bidi_Class via TD-29), `&` with nested style rules expanded by `StyleSheet::parse`, more pseudo-elements and user-action states after them; `css.selectors` is complete. Constraint-validation states and form owners set by the parser (TD-31) remain |
@@ -2271,3 +2278,26 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## M6 entry — Encoding Standard decoders and encoders
+
+Started 2026-11-18, in parallel with the end of M5, because it depends on no
+M5 task. [ADR 0043](adr/0043-encoding-standard.md) chose an original
+implementation over a reviewed crate; [ENCODING.md](ENCODING.md) is the
+subsystem guide.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Data | Label table and every index generated from whatwg/encoding `be17ac5c`, inputs pinned by SHA-256, outputs checked by `--check` | `tools/generate_encoding_data.py`, `crates/rustic-encoding/data/manifest.json` |
+| `Encoding` | All 40 encodings, "get an encoding" over 228 labels, names, output encodings | `labels_follow_get_an_encoding`, `output_encodings_and_classes` |
+| `Decoder` | Every decoder as the standard's handler, restore queue across chunks, replacement and fatal modes, ASCII and valid-UTF-8 fast paths | Per-decoder tests, `streaming_matches_one_shot`, fuzz target `encoding` |
+| `Encoder` | Per-scalar encoders returning unmappable values ("encode or fail"), ISO-2022-JP state and end escape, Shift_JIS/Big5 pointer rules, gb18030 side table | `encoders`, `iso_2022_jp_encoder`, `every_encodable_scalar_round_trips` |
+| Hooks | `decode`, `bom_sniff`, `encode` (`&#NNNN;`), the UTF-8 decode variants | `hooks` |
+| Stylesheets | CSS Syntax §3.2 fallback chain in `rustic_css::decode_stylesheet`; the CLI's local fetcher uses it (TD-28 paid) | `decode` unit tests, `stylesheets_decode_with_their_charset_rule` |
+
+Compared with Chromium 157 (`tools/encoding_reference.js` and the
+`compare_reference` example): 44,469,888 cases agree, including every
+encoder on every scalar value. The 242 decoder differences are three
+documented places where Chromium departs from the standard's text.
+HTML encoding sniffing and restart (`url.restart`), URL query encoding and
+the TextDecoder/TextEncoder bindings remain.

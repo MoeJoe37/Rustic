@@ -31,6 +31,7 @@ CSS, layout, paint, codecs and URL code stay original Rust (ADR 0001).
 | --- | --- | --- |
 | TLS | Maintained Rust TLS library such as rustls with reviewed crypto/provider/root strategy | Certificate error behavior, HTTPS policy and broker authority |
 | HTTP transport | Reviewed HTTP library such as hyper, with a bounded async runtime if needed | Fetch, redirects, CORS, cookies, cache, MIME and response visibility |
+| Text encodings | **Chosen at M6 entry:** original Encoding Standard decoders and encoders over indexes generated from pinned whatwg/encoding data (`rustic-encoding`, [ADR 0043](adr/0043-encoding-standard.md)), no library | Charset selection, sniffing and restart, URL and form encoding |
 | Unicode/IDNA | Chosen at M1: original UTS #46/NFC code over tables generated from pinned Unicode data (`tools/generate_idna_data.py`), no library | URL/origin algorithms, data updates and string/index semantics |
 | Font parsing/shaping | **Adopted (M3):** HarfRust 0.16.0, Skrifa 0.50.0, Wuff 0.2.10; discovery is Rustic's own host-granted walk | Font selection, CSS metrics, bidi/line breaking integration, layout |
 | Image codecs | **Chosen at M3:** original bounded inflate/PNG/JPEG/GIF/WebP decoders in `rustic-codecs`, no library; video/audio codecs remain candidates | Input/output limits, resource accounting, sandbox isolation and color handling |

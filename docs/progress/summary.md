@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 32.82%** = 31.48% verified complete + 1.34% partial credit. 72/221 capabilities complete, 7 in progress.
+**Overall completion: 32.99%** = 31.48% verified complete + 1.51% partial credit. 72/221 capabilities complete, 8 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `4abfbbf35cd8db2893e8e870359e3fd95b676ce339900d2d7fccb71faf58baeb`.
+Catalog: `engine-v4`. Source fingerprint: `9f115288fdac86f87b267a3fd5c9781f50a5ed25d872be16c7acb7ea4b79f273`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `4abfbbf35cd8db2893e8e870359e3fd95b676
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 6/12 | 64.59% | 52.41% | 5.29% |
-| M6 Networking & services | 0/12 | 0.00% | 0.00% | 4.38% |
+| M6 Networking & services | 0/12 | 3.79% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -29,7 +29,7 @@ Catalog: `engine-v4`. Source fingerprint: `4abfbbf35cd8db2893e8e870359e3fd95b676
 | Subsystem | Completed | In progress | Progress | Verified | Engine weight | Engine points |
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
-| URLs & encoding | 6/12 | 0 | 43.33% | 43.33% | 2% | 0.86 |
+| URLs & encoding | 6/12 | 1 | 51.66% | 43.33% | 2% | 1.03 |
 | DOM | 7/10 | 1 | 71.32% | 67.64% | 4% | 2.85 |
 | HTML | 9/11 | 1 | 75.67% | 70.27% | 5% | 3.78 |
 | CSS & style | 8/10 | 2 | 84.18% | 79.59% | 6% | 5.05 |
@@ -78,7 +78,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `url.file` — File URL and platform rules · size 2 · M1 · 0.13% of engine ([source](../../crates/rustic-url/src/parser.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **planned** `url.blob` — Blob registry and origin rules · size 2 · M9 · 0.13% of engine
 - **planned** `url.setters` — URL setters and URLSearchParams · size 2 · M9 · 0.13% of engine
-- **planned** `url.encoding` — Required legacy decoders and charset selection · size 5 · M6 · 0.33% of engine
+- **in progress 50.00%** `url.encoding` — Required legacy decoders and charset selection · size 5 · M6 · 0.33% of engine
+  - [x] Encoding Standard labels, decoders, encoders and hooks for all 40 encodings ([source](../../crates/rustic-encoding/src/decoder.rs), [test](../../crates/rustic-encoding/tests/encoding.rs))
+  - [x] Stylesheet charset selection (CSS Syntax 3.2: BOM, transport, @charset, document) ([source](../../crates/rustic-css/src/decode.rs), [test](../../crates/rustic-cli/tests/cli.rs))
+  - [ ] URL query encoding in the document's encoding
+  - [ ] Response charset from Content-Type for documents, scripts and stylesheets
 - **planned** `url.restart` — Encoding sniff/restart integration · size 2 · M6 · 0.13% of engine
 - **complete** `url.diagnostics` — Validation-error diagnostics and source locations · size 1 · M1 · 0.06% of engine ([source](../../crates/rustic-url/src/diagnostics.rs), [test](../../crates/rustic-url/tests/diagnostics.rs))
 - **planned** `url.policy` — Navigation origin inheritance and policy integration · size 3 · M6 · 0.20% of engine

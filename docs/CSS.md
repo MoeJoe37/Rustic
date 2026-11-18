@@ -36,8 +36,11 @@ states.
 Numbers parse with Rust's correctly rounded float conversion and saturate to
 `±f64::MAX`, so values are always finite. Unicode-range tokens are not produced:
 CSS Syntax removed them, and a grammar that needs `U+` ranges reparses ordinary
-tokens. Byte-stream decoding (`@charset`, BOM and protocol encodings) is not
-implemented; input is a Rust string.
+tokens. The parser's input is a Rust string; `decode_stylesheet` turns a
+sheet's bytes into one first (CSS Syntax §3.2: BOM, then the transport
+`charset`, then a leading `@charset "…";` byte for byte within the first
+1,024 bytes, then the referring document's encoding, then UTF-8), with the
+decoders of [ENCODING.md](ENCODING.md).
 
 ## Limits and failure
 
@@ -607,8 +610,9 @@ with unlimited budgets loads without recursion.
 names a regular file inside the document's directory tree, checked both
 lexically and after resolving symbolic links. Network, `data:` and other-host
 URLs and paths that leave the directory are blocked. Files are read in
-chunks within the remaining byte budget and decoded as UTF-8 (a BOM is
-stripped; `@charset` and legacy encodings are TD-28). The dump lists each
+chunks within the remaining byte budget and decoded with `decode_stylesheet`
+(a BOM or `@charset` selects the encoding; otherwise the document's, which
+is UTF-8 until HTML encoding sniffing lands). The dump lists each
 `@link` with its `href` as written and each `@import` indented by depth, with
 statuses and dropped constructs. `--max-stylesheets`, `--max-stylesheet-bytes`
 and `--max-import-depth` set the budgets.

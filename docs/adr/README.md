@@ -50,6 +50,7 @@ instead of rewriting the history of a decision.
 | [0040](0040-local-module-scripts.md) | Local static module graphs, shared instances and evaluation order | Accepted for the WEB-05 local module slice |
 | [0041](0041-scripted-document-readiness.md) | Document readiness, script events and CLI lifecycle | Accepted for the WEB-05 local host |
 | [0042](0042-scripted-render-state.md) | Style, layout and frame validity in scripted documents | Accepted for WEB-06 |
+| [0043](0043-encoding-standard.md) | Original Encoding Standard decoders and encoders over pinned, generated indexes | Accepted for `url.encoding` (M6 entry) |
 
 ## Records by area
 
@@ -66,6 +67,7 @@ instead of rewriting the history of a decision.
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041 |
 | Scripted rendering (M5, WEB-06) | 0023, 0042 |
+| Networking and resources (M6) | 0043 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -79,7 +81,6 @@ authority boundary or `unsafe` code.
 | --- | --- | --- |
 | Style and layout invalidation from script, and forced layout flushes | WEB-06 (M5) | Changes the rendering-turn contract of ADR 0023 |
 | Transport and TLS library, certificate verification and the fixture server | NET-01 (M6) | First network dependency and first native/crypto boundary |
-| Legacy text encodings: own decoders or a reviewed crate | `url.encoding` (M6) | Dependency or large generated tables |
 | Profile and storage format, partition keys and schema versions | NET-06 (M6) | Persistent on-disk compatibility promise |
 | IPC format and broker capabilities | ISO-02 (M7) | Process authority |
 | Sandbox mechanism per OS: Windows, macOS, Linux, Android, iOS | ISO-03/04/08 (M7) | Platform security boundary; ADR 0004 only fixes the order |

@@ -58,14 +58,14 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-28, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
@@ -108,7 +108,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
 | TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Open |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
-| TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Open, pay with the encoding layer |
+| TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Paid |
 | TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Paid |
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
@@ -210,6 +210,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (`Array.fromAsync`, `Math.sumPrecise`, base64 on `Uint8Array`, JSON source text, iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
 | TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
+| TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -551,7 +552,16 @@ CSSOM serializes the shorthand from them. **Pay:** add the longhands, make
 combinations) and give text layout the longhands. **Trigger:** inline layout
 (REN) consuming white-space, or any page using the new longhands.
 
-### TD-28 — External stylesheets decode as UTF-8 only
+### TD-28 — External stylesheets decode as UTF-8 only (Paid)
+
+**Paid 2026-11-18:** `rustic_css::decode_stylesheet` implements CSS Syntax
+§3.2 (BOM, transport `charset`, a leading `@charset "…";`, the referring
+document's encoding, UTF-8) over the `rustic-encoding` decoders
+([ADR 0043](adr/0043-encoding-standard.md)), and the CLI's local fetcher
+uses it. `stylesheets_decode_with_their_charset_rule` checks an ISO-8859-1
+sheet end to end. Documents are still UTF-8, so the environment encoding is
+UTF-8 until HTML encoding sniffing lands (`url.restart`, a planned
+capability rather than debt). The original entry is kept below.
 
 `dump-style`'s local fetcher decodes every linked or imported stylesheet as
 UTF-8: it strips a UTF-8 byte order mark and turns invalid sequences into
@@ -2222,3 +2232,19 @@ NaN-boxing, `libm` results for `Math` (allowed to differ in the last bit)
 and endian-sensitive buffer code differ. Pay when hosted CI returns: add a
 job that fetches the pinned revision, runs the gates on x86-64 and ARM64,
 and runs at least the built-in gate under the emulated tiers.
+
+### TD-146 — Legacy multi-byte encodings are decoded byte at a time
+
+`rustic-encoding` runs each decoder as the Encoding Standard's handler, one
+byte per call, and each encoder one scalar value per call
+([ADR 0043](adr/0043-encoding-standard.md)). ASCII runs and valid UTF-8
+prefixes are copied in bulk, so UTF-8 and mostly-ASCII pages are fast, but
+a page in Shift_JIS, GBK, Big5 or EUC-KR pays a branchy state machine and
+an index read per character, and the first use of each multi-byte encoder
+builds a sorted reverse index (up to about 100 KB). Nothing has measured
+this against other engines. **Pay:** add legacy-encoding pages to the
+PERF-01 corpus, and if decoding shows on a profile, add table-driven or
+vectorized paths with the fuzz target's chunked-versus-whole differential
+as the guard. **Trigger:** M12 performance work, or a profile showing
+decoding on a critical path earlier.
+

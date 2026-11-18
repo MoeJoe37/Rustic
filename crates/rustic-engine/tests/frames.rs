@@ -402,6 +402,39 @@ fn computed_style_and_geometry_share_the_dirty_flush_quota() {
 }
 
 
+
+#[test]
+fn computed_style_mutation_methods_are_read_only() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+            const body = document.body;
+            const computed = getComputedStyle(body);
+            if (computed.cssText !== '') throw 'computed cssText';
+            for (const edit of [
+                () => computed.setProperty('color', 'green'),
+                () => computed.removeProperty('color'),
+                () => { computed.cssText = 'color: green' }
+            ]) {
+                try {
+                    edit();
+                    throw 'computed declaration was editable';
+                } catch (error) {
+                    if (error.name !== 'NoModificationAllowedError') throw 'wrong error';
+                }
+            }
+            if (computed.getPropertyValue('color') !== 'red' ||
+                body.getAttribute('style') !== null) throw 'mutated computed style';
+            "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+}
+
 #[test]
 fn connected_computed_styles_require_a_renderer_but_detached_reads_are_empty() {
     let mut engine = Engine::new(1);

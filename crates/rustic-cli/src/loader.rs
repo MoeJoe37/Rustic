@@ -21,7 +21,7 @@ use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment, PropertyId};
 use rustic_dom::{Document, DumpError};
 use rustic_engine::{
     ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
-    EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop,
+    ComputedStyleSnapshot, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop,
     TaskLimits,
 };
 use rustic_html::{
@@ -34,7 +34,6 @@ use rustic_style::{
 };
 
 use crate::stylesheets::{LocalStylesheetFetcher, file_url};
-use rustic_bindings::page::ComputedStyleSnapshot;
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;

@@ -326,7 +326,7 @@ stays local and deterministic; no network, no native window.
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | `web.window` | WEB-02, CSS-02 | **Done** for the declared scope (ADR 0028–0033): live `window`/`document`, node creation and mutation, selectors, NodeLists and HTMLCollections, detached documents and adoption. Open debt: TD-126, TD-127, TD-129, TD-130 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
 | WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **Done** for the local host, including bounded encoding replay before author code. [ADR 0041](adr/0041-scripted-document-readiness.md), [ADR 0044](adr/0044-local-html-encoding-replay.md) |
-| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **In progress.** Geometry and initial live `getComputedStyle` methods share bounded snapshots; frame tickets validate DOM and applied inputs. CSSOM getters and resource completion ordering are open. [ADR 0042](adr/0042-scripted-render-state.md), [ADR 0045](adr/0045-live-computed-style-reads.md) |
+| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **In progress.** Geometry and initial live `getComputedStyle` methods share bounded snapshots; frame tickets validate DOM and applied inputs. CSSOM indexed properties and resource completion ordering are open. [ADR 0042](adr/0042-scripted-render-state.md), [ADR 0045](adr/0045-live-computed-style-reads.md) |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | Not started |
 | WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | **In progress.** Initial Window suite and exact baseline are checked in. [Results](SCRIPTING.md#pinned-window-web-platform-tests) |
 | PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | Not started; runs in parallel |
@@ -364,7 +364,7 @@ ADR is accepted.
      snapshot and resource changes as those paths land.
    - `offsetWidth`, `getBoundingClientRect` and the initial live
      `getComputedStyle` methods share a reference layout snapshot and per-turn
-     flush budget. Complete named/indexed CSSOM getters and edge cases under
+     flush budget. Complete indexed CSSOM properties and edge cases under
      [ADR 0045](adr/0045-live-computed-style-reads.md).
    - Frame tickets check the DOM and the host's applied viewport and resource
      revision. Connect stylesheet and image completions to that revision as

@@ -106,14 +106,17 @@ The first implementation exposes `getComputedStyle(element)` and a live,
 read-only `CSSStyleDeclaration` with `getPropertyValue`,
 `getPropertyPriority`, `item`, `length` and an empty `cssText` getter.
 `setProperty`, `removeProperty` and `cssText` assignment throw
-`NoModificationAllowedError`. A connected declaration without an installed
+`NoModificationAllowedError`. Generated prototype getters expose all supported
+longhands in canonical CSS spelling and camelCase, with the `cssFloat` alias;
+they are live and reject assignment. The property catalog and getter table
+have matching compile-time lengths. A connected declaration without an installed
 renderer reports `InvalidStateError`; detached declarations return empty
 values. Supported longhands and custom properties come from the same CLI cascade pass that builds layout;
 reads share the existing revision key and eight-flush budget. Declarations
 hold their element wrappers through the page's rooted weak map. Nonempty
 pseudo-element arguments fail explicitly rather than return fabricated styles.
 
-This is **not** the full decision: named camel-cased getters, bracketed
-indexed properties, CSSOM serialization edge cases, DOM adoption/GC stress,
+This is **not** the full decision: numeric bracketed indexed properties,
+CSSOM serialization edge cases, DOM adoption/GC stress,
 WPT expansion and applied stylesheet/image completion ordering still need
 implementation and passing tests. Until those arrive WEB-06 remains open.

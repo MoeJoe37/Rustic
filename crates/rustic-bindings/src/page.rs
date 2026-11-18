@@ -20,6 +20,7 @@ mod character_data;
 mod collections;
 mod creation;
 mod documents;
+mod dom_rect;
 mod events;
 mod html_collections;
 mod selectors;
@@ -60,6 +61,10 @@ pub trait PageTree: Debug {
     fn offset_width(&self, _node: NodeId) -> Result<i32, LayoutReadError> {
         Ok(0)
     }
+    /// The transformed border-fragment bounds as `[x, y, width, height]`.
+    fn client_rect(&self, _node: NodeId) -> Result<[f64; 4], LayoutReadError> {
+        Ok([0.0; 4])
+    }
     /// Whether a subtree may move out of the main document, within the turn budget.
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
         Ok(true)
@@ -81,6 +86,7 @@ struct Page {
     window: Value,
     scheduler: Option<Rc<dyn WindowScheduler>>,
     events: events::Events,
+    rects: ObjectId,
     wrappers: RefCell<DomHeap>,
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
@@ -240,6 +246,7 @@ fn install_page(
         return agent.type_error("document is busy");
     };
     events::install(agent)?;
+    dom_rect::install(agent)?;
     collections::install(agent)?;
     html_collections::install(agent)?;
     install_interface(
@@ -335,6 +342,13 @@ fn install_page(
             attributes::install(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
             selectors::install_element(agent, proto)?;
+            events::define_method(
+                agent,
+                proto,
+                "getBoundingClientRect",
+                bounding_client_rect,
+                0,
+            )?;
             html_collections::install_lookup::<false>(agent, proto)
         },
     )?;
@@ -395,6 +409,8 @@ fn install_page(
     drop(document);
     let window = window::install(agent, scheduler.is_some())?;
     let events = events::Events::new(agent)?;
+    let rects = agent.new_weak_map()?;
+    agent.root(Value::object(rects))?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
         main,
@@ -403,6 +419,7 @@ fn install_page(
         window,
         scheduler,
         events,
+        rects,
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),
@@ -592,10 +609,29 @@ fn require_receiver(
 }
 
 fn offset_width(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    let width = read_layout(agent, receiver, true, 0, |tree, id| tree.offset_width(id))?;
+    Ok(Value::number(f64::from(width)))
+}
+
+fn bounding_client_rect(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+    let rect = read_layout(agent, receiver, false, [0.0; 4], |tree, id| {
+        tree.client_rect(id)
+    })?;
+    dom_rect::new_mutable(agent, rect)
+}
+
+fn read_layout<T>(
+    agent: &mut Agent,
+    receiver: Value,
+    html_only: bool,
+    empty: T,
+    read: impl FnOnce(&dyn PageTree, NodeId) -> Result<T, LayoutReadError>,
+) -> JsResult<T> {
     let element = read_node(agent, receiver, |agent, _, document, id, node| {
-        if !matches!(node.kind(), NodeKind::Element(element)
-            if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE))
-        {
+        let NodeKind::Element(element) = node.kind() else {
+            return agent.type_error("expected Element");
+        };
+        if html_only && element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE) {
             return agent.type_error("expected HTMLElement");
         }
         events::reaches_root(document, id, || agent.check_native_work())
@@ -603,12 +639,12 @@ fn offset_width(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Val
     })?;
     with_page(agent, |agent, page| {
         let Some(id) = element.filter(|id| id.document() == page.main) else {
-            return Ok(Value::number(0.0));
+            return Ok(empty);
         };
-        let width = page.tree.offset_width(id);
+        let value = read(page.tree.as_ref(), id);
         agent.check_native_work()?;
-        match width {
-            Ok(width) => Ok(Value::number(f64::from(width))),
+        match value {
+            Ok(value) => Ok(value),
             Err(LayoutReadError::Limit) => Err(Abrupt::Throw(dom_exception::new(
                 agent,
                 "QuotaExceededError",

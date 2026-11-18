@@ -549,6 +549,16 @@ another frame. The regression covers character data, attributes and
 child removal, including an unchanged attribute and a promise-driven edit.
 [ADR 0042](adr/0042-scripted-render-state.md)
 
+Frame tickets also validate the host's applied viewport and resource
+revision. `HTMLElement.offsetWidth` and `Element.getBoundingClientRect()`
+share a document-local geometry snapshot keyed by those two revisions.
+The CLI uses its style, image and layout pipeline for both reads. Client
+rectangles project border fragments using the painter's transforms.
+`DOMRect` and `DOMRectReadOnly` keep their coordinates in private state
+traced by the JS heap. The regressions cover transform updates during
+parsing, rectangle conversion under collection, and an eight-flush budget
+shared with a turn's promise jobs.
+
 `Node.textContent` concatenates descendant text without comments and preserves
 UTF-16 code units. Its setter converts before borrowing the document, leaves
 removed nodes reachable through their existing wrappers and preserves the old
@@ -560,8 +570,8 @@ a freshly parsed reference.
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 16 Window WPT files. It reports 69 subtests, including 60 passes
-and 9 expected failures. The runner checks vendored files by digest and
+baseline for 21 Window WPT files. It reports 78 subtests, including 67 passes
+and 11 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.
@@ -569,6 +579,8 @@ Native regressions cover body adoption, failure atomicity, event initialization
 and visibility for detached documents.
 Checked outward adoption of completed or detached subtrees resolves the two
 detached-document event propagation cases without moving parser-held identities.
+Five upstream CSSOM View files cover script layout reads. They add seven
+passes and two expected failures for empty-inline coordinates.
 [Pinned Window WPT results](SCRIPTING.md#pinned-window-web-platform-tests)
 
 ## DOC-03 and DOC-04a — Document-owned tree core

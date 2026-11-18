@@ -1,4 +1,52 @@
 {
+  "css/cssom-view/GetBoundingRect.html": [
+    {
+      "name": "getBoundingClientRect",
+      "status": "PASS"
+    }
+  ],
+  "css/cssom-view/cssom-getBoundingClientRect-001.html": [
+    {
+      "name": "getBoundingClientRect() should return a DOMRect where height=bottom-top",
+      "status": "PASS"
+    },
+    {
+      "name": "getBoundingClientRect() should return a DOMRect where width=right-left",
+      "status": "PASS"
+    }
+  ],
+  "css/cssom-view/cssom-getBoundingClientRect-002.html": [
+    {
+      "name": "getBoundingClientRect on a newly-created Element not yet inserted into the DOM should return an all-zeroes DOMRect",
+      "status": "PASS"
+    }
+  ],
+  "css/cssom-view/getBoundingClientRect-empty-inline-002.html": [
+    {
+      "name": "x",
+      "status": "FAIL",
+      "message": "assert_equals: expected 8 but got 0"
+    },
+    {
+      "name": "y",
+      "status": "FAIL",
+      "message": "assert_equals: expected 8 but got 0"
+    },
+    {
+      "name": "width",
+      "status": "PASS"
+    },
+    {
+      "name": "height",
+      "status": "PASS"
+    }
+  ],
+  "css/cssom-view/htmlelement-offset-width-001.html": [
+    {
+      "name": "CSSOM View - 7 - element.offsetWidth detatches correctly",
+      "status": "PASS"
+    }
+  ],
   "dom/collections/HTMLCollection-empty-name.html": [
     {
       "name": "Empty string as a name for Document.getElementsByTagName",

@@ -1,12 +1,11 @@
 use std::cell::Cell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
 
 use rustic_base::ManualClock;
-use rustic_dom::{Document, NodeId};
+use rustic_dom::Document;
 use rustic_engine::{
-    DocumentTurn, Engine, EngineDocument, LayoutReadError, LayoutSource,
+    DocumentTurn, Engine, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource,
     MAX_LAYOUT_FLUSHES_PER_TURN, RenderFrame, ScriptStop, ScriptTurn, ScriptedDocument, TaskLimits,
 };
 use rustic_html::{DocumentMode, ParserLimits};
@@ -162,16 +161,19 @@ fn mutations_invalidate_frame_tickets_after_animation_and_promise_work() {
 struct LayoutFixture(Rc<Cell<i32>>);
 
 impl LayoutSource for LayoutFixture {
-    fn measure_widths(
+    fn measure_layout(
         &self,
         document: &Document,
         _: DocumentMode,
-    ) -> Result<HashMap<NodeId, i32>, LayoutReadError> {
-        let mut widths = HashMap::new();
+    ) -> Result<LayoutGeometry, LayoutReadError> {
+        let mut geometry = LayoutGeometry::default();
         for (node, _) in document.walk(document.root()).unwrap() {
-            widths.insert(node, self.0.get());
+            geometry.offset_widths.insert(node, self.0.get());
+            geometry
+                .client_rects
+                .insert(node, Some([0.0, 0.0, f64::from(self.0.get()), 10.0]));
         }
-        Ok(widths)
+        Ok(geometry)
     }
 }
 
@@ -193,7 +195,7 @@ fn layout_flushes_once_per_revision_with_a_shared_turn_budget() {
         var body = document.body;
         if (body.offsetWidth !== 30 || body.offsetWidth !== 30) throw 'first snapshot';
         Promise.resolve().then(() => {
-            if (body.offsetWidth !== 30) throw 'checkpoint snapshot';
+            if (body.getBoundingClientRect().width !== 30) throw 'checkpoint snapshot';
         });
         ",
     );

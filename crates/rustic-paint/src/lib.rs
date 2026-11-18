@@ -11,12 +11,14 @@
 
 #![warn(missing_docs)]
 
+mod client_rects;
 mod clip;
 mod color;
 mod display;
 mod matrix;
 mod rounded;
 
+pub use client_rects::{ClientRects, client_rects};
 pub use color::{Srgba, srgba};
 pub use display::{
     BoxShadow, ClipNode, DisplayCommand, DisplayItem, DisplayList, FilterOp, Fonts, Hit, Image,

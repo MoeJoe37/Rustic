@@ -44,9 +44,7 @@ pub(crate) fn perspective_of(
 pub(crate) enum BoxTransform {
     /// No transform.
     None,
-    /// A transform that renders nothing: a length that does not resolve to
-    /// a finite value, or a matrix that is not finite or not invertible on
-    /// the plane (CSS Transforms 1 §6).
+    /// A length or matrix that cannot be resolved to a finite value.
     Degenerate,
     /// The box's matrix in layout coordinates, perspective included.
     Matrix(Matrix4),
@@ -90,7 +88,7 @@ pub(crate) fn box_transform(
         }
         let m = m.multiply(&Matrix4::translate(-ox, -oy, -oz));
         let finite = m.0.iter().flatten().all(|v| v.is_finite());
-        (finite && m.plane().inverse().is_some()).then_some(m)
+        finite.then_some(m)
     };
     Ok(matrix().map_or(BoxTransform::Degenerate, BoxTransform::Matrix))
 }

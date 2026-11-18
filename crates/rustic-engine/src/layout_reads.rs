@@ -12,13 +12,22 @@ pub const MAX_LAYOUT_FLUSHES_PER_TURN: usize = 8;
 
 /// Bounded layout inputs supplied by a host, using its normal renderer's pipeline.
 pub trait LayoutSource: Debug {
-    /// Build the widths of the rendered elements from the current DOM. Missing
-    /// elements have no associated box and read as zero.
-    fn measure_widths(
+    /// Build the geometry of rendered elements from the current DOM.
+    /// Missing elements have no associated box and read as zero.
+    fn measure_layout(
         &self,
         document: &Document,
         mode: DocumentMode,
-    ) -> Result<HashMap<NodeId, i32>, LayoutReadError>;
+    ) -> Result<LayoutGeometry, LayoutReadError>;
+}
+
+/// Geometry captured at one DOM and rendering-input revision.
+#[derive(Debug, Default)]
+pub struct LayoutGeometry {
+    /// Rounded untransformed border-fragment widths.
+    pub offset_widths: HashMap<NodeId, i32>,
+    /// Transformed client bounds. `None` values describe unprojectable geometry.
+    pub client_rects: HashMap<NodeId, Option<[f64; 4]>>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,12 +36,12 @@ pub(crate) struct LayoutRevision {
     pub(crate) inputs: u64,
 }
 
-type Widths = Result<HashMap<NodeId, i32>, LayoutReadError>;
+type Geometry = Result<LayoutGeometry, LayoutReadError>;
 
 #[derive(Debug, Default)]
 pub(crate) struct LayoutReads {
     source: Option<Box<dyn LayoutSource>>,
-    cached: Option<(LayoutRevision, Widths)>,
+    cached: Option<(LayoutRevision, Geometry)>,
     inputs: u64,
     turn_flushes: usize,
     total_flushes: u64,
@@ -69,19 +78,20 @@ impl LayoutReads {
         self.cached = None;
     }
 
-    pub(crate) fn width(
+    pub(crate) fn read<T>(
         &mut self,
         document: &Document,
         mode: DocumentMode,
-        node: NodeId,
-    ) -> Result<i32, LayoutReadError> {
+        empty: T,
+        read: impl FnOnce(&LayoutGeometry) -> Result<T, LayoutReadError>,
+    ) -> Result<T, LayoutReadError> {
         let Some(source) = &self.source else {
-            return Ok(0);
+            return Ok(empty);
         };
         let revision = self.revision(document);
-        if let Some((cached, widths)) = &self.cached {
+        if let Some((cached, geometry)) = &self.cached {
             if Some(*cached) == revision {
-                return width_in(widths, node);
+                return geometry.as_ref().map_err(|&error| error).and_then(read);
             }
         }
         if self.turn_flushes == MAX_LAYOUT_FLUSHES_PER_TURN {
@@ -89,16 +99,9 @@ impl LayoutReads {
         }
         self.turn_flushes += 1;
         self.total_flushes = self.total_flushes.saturating_add(1);
-        let widths = source.measure_widths(document, mode);
-        let result = width_in(&widths, node);
-        self.cached = revision.map(|revision| (revision, widths));
+        let geometry = source.measure_layout(document, mode);
+        let result = geometry.as_ref().map_err(|&error| error).and_then(read);
+        self.cached = revision.map(|revision| (revision, geometry));
         result
     }
-}
-
-fn width_in(widths: &Widths, node: NodeId) -> Result<i32, LayoutReadError> {
-    widths
-        .as_ref()
-        .map(|widths| widths.get(&node).copied().unwrap_or(0))
-        .map_err(|&error| error)
 }

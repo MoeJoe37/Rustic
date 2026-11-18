@@ -1709,7 +1709,7 @@ impl DisplayList {
                     style.get(P::BackfaceVisibility),
                     V::BackfaceVisibility(BackfaceVisibility::Hidden)
                 );
-                if hidden && m.back_facing() {
+                if m.plane().inverse().is_none() || (hidden && m.back_facing()) {
                     transform = BoxTransform::Degenerate;
                 }
             }

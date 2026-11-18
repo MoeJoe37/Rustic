@@ -74,14 +74,17 @@ original document while those identities are in use.
 
 With `--run-scripts`, `HTMLElement.offsetWidth` reads the rounded,
 untransformed border-fragment width through the same layout pipeline as
-the output renderer. Hidden and detached elements read as zero.
+the output renderer. `Element.getBoundingClientRect()` returns a new
+`DOMRect` with the transformed bounds in the initial viewport. Elements
+without layout boxes read as zero. Unprojectable bounds return
+`InvalidStateError` in the headless renderer.
 [CSSOM View](https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsetwidth)
 
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Additional layout reads and resource ordering | `getBoundingClientRect`, `getComputedStyle` and stylesheet/image completion ordering remain open. | WEB-06 |
+| Resolved style reads and resource ordering | `getComputedStyle` and stylesheet/image completion ordering remain open. | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
@@ -286,11 +289,11 @@ depends on WEB-07.
 ### Pinned Window web-platform-tests
 
 The headless CLI runs upstream `testharness.js` unchanged at WPT revision
-`cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The initial selection covers
+`cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
-and `html/webappapis/animation-frames`. Linux CI is configured to require
-an exact match to the checked-in **16 files, 69 subtests, 60 passes and
-9 expected failures**. The expectations record the names and diagnoses
+`html/webappapis/animation-frames` and `css/cssom-view`. Linux CI is
+configured to require an exact match to the checked-in **21 files,
+78 subtests, 67 passes and 11 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -302,6 +305,9 @@ clock and one rendering opportunity. The candidate
 `ParentNode-querySelectorAll-removed-elements.html` depends on
 `innerHTML`, and `clearinterval-from-callback.any.js` leaves an interval
 running after completion. Both remain outside the initial selection.
+The CSSOM View cases cover detached elements, fixed positioning with a
+transform and rectangle dimensions. The two new expected failures concern
+the coordinates of an empty inline in a phantom line box.
 
 ```sh
 cargo build --locked -p rustic-cli

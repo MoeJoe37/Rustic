@@ -7,7 +7,6 @@
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
-use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
@@ -18,10 +17,11 @@ use std::time::Duration;
 
 use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
 use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment};
-use rustic_dom::{Document, DumpError, NodeId};
+use rustic_dom::{Document, DumpError};
 use rustic_engine::{
     ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
-    EngineDocument, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop, TaskLimits,
+    EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop,
+    TaskLimits,
 };
 use rustic_html::{DocumentMode, ParseError, ParserLimits};
 use rustic_style::{
@@ -660,11 +660,11 @@ struct LocalLayout {
 }
 
 impl LayoutSource for LocalLayout {
-    fn measure_widths(
+    fn measure_layout(
         &self,
         document: &Document,
         mode: DocumentMode,
-    ) -> Result<HashMap<NodeId, i32>, LayoutReadError> {
+    ) -> Result<LayoutGeometry, LayoutReadError> {
         let (tree, layout, _, _) = block_layout(LayoutInput {
             document,
             mode,
@@ -674,9 +674,13 @@ impl LayoutSource for LocalLayout {
             cancellation: &self.cancellation,
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
-        layout
-            .offset_widths(&tree, &self.cancellation)
-            .map_err(|_| LayoutReadError::Unavailable)
+        Ok(LayoutGeometry {
+            offset_widths: layout
+                .offset_widths(&tree, &self.cancellation)
+                .map_err(|_| LayoutReadError::Unavailable)?,
+            client_rects: rustic_paint::client_rects(&tree, &layout, &self.cancellation)
+                .map_err(|_| LayoutReadError::Unavailable)?,
+        })
     }
 }
 
@@ -892,10 +896,18 @@ mod tests {
                     const inline = document.querySelector('#inline');
                     const detached = document.implementation.createHTMLDocument('').body;
                     const width = box.offsetWidth;
+                    const before = box.getBoundingClientRect();
                     box.setAttribute('class', 'wide');
+                    const after = box.getBoundingClientRect();
+                    const dimensions = [before.width, after.width, after.height, after.left];
+                    const rectType = after instanceof DOMRect && after instanceof DOMRectReadOnly;
+                    after.width = 7;
                     document.body.setAttribute('data-layout', [
                         width, box.offsetWidth, hidden.offsetWidth, detached.offsetWidth,
                         inline.offsetWidth > 6, box instanceof HTMLElement,
+                        dimensions.join(':'), rectType, after.width,
+                        box.getBoundingClientRect().width,
+                        detached.getBoundingClientRect().width,
                     ].join(','));
                 </script>"#,
         );
@@ -907,7 +919,9 @@ mod tests {
         let parsed = load_document(&mut Engine::new(1), &file.0, limits).unwrap();
         let tree = dump_dom(&parsed, &file.0, limits).unwrap();
         assert!(
-            tree.contains("local=\"data-layout\" value=\"84,164,0,0,true,true\""),
+            tree.contains(
+                "local=\"data-layout\" value=\"84,164,0,0,true,true,84:328:28:-74,true,7,328,0\""
+            ),
             "{tree}"
         );
     }

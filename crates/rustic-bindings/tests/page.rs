@@ -20,6 +20,44 @@ impl PageTree for Tree {
 }
 
 #[test]
+fn dom_rects_are_branded_and_keep_their_values_through_reentry() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let tree = Rc::new(Tree(RefCell::new(document)));
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, tree).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent
+        .evaluate(
+            r#"
+        let trace = '';
+        const readOnly = DOMRectReadOnly.fromRect({
+            get height() { trace += 'h'; return -3; },
+            get width() { trace += 'w'; return -5; },
+            get x() { trace += 'x'; return 20; },
+            get y() { trace += 'y'; return 10; },
+        });
+        if (trace !== 'hwxy' || readOnly instanceof DOMRect ||
+            readOnly.top !== 7 || readOnly.right !== 20 ||
+            readOnly.bottom !== 10 || readOnly.left !== 15) throw 1;
+        const write = Object.getOwnPropertyDescriptor(DOMRect.prototype, 'x').set;
+        try { write.call(readOnly, 0); throw 2; }
+        catch (error) { if (!(error instanceof TypeError)) throw error; }
+        const mutable = DOMRect.fromRect(readOnly);
+        mutable.x = { valueOf() {
+            const temporary = new DOMRect(4, 3, 2, 1);
+            if (temporary.right !== 6) throw 3;
+            return 7;
+        } };
+        if (mutable.x !== 7 || mutable.left !== 2 || readOnly.x !== 20 ||
+            mutable.toJSON().height !== -3 || Object.keys(mutable).length !== 0) throw 4;
+        if (!Number.isNaN(new DOMRect(0, 0, NaN).right)) throw 5;
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
 fn text_content_preserves_code_units_and_reentrant_conversion() {
     let document = Document::new(DocumentLimits::default()).unwrap();
     let tree = Rc::new(Tree(RefCell::new(document)));

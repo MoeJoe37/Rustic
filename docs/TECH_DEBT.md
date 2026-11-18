@@ -1942,7 +1942,9 @@ the first cross-engine report of PERF-01.
 
 The page host supports detached HTML and XML documents, explicit and
 automatic cross-document node moves, and namespace-aware element and
-attribute operations. Element creation provides the base Element interface.
+attribute operations. Element creation provides Element, HTMLElement and
+HTMLInputElement prototypes, as applicable. Geometry rectangle interfaces
+are bound by hand.
 Add Attr nodes and NamedNodeMap with the DOM attribute wrappers, and add
 HTML element-specific prototypes and custom element reactions with the
 HTML interface and registry work.

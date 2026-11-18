@@ -97,7 +97,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     ui::install(agent)
 }
 
-fn define_method(
+pub(super) fn define_method(
     agent: &mut Agent,
     prototype: ObjectId,
     name: &str,
@@ -116,25 +116,25 @@ fn define_method(
 /// Arrays used as native records have no prototype, so reads and writes
 /// cannot invoke page code. The records themselves are never exposed.
 #[derive(Clone, Copy)]
-struct PrivateArray(ObjectId);
+pub(super) struct PrivateArray(ObjectId);
 
 impl PrivateArray {
-    fn new(agent: &mut Agent, values: &[Value]) -> JsResult<Self> {
+    pub(super) fn new(agent: &mut Agent, values: &[Value]) -> JsResult<Self> {
         let object = agent.create_array_from_list(values)?;
         let success = agent.set_prototype_of(object, None)?;
         debug_assert!(success);
         Ok(Self(object))
     }
 
-    fn value(self) -> Value {
+    pub(super) fn value(self) -> Value {
         Value::object(self.0)
     }
 
-    fn get(self, agent: &mut Agent, index: u32) -> JsResult<Value> {
+    pub(super) fn get(self, agent: &mut Agent, index: u32) -> JsResult<Value> {
         agent.get(self.0, PropertyKey::Index(index))
     }
 
-    fn set(self, agent: &mut Agent, index: u32, value: Value) -> JsResult<()> {
+    pub(super) fn set(self, agent: &mut Agent, index: u32, value: Value) -> JsResult<()> {
         agent.set(self.0, PropertyKey::Index(index), value, true)
     }
 
@@ -145,7 +145,7 @@ impl PrivateArray {
         Ok(len.as_number().expect("array length") as u32)
     }
 
-    fn from_value(value: Value) -> Option<Self> {
+    pub(super) fn from_value(value: Value) -> Option<Self> {
         value.as_object().map(Self)
     }
 }

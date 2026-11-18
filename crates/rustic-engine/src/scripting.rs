@@ -18,7 +18,7 @@ use rustic_js::runtime::{
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
 use crate::frames::{RenderFrame, Rendering};
-use crate::layout_reads::{LayoutReads, LayoutSource};
+use crate::layout_reads::{LayoutGeometry, LayoutReads, LayoutSource};
 use crate::lifecycle::DocumentScope;
 use crate::local_modules::{LocalModules, ModuleKey};
 use crate::tasks::{ScriptQueue, Task, TimerId};
@@ -171,6 +171,16 @@ struct ScriptTree {
 }
 
 impl ScriptTree {
+    fn read_layout<T>(
+        &self,
+        empty: T,
+        read: impl FnOnce(&LayoutGeometry) -> Result<T, LayoutReadError>,
+    ) -> Result<T, LayoutReadError> {
+        let document = self.read().ok_or(LayoutReadError::Unavailable)?;
+        let mode = self.mode().ok_or(LayoutReadError::Unavailable)?;
+        self.layout.borrow_mut().read(&document, mode, empty, read)
+    }
+
     fn mode(&self) -> Option<DocumentMode> {
         match &*self.state.borrow() {
             ScriptTreeState::Parsing(parser) => parser.live_document_mode(),
@@ -234,9 +244,20 @@ impl PageTree for ScriptTree {
     }
 
     fn offset_width(&self, id: NodeId) -> Result<i32, LayoutReadError> {
-        let document = self.read().ok_or(LayoutReadError::Unavailable)?;
-        let mode = self.mode().ok_or(LayoutReadError::Unavailable)?;
-        self.layout.borrow_mut().width(&document, mode, id)
+        self.read_layout(0, |geometry| {
+            Ok(geometry.offset_widths.get(&id).copied().unwrap_or(0))
+        })
+    }
+
+    fn client_rect(&self, id: NodeId) -> Result<[f64; 4], LayoutReadError> {
+        self.read_layout([0.0; 4], |geometry| {
+            geometry
+                .client_rects
+                .get(&id)
+                .copied()
+                .unwrap_or(Some([0.0; 4]))
+                .ok_or(LayoutReadError::Unavailable)
+        })
     }
 
     fn allows_adoption_from_main(&self, agent: &mut Agent, subtree: NodeId) -> JsResult<bool> {

@@ -580,12 +580,15 @@ a freshly parsed reference.
 A held `CSSStyleDeclaration` obtained from `Window.getComputedStyle` is
 associated with its element through a rooted weak map. Its `getPropertyValue`,
 `getPropertyPriority`, `item` and `length` methods read from the declaration;
-value, item and length accesses ask the shared `LayoutReads` snapshot for the latest successful DOM and applied-input
+value, item, length and named getter accesses ask the shared `LayoutReads` snapshot for the latest successful DOM and applied-input
 revisions. The CLI's `LocalLayout` attaches computed longhand and custom
 property values from the same `style_tree` call used to construct its layout
 boxes, so the style query and geometry do not run competing cascades.
-The `cssText` getter is empty and mutation methods and assignment throw
-`NoModificationAllowedError`. Connected computed-style reads without a host
+All 110 supported longhands expose camel-cased (including `cssFloat`) and
+canonical CSS-named getters on the prototype. The getter function table has
+a compile-time size check against `PropertyId::ALL`; a pure unit test verifies
+name uniqueness. Named property assignments, the empty `cssText` getter and
+explicit mutation methods throw `NoModificationAllowedError` for writes. Connected computed-style reads without a host
 layout source throw `InvalidStateError`, while detached nodes retain their
 empty values and geometry's no-source fallback is unchanged.
 
@@ -595,7 +598,7 @@ read-only mutation errors, and absent-renderer/detached semantics) and
 `crates/rustic-cli/src/loader.rs` (live local style/class/inline mutations,
 custom names, inheritance and detached nodes). **Verification pending**:
 this environment has no Rust toolchain, and the hosted CI billing block remains.
-Camel-cased getters, indexed properties, pseudo-elements, style serialization
+Indexed properties, pseudo-elements, style serialization
 coverage and applied resource-completion tasks remain WEB-06 work under
 [ADR 0045](adr/0045-live-computed-style-reads.md). No new capability is
 marked complete by this slice.

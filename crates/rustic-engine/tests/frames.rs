@@ -240,6 +240,118 @@ fn layout_flushes_once_per_revision_with_a_shared_turn_budget() {
     assert_eq!(scripts.accept_rendered_frame(fresh), Ok(true));
 }
 
+#[derive(Debug)]
+struct AppliedResourceFixture {
+    stylesheet_width: Rc<Cell<i32>>,
+    image_width: Rc<Cell<i32>>,
+}
+
+impl LayoutSource for AppliedResourceFixture {
+    fn measure_layout(
+        &self,
+        document: &Document,
+        _: DocumentMode,
+    ) -> Result<LayoutGeometry, LayoutReadError> {
+        let mut geometry = LayoutGeometry::default();
+        let stylesheet = self.stylesheet_width.get();
+        let image = self.image_width.get();
+        let width = stylesheet + image;
+        for (node, _) in document.walk(document.root()).unwrap() {
+            if !matches!(document.node(node).unwrap().kind(), rustic_dom::NodeKind::Element(_)) {
+                continue;
+            }
+            geometry.offset_widths.insert(node, width);
+            geometry
+                .client_rects
+                .insert(node, Some([0.0, 0.0, f64::from(width), 12.0]));
+            geometry.computed_styles.insert(
+                node,
+                rustic_engine::ComputedStyleSnapshot {
+                    longhands: vec![("width", format!("{stylesheet}px"))],
+                    custom_properties: vec![(
+                        "--image-width".to_owned(),
+                        format!("{image}px"),
+                    )],
+                },
+            );
+        }
+        Ok(geometry)
+    }
+}
+
+#[test]
+fn resource_completions_publish_only_after_application_and_offer_a_frame() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    let stylesheet_width = Rc::new(Cell::new(20));
+    let image_width = Rc::new(Cell::new(5));
+    scripts
+        .set_layout_source(Box::new(AppliedResourceFixture {
+            stylesheet_width: stylesheet_width.clone(),
+            image_width: image_width.clone(),
+        }))
+        .unwrap();
+
+    let run = |scripts: &mut ScriptedDocument<ManualClock>, expected: &str| {
+        scripts
+            .queue_script(source(&format!(
+                r#"
+                var body = document.body;
+                var style = getComputedStyle(body);
+                if ([body.offsetWidth, body.getBoundingClientRect().width,
+                    style.width, style.getPropertyValue('--image-width')].join('|')
+                    !== '{expected}') throw 'resource inputs are inconsistent';
+                "#
+            )))
+            .unwrap();
+        assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    };
+
+    run(&mut scripts, "25|25|20px|5px");
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+    scripts.offer_rendering_opportunity().unwrap();
+    let first_frame = render_turn(&mut scripts);
+
+    // A failed stylesheet fetch has not applied anything, so it must not
+    // invalidate the frame or queue an unnecessary rendering opportunity.
+    assert_eq!(
+        scripts.apply_resource_completion(|| Err::<(), _>("stylesheet fetch rejected")),
+        Ok(Err("stylesheet fetch rejected"))
+    );
+    run(&mut scripts, "25|25|20px|5px");
+    assert_eq!(scripts.take_layout_flush_count(), 0);
+    assert_eq!(scripts.accept_rendered_frame(first_frame), Ok(true));
+    assert_eq!(scripts.run_next_with_render(unexpected_render), Ok(None));
+
+    scripts.offer_rendering_opportunity().unwrap();
+    let stale_stylesheet = render_turn(&mut scripts);
+    assert_eq!(
+        scripts.apply_resource_completion(|| {
+            stylesheet_width.set(40);
+            Ok::<(), &str>(())
+        }),
+        Ok(Ok(()))
+    );
+    assert_eq!(scripts.accept_rendered_frame(stale_stylesheet), Ok(false));
+    run(&mut scripts, "45|45|40px|5px");
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+    // The successful completion queued this frame without an explicit offer.
+    let stylesheet_frame = render_turn(&mut scripts);
+    assert_eq!(scripts.accept_rendered_frame(stylesheet_frame), Ok(true));
+
+    assert_eq!(
+        scripts.apply_resource_completion(|| {
+            image_width.set(15);
+            Ok::<(), &str>(())
+        }),
+        Ok(Ok(()))
+    );
+    run(&mut scripts, "55|55|40px|15px");
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+    let image_frame = render_turn(&mut scripts);
+    assert_eq!(scripts.accept_rendered_frame(image_frame), Ok(true));
+}
+
 #[test]
 fn rendering_input_revisions_are_scoped_to_their_document() {
     let mut engine = Engine::new(2);

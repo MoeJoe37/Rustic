@@ -436,9 +436,14 @@ fn computed_style_and_geometry_share_the_dirty_flush_quota() {
         for (let i = 0; i < {MAX_LAYOUT_FLUSHES_PER_TURN}; i++) {{
             body.setAttribute('data-next', String(i));
             if (style.getPropertyValue('color') !== 'blue') throw 'style value';
+            if (style[0] !== 'display' || style.length !== 4) throw 'indexed style';
             if (body.offsetWidth !== 0) throw 'geometry value';
         }}
         body.removeAttribute('data-next');
+        try {{ style[0]; throw 'indexed quota missing'; }}
+        catch (error) {{
+            if (error.name !== 'QuotaExceededError') throw 'wrong indexed quota error';
+        }}
         try {{ style.getPropertyValue('color'); throw 'quota missing'; }}
         catch (error) {{
             if (error.name !== 'QuotaExceededError') throw 'wrong quota error';

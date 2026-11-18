@@ -4,7 +4,9 @@
 //! remains reachable, without keeping dead declarations or detached nodes alive.
 
 use rustic_dom::NodeKind;
-use rustic_js::runtime::{Abrupt, Agent, JsResult, Value};
+use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, PropertyDescriptor, Value};
+
+use crate::dom_exception;
 
 use crate::webidl::{IntegerConversion, to_unsigned_long};
 
@@ -24,10 +26,20 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         0,
         &[("length", "get length", length)],
         |agent, proto| {
+            let getter = Value::object(agent.new_native_function(css_text, "get cssText", 0)?);
+            let setter = Value::object(agent.new_native_function(set_css_text, "set cssText", 1)?);
+            let key = agent.heap.key("cssText")?;
+            agent.define_property_or_throw(
+                proto,
+                key,
+                PropertyDescriptor::accessor(getter, setter, true, true),
+            )?;
             for (name, operation, count) in [
-                ("getPropertyValue", get_property_value as rustic_js::runtime::NativeFn, 1),
+                ("getPropertyValue", get_property_value as NativeFn, 1),
                 ("getPropertyPriority", get_property_priority, 1),
                 ("item", item, 1),
+                ("setProperty", set_property, 2),
+                ("removeProperty", remove_property, 1),
             ] {
                 events::define_method(agent, proto, name, operation, count)?;
             }
@@ -130,4 +142,49 @@ fn item(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value
         agent,
         style.name_at(usize::try_from(index).map_err(|_| Abrupt::OutOfMemory)?).unwrap_or(""),
     )
+}
+
+fn read_only(agent: &mut Agent) -> Abrupt {
+    match dom_exception::new(
+        agent,
+        "NoModificationAllowedError",
+        "computed style declarations are read-only",
+    ) {
+        Ok(error) => Abrupt::Throw(error),
+        Err(error) => error,
+    }
+}
+
+fn css_text(agent: &mut Agent, declaration: Value, _: &[Value]) -> JsResult<Value> {
+    element(agent, declaration)?;
+    value(agent, "")
+}
+
+fn set_css_text(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    let argument = required_arg(agent, args, 0)?;
+    let _ = creation::string(agent, argument)?;
+    element(agent, declaration)?;
+    Err(read_only(agent))
+}
+
+fn set_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    let name = required_arg(agent, args, 0)?;
+    let _ = creation::string(agent, name)?;
+    if let Some(&value) = args.get(1) {
+        if !value.is_nullish() {
+            let _ = creation::string(agent, value)?;
+        }
+    }
+    if let Some(&priority) = args.get(2) {
+        let _ = creation::string(agent, priority)?;
+    }
+    element(agent, declaration)?;
+    Err(read_only(agent))
+}
+
+fn remove_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    let name = required_arg(agent, args, 0)?;
+    let _ = creation::string(agent, name)?;
+    element(agent, declaration)?;
+    Err(read_only(agent))
 }

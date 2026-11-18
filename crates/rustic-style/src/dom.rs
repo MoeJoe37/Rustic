@@ -12,7 +12,7 @@ use crate::matching::{MatchCache, matches_complex_cached};
 use crate::{
     AttributeRef, Cascade, ChildRef, ComputeContext, ComputedStyle, ContainerInfo, ContainerSize,
     ElementView, MatchContext, SpecifiedStyle, StyleDiagnostic, StyleInputs, TreeContext,
-    TreeScope, parse_style_attribute,
+    TreeScope, parse_style_attribute, resolve_declaration_urls,
 };
 
 /// An element of a [`Document`], borrowed for matching.
@@ -605,10 +605,13 @@ pub(crate) fn style_walk<'a>(
                     .attributes()
                     .find(|a| a.namespace.is_none() && a.local == "style")
                     .map(|a| String::from_utf16_lossy(a.value));
-                let (inline, inline_diagnostics) = match style_attribute {
+                let (mut inline, inline_diagnostics) = match style_attribute {
                     Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
                     None => Default::default(),
                 };
+                if let Some(base) = cascade.document_base_url() {
+                    resolve_declaration_urls(&mut inline, base);
+                }
                 let containers: Vec<ContainerInfo<'_, DomElement<'a>>> = if container_queries {
                     path.iter()
                         .filter_map(|e| {

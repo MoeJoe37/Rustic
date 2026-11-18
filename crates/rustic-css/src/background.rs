@@ -17,8 +17,8 @@ use crate::{Calc, Color, ComponentValue, LengthPercentage, PropertyValue, Token,
 pub enum Image {
     /// `none`.
     None,
-    /// `url(...)`, unresolved (relative URLs resolve once stylesheets know
-    /// their base URL; see TD-26).
+    /// `url(...)`: as written when parsed, absolute once the style system
+    /// resolves it against the declaring sheet's base URL.
     Url(String),
 }
 

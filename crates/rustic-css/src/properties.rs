@@ -1154,6 +1154,50 @@ impl fmt::Display for PropertyError {
 
 impl std::error::Error for PropertyError {}
 
+impl PropertyValue {
+    /// Replace every `url()` in the value with `resolve`'s result, keeping
+    /// a URL as written where `resolve` returns `None`. The style system
+    /// uses this to make relative URLs absolute against the declaring
+    /// sheet's base URL (CSS Values 4 §4.5.1).
+    pub fn resolve_urls(&mut self, resolve: &dyn Fn(&str) -> Option<String>) {
+        let apply = |url: &mut String| {
+            if let Some(resolved) = resolve(url) {
+                *url = resolved;
+            }
+        };
+        match self {
+            Self::BackgroundImage(images) => {
+                for image in images {
+                    if let Image::Url(url) = image {
+                        apply(url);
+                    }
+                }
+            }
+            Self::ClipPath(crate::ClipPath::Url(url)) => apply(url),
+            Self::Filter(functions) => {
+                for function in functions {
+                    if let crate::FilterFunction::Url(url) = function {
+                        apply(url);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Does the value contain a `url()`?
+    pub fn has_urls(&self) -> bool {
+        match self {
+            Self::BackgroundImage(images) => images.iter().any(|i| matches!(i, Image::Url(_))),
+            Self::ClipPath(crate::ClipPath::Url(_)) => true,
+            Self::Filter(functions) => functions
+                .iter()
+                .any(|f| matches!(f, crate::FilterFunction::Url(_))),
+            _ => false,
+        }
+    }
+}
+
 /// Parse a declaration into typed longhand declarations.
 ///
 /// A shorthand expands to all of its longhands; a CSS-wide keyword applies

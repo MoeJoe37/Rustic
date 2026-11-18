@@ -217,6 +217,7 @@ pub fn document_cascade_with(
 ) -> Result<(Cascade, Vec<StyleElementSheet>), DomError> {
     let base = base_url(document, document_url, loader)?;
     let mut cascade = Cascade::new();
+    cascade.set_document_base_url(base.clone());
     cascade.push(html_user_agent_sheet(parser));
     let mut reports = Vec::new();
     // An explicit stack of (walk, tree) pairs for nested shadow trees.

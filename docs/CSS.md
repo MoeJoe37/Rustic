@@ -270,7 +270,7 @@ properties return `UnknownProperty` and values outside the grammar return
 | `text-decoration-line` | `none` or any of `underline`, `overline`, `line-through`, `blink` |
 | `text-decoration-style` | `solid`, `double`, `dotted`, `dashed`, `wavy` |
 | `text-decoration-color` | `<color>` |
-| `background-image` | Comma-separated `none` or `url()` (gradients and other images later; URLs stay unresolved, TD-26) |
+| `background-image` | Comma-separated `none` or `url()` (gradients and other images later); URLs resolve against the declaring sheet's base URL |
 | `background-position` | Comma-separated `<bg-position>`: 1–4 values with keywords, offsets and side-relative offsets (`right 10px bottom 20%`) |
 | `background-size` | Comma-separated `cover`, `contain` or one or two of `auto` / nonnegative `<length-percentage>` |
 | `background-repeat` | Comma-separated `repeat-x`, `repeat-y` or one or two of `repeat`, `space`, `round`, `no-repeat` |

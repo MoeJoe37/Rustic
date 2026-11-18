@@ -21,6 +21,8 @@ use rustic_css::{
     PropertyValue, Specificity,
 };
 
+use rustic_url::Url;
+
 use crate::containers::{ContainerInfo, container_list_matches};
 use crate::layer::{LayerOrder, UNLAYERED};
 use crate::matching::{MatchCache, matches_in_tree};
@@ -304,6 +306,9 @@ pub struct Cascade {
     /// Custom properties registered with `@property` (derived from the
     /// sheets; a later registration of a name wins).
     registry: RegistryRef,
+    /// The document base URL, which `url()` values in `style` attributes
+    /// resolve against.
+    document_base_url: Option<Url>,
 }
 
 impl PartialEq for Cascade {
@@ -311,6 +316,7 @@ impl PartialEq for Cascade {
         self.sheets == other.sheets
             && self.placements == other.placements
             && self.environment == other.environment
+            && self.document_base_url == other.document_base_url
     }
 }
 
@@ -330,6 +336,17 @@ impl Cascade {
             environment,
             ..Self::default()
         }
+    }
+
+    /// Set the document base URL that `style` attributes resolve `url()`
+    /// values against (sheets carry their own, [`StyleSheet::base_url`]).
+    pub fn set_document_base_url(&mut self, base: Option<Url>) {
+        self.document_base_url = base;
+    }
+
+    /// The document base URL set with [`Cascade::set_document_base_url`].
+    pub fn document_base_url(&self) -> Option<&Url> {
+        self.document_base_url.as_ref()
     }
 
     /// Append a document-tree stylesheet; later sheets come later in order

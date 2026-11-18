@@ -615,3 +615,49 @@ fn link_and_base_urls_use_the_document_encoding_for_queries() {
         ]
     );
 }
+
+#[test]
+fn url_values_resolve_against_the_declaring_sheets_base() {
+    let loaded = load(
+        "<!doctype html><base href='https://site.test/base/'>\
+         <link rel=stylesheet href='/css/a.css'>\
+         <style>#s { background-image: url(s.png) } #f { clip-path: url(#clip) }</style>\
+         <p id=a>a</p><p id=i>i</p><p id=s>s</p><p id=f>f</p>\
+         <p id=v>v</p><p id=w>w</p>\
+         <p id=e style='background-image: url(e.png); filter: url(\"f.svg#x\") blur(1px)'>e</p>",
+        &[
+            (
+                "css/a.css",
+                "@import 'deep/i.css';\
+                 #a { background-image: url(a.png), url('../img/b.png') }\
+                 #v { --img: url(v.png) }\
+                 #v, #w { background: var(--img, url(w.png)) }",
+            ),
+            ("css/deep/i.css", "#i { background-image: url(i.png) }"),
+        ],
+        StyleLoadLimits::default(),
+    );
+    let image = |id| computed(&loaded, id, PropertyId::BackgroundImage);
+    // An external sheet resolves against its own URL, an imported sheet
+    // against its URL, and a `<style>` element against the document base.
+    assert_eq!(
+        image("a"),
+        "url(\"https://site.test/css/a.png\"), url(\"https://site.test/img/b.png\")"
+    );
+    assert_eq!(image("i"), "url(\"https://site.test/css/deep/i.png\")");
+    assert_eq!(image("s"), "url(\"https://site.test/base/s.png\")");
+    // After `var()` substitution, the declaring sheet's base still applies.
+    assert_eq!(image("v"), "url(\"https://site.test/css/v.png\")");
+    assert_eq!(image("w"), "url(\"https://site.test/css/w.png\")");
+    // A `style` attribute uses the document base URL.
+    assert_eq!(image("e"), "url(\"https://site.test/base/e.png\")");
+    assert_eq!(
+        computed(&loaded, "e", PropertyId::Filter),
+        "url(\"https://site.test/base/f.svg#x\") blur(1px)"
+    );
+    // Fragment-only URLs refer to the document and stay as written.
+    assert_eq!(
+        computed(&loaded, "f", PropertyId::ClipPath),
+        "url(\"#clip\")"
+    );
+}

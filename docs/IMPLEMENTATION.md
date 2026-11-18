@@ -1110,8 +1110,8 @@ offsets, `z-index`, `float`, `clear`), `overflow-x`/`-y`, `visibility`,
 and absolutely positioned boxes, overflow pairing, `match-parent`, background
 positions as offsets) and the HTML user-agent sheet uses them for `pre`,
 links, decorations, `sub`/`sup`, table alignment and `dir`. Gradients, system
-fonts, the Text 4 `white-space` longhands (TD-27) and `url()` resolution
-(TD-26) remain. See [CSS.md](CSS.md#property-values).
+fonts and the Text 4 `white-space` longhands (TD-27) remain. `url()` values
+resolve against their sheet's base URL (TD-26, paid). See [CSS.md](CSS.md#property-values).
 
 ## CSS-04 — Cascade and inheritance
 

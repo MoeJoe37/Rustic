@@ -316,11 +316,28 @@ fn substitute_into<'a>(
 pub struct UnparsedValue {
     property: String,
     value: CustomValue,
+    url_base: Option<Arc<str>>,
 }
 
 impl UnparsedValue {
     pub(crate) fn new(property: String, value: CustomValue) -> Self {
-        Self { property, value }
+        Self {
+            property,
+            value,
+            url_base: None,
+        }
+    }
+
+    /// The serialized base URL of the stylesheet (or document, for a `style`
+    /// attribute) that declared the value. `url()` values in the parsed
+    /// result resolve against it; `None` leaves them as written.
+    pub fn url_base(&self) -> Option<&str> {
+        self.url_base.as_deref()
+    }
+
+    /// Record the declaring sheet's base URL (see [`Self::url_base`]).
+    pub fn set_url_base(&mut self, base: Option<Arc<str>>) {
+        self.url_base = base;
     }
 
     /// The declared property (a shorthand for a longhand set through one).

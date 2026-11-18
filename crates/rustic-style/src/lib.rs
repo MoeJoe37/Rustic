@@ -78,7 +78,7 @@ pub use rustic_text::EmRatios;
 pub use scope::ScopeRule;
 pub use sheet::{
     ImportRule, Origin, StyleDiagnostic, StyleDiagnosticKind, StyleRule, StyleSheet,
-    parse_style_attribute,
+    parse_style_attribute, resolve_declaration_urls,
 };
 pub use variables::{CustomProperties, PropertyRegistration};
 pub use view::{AttributeRef, ChildRef, ElementView};

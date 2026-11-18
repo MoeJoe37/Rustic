@@ -268,6 +268,7 @@ impl<'a> StyleLoader<'a> {
         while let Some(frame) = stack.last_mut() {
             let Some(import) = frame.imports.get(frame.next).cloned() else {
                 let mut done = stack.pop().expect("the loop saw a frame");
+                done.sheet.set_base_url(done.base);
                 for media in done.media {
                     done.sheet.restrict_to(media);
                 }

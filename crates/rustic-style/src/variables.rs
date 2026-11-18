@@ -259,7 +259,14 @@ impl SubstitutionCache {
         }
         let mut budget = MAX_SUBSTITUTED_VALUES;
         let lookup = |name: &str| custom.get(name);
-        let result = unparsed.resolve(property, &lookup, &mut budget);
+        let mut result = unparsed.resolve(property, &lookup, &mut budget);
+        if let (Some(value), Some(base)) = (result.as_mut(), unparsed.url_base()) {
+            if value.has_urls() {
+                if let Ok(base) = rustic_url::Url::parse(base, None) {
+                    value.resolve_urls(&|url| crate::sheet::resolve_css_url(url, &base));
+                }
+            }
+        }
         self.longhands.insert(key, (custom.clone(), result.clone()));
         result
     }

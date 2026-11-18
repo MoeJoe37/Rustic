@@ -58,7 +58,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-02, TD-15, TD-26, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-02, TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -106,7 +106,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-23 | Deliberate | Style | Light children of a shadow host inherit from the host, not a slot | Open, pay with slot assignment |
 | TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Open, pay with the custom element registry |
 | TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
-| TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Open |
+| TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Paid |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
 | TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Paid |
 | TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Paid |
@@ -526,7 +526,20 @@ pages that declare the same layer in competing conditional blocks. **Pay:**
 record each layer declaration with its media conditions and rebuild the layer
 order when `Cascade::set_environment` changes a result. **Trigger:** a WPT
 layer-in-media case, or a site report.
-### TD-26 — `url()` values stay unresolved until stylesheets carry a base URL
+### TD-26 — `url()` values stay unresolved until stylesheets carry a base URL (Paid)
+
+**Paid 2026-11-18:** `StyleSheet::base_url` records each sheet's base: its
+own URL for linked and imported sheets, the document base URL for `<style>`
+elements. `StyleSheet::set_base_url` resolves `url()` values in
+`background-image`, `filter` and `clip-path` with `rustic-url` (UTF-8, as
+CSS requires), and `Cascade::set_document_base_url` does the same for
+`style` attributes. Empty and fragment-only URLs stay as written, as do URLs
+that fail to parse. A value with `var()` remembers its declaring sheet's
+base and resolves after substitution, so a custom property's `url()`
+resolves against the sheet that uses it, not the one that declared the
+custom property (Chromium's behavior; CSSWG issue 757 is still open).
+`url_values_resolve_against_the_declaring_sheets_base` checks each case.
+The original entry is kept below.
 
 `background-image: url(a.png)` keeps the URL text as written (CSS-03c). CSS
 says the computed value is the absolute URL, resolved against the

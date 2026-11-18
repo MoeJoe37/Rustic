@@ -8,11 +8,13 @@ use std::sync::Arc;
 use rustic_base::SourceSpan;
 use rustic_css::{
     AtRule, BlockItem, ComponentValue, ContainerQueryList, CssError, CssParser, CustomValue,
-    Declaration, MediaQueryList, NamespaceMap, PropertyDeclaration, PropertyError, PropertySyntax,
-    Rule, SelectorErrorKind, SelectorList, Token, Value, parse_block_contents,
-    parse_container_query_list, parse_declaration, parse_media_query_list,
+    Declaration, DeclaredValue, MediaQueryList, NamespaceMap, PropertyDeclaration, PropertyError,
+    PropertySyntax, Rule, SelectorErrorKind, SelectorList, Token, UnparsedValue, Value,
+    parse_block_contents, parse_container_query_list, parse_declaration, parse_media_query_list,
     parse_nested_selector_list, parse_scoped_selector_list, parse_selector_list,
 };
+
+use rustic_url::Url;
 
 use crate::{LayerName, LayerSegment, PropertyRegistration, ScopeRule};
 
@@ -75,6 +77,10 @@ pub struct StyleSheet {
     /// Custom properties registered by valid `@property` rules, in source
     /// order (a later registration of a name wins).
     pub properties: Vec<PropertyRegistration>,
+    /// The URL that relative `url()` values resolve against: the sheet's
+    /// own URL for an external or imported sheet, the document base URL
+    /// for a `<style>` element. Set it with [`StyleSheet::set_base_url`].
+    pub base_url: Option<Url>,
 }
 
 /// Why part of a stylesheet was dropped.
@@ -732,6 +738,18 @@ impl StyleSheet {
         Ok((builder.sheet, imports, builder.diagnostics))
     }
 
+    /// Record the sheet's base URL and resolve every `url()` in its
+    /// declarations against it (CSS Values 4 §4.5.1). Values that contain
+    /// `var()` resolve after substitution, against the same base.
+    pub fn set_base_url(&mut self, base: Option<Url>) {
+        if let Some(base) = &base {
+            for rule in &mut self.rules {
+                resolve_declaration_urls(&mut rule.declarations, base);
+            }
+        }
+        self.base_url = base;
+    }
+
     /// Make every rule also depend on `media` (for example a `<style>`
     /// element's `media` attribute).
     pub fn restrict_to(&mut self, media: MediaQueryList) {
@@ -853,4 +871,43 @@ pub fn parse_style_attribute(
     let mut diagnostics = Vec::new();
     let declarations = declarations(&values, &mut diagnostics);
     Ok((declarations, diagnostics))
+}
+
+/// Resolve a `url()` value against `base`: `None` (keep it as written) for
+/// an empty or fragment-only URL, which refer to the current document and
+/// never fetch, and for a URL that does not parse. CSS parses URLs as UTF-8
+/// whatever the sheet's encoding.
+pub(crate) fn resolve_css_url(url: &str, base: &Url) -> Option<String> {
+    if url.is_empty() || url.starts_with('#') {
+        return None;
+    }
+    Url::parse(url, Some(base)).ok().map(|url| url.serialize())
+}
+
+/// Resolve the `url()` values of `declarations` (a style rule's or a `style`
+/// attribute's) against `base`, and record `base` on values that contain
+/// `var()` so they resolve after substitution. The longhands of one
+/// shorthand keep sharing one unparsed value.
+pub fn resolve_declaration_urls(declarations: &mut [PropertyDeclaration], base: &Url) {
+    let serialized: Arc<str> = base.serialize().into();
+    let mut last: Option<(*const UnparsedValue, Arc<UnparsedValue>)> = None;
+    for declaration in declarations {
+        match &mut declaration.value {
+            DeclaredValue::Value(value) => value.resolve_urls(&|url| resolve_css_url(url, base)),
+            DeclaredValue::Unparsed(unparsed) => {
+                let original = Arc::as_ptr(unparsed);
+                if let Some((pointer, shared)) = &last {
+                    if *pointer == original {
+                        *unparsed = shared.clone();
+                        continue;
+                    }
+                }
+                let mut value = (**unparsed).clone();
+                value.set_url_base(Some(serialized.clone()));
+                *unparsed = Arc::new(value);
+                last = Some((original, unparsed.clone()));
+            }
+            DeclaredValue::CssWide(_) | DeclaredValue::Custom(_) => {}
+        }
+    }
 }

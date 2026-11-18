@@ -183,17 +183,16 @@ impl TreeBuilder {
                 if last == block {
                     bookmark = Bookmark::After(replacement);
                 }
-                self.document.append_child(replacement, last)?;
+                self.move_capped(replacement, None, last)?;
                 last = replacement;
             }
-            let place = self.place(Some(ancestor));
-            self.document
-                .insert_before(place.parent, last, place.before)?;
+            let place = self.place(Some(ancestor))?;
+            self.move_capped(place.parent, place.before, last)?;
             let replacement = self.create_element(&tag, Ns::Html)?;
             while let Some(child) = self.document.node(block)?.first_child() {
-                self.document.append_child(replacement, child)?;
+                self.move_capped(replacement, None, child)?;
             }
-            self.document.append_child(block, replacement)?;
+            self.move_capped(block, None, replacement)?;
             match bookmark {
                 Bookmark::Replace => {
                     let index = self

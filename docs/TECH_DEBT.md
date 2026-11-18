@@ -58,19 +58,18 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-02, TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
-| M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
-scope limits, but the short ones before them: TD-02 (a large page fails to
-load at all), TD-12 (no native Windows, macOS or ARM64 test evidence since
+scope limits, but the short ones before them: TD-12 (no native Windows, macOS or ARM64 test evidence since
 2026-11-08) and TD-111 (a regular expression can run for exponential time
 until the step budget stops it).
 
@@ -82,7 +81,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | ID | Kind | Area | Summary | Status |
 | --- | --- | --- | --- | --- |
 | TD-01 | Bad | HTML parser | Diagnostic count limits made error-heavy pages fail | Paid |
-| TD-02 | Deliberate | DOM / parser | Depth and node budgets abort the whole parse | Open, pay before real-page loading |
+| TD-02 | Deliberate | DOM / parser | Depth and node budgets abort the whole parse | Paid |
 | TD-03 | Watch | DOM | Every insert walks the moved subtree to measure height | Open, no measured blowup |
 | TD-04 | Deliberate | All crates | Invariant `expect`/indexing in library code | Open, governed by rule 6 |
 | TD-05 | Bad | HTML tokenizer | `char as u8` truncation in end-tag matching | Paid |
@@ -211,6 +210,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
+| TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -229,7 +229,16 @@ expose the count, and both fatal error variants are gone. A test parses a page
 with over 3,000 recoveries at default limits and checks that the tree does not
 depend on the retention limit.
 
-### TD-02 — Depth and node budgets abort the whole parse
+### TD-02 — Depth and node budgets abort the whole parse (Paid)
+
+**Paid 2026-11-18** by [ADR 0046](adr/0046-parse-budget-degradation.md).
+Past `max_depth` the tree builder inserts higher up, as Chromium, WebKit
+and Gecko do; at a 514-edge limit the trees equal Chromium 157's on the
+recorded cases (`depth_cap_places_nodes_like_chromium`). At the node or
+payload budget a document parser truncates: the tree built so far is the
+document, `ParsedDocument::truncated()` says so and the CLI warns. Fragment
+parsers still fail, so DOM APIs can throw. The default depth stays 256
+(TD-147). The original entry is kept below.
 
 `DocumentLimits` (100,000 nodes, 256 edges deep, 16 MiB payload) are fatal for
 parser-built documents ([HTML_TREE.md](HTML_TREE.md#ownership-and-failure)).
@@ -2261,3 +2270,15 @@ vectorized paths with the fuzz target's chunked-versus-whole differential
 as the guard. **Trigger:** M12 performance work, or a profile showing
 decoding on a critical path earlier.
 
+### TD-147 — The default depth limit flattens earlier than Chromium
+
+[ADR 0046](adr/0046-parse-budget-degradation.md) inserts nodes past
+`max_depth` the way Chromium does, and with a 514-edge limit the trees are
+identical. The default is still 256 edges, because the layout tree has its
+own 256-edge limit (`LayoutLimits::max_depth`) and the paint, bindings and
+emulated tiers have no evidence at 514 levels. A page between 256 and 514
+levels deep therefore loads, but flattened earlier than in Chromium.
+**Pay:** raise `DocumentLimits::max_depth` and `LayoutLimits::max_depth` to
+514 together, with deep-tree layout, paint and binding tests on every tier.
+**Trigger:** M9 layout work, or a real page that renders differently
+because of the cap.

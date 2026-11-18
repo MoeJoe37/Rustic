@@ -155,6 +155,9 @@ pub(super) struct TreeBuilder {
     selected_options: Vec<(NodeId, NodeId)>,
     /// Inserted options in a select, not yet popped and mirrored.
     pending_options: Vec<(NodeId, NodeId)>,
+    /// A node or payload budget ran out, so construction stopped and the
+    /// document keeps the tree built so far (ADR 0046).
+    truncated: bool,
 }
 
 impl TreeBuilder {
@@ -196,6 +199,7 @@ impl TreeBuilder {
             context: None,
             selected_options: Vec::new(),
             pending_options: Vec::new(),
+            truncated: false,
         })
     }
 
@@ -344,6 +348,22 @@ impl TreeBuilder {
             .is_some_and(|id| self.ns(id) != Ns::Html)
     }
 
+    /// Stop construction after a node or payload budget ran out: the tree
+    /// built so far becomes the document, as if the input had ended, but
+    /// without EOF's implied nodes (which would need the exhausted budget).
+    /// Only document parsers truncate; fragment parsers keep failing.
+    pub(super) fn truncate(&mut self) -> Result<(), ParseError> {
+        self.truncated = true;
+        self.done = true;
+        self.text_mode = None;
+        self.script_boundary = None;
+        self.diagnostic(ErrorKind::Truncated)
+    }
+
+    pub(super) fn truncated(&self) -> bool {
+        self.truncated
+    }
+
     pub(super) fn into_result(mut self, tokenizer: TokenizerDiagnostics) -> ParsedDocument {
         if self.document.ready_state() != ReadyState::Complete {
             self.document
@@ -358,6 +378,7 @@ impl TreeBuilder {
             tokenizer_diagnostics: tokenizer.retained,
             tree_diagnostics: self.diagnostics,
             dropped_diagnostics: tokenizer.dropped.saturating_add(self.dropped_diagnostics),
+            truncated: self.truncated,
         }
     }
 

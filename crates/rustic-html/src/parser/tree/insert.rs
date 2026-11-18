@@ -14,8 +14,77 @@ pub(super) struct Place {
 
 impl TreeBuilder {
     /// The appropriate place for inserting a node, including foster parenting
-    /// and redirection into template contents.
-    pub(super) fn place(&self, target: Option<NodeId>) -> Place {
+    /// and redirection into template contents, capped at the document's
+    /// depth limit (see [`Self::cap_depth`]).
+    pub(super) fn place(&mut self, target: Option<NodeId>) -> Result<Place, ParseError> {
+        let place = self.uncapped_place(target);
+        self.cap_depth(place, 0)
+    }
+
+    /// Edges from `id` up to the root of its tree, as the document counts
+    /// depth (template contents are a root of their own).
+    fn tree_depth(&self, id: NodeId) -> usize {
+        let mut depth = 0;
+        let mut node = self.document.node(id).ok().and_then(|n| n.parent());
+        while let Some(parent) = node {
+            depth += 1;
+            node = self.document.node(parent).ok().and_then(|n| n.parent());
+        }
+        depth
+    }
+
+    /// Move `place` up until a node of subtree `height` fits under the
+    /// document's depth limit (ADR 0046). Past the limit a node goes into
+    /// the would-be parent's parent instead (a later sibling), as Blink,
+    /// WebKit and Gecko do at their parser depth caps, so a deep document
+    /// degrades instead of failing. Each capped insertion is a diagnostic.
+    pub(super) fn cap_depth(&mut self, place: Place, height: usize) -> Result<Place, ParseError> {
+        let max = self.document.limits().max_depth;
+        let mut place = place;
+        let mut depth = self.tree_depth(place.parent);
+        let mut capped = false;
+        while depth.saturating_add(1).saturating_add(height) > max {
+            let node = self.document.node(place.parent)?;
+            let Some(up) = node.parent().filter(|&up| up != self.document.root()) else {
+                break;
+            };
+            // Appending stays appending (Blink's rule), so later capped
+            // nodes follow earlier ones; an insertion before a reference
+            // lands right after the would-be parent.
+            place = Place {
+                parent: up,
+                before: place.before.and(node.next_sibling()),
+            };
+            depth -= 1;
+            capped = true;
+        }
+        if capped {
+            self.diagnostic(super::ErrorKind::NestingTooDeep)?;
+        }
+        Ok(place)
+    }
+
+    /// Move an existing node (and its subtree) to `parent` before `before`,
+    /// capped at the depth limit like a new node.
+    pub(super) fn move_capped(
+        &mut self,
+        parent: NodeId,
+        before: Option<NodeId>,
+        node: NodeId,
+    ) -> Result<(), ParseError> {
+        let height = self
+            .document
+            .walk(node)?
+            .map(|(_, depth)| depth)
+            .max()
+            .unwrap_or(0);
+        let place = self.cap_depth(Place { parent, before }, height)?;
+        self.document
+            .insert_before(place.parent, node, place.before)?;
+        Ok(())
+    }
+
+    fn uncapped_place(&self, target: Option<NodeId>) -> Place {
         let target = target
             .or_else(|| self.open.last().copied())
             .unwrap_or_else(|| self.document.root());
@@ -122,7 +191,10 @@ impl TreeBuilder {
         self.open
             .try_reserve(1)
             .map_err(|_| DomError::AllocationFailed)?;
-        let place = self.place(None);
+        // An element keeps one edge free for its text: Chromium caps
+        // elements and comments by stack depth and lets text go one deeper.
+        let place = self.uncapped_place(None);
+        let place = self.cap_depth(place, 1)?;
         let id = self.create_element(tag, ns)?;
         self.attach_or_destroy(place.parent, place.before, id)?;
         self.open.push(id);
@@ -200,8 +272,10 @@ impl TreeBuilder {
                 parent,
                 before: None,
             },
-            None => self.place(None),
+            None => self.uncapped_place(None),
         };
+        // Comments are capped like elements; only text goes one deeper.
+        let place = self.cap_depth(place, 1)?;
         let id = match annotation {
             Annotation::Comment(text) => self.document.create_comment(text)?,
             Annotation::Instruction(instruction) => self
@@ -216,7 +290,7 @@ impl TreeBuilder {
         if text.is_empty() {
             return Ok(());
         }
-        let place = self.place(None);
+        let place = self.place(None)?;
         if place.parent == self.document.root() {
             return Ok(());
         }

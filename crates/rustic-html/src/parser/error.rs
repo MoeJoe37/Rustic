@@ -73,6 +73,12 @@ pub enum TreeDiagnosticKind {
     EofInText,
     /// A closing body/html token or EOF encountered disallowed open elements.
     UnclosedElements,
+    /// A node would have been deeper than the document's depth limit, so it
+    /// was inserted as a sibling of its parent instead (ADR 0046).
+    NestingTooDeep,
+    /// The document reached its node or payload budget; construction
+    /// stopped there and the rest of the input was ignored (ADR 0046).
+    Truncated,
 }
 
 /// A tree recovery at a zero-based tokenizer-delivery index (EOF included).

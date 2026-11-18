@@ -1267,9 +1267,14 @@ mod tests {
         let file = TempFile::new(SOURCE);
         let mut limits = LoaderLimits::default();
         limits.parser.document.max_nodes = 4;
+        let mut engine = Engine::new(1);
+        let parsed = load_document(&mut engine, &file.0, limits).unwrap();
+        assert!(parsed.parsed().truncated());
+        assert_eq!(parsed.parsed().document().node_count(), 4);
+        limits.parser.tokenizer.max_tokens = 1;
         assert!(matches!(
             dump(&file, limits),
-            Err(LoadError::Parse(ParseError::Document(_)))
+            Err(LoadError::Parse(ParseError::Tokenizer(_)))
         ));
     }
 

@@ -82,8 +82,10 @@ Limits for all dump commands (positive integers; exceeding any limit except
   --max-input-bytes N    file and tokenizer input bytes (default 8388608)
   --max-output-bytes N   dump output bytes (default 67108864)
   --chunk-bytes N        bytes read per step (default 65536)
-  --max-nodes N          document nodes, including the root (default 100000)
-  --max-depth N          element nesting depth (default 256)
+  --max-nodes N          document nodes, including the root (default 100000);
+                         a larger page is truncated, with a warning
+  --max-depth N          document tree depth (default 256); deeper elements
+                         become siblings, as in other browsers
   --max-diagnostics N    retained tokenizer and tree recoveries, each; later
                          recoveries are counted, not fatal (default 1024)
 
@@ -228,6 +230,15 @@ fn load<T>(
         }
     };
     let result = loader::load_document(engine, &path, limits).and_then(|parsed| {
+        if parsed.parsed().truncated() {
+            // A page over its node or payload budget degrades visibly
+            // (ADR 0046): the output covers the content before that point.
+            eprintln!(
+                "rustic {command}: {}: warning: document truncated at its node or size limit \
+                 (--max-nodes); the rest of the page was ignored",
+                EscapedText(&path.to_string_lossy())
+            );
+        }
         let value = then(&parsed, &path)?;
         loader::check_cancelled(parsed.cancellation())?;
         Ok(value)

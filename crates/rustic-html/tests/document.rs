@@ -1,5 +1,5 @@
 use rustic_base::CancellationToken;
-use rustic_dom::{Document, DomError, HTML_NAMESPACE, NodeId, NodeKind};
+use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_html::{
     DocumentMode, HtmlDocumentParser, HtmlError, ParseError, ParsedDocument, ParserLimits,
     Scripting, TreeDiagnosticKind as D,
@@ -402,16 +402,16 @@ fn processing_instructions_preserve_data_and_use_tree_insertion_rules() {
 }
 
 #[test]
-fn processing_instruction_node_limit_poisons_the_stream() {
+fn node_limit_truncates_the_document_and_ignores_later_input() {
     let mut limits = ParserLimits::default();
     limits.document.max_nodes = 1;
     let mut parser = HtmlDocumentParser::new(limits, CancellationToken::default()).unwrap();
-    assert_eq!(
-        parser.feed(b"<?target value?>"),
-        Err(ParseError::Document(DomError::NodeLimit))
-    );
-    assert_eq!(parser.feed(b""), Err(ParseError::Poisoned));
-    assert_eq!(parser.finish().unwrap_err(), ParseError::Poisoned);
+    parser.feed(b"<?target value?>").unwrap();
+    parser.feed(b"<p>ignored").unwrap();
+    let result = parser.finish().unwrap();
+    assert!(result.truncated());
+    assert_eq!(result.document().node_count(), 1);
+    assert_eq!(parser.finish().unwrap_err(), ParseError::AlreadyFinished);
 }
 
 #[test]
@@ -427,30 +427,50 @@ fn exact_node_depth_and_utf16_payload_limits_include_implied_nodes_and_text_merg
         shape(&parse(source.as_bytes(), exact).unwrap()),
         shape(&expected)
     );
-    for (field, error) in [
-        (0, DomError::NodeLimit),
-        (1, DomError::DepthLimit),
-        (2, DomError::DataLimit),
-    ] {
+    // One node or byte less: the document keeps what was built before the
+    // budget ran out, and says so (ADR 0046).
+    for field in 0..2 {
         let mut limits = exact;
         match field {
             0 => limits.document.max_nodes -= 1,
-            1 => limits.document.max_depth -= 1,
             _ => limits.document.max_data_bytes -= 1,
         }
+        let truncated = parse(source.as_bytes(), limits).unwrap();
+        assert!(truncated.truncated());
+        // The payload budget still fits the first text chunk.
+        let text = if field == 0 { "" } else { "\n4:\"🚀\"" };
         assert_eq!(
-            parse(source.as_bytes(), limits).unwrap_err(),
-            ParseError::Document(error)
+            shape(&truncated),
+            format!("1:doctype \"html\"\n1:html\n2:head\n2:body\n3:p{text}")
+        );
+        assert_eq!(
+            truncated.tree_diagnostics().last().map(|d| d.kind),
+            Some(rustic_html::TreeDiagnosticKind::Truncated)
         );
     }
-    // The late-head stack is shorter than the DOM path: enforce actual DOM depth.
+    assert!(!parse(source.as_bytes(), exact).unwrap().truncated());
+    // One edge less: the paragraph, which keeps an edge free for its text,
+    // becomes the body's sibling instead of failing the parse (ADR 0046).
+    let mut limits = exact;
+    limits.document.max_depth -= 1;
+    let capped = parse(source.as_bytes(), limits).unwrap();
+    assert_eq!(
+        shape(&capped),
+        "1:doctype \"html\"\n1:html\n2:head\n2:body\n2:p\n3:\"🚀&x\""
+    );
+    assert!(
+        capped
+            .tree_diagnostics()
+            .iter()
+            .any(|d| d.kind == rustic_html::TreeDiagnosticKind::NestingTooDeep)
+    );
+    // The late-head stack is shorter than the DOM path: the cap follows the
+    // actual DOM depth.
     exact.document.max_nodes = 32;
     exact.document.max_data_bytes = 1024;
     exact.document.max_depth = 3;
-    assert_eq!(
-        parse(b"<head></head><title>x", exact).unwrap_err(),
-        ParseError::Document(DomError::DepthLimit)
-    );
+    let late = parse(b"<head></head><title>x", exact).unwrap();
+    assert_eq!(shape(&late), "1:html\n2:head\n2:title\n3:\"x\"\n2:body");
 }
 
 #[test]
@@ -590,10 +610,21 @@ fn deep_construction_and_completion_remain_iterative_and_obey_actual_edge_depth(
         doc.walk(doc.root()).unwrap().map(|(_, depth)| depth).max(),
         Some(703)
     );
+    // One edge less: the innermost span becomes its parent's sibling and
+    // its text stays inside it, as in Blink (ADR 0046).
     limits.document.max_depth -= 1;
+    let capped = parse(source.as_bytes(), limits).unwrap();
+    let doc = capped.document();
+    assert_eq!(doc.node_count(), 706);
     assert_eq!(
-        parse(source.as_bytes(), limits).unwrap_err(),
-        ParseError::Document(DomError::DepthLimit)
+        doc.walk(doc.root()).unwrap().map(|(_, depth)| depth).max(),
+        Some(702)
+    );
+    assert!(
+        capped
+            .tree_diagnostics()
+            .iter()
+            .any(|d| d.kind == rustic_html::TreeDiagnosticKind::NestingTooDeep)
     );
 }
 
@@ -626,4 +657,49 @@ fn later_doctypes_are_ignored_without_changing_the_initial_document_mode() {
             doctypes
         );
     }
+}
+
+/// `depth:label` lines in the format of `tools/html_depth_reference.js`.
+fn reference_shape(result: &ParsedDocument) -> String {
+    let doc = result.document();
+    let mut lines = Vec::new();
+    for (id, depth) in doc.walk(doc.root()).unwrap().skip(1) {
+        let label = match doc.node(id).unwrap().kind() {
+            NodeKind::Element(element) => element.name().local().to_owned(),
+            NodeKind::Text(value) => format!("{:?}", String::from_utf16(value.as_units()).unwrap()),
+            NodeKind::Comment(value) => format!(
+                "comment {:?}",
+                String::from_utf16(value.as_units()).unwrap()
+            ),
+            NodeKind::DocumentType(_) => "doctype".to_owned(),
+            other => panic!("unexpected node {other:?}"),
+        };
+        lines.push(format!("{depth}:{label}"));
+    }
+    lines.join("\n")
+}
+
+#[test]
+fn depth_cap_places_nodes_like_chromium() {
+    // Chromium caps elements at 513 edges and lets text go one deeper;
+    // a 514-edge document limit reproduces its trees exactly (ADR 0046).
+    let fixture = include_str!("fixtures/depth-cap-chromium.txt");
+    let mut limits = ParserLimits::default();
+    limits.document.max_depth = 514;
+    limits.document.max_nodes = 10_000;
+    let mut cases = 0;
+    for case in fixture.split("#case\n").skip(1) {
+        let (html, expected) = case.split_once("\n#chromium\n").unwrap();
+        let result = parse(html.as_bytes(), limits).unwrap();
+        assert!(!result.truncated());
+        let actual = reference_shape(&result);
+        let first_difference = actual
+            .lines()
+            .zip(expected.lines())
+            .position(|(a, b)| a != b);
+        assert_eq!(first_difference, None, "case {cases}");
+        assert_eq!(actual, expected.trim_end(), "case {cases}");
+        cases += 1;
+    }
+    assert_eq!(cases, 5);
 }

@@ -322,7 +322,14 @@ impl LayoutSource for LiveStyleFixture {
                         ("display", "block".to_owned()),
                         ("color", if next { "blue" } else { "red" }.to_owned()),
                     ],
-                    custom_properties: vec![("--Case".to_owned(), "preserved".to_owned())],
+                    custom_properties: if next {
+                        vec![
+                            ("--Case".to_owned(), "preserved".to_owned()),
+                            ("--Dynamic".to_owned(), "next".to_owned()),
+                        ]
+                    } else {
+                        vec![("--Case".to_owned(), "preserved".to_owned())]
+                    },
                 },
             );
         }
@@ -373,6 +380,43 @@ fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
         try { getComputedStyle(body, '::before'); throw 'pseudo accepted'; }
         catch (error) {
             if (error.name !== 'TypeError') throw 'wrong pseudo error';
+        }
+        "#,
+    )).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 3);
+}
+
+#[test]
+fn computed_style_numeric_indices_track_live_properties_and_reject_writes() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
+    scripts.queue_script(source(
+        r#"
+        const body = document.body;
+        const style = getComputedStyle(body);
+        if (style.length !== 3 || style[0] !== 'display' ||
+            style[1] !== 'color' || style[2] !== '--Case' ||
+            style[3] !== undefined) throw 'initial indices';
+        if (!('0' in style) || '3' in style ||
+            Object.keys(style).join(',') !== '0,1,2') throw 'own keys';
+        const desc = Object.getOwnPropertyDescriptor(style, '0');
+        if (!desc || desc.value !== 'display' || desc.writable ||
+            !desc.enumerable || !desc.configurable) throw 'index descriptor';
+        if (Reflect.set(style, '0', 'other') ||
+            Reflect.deleteProperty(style, '0') ||
+            style[0] !== 'display') throw 'indexed mutation';
+        body.setAttribute('data-next', 'yes');
+        if (style.length !== 4 || style[3] !== '--Dynamic' ||
+            !('3' in style) ||
+            Object.keys(style).join(',') !== '0,1,2,3') {
+            throw 'index did not grow';
+        }
+        body.removeAttribute('data-next');
+        if (style.length !== 3 || '3' in style || style[3] !== undefined ||
+            Object.keys(style).join(',') !== '0,1,2') {
+            throw 'index did not shrink';
         }
         "#,
     )).unwrap();

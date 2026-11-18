@@ -164,27 +164,47 @@ const INTERFACE: &str = "CSSStyleDeclaration";
      agent: &mut Agent,
      prototype: rustic_js::runtime::ObjectId,
  ) -> JsResult<()> {
-     for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
-         let canonical = property.name();
-         let camel = camel_name(canonical);
-         let getter = Value::object(
-             agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
-         );
-         for name in [canonical, camel.as_str()] {
-             if name == canonical && canonical == camel {
-                 continue;
-             }
-             let key = agent.heap.key(name)?;
-             agent.define_property_or_throw(
-                 prototype,
-                 key,
-                 PropertyDescriptor::accessor(getter, Value::UNDEFINED, true, true),
-             )?;
+     let setter = Value::object(agent.new_native_function(
+         set_named_longhand, "set computed property", 1,
+     )?);
+     let setter_root = agent.root(setter)?;
+     let result = (|| {
+         for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
+             let canonical = property.name();
+             let camel = camel_name(canonical);
+             let getter = Value::object(
+                 agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
+             );
+             let getter_root = agent.root(getter)?;
+             let installed = (|| {
+                 for name in [canonical, camel.as_str()] {
+                     if name == canonical && canonical == camel.as_str() {
+                         continue;
+                     }
+                     let key = agent.heap.key(name)?;
+                     agent.define_property_or_throw(
+                         prototype,
+                         key,
+                         PropertyDescriptor::accessor(getter, setter, true, true),
+                     )?;
+                 }
+                 Ok(())
+             })();
+             agent.unroot(getter_root);
+             installed?;
          }
-     }
-     Ok(())
+         Ok(())
+     })();
+     agent.unroot(setter_root);
+     result
  }
 
+ fn set_named_longhand(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+     let argument = required_arg(agent, args, 0)?;
+     let _ = creation::string(agent, argument)?;
+     element(agent, declaration)?;
+     Err(read_only(agent))
+ }
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_interface(

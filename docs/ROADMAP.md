@@ -363,8 +363,8 @@ ADR is accepted.
      and child changes to a fresh document. Extend parity to the cached
      snapshot and resource changes as those paths land.
    - `offsetWidth` and `getBoundingClientRect` share CPU reference layout
-     snapshots and a per-turn flush budget with promise jobs. Add
-     `getComputedStyle` on the same path.
+     snapshots and a per-turn flush budget with promise jobs. Add live
+     `getComputedStyle` on the same path, under [ADR 0045](adr/0045-live-computed-style-reads.md).
    - Frame tickets check the DOM and the host's applied viewport and resource
      revision. Connect stylesheet and image completions to that revision as
      their results enter the page pump.

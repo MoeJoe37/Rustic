@@ -52,6 +52,7 @@ instead of rewriting the history of a decision.
 | [0042](0042-scripted-render-state.md) | Style, layout and frame validity in scripted documents | Accepted for WEB-06 |
 | [0043](0043-encoding-standard.md) | Original Encoding Standard decoders and encoders over pinned, generated indexes | Accepted for `url.encoding` (M6 entry) |
 | [0044](0044-local-html-encoding-replay.md) | Bounded local HTML encoding replay before author script | Accepted for WEB-05 |
+| [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted design for WEB-06; implementation pending |
 
 ## Records by area
 
@@ -67,7 +68,7 @@ instead of rewriting the history of a decision.
 | Document, Window and node bindings (M5, WEB-03) | 0028, 0029, 0030, 0031, 0032, 0033 |
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041, 0044 |
-| Scripted rendering (M5, WEB-06) | 0023, 0042 |
+| Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
 | Networking and resources (M6) | 0043 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
@@ -80,7 +81,6 @@ authority boundary or `unsafe` code.
 
 | Decision | Needed before | Why it needs a record |
 | --- | --- | --- |
-| Style and layout invalidation from script, and forced layout flushes | WEB-06 (M5) | Changes the rendering-turn contract of ADR 0023 |
 | Transport and TLS library, certificate verification and the fixture server | NET-01 (M6) | First network dependency and first native/crypto boundary |
 | Profile and storage format, partition keys and schema versions | NET-06 (M6) | Persistent on-disk compatibility promise |
 | IPC format and broker capabilities | ISO-02 (M7) | Process authority |

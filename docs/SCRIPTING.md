@@ -89,7 +89,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Resolved style reads and resource ordering | `getComputedStyle` and stylesheet/image completion ordering remain open. | WEB-06 |
+| Resolved style reads and resource ordering | `getComputedStyle` and stylesheet/image completion ordering remain open; the live-read contract is [ADR 0045](adr/0045-live-computed-style-reads.md). | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |

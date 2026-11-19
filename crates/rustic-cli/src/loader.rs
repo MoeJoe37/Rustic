@@ -339,13 +339,139 @@ fn load_scripted_document(
         advance_script_timer(load.clock().expect("active load"), delay, &mut turns)?;
         load.run_next()?;
     };
-    while let Some(delay) = document.time_until_next_timer()? {
+    // The parser is now complete: discover external local CSS/images in DOM
+    // order and deliver their validated bytes through normal host turns.
+    // This is synchronous local-file discovery, not an asynchronous fetcher.
+    let requests = {
+        let parsed = document.document();
+        discover_local_resources(parsed.parsed().document(), &path, limits)
+    };
+    for (url, kind) in requests {
+        let staged = match kind {
+            LocalResourceKind::Stylesheet => fetch.stage_completion(
+                &applied_files,
+                &url,
+                limits.stylesheets.max_total_bytes,
+            ),
+            LocalResourceKind::Image => crate::images::stage_image_completion(
+                &fetch,
+                &applied_files,
+                &url,
+                limits.images,
+                &cancellation,
+            ),
+        };
+        if let Ok(staged) = staged {
+            let snapshot = applied_files.clone();
+            // If another source already fills the bounded task queue, leave
+            // this resource to the existing on-demand renderer fetch path.
+            let _ = document.queue_resource_completion(move || snapshot.commit(staged));
+        }
+    }
+    // Drain immediate completion tasks even when there are no timers.
+    // Future timers still obey the established bounded manual-clock loop.
+    loop {
+        if document.run_next()?.is_some() {
+            continue;
+        }
+        let Some(delay) = document.time_until_next_timer()? else {
+            break;
+        };
         advance_script_timer(document.clock(), delay, &mut turns)?;
-        document.run_next()?;
     }
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;
     Ok(document.into_document())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LocalResourceKind {
+    Stylesheet,
+    Image,
+}
+
+/// Discover local subresource candidates from the completed DOM, bounded by
+/// the existing per-kind document fetch limits. The document's first base href
+/// is resolved once; the subsequent fetcher enforces the canonical file grant
+/// and rejects all unsupported schemes and escaping links.
+fn discover_local_resources(
+    document: &Document,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Vec<(rustic_url::Url, LocalResourceKind)> {
+    use crate::reftest::{attribute, is_html};
+
+    let Some(document_url) = file_url(path) else {
+        return Vec::new();
+    };
+    let mut base = document_url.clone();
+    if let Ok(walk) = document.walk(document.root()) {
+        for (node, _) in walk {
+            let Some(element) = rustic_style::DomElement::new(document, node) else {
+                continue;
+            };
+            if is_html(element, "base") {
+                if let Some(href) = attribute(element, "href") {
+                    if let Ok(url) = rustic_url::Url::parse(&href, Some(&document_url)) {
+                        base = url;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    let mut requests = Vec::new();
+    let mut sheets = 0usize;
+    let mut images = 0usize;
+    if let Ok(walk) = document.walk(document.root()) {
+        for (node, _) in walk {
+            let Some(element) = rustic_style::DomElement::new(document, node) else {
+                continue;
+            };
+            let (kind, candidate) = if is_html(element, "link") {
+                let rel = attribute(element, "rel").unwrap_or_default();
+                let mut is_stylesheet = false;
+                let mut alternate = false;
+                for token in rel.split([' ', '\t', '\n', '\x0c', '\r']) {
+                    is_stylesheet |= token.eq_ignore_ascii_case("stylesheet");
+                    alternate |= token.eq_ignore_ascii_case("alternate");
+                }
+                let css_type = attribute(element, "type").is_none_or(|value| {
+                    let value = value.trim_matches([' ', '\t', '\n', '\x0c', '\r']);
+                    value.is_empty() || value.eq_ignore_ascii_case("text/css")
+                });
+                if !is_stylesheet || alternate || !css_type ||
+                    attribute(element, "disabled").is_some() ||
+                    sheets >= limits.stylesheets.max_sheets
+                {
+                    continue;
+                }
+                (LocalResourceKind::Stylesheet, attribute(element, "href"))
+            } else if is_html(element, "img") {
+                if images >= limits.images.max_images {
+                    continue;
+                }
+                (LocalResourceKind::Image, attribute(element, "src"))
+            } else {
+                continue;
+            };
+            let Some(href) = candidate.filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            let Ok(url) = rustic_url::Url::parse(&href, Some(&base)) else {
+                continue;
+            };
+            // The file policy is checked before staging. Count only actual
+            // candidates; the shared cache also bounds aggregate resource
+            // storage and de-duplicates successful first fetches by URL.
+            match kind {
+                LocalResourceKind::Stylesheet => sheets += 1,
+                LocalResourceKind::Image => images += 1,
+            }
+            requests.push((url, kind));
+        }
+    }
+    requests
 }
 
 fn advance_script_timer(

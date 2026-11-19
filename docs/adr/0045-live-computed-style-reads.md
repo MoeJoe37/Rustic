@@ -112,7 +112,8 @@ they are live and reject assignment. The property catalog and getter table
 have matching compile-time lengths. Numeric indexed properties use the
 runtime's `LiveIndexAccess` with live own keys and read-only descriptors;
 index, `item`, named getter and geometry reads share the same flush quota.
-A connected declaration without an installed renderer reports `InvalidStateError`; detached declarations return empty
+A connected declaration without an installed renderer reports `InvalidStateError`, as does a connected element missing
+from its host's computed-style entries; detached declarations return empty
 values. Supported longhands and custom properties come from the same CLI cascade pass that builds layout;
 reads share the existing revision key and eight-flush budget. Declarations
 hold their element wrappers through the page's rooted weak map and the

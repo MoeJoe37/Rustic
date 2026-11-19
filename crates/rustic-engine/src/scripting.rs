@@ -796,7 +796,15 @@ impl<C: Clock> ScriptedDocument<C> {
         render: impl FnOnce(&EngineDocument, RenderFrame) -> T,
     ) -> Result<Option<DocumentTurn<T>>, ScriptStop> {
         self.check_live()?;
-        if !self.rendering.has_priority() {
+        // A completed resource already next in task order must be published
+        // before a pending render can consume the previous input revision.
+        // Ordinary scripts and timers retain the existing alternating policy.
+        let ready_resource = self
+            .pending
+            .queue
+            .borrow()
+            .next_ready_is_resource(self.clock.now());
+        if ready_resource || !self.rendering.has_priority() {
             if let Some(turn) = self.run_script()? {
                 return Ok(Some(DocumentTurn::Script(turn)));
             }

@@ -129,8 +129,10 @@ applied stylesheet and image bytes. It remembers first-fetch successes and
 failures across dirty layout reads, preventing file replacement or deletion
 from changing an already-applied resource without a host event. The static
 CLI retains its direct fetch behavior. The local fetcher can stage bounded,
-policy-checked replacement bytes, and the cache commits them atomically after
-rechecking aggregate and entry budgets. Per-URL version checks reject late
+policy-checked replacement bytes; the image-specific staging path also decodes
+with the normal image budget and refuses malformed or oversized decoded pixels.
+The cache commits successfully staged resources atomically after rechecking
+aggregate and entry budgets. Per-URL version checks reject late
 out-of-order completions, while unrelated URLs may publish independently.
 An in-flight first fetch cannot overwrite an already-published completion. An integration fixture applies staged
 CSS and PNG file versions through `apply_resource_completion`, checking that

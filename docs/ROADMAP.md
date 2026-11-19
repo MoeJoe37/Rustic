@@ -373,8 +373,11 @@ ADR is accepted.
      first-fetched byte snapshots across layout flushes; policy-checked
      replacements can be staged and atomically published through the
      completion boundary (CLI regression fixture), with per-URL stale
-     completion rejection, budget revalidation and precommit image decoding. Wire automatic
-     stylesheet/image completion task delivery into the page pump.
+     completion rejection, budget revalidation and precommit image decoding.
+     `queue_resource_completion` now delivers staged resources through bounded
+     host turns before an older offered frame, with failure and cancellation
+     coverage. The local loader still needs an asynchronous fetch/completion
+     source and parser integration to enqueue these tasks automatically.
 3. **WEB-07 — observers, errors, focus and forms.**
    - `MutationObserver` records are delivered at the microtask checkpoint in
      the specified order relative to promise jobs (`dom.observers`).

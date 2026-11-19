@@ -552,6 +552,32 @@ mod tests {
     }
 
     #[test]
+    fn older_completion_for_same_url_cannot_overwrite_newer_applied_bytes() {
+        let applied = AppliedLocalFiles::new(2, 32);
+        let css = Url::parse("file:///page/theme.css", None).unwrap();
+        let image = Url::parse("file:///page/cover.png", None).unwrap();
+        applied.read(&css, 32, || Ok(b"original".to_vec())).unwrap();
+        applied.read(&image, 32, || Ok(b"image".to_vec())).unwrap();
+        let stale = applied.stage(&css, 32, b"older".to_vec()).unwrap();
+        let fresh = applied.stage(&css, 32, b"newer".to_vec()).unwrap();
+        let independent_image = applied.stage(&image, 32, b"updated".to_vec()).unwrap();
+        applied.commit(fresh).unwrap();
+        assert_eq!(applied.commit(stale), Err(FetchError::Failed));
+        // A separate URL staged before the CSS commit can still publish.
+        applied.commit(independent_image).unwrap();
+        assert_eq!(
+            applied.read(&css, 32, || panic!("unexpected CSS refetch"))
+                .unwrap().as_ref(),
+            b"newer",
+        );
+        assert_eq!(
+            applied.read(&image, 32, || panic!("unexpected image refetch"))
+                .unwrap().as_ref(),
+            b"updated",
+        );
+    }
+
+    #[test]
     fn a_staged_commit_rechecks_capacity_and_leaves_bytes_unchanged_on_failure() {
         let applied = AppliedLocalFiles::new(2, 8);
         let first = Url::parse("file:///page/first.css", None).unwrap();

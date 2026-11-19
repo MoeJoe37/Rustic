@@ -613,14 +613,21 @@ loads; the applied cache validates entry/aggregate budgets both at staging and
 again at atomic commit. Per-URL version checks reject out-of-order commits;
 an in-flight first fetch also cannot overwrite a newer published resource. The host can commit those bytes using
 `ScriptedDocument::apply_resource_completion`, which invalidates the shared
-snapshot and outstanding frame ticket only on success. A CLI integration
-fixture stages changed CSS and PNG files, publishes them in separate host
-epochs, and compares actual styles and image geometry. The image-specific
+snapshot and outstanding frame ticket only on success. Hosts can now also
+submit staged, non-script-executing commits with `queue_resource_completion`.
+They enter the existing `ScriptQueue` as bounded tasks, share the admission
+limit with scripts/timers/input, and return `ScriptTurn::ResourceCompletion`.
+The pump publishes them after preceding JavaScript checkpoints and before an
+already-offered render when the completion is the next eligible task; failed
+commits do not invalidate a frame. Shutdown discards pending completions. A CLI integration
+fixture stages changed CSS and PNG files, queues them for separate document
+turns, and compares actual styles and image geometry. The image-specific
 stager uses the existing bounded decoder to reject malformed image replacements
 and decoded-pixel budget failures before publication, retaining the old image
 and frame revision on those errors. This is still
-synchronous first-demand loading: there is **no automatic resource-completion
-queue or delivery during parser turns**.
+synchronous first-demand loading: queued *delivery of host-supplied
+completions* now works, but there is **no asynchronous fetch/notification
+source or automatic parser resource-delivery integration**.
 
 Regression sources: `crates/rustic-engine/tests/frames.rs` (held declarations,
 callback argument conversion, microtasks, shared eight-flush quota,

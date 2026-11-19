@@ -34,7 +34,7 @@ use rustic_style::{
     StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
 
-use crate::stylesheets::{AppliedLocalFiles, LocalStylesheetFetcher, file_url};
+use crate::stylesheets::{AppliedLocalFiles, LocalStylesheetFetcher, MAX_APPLIED_URL_BYTES, file_url};
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -481,7 +481,9 @@ fn discover_local_resources(
                     alternate |= token.eq_ignore_ascii_case("alternate");
                 }
                 let css_type = attribute(element, "type").is_none_or(|value| {
-                    let value = value.trim_matches([' ', '\t', '\n', '\x0c', '\r']);
+                    let value = value.trim_matches(|c: char| {
+                        matches!(c, ' ' | '\t' | '\n' | '\x0c' | '\r')
+                    });
                     value.is_empty() || value.eq_ignore_ascii_case("text/css")
                 });
                 if !is_stylesheet || alternate || !css_type ||
@@ -505,10 +507,16 @@ fn discover_local_resources(
             let Ok(url) = rustic_url::Url::parse(&href, Some(&base)) else {
                 continue;
             };
+            // Apply the same bound here as the resource cache, before
+            // retaining keys for all discovered candidates. A document
+            // with huge repeated URLs must not amplify parser memory.
+            let key = url.serialize();
+            if key.len() > MAX_APPLIED_URL_BYTES {
+                continue;
+            }
             // Multiple elements sharing one URL need only one completion
-            // per kind. Each URL remains subject to the same local grant
-            // and shared applied-byte budget once the host stages it.
-            if !seen.insert((kind, url.serialize())) {
+            // per kind. Each URL remains subject to the local file grant.
+            if !seen.insert((kind, key)) {
                 continue;
             }
             match kind {

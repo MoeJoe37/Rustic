@@ -422,7 +422,7 @@ fn queue_discovered_local_resources(
     Ok(delivered)
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum LocalResourceKind {
     Stylesheet,
     Image,
@@ -459,6 +459,7 @@ fn discover_local_resources(
         }
     }
     let mut requests = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     let mut sheets = 0usize;
     let mut images = 0usize;
     if let Ok(walk) = document.walk(document.root()) {
@@ -499,9 +500,12 @@ fn discover_local_resources(
             let Ok(url) = rustic_url::Url::parse(&href, Some(&base)) else {
                 continue;
             };
-            // The file policy is checked before staging. Count only actual
-            // candidates; the shared cache also bounds aggregate resource
-            // storage and de-duplicates successful first fetches by URL.
+            // Multiple elements sharing one URL need only one completion
+            // per kind. Each URL remains subject to the same local grant
+            // and shared applied-byte budget once the host stages it.
+            if !seen.insert((kind, url.serialize())) {
+                continue;
+            }
             match kind {
                 LocalResourceKind::Stylesheet => sheets += 1,
                 LocalResourceKind::Image => images += 1,

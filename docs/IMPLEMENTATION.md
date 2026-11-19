@@ -663,7 +663,15 @@ longhands in lexicographical order, followed by custom properties. The upstream
 property-order test passes. Computed-style methods check receivers and required
 arguments before invoking author-defined conversions. The optional pseudo
 argument uses the element itself for strings without a leading colon.
-Pseudo-elements, style serialization coverage, real asynchronous
+The CLI resolves `width` and `height` from the layout fragment selected by
+`box-sizing` and uses the computed values for elements without a size-bearing
+box. A unitless `line-height` uses the element's computed font size. The CLI
+regression covers fractional pixels, transforms, atomic inline boxes, hidden
+elements, and a held declaration after its containing block resizes. The
+staged-image fixture checks the CSSOM width before and after publication.
+The pinned CSSOM `computed-style-001.html` passes all four subtests, including
+the percentage-width assertion.
+Pseudo-elements, remaining style serialization, real asynchronous
 stylesheet/image completion delivery and broader validation remain WEB-06
 work under
 [ADR 0045](adr/0045-live-computed-style-reads.md). No new capability is
@@ -672,7 +680,7 @@ marked complete by this slice.
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 22 Window WPT files. It reports 79 subtests, including 68 passes
+baseline for 23 Window WPT files. It reports 83 subtests, including 72 passes
 and 11 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11

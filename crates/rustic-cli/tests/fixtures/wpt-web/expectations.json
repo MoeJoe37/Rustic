@@ -47,6 +47,24 @@
       "status": "PASS"
     }
   ],
+  "css/cssom/computed-style-001.html": [
+    {
+      "name": "read_only",
+      "status": "PASS"
+    },
+    {
+      "name": "property_values",
+      "status": "PASS"
+    },
+    {
+      "name": "inherited_property_values",
+      "status": "PASS"
+    },
+    {
+      "name": "relative_property_values",
+      "status": "PASS"
+    }
+  ],
   "css/cssom/getComputedStyle-property-order.html": [
     {
       "name": "Computed style properties should be sorted lexicographically",

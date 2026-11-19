@@ -28,7 +28,7 @@ pub struct LayoutGeometry {
     pub offset_widths: HashMap<NodeId, i32>,
     /// Transformed client bounds. `None` values describe unprojectable geometry.
     pub client_rects: HashMap<NodeId, Option<[f64; 4]>>,
-    /// Computed values for every styled element, including elements without boxes.
+    /// CSSOM values for every styled element, including elements without boxes.
     pub computed_styles: HashMap<NodeId, ComputedStyleSnapshot>,
 }
 

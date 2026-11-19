@@ -120,7 +120,11 @@ hold their element wrappers through the page's rooted weak map and the
 indexed host object's GC-traced source. A second argument without a leading
 colon selects the element. Colon-prefixed pseudo-element requests remain open.
 Indexed access and iteration list supported longhands in lexicographical order
-before custom properties (CSSOM §7.2).
+before custom properties (CSSOM §7.2). For width and height, the CLI uses the
+untransformed fragment dimensions selected by `box-sizing` when the property
+applies and the element has a box. Otherwise it serializes the computed value.
+Unitless line heights use the element's font size. These resolved values come
+from the same snapshot as geometry (CSSOM §9, CSS Sizing §3.3).
 
 The host-facing `apply_resource_completion` API publishes a staged resource
 result before advancing the applied-input epoch and offering a frame. Failed

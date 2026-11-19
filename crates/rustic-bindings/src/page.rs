@@ -40,7 +40,7 @@ pub enum LayoutReadError {
     Unavailable,
 }
 
-/// Owned supported longhand and custom-property values at one layout revision.
+/// Owned CSSOM longhand and custom-property values at one layout revision.
 ///
 /// No JavaScript object owns this record: a held CSSStyleDeclaration reads a
 /// fresh record through the shared revision-keyed layout cache on each access.

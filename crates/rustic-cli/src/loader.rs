@@ -8,6 +8,7 @@
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
@@ -17,7 +18,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
-use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment, PropertyId};
+use rustic_css::{
+    BoxSizing, CssError, CssLimits, CssParser, Length, LineHeight, MediaEnvironment, PropertyId,
+    PropertyValue,
+};
 use rustic_dom::{Document, DumpError};
 use rustic_engine::{
     ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, ComputedStyleSnapshot,
@@ -29,8 +33,8 @@ use rustic_html::{
     select_local_encoding,
 };
 use rustic_style::{
-    ComputeContext, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader,
-    StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
+    ComputeContext, ComputedStyle, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits,
+    StyleLoader, StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
 
 use crate::stylesheets::{
@@ -991,6 +995,27 @@ fn cssom_longhands() -> &'static [PropertyId] {
     &ORDER
 }
 
+// CSSOM §9 exposes used dimensions for rendered boxes. Resolve them before
+// transforms and CSSOM View rounding, on the box selected by CSS Sizing §3.3.
+fn cssom_value(
+    style: &ComputedStyle,
+    used_size: Option<rustic_layout::CssSize>,
+    property: PropertyId,
+) -> String {
+    let computed = style.get(property);
+    let pixels = match (property, used_size, computed) {
+        (PropertyId::Width, Some(size), _) => size.width().get(),
+        (PropertyId::Height, Some(size), _) => size.height().get(),
+        (PropertyId::LineHeight, _, PropertyValue::LineHeight(LineHeight::Number(factor))) => {
+            // Keep the serialized length finite for very large valid factors.
+            let font_size = style.font_size_px().min(f64::MAX);
+            (factor * font_size).min(f64::MAX)
+        }
+        _ => return computed.to_string(),
+    };
+    Length::px(pixels).to_string()
+}
+
 impl LayoutSource for LocalLayout {
     fn measure_layout(
         &self,
@@ -1008,6 +1033,13 @@ impl LayoutSource for LocalLayout {
             applied_files: Some(&self.applied_files),
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
+        // Public block fragments omit anonymous wrappers and include atomic
+        // inlines. Ordinary inline fragments do not have a used width/height.
+        let fragments: HashMap<_, _> = layout
+            .fragments()
+            .iter()
+            .map(|fragment| (fragment.node(), fragment))
+            .collect();
         Ok(LayoutGeometry {
             offset_widths: layout
                 .offset_widths(&tree, &self.cancellation)
@@ -1017,10 +1049,26 @@ impl LayoutSource for LocalLayout {
             computed_styles: styles
                 .into_iter()
                 .map(|style| {
+                    self.cancellation
+                        .check()
+                        .map_err(|_| LayoutReadError::Unavailable)?;
+                    let used_size = fragments.get(&style.node).map(|fragment| {
+                        if matches!(
+                            style.computed.get(PropertyId::BoxSizing),
+                            PropertyValue::BoxSizing(BoxSizing::BorderBox)
+                        ) {
+                            fragment.border().size()
+                        } else {
+                            fragment.content().size()
+                        }
+                    });
                     let longhands = cssom_longhands()
                         .iter()
                         .map(|&property| {
-                            (property.name(), style.computed.get(property).to_string())
+                            (
+                                property.name(),
+                                cssom_value(&style.computed, used_size, property),
+                            )
                         })
                         .collect();
                     let custom_properties = style
@@ -1029,15 +1077,15 @@ impl LayoutSource for LocalLayout {
                         .iter()
                         .map(|(name, value)| (name.to_owned(), value.to_string()))
                         .collect();
-                    (
+                    Ok((
                         style.node,
                         ComputedStyleSnapshot {
                             longhands,
                             custom_properties,
                         },
-                    )
+                    ))
                 })
-                .collect(),
+                .collect::<Result<_, LayoutReadError>>()?,
         })
     }
 }
@@ -1432,6 +1480,75 @@ mod tests {
     }
 
     #[test]
+    fn cssom_resolves_used_sizes_and_keeps_boxless_values() {
+        let file = TempFile::new(
+            br#"<!doctype html>
+                <style>
+                    #parent { width: 201px; height: 81px; font-size: 14px; line-height: 1.25 }
+                    #box {
+                        width: 50%; height: 50%; padding: 3px; border: 2px solid;
+                        transform: scale(2);
+                    }
+                    #box.bordered { box-sizing: border-box; max-width: 90px }
+                    #box.hidden { display: none }
+                    #inline, #boxless, #hidden { width: 50%; height: 50% }
+                    #boxless { display: contents }
+                    #hidden { display: none }
+                    #atomic { display: inline-block; width: 50%; height: 10px }
+                    #inline { font-size: 20px }
+                    #hidden { line-height: normal }
+                </style>
+                <div id="parent">
+                    <div id="box"></div>
+                    <span id="inline">text</span>
+                    <span id="atomic"></span>
+                    <div id="boxless"></div>
+                    <div id="hidden"></div>
+                </div>
+                <script>
+                    const parent = document.querySelector('#parent');
+                    const box = document.querySelector('#box');
+                    const held = getComputedStyle(box);
+                    const inline = getComputedStyle(document.querySelector('#inline'));
+                    const atomic = getComputedStyle(document.querySelector('#atomic'));
+                    const contents = getComputedStyle(document.querySelector('#boxless'));
+                    const hidden = getComputedStyle(document.querySelector('#hidden'));
+                    const reads = [held.getPropertyValue('width'), held.height, held.lineHeight,
+                                   box.offsetWidth, box.getBoundingClientRect().width,
+                                   inline.width, inline.height, inline.lineHeight,
+                                   atomic.width, atomic.height, contents.width, contents.height,
+                                   hidden.width, hidden.height, hidden.lineHeight];
+                    box.setAttribute('class', 'bordered');
+                    reads.push(held.width, held.height, box.offsetWidth);
+                    parent.setAttribute('style', 'width: 141px; height: 101px');
+                    reads.push(held.width, held.height, box.offsetWidth);
+                    box.setAttribute('class', 'hidden');
+                    reads.push(held.width, held.height, box.offsetWidth);
+                    box.setAttribute('style', 'line-height: 1e308');
+                    const largeLineHeight = held.lineHeight;
+                    reads.push(largeLineHeight.endsWith('px') &&
+                               Number.isFinite(parseFloat(largeLineHeight)));
+                    document.body.setAttribute('data-resolved', reads.join(','));
+                </script>"#,
+        );
+        let mut engine = Engine::new(1);
+        let limits = LoaderLimits {
+            run_scripts: true,
+            ..LoaderLimits::default()
+        };
+        let parsed = load_document(&mut engine, &file.0, limits).unwrap();
+        let output = dump_dom(&parsed, &file.0, limits).unwrap();
+        assert!(
+            output.contains(concat!(
+                "local=\"data-resolved\" value=\"",
+                "100.5px,40.5px,17.5px,111,221,50%,50%,25px,100.5px,10px,50%,50%,50%,50%,normal,",
+                "90px,40.5px,90,70.5px,50.5px,71,50%,50%,0,true\"",
+            )),
+            "{output}"
+        );
+    }
+
+    #[test]
     fn final_scripted_output_uses_the_stylesheet_and_image_applied_at_load() {
         let sheet = TempFile::new(b"img { border: 3px solid red }");
         let png = rustic_raster::encode_png(
@@ -1692,10 +1809,10 @@ mod tests {
             encoding,
             applied_files: applied.clone(),
         };
-        let get_width = |geometry: &LayoutGeometry| {
+        let get_width = |geometry: &LayoutGeometry, node| {
             geometry
                 .computed_styles
-                .get(&box_id)
+                .get(&node)
                 .unwrap()
                 .longhands
                 .iter()
@@ -1707,7 +1824,8 @@ mod tests {
         let initial = layout
             .measure_layout(parsed.parsed().document(), mode)
             .unwrap();
-        assert_eq!(get_width(&initial), "18px");
+        assert_eq!(get_width(&initial, box_id), "18px");
+        assert_eq!(get_width(&initial, image_id), "2px");
         assert_eq!(initial.offset_widths.get(&image_id), Some(&2));
 
         let mut scripted = parsed
@@ -1797,8 +1915,10 @@ mod tests {
                 .unwrap_err(),
             FetchError::Blocked,
         );
-        assert_eq!(get_width(&measure(&scripted)), "18px");
-        assert_eq!(measure(&scripted).offset_widths.get(&image_id), Some(&2));
+        let before_apply = measure(&scripted);
+        assert_eq!(get_width(&before_apply, box_id), "18px");
+        assert_eq!(get_width(&before_apply, image_id), "2px");
+        assert_eq!(before_apply.offset_widths.get(&image_id), Some(&2));
 
         // A rejected host completion leaves the original render valid.
         scripted
@@ -1828,7 +1948,8 @@ mod tests {
         );
         assert_eq!(scripted.accept_rendered_frame(stale_css), Ok(false));
         let applied_css = measure(&scripted);
-        assert_eq!(get_width(&applied_css), "43px");
+        assert_eq!(get_width(&applied_css, box_id), "43px");
+        assert_eq!(get_width(&applied_css, image_id), "2px");
         assert_eq!(applied_css.offset_widths.get(&image_id), Some(&2));
         // A successful completion automatically offers the next render.
         let stable_css = render(&mut scripted);
@@ -1858,7 +1979,8 @@ mod tests {
         );
         assert_eq!(scripted.accept_rendered_frame(stale_image), Ok(false));
         let applied_both = measure(&scripted);
-        assert_eq!(get_width(&applied_both), "43px");
+        assert_eq!(get_width(&applied_both, box_id), "43px");
+        assert_eq!(get_width(&applied_both, image_id), "6px");
         assert_eq!(applied_both.offset_widths.get(&image_id), Some(&6));
         let fresh = render(&mut scripted);
         assert_eq!(scripted.accept_rendered_frame(fresh), Ok(true));

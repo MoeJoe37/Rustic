@@ -93,6 +93,12 @@ refresh from the same revision-keyed snapshot as geometry and respect the
 same flush budget. Custom names remain case-sensitive; unknown names return
 an empty value. Indexed reads, `item()` and JavaScript iteration list supported
 longhands in lexicographical order, followed by custom properties.
+For rendered boxes whose sizing properties apply, `width` and `height` use the
+untransformed content or border dimensions selected by `box-sizing`. Ordinary
+inlines and elements without boxes expose their computed dimensions. A unitless
+`line-height` resolves against the element's computed font size, and `normal`
+remains a keyword.
+[CSSOM §9](https://drafts.csswg.org/cssom/#resolved-values)
 `getComputedStyle` uses the element for a pseudo argument without a leading
 colon. Colon-prefixed pseudo-element requests remain unsupported.
 If the host has no applied renderer, a connected computed-style read reports
@@ -356,8 +362,8 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 `html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
-configured to require an exact match to the checked-in **22 files,
-79 subtests, 68 passes and 11 expected failures**. The expectations record the names and diagnoses
+configured to require an exact match to the checked-in **23 files,
+83 subtests, 72 passes and 11 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -371,7 +377,8 @@ clock and one rendering opportunity. The candidate
 running after completion. Both remain outside the initial selection.
 The CSSOM View cases cover detached elements, fixed positioning with a
 transform and rectangle dimensions. The two new expected failures concern
-the coordinates of an empty inline in a phantom line box. The CSSOM property-order case passes using iteration over a computed declaration.
+the coordinates of an empty inline in a phantom line box. The CSSOM cases cover property order, read-only declarations, and resolved
+sizes, including percentage widths.
 
 ```sh
 cargo build --locked -p rustic-cli

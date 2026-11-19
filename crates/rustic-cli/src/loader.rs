@@ -1393,6 +1393,28 @@ mod tests {
         assert_eq!(urls[1].1, LocalResourceKind::Image);
         assert!(urls[0].0.serialize().ends_with("/site.css"));
         assert!(urls[1].0.serialize().ends_with("/first.png"));
+
+        // With more capacity, repeated references must not consume slots:
+        // the next distinct stylesheet and image are still discovered.
+        let wider = LoaderLimits {
+            stylesheets: StyleLoadLimits {
+                max_sheets: 2,
+                ..StyleLoadLimits::default()
+            },
+            images: crate::images::ImageLimits {
+                max_images: 2,
+                ..crate::images::ImageLimits::default()
+            },
+            ..LoaderLimits::default()
+        };
+        let unique = discover_local_resources(parsed.parsed().document(), &file.0, wider);
+        assert_eq!(unique.len(), 4);
+        assert_eq!(unique[0].1, LocalResourceKind::Stylesheet);
+        assert_eq!(unique[1].1, LocalResourceKind::Stylesheet);
+        assert_eq!(unique[2].1, LocalResourceKind::Image);
+        assert_eq!(unique[3].1, LocalResourceKind::Image);
+        assert!(unique[1].0.serialize().ends_with("/over-limit.css"));
+        assert!(unique[3].0.serialize().ends_with("/over-limit.png"));
     }
 
     #[test]

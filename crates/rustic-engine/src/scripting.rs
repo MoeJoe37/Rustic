@@ -21,7 +21,7 @@ use crate::frames::{RenderFrame, Rendering};
 use crate::layout_reads::{LayoutGeometry, LayoutReads, LayoutSource};
 use crate::lifecycle::DocumentScope;
 use crate::local_modules::{LocalModules, ModuleKey};
-use crate::tasks::{ScriptQueue, Task, TimerId};
+use crate::tasks::{ResourceCompletion, ScriptQueue, Task, TimerId};
 use crate::window_tasks::WindowWork;
 use crate::{EngineDocument, InputEvent};
 
@@ -139,6 +139,12 @@ pub enum ScriptTurn {
     Completed,
     /// The task failed and the checkpoint still ran.
     Failed(ScriptFailure),
+    /// A prevalidated host resource was delivered at the document boundary.
+    /// On failure, the applied-input revision and frame ticket remain intact.
+    ResourceCompletion {
+        /// Whether the staged completion was committed.
+        applied: bool,
+    },
 }
 
 /// Work selected by the document pump when the host supplies a renderer.
@@ -697,6 +703,26 @@ impl<C: Clock> ScriptedDocument<C> {
         self.pending.queue.borrow_mut().queue(Task::Script(source))
     }
 
+    /// Queue a previously fetched and validated resource completion as a
+    /// document task. The normal turn pump publishes it in task order, after
+    /// any prior script's microtask checkpoint, before subsequent JS work.
+    ///
+    /// The supplied closure may only commit already-staged resource state:
+    /// it must not perform file/network I/O or execute JavaScript. A failed
+    /// commit returns `ResourceCompletion { applied: false }` without
+    /// invalidating an old frame or offering a new one. The same task-count
+    /// limit used for scripts, timers and input bounds pending completions.
+    pub fn queue_resource_completion<E>(
+        &mut self,
+        commit: impl FnOnce() -> Result<(), E> + 'static,
+    ) -> Result<(), ScriptQueueError> {
+        self.check_live().map_err(ScriptQueueError::Stopped)?;
+        self.pending
+            .queue
+            .borrow_mut()
+            .queue(Task::ResourceCompletion(ResourceCompletion::new(commit)))
+    }
+
     /// Queue host input for a connected target in this document.
     ///
     /// The host supplies the hit-tested pointer or selected keyboard target.
@@ -759,7 +785,7 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(())
     }
 
-    /// Pump one script, timer, input or rendering turn.
+    /// Pump one script, timer, input, resource completion or rendering turn.
     ///
     /// A ready task and an offered frame alternate when both can
     /// run. Each task completes its checkpoint before a later rendering turn.
@@ -805,10 +831,13 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(self.rendering.accept(frame, revision))
     }
 
-    /// Run one eligible task and drain its promise jobs before a later task.
+    /// Run one eligible task and drain JS promise jobs before a later task.
+    /// Host resource completions run without executing JS and are reported as
+    /// `ScriptTurn::ResourceCompletion` with their publication result.
     ///
     /// A terminal failure discards pending tasks and releases the JS agent.
-    /// Returns `Ok(None)` when there is no eligible script, timer or input. Use
+    /// Returns `Ok(None)` when there is no eligible script, timer, input or
+    /// resource completion. Use
     /// [`Self::run_next_with_render`] to service rendering offers as well.
     pub fn run_next(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
         self.check_live()?;
@@ -820,6 +849,22 @@ impl<C: Clock> ScriptedDocument<C> {
             return Ok(None);
         };
 
+        if let Task::ResourceCompletion(commit) = task {
+            // Resource delivery is its own host task, not JS execution. All
+            // prior JS checkpoints have finished before this point. Reuse
+            // the same commit-before-revision publication contract as direct
+            // host completions; failed commits do not schedule frames.
+            let applied = self
+                .apply_resource_completion(|| {
+                    if commit.apply() { Ok(()) } else { Err(()) }
+                })?
+                .is_ok();
+            if applied {
+                self.rendering.after_script();
+            }
+            return Ok(Some(ScriptTurn::ResourceCompletion { applied }));
+        }
+
         self.begin_turn()?;
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         let result = match task {
@@ -828,6 +873,7 @@ impl<C: Clock> ScriptedDocument<C> {
             Task::Input { target, event } => {
                 page::deliver_input(agent, target, &event).map_err(EvalError::from)
             }
+            Task::ResourceCompletion(_) => unreachable!("handled before JS task"),
         };
         self.finish_script_turn(result).map(Some)
     }

@@ -371,8 +371,9 @@ ADR is accepted.
      before invalidation and schedules a frame, while failed results leave the
      old snapshot intact. Scripted local CSS and images retain bounded
      first-fetched byte snapshots across layout flushes; policy-checked
-     replacements can now be staged and atomically published through the
-     completion boundary (CLI regression fixture). Wire automatic
+     replacements can be staged and atomically published through the
+     completion boundary (CLI regression fixture), with per-URL stale
+     completion rejection and budget revalidation. Wire automatic
      stylesheet/image completion task delivery into the page pump.
 3. **WEB-07 — observers, errors, focus and forms.**
    - `MutationObserver` records are delivered at the microtask checkpoint in

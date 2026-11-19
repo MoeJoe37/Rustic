@@ -426,6 +426,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn installed_longhand_getters_include_identical_css_and_camel_names() {
+        let mut agent = Agent::new().expect("agent");
+        install(&mut agent).expect("CSSStyleDeclaration interface");
+        let prototype = agent
+            .host_interface_prototype(INTERFACE)
+            .expect("installed prototype");
+
+        // Regression: an earlier alias-deduplication loop skipped both names
+        // when the CSS and camel-case spellings were identical.
+        for name in [
+            "color",
+            "display",
+            "width",
+            "background-color",
+            "backgroundColor",
+            "cssFloat",
+        ] {
+            let key = agent.heap.key(name).expect("property name");
+            let descriptor = agent
+                .get_own_property(prototype, key)
+                .expect("property lookup")
+                .unwrap_or_else(|| panic!("missing longhand getter: {name}"));
+            assert!(descriptor.get.and_then(Value::as_object).is_some(), "{name}");
+            assert!(descriptor.set.and_then(Value::as_object).is_some(), "{name}");
+        }
+    }
+
+    #[test]
     fn longhand_getter_names_cover_the_supported_catalog_without_collisions() {
         assert_eq!(LONGHAND_GETTERS.len(), PropertyId::ALL.len());
         let mut seen = HashSet::new();

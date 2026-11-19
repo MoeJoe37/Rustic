@@ -607,9 +607,16 @@ between CSS and image loading. A first fetch pins the source bytes or failure;
 later dirty style/layout measurements reuse the pinned result instead of
 silently rereading changed files. Resource count and aggregate byte budgets
 limit the snapshot; each fetch also obeys its own offered byte budget. Static
-commands keep their direct-file behavior. This is still synchronous,
-first-demand loading, **not** a real completion queue: applying staged
-replacements through the host's completion boundary remains unimplemented.
+commands keep their direct-file behavior. A local fetcher can now stage
+replacement bytes with the same path containment and byte limits as normal
+loads; the applied cache validates entry/aggregate budgets both at staging and
+again at atomic commit. The host can commit those bytes using
+`ScriptedDocument::apply_resource_completion`, which invalidates the shared
+snapshot and outstanding frame ticket only on success. A CLI integration
+fixture stages changed CSS and PNG files, publishes them in separate host
+epochs, and compares actual styles and image geometry. This is still
+synchronous first-demand loading: there is **no automatic resource-completion
+queue or delivery during parser turns**.
 
 Regression sources: `crates/rustic-engine/tests/frames.rs` (held declarations,
 callback argument conversion, microtasks, shared eight-flush quota,
@@ -618,13 +625,15 @@ absent-renderer/detached semantics and successful/failed host resource
 completion ordering for stylesheet/image fixture values) and
 `crates/rustic-cli/src/loader.rs` (live local style/class/inline mutations,
 custom names, inheritance, detached nodes and indexed enumeration after
-stylesheet mutation, plus stylesheet/image file replacement and deletion
-without accidental resource application). Cache limit, missing-resource and
+stylesheet mutation, stylesheet/image file replacement and deletion without
+accidental resource application, plus staged stylesheet/PNG replacement using
+the host completion boundary and frame-ticket rejection). Cache limit,
+atomic revalidation, missing-resource and
 cancelled-load regressions are in `crates/rustic-cli/src/stylesheets.rs`.
 **Verification pending**:
 this environment has no Rust toolchain, and the hosted CI billing block remains.
-Pseudo-elements, style serialization coverage, validated replacement of
-applied snapshots and real stylesheet/image completion delivery remain WEB-06
+Pseudo-elements, style serialization coverage, real asynchronous
+stylesheet/image completion delivery and broader validation remain WEB-06
 work under
 [ADR 0045](adr/0045-live-computed-style-reads.md). No new capability is
 marked complete by this slice.

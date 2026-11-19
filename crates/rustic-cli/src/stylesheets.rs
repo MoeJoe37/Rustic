@@ -173,14 +173,22 @@ impl AppliedLocalFiles {
         fetch: impl FnOnce() -> Result<Vec<u8>, FetchError>,
     ) -> Result<Arc<[u8]>, FetchError> {
         let key = url.serialize();
-        if let Some(result) = self.state.borrow().entries.get(&key) {
-            return result.clone().and_then(|bytes| {
-                if bytes.len() > max_bytes {
-                    Err(FetchError::TooLarge)
-                } else {
-                    Ok(bytes)
-                }
-            });
+        {
+            let state = self.state.borrow();
+            if let Some(result) = state.entries.get(&key) {
+                return result.clone().and_then(|bytes| {
+                    if bytes.len() > max_bytes {
+                        Err(FetchError::TooLarge)
+                    } else {
+                        Ok(bytes)
+                    }
+                });
+            }
+            // A missing entry still counts against the resource cap. Reject
+            // before performing I/O when this snapshot cannot retain it.
+            if state.entries.len() >= state.max_entries {
+                return Err(FetchError::TooLarge);
+            }
         }
         let result = fetch().and_then(|bytes| {
             if bytes.len() > max_bytes {
@@ -328,6 +336,69 @@ impl StylesheetFetcher for LocalStylesheetFetcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn applied_snapshot_pins_bytes_failures_and_enforces_each_budget() {
+        let snapshot = AppliedLocalFiles::new(3, 5);
+        let first = Url::parse("file:///page/first.css", None).unwrap();
+        let missing = Url::parse("file:///page/missing.css", None).unwrap();
+        let other = Url::parse("file:///page/other.css", None).unwrap();
+        let overflow = Url::parse("file:///page/overflow.css", None).unwrap();
+
+        assert_eq!(
+            snapshot.read(&first, 100, || Ok(b"body".to_vec())).unwrap().as_ref(),
+            b"body",
+        );
+        // A hit never reads the changed underlying file and still respects
+        // the per-request limit offered by the stylesheet/image loader.
+        assert_eq!(
+            snapshot.read(&first, 100, || panic!("refetched applied bytes"))
+                .unwrap().as_ref(),
+            b"body",
+        );
+        assert_eq!(
+            snapshot.read(&first, 3, || panic!("read past cache")).unwrap_err(),
+            FetchError::TooLarge,
+        );
+        assert_eq!(
+            snapshot.read(&missing, 100, || Err(FetchError::NotFound)),
+            Err(FetchError::NotFound),
+        );
+        assert_eq!(
+            snapshot.read(&missing, 100, || panic!("refetched missing file")),
+            Err(FetchError::NotFound),
+        );
+        // Only one byte remains in the aggregate applied-byte budget.
+        assert_eq!(
+            snapshot.read(&other, 100, || Ok(b"extra".to_vec())),
+            Err(FetchError::TooLarge),
+        );
+        // Failed applied resources consume an entry but not decoded bytes.
+        assert_eq!(
+            snapshot.read(&overflow, 100, || panic!("exceeded resource count")),
+            Err(FetchError::TooLarge),
+        );
+        assert_eq!(
+            snapshot.read(&first, 100, || panic!("evicted stable bytes"))
+                .unwrap().as_ref(),
+            b"body",
+        );
+    }
+
+    #[test]
+    fn cancellation_does_not_poison_an_applied_resource() {
+        let snapshot = AppliedLocalFiles::new(1, 8);
+        let url = Url::parse("file:///page/image.png", None).unwrap();
+        assert_eq!(
+            snapshot.read(&url, 8, || Err(FetchError::Cancelled)),
+            Err(FetchError::Cancelled),
+        );
+        assert_eq!(
+            snapshot.read(&url, 8, || Ok(b"updated".to_vec()))
+                .unwrap().as_ref(),
+            b"updated",
+        );
+    }
 
     #[test]
     fn file_urls_round_trip_paths() {

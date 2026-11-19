@@ -153,14 +153,22 @@ pub(crate) struct AppliedLocalFiles {
 pub(crate) struct StagedLocalFile {
     key: String,
     bytes: Arc<[u8]>,
+    expected_version: Option<u64>,
+}
+
+#[derive(Debug)]
+struct AppliedFileEntry {
+    result: Result<Arc<[u8]>, FetchError>,
+    version: u64,
 }
 
 #[derive(Debug)]
 struct AppliedFileState {
-    entries: HashMap<String, Result<Arc<[u8]>, FetchError>>,
+    entries: HashMap<String, AppliedFileEntry>,
     bytes: usize,
     max_bytes: usize,
     max_entries: usize,
+    next_version: u64,
 }
 
 impl AppliedLocalFiles {
@@ -171,6 +179,7 @@ impl AppliedLocalFiles {
                 bytes: 0,
                 max_bytes,
                 max_entries,
+                next_version: 0,
             })),
         }
     }
@@ -193,7 +202,7 @@ impl AppliedLocalFiles {
         let old_bytes = state
             .entries
             .get(&key)
-            .and_then(|entry| entry.as_ref().ok())
+            .and_then(|entry| entry.result.as_ref().ok())
             .map_or(0, |bytes| bytes.len());
         if !state.entries.contains_key(&key) && state.entries.len() >= state.max_entries {
             return Err(FetchError::TooLarge);
@@ -201,10 +210,12 @@ impl AppliedLocalFiles {
         if bytes.len() > state.max_bytes.saturating_sub(state.bytes - old_bytes) {
             return Err(FetchError::TooLarge);
         }
+        let expected_version = state.entries.get(&key).map(|entry| entry.version);
         drop(state);
         Ok(StagedLocalFile {
             key,
             bytes: Arc::<[u8]>::from(bytes),
+            expected_version,
         })
     }
 
@@ -217,10 +228,17 @@ impl AppliedLocalFiles {
             .state
             .try_borrow_mut()
             .map_err(|_| FetchError::Failed)?;
+        // Reject late completion of an older fetch for this URL, without
+        // blocking independently staged updates to other resource URLs.
+        if state.entries.get(&staged.key).map(|entry| entry.version)
+            != staged.expected_version
+        {
+            return Err(FetchError::Failed);
+        }
         let old_bytes = state
             .entries
             .get(&staged.key)
-            .and_then(|entry| entry.as_ref().ok())
+            .and_then(|entry| entry.result.as_ref().ok())
             .map_or(0, |bytes| bytes.len());
         let existing = state.entries.contains_key(&staged.key);
         if !existing && state.entries.len() >= state.max_entries {
@@ -236,8 +254,21 @@ impl AppliedLocalFiles {
                 .try_reserve(1)
                 .map_err(|_| FetchError::Failed)?;
         }
-        state.bytes = state.bytes - old_bytes + staged.bytes.len();
-        state.entries.insert(staged.key, Ok(staged.bytes));
+        let version = state.next_version.checked_add(1).ok_or(FetchError::TooLarge)?;
+        state.entries.insert(
+            staged.key,
+            AppliedFileEntry {
+                result: Ok(staged.bytes),
+                version,
+            },
+        );
+        state.bytes = state.bytes - old_bytes + state
+            .entries
+            .values()
+            .find(|entry| entry.version == version)
+            .and_then(|entry| entry.result.as_ref().ok())
+            .map_or(0, |bytes| bytes.len());
+        state.next_version = version;
         Ok(())
     }
 
@@ -256,8 +287,8 @@ impl AppliedLocalFiles {
         }
         {
             let state = self.state.borrow();
-            if let Some(result) = state.entries.get(&key) {
-                return result.clone().and_then(|bytes| {
+            if let Some(entry) = state.entries.get(&key) {
+                return entry.result.clone().and_then(|bytes| {
                     if bytes.len() > max_bytes {
                         Err(FetchError::TooLarge)
                     } else {
@@ -293,7 +324,15 @@ impl AppliedLocalFiles {
         });
         // Cancellation must not poison a retryable resource snapshot.
         if result != Err(FetchError::Cancelled) {
-            state.entries.insert(key, result.clone());
+            let version = state.next_version.checked_add(1).ok_or(FetchError::TooLarge)?;
+            state.entries.insert(
+                key,
+                AppliedFileEntry {
+                    result: result.clone(),
+                    version,
+                },
+            );
+            state.next_version = version;
         }
         result
     }

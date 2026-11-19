@@ -154,12 +154,26 @@ fetching, live file watching or streaming parser-barrier resource scheduling.**
 Static dump commands still read local files directly. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
 
+`new MutationObserver(callback)` observes child-list, attribute and
+character-data changes with `subtree`, `attributeFilter` and old values.
+Records from script edits, host edits and the HTML parser reach the
+callback in one microtask, in the specified order relative to promise jobs,
+and `takeRecords()` and `disconnect()` follow the DOM steps. A removed node
+stays observed through its former ancestors' subtree registrations until
+the next notification. The scripted document performs a microtask
+checkpoint before each parser-inserted classic, so a script sees records
+for the markup before it. Callback exceptions are counted like listener
+errors. `queueMicrotask` uses the same queue. Registrations are edges held
+by observed nodes: an observer lives as long as a node it watches, follows
+adopted nodes and is collected with them.
+[ADR 0047](adr/0047-mutation-observers.md)
+
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
 | Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md), [TD-148](TECH_DEBT.md#td-148--computed-style-snapshots-are-eager-and-copied-per-read), [TD-149](TECH_DEBT.md#td-149--pseudo-element-getcomputedstyle-throws)). | WEB-06 |
-| Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
+| `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
 | Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
@@ -290,8 +304,8 @@ same turn budget, so a single call cannot run unmetered.
   `DocumentType`, `Element`, `CharacterData`, `Text`, `CDATASection`, `Comment`,
   `ProcessingInstruction`, `XMLDocument`, `DOMImplementation`, `NodeList`,
   `HTMLCollection`, `Window`, `Event`, `CustomEvent`, `UIEvent`, `MouseEvent`,
-  `PointerEvent`, `KeyboardEvent`, `DOMException` and the checkbox state of
-  `HTMLInputElement`. IMPLEMENTATION.md lists the members of each; treat that
+  `PointerEvent`, `KeyboardEvent`, `MutationObserver`, `MutationRecord`,
+  `DOMException` and the checkbox state of `HTMLInputElement`. IMPLEMENTATION.md lists the members of each; treat that
   list, not this one, as the contract.
 - **Selectors** ([ADR 0030](adr/0030-dom-selectors-and-node-lists.md)).
   `querySelector`, `querySelectorAll`, `matches` and `closest` use the same
@@ -346,6 +360,7 @@ and `AbortSignal` listener removal are TD-131.
 | Conversions and generated metadata | `crates/rustic-bindings/tests/webidl.rs`, `metadata.rs` |
 | Wrapper identity, adoption, joint collection | `crates/rustic-bindings/tests/dom_gc.rs`, `page.rs` |
 | Events | `crates/rustic-bindings/tests/events.rs` |
+| Mutation journal, observers and `queueMicrotask` | `crates/rustic-dom/tests/journal.rs`, `crates/rustic-bindings/tests/mutation_observer.rs`, `crates/rustic-engine/tests/mutation_observers.rs` |
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
 
 These tests use a manual clock and run on CI tiers including the 32-bit and
@@ -366,8 +381,8 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 `html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
-configured to require an exact match to the checked-in **24 files,
-87 subtests, 75 passes and 12 expected failures**. The expectations record the names and diagnoses
+configured to require an exact match to the checked-in **35 files,
+191 subtests, 155 passes and 36 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -379,6 +394,15 @@ clock and one rendering opportunity. The candidate
 `ParentNode-querySelectorAll-removed-elements.html` depends on
 `innerHTML`, and `clearinterval-from-callback.any.js` leaves an interval
 running after completion. Both remain outside the initial selection.
+Eleven `dom/nodes` mutation-observer files load the upstream
+`mutationobservers.js` helper, which the manifest lists as a support file.
+Their expected failures name APIs that are not built: `classList`,
+`Element.attributes`, Range, `normalize()`, `HTMLInputElement.type`
+reflection, script-inserted script execution (TD-133) and `Attr` nodes.
+`MutationObserver-textContent.html` needs `DOMParser` and
+`MutationObserver-inner-outer.html` needs `innerHTML`; the two `.window.js`
+observer files need the `.window.js` wrapper. They stay outside the
+selection until those land.
 The CSSOM View cases cover detached elements, fixed positioning with a
 transform and rectangle dimensions. The two new expected failures concern
 the coordinates of an empty inline in a phantom line box. The CSSOM cases cover property order, read-only declarations, and resolved
@@ -409,6 +433,8 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 | TD-135 | Dynamic page imports, import maps and data module types | M6 and M9 |
 | TD-148 | Eager computed-style snapshots copied on each read | M7 entry |
 | TD-149 | Pseudo-element `getComputedStyle` throws | WEB-06 |
+| TD-150 | Dead observer registrations are dropped lazily | M7 entry |
+| TD-151 | Parser and host records resolve observers when drained | M9 HTML lifecycle |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

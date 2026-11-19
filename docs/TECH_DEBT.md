@@ -59,12 +59,12 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134, TD-149 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -213,6 +213,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
 | TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Open, M7 entry |
 | TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, WEB-06 |
+| TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
+| TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2324,3 +2326,39 @@ empty declaration for failures, `::slotted()` and `::part()`, and read
 generated-box styles from the same snapshot for supported pseudo-elements,
 with WPT `getComputedStyle-pseudo*` cases.
 **Trigger:** WEB-06 completion, or before M6 loads server pages.
+
+### TD-150 — Dead mutation-observer registrations are dropped lazily
+
+A registration is an edge held by its node ([ADR 0047](adr/0047-mutation-observers.md)).
+`disconnect()` and the end of a transient registration mark the record dead
+instead of finding its node, because the observer deliberately keeps no
+strong reference to observed nodes and node IDs change on adoption. The
+node drops the dead edge when a later mutation walks it, or when the node
+is collected. Separately, a live observer that observes many short-lived
+nodes and never disconnects keeps one small record per node it ever
+observed in its own list. Both are bounded by script's own allocations and
+charged to the JS heap, but they are memory nothing will use again.
+**Pay:** give each registration a weak back-reference the collector clears
+(or a per-observer compaction at collection time), and drop dead edges
+during `disconnect` when the node is still reachable.
+**Trigger:** M7 entry, or a heap report that shows observer records
+dominating a page.
+
+### TD-151 — Mutation records for parser and host edits resolve observers when drained
+
+Binding operations drain the document journal when the outermost call
+releases the page, so their records see the tree as it was changed. The
+HTML parser and host code (checkbox activation, resource completion) edit
+the tree outside a binding call; their entries are interpreted at the next
+binding call or microtask checkpoint, and interested observers are found
+from the target's ancestors *then*. A node the parser inserts and later
+moves within the same chunk (adoption agency, foster parenting) can be
+attributed to its later ancestors, and parser text appends copy the old
+character data for every append while an observer exists.
+**Pay:** drain the journal at each parser insertion step that changes an
+existing node's ancestry, or record the ancestor chain's registration
+snapshot in the entry; coalesce parser text appends into one record per
+token run.
+**Trigger:** M9 HTML lifecycle work, or a WPT parser-mutation case that
+depends on it.
+

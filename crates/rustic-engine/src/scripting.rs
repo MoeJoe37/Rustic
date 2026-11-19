@@ -592,6 +592,9 @@ impl<C: Clock> ScriptedDocument<C> {
     ) -> Result<ScriptTurn, ScriptStop> {
         self.check_live()?;
         self.begin_turn()?;
+        // HTML "</script>" step: a microtask checkpoint before the script,
+        // which delivers mutation records for the parser's insertions.
+        self.checkpoint()?;
         self.document.current_script.set(Some(element));
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         let result = agent.evaluate_source(source).map(|_| ());
@@ -951,6 +954,14 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     fn checkpoint(&mut self) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        // Parser and host edits since the last binding call become mutation
+        // records before the microtasks they schedule run.
+        match page::flush_mutation_records(agent) {
+            Ok(()) | Err(Abrupt::Throw(_)) => {}
+            Err(Abrupt::OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
+            Err(Abrupt::Cancelled) => return Err(self.stop_after_cancellation()),
+        }
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         match agent.run_jobs_limited(self.limits.jobs_per_checkpoint) {
             Ok(true) => {

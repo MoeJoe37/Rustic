@@ -684,11 +684,47 @@ work under
 [ADR 0045](adr/0045-live-computed-style-reads.md). No new capability is
 marked complete by this slice.
 
+## WEB-07 — Mutation observers and microtasks
+
+`Document::set_mutation_journal` makes the DOM tree record a
+`MutationEntry` for every child-list, attribute and character-data change:
+targets, added and removed nodes with their siblings, and previous values.
+Entries follow the DOM's record order (a move logs removal then insertion, a
+fragment logs its emptying, `splitText` logs the insertion first, "replace
+all" logs one record) and are allocated before the edit, so a rejected edit
+records nothing. Cross-document moves name nodes by their new IDs in the
+destination's journal.
+
+`MutationObserver` (`observe`, `disconnect`, `takeRecords`) and
+`MutationRecord` (all nine attributes, static `NodeList`s) are exposed.
+`observe` converts `MutationObserverInit` in Web IDL member order, including
+an iterable `attributeFilter`, and applies the DOM validation steps;
+observing a node again replaces its options and drops the transient
+registrations it created. The bindings drain journals when the outermost
+binding operation releases the page and before every microtask checkpoint,
+find interested observers on the target's inclusive ancestors and queue one
+notification microtask. Notification runs observers in creation order with
+`(records, observer)` and `this` bound to the observer; an exception is
+counted with listener errors. Removals give the removed nodes transient
+registrations for their former ancestors' subtree observers until the next
+notification. A registration is a private record held by its node through
+the joint heap, so observers survive collection through observed nodes,
+follow adoption and are collected with them. The scripted document performs
+a microtask checkpoint before each parser-inserted classic.
+`queueMicrotask(callback)` and `Agent::enqueue_microtask` share the job
+queue. `Element.id`, `Element.className` and the `Node` type constants are
+also exposed.
+
+[ADR 0047](adr/0047-mutation-observers.md),
+[DOM §4.3](https://dom.spec.whatwg.org/#mutation-observers).
+Open debt: [TD-150](TECH_DEBT.md#td-150--dead-mutation-observer-registrations-are-dropped-lazily),
+[TD-151](TECH_DEBT.md#td-151--mutation-records-for-parser-and-host-edits-resolve-observers-when-drained).
+
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 24 Window WPT files. It reports 87 subtests, including 75 passes
-and 12 expected failures. The runner checks vendored files by digest and
+baseline for 35 Window WPT files. It reports 191 subtests, including 155
+passes and 36 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.

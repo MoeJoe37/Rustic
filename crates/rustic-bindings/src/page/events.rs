@@ -68,7 +68,7 @@ impl Events {
         self.listener_errors.take()
     }
 
-    fn report_listener_error(&self) {
+    pub(super) fn report_listener_error(&self) {
         self.listener_errors
             .set(self.listener_errors.get().saturating_add(1));
     }
@@ -138,7 +138,7 @@ impl PrivateArray {
         agent.set(self.0, PropertyKey::Index(index), value, true)
     }
 
-    fn len(self, agent: &mut Agent) -> JsResult<u32> {
+    pub(super) fn len(self, agent: &mut Agent) -> JsResult<u32> {
         let key = PropertyKey::String(agent.names.length);
         let len = agent.get(self.0, key)?;
         // A private array's non-configurable length is always a uint32.
@@ -150,7 +150,7 @@ impl PrivateArray {
     }
 }
 
-fn with_root<T>(
+pub(super) fn with_root<T>(
     agent: &mut Agent,
     value: Value,
     operation: impl FnOnce(&mut Agent) -> JsResult<T>,

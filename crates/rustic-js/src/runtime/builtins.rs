@@ -314,6 +314,28 @@ pub(crate) fn iterate(
     }
 }
 
+impl Agent {
+    /// Iterate `iterable` with its `@@iterator` method, as Web IDL converts a
+    /// sequence: a value without a callable iterator method is a `TypeError`.
+    /// `each` returns `false` to stop early and close the iterator; an error
+    /// from `each` closes it and wins.
+    pub fn iterate_values(
+        &mut self,
+        iterable: Value,
+        each: impl FnMut(&mut Agent, Value) -> JsResult<bool>,
+    ) -> JsResult<()> {
+        let key = PropertyKey::Symbol(self.symbols.iterator);
+        let method = match iterable.as_object() {
+            Some(_) => self.get_method(iterable, key)?,
+            None => None,
+        };
+        let Some(method) = method else {
+            return self.type_error("value is not iterable");
+        };
+        iterate(self, iterable, method, each)
+    }
+}
+
 /// `Array.prototype.values` (§23.1.3.37).
 fn array_values(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let object = agent.to_object(this)?;

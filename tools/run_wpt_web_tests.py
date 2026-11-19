@@ -33,18 +33,31 @@ def pinned_cases() -> list[str]:
     """Verify that the selected upstream files are complete and unmodified."""
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     cases = manifest["cases"]
+    support = support_files(manifest)
     actual = {
         path.relative_to(UPSTREAM).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(UPSTREAM.rglob("*"))
         if path.is_file()
     }
-    if not cases or sorted(set(cases)) != cases or {*cases, HARNESS, LICENSE} != actual.keys():
+    expected = {*cases, *support, HARNESS, LICENSE}
+    if not cases or sorted(set(cases)) != cases or expected != actual.keys():
         raise ValueError("the manifest must list each selected test and its supporting files")
     if actual != manifest["sha256"]:
         raise ValueError("a pinned upstream file differs from the manifest")
     if not re.fullmatch(r"[0-9a-f]{40}", manifest["upstream_revision"]):
         raise ValueError("the upstream revision must be an exact Git commit")
     return cases
+
+
+def support_files(manifest: dict) -> list[str]:
+    """Helper scripts that selected tests load by a relative URL."""
+    support = manifest.get("support", [])
+    if sorted(set(support)) != support:
+        raise ValueError("support files must be sorted and unique")
+    for name in support:
+        if not name.endswith(".js") or set(support) & set(manifest["cases"]):
+            raise ValueError(f"{name}: a support file must be a script, not a case")
+    return support
 
 
 def read_expectations(cases: list[str]) -> dict:
@@ -117,10 +130,17 @@ def run_case(binary: Path, name: str, directory: Path) -> list[dict]:
 
 
 def run(binary: Path, cases: list[str]) -> dict:
+    support = support_files(json.loads(MANIFEST.read_text(encoding="utf-8")))
     with tempfile.TemporaryDirectory(prefix="rustic-wpt-") as temp:
         directory = Path(temp)
         shutil.copyfile(UPSTREAM / HARNESS, directory / "testharness.js")
         shutil.copyfile(FIXTURES / "report.js", directory / "report.js")
+        # Every case shares one directory, so a helper's basename must be unique.
+        names = [Path(name).name for name in support]
+        if len(set(names)) != len(names):
+            raise ValueError("support file basenames must be unique")
+        for name in support:
+            shutil.copyfile(UPSTREAM / name, directory / Path(name).name)
         return {name: run_case(binary, name, directory) for name in cases}
 
 

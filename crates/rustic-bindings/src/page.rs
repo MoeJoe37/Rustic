@@ -24,6 +24,7 @@ mod documents;
 mod dom_rect;
 mod events;
 mod html_collections;
+mod mutation_observer;
 mod selectors;
 mod window;
 
@@ -148,6 +149,7 @@ struct Page {
     wrappers: RefCell<DomHeap>,
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
+    observers: mutation_observer::Observers,
 }
 
 impl ExecutionHost for Page {
@@ -308,6 +310,7 @@ fn install_page(
     computed_style::install(agent)?;
     collections::install(agent)?;
     html_collections::install(agent)?;
+    mutation_observer::install(agent)?;
     install_interface(
         agent,
         "Node",
@@ -336,6 +339,7 @@ fn install_page(
             Ok(())
         },
     )?;
+    install_node_constants(agent)?;
     install_interface(
         agent,
         "Document",
@@ -479,6 +483,7 @@ fn install_page(
     agent.root(Value::object(rects))?;
     let computed_styles = agent.new_weak_map()?;
     agent.root(Value::object(computed_styles))?;
+    let observers = mutation_observer::Observers::new(agent)?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
         main,
@@ -492,6 +497,7 @@ fn install_page(
         wrappers: RefCell::new(wrappers),
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),
+        observers,
     }))
 }
 
@@ -508,6 +514,20 @@ pub fn deliver_input(agent: &mut Agent, target: NodeId, input: &InputEvent) -> J
 /// Deliver a trusted event owned by the scripted document lifecycle.
 pub fn deliver_lifecycle(agent: &mut Agent, event: LifecycleEvent) -> JsResult<()> {
     events::deliver_lifecycle(agent, event)
+}
+
+/// Queue mutation records for edits a host or parser made outside a binding
+/// operation. Call before each microtask checkpoint; a page without
+/// observers returns at once.
+pub fn flush_mutation_records(agent: &mut Agent) -> JsResult<()> {
+    let host = agent.execution_host();
+    let Some(page) = host
+        .as_ref()
+        .and_then(|host| host.as_any().downcast_ref::<Page>())
+    else {
+        return Ok(());
+    };
+    mutation_observer::flush(agent, page)
 }
 
 /// Read and clear the number of exceptions reported by event listeners.
@@ -564,6 +584,41 @@ fn install_interface(
             Ok(())
         },
     )
+}
+
+/// The `Node` node-type constants on the interface object and prototype.
+fn install_node_constants(agent: &mut Agent) -> JsResult<()> {
+    let prototype = prototype(agent, "Node")?;
+    let key = PropertyKey::String(agent.names.constructor);
+    let Some(constructor) = agent.get(prototype, key)?.as_object() else {
+        return agent.type_error("Node constructor is missing");
+    };
+    for (value, name) in [
+        "ELEMENT_NODE",
+        "ATTRIBUTE_NODE",
+        "TEXT_NODE",
+        "CDATA_SECTION_NODE",
+        "ENTITY_REFERENCE_NODE",
+        "ENTITY_NODE",
+        "PROCESSING_INSTRUCTION_NODE",
+        "COMMENT_NODE",
+        "DOCUMENT_NODE",
+        "DOCUMENT_TYPE_NODE",
+        "DOCUMENT_FRAGMENT_NODE",
+        "NOTATION_NODE",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let key = agent.heap.key(name)?;
+        let number = Value::number(f64::from(
+            u8::try_from(value + 1).expect("twelve constants"),
+        ));
+        let desc = PropertyDescriptor::data_with(number, false, true, false);
+        agent.define_property_or_throw(prototype, key, desc)?;
+        agent.define_property_or_throw(constructor, key, desc)?;
+    }
+    Ok(())
 }
 
 fn illegal_constructor(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
@@ -644,7 +699,13 @@ fn with_page<T>(
     else {
         return agent.type_error("no DOM document is attached");
     };
-    operation(agent, page)
+    let result = operation(agent, page);
+    if page.observers.is_active() {
+        // Records are queued as soon as the outermost operation releases the
+        // page, so interested observers see the tree as it was changed.
+        mutation_observer::flush(agent, page)?;
+    }
+    result
 }
 
 fn identity(

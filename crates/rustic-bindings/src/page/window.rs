@@ -96,6 +96,17 @@ pub(super) fn install(agent: &mut Agent, scheduler: bool) -> JsResult<Value> {
         key,
         PropertyDescriptor::data_with(Value::object(computed_style), true, true, true),
     )?;
+    let queue = agent.new_native_function(
+        super::mutation_observer::queue_microtask,
+        "queueMicrotask",
+        1,
+    )?;
+    let key = agent.heap.key("queueMicrotask")?;
+    agent.define_property_or_throw(
+        global,
+        key,
+        PropertyDescriptor::data_with(Value::object(queue), true, true, true),
+    )?;
     if scheduler {
         for (name, function, length) in [
             ("setTimeout", set_timer::<false> as NativeFn, 1),

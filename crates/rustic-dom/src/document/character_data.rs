@@ -1,6 +1,6 @@
 use rustic_base::NodeId;
 
-use super::Document;
+use super::{Document, MutationEntry};
 use crate::{DomError, DomString, NodeKind};
 
 /// A validated code-unit edit. Counts clamp before endpoint/length arithmetic.
@@ -47,10 +47,12 @@ impl Document {
         let bytes = fixed
             .checked_add(value.data_bytes())
             .ok_or(DomError::DataLimit)?;
+        let entry = self.data_entry(id)?;
         self.arena.resize_data(id, bytes)?;
         if changed {
             self.note_mutation();
         }
+        self.push_entry(entry);
         Ok(std::mem::replace(self.character_data_mut(id), value))
     }
 
@@ -58,8 +60,9 @@ impl Document {
     ///
     /// An offset past the end fails. A count past the end is clamped, including
     /// `usize::MAX`. Surrogate halves may be edited individually. Validation and
-    /// capacity reservation precede content/accounting changes. This internal
-    /// operation does not yet update live ranges or queue mutation records.
+    /// capacity reservation precede content/accounting changes. It does not
+    /// update live ranges. An enabled journal records the edit even when the
+    /// replacement equals the existing range, as the DOM queues a record.
     pub fn replace_character_data(
         &mut self,
         id: NodeId,
@@ -70,13 +73,17 @@ impl Document {
         let units = self.character_data(id)?.as_units();
         let len = units.len();
         let plan = EditPlan::new(len, offset, count, value.len())?;
-        if units[offset..plan.end] == *value {
+        let unchanged = units[offset..plan.end] == *value;
+        let entry = self.data_entry(id)?;
+        if unchanged {
+            self.push_entry(entry);
             return Ok(());
         }
         self.prepare_character_edit(id, len, &plan)?;
         self.character_data_mut(id)
             .replace_reserved(offset..plan.end, value, plan.new_len);
         self.note_mutation();
+        self.push_entry(entry);
         Ok(())
     }
 
@@ -97,9 +104,11 @@ impl Document {
             return Ok(());
         }
         let plan = EditPlan::new(len, len, 0, value.encode_utf16().count())?;
+        let entry = self.data_entry(id)?;
         self.prepare_character_edit(id, len, &plan)?;
         self.character_data_mut(id).append_utf8_reserved(value);
         self.note_mutation();
+        self.push_entry(entry);
         Ok(())
     }
 
@@ -139,6 +148,24 @@ impl Document {
             .map_err(|_| DomError::AllocationFailed)?;
         tail.extend_from_slice(suffix);
         let tail = DomString::from_units(tail);
+        let data = self.data_entry(id)?;
+        let insertion = match (&data, parent) {
+            (Some(_), Some(parent)) => Some(MutationEntry::ChildList {
+                target: parent,
+                added: Vec::new(),
+                removed: Vec::new(),
+                previous: Some(id),
+                next,
+            }),
+            _ => None,
+        };
+        let mut added = Vec::new();
+        if insertion.is_some() {
+            self.reserve_journal(2)?;
+            added
+                .try_reserve_exact(1)
+                .map_err(|_| DomError::AllocationFailed)?;
+        }
         let new = self.create_text(DomString::default())?;
         let handle = match prepare(self, new) {
             Ok(handle) => handle,
@@ -163,7 +190,44 @@ impl Document {
         } else if offset != len {
             self.note_mutation();
         }
+        // DOM splitText inserts the new node before replacing the old data.
+        if let Some(MutationEntry::ChildList {
+            target,
+            removed,
+            previous,
+            next,
+            ..
+        }) = insertion
+        {
+            added.push(new);
+            self.push_entry(Some(MutationEntry::ChildList {
+                target,
+                added,
+                removed,
+                previous,
+                next,
+            }));
+        }
+        self.push_entry(data);
         Ok(handle)
+    }
+
+    /// A reserved `characterData` entry holding the current value, if recording.
+    fn data_entry(&mut self, id: NodeId) -> Result<Option<MutationEntry>, DomError> {
+        let Some(old_value) = self.journal_old_data(id)? else {
+            return Ok(None);
+        };
+        self.reserve_journal(1)?;
+        Ok(Some(MutationEntry::CharacterData {
+            target: id,
+            old_value,
+        }))
+    }
+
+    fn push_entry(&mut self, entry: Option<MutationEntry>) {
+        if let Some(entry) = entry {
+            self.push_reserved(entry);
+        }
     }
 
     fn character_data_mut(&mut self, id: NodeId) -> &mut DomString {

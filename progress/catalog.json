@@ -694,8 +694,59 @@
           "label": "Mutation records and observers",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/journal.rs",
+              "marker": "pub enum MutationEntry"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/mutation_observer.rs",
+              "marker": "pub(super) fn flush"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/mutation_observer.rs",
+              "marker": "fn notify"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/journal.rs",
+              "marker": "fn insertion_and_moves_record_removal_then_insertion"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/journal.rs",
+              "marker": "fn cross_document_moves_record_new_identities_in_the_destination"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn records_arrive_in_one_microtask_before_later_promise_jobs"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn removed_nodes_stay_observed_until_the_next_notification"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn observers_survive_collection_through_their_nodes_and_follow_adoption"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/mutation_observers.rs",
+              "marker": "fn parser_insertions_reach_observers_at_the_next_checkpoint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "dom/nodes/MutationObserver-sanity.html"
+            }
+          ]
         },
         {
           "id": "dom.ranges",

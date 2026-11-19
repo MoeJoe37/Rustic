@@ -8,7 +8,7 @@
 
 use rustic_base::NodeId;
 
-use super::Document;
+use super::{Document, MutationEntry};
 use crate::{DomError, Element, NodeKind, ShadowRootMode};
 
 /// The result of [`Document::adopt_node`]: the new root plus an ID map.
@@ -171,20 +171,44 @@ impl Document {
         ids.try_reserve_exact(plan.len())
             .map_err(|_| DomError::AllocationFailed)?;
         ids.extend(plan.iter().map(|item| (item.source, item.source)));
+        // The DOM's removal record: from the old parent, or the fragment's
+        // children. It lists the moved nodes by their new identities.
+        let old = source.live(node);
+        let removal = match (fragment, old.parent()) {
+            (true, _) => Some((node, None, None, roots.capacity())),
+            (false, Some(parent)) => Some((parent, old.previous_sibling(), old.next_sibling(), 1)),
+            (false, None) => None,
+        };
+        let into_self = self.mutation_journal_enabled();
+        let mut removed = Vec::new();
+        let removal = match removal {
+            Some(removal)
+                if (into_self && self.reserve_journal(2)?)
+                    || (!into_self && source.reserve_journal(1)?) =>
+            {
+                removed
+                    .try_reserve_exact(removal.3)
+                    .map_err(|_| DomError::AllocationFailed)?;
+                Some(removal)
+            }
+            _ => None,
+        };
         preflight(plan.len())?;
         let created = self.materialize(plan)?;
         for (pair, &new) in ids.iter_mut().zip(&created) {
             pair.1 = new;
         }
         let root = ids[0].1;
+        if fragment {
+            roots.extend(
+                created
+                    .iter()
+                    .copied()
+                    .filter(|&id| self.is_detached_root(id)),
+            );
+        }
         if let Some((parent, before)) = insert {
             let result = if fragment {
-                roots.extend(
-                    created
-                        .iter()
-                        .copied()
-                        .filter(|&id| self.is_detached_root(id)),
-                );
                 self.insert_forest(parent, before, &roots)
             } else {
                 self.insert_before(parent, root, before)
@@ -192,6 +216,28 @@ impl Document {
             if let Err(error) = result {
                 self.destroy_materialized(&created);
                 return Err(error);
+            }
+        }
+        if let Some((target, previous, next, _)) = removal {
+            if fragment {
+                removed.extend_from_slice(&roots);
+            } else {
+                removed.push(root);
+            }
+            let entry = MutationEntry::ChildList {
+                target,
+                added: Vec::new(),
+                removed,
+                previous,
+                next,
+            };
+            if into_self {
+                // The insertion entry was pushed first; the removal precedes it.
+                let log = self.journal.as_mut().expect("enabled journal");
+                let at = log.len() - usize::from(insert.is_some());
+                log.insert(at, entry);
+            } else {
+                source.push_reserved(entry);
             }
         }
         if fragment {
@@ -230,8 +276,26 @@ impl Document {
         if parent == self.root {
             self.validate_document_order(roots, before)?;
         }
+        let entry = if self.reserve_journal(1)? {
+            let previous = match before {
+                Some(id) => self.live(id).previous_sibling(),
+                None => self.live(parent).last_child(),
+            };
+            Some(MutationEntry::ChildList {
+                target: parent,
+                added: super::journal::nodes(roots)?,
+                removed: Vec::new(),
+                previous,
+                next: before,
+            })
+        } else {
+            None
+        };
         for &root in roots {
             self.link_before(parent, root, before);
+        }
+        if let Some(entry) = entry {
+            self.push_reserved(entry);
         }
         Ok(())
     }

@@ -362,6 +362,13 @@ impl DomHeap {
         Ok(())
     }
 
+    /// The values `node` keeps alive. Removal may reorder them.
+    pub(crate) fn edges(&self, node: NodeId) -> &[Value] {
+        self.bindings
+            .get(&node)
+            .map_or(&[], |bindings| bindings.edges.as_slice())
+    }
+
     /// Remove one node-held edge. Returns whether it existed.
     pub fn remove_edge(&mut self, node: NodeId, value: Value) -> bool {
         let Some(bindings) = self.bindings.get_mut(&node) else {

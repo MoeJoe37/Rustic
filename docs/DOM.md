@@ -32,8 +32,8 @@ These range semantics follow the storage portion of the DOM Standard's
 [replace-data algorithm](https://dom.spec.whatwg.org/#concept-cd-replace), reviewed
 2026-11-08 against the living standard last updated 2026-11-04. This is not a full
 `CharacterData` implementation: Web IDL conversion/exception mapping, live-range
-adjustment, mutation records/observers, text
-splitting and normalization remain pending. No browser conformance suite has
+adjustment and normalization remain pending. Edits record mutation entries
+when the document's journal is enabled ([ADR 0047](adr/0047-mutation-observers.md)). No browser conformance suite has
 been run for this storage subset.
 
 ## Reservation, accounting and ownership

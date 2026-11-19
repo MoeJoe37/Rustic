@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d1c7125ba9201ab3bd9fb49b07c34a1c6e335f6579d2f7714d5b59d8dddc53f4",
-  "percent": "33.21",
-  "verified_percent": "31.89",
+  "source_fingerprint": "4db186be2a85925b9f4e51a76f6396ef0421ad84ac9f253a6079086294faf532",
+  "percent": "33.56",
+  "verified_percent": "32.24",
   "partial_percent": "1.32",
-  "completed": 73,
+  "completed": 74,
   "in_progress": 7,
   "total": 221,
   "fully_complete": false,
@@ -55,10 +55,10 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 7,
+      "completed": 8,
       "total": 12,
-      "percent": "67.14",
-      "verified_percent": "60.06",
+      "percent": "73.80",
+      "verified_percent": "66.72",
       "partial_percent": "7.08"
     },
     {
@@ -848,9 +848,60 @@
           "label": "Mutation records and observers",
           "size": 3,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/journal.rs",
+              "marker": "pub enum MutationEntry"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/mutation_observer.rs",
+              "marker": "pub(super) fn flush"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/mutation_observer.rs",
+              "marker": "fn notify"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/journal.rs",
+              "marker": "fn insertion_and_moves_record_removal_then_insertion"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/journal.rs",
+              "marker": "fn cross_document_moves_record_new_identities_in_the_destination"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn records_arrive_in_one_microtask_before_later_promise_jobs"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn removed_nodes_stay_observed_until_the_next_notification"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn observers_survive_collection_through_their_nodes_and_follow_adoption"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/mutation_observers.rs",
+              "marker": "fn parser_insertions_reach_observers_at_the_next_checkpoint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "dom/nodes/MutationObserver-sanity.html"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.35"
         },
         {
@@ -944,13 +995,13 @@
         }
       ],
       "points": 34,
-      "completed": 7,
+      "completed": 8,
       "in_progress": 1,
       "total": 10,
-      "contribution": "2.85",
-      "percent": "71.32",
-      "verified_percent": "67.64",
-      "partial_percent": "3.68"
+      "contribution": "3.20",
+      "percent": "80.14",
+      "verified_percent": "76.47",
+      "partial_percent": "3.67"
     },
     {
       "id": "html",

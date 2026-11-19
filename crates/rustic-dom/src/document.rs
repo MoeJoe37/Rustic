@@ -9,7 +9,10 @@ use crate::{
 mod adoption;
 mod character_data;
 mod invariants;
+mod journal;
 pub(crate) mod marking;
+
+pub use journal::MutationEntry;
 
 pub use invariants::InvariantViolation;
 
@@ -82,8 +85,9 @@ impl DocumentFormat {
 /// Sole owner of an arena and its tree links; it is deliberately not `Clone`.
 ///
 /// Checked moves operate within one document; [`Self::clone_node`] copies within
-/// a document and [`Self::adopt_node`] moves a subtree between documents. Mutation
-/// observers, bindings and garbage collection are not implemented yet.
+/// a document and [`Self::adopt_node`] moves a subtree between documents. An
+/// optional journal ([`Self::set_mutation_journal`]) records the facts mutation
+/// observers need; observers themselves live in the binding layer.
 #[derive(Debug)]
 pub struct Document {
     arena: Arena,
@@ -93,6 +97,7 @@ pub struct Document {
     format: DocumentFormat,
     child_revision: u64,
     mutation_revision: u64,
+    journal: Option<Vec<MutationEntry>>,
 }
 
 impl Document {
@@ -139,6 +144,7 @@ impl Document {
             format: DocumentFormat::Html,
             child_revision: 0,
             mutation_revision: 0,
+            journal: None,
         })
     }
 
@@ -361,12 +367,32 @@ impl Document {
         ) {
             return Err(DomError::WrongNodeKind);
         }
+        // DOM "replace all": one record lists every removed child and the text.
+        let entry = if self.reserve_journal(1)? {
+            let mut removed = Vec::new();
+            let count = self.children(parent)?.count();
+            removed
+                .try_reserve_exact(count)
+                .map_err(|_| DomError::AllocationFailed)?;
+            removed.extend(self.children(parent)?);
+            let mut added = Vec::new();
+            added
+                .try_reserve_exact(1)
+                .map_err(|_| DomError::AllocationFailed)?;
+            Some((removed, added))
+        } else {
+            None
+        };
         // Append first, so any budget or depth failure preserves every original child.
         let replacement = if value.as_units().is_empty() {
             None
         } else {
             let node = self.create_text(value)?;
-            if let Err(error) = self.append_child(parent, node) {
+            // The DOM suppresses observers for the inner insertion.
+            let journal = self.journal.take();
+            let result = self.append_child(parent, node);
+            self.journal = journal;
+            if let Err(error) = result {
                 self.destroy_unchecked(node);
                 return Err(error);
             }
@@ -379,6 +405,18 @@ impl Document {
         {
             self.unlink(child);
         }
+        if let Some((removed, mut added)) = entry {
+            added.extend(replacement);
+            if !removed.is_empty() || !added.is_empty() {
+                self.push_reserved(MutationEntry::ChildList {
+                    target: parent,
+                    added,
+                    removed,
+                    previous: None,
+                    next: None,
+                });
+            }
+        }
         Ok(())
     }
 
@@ -388,7 +426,9 @@ impl Document {
     /// children move instead, in order, and the fragment stays behind empty.
     /// All hierarchy, cycle, reference, and depth checks happen before unlinking,
     /// so a rejected fragment insertion moves none of its children. This
-    /// low-level operation has no browser callbacks or mutation observers.
+    /// low-level operation has no browser callbacks; with the journal enabled it
+    /// records the DOM's removal and insertion records, even for a move that
+    /// leaves the node where it was.
     pub fn insert_before(
         &mut self,
         parent: NodeId,
@@ -485,8 +525,17 @@ impl Document {
         if parent == self.root {
             self.validate_document_order(&moved, before)?;
         }
+        let entries = self.insertion_entries(parent, child, fragment, &moved, before)?;
+        let child_node = self.live(child);
         if !fragment && child_node.parent() == Some(parent) && child_node.next_sibling() == before {
+            entries
+                .into_iter()
+                .flatten()
+                .for_each(|entry| self.push_reserved(entry));
             return Ok(());
+        }
+        for entry in entries.into_iter().flatten() {
+            self.push_reserved(entry);
         }
 
         for id in moved {
@@ -494,6 +543,54 @@ impl Document {
             self.link_before(parent, id, before);
         }
         Ok(())
+    }
+
+    /// The removal and insertion records for a validated [`Self::insert_before`].
+    fn insertion_entries(
+        &mut self,
+        parent: NodeId,
+        child: NodeId,
+        fragment: bool,
+        moved: &[NodeId],
+        before: Option<NodeId>,
+    ) -> Result<[Option<MutationEntry>; 2], DomError> {
+        if moved.is_empty() || !self.reserve_journal(2)? {
+            return Ok([None, None]);
+        }
+        let node = self.live(child);
+        let removal = match (fragment, node.parent()) {
+            (true, _) => Some(MutationEntry::ChildList {
+                target: child,
+                added: Vec::new(),
+                removed: journal::nodes(moved)?,
+                previous: None,
+                next: None,
+            }),
+            (false, Some(old)) => Some(MutationEntry::ChildList {
+                target: old,
+                added: Vec::new(),
+                removed: journal::nodes(moved)?,
+                previous: node.previous_sibling(),
+                next: node.next_sibling(),
+            }),
+            (false, None) => None,
+        };
+        // The sibling before the insertion point once `child` has been removed.
+        let mut previous = match before {
+            Some(id) => self.live(id).previous_sibling(),
+            None => self.live(parent).last_child(),
+        };
+        if !fragment && previous == Some(child) {
+            previous = self.live(child).previous_sibling();
+        }
+        let insertion = MutationEntry::ChildList {
+            target: parent,
+            added: journal::nodes(moved)?,
+            removed: Vec::new(),
+            previous,
+            next: before,
+        };
+        Ok([removal, Some(insertion)])
     }
 
     /// Unchecked link of a detached node before `before` (or last).
@@ -523,8 +620,22 @@ impl Document {
         if node == self.root {
             return Err(DomError::ProtectedRoot);
         }
-        if self.node(node)?.owner_host().is_some() {
+        let current = self.node(node)?;
+        if current.owner_host().is_some() {
             return Err(DomError::InvalidHierarchy);
+        }
+        if let Some(parent) = current.parent() {
+            let (previous, next) = (current.previous_sibling(), current.next_sibling());
+            if self.reserve_journal(1)? {
+                let entry = MutationEntry::ChildList {
+                    target: parent,
+                    added: Vec::new(),
+                    removed: journal::nodes(&[node])?,
+                    previous,
+                    next,
+                };
+                self.push_reserved(entry);
+            }
         }
         self.unlink(node);
         Ok(())
@@ -599,6 +710,19 @@ impl Document {
             value: value.into(),
         };
         let changed = position.is_none_or(|index| element.attributes[index] != attribute);
+        let entry = if self.reserve_journal(1)? {
+            let element = self.element(id)?;
+            let old_value = position
+                .map(|index| journal::copy_string(&element.attributes[index].value))
+                .transpose()?;
+            Some(MutationEntry::Attribute {
+                target: id,
+                name: attribute.name.clone(),
+                old_value,
+            })
+        } else {
+            None
+        };
         let attribute_bytes = attribute.data_bytes()?;
         let bytes = self
             .node(id)?
@@ -615,6 +739,9 @@ impl Document {
         self.arena.resize_data(id, bytes)?;
         if changed {
             self.note_mutation();
+        }
+        if let Some(entry) = entry {
+            self.push_reserved(entry);
         }
         let attributes = &mut self.element_mut(id).attributes;
         Ok(if let Some(index) = position {
@@ -640,8 +767,21 @@ impl Document {
             return Ok(None);
         };
         let bytes = self.node(id)?.data_bytes - element.attributes[index].data_bytes()?;
+        let entry = if self.reserve_journal(1)? {
+            let attribute = &self.element(id)?.attributes[index];
+            Some(MutationEntry::Attribute {
+                target: id,
+                name: attribute.name.clone(),
+                old_value: Some(journal::copy_string(&attribute.value)?),
+            })
+        } else {
+            None
+        };
         self.arena.resize_data(id, bytes)?;
         self.note_mutation();
+        if let Some(entry) = entry {
+            self.push_reserved(entry);
+        }
         Ok(Some(self.element_mut(id).attributes.remove(index).value))
     }
 

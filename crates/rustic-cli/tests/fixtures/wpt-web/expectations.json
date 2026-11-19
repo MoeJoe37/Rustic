@@ -344,8 +344,7 @@
     },
     {
       "name": "update `id` attribute via element.id",
-      "status": "FAIL",
-      "message": "assert_equals: should get the element with id. expected object \"[object HTMLElement]\" but got null"
+      "status": "PASS"
     },
     {
       "name": "where insertion order and tree order don't match",
@@ -353,8 +352,7 @@
     },
     {
       "name": "Inserting an id by inserting its parent node",
-      "status": "FAIL",
-      "message": "assert_equals: expected object \"[object HTMLElement]\" but got null"
+      "status": "PASS"
     },
     {
       "name": "Document.getElementById must not return nodes not present in document",
@@ -365,6 +363,470 @@
     {
       "name": "querySelectorAll should still work on DocumentFragments after they are modified",
       "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-attributes.html": [
+    {
+      "name": "attributes Element.id: update, no oldValue, mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.id: update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.id: empty string update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.id: same value mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.unknown: IDL attribute no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes HTMLInputElement.type: type update mutation",
+      "status": "FAIL",
+      "message": "assert_equals: mutation records must match expected 2 but got 1"
+    },
+    {
+      "name": "attributes Element.className: new value mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.className: empty string update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.className: same value mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.className: same multiple values mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.classList.add: single token addition mutation",
+      "status": "FAIL",
+      "message": "cannot access property add of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.add: multiple tokens addition mutation",
+      "status": "FAIL",
+      "message": "cannot access property add of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.add: syntax err/no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.classList.add: invalid character/no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.classList.add: same value mutation",
+      "status": "FAIL",
+      "message": "cannot access property add of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.remove: single token removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property remove of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.remove: multiple tokens removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property remove of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.remove: missing token removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property remove of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.toggle: token removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property toggle of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.toggle: token addition mutation",
+      "status": "FAIL",
+      "message": "cannot access property toggle of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.toggle: forced token removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property toggle of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.toggle: forced missing token removal no mutation",
+      "status": "FAIL",
+      "message": "cannot access property toggle of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.toggle: forced existing token addition no mutation",
+      "status": "FAIL",
+      "message": "cannot access property toggle of undefined or null"
+    },
+    {
+      "name": "attributes Element.classList.toggle: forced token addition mutation",
+      "status": "FAIL",
+      "message": "cannot access property toggle of undefined or null"
+    },
+    {
+      "name": "attributes Element.attributes.value: update mutation",
+      "status": "FAIL",
+      "message": "cannot access property length of undefined or null"
+    },
+    {
+      "name": "attributes Element.attributes.value: same id mutation",
+      "status": "FAIL",
+      "message": "cannot access a property of undefined or null"
+    },
+    {
+      "name": "attributes Element.setAttribute: id mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.setAttribute: same class mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.setAttribute: classname mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.removeAttribute: removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.removeAttribute: removal no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList HTMLInputElement.removeAttribute: type removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.setAttributeNS: creation mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.setAttributeNS: prefixed attribute creation mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.removeAttributeNS: removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.removeAttributeNS: removal no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes Element.removeAttributeNS: prefixed attribute removal no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes/attributeFilter Element.id/Element.className: update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes/attributeFilter Element.id/Element.className: multiple filter update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributeOldValue alone Element.id: update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "attributeFilter alone Element.id/Element.className: multiple filter update mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList false: no childList mutation",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-callback-arguments.html": [
+    {
+      "name": "Callback is invoked with |this| value of MutationObserver and two arguments",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-callback-tricky.html": [
+    {
+      "name": "Calling observe in callback should not lead to more calls",
+      "status": "PASS"
+    },
+    {
+      "name": "Disconnect and re-observe in callback should not lead to more calls",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-characterData.html": [
+    {
+      "name": "characterData Text.data: simple mutation without oldValue",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.data: simple mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.appendData: simple mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.appendData: empty string mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.appendData: null string mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.insertData: simple mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.insertData: empty string mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.insertData: null string mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.deleteData: simple mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.deleteData: empty mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.replaceData: simple mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Text.replaceData: empty mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData ProcessingInstruction: data mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "characterData Comment: data mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "Range (r70) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "characterData Range.deleteContents: child and data removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property deleteContents of undefined or null"
+    },
+    {
+      "name": "Range (r71) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "characterData Range.deleteContents: child and data removal mutation (2)",
+      "status": "FAIL",
+      "message": "invalid DOM receiver or node argument"
+    },
+    {
+      "name": "Range (r80) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "characterData Range.extractContents: child and data removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property extractContents of undefined or null"
+    },
+    {
+      "name": "Range (r81) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "characterData Range.extractContents: child and data removal mutation (2)",
+      "status": "FAIL",
+      "message": "invalid DOM receiver or node argument"
+    },
+    {
+      "name": "characterData/characterDataOldValue alone Text.data: simple mutation",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-childList.html": [
+    {
+      "name": "childList Node.nodeValue: no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.textContent: replace content mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.textContent: no previous content mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.textContent: textContent no mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.textContent: empty string mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.normalize mutation",
+      "status": "FAIL",
+      "message": "value is not a function"
+    }
+  ],
+  "dom/nodes/MutationObserver-disconnect.html": [
+    {
+      "name": "subtree mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "disconnect discarded some mutations",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-document.html": [
+    {
+      "name": "setup test",
+      "status": "PASS"
+    },
+    {
+      "name": "parser insertion mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "parser script insertion mutation",
+      "status": "FAIL",
+      "message": "assert_equals: mutation records must match expected 2 but got 1"
+    },
+    {
+      "name": "removal of parent during parsing",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-overlapping-registrations.html": [
+    {
+      "name": "Observers registered on separate targets do not share registrations",
+      "status": "PASS"
+    },
+    {
+      "name": "An observer matching through multiple registrations receives one record with the requested old value",
+      "status": "PASS"
+    },
+    {
+      "name": "Distinct observers matching the same mutation receive records using their own options",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-sanity.html": [
+    {
+      "name": "Should throw if none of childList, attributes, characterData are true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if childList is true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if attributes is true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if characterData is true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if attributeOldValue is true and attributes is omitted",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if characterDataOldValue is true and characterData is omitted",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if attributeFilter is present and attributes is omitted",
+      "status": "PASS"
+    },
+    {
+      "name": "Should throw if attributeOldValue is true and attributes is false",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if attributeOldValue and attributes are both true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should throw if attributeFilter is present and attributes is false",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if attributeFilter is present and attributes is true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should throw if characterDataOldValue is true and characterData is false",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if characterDataOldValue is true and characterData is true",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if attributeOldValue is false and attributes is omitted",
+      "status": "PASS"
+    },
+    {
+      "name": "Should not throw if characterDataOldValue is false and characterData is omitted",
+      "status": "PASS"
+    },
+    {
+      "name": "attributeOldValue:false (present) auto-enables attribute observation",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/MutationObserver-takeRecords.html": [
+    {
+      "name": "unreachabled test",
+      "status": "PASS"
+    },
+    {
+      "name": "All records present",
+      "status": "PASS"
+    },
+    {
+      "name": "No more records present",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Node-mutation-adoptNode.html": [
+    {
+      "name": "simple append of foreign div with text",
+      "status": "PASS"
+    },
+    {
+      "name": "Adopting an element into a different document update's the element's owner doc as well as the owner docs of it's attributes",
+      "status": "FAIL",
+      "message": "cannot access a property of undefined or null"
     }
   ],
   "html/webappapis/animation-frames/callback-handle.html": [

@@ -440,6 +440,10 @@ calls a function value. The design is recorded in
     `Agent::run_jobs()`, a microtask checkpoint; `js_run` and the Test262
     runner call it after the script. Jobs run at the host level, so their
     script collects at its safe points like any other.
+    `Agent::enqueue_microtask(callback, argument)` lets a host queue its own
+    job behind the waiting ones (HTML `queueMicrotask` and mutation-observer
+    delivery use it), and `Agent::iterate_values` gives hosts the Web IDL
+    sequence iteration.
   - A promise is an ordinary object with a boxed record: state, result
     and its reactions (40 bytes each). A promise made by `%Promise%` for
     `then` or an async function has no resolving function objects, since

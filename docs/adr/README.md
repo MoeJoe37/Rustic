@@ -54,6 +54,7 @@ instead of rewriting the history of a decision.
 | [0044](0044-local-html-encoding-replay.md) | Bounded local HTML encoding replay before author script | Accepted for WEB-05 |
 | [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted design for WEB-06; implementation pending |
 | [0046](0046-parse-budget-degradation.md) | Parse budgets degrade: Chromium's depth cap and truncation at the node budget | Accepted for TD-02 (M6 entry) |
+| [0047](0047-mutation-observers.md) | Mutation observers over a document journal, with registrations held as node edges | Accepted for WEB-07 (`dom.observers`) |
 
 ## Records by area
 
@@ -70,6 +71,7 @@ instead of rewriting the history of a decision.
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041, 0044 |
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
+| Observers, errors, focus and forms (M5, WEB-07) | 0047 |
 | Networking and resources (M6) | 0043 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.

@@ -682,6 +682,33 @@ impl Agent {
         }
     }
 
+    /// Queue `callback(argument)` behind the jobs already waiting, as HTML's
+    /// "queue a microtask" does. A value thrown by the callback is discarded,
+    /// like a reaction job without a derived promise; a host that must report
+    /// errors passes a native callback that catches them itself.
+    pub fn enqueue_microtask(
+        &mut self,
+        callback: Value,
+        argument: Value,
+    ) -> Result<(), crate::runtime::OutOfMemory> {
+        self.vm
+            .jobs
+            .try_reserve(1)
+            .map_err(|_| crate::runtime::OutOfMemory)?;
+        self.vm.jobs.push_back(Job::Reaction {
+            reaction: Reaction {
+                handler: callback,
+                kind: crate::runtime::object::ReactionKind::Call,
+                promise: Value::UNDEFINED,
+                resolve: Value::UNDEFINED,
+                reject: Value::UNDEFINED,
+            },
+            fulfilled: true,
+            argument,
+        });
+        Ok(())
+    }
+
     /// Whether promise jobs are waiting.
     pub fn has_pending_jobs(&self) -> bool {
         !self.vm.jobs.is_empty()

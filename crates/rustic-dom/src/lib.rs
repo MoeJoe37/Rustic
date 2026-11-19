@@ -32,7 +32,8 @@ mod traversal;
 
 pub use document::marking::TreeMarks;
 pub use document::{
-    Adopted, Document, DocumentFormat, DocumentLimits, InvariantViolation, ReadyState,
+    Adopted, Document, DocumentFormat, DocumentLimits, InvariantViolation, MutationEntry,
+    ReadyState,
 };
 pub use dump::DumpError;
 pub use error::DomError;

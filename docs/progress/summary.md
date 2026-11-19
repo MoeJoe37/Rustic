@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 33.21%** = 31.89% verified complete + 1.32% partial credit. 73/221 capabilities complete, 7 in progress.
+**Overall completion: 33.56%** = 32.24% verified complete + 1.32% partial credit. 74/221 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `d1c7125ba9201ab3bd9fb49b07c34a1c6e335f6579d2f7714d5b59d8dddc53f4`.
+Catalog: `engine-v4`. Source fingerprint: `4db186be2a85925b9f4e51a76f6396ef0421ad84ac9f253a6079086294faf532`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `d1c7125ba9201ab3bd9fb49b07c34a1c6e335
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 7/12 | 67.14% | 60.06% | 5.29% |
+| M5 Scripted documents | 8/12 | 73.80% | 66.72% | 5.29% |
 | M6 Networking & services | 0/12 | 5.69% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -30,7 +30,7 @@ Catalog: `engine-v4`. Source fingerprint: `d1c7125ba9201ab3bd9fb49b07c34a1c6e335
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | URLs & encoding | 6/12 | 1 | 55.83% | 43.33% | 2% | 1.11 |
-| DOM | 7/10 | 1 | 71.32% | 67.64% | 4% | 2.85 |
+| DOM | 8/10 | 1 | 80.14% | 76.47% | 4% | 3.20 |
 | HTML | 10/11 | 0 | 78.37% | 78.37% | 5% | 3.91 |
 | CSS & style | 8/10 | 2 | 84.18% | 79.59% | 6% | 5.05 |
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
@@ -96,7 +96,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `dom.nodekinds` — Fragments, processing instructions and full node kinds · size 2 · M1 · 0.23% of engine ([source](../../crates/rustic-dom/src/node.rs), [source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/node_kinds.rs), [test](../../crates/rustic-dom/tests/node_kinds.rs))
 - **complete** `dom.adoption` — Adoption, cloning and document lifecycle · size 3 · M1 · 0.35% of engine ([source](../../crates/rustic-dom/src/document/adoption.rs), [source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/adoption.rs), [test](../../crates/rustic-dom/tests/adoption.rs), [test](../../crates/rustic-dom/tests/adoption.rs))
 - **complete** `dom.events` — DOM event propagation and default actions · size 5 · M5 · 0.58% of engine ([source](../../crates/rustic-bindings/src/page/events.rs), [source](../../crates/rustic-bindings/src/page/events/state.rs), [test](../../crates/rustic-bindings/tests/events.rs), [test](../../crates/rustic-bindings/tests/events.rs), [test](../../crates/rustic-bindings/tests/events.rs), [test](../../crates/rustic-bindings/tests/events.rs), [test](../../crates/rustic-bindings/tests/events.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-engine/src/scripting.rs), [source](../../crates/rustic-bindings/src/page/events/input.rs), [test](../../crates/rustic-engine/tests/input.rs), [test](../../crates/rustic-engine/tests/input.rs), [test](../../crates/rustic-engine/tests/input.rs), [test](../../crates/rustic-engine/tests/input.rs), [test](../../crates/rustic-bindings/tests/events.rs))
-- **planned** `dom.observers` — Mutation records and observers · size 3 · M5 · 0.35% of engine
+- **complete** `dom.observers` — Mutation records and observers · size 3 · M5 · 0.35% of engine ([source](../../crates/rustic-dom/src/document/journal.rs), [source](../../crates/rustic-bindings/src/page/mutation_observer.rs), [source](../../crates/rustic-bindings/src/page/mutation_observer.rs), [test](../../crates/rustic-dom/tests/journal.rs), [test](../../crates/rustic-dom/tests/journal.rs), [test](../../crates/rustic-bindings/tests/mutation_observer.rs), [test](../../crates/rustic-bindings/tests/mutation_observer.rs), [test](../../crates/rustic-bindings/tests/mutation_observer.rs), [test](../../crates/rustic-engine/tests/mutation_observers.rs), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json))
 - **planned** `dom.ranges` — Ranges, live collections and traversal APIs · size 3 · M9 · 0.35% of engine
 - **in progress 25.00%** `dom.shadow` — Shadow DOM and custom element lifecycle · size 5 · M9 · 0.58% of engine
   - [x] Shadow roots: attachment, ownership, destruction, dumps, adoption and tracing ([source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-dom/tests/shadow.rs))

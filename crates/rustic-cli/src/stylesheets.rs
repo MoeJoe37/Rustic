@@ -133,7 +133,7 @@ fn root_for(first: Option<&str>) -> Option<PathBuf> {
 
 /// Maximum URL-key size retained in a resource snapshot. Along with the
 /// entry count cap, this also bounds bookkeeping for rejected resources.
-const MAX_APPLIED_URL_BYTES: usize = 4096;
+pub(crate) const MAX_APPLIED_URL_BYTES: usize = 4096;
 
 /// Bytes which have been applied to a scripted local document.
 ///

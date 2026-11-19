@@ -615,7 +615,10 @@ an in-flight first fetch also cannot overwrite a newer published resource. The h
 `ScriptedDocument::apply_resource_completion`, which invalidates the shared
 snapshot and outstanding frame ticket only on success. A CLI integration
 fixture stages changed CSS and PNG files, publishes them in separate host
-epochs, and compares actual styles and image geometry. This is still
+epochs, and compares actual styles and image geometry. The image-specific
+stager uses the existing bounded decoder to reject malformed image replacements
+and decoded-pixel budget failures before publication, retaining the old image
+and frame revision on those errors. This is still
 synchronous first-demand loading: there is **no automatic resource-completion
 queue or delivery during parser turns**.
 

@@ -1237,7 +1237,7 @@ mod tests {
                 .find(|(name, _)| *name == "width")
                 .unwrap()
                 .1
-                .as_str()
+                .clone()
         };
         let initial = layout.measure_layout(tree, mode).unwrap();
         assert_eq!(width(&initial), "21px");

@@ -140,11 +140,15 @@ that styles, image layout and frame tickets change only upon successful
 publication. This shares normal task admission limits, respects previous JS
 microtask checkpoints and can preempt an already-offered render when the
 resource is the next eligible task. Failed and cancelled completions leave
-applied frames unchanged. The loader still fetches on demand and has **no
-asynchronous fetch/notification source or parser resource-delivery integration**.
+applied frames unchanged. The local CLI also discovers linked stylesheets and
+images from the completed HTML DOM and delivers their staged bytes one at a
+time through the document pump, bounded by URL length, per-kind resource
+counts, existing task admission and timer budgets. This end-of-parse path
+coexists with on-demand CSS imports and layout reads. There is **no
+asynchronous fetch/notification source or streaming parser-barrier delivery**.
 
 This is **not** the full decision: CSSOM serialization edge cases,
 pseudo-elements, DOM adoption/GC stress,
-WPT expansion, asynchronous stylesheet/image fetching and parser delivery,
+WPT expansion, asynchronous stylesheet/image fetching and parser-barrier delivery,
 and the remaining resource failure/decoding behaviors still need implementation and
 passing tests. Until those arrive WEB-06 remains open.

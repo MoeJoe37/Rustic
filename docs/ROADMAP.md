@@ -373,7 +373,7 @@ ADR is accepted.
      first-fetched byte snapshots across layout flushes; policy-checked
      replacements can be staged and atomically published through the
      completion boundary (CLI regression fixture), with per-URL stale
-     completion rejection and budget revalidation. Wire automatic
+     completion rejection, budget revalidation and precommit image decoding. Wire automatic
      stylesheet/image completion task delivery into the page pump.
 3. **WEB-07 — observers, errors, focus and forms.**
    - `MutationObserver` records are delivered at the microtask checkpoint in

@@ -1324,17 +1324,26 @@ mod tests {
         assert_eq!(measure(&scripted).offset_widths.get(&image_id), Some(&2));
 
         // A rejected host completion leaves the original render valid.
+        scripted
+            .queue_resource_completion(|| Err::<(), _>(FetchError::Blocked))
+            .unwrap();
         assert_eq!(
-            scripted.apply_resource_completion(|| Err::<(), _>(FetchError::Blocked)),
-            Ok(Err(FetchError::Blocked))
+            scripted.run_next(),
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: false }))
         );
         assert_eq!(scripted.accept_rendered_frame(previous), Ok(true));
 
         scripted.offer_rendering_opportunity().unwrap();
         let stale_css = render(&mut scripted);
+        let css_cache = applied.clone();
+        scripted
+            .queue_resource_completion(move || css_cache.commit(staged_css))
+            .unwrap();
+        // The bounded host task pump publishes the resource without a direct
+        // completion API call or another script execution.
         assert_eq!(
-            scripted.apply_resource_completion(|| applied.commit(staged_css)),
-            Ok(Ok(()))
+            scripted.run_next(),
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: true }))
         );
         assert_eq!(scripted.accept_rendered_frame(stale_css), Ok(false));
         let applied_css = measure(&scripted);
@@ -1342,17 +1351,25 @@ mod tests {
         assert_eq!(applied_css.offset_widths.get(&image_id), Some(&2));
         // A successful completion automatically offers the next render.
         let stable_css = render(&mut scripted);
+        let stale_cache = applied.clone();
+        scripted
+            .queue_resource_completion(move || stale_cache.commit(superseded_css))
+            .unwrap();
         assert_eq!(
-            scripted.apply_resource_completion(|| applied.commit(superseded_css)),
-            Ok(Err(FetchError::Failed))
+            scripted.run_next(),
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: false }))
         );
         assert_eq!(scripted.accept_rendered_frame(stable_css), Ok(true));
 
         scripted.offer_rendering_opportunity().unwrap();
         let stale_image = render(&mut scripted);
+        let image_cache = applied.clone();
+        scripted
+            .queue_resource_completion(move || image_cache.commit(staged_image))
+            .unwrap();
         assert_eq!(
-            scripted.apply_resource_completion(|| applied.commit(staged_image)),
-            Ok(Ok(()))
+            scripted.run_next(),
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: true }))
         );
         assert_eq!(scripted.accept_rendered_frame(stale_image), Ok(false));
         let applied_both = measure(&scripted);

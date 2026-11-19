@@ -98,6 +98,8 @@ pub struct Document {
     child_revision: u64,
     mutation_revision: u64,
     journal: Option<Vec<MutationEntry>>,
+    /// Controls the HTML parser associated with its form element pointer.
+    form_associations: Vec<(NodeId, NodeId)>,
 }
 
 impl Document {
@@ -145,6 +147,7 @@ impl Document {
             child_revision: 0,
             mutation_revision: 0,
             journal: None,
+            form_associations: Vec::new(),
         })
     }
 
@@ -671,6 +674,29 @@ impl Document {
         Ok(())
     }
 
+    /// Record that the HTML parser associated `control` with `form` through
+    /// its form element pointer, for a control that is not the form's
+    /// descendant (`<table><form><tr><td><input>`). Moving the control
+    /// drops the association.
+    pub fn associate_parser_form(&mut self, control: NodeId, form: NodeId) -> Result<(), DomError> {
+        self.element(control)?;
+        self.element(form)?;
+        self.form_associations
+            .try_reserve(1)
+            .map_err(|_| DomError::AllocationFailed)?;
+        self.form_associations.retain(|&(id, _)| id != control);
+        self.form_associations.push((control, form));
+        Ok(())
+    }
+
+    /// The form the parser associated with `control`, while both are live.
+    pub fn parser_form(&self, control: NodeId) -> Option<NodeId> {
+        self.form_associations
+            .iter()
+            .find(|&&(id, form)| id == control && self.node(form).is_ok())
+            .map(|&(_, form)| form)
+    }
+
     /// The removal and insertion records for a validated [`Self::insert_before`].
     fn insertion_entries(
         &mut self,
@@ -950,6 +976,11 @@ impl Document {
     }
 
     fn unlink(&mut self, id: NodeId) {
+        // HTML resets a moved control's form owner; the parser's association
+        // does not survive the control leaving its parent.
+        if !self.form_associations.is_empty() {
+            self.form_associations.retain(|&(control, _)| control != id);
+        }
         let node = self.live(id);
         let (Some(parent), previous, next) =
             (node.parent(), node.previous_sibling(), node.next_sibling())

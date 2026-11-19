@@ -33,6 +33,7 @@ pub use events::LifecycleEvent;
 pub use events::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
+pub use events::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
 pub use events::{InputEvent, KeyInput, Modifiers};
 pub use window::{TimerHandler, WindowScheduler};
 
@@ -438,6 +439,7 @@ fn install_page(
         |agent, proto| events::install_handlers(agent, proto, false),
     )?;
     events::install_controls(agent)?;
+    events::install_forms(agent)?;
     install_interface(
         agent,
         "DocumentFragment",
@@ -560,6 +562,16 @@ pub fn take_console_messages(agent: &Agent) -> ConsoleLog {
     host.as_ref()
         .and_then(|host| host.as_any().downcast_ref::<Page>())
         .map(|page| page.events.reporting.take_console())
+        .unwrap_or_default()
+}
+
+/// Take the form submissions that passed validation since the last call.
+/// Rustic has no navigation yet, so a submission ends here.
+pub fn take_form_submissions(agent: &Agent) -> FormSubmissions {
+    let host = agent.execution_host();
+    host.as_ref()
+        .and_then(|host| host.as_any().downcast_ref::<Page>())
+        .map(|page| page.events.forms.take_submissions())
         .unwrap_or_default()
 }
 
@@ -695,9 +707,17 @@ fn wrap(
         },
         NodeKind::Element(element)
             if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
-                && element.name().local() == "input" =>
+                && matches!(
+                    element.name().local(),
+                    "input" | "textarea" | "button" | "form"
+                ) =>
         {
-            "HTMLInputElement"
+            match element.name().local() {
+                "input" => "HTMLInputElement",
+                "textarea" => "HTMLTextAreaElement",
+                "button" => "HTMLButtonElement",
+                _ => "HTMLFormElement",
+            }
         }
         NodeKind::Element(element)
             if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>

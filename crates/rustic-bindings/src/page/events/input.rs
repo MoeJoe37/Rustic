@@ -119,6 +119,8 @@ pub(in crate::page) fn deliver(agent: &mut Agent, id: NodeId, input: &InputEvent
             modifiers,
         } => {
             if !disabled_click_target(agent, target)? {
+                // A press focuses the clicked area before the click event.
+                super::forms::focus_for_click(agent, target)?;
                 let event = ui::click_event(agent, Some((*client_x, *client_y)), *modifiers)?;
                 fire_trusted(agent, target, event)?;
             }
@@ -153,6 +155,13 @@ fn key_default(
     released: Option<NodeId>,
 ) -> JsResult<()> {
     if key.modifiers.control || key.modifiers.alt || key.modifiers.meta {
+        return Ok(());
+    }
+    if down && is_key(key, "Tab") {
+        return super::forms::navigate(agent, key.modifiers.shift);
+    }
+    // Text controls handle printable keys, Backspace and Enter.
+    if down && super::forms::edit(agent, target, key.key.as_units())? {
         return Ok(());
     }
     let space = is_key(key, " ");
@@ -200,14 +209,14 @@ fn fire_trusted(agent: &mut Agent, target: Value, event: Value) -> JsResult<bool
     })
 }
 
-fn html_element(node: &Node) -> Option<&Element> {
+pub(super) fn html_element(node: &Node) -> Option<&Element> {
     let NodeKind::Element(element) = node.kind() else {
         return None;
     };
     (element.name().namespace() == Some(HTML_NAMESPACE)).then_some(element)
 }
 
-fn attribute<'a>(element: &'a Element, local: &str) -> Option<&'a DomString> {
+pub(super) fn attribute<'a>(element: &'a Element, local: &str) -> Option<&'a DomString> {
     element.attributes().iter().find_map(|attribute| {
         let name = attribute.name();
         (name.namespace().is_none() && name.local() == local).then(|| attribute.value())
@@ -258,7 +267,12 @@ fn enabled_control(
     Ok(control)
 }
 
-fn disabled(agent: &mut Agent, document: &Document, id: NodeId, node: &Node) -> JsResult<bool> {
+pub(super) fn disabled(
+    agent: &mut Agent,
+    document: &Document,
+    id: NodeId,
+    node: &Node,
+) -> JsResult<bool> {
     if html_element(node).is_some_and(|element| attribute(element, "disabled").is_some()) {
         return Ok(true);
     }
@@ -441,6 +455,19 @@ fn checked(agent: &mut Agent, target: Value, _: &[Value]) -> JsResult<Value> {
         }
     }
     Ok(Value::boolean(default))
+}
+
+/// The checkedness of a checkbox or radio input.
+pub(super) fn checked_state(agent: &mut Agent, target: Value) -> JsResult<bool> {
+    checked(agent, target, &[]).map(|value| value == Value::TRUE)
+}
+
+/// Form reset: restore the default checkedness and clear indeterminate.
+pub(super) fn reset_checkedness(agent: &mut Agent, target: Value) -> JsResult<()> {
+    if let Some(record) = record(agent, target)? {
+        record.set(agent, DIRTY_CHECKED, Value::UNDEFINED)?;
+    }
+    Ok(())
 }
 
 fn default_checked(agent: &mut Agent, target: Value, _: &[Value]) -> JsResult<Value> {

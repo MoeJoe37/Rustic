@@ -15,6 +15,7 @@ use crate::webidl::coerce_string;
 use super::{identity, install_interface, prototype, read_node, required_arg, with_page, wrap};
 
 mod errors;
+mod forms;
 mod handlers;
 mod input;
 mod state;
@@ -23,6 +24,8 @@ pub use errors::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
 pub(super) use errors::{report_exception, report_rejections};
+pub(super) use forms::install as install_forms;
+pub use forms::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
 pub(super) use handlers::install as install_handlers;
 pub use input::{InputEvent, KeyInput, Modifiers};
 pub(super) use input::{connected, deliver, install_controls, reaches_root};
@@ -44,6 +47,7 @@ pub(super) struct Events {
     controls: ObjectId,
     pressed_space: Cell<Option<rustic_dom::NodeId>>,
     pub(super) reporting: errors::Reporting,
+    pub(super) forms: forms::Forms,
 }
 
 impl Events {
@@ -54,6 +58,7 @@ impl Events {
         let is_trusted = state::trusted_getter(agent)?;
         let controls = agent.new_weak_map()?;
         let (reporting, [errors, rejections, outstanding]) = errors::Reporting::new(agent)?;
+        let (forms, form_maps) = forms::Forms::new(agent)?;
         let storage = PrivateArray::new(
             agent,
             &[
@@ -65,6 +70,10 @@ impl Events {
                 errors,
                 rejections,
                 outstanding,
+                form_maps[0],
+                form_maps[1],
+                form_maps[2],
+                form_maps[3],
             ],
         )?;
         agent.root(storage.value())?;
@@ -78,6 +87,7 @@ impl Events {
             controls,
             pressed_space: Cell::new(None),
             reporting,
+            forms,
         })
     }
 
@@ -682,10 +692,17 @@ fn fire_with_target(
             let result = dispatch(agent, event, value, key, path);
             event.finish(agent)?;
             let canceled = event.canceled(agent)?;
+            let checkbox_activated = checkbox.is_some();
             if let Some((activation, previous)) = checkbox.zip(previous) {
                 input::finish_activation(agent, activation, previous, canceled || result.is_err())?;
             }
             result?;
+            // Submit and reset buttons run their activation behavior after an
+            // uncanceled click.
+            if click && !canceled && !checkbox_activated {
+                let bubbles = event.bubbles(agent)?;
+                forms::activate_button(agent, path, bubbles)?;
+            }
             Ok(!canceled)
         })
     })

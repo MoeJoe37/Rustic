@@ -185,13 +185,28 @@ error. Describing a value never runs page code. `Node` also has
 `compareDocumentPosition`, `replaceChild` and `normalize`.
 [ADR 0048](adr/0048-error-reporting-and-event-handlers.md)
 
+Focus follows HTML: `focus()`, `blur()`, `click()`, `tabIndex`,
+`document.activeElement` and `hasFocus()`; trusted clicks focus the nearest
+focusable area, and an unhandled Tab or Shift+Tab moves through the tab
+order with `blur`, `focusout`, `focus` and `focusin`. Typing into a focused
+text input or textarea appends text (or deletes with Backspace) between
+`beforeinput` and `input`, and an edited control fires `change` when it
+loses focus. `value`, `defaultValue`, `type` and the reflected attributes
+follow HTML value sanitization. Form owners come from the `form` attribute,
+the nearest form or the parser's form element pointer. `ValidityState`,
+`checkValidity`, `setCustomValidity`, `requestSubmit`, submit buttons and
+implicit submission validate, fire `invalid` and `SubmitEvent`, and give
+the host a `FormSubmission` with the entry list
+(`take_form_submissions`); `reset()` restores defaults. Nothing navigates.
+[ADR 0049](adr/0049-focus-and-forms.md)
+
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
 | Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md), [TD-148](TECH_DEBT.md#td-148--computed-style-snapshots-are-eager-and-copied-per-read), [TD-149](TECH_DEBT.md#td-149--pseudo-element-getcomputedstyle-throws)). | WEB-06 |
 | `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
-| Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
+| Control painting and the rest of forms | Values and focus are not painted or matched by `:focus`/`:invalid`; no `select`, labels or caret (TD-154) | M9 |
 | Error locations, handler content attributes | `ErrorEvent` has no file or line, `onclick="…"` markup is not compiled (TD-152, TD-153) | M6, M9 |
 | Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
 | Network, storage, workers | Not present | M6, M9 |
@@ -322,8 +337,10 @@ same turn budget, so a single call cannot run unmetered.
   `ProcessingInstruction`, `XMLDocument`, `DOMImplementation`, `NodeList`,
   `HTMLCollection`, `Window`, `Event`, `CustomEvent`, `UIEvent`, `MouseEvent`,
   `PointerEvent`, `KeyboardEvent`, `ErrorEvent`, `PromiseRejectionEvent`,
-  `MutationObserver`, `MutationRecord`, `DOMException`, the `console`
-  namespace and the checkbox state of `HTMLInputElement`. IMPLEMENTATION.md lists the members of each; treat that
+  `FocusEvent`, `InputEvent`, `SubmitEvent`, `MutationObserver`,
+  `MutationRecord`, `ValidityState`, `HTMLInputElement`,
+  `HTMLTextAreaElement`, `HTMLButtonElement`, `HTMLFormElement`,
+  `DOMException` and the `console` namespace. IMPLEMENTATION.md lists the members of each; treat that
   list, not this one, as the contract.
 - **Selectors** ([ADR 0030](adr/0030-dom-selectors-and-node-lists.md)).
   `querySelector`, `querySelectorAll`, `matches` and `closest` use the same
@@ -380,6 +397,7 @@ and `AbortSignal` listener removal are TD-131.
 | Events | `crates/rustic-bindings/tests/events.rs` |
 | Error reporting, handlers and console | `crates/rustic-bindings/tests/errors.rs`, `crates/rustic-engine/tests/error_reporting.rs` |
 | Node tree members | `crates/rustic-bindings/tests/node_tree.rs` |
+| Focus, editing, validation and submission | `crates/rustic-engine/tests/forms.rs`; parser form association in `crates/rustic-style/tests/invalidation.rs` |
 | Mutation journal, observers and `queueMicrotask` | `crates/rustic-dom/tests/journal.rs`, `crates/rustic-bindings/tests/mutation_observer.rs`, `crates/rustic-engine/tests/mutation_observers.rs` |
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
 
@@ -393,7 +411,8 @@ the updated pixels to an independently parsed document containing the expected
 markup. Both targets replay 128 deterministic seeds before mutations.
 The scripted reftests cover the counter, timer, event bubbling and stylesheet
 and tree updates at device scales one and two. The form-validation fixture
-depends on WEB-07.
+checks `requestSubmit`, `invalid` events and `checkValidity` against a
+static reference.
 
 ### Pinned Window web-platform-tests
 
@@ -402,7 +421,7 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 `html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
 configured to require an exact match to the checked-in **59 files,
-342 subtests, 271 passes and 71 expected failures**. The expectations record the names and diagnoses
+342 subtests, 272 passes and 70 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -450,7 +469,6 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 
 | Entry | What | Due |
 | --- | --- | --- |
-| TD-31 | Form owners ignore the parser's form pointer | WEB-07 |
 | TD-118 | A realm is never freed while its agent lives | Before frames (M6) |
 | TD-124 | `DOMException` extras | M9 |
 | TD-126 | Hand-bound subset of interfaces | Each new interface family |
@@ -468,6 +486,7 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 | TD-151 | Parser and host records resolve observers when drained | M9 HTML lifecycle |
 | TD-152 | Error reports lack locations; console has no formatter | M6 navigation |
 | TD-153 | Handler content attributes and remaining handler names | M9 HTML lifecycle |
+| TD-154 | Focus and validity are not style states; no select, labels or caret | M9 HTML lifecycle |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

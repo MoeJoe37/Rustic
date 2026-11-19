@@ -621,3 +621,20 @@ fn empty_ancestor_sibling_subjects_change_after_text_and_child_list_edits() {
         page.restyle();
     }
 }
+
+#[test]
+fn parser_associated_controls_use_the_form_element_pointer() {
+    // The button is not the form's descendant: the parser's form element
+    // pointer associates it, so it is the form's default button (TD-31).
+    let page = Page::new(
+        "<table><form id=f><tr><td><button id=b>go</button></td></tr></form></table>\
+         <button id=loose>no form</button>",
+        ":default { color: red }",
+    );
+    let form = by_id(&page.document, "f");
+    let button = by_id(&page.document, "b");
+    assert_ne!(page.document.node(button).unwrap().parent(), Some(form));
+    assert_eq!(page.document.parser_form(button), Some(form));
+    assert_eq!(page.color("b"), "rgb(255, 0, 0)");
+    assert_eq!(page.color("loose"), "rgb(0, 0, 0)");
+}

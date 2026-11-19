@@ -765,11 +765,51 @@ combined entry, including for `replaceChild(x, x)`.
 Open debt: [TD-152](TECH_DEBT.md#td-152--error-reports-lack-source-locations-and-console-formatting),
 [TD-153](TECH_DEBT.md#td-153--event-handler-content-attributes-and-remaining-handler-names).
 
+## WEB-07 — Focus, text controls and forms
+
+The main document has one focused area. `focus()`, `blur()`, `click()` and
+`tabIndex` are on HTMLElement; `activeElement` and `hasFocus()` on
+Document. Focusable areas are HTML elements with a valid `tabindex`,
+`a`/`area` with `href`, `button`, `select`, `textarea`, `summary` and
+non-hidden inputs, minus disabled controls. Focus changes fire `change` for
+an edited text control, then `blur` and `focusout`, then `focus` and
+`focusin`, with `relatedTarget`. Trusted clicks focus the nearest focusable
+inclusive ancestor or the viewport before `click`; an uncanceled Tab or
+Shift+Tab follows positive `tabindex` order, then tree order, and wraps.
+
+`HTMLInputElement`, `HTMLTextAreaElement`, `HTMLButtonElement` and
+`HTMLFormElement` are exposed. Values live in GC-traced records keyed by
+the wrapper, with HTML value sanitization for text, search, tel, password,
+url, email and number. Trusted keys edit a text control at the end of its
+value between a cancelable `beforeinput` and `input` InputEvent, respect
+`maxlength`, `readonly` and `disabled`, insert line breaks in a textarea,
+and run implicit submission on Enter in a single-line input. Form owners
+come from the `form` attribute, the nearest form, or the parser's form
+element pointer, which `Document::associate_parser_form` records for
+listed controls outside the form (TD-31 paid; style uses it too).
+
+`ValidityState` computes `valueMissing` (with radio groups),
+`typeMismatch` for email and url, `tooLong` and `tooShort` after user
+edits, range underflow and overflow, and custom errors; `willValidate`,
+`validationMessage`, `checkValidity`, `reportValidity` and
+`setCustomValidity` follow HTML. `requestSubmit`, submit buttons and
+implicit submission validate unless `novalidate` or `formnovalidate` is
+set, fire `invalid` and a cancelable `SubmitEvent`, and record a
+`FormSubmission` (form, submitter, method, action, entry list) that hosts
+take with `ScriptedDocument::take_form_submissions`; at most 64 wait, and
+more are counted as dropped. `submit()` skips validation and the event;
+`reset()` fires `reset` and restores values and checkedness. `elements`
+is a live HTMLCollection. `FocusEvent`, `InputEvent` and `SubmitEvent` have
+constructors. The `form-validation` scripted reftest is the M5 demo.
+
+[ADR 0049](adr/0049-focus-and-forms.md). Open debt:
+[TD-154](TECH_DEBT.md#td-154--form-and-focus-gaps-outside-the-m5-scope).
+
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 59 Window WPT files. It reports 342 subtests, including 271
-passes and 71 expected failures. The runner checks vendored files by digest and
+baseline for 59 Window WPT files. It reports 342 subtests, including 272
+passes and 70 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.

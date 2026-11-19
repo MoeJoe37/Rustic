@@ -201,7 +201,40 @@ impl TreeBuilder {
         if ns == Ns::Html && tag.name() == "option" {
             self.option_inserted(id);
         }
+        if ns == Ns::Html {
+            self.associate_form(tag, id)?;
+        }
         Ok(id)
+    }
+
+    /// HTML "create an element for a token" step 13 for listed controls: the
+    /// form element pointer, unless a template is open or the token names a
+    /// form itself. Descendants of the form need no record.
+    fn associate_form(&mut self, tag: &Tag, id: NodeId) -> Result<(), ParseError> {
+        const LISTED: [&str; 7] = [
+            "button", "fieldset", "input", "object", "output", "select", "textarea",
+        ];
+        let Some(form) = self.form else {
+            return Ok(());
+        };
+        if !LISTED.contains(&tag.name())
+            || tag
+                .attributes()
+                .iter()
+                .any(|attribute| attribute.name() == "form")
+            || self.has_open("template")
+        {
+            return Ok(());
+        }
+        let mut ancestor = self.document.node(id)?.parent();
+        while let Some(current) = ancestor {
+            if current == form {
+                return Ok(());
+            }
+            ancestor = self.document.node(current)?.parent();
+        }
+        self.document.associate_parser_form(id, form)?;
+        Ok(())
     }
 
     pub(super) fn insert_html(&mut self, tag: &Tag) -> Result<NodeId, ParseError> {

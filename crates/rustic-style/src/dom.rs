@@ -123,6 +123,11 @@ impl ElementView for DomElement<'_> {
         self.element_at(self.node.next_sibling(), Node::next_sibling)
     }
 
+    fn parser_form(&self) -> Option<Self> {
+        let form = self.document.parser_form(self.id)?;
+        Self::with_work(self.document, form, self.work)
+    }
+
     fn parent_shadow_host(&self) -> Option<Self> {
         let parent = self.document.node(self.node.parent()?).ok()?;
         Self::with_work(self.document, parent.shadow_host()?, self.work)

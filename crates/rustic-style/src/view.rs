@@ -78,6 +78,13 @@ pub trait ElementView: Copy + Eq + std::hash::Hash {
     /// are ignored).
     fn is_empty(&self) -> bool;
 
+    /// The form the HTML parser associated with this control through its
+    /// form element pointer, when the control is not that form's
+    /// descendant. Views without parser state have none.
+    fn parser_form(&self) -> Option<Self> {
+        None
+    }
+
     /// Whether the element is in a user-interaction state. Without an
     /// interaction model, nothing is.
     fn in_state(&self, state: ElementState) -> bool {

@@ -4566,8 +4566,54 @@
           "label": "Forms, focus, editing and user input",
           "size": 5,
           "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/forms.rs",
+              "marker": "fn move_focus"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/forms.rs",
+              "marker": "fn submit("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub fn associate_parser_form"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/forms.rs",
+              "marker": "fn tab_moves_focus_in_tree_order_with_focus_events"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/forms.rs",
+              "marker": "fn typing_edits_values_with_input_events_and_change_on_blur"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/forms.rs",
+              "marker": "fn enter_submits_after_validation_and_the_host_receives_the_entries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/forms.rs",
+              "marker": "fn script_apis_follow_value_owner_and_validity_rules"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn parser_associated_controls_use_the_form_element_pointer"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/reftests.rs",
+              "marker": "form-validation.html"
+            }
+          ]
         },
         {
           "id": "web.observers",

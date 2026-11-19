@@ -388,8 +388,7 @@
     },
     {
       "name": "attributes HTMLInputElement.type: type update mutation",
-      "status": "FAIL",
-      "message": "assert_equals: mutation records must match expected 2 but got 1"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.className: new value mutation",

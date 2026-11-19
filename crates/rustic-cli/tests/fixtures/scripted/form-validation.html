@@ -1,0 +1,37 @@
+<!doctype html>
+<link rel="match" href="form-validation-ref.html">
+<style>
+  form { display: none }
+  .bar { display: block; height: 8px; width: 16px; background: gray }
+</style>
+<form id="signup">
+  <input id="name" name="name" required minlength="2">
+  <input id="mail" name="mail" type="email" required>
+  <input id="age" name="age" type="number" min="18" max="130">
+  <button id="send">Send</button>
+</form>
+<div class="bar" id="name-state"></div>
+<div class="bar" id="mail-state"></div>
+<div class="bar" id="age-state"></div>
+<div class="bar" id="submit-state"></div>
+<script>
+  const form = document.getElementById('signup');
+  const field = (id) => document.getElementById(id);
+  const paint = (id, ok) => field(id).setAttribute('style', 'background: ' + (ok ? 'green' : 'red'));
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    paint('submit-state', true);
+  });
+  form.addEventListener('invalid', (event) => paint(event.target.id + '-state', false), true);
+  // Every field fails: a missing name, a malformed address, an age below min.
+  field('mail').value = 'not-an-address';
+  field('age').value = '12';
+  form.requestSubmit();
+  // Fix two fields; the address still fails, so nothing is submitted.
+  field('name').value = 'Ada';
+  field('age').value = '36';
+  for (const id of ['name', 'mail', 'age']) {
+    if (field(id).checkValidity()) paint(id + '-state', true);
+  }
+  form.requestSubmit(field('send'));
+</script>

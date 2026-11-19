@@ -56,7 +56,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134, TD-149 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
+| M5, with WEB-06 and WEB-07 | TD-131, TD-132, TD-134, TD-149 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-15, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
@@ -64,7 +64,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151, TD-153 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -110,7 +110,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Paid |
 | TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Paid |
 | TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
-| TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Open, pay with WEB form association |
+| TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Paid |
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
 | TD-34 | Watch | Style | Container conditions were tested before selectors; nearest-container lookup is still per rule | Partly paid |
@@ -217,6 +217,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M6 navigation |
 | TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled, body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
+| TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -634,7 +635,7 @@ per-element ancestor/sibling bloom filters or the invalidation-time `:has()`
 indexes that engines use. **Trigger:** CSS-06 invalidation work on `:has()`, or
 a measured slow page.
 
-### TD-31 — Form owners ignore the parser's form element pointer
+### TD-31 — Form owners ignore the parser's form element pointer (Paid)
 
 `:default`, `:checked` and `:indeterminate` need form owners (default buttons,
 radio groups). Rustic resolves an owner from the `form` attribute or the
@@ -645,6 +646,14 @@ controls get no owner. **Pay:** record parser-set form owners on the element
 when form association (`HTMLFormElement.elements`) is implemented.
 **Trigger:** WEB-series form APIs, or the first test that needs parser
 association.
+
+**Paid 2026-11-19 (WEB-07).** The tree builder records the form element
+pointer for listed controls outside the form with
+`Document::associate_parser_form`; style (`:default`, radio groups) and the
+form bindings use it after the `form` attribute and the ancestor form. A
+control that leaves its parent loses the association, as HTML resets its
+owner; an ancestor's move does not yet clear it
+([ADR 0049](adr/0049-focus-and-forms.md)).
 
 ### TD-32 — `:has()` and element states invalidate the whole document (Paid)
 
@@ -2037,7 +2046,9 @@ descriptors with the corresponding Web Platform Tests.
 
 WEB-04 now dispatches trusted primary clicks and key events from the host
 queue, with button keyboard activation and reversible checkbox activation.
-Complete focus targeting and pressed-key reset on focus changes with WEB-07.
+Focus, Tab navigation and click focusing landed with WEB-07
+([ADR 0049](adr/0049-focus-and-forms.md)); pressed-key reset on focus
+changes remains.
 Extend the input model for pointer sequences, mouse and pointer attributes,
 text input, IME, and additional control defaults when the corresponding host
 and form APIs land. HTML input cloning still needs to copy mutable
@@ -2395,4 +2406,23 @@ raw-handler rules, forward the body handlers, generate the handler list
 from the pinned IDL, adopt then replace in one DOM operation, and
 preflight the total normalized size.
 **Trigger:** M9 HTML lifecycle work, or the first WPT case that needs one.
+
+### TD-154 — Form and focus gaps outside the M5 scope
+
+WEB-07 implements focus, text editing at the end of the value, form owners,
+constraint validation and submission without navigation
+([ADR 0049](adr/0049-focus-and-forms.md)). Not done: `:focus`,
+`:focus-within`, `:focus-visible`, `:valid`/`:invalid` and dirty
+checkedness are not passed to style, and focus changes do not invalidate
+frames; control values and carets are not painted; `select`/`option`,
+`label`, `output`, `autofocus`, selection APIs and caret movement are
+missing; `pattern` (needs a `v`-flag RegExp from the bindings), `step` and
+`badInput` validity are always false; removing the focused element moves
+focus without firing `blur`; radio groups do not move with arrow keys.
+**Pay:** feed a per-element state set from the bindings into the style
+view and the frame revision, paint text control values, add the remaining
+controls and the selection model, and compile `pattern` through the JS
+RegExp engine.
+**Trigger:** M9 HTML lifecycle and forms work, or the first WPT form case
+that needs one.
 

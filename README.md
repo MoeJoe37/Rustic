@@ -38,7 +38,9 @@ A rendering turn gives the host the live tree to render again in full. Hosts
 can opt into running inline and local external classics and static JavaScript
 modules, with document and script readiness events. `rustic render --run-scripts`
 can render the resulting page. Scripts can observe mutations with
-`MutationObserver`. Style and layout invalidation, forms and focus are still on the
+`MutationObserver`, report errors to `window.onerror`, move focus and
+validate and submit forms without navigation. Style and layout
+invalidation and rendering observers are still on the
 [M5 roadmap](docs/ROADMAP.md#8-m5--scripted-document-integration).
 M6 entry work has started alongside M5 where it does not depend on scripting:
 Rustic now decodes and encodes all 40 [Encoding Standard](docs/ENCODING.md)
@@ -52,7 +54,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 33.56%** (32.24% verified complete + 1.32% partial credit) — 74/221 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 73.80% done.
+**Overall engine completion: 34.19%** (32.86% verified complete + 1.33% partial credit) — 75/221 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 85.61% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

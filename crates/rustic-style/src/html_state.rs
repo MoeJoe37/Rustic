@@ -204,12 +204,13 @@ impl<E: ElementView> TreeFacts<E> {
 
     /// A form-associated element's form owner: the element its `form`
     /// attribute names if that is a form, otherwise its nearest form
-    /// ancestor. The parser's form element pointer is not recorded in the
-    /// DOM, so parser association of non-descendants is missed (TD-31).
+    /// ancestor, otherwise the form the parser associated it with.
     fn form_owner(&self, e: E) -> Option<E> {
         match attr(&e, "form") {
             Some(id) => self.ids.get(id).copied().filter(|f| is_html(f, "form")),
-            None => parent_chain(e).find(|a| is_html(a, "form")),
+            None => parent_chain(e)
+                .find(|a| is_html(a, "form"))
+                .or_else(|| e.parser_form()),
         }
     }
 }

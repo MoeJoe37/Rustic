@@ -706,6 +706,14 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or_else(|_| page::ConsoleLog::default(), page::take_console_messages)
     }
 
+    /// Take the form submissions that passed validation; nothing navigates.
+    pub fn take_form_submissions(&self) -> page::FormSubmissions {
+        self.agent.as_ref().map_or_else(
+            |_| page::FormSubmissions::default(),
+            page::take_form_submissions,
+        )
+    }
+
     /// Read and clear uncaught exceptions from animation frame callbacks.
     pub fn take_animation_error_count(&mut self) -> u64 {
         std::mem::take(&mut self.animation_errors)

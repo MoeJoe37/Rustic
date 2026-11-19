@@ -41,6 +41,7 @@ fn the_scripted_demos_match_static_references() {
     for name in [
         "counter.html",
         "event-bubbling.html",
+        "form-validation.html",
         "style-mutation.html",
         "timer.html",
     ] {

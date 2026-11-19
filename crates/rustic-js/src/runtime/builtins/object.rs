@@ -332,10 +332,15 @@ fn prevent_extensions(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
 /// `Object.fromEntries(iterable)` (§20.1.2.7), over arrays and other
 /// array-likes until iterators of every kind exist (JS-05).
 fn from_entries(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    // `AddEntriesFromIterable` (§24.1.1.2): each entry is handled as it
+    // arrives, and an abrupt completion closes the iterator.
     let iterable = agent.require_object_coercible(arg(args, 0))?;
     let o = agent.new_object()?;
-    let items = super::function::create_list_from_array_like(agent, iterable)?;
-    for entry in items {
+    let iterator_key = PropertyKey::Symbol(agent.symbols.iterator);
+    let Some(method) = agent.get_method(iterable, iterator_key)? else {
+        return agent.type_error("Object.fromEntries: value is not iterable");
+    };
+    super::iterate(agent, iterable, method, |agent, entry| {
         let Some(entry) = entry.as_object() else {
             return agent.type_error("Object.fromEntries: an entry is not an object");
         };
@@ -343,7 +348,8 @@ fn from_entries(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> 
         let v = agent.get(entry, PropertyKey::Index(1))?;
         let key = agent.to_property_key(k)?;
         agent.create_data_property_or_throw(o, key, v)?;
-    }
+        Ok(true)
+    })?;
     Ok(Value::object(o))
 }
 

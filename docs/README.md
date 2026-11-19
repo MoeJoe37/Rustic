@@ -109,7 +109,7 @@ an earlier one's "remaining" notes.
 | CSS | 8,041 color cases; 1,115 of 1,455 in-scope pinned WPT parsing cases with a reasoned ratchet |
 | Layout and paint | Exact-geometry tests, checked reftests, 38 of 91 static css-flexbox WPT pages |
 | Text | Shaping compared against 30 committed HarfBuzz reference cases |
-| JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required; 21,939 of the 22,427 that run pass (97.8%); 17,523 of 18,791 in the gated `test/built-ins` areas pass (93.3%); 1,240 of 1,326 in the gated `test/intl402` areas pass (93.5%); all 696 executed module files pass. Eight benchmark workloads with pinned checksums and a committed heap-size report |
+| JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required; 21,939 of the 22,427 that run pass (97.8%); 17,536 of 18,791 in the gated `test/built-ins` areas pass (93.3%); 1,240 of 1,326 in the gated `test/intl402` areas pass (93.5%); all 696 executed module files pass. Eight benchmark workloads with pinned checksums and a committed heap-size report |
 | Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock; binding tests for identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles. No WPT `dom/` or `html/` results yet (`web.conformance`) |
 | Robustness | 24 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
 | Platforms | Native tests on x64/ARM64 Linux, Windows and macOS; emulated 32-bit ARM/x86, RISC-V and big-endian; cross-checks for Android, iOS and eight more targets |

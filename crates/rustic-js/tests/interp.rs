@@ -1522,6 +1522,16 @@ fn collections_and_reflect() {
          out.push(new WeakMap().has(g), new WeakMap().set(u, 2).get(u), new WeakSet().add(u).has(u)); out.join()",
         "TypeError,TypeError,TypeError,TypeError,TypeError,false,2,true",
     );
+    // Object.fromEntries reads an iterable and closes it on a bad entry;
+    // Object.prototype's prototype is immutable.
+    check(
+        "var closed = 0, it = { [Symbol.iterator]() { return { next() { return { value: 1, done: false } }, return() { closed++; return {} } } } }; \
+         var r; try { Object.fromEntries(it) } catch (e) { r = e.name } \
+         var m = Object.fromEntries(new Map([['a', 1]])); \
+         var s; try { Object.setPrototypeOf(Object.prototype, {}) } catch (e) { s = e.name } \
+         [r, closed, m.a, s, Reflect.setPrototypeOf(Object.prototype, {}), Reflect.setPrototypeOf(Object.prototype, null)].join()",
+        "TypeError,1,1,TypeError,false,true",
+    );
     check(
         "var r; try { Map() } catch (e) { r = e.name } r + (new (class extends Set {})([1]) instanceof Set)",
         "TypeErrortrue",

@@ -634,6 +634,10 @@ impl Agent {
     fn create_intrinsics(&mut self, registry: Option<ObjectId>) -> JsResult<()> {
         let h = &mut self.heap;
         let object_prototype = h.alloc_object(Object::new(Class::Ordinary, None))?;
+        // `%Object.prototype%` is an immutable prototype exotic object
+        // (§10.4.7): its [[Prototype]] stays null.
+        h.object_mut(object_prototype)
+            .set_flag(super::object::FLAG_IMMUTABLE_PROTO, true);
         let mut function = Object::new(Class::Function, Some(object_prototype));
         function.extra_mut().native = Some(|_, _, _| Ok(Value::UNDEFINED));
         let function_prototype = h.alloc_object(function)?;

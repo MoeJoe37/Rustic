@@ -200,8 +200,10 @@ fn install_longhand_getters(agent: &mut Agent, prototype: ObjectId) -> JsResult<
                 );
                 let getter_root = agent.root(getter)?;
                 let installed = (|| {
-                    for name in [canonical, camel.as_str()] {
-                        if name == canonical && canonical == camel.as_str() {
+                    for (index, name) in [canonical, camel.as_str()].into_iter().enumerate() {
+                        // A one-word longhand has identical CSS and IDL spellings:
+                        // install it once, rather than accidentally skipping both.
+                        if index == 1 && canonical == camel {
                             continue;
                         }
                         let key = agent.heap.key(name)?;

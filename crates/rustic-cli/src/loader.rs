@@ -815,15 +815,26 @@ fn block_layout(
         ..
     } = input;
     let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
-    let images = crate::images::load_applied(
-        document,
-        &tree,
-        &canonical,
-        limits.images,
-        limits.read_chunk_bytes,
-        cancellation,
-        applied_files,
-    );
+    let images = if let Some(applied) = applied_files {
+        crate::images::load_applied(
+            document,
+            &tree,
+            &canonical,
+            limits.images,
+            limits.read_chunk_bytes,
+            cancellation,
+            Some(applied),
+        )
+    } else {
+        crate::images::load(
+            document,
+            &tree,
+            &canonical,
+            limits.images,
+            limits.read_chunk_bytes,
+            cancellation,
+        )
+    };
     if !images.sizes.is_empty() {
         tree.set_natural_sizes(&images.sizes)
             .map_err(LoadError::Layout)?;

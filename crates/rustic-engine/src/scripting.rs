@@ -849,33 +849,36 @@ impl<C: Clock> ScriptedDocument<C> {
             return Ok(None);
         };
 
-        if let Task::ResourceCompletion(commit) = task {
-            // Resource delivery is its own host task, not JS execution. All
-            // prior JS checkpoints have finished before this point. Reuse
-            // the same commit-before-revision publication contract as direct
-            // host completions; failed commits do not schedule frames.
-            let applied = self
-                .apply_resource_completion(|| {
-                    if commit.apply() { Ok(()) } else { Err(()) }
-                })?
-                .is_ok();
-            if applied {
-                self.rendering.after_script();
+        match task {
+            Task::ResourceCompletion(commit) => {
+                // Resource delivery is its own host task, not JS execution.
+                // All previous JS checkpoints finished before this boundary.
+                // The shared publication API changes the revision and queues
+                // a frame only if the already-staged commit succeeds.
+                let applied = self
+                    .apply_resource_completion(|| {
+                        if commit.apply() { Ok(()) } else { Err(()) }
+                    })?
+                    .is_ok();
+                if applied {
+                    self.rendering.after_script();
+                }
+                Ok(Some(ScriptTurn::ResourceCompletion { applied }))
             }
-            return Ok(Some(ScriptTurn::ResourceCompletion { applied }));
+            task => {
+                self.begin_turn()?;
+                let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+                let result = match task {
+                    Task::Script(source) => agent.evaluate_source(&source).map(|_| ()),
+                    Task::Timer(timer) => timer.run(agent, &self.pending),
+                    Task::Input { target, event } => {
+                        page::deliver_input(agent, target, &event).map_err(EvalError::from)
+                    }
+                    Task::ResourceCompletion(_) => unreachable!("handled above"),
+                };
+                self.finish_script_turn(result).map(Some)
+            }
         }
-
-        self.begin_turn()?;
-        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        let result = match task {
-            Task::Script(source) => agent.evaluate_source(&source).map(|_| ()),
-            Task::Timer(timer) => timer.run(agent, &self.pending),
-            Task::Input { target, event } => {
-                page::deliver_input(agent, target, &event).map_err(EvalError::from)
-            }
-            Task::ResourceCompletion(_) => unreachable!("handled before JS task"),
-        };
-        self.finish_script_turn(result).map(Some)
     }
 
     fn finish_script_turn(

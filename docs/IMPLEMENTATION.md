@@ -805,6 +805,22 @@ constructors. The `form-validation` scripted reftest is the M5 demo.
 [ADR 0049](adr/0049-focus-and-forms.md). Open debt:
 [TD-154](TECH_DEBT.md#td-154--form-and-focus-gaps-outside-the-m5-scope).
 
+## WEB-07 — ResizeObserver in rendering turns
+
+`ResizeObserver`, `ResizeObserverEntry` (`target`, `contentRect`,
+`borderBoxSize`, `contentBoxSize`, `devicePixelContentBoxSize` as frozen
+arrays) and `ResizeObserverSize` are exposed. After a rendering turn's
+animation frame callbacks, the scripted document gathers observations
+whose observed box changed, broadcasts them per observer in creation order
+with `(entries, observer)`, repeats for deeper targets, and reports
+"ResizeObserver loop completed with undelivered notifications." when some
+were skipped; a checkpoint follows before rendering. Sizes come from
+`LayoutGeometry::box_sizes` (content box, border box, padding offset) in
+the shared layout snapshot; the CLI fills it from block fragments.
+
+[ADR 0050](adr/0050-resize-observer.md). Open debt:
+[TD-155](TECH_DEBT.md#td-155--resizeobserver-lifetime-and-geometry-approximations).
+
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact

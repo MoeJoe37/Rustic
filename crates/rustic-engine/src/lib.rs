@@ -23,7 +23,7 @@ pub use inline_scripts::{ClassicScriptLoad, InlineScriptLoad, ScriptLoadError};
 pub use layout_reads::{LayoutGeometry, LayoutSource, MAX_LAYOUT_FLUSHES_PER_TURN};
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use rustic_bindings::page::{
-    ComputedStyleSnapshot, ConsoleLevel, ConsoleLog, ConsoleMessage, FormSubmission,
+    BoxSizes, ComputedStyleSnapshot, ConsoleLevel, ConsoleLog, ConsoleMessage, FormSubmission,
     FormSubmissions, InputEvent, KeyInput, LayoutReadError, Modifiers,
 };
 pub use scripting::{

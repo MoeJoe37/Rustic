@@ -23,7 +23,7 @@ mod ui;
 pub use errors::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
-pub(super) use errors::{report_exception, report_rejections};
+pub(in crate::page) use errors::{report_exception, report_rejections};
 pub(super) use forms::install as install_forms;
 pub use forms::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
 pub(super) use handlers::install as install_handlers;
@@ -127,7 +127,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
 
 /// Count a callback's exception and report it to the page (HTML "report an
 /// exception"), as listeners, observers and microtask callbacks do.
-pub(super) fn report_callback_error(agent: &mut Agent, error: Value) -> JsResult<()> {
+pub(in crate::page) fn report_callback_error(agent: &mut Agent, error: Value) -> JsResult<()> {
     with_page(agent, |_, page| {
         page.events.report_listener_error();
         Ok(())

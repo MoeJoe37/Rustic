@@ -89,6 +89,11 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     Ok(())
 }
 
+pub(super) fn new_readonly(agent: &mut Agent, coords: [f64; 4]) -> JsResult<Value> {
+    let proto = prototype(agent, READONLY)?;
+    create(agent, proto, false, coords.map(Value::number))
+}
+
 pub(super) fn new_mutable(agent: &mut Agent, coords: [f64; 4]) -> JsResult<Value> {
     let proto = prototype(agent, MUTABLE)?;
     create(agent, proto, true, coords.map(Value::number))

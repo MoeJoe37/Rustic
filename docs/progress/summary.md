@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 34.19%** = 32.86% verified complete + 1.33% partial credit. 75/221 capabilities complete, 7 in progress.
+**Overall completion: 34.37%** = 33.24% verified complete + 1.13% partial credit. 76/221 capabilities complete, 6 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `e21b90eaa5535c2ebdfe86afecd6f12b7e13f331e19b9c47a3abd78bdb3e8190`.
+Catalog: `engine-v4`. Source fingerprint: `9308529e41bff835bcd0717a6c2a1a24bb4133cadf4533925123bdc8a5715143`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,7 +14,7 @@ Catalog: `engine-v4`. Source fingerprint: `e21b90eaa5535c2ebdfe86afecd6f12b7e13f
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 9/12 | 85.61% | 78.52% | 5.29% |
+| M5 Scripted documents | 10/12 | 89.15% | 85.61% | 5.29% |
 | M6 Networking & services | 0/12 | 5.69% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `e21b90eaa5535c2ebdfe86afecd6f12b7e13f
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 5/10 | 2 | 60.00% | 52.50% | 5% | 3.00 |
+| Bindings & web APIs | 6/10 | 1 | 63.75% | 60.00% | 5% | 3.18 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -216,9 +216,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `web.scheduler` — Tasks, microtasks and rendering opportunities · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [test](../../crates/rustic-engine/tests/scripting.rs), [source](../../crates/rustic-engine/src/tasks.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [source](../../crates/rustic-engine/src/scripting.rs), [source](../../crates/rustic-engine/src/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-cli/src/loader.rs))
 - **complete** `web.scripts` — Classic/module script lifecycle and readiness · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs), [source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [source](../../crates/rustic-engine/src/local_modules.rs), [test](../../crates/rustic-engine/tests/module_scripts.rs), [test](../../crates/rustic-engine/tests/module_scripts.rs), [test](../../crates/rustic-engine/tests/module_scripts.rs), [source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **complete** `web.input` — Forms, focus, editing and user input · size 5 · M5 · 0.62% of engine ([source](../../crates/rustic-bindings/src/page/events/forms.rs), [source](../../crates/rustic-bindings/src/page/events/forms.rs), [source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [test](../../crates/rustic-cli/tests/reftests.rs))
-- **in progress 50.00%** `web.observers` — Timers, animation frames and observer APIs · size 3 · M5 · 0.37% of engine
-  - [x] Window timers and renderer-driven animation callbacks ([source](../../crates/rustic-bindings/src/page/window.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/src/window_tasks.rs))
-  - [ ] Observer APIs integrated with document and rendering turns
+- **complete** `web.observers` — Timers, animation frames and observer APIs · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-bindings/src/page/window.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/src/window_tasks.rs), [source](../../crates/rustic-bindings/src/page/resize_observer.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/resize_observers.rs), [test](../../crates/rustic-engine/tests/resize_observers.rs))
 - **planned** `web.streams` — Streams, messaging and structured clone · size 5 · M9 · 0.62% of engine
 - **in progress 50.00%** `web.conformance` — Exposed web API conformance and reentry gate · size 3 · M5 · 0.37% of engine
   - [x] Pinned upstream Window WPT selection and exact expectation ratchet ([source](../../tools/run_wpt_web_tests.py), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json))

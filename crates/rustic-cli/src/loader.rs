@@ -1121,7 +1121,29 @@ impl LayoutSource for LocalLayout {
             .iter()
             .map(|fragment| (fragment.node(), fragment))
             .collect();
+        let mut box_sizes = HashMap::new();
+        for style in &styles {
+            self.cancellation
+                .check()
+                .map_err(|_| LayoutReadError::Unavailable)?;
+            let Some(fragment) = fragments.get(&style.node) else {
+                continue;
+            };
+            let (_, padding) = fragment
+                .resolved_edges(&style.computed)
+                .map_err(|_| LayoutReadError::Unavailable)?;
+            let size = |size: rustic_layout::CssSize| [size.width().get(), size.height().get()];
+            box_sizes.insert(
+                style.node,
+                rustic_engine::BoxSizes {
+                    content: size(fragment.content().size()),
+                    border: size(fragment.border().size()),
+                    padding: [padding.left.get(), padding.top.get()],
+                },
+            );
+        }
         Ok(LayoutGeometry {
+            box_sizes,
             offset_widths: layout
                 .offset_widths(&tree, &self.cancellation)
                 .map_err(|_| LayoutReadError::Unavailable)?,

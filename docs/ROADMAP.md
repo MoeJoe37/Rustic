@@ -327,7 +327,7 @@ stays local and deterministic; no network, no native window.
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
 | WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **Done** for the local host, including bounded encoding replay before author code. [ADR 0041](adr/0041-scripted-document-readiness.md), [ADR 0044](adr/0044-local-html-encoding-replay.md) |
 | WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **In progress.** Geometry and live computed declarations share bounded snapshots. Pinned WPT cases exercise CSSOM iteration, resolved dimensions and auto margins. Scripted local CSS and image completions update frame inputs and persist through final CLI output. CSSOM serialization, pseudo-elements and asynchronous delivery remain open. [ADR 0042](adr/0042-scripted-render-state.md), [ADR 0045](adr/0045-live-computed-style-reads.md) |
-| WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | **In progress.** `MutationObserver`, `MutationRecord` and `queueMicrotask` ([ADR 0047](adr/0047-mutation-observers.md)), error reporting, rejection events, event handler attributes and the console sink ([ADR 0048](adr/0048-error-reporting-and-event-handlers.md)), focus, text editing, validation and submission ([ADR 0049](adr/0049-focus-and-forms.md)) are done; the remaining observer step is open |
+| WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | **Done.** `MutationObserver`, `MutationRecord` and `queueMicrotask` ([ADR 0047](adr/0047-mutation-observers.md)), error reporting, rejection events, event handler attributes and the console sink ([ADR 0048](adr/0048-error-reporting-and-event-handlers.md)), focus, text editing, validation and submission ([ADR 0049](adr/0049-focus-and-forms.md)) and `ResizeObserver` ([ADR 0050](adr/0050-resize-observer.md)) are done |
 | WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | **In progress.** Initial Window suite and exact baseline are checked in. [Results](SCRIPTING.md#pinned-window-web-platform-tests) |
 | PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | Not started; runs in parallel |
 | MOB-03/04 | Android/iOS local-fixture CPU surfaces (carried over from M3) | evidence for `platform.android`, `platform.ios` (M8) | REN-05; hosted CI or a machine with the NDK and Xcode | Blocked on CI; runs in parallel |
@@ -394,10 +394,10 @@ ADR is accepted.
    - **Done:** forms: text input and editing of `value`, form owners (pays
      TD-31), `submit` and constraint validation without navigation
      (`web.input`, [ADR 0049](adr/0049-focus-and-forms.md)).
-   - The remaining observer step of `web.observers` (at least
-     `ResizeObserver` or `IntersectionObserver` integrated with rendering
-     turns) is delivered or its scope is narrowed in the catalog with a
-     reason.
+   - **Done:** the remaining observer step of `web.observers`:
+     `ResizeObserver` integrated with rendering turns
+     ([ADR 0050](adr/0050-resize-observer.md)); `IntersectionObserver` is
+     TD-155.
 4. **WEB-09 — conformance gate.** The initial pinned Window WPT selection
    covers nodes, events, collections, timers and animation frames through
    upstream `testharness.js`. The denominator and failures are recorded in
@@ -785,7 +785,7 @@ JS-09) are complete.
 | done | WEB-01 to WEB-04: scheduler, Web IDL, bindings, events, input, timers | See [SCRIPTING.md](SCRIPTING.md) | Done |
 | 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | Local lifecycle, CLI and all pinned html5lib records verified. |
 | 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
-| 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Done except the rendering-observer step |
+| 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Done |
 | 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Initial 16-file Window baseline verified locally. |
 | 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | Planned |
 | — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Parallel; not started |

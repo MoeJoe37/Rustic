@@ -64,7 +64,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -218,6 +218,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M6 navigation |
 | TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled, body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
+| TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2425,4 +2426,19 @@ controls and the selection model, and compile `pattern` through the JS
 RegExp engine.
 **Trigger:** M9 HTML lifecycle and forms work, or the first WPT form case
 that needs one.
+
+### TD-155 — ResizeObserver lifetime and geometry approximations
+
+The page holds an observer while it observes anything, and the observer
+holds its targets, so an observer script dropped without `disconnect` and
+its targets live until the page closes. `devicePixelContentBoxSize`
+equals the content box (one device pixel per CSS pixel), inline and block
+sizes are width and height (no vertical writing modes), inline boxes and
+SVG elements report zero, and `IntersectionObserver` is not implemented
+([ADR 0050](adr/0050-resize-observer.md)).
+**Pay:** make observations weak with collector support for active
+observers, pass the device scale and writing mode in `BoxSizes`, measure
+inline and SVG boxes, and add `IntersectionObserver` with scrolling.
+**Trigger:** M9 layout and scrolling work, or a heap report showing
+retained observers.
 

@@ -4620,59 +4620,67 @@
           "label": "Timers, animation frames and observer APIs",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Window timers and renderer-driven animation callbacks",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/window.rs",
-                  "marker": "pub trait WindowScheduler"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "fn run_animation_callbacks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn window_timers_share_host_deadlines_and_keep_arguments_and_checkpoint_order"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn nested_timeouts_and_intervals_clamp_after_six_timer_turns"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn script_callbacks_share_pending_slots_and_text_budget_with_host_tasks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/frames.rs",
-                  "marker": "fn animation_callbacks_run_before_render_with_live_cancellation_and_per_callback_jobs"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/frames.rs",
-                  "marker": "fn a_failed_animation_checkpoint_prevents_rendering_and_discards_callbacks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/src/window_tasks.rs",
-                  "marker": "fn queued_timer_retains_its_callback_and_arguments_through_collection"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/window.rs",
+              "marker": "pub trait WindowScheduler"
             },
             {
-              "label": "Observer APIs integrated with document and rendering turns",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "fn run_animation_callbacks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn window_timers_share_host_deadlines_and_keep_arguments_and_checkpoint_order"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn nested_timeouts_and_intervals_clamp_after_six_timer_turns"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn script_callbacks_share_pending_slots_and_text_budget_with_host_tasks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/frames.rs",
+              "marker": "fn animation_callbacks_run_before_render_with_live_cancellation_and_per_callback_jobs"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/frames.rs",
+              "marker": "fn a_failed_animation_checkpoint_prevents_rendering_and_discards_callbacks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/src/window_tasks.rs",
+              "marker": "fn queued_timer_retains_its_callback_and_arguments_through_collection"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/resize_observer.rs",
+              "marker": "pub(super) fn run"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "broadcast_resize_observations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/resize_observers.rs",
+              "marker": "fn observations_report_once_per_size_change_in_rendering_turns"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/resize_observers.rs",
+              "marker": "fn shallower_changes_wait_for_the_next_frame_with_a_loop_error"
             }
           ]
         },

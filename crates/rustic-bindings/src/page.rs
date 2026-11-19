@@ -26,6 +26,7 @@ mod events;
 mod html_collections;
 mod mutation_observer;
 mod node_tree;
+mod resize_observer;
 mod selectors;
 mod window;
 
@@ -44,6 +45,17 @@ pub enum LayoutReadError {
     Limit,
     /// The host could not compute a bounded layout snapshot.
     Unavailable,
+}
+
+/// The box sizes a ResizeObserver reports, in CSS pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct BoxSizes {
+    /// Content-box width and height.
+    pub content: [f64; 2],
+    /// Border-box width and height.
+    pub border: [f64; 2],
+    /// Left and top padding: the content box's offset in the padding box.
+    pub padding: [f64; 2],
 }
 
 /// Owned CSSOM longhand and custom-property values at one layout revision.
@@ -128,6 +140,10 @@ pub trait PageTree: Debug {
     fn computed_style(&self, _node: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
         Err(LayoutReadError::Unavailable)
     }
+    /// The element's untransformed box sizes, or `None` without a layout box.
+    fn box_sizes(&self, _node: NodeId) -> Result<Option<BoxSizes>, LayoutReadError> {
+        Ok(None)
+    }
     /// Whether a subtree may move out of the main document, within the turn budget.
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
         Ok(true)
@@ -155,6 +171,7 @@ struct Page {
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
     observers: mutation_observer::Observers,
+    resize_observers: resize_observer::ResizeObservers,
 }
 
 impl ExecutionHost for Page {
@@ -316,6 +333,7 @@ fn install_page(
     collections::install(agent)?;
     html_collections::install(agent)?;
     mutation_observer::install(agent)?;
+    resize_observer::install(agent)?;
     install_interface(
         agent,
         "Node",
@@ -492,6 +510,7 @@ fn install_page(
     let computed_styles = agent.new_weak_map()?;
     agent.root(Value::object(computed_styles))?;
     let observers = mutation_observer::Observers::new(agent)?;
+    let resize_observers = resize_observer::ResizeObservers::new(agent)?;
     agent.attach_execution_host(Rc::new(Page {
         tree,
         main,
@@ -506,6 +525,7 @@ fn install_page(
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),
         observers,
+        resize_observers,
     }))
 }
 
@@ -522,6 +542,20 @@ pub fn deliver_input(agent: &mut Agent, target: NodeId, input: &InputEvent) -> J
 /// Deliver a trusted event owned by the scripted document lifecycle.
 pub fn deliver_lifecycle(agent: &mut Agent, event: LifecycleEvent) -> JsResult<()> {
     events::deliver_lifecycle(agent, event)
+}
+
+/// The Resize Observer steps of a rendering turn: after animation frame
+/// callbacks, broadcast resize observations until none is active. Call
+/// before rendering; a page without observers returns at once.
+pub fn broadcast_resize_observations(agent: &mut Agent) -> JsResult<()> {
+    let host = agent.execution_host();
+    if !host
+        .as_ref()
+        .is_some_and(|host| host.as_any().downcast_ref::<Page>().is_some())
+    {
+        return Ok(());
+    }
+    resize_observer::run(agent)
 }
 
 /// Queue mutation records for edits a host or parser made outside a binding

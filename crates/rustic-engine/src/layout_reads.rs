@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use rustic_bindings::page::{ComputedStyleSnapshot, LayoutReadError};
+use rustic_bindings::page::{BoxSizes, ComputedStyleSnapshot, LayoutReadError};
 use rustic_dom::{Document, NodeId};
 use rustic_html::DocumentMode;
 
@@ -30,6 +30,9 @@ pub struct LayoutGeometry {
     pub client_rects: HashMap<NodeId, Option<[f64; 4]>>,
     /// CSSOM values for every styled element, including elements without boxes.
     pub computed_styles: HashMap<NodeId, ComputedStyleSnapshot>,
+    /// Content and border box sizes of elements with block or atomic boxes,
+    /// for ResizeObserver. Elements without an entry report zero.
+    pub box_sizes: HashMap<NodeId, BoxSizes>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -277,6 +277,10 @@ impl PageTree for ScriptTree {
         })
     }
 
+    fn box_sizes(&self, id: NodeId) -> Result<Option<page::BoxSizes>, LayoutReadError> {
+        self.read_layout(None, |geometry| Ok(geometry.box_sizes.get(&id).copied()))
+    }
+
     fn computed_style(&self, id: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
         if !self.layout.borrow().has_source() {
             return Err(LayoutReadError::Unavailable);
@@ -974,6 +978,12 @@ impl<C: Clock> ScriptedDocument<C> {
             }
             self.checkpoint()?;
         }
+        // Resize Observer steps of "update the rendering", each callback
+        // followed by its own checkpoint as script cleanup requires.
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let observed = page::broadcast_resize_observations(agent);
+        self.page_result(observed)?;
+        self.checkpoint()?;
         self.pending
             .queue
             .borrow_mut()

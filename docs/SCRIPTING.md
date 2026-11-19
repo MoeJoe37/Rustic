@@ -200,12 +200,18 @@ the host a `FormSubmission` with the entry list
 (`take_form_submissions`); `reset()` restores defaults. Nothing navigates.
 [ADR 0049](adr/0049-focus-and-forms.md)
 
+`ResizeObserver` reports content and border box sizes in each rendering
+turn, after animation frame callbacks and before the host renders,
+looping deeper as the Resize Observer specification requires and
+reporting the loop error for skipped observations. Sizes come from the same
+layout snapshot as other script reads. [ADR 0050](adr/0050-resize-observer.md)
+
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
 | Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md), [TD-148](TECH_DEBT.md#td-148--computed-style-snapshots-are-eager-and-copied-per-read), [TD-149](TECH_DEBT.md#td-149--pseudo-element-getcomputedstyle-throws)). | WEB-06 |
-| `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
+| `IntersectionObserver` | Not exposed; ResizeObserver approximations in TD-155 | M9 |
 | Control painting and the rest of forms | Values and focus are not painted or matched by `:focus`/`:invalid`; no `select`, labels or caret (TD-154) | M9 |
 | Error locations, handler content attributes | `ErrorEvent` has no file or line, `onclick="…"` markup is not compiled (TD-152, TD-153) | M6, M9 |
 | Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
@@ -338,7 +344,8 @@ same turn budget, so a single call cannot run unmetered.
   `HTMLCollection`, `Window`, `Event`, `CustomEvent`, `UIEvent`, `MouseEvent`,
   `PointerEvent`, `KeyboardEvent`, `ErrorEvent`, `PromiseRejectionEvent`,
   `FocusEvent`, `InputEvent`, `SubmitEvent`, `MutationObserver`,
-  `MutationRecord`, `ValidityState`, `HTMLInputElement`,
+  `MutationRecord`, `ResizeObserver`, `ResizeObserverEntry`,
+  `ResizeObserverSize`, `ValidityState`, `HTMLInputElement`,
   `HTMLTextAreaElement`, `HTMLButtonElement`, `HTMLFormElement`,
   `DOMException` and the `console` namespace. IMPLEMENTATION.md lists the members of each; treat that
   list, not this one, as the contract.
@@ -397,6 +404,7 @@ and `AbortSignal` listener removal are TD-131.
 | Events | `crates/rustic-bindings/tests/events.rs` |
 | Error reporting, handlers and console | `crates/rustic-bindings/tests/errors.rs`, `crates/rustic-engine/tests/error_reporting.rs` |
 | Node tree members | `crates/rustic-bindings/tests/node_tree.rs` |
+| ResizeObserver in rendering turns | `crates/rustic-engine/tests/resize_observers.rs` |
 | Focus, editing, validation and submission | `crates/rustic-engine/tests/forms.rs`; parser form association in `crates/rustic-style/tests/invalidation.rs` |
 | Mutation journal, observers and `queueMicrotask` | `crates/rustic-dom/tests/journal.rs`, `crates/rustic-bindings/tests/mutation_observer.rs`, `crates/rustic-engine/tests/mutation_observers.rs` |
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
@@ -487,6 +495,7 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 | TD-152 | Error reports lack locations; console has no formatter | M6 navigation |
 | TD-153 | Handler content attributes and remaining handler names | M9 HTML lifecycle |
 | TD-154 | Focus and validity are not style states; no select, labels or caret | M9 HTML lifecycle |
+| TD-155 | ResizeObserver lifetime and geometry approximations | M9 |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

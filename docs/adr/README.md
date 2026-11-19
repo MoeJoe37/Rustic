@@ -57,6 +57,7 @@ instead of rewriting the history of a decision.
 | [0047](0047-mutation-observers.md) | Mutation observers over a document journal, with registrations held as node edges | Accepted for WEB-07 (`dom.observers`) |
 | [0048](0048-error-reporting-and-event-handlers.md) | Error reporting, rejection events, event handler attributes and a bounded console sink | Accepted for WEB-07 |
 | [0049](0049-focus-and-forms.md) | Focus, text controls, form owners, validation and submission without navigation | Accepted for WEB-07 (`web.input`) |
+| [0050](0050-resize-observer.md) | ResizeObserver broadcast in rendering turns from the layout snapshot | Accepted for WEB-07 (`web.observers`) |
 
 ## Records by area
 
@@ -73,7 +74,7 @@ instead of rewriting the history of a decision.
 | Events, input and timers (M5, WEB-04) | 0034, 0035, 0036 |
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041, 0044 |
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
-| Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049 |
+| Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.

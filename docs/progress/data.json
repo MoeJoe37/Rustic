@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "e21b90eaa5535c2ebdfe86afecd6f12b7e13f331e19b9c47a3abd78bdb3e8190",
-  "percent": "34.19",
-  "verified_percent": "32.86",
-  "partial_percent": "1.33",
-  "completed": 75,
-  "in_progress": 7,
+  "source_fingerprint": "9308529e41bff835bcd0717a6c2a1a24bb4133cadf4533925123bdc8a5715143",
+  "percent": "34.37",
+  "verified_percent": "33.24",
+  "partial_percent": "1.13",
+  "completed": 76,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -55,11 +55,11 @@
       "id": "M5",
       "label": "Scripted documents",
       "share": "5.29",
-      "completed": 9,
+      "completed": 10,
       "total": 12,
-      "percent": "85.61",
-      "verified_percent": "78.52",
-      "partial_percent": "7.09"
+      "percent": "89.15",
+      "verified_percent": "85.61",
+      "partial_percent": "3.54"
     },
     {
       "id": "M6",
@@ -4994,62 +4994,70 @@
           "label": "Timers, animation frames and observer APIs",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Window timers and renderer-driven animation callbacks",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/window.rs",
-                  "marker": "pub trait WindowScheduler"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "fn run_animation_callbacks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn window_timers_share_host_deadlines_and_keep_arguments_and_checkpoint_order"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn nested_timeouts_and_intervals_clamp_after_six_timer_turns"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/timers.rs",
-                  "marker": "fn script_callbacks_share_pending_slots_and_text_budget_with_host_tasks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/frames.rs",
-                  "marker": "fn animation_callbacks_run_before_render_with_live_cancellation_and_per_callback_jobs"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/frames.rs",
-                  "marker": "fn a_failed_animation_checkpoint_prevents_rendering_and_discards_callbacks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/src/window_tasks.rs",
-                  "marker": "fn queued_timer_retains_its_callback_and_arguments_through_collection"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/window.rs",
+              "marker": "pub trait WindowScheduler"
             },
             {
-              "label": "Observer APIs integrated with document and rendering turns",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "fn run_animation_callbacks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn window_timers_share_host_deadlines_and_keep_arguments_and_checkpoint_order"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn nested_timeouts_and_intervals_clamp_after_six_timer_turns"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/timers.rs",
+              "marker": "fn script_callbacks_share_pending_slots_and_text_budget_with_host_tasks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/frames.rs",
+              "marker": "fn animation_callbacks_run_before_render_with_live_cancellation_and_per_callback_jobs"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/frames.rs",
+              "marker": "fn a_failed_animation_checkpoint_prevents_rendering_and_discards_callbacks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/src/window_tasks.rs",
+              "marker": "fn queued_timer_retains_its_callback_and_arguments_through_collection"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/resize_observer.rs",
+              "marker": "pub(super) fn run"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "broadcast_resize_observations"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/resize_observers.rs",
+              "marker": "fn observations_report_once_per_size_change_in_rendering_turns"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/resize_observers.rs",
+              "marker": "fn shallower_changes_wait_for_the_next_frame_with_a_loop_error"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.37"
         },
         {
@@ -5117,13 +5125,13 @@
         }
       ],
       "points": 40,
-      "completed": 5,
-      "in_progress": 2,
+      "completed": 6,
+      "in_progress": 1,
       "total": 10,
-      "contribution": "3.00",
-      "percent": "60.00",
-      "verified_percent": "52.50",
-      "partial_percent": "7.50"
+      "contribution": "3.18",
+      "percent": "63.75",
+      "verified_percent": "60.00",
+      "partial_percent": "3.75"
     },
     {
       "id": "media",

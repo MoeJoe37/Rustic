@@ -54,11 +54,32 @@ impl Ord for TimedTask {
     }
 }
 
+/// A bounded host completion already fetched and staged outside the VM.
+/// The closure must only publish validated data; it must not execute script.
+pub(crate) struct ResourceCompletion(Box<dyn FnOnce() -> bool>);
+
+impl ResourceCompletion {
+    pub(crate) fn new<E>(apply: impl FnOnce() -> Result<(), E> + 'static) -> Self {
+        Self(Box::new(move || apply().is_ok()))
+    }
+
+    pub(crate) fn apply(self) -> bool {
+        (self.0)()
+    }
+}
+
+impl std::fmt::Debug for ResourceCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ResourceCompletion(..)")
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum Task {
     Script(Source),
     Timer(WindowTimer),
     Input { target: NodeId, event: InputEvent },
+    ResourceCompletion(ResourceCompletion),
 }
 
 impl Task {
@@ -77,7 +98,8 @@ impl Task {
             Self::Input {
                 event: InputEvent::Click { .. },
                 ..
-            } => 0,
+            }
+            | Self::ResourceCompletion(_) => 0,
         }
     }
 }

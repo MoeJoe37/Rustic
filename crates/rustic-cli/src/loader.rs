@@ -1280,6 +1280,11 @@ mod tests {
         let staged_css = fetcher
             .stage_completion(&applied, &css_url, limits.stylesheets.max_total_bytes)
             .unwrap();
+        // Another request for the same URL starts before publication. Once
+        // the first completion wins, this one must not publish stale bytes.
+        let superseded_css = fetcher
+            .stage_completion(&applied, &css_url, limits.stylesheets.max_total_bytes)
+            .unwrap();
         let staged_image = fetcher
             .stage_completion(&applied, &image_url, limits.images.max_file_bytes)
             .unwrap();
@@ -1312,8 +1317,15 @@ mod tests {
         assert_eq!(get_width(&applied_css), "43px");
         assert_eq!(applied_css.offset_widths.get(&image_id), Some(&2));
         // A successful completion automatically offers the next render.
-        let stale_image = render(&mut scripted);
+        let stable_css = render(&mut scripted);
+        assert_eq!(
+            scripted.apply_resource_completion(|| applied.commit(superseded_css)),
+            Ok(Err(FetchError::Failed))
+        );
+        assert_eq!(scripted.accept_rendered_frame(stable_css), Ok(true));
 
+        scripted.offer_rendering_opportunity().unwrap();
+        let stale_image = render(&mut scripted);
         assert_eq!(
             scripted.apply_resource_completion(|| applied.commit(staged_image)),
             Ok(Ok(()))

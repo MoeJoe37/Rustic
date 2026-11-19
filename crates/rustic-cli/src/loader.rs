@@ -415,7 +415,7 @@ fn queue_discovered_local_resources(
                     // A ready timer can precede the resource task under
                     // source alternation. Such JS work must still count
                     // against the existing snapshot timer-turn ceiling.
-                    if *timer_turns == MAX_SCRIPT_TIMER_TURNS {
+                    if *timer_turns >= MAX_SCRIPT_TIMER_TURNS {
                         return Err(LoadError::ScriptTurnLimit);
                     }
                     *timer_turns += 1;
@@ -486,9 +486,11 @@ fn discover_local_resources(
                     });
                     value.is_empty() || value.eq_ignore_ascii_case("text/css")
                 });
-                if !is_stylesheet || alternate || !css_type ||
-                    attribute(element, "disabled").is_some() ||
-                    sheets >= limits.stylesheets.max_sheets
+                if !is_stylesheet
+                    || alternate
+                    || !css_type
+                    || attribute(element, "disabled").is_some()
+                    || sheets >= limits.stylesheets.max_sheets
                 {
                     continue;
                 }
@@ -1428,10 +1430,18 @@ mod tests {
         let mut scripted = parsed
             .into_scripted_with_clock(TaskLimits::default(), ManualClock::default())
             .unwrap();
+        let mut timer_turns = 0;
         let delivered = queue_discovered_local_resources(
-            &mut scripted, &page.0, limits, &fetch, &applied, &token, &mut 0,
+            &mut scripted,
+            &page.0,
+            limits,
+            &fetch,
+            &applied,
+            &token,
+            &mut timer_turns,
         )
         .unwrap();
+        assert_eq!(timer_turns, 0);
         assert_eq!(delivered, 2);
         assert_eq!(scripted.run_next(), Ok(None));
 
@@ -1442,7 +1452,8 @@ mod tests {
             &rustic_raster::Surface::new(8, 3, rustic_raster::RasterLimits::default())
                 .unwrap(),
             usize::MAX,
-        ).unwrap();
+        )
+        .unwrap();
         fs::write(&image.0, changed_png).unwrap();
         scripted.set_layout_source(Box::new(LocalLayout {
             path: page.0.clone(),

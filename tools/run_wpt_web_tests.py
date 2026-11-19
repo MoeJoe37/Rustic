@@ -6,6 +6,7 @@ from collections import Counter
 import hashlib
 import json
 from pathlib import Path
+import posixpath
 import re
 import shutil
 import subprocess
@@ -79,13 +80,25 @@ def validate_expectations(expected: dict, cases: list[str]) -> None:
                 raise ValueError(f"{name}: every expected failure needs a reason")
 
 
-def window_page(path: Path, directory: Path) -> bytes:
+def supported_meta(line: bytes) -> bool:
+    """Directives the Window variant can honor: a title, or a global list
+    that includes the Window scope this runner provides."""
+    if line.startswith(b"// META: title="):
+        return True
+    prefix = b"// META: global="
+    if line.startswith(prefix):
+        scopes = {scope.strip() for scope in line[len(prefix):].split(b",")}
+        return b"window" in scopes
+    return False
+
+
+def window_page(path: Path, directory: Path, support: list[str] = ()) -> bytes:
     source = path.read_bytes()
     if path.name.endswith(".any.js"):
-        # This selection uses the ordinary Window variant without script,
-        # timeout or globals directives. Fail if a future import needs one.
+        # This selection uses the ordinary Window variant without script or
+        # timeout directives. Fail if a future import needs one.
         for line in source.splitlines():
-            if line.startswith(b"// META:") and not line.startswith(b"// META: title="):
+            if line.startswith(b"// META:") and not supported_meta(line):
                 raise ValueError(f"{path.name}: unsupported META directive {line!r}")
         (directory / "case.js").write_bytes(source)
         return ANY_PAGE
@@ -98,12 +111,20 @@ def window_page(path: Path, directory: Path) -> bytes:
         if source.count(before) != 1:
             raise ValueError(f"{path.name}: expected exactly one reference to {before!r}")
         source = source.replace(before, after)
+    # Helper scripts are copied flat beside the page; rewrite each reference
+    # that resolves to a pinned support file, wherever it lives upstream.
+    case_directory = path.parent.relative_to(UPSTREAM).as_posix()
+    for name in support:
+        relative = posixpath.relpath(name, case_directory).encode()
+        pattern = re.compile(rb'src=(["\']?)' + re.escape(relative) + rb'\1(?=[\s>])')
+        source = pattern.sub(lambda match: b"src=" + match.group(1)
+                             + Path(name).name.encode() + match.group(1), source)
     return source
 
 
-def run_case(binary: Path, name: str, directory: Path) -> list[dict]:
+def run_case(binary: Path, name: str, directory: Path, support: list[str] = ()) -> list[dict]:
     page = directory / "case.html"
-    page.write_bytes(window_page(UPSTREAM / name, directory))
+    page.write_bytes(window_page(UPSTREAM / name, directory, support))
     result = subprocess.run(
         [str(binary), "dump-dom", "--run-scripts", str(page)],
         check=False, capture_output=True, encoding="utf-8", timeout=30,
@@ -141,7 +162,7 @@ def run(binary: Path, cases: list[str]) -> dict:
             raise ValueError("support file basenames must be unique")
         for name in support:
             shutil.copyfile(UPSTREAM / name, directory / Path(name).name)
-        return {name: run_case(binary, name, directory) for name in cases}
+        return {name: run_case(binary, name, directory, support) for name in cases}
 
 
 def main() -> int:

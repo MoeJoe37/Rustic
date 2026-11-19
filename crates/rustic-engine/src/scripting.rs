@@ -15,7 +15,8 @@ use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
 use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
 use rustic_js::runtime::{
-    Abrupt, Agent, DEFAULT_HEAP_BYTES, HostRoot, JsResult, JsStr, ObjectId, OutOfMemory, Value,
+    Abrupt, Agent, DEFAULT_HEAP_BYTES, HostRoot, JsResult, JsStr, ObjectId, OutOfMemory,
+    RejectionEvent, Value,
 };
 use rustic_js::{CompileError, EvalError, ParseError, Source};
 
@@ -697,6 +698,14 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or(0, page::take_listener_error_count)
     }
 
+    /// Take the page's console messages and the count dropped because the
+    /// bounded buffer was full.
+    pub fn take_console_messages(&self) -> page::ConsoleLog {
+        self.agent
+            .as_ref()
+            .map_or_else(|_| page::ConsoleLog::default(), page::take_console_messages)
+    }
+
     /// Read and clear uncaught exceptions from animation frame callbacks.
     pub fn take_animation_error_count(&mut self) -> u64 {
         std::mem::take(&mut self.animation_errors)
@@ -892,6 +901,7 @@ impl<C: Clock> ScriptedDocument<C> {
                     Task::Input { target, event } => {
                         page::deliver_input(agent, target, &event).map_err(EvalError::from)
                     }
+                    Task::PromiseRejections(roots) => notify_rejections(agent, roots),
                     Task::ResourceCompletion(_) => unreachable!("handled above"),
                 };
                 self.finish_script_turn(result).map(Some)
@@ -905,9 +915,18 @@ impl<C: Clock> ScriptedDocument<C> {
     ) -> Result<ScriptTurn, ScriptStop> {
         let turn = match result {
             Ok(_) => ScriptTurn::Completed,
-            Err(EvalError::Parse(error)) => ScriptTurn::Failed(ScriptFailure::Parse(error)),
-            Err(EvalError::Compile(error)) => ScriptTurn::Failed(ScriptFailure::Compile(error)),
-            Err(EvalError::Throw(_)) => ScriptTurn::Failed(ScriptFailure::UncaughtException),
+            Err(EvalError::Parse(error)) => {
+                self.report_syntax_error(&error.to_string())?;
+                ScriptTurn::Failed(ScriptFailure::Parse(error))
+            }
+            Err(EvalError::Compile(error)) => {
+                self.report_syntax_error(&format!("{error:?}"))?;
+                ScriptTurn::Failed(ScriptFailure::Compile(error))
+            }
+            Err(EvalError::Throw(value)) => {
+                self.report_value(value)?;
+                ScriptTurn::Failed(ScriptFailure::UncaughtException)
+            }
             Err(EvalError::OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
             Err(EvalError::Cancelled) => return Err(self.stop_after_cancellation()),
             Err(EvalError::SourceTooLong) => unreachable!("Source already bounds its length"),
@@ -938,8 +957,9 @@ impl<C: Clock> ScriptedDocument<C> {
             agent.unroot(root);
             match result {
                 Ok(_) => {}
-                Err(Abrupt::Throw(_)) => {
-                    self.animation_errors = self.animation_errors.saturating_add(1)
+                Err(Abrupt::Throw(error)) => {
+                    self.animation_errors = self.animation_errors.saturating_add(1);
+                    self.report_value(error)?;
                 }
                 Err(Abrupt::OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
                 Err(Abrupt::Cancelled) => return Err(self.stop_after_cancellation()),
@@ -954,41 +974,127 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     fn checkpoint(&mut self) -> Result<(), ScriptStop> {
-        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        // Parser and host edits since the last binding call become mutation
-        // records before the microtasks they schedule run.
-        match page::flush_mutation_records(agent) {
-            Ok(()) | Err(Abrupt::Throw(_)) => {}
-            Err(Abrupt::OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
-            Err(Abrupt::Cancelled) => return Err(self.stop_after_cancellation()),
-        }
-        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
-        match agent.run_jobs_limited(self.limits.jobs_per_checkpoint) {
-            Ok(true) => {
-                // Release the rejection report's roots at the checkpoint.
-                // Web rejection-event dispatch belongs to the later event layer.
-                agent.take_rejection_events();
-                self.pending_modules.retain(|&root| {
-                    let promise = agent
-                        .rooted(root)
-                        .and_then(Value::as_object)
-                        .expect("retained module completion");
-                    match agent.promise_rejected(promise) {
-                        Some(rejected) => {
-                            self.module_script_errors = self
-                                .module_script_errors
-                                .saturating_add(u64::from(rejected));
-                            false
-                        }
-                        None => true,
-                    }
-                });
-                self.check_live()
+        loop {
+            let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+            // Parser and host edits since the last binding call become mutation
+            // records before the microtasks they schedule run.
+            let flushed = page::flush_mutation_records(agent);
+            self.page_result(flushed)?;
+            let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+            match agent.run_jobs_limited(self.limits.jobs_per_checkpoint) {
+                Ok(true) => {}
+                Ok(false) => return Err(self.stop(ScriptStop::JobLimit)),
+                Err(Abrupt::OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
+                Err(Abrupt::Cancelled) => return Err(self.stop_after_cancellation()),
+                Err(Abrupt::Throw(_)) => unreachable!("the job runner handles thrown values"),
             }
-            Ok(false) => Err(self.stop(ScriptStop::JobLimit)),
+            // Taking the tracker's events releases their roots; the page roots
+            // the promises again while it dispatches.
+            let rejections = agent.take_rejection_events();
+            let mut failed = Vec::new();
+            let mut module_errors = 0u64;
+            self.pending_modules.retain(|&root| {
+                let promise = agent
+                    .rooted(root)
+                    .and_then(Value::as_object)
+                    .expect("retained module completion");
+                match agent.promise_rejected(promise) {
+                    Some(rejected) => {
+                        if rejected {
+                            module_errors = module_errors.saturating_add(1);
+                            if failed.try_reserve(1).is_ok() {
+                                failed.push(
+                                    agent.promise_result(promise).unwrap_or(Value::UNDEFINED),
+                                );
+                            }
+                        }
+                        false
+                    }
+                    None => true,
+                }
+            });
+            self.module_script_errors = self.module_script_errors.saturating_add(module_errors);
+            // HTML reports a module script's evaluation error like a classic's.
+            for reason in failed {
+                self.report_value(reason)?;
+            }
+            self.check_live()?;
+            if rejections.is_empty() {
+                return Ok(());
+            }
+            // "Notify about rejected promises" queues a task. If the queue
+            // is full the page is notified now, at the end of this checkpoint.
+            let admitted = self.pending.queue.borrow().check_admission(0).is_ok();
+            if !admitted {
+                let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+                let reported = page::report_rejections(agent, rejections);
+                self.page_result(reported)?;
+                continue;
+            }
+            let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+            let mut roots = Vec::new();
+            if roots.try_reserve_exact(rejections.len()).is_err() {
+                return Err(self.stop(ScriptStop::OutOfMemory));
+            }
+            for event in &rejections {
+                match agent.root(Value::object(event.promise)) {
+                    Ok(root) => roots.push((event.operation, root)),
+                    Err(OutOfMemory) => return Err(self.stop(ScriptStop::OutOfMemory)),
+                }
+            }
+            let queued = self
+                .pending
+                .queue
+                .borrow_mut()
+                .queue(Task::PromiseRejections(roots));
+            if queued.is_err() {
+                // Admission was checked: only allocation can fail, and a
+                // fatal stop releases the agent with its roots.
+                return Err(self.stop(ScriptStop::OutOfMemory));
+            }
+            return Ok(());
+        }
+    }
+
+    /// Run queued rejection notifications before a readiness step of the
+    /// same task source, in their queue order.
+    pub(crate) fn run_rejection_notifications(&mut self) -> Result<(), ScriptStop> {
+        loop {
+            let task = self.pending.queue.borrow_mut().take_rejection_task();
+            let Some(Task::PromiseRejections(roots)) = task else {
+                return Ok(());
+            };
+            self.check_live()?;
+            self.begin_turn()?;
+            let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+            let result = notify_rejections(agent, roots);
+            self.finish_script_turn(result)?;
+        }
+    }
+
+    /// Map a page reporting call's result: page exceptions were already
+    /// reported, and only fatal stops end the turn.
+    fn page_result(&mut self, result: JsResult<()>) -> Result<(), ScriptStop> {
+        match result {
+            Ok(()) | Err(Abrupt::Throw(_)) => Ok(()),
             Err(Abrupt::OutOfMemory) => Err(self.stop(ScriptStop::OutOfMemory)),
             Err(Abrupt::Cancelled) => Err(self.stop_after_cancellation()),
-            Err(Abrupt::Throw(_)) => unreachable!("the job runner handles thrown values"),
+        }
+    }
+
+    /// HTML "report an exception" for a value a script, callback or module threw.
+    fn report_value(&mut self, value: Value) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let reported = page::report_exception(agent, value);
+        self.page_result(reported)
+    }
+
+    /// Report a script that failed to parse or compile as a SyntaxError.
+    fn report_syntax_error(&mut self, message: &str) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        match agent.new_error(rustic_js::runtime::ErrorKind::SyntaxError, message) {
+            Ok(error) => self.report_value(error),
+            Err(error) => self.page_result(Err(error)),
         }
     }
 
@@ -1068,5 +1174,29 @@ fn store_module(
             agent.unroot(namespace);
             Err(error)
         }
+    }
+}
+
+/// Unroot a queued notification's promises and fire their events.
+fn notify_rejections(
+    agent: &mut Agent,
+    roots: Vec<(rustic_js::runtime::RejectionOperation, HostRoot)>,
+) -> Result<(), EvalError> {
+    let mut events = Vec::new();
+    let reserved = events.try_reserve_exact(roots.len());
+    for (operation, root) in roots {
+        let promise = agent
+            .rooted(root)
+            .and_then(Value::as_object)
+            .expect("rooted rejected promise");
+        agent.unroot(root);
+        if reserved.is_ok() {
+            events.push(RejectionEvent { operation, promise });
+        }
+    }
+    match reserved {
+        // Nothing runs between unrooting and the page rooting them again.
+        Ok(()) => page::report_rejections(agent, events).map_err(EvalError::from),
+        Err(_) => Err(EvalError::OutOfMemory),
     }
 }

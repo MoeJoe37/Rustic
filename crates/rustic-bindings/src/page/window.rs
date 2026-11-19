@@ -58,6 +58,7 @@ pub(super) fn install(agent: &mut Agent, scheduler: bool) -> JsResult<Value> {
         |_, _| Ok(()),
     )?;
     let prototype = prototype(agent, "Window")?;
+    events::install_handlers(agent, prototype, true)?;
     let global = agent.intrinsics.global;
     for (name, get, set) in [
         ("window", view as NativeFn, None),

@@ -330,7 +330,7 @@
     {
       "name": "remove id attribute via innerHTML",
       "status": "FAIL",
-      "message": "assert_equals: should be null. expected null but got object \"[object HTMLElement]\""
+      "message": "cannot access property length of undefined or null"
     },
     {
       "name": "add id attribute via outerHTML",
@@ -340,7 +340,7 @@
     {
       "name": "remove id attribute via outerHTML",
       "status": "FAIL",
-      "message": "assert_equals: should be null. expected null but got object \"[object HTMLElement]\""
+      "message": "cannot access property length of undefined or null"
     },
     {
       "name": "update `id` attribute via element.id",
@@ -641,7 +641,7 @@
     {
       "name": "characterData Range.deleteContents: child and data removal mutation (2)",
       "status": "FAIL",
-      "message": "invalid DOM receiver or node argument"
+      "message": "cannot access property deleteContents of undefined or null"
     },
     {
       "name": "Range (r80) is created",
@@ -661,7 +661,7 @@
     {
       "name": "characterData Range.extractContents: child and data removal mutation (2)",
       "status": "FAIL",
-      "message": "invalid DOM receiver or node argument"
+      "message": "cannot access property extractContents of undefined or null"
     },
     {
       "name": "characterData/characterDataOldValue alone Text.data: simple mutation",
@@ -691,8 +691,159 @@
     },
     {
       "name": "childList Node.normalize mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.normalize mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.insertBefore: addition mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.insertBefore: removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.insertBefore: removal and addition mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.insertBefore: fragment addition mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.insertBefore: fragment removal mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.insertBefore: last child addition mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.appendChild: addition mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.appendChild: removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.appendChild: removal and addition mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.appendChild: fragment addition mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.appendChild: fragment removal mutations",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.appendChild: addition outside document tree mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.replaceChild: replacement mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.replaceChild: removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.replaceChild: internal replacement mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList Node.replaceChild: self internal replacement mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "childList ParentNode.replaceChildren: move an existing child",
       "status": "FAIL",
       "message": "value is not a function"
+    },
+    {
+      "name": "childList ParentNode.replaceChildren: self replacement of only child",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Node.removeChild: removal mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "Range (r70) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.deleteContents: child removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property deleteContents of undefined or null"
+    },
+    {
+      "name": "Range (r71) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.deleteContents: child and data removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property deleteContents of undefined or null"
+    },
+    {
+      "name": "Range (r80) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.extractContents: child removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property extractContents of undefined or null"
+    },
+    {
+      "name": "Range (r81) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.extractContents: child and data removal mutation",
+      "status": "FAIL",
+      "message": "cannot access property extractContents of undefined or null"
+    },
+    {
+      "name": "Range (r90) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.insertNode: child insertion mutation",
+      "status": "FAIL",
+      "message": "cannot access property insertNode of undefined or null"
+    },
+    {
+      "name": "Range (r91) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.insertNode: children insertion mutation",
+      "status": "FAIL",
+      "message": "cannot access property insertNode of undefined or null"
+    },
+    {
+      "name": "Range (r100) is created",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "childList Range.surroundContents: children removal and addition mutation",
+      "status": "FAIL",
+      "message": "cannot access property surroundContents of undefined or null"
     }
   ],
   "dom/nodes/MutationObserver-disconnect.html": [
@@ -818,6 +969,105 @@
       "status": "PASS"
     }
   ],
+  "dom/nodes/Node-childNodes.html": [
+    {
+      "name": "Caching of Node.childNodes",
+      "status": "PASS"
+    },
+    {
+      "name": "Node.childNodes on an Element.",
+      "status": "PASS"
+    },
+    {
+      "name": "Node.childNodes on a DocumentFragment.",
+      "status": "PASS"
+    },
+    {
+      "name": "Node.childNodes on a Document.",
+      "status": "PASS"
+    },
+    {
+      "name": "Iterator behavior of Node.childNodes",
+      "status": "PASS"
+    },
+    {
+      "name": "Node.childNodes should be a live collection",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Node-constants.html": [
+    {
+      "name": "Constants for nodeType on Node interface object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for nodeType on Node prototype object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for nodeType on Element object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for nodeType on Text object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for createDocumentPosition on Node interface object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for createDocumentPosition on Node prototype object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for createDocumentPosition on Element object.",
+      "status": "PASS"
+    },
+    {
+      "name": "Constants for createDocumentPosition on Text object.",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Node-isSameNode.html": [
+    {
+      "name": "doctypes should be compared on reference",
+      "status": "PASS"
+    },
+    {
+      "name": "elements should be compared on reference (namespaced element)",
+      "status": "PASS"
+    },
+    {
+      "name": "elements should be compared on reference (namespaced attribute)",
+      "status": "PASS"
+    },
+    {
+      "name": "processing instructions should be compared on reference",
+      "status": "PASS"
+    },
+    {
+      "name": "text nodes should be compared on reference",
+      "status": "PASS"
+    },
+    {
+      "name": "comments should be compared on reference",
+      "status": "PASS"
+    },
+    {
+      "name": "document fragments should be compared on reference",
+      "status": "PASS"
+    },
+    {
+      "name": "documents should be compared on reference",
+      "status": "PASS"
+    },
+    {
+      "name": "attributes should be compared on reference",
+      "status": "FAIL",
+      "message": "value is not a function"
+    }
+  ],
   "dom/nodes/Node-mutation-adoptNode.html": [
     {
       "name": "simple append of foreign div with text",
@@ -827,6 +1077,257 @@
       "name": "Adopting an element into a different document update's the element's owner doc as well as the owner docs of it's attributes",
       "status": "FAIL",
       "message": "cannot access a property of undefined or null"
+    }
+  ],
+  "dom/nodes/Node-nodeName.html": [
+    {
+      "name": "For Element nodes, nodeName should return the same as tagName.",
+      "status": "PASS"
+    },
+    {
+      "name": "For Text nodes, nodeName should return \"#text\".",
+      "status": "PASS"
+    },
+    {
+      "name": "For Comment nodes, nodeName should return \"#comment\".",
+      "status": "PASS"
+    },
+    {
+      "name": "For Document nodes, nodeName should return \"#document\".",
+      "status": "PASS"
+    },
+    {
+      "name": "For DocumentType nodes, nodeName should return the name.",
+      "status": "PASS"
+    },
+    {
+      "name": "For DocumentFragment nodes, nodeName should return \"#document-fragment\".",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Node-nodeValue.html": [
+    {
+      "name": "Text.nodeValue",
+      "status": "PASS"
+    },
+    {
+      "name": "Comment.nodeValue",
+      "status": "PASS"
+    },
+    {
+      "name": "ProcessingInstruction.nodeValue",
+      "status": "PASS"
+    },
+    {
+      "name": "Element.nodeValue",
+      "status": "PASS"
+    },
+    {
+      "name": "Document.nodeValue",
+      "status": "PASS"
+    },
+    {
+      "name": "DocumentFragment.nodeValue",
+      "status": "PASS"
+    },
+    {
+      "name": "DocumentType.nodeValue",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Node-normalize.html": [
+    {
+      "name": "Node.normalize()",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty text nodes separated by a non-empty text node",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty text nodes",
+      "status": "PASS"
+    },
+    {
+      "name": "Non-text nodes with empty textContent values.",
+      "status": "FAIL",
+      "message": "DOMParser is not defined"
+    }
+  ],
+  "dom/nodes/Node-parentElement.html": [
+    {
+      "name": "When the parent is null, parentElement should be null",
+      "status": "PASS"
+    },
+    {
+      "name": "When the parent is a document, parentElement should be null (doctype)",
+      "status": "PASS"
+    },
+    {
+      "name": "When the parent is a document, parentElement should be null (element)",
+      "status": "PASS"
+    },
+    {
+      "name": "When the parent is a document, parentElement should be null (comment)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should return null for children of DocumentFragments (element)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should return null for children of DocumentFragments (text)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should work correctly with DocumentFragments (element)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should work correctly with DocumentFragments (text)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should work correctly in disconnected subtrees (element)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should work correctly in disconnected subtrees (text)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should work correctly in a document (element)",
+      "status": "PASS"
+    },
+    {
+      "name": "parentElement should work correctly in a document (text)",
+      "status": "PASS"
+    }
+  ],
+  "dom/nodes/Node-replaceChild.html": [
+    {
+      "name": "Should check the 'parent' type before checking whether 'child' is a child of 'parent'",
+      "status": "PASS"
+    },
+    {
+      "name": "Should check that 'node' is not an ancestor of 'parent' before checking whether 'child' is a child of 'parent'",
+      "status": "PASS"
+    },
+    {
+      "name": "Should check whether 'child' is a child of 'parent' before checking whether 'node' is of a type that can have a parent.",
+      "status": "PASS"
+    },
+    {
+      "name": "Should check whether 'child' is a child of 'parent' before checking whether 'node' is of a type that can have a parent of the type that 'parent' is.",
+      "status": "PASS"
+    },
+    {
+      "name": "Should check whether 'child' is a child of 'parent' before checking whether 'node' can be inserted into the document given the kids the document has right now.",
+      "status": "FAIL",
+      "message": "operation violates the node hierarchy"
+    },
+    {
+      "name": "Passing null to replaceChild should throw a TypeError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If child's parent is not the context node, a NotFoundError exception should be thrown",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is not a node that can contain children, a HierarchyRequestError exception should be thrown",
+      "status": "PASS"
+    },
+    {
+      "name": "If node is an inclusive ancestor of the context node, a HierarchyRequestError should be thrown.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a document or text node should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a DocumentFragment that contains a text node or too many elements should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document (without element children), inserting a DocumentFragment that contains multiple elements should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a DocumentFragment with an element if there already is an element child should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a DocumentFragment with an element before the doctype should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting an element if there already is an element child should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting an element before the doctype should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a doctype if there already is a doctype child should throw a HierarchyRequestError.",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a doctype after the document element should throw a HierarchyRequestError.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "If the context node is a DocumentFragment, inserting a document or a doctype should throw a HierarchyRequestError.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "If the context node is an element, inserting a document or a doctype should throw a HierarchyRequestError.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "Replacing a node with its next sibling should work (2 children)",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacing a node with its next sibling should work (4 children)",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacing a node with itself should not move the node",
+      "status": "PASS"
+    },
+    {
+      "name": "If the context node is a document, inserting a new doctype should work.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "Replacing the document element with a DocumentFragment containing a single element should work.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "Replacing the document element with a DocumentFragment containing a single element and comments should work.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "Replacing the document element with a single element should work.",
+      "status": "FAIL",
+      "message": "too many detached documents"
+    },
+    {
+      "name": "replaceChild should work in the presence of mutation events.",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacing an element with a DocumentFragment should allow a child of the DocumentFragment to be found by Id.",
+      "status": "PASS"
     }
   ],
   "html/webappapis/animation-frames/callback-handle.html": [
@@ -844,6 +1345,192 @@
   "html/webappapis/animation-frames/cancel-invoked.html": [
     {
       "name": "cancelAnimationFrame does nothing if there is no callback with the given handle",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/microtask-queuing/queue-microtask-exceptions.any.js": [
+    {
+      "name": "It rethrows exceptions",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/microtask-queuing/queue-microtask.any.js": [
+    {
+      "name": "It exists and is a function",
+      "status": "PASS"
+    },
+    {
+      "name": "It throws when given non-functions",
+      "status": "PASS"
+    },
+    {
+      "name": "It calls the callback asynchronously",
+      "status": "PASS"
+    },
+    {
+      "name": "It does not pass any arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "It interleaves with promises as expected",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/events/event-handler-handleEvent-ignored.html": [
+    {
+      "name": "plain object \"mouseenter\" handler",
+      "status": "PASS"
+    },
+    {
+      "name": "non-callable \"message\" handler that is instance of Function",
+      "status": "FAIL",
+      "message": "value is not a function"
+    }
+  ],
+  "html/webappapis/scripting/events/event-handler-processing-algorithm.html": [
+    {
+      "name": "mouseover listener returning false cancels event (using Event)",
+      "status": "PASS"
+    },
+    {
+      "name": "mouseover listener returning false cancels event (using MouseEvent)",
+      "status": "PASS"
+    },
+    {
+      "name": "mouseover listener returning true doesn't cancel event (using Event)",
+      "status": "PASS"
+    },
+    {
+      "name": "mouseover listener returning true doesn't cancel event (using MouseEvent)",
+      "status": "PASS"
+    },
+    {
+      "name": "click listener returning false cancels event",
+      "status": "PASS"
+    },
+    {
+      "name": "blur listener returning false cancels event",
+      "status": "PASS"
+    },
+    {
+      "name": "dblclick listener returning false cancels event",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/addEventListener.html": [
+    {
+      "name": "window.onerror - addEventListener",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/compile-error.html": [
+    {
+      "name": "window.onerror - compile error in <script>",
+      "status": "FAIL",
+      "message": "location is not defined"
+    },
+    {
+      "name": "undefined (column)",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/runtime-error-in-setTimeout.html": [
+    {
+      "name": "window.onerror - runtime error in setTimeout",
+      "status": "FAIL",
+      "message": "location is not defined"
+    },
+    {
+      "name": "undefined (column)",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/runtime-error-in-window-onerror.html": [
+    {
+      "name": "runtime error in window.onerror",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/runtime-error.html": [
+    {
+      "name": "window.onerror - runtime error in <script>",
+      "status": "FAIL",
+      "message": "location is not defined"
+    },
+    {
+      "name": "undefined (column)",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/unhandled-promise-rejections/promise-rejection-event-constructor.html": [
+    {
+      "name": "This tests the constructor for the PromiseRejectionEvent DOM class.",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/unhandled-promise-rejections/promise-rejection-event-during-parse.html": [
+    {
+      "name": "Promise rejection during initial parsing of document",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/unhandled-promise-rejections/promise-rejection-events-attached-in-event.html": [
+    {
+      "name": "Attaching a handler in unhandledrejection should not trigger rejectionhandled.",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/window-onerror-event-throw-null.html": [
+    {
+      "name": "Throwing null in event listener",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/window-onerror-parse-error.html": [
+    {
+      "name": "correct url passed to window.onerror",
+      "status": "FAIL",
+      "message": "cannot access property href of undefined or null"
+    },
+    {
+      "name": "correct line number passed to window.onerror",
+      "status": "FAIL",
+      "message": "assert_equals: expected 34 but got 0"
+    },
+    {
+      "name": "correct number of calls to window.onerror",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/window-onerror-runtime-error-throw.html": [
+    {
+      "name": "correct url passed to window.onerror",
+      "status": "FAIL",
+      "message": "cannot access property href of undefined or null"
+    },
+    {
+      "name": "correct line number passed to window.onerror",
+      "status": "FAIL",
+      "message": "assert_equals: expected 36 but got 0"
+    },
+    {
+      "name": "correct number of calls to window.onerror",
+      "status": "PASS"
+    }
+  ],
+  "html/webappapis/scripting/processing-model-2/window-onerror-runtime-error.html": [
+    {
+      "name": "correct url passed to window.onerror",
+      "status": "FAIL",
+      "message": "cannot access property href of undefined or null"
+    },
+    {
+      "name": "correct line number passed to window.onerror",
+      "status": "FAIL",
+      "message": "assert_equals: expected 36 but got 0"
+    },
+    {
+      "name": "correct number of calls to window.onerror",
       "status": "PASS"
     }
   ],

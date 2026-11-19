@@ -720,11 +720,56 @@ also exposed.
 Open debt: [TD-150](TECH_DEBT.md#td-150--dead-mutation-observer-registrations-are-dropped-lazily),
 [TD-151](TECH_DEBT.md#td-151--mutation-records-for-parser-and-host-edits-resolve-observers-when-drained).
 
+## WEB-07 — Error reporting, event handlers and console
+
+Uncaught exceptions from classic and host scripts, parse and compile
+failures (reported as a `SyntaxError`), listeners, timers, animation and
+mutation-observer callbacks, `queueMicrotask` callbacks and rejected module
+evaluations fire a trusted, cancelable `ErrorEvent` at Window and, unless a
+handler cancels it, add an error to the console sink. A report made while
+reporting is only logged. `ErrorEvent` and `PromiseRejectionEvent` have
+constructors that read their dictionaries in Web IDL order and branded
+getters. After each microtask checkpoint the scripted document roots the
+rejection tracker's promises and queues one task that fires
+`unhandledrejection` (skipped if a handler was attached in time) and
+`rejectionhandled` for promises reported earlier; a handler attached during
+the event keeps the promise out of the outstanding set. The inline loader
+runs those tasks before `DOMContentLoaded` and before readiness becomes
+`complete`; a full task queue notifies at once.
+
+Event handler IDL attributes for a subset of `GlobalEventHandlers` exist on
+Window, Document and HTMLElement, plus `onunhandledrejection` and
+`onrejectionhandled` on Window. Assigning an object appends one ordered
+listener record; `null` or a non-object removes it. A `false` return
+cancels; Window's `onerror` receives `(message, source, lineno, colno,
+error)` and cancels with `true`. A non-callable object handler does
+nothing.
+
+`console.debug`, `log`, `info`, `warn`, `error` and `assert` append to a
+1,024-message buffer with 8 KiB per message; overflow is counted and cut
+messages are flagged. `ScriptedDocument::take_console_messages` drains it
+and the scripted CLI prints it to standard error. `Agent::describe_value`
+formats values without running page code. The CLI also runs tasks queued
+without a deadline before advancing its manual clock.
+
+`Node` gains `nodeName`, `nodeValue`, `parentElement`, `lastChild`,
+`previousSibling`, `isConnected`, `hasChildNodes()`, `getRootNode()`,
+`contains()`, `isSameNode()`, `compareDocumentPosition()` with its
+constants, `replaceChild()` and `normalize()`. `Document::replace_child`
+validates in the DOM's order and records the adoption removal and one
+combined entry, including for `replaceChild(x, x)`.
+
+[ADR 0048](adr/0048-error-reporting-and-event-handlers.md),
+[HTML §8.1.4.7](https://html.spec.whatwg.org/multipage/webappapis.html#runtime-script-errors),
+[HTML §8.1.5.7](https://html.spec.whatwg.org/multipage/webappapis.html#unhandled-promise-rejections).
+Open debt: [TD-152](TECH_DEBT.md#td-152--error-reports-lack-source-locations-and-console-formatting),
+[TD-153](TECH_DEBT.md#td-153--event-handler-content-attributes-and-remaining-handler-names).
+
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 35 Window WPT files. It reports 191 subtests, including 155
-passes and 36 expected failures. The runner checks vendored files by digest and
+baseline for 59 Window WPT files. It reports 342 subtests, including 271
+passes and 71 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.

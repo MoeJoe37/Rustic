@@ -58,13 +58,13 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134, TD-149 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-15, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151, TD-153 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -215,6 +215,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, WEB-06 |
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
+| TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M6 navigation |
+| TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled, body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2040,8 +2042,9 @@ Extend the input model for pointer sequences, mouse and pointer attributes,
 text input, IME, and additional control defaults when the corresponding host
 and form APIs land. HTML input cloning still needs to copy mutable
 checkedness and indeterminateness. Add signal-driven listener removal with
-AbortSignal. Route listener exceptions to HTML error reporting and
-console/debugging. The current host can consume an exception count.
+AbortSignal. Listener, observer, timer and script exceptions now reach HTML
+error reporting and the console sink ([ADR 0048](adr/0048-error-reporting-and-event-handlers.md));
+debugging hooks remain.
 
 Extend the path to handle shadow retargeting, connected shadow input
 targets, and scoped composed paths when exposing shadow trees in M9.
@@ -2361,4 +2364,35 @@ snapshot in the entry; coalesce parser text appends into one record per
 token run.
 **Trigger:** M9 HTML lifecycle work, or a WPT parser-mutation case that
 depends on it.
+
+### TD-152 — Error reports lack source locations and console formatting
+
+`ErrorEvent.filename` is empty and `lineno` and `colno` are zero, because
+script sources carry no URL and thrown values no position the host can
+read; `window.location` does not exist yet. The console joins arguments
+with spaces and does not interpret `%s`, `%d`, `%o` or `%c`, and objects
+appear as `[object Object]` or `Name: message` rather than an inspectable
+preview ([ADR 0048](adr/0048-error-reporting-and-event-handlers.md)).
+**Pay:** record the script URL and the throw position in the VM, pass them
+through `report_exception`, add `location` with navigation, and implement
+the Console Standard's formatter with side-effect-free previews.
+**Trigger:** M6 navigation, or the DevTools work in M10.
+
+### TD-153 — Event handler content attributes and remaining handler names
+
+Event handler IDL attributes exist for a subset of `GlobalEventHandlers`
+plus Window's rejection handlers. Content attributes such as
+`onclick="…"` are not compiled into handlers, `<body>` and `<frameset>` do
+not forward Window handlers such as `onload`, and handlers like
+`onmessage` and the animation, pointer and drag families are absent.
+Separately, `replaceChild` with a node from another document records an
+insertion and a removal instead of the DOM's one combined record, and
+`normalize()` validates each merge on its own, so a document at its data
+budget can be left part-normalized when it throws.
+**Pay:** add a scoped function compilation entry point in `rustic-js`
+(element, form owner and document scopes), compile on first use with the
+raw-handler rules, forward the body handlers, generate the handler list
+from the pinned IDL, adopt then replace in one DOM operation, and
+preflight the total normalized size.
+**Trigger:** M9 HTML lifecycle work, or the first WPT case that needs one.
 

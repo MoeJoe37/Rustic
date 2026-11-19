@@ -168,6 +168,23 @@ by observed nodes: an observer lives as long as a node it watches, follows
 adopted nodes and is collected with them.
 [ADR 0047](adr/0047-mutation-observers.md)
 
+Uncaught exceptions from scripts, parse failures, listeners, timers,
+animation and observer callbacks and module evaluation are reported the
+HTML way: a cancelable `ErrorEvent` at Window (`window.onerror` gets the
+five-argument form and cancels with `true`), then a console message unless
+canceled. After each checkpoint the document queues a task that fires
+`unhandledrejection` for still-unhandled rejections and `rejectionhandled`
+for ones handled later; the loader runs it before the readiness steps.
+Event handler IDL attributes (`onclick`, `onerror`, `onload`, … on Window,
+Document and HTML elements) keep their position among listeners. `console`
+methods fill a bounded buffer the host drains with
+`take_console_messages`; `rustic … --run-scripts` prints it to standard
+error. Describing a value never runs page code. `Node` also has
+`nodeName`, `nodeValue`, `parentElement`, `lastChild`, `previousSibling`,
+`isConnected`, `hasChildNodes`, `getRootNode`, `contains`, `isSameNode`,
+`compareDocumentPosition`, `replaceChild` and `normalize`.
+[ADR 0048](adr/0048-error-reporting-and-event-handlers.md)
+
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
@@ -175,7 +192,7 @@ What does **not** work yet:
 | Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md), [TD-148](TECH_DEBT.md#td-148--computed-style-snapshots-are-eager-and-copied-per-read), [TD-149](TECH_DEBT.md#td-149--pseudo-element-getcomputedstyle-throws)). | WEB-06 |
 | `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
-| Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
+| Error locations, handler content attributes | `ErrorEvent` has no file or line, `onclick="…"` markup is not compiled (TD-152, TD-153) | M6, M9 |
 | Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
 | Network, storage, workers | Not present | M6, M9 |
 | Expanded WPT coverage | The initial Window baseline covers nodes, events, collections, timers and animation callbacks. New APIs need their own coverage as they land. | WEB-09 |
@@ -304,8 +321,9 @@ same turn budget, so a single call cannot run unmetered.
   `DocumentType`, `Element`, `CharacterData`, `Text`, `CDATASection`, `Comment`,
   `ProcessingInstruction`, `XMLDocument`, `DOMImplementation`, `NodeList`,
   `HTMLCollection`, `Window`, `Event`, `CustomEvent`, `UIEvent`, `MouseEvent`,
-  `PointerEvent`, `KeyboardEvent`, `MutationObserver`, `MutationRecord`,
-  `DOMException` and the checkbox state of `HTMLInputElement`. IMPLEMENTATION.md lists the members of each; treat that
+  `PointerEvent`, `KeyboardEvent`, `ErrorEvent`, `PromiseRejectionEvent`,
+  `MutationObserver`, `MutationRecord`, `DOMException`, the `console`
+  namespace and the checkbox state of `HTMLInputElement`. IMPLEMENTATION.md lists the members of each; treat that
   list, not this one, as the contract.
 - **Selectors** ([ADR 0030](adr/0030-dom-selectors-and-node-lists.md)).
   `querySelector`, `querySelectorAll`, `matches` and `closest` use the same
@@ -360,6 +378,8 @@ and `AbortSignal` listener removal are TD-131.
 | Conversions and generated metadata | `crates/rustic-bindings/tests/webidl.rs`, `metadata.rs` |
 | Wrapper identity, adoption, joint collection | `crates/rustic-bindings/tests/dom_gc.rs`, `page.rs` |
 | Events | `crates/rustic-bindings/tests/events.rs` |
+| Error reporting, handlers and console | `crates/rustic-bindings/tests/errors.rs`, `crates/rustic-engine/tests/error_reporting.rs` |
+| Node tree members | `crates/rustic-bindings/tests/node_tree.rs` |
 | Mutation journal, observers and `queueMicrotask` | `crates/rustic-dom/tests/journal.rs`, `crates/rustic-bindings/tests/mutation_observer.rs`, `crates/rustic-engine/tests/mutation_observers.rs` |
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |
 
@@ -381,8 +401,8 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 `html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
-configured to require an exact match to the checked-in **35 files,
-191 subtests, 155 passes and 36 expected failures**. The expectations record the names and diagnoses
+configured to require an exact match to the checked-in **59 files,
+342 subtests, 271 passes and 71 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -396,6 +416,17 @@ clock and one rendering opportunity. The candidate
 running after completion. Both remain outside the initial selection.
 Eleven `dom/nodes` mutation-observer files load the upstream
 `mutationobservers.js` helper, which the manifest lists as a support file.
+Support files are copied beside the page and the runner rewrites any
+`src` that resolves to one, so `../constants.js` works too; `.any.js`
+files may declare `global=` lists that include `window`. The error
+reporting files cover `window.onerror`, runtime, compile and
+`setTimeout` errors, rejection events (including one raised while the
+document parses), `queueMicrotask` and the event handler processing
+algorithm. Their expected failures are the missing `location`, source
+positions (TD-152) and `onmessage`. The `Node` files cover names, values,
+parents, child lists, constants, `isSameNode`, `normalize` and
+`replaceChild`, whose expected failures come from the 16 detached
+document limit, `Attr` nodes and `DOMParser`.
 Their expected failures name APIs that are not built: `classList`,
 `Element.attributes`, Range, `normalize()`, `HTMLInputElement.type`
 reflection, script-inserted script execution (TD-133) and `Attr` nodes.
@@ -435,6 +466,8 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 | TD-149 | Pseudo-element `getComputedStyle` throws | WEB-06 |
 | TD-150 | Dead observer registrations are dropped lazily | M7 entry |
 | TD-151 | Parser and host records resolve observers when drained | M9 HTML lifecycle |
+| TD-152 | Error reports lack locations; console has no formatter | M6 navigation |
+| TD-153 | Handler content attributes and remaining handler names | M9 HTML lifecycle |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

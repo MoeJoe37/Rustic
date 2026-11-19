@@ -148,7 +148,7 @@ impl Event {
         self.current(agent, Value::NULL, Phase::None)
     }
 
-    fn prevent_default(self, agent: &mut Agent) -> JsResult<()> {
+    pub(super) fn prevent_default(self, agent: &mut Agent) -> JsResult<()> {
         let flags = self.flags(agent)?;
         if flags & Self::CANCELABLE != 0 && flags & Self::PASSIVE == 0 {
             self.set_flags(agent, flags | Self::CANCELED)?;

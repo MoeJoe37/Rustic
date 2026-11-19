@@ -443,7 +443,10 @@ calls a function value. The design is recorded in
     `Agent::enqueue_microtask(callback, argument)` lets a host queue its own
     job behind the waiting ones (HTML `queueMicrotask` and mutation-observer
     delivery use it), and `Agent::iterate_values` gives hosts the Web IDL
-    sequence iteration.
+    sequence iteration. `Agent::promise_is_handled` reads
+    `[[PromiseIsHandled]]` for the HTML rejection events, and
+    `Agent::describe_value` formats a thrown or logged value from data
+    properties only, without running script.
   - A promise is an ordinary object with a boxed record: state, result
     and its reactions (40 bytes each). A promise made by `%Promise%` for
     `then` or an async function has no resolving function objects, since

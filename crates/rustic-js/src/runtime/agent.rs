@@ -876,6 +876,50 @@ impl Agent {
         self.heap.object(object).primitive()
     }
 
+    /// Text for a thrown or logged value that runs no script: primitives
+    /// as `display` shows them, and an ordinary object as `Name: message`
+    /// from `name` and `message` data properties on it or its ordinary
+    /// prototypes. Accessors and exotic objects (including proxies) are
+    /// never consulted, so a reporting host cannot reenter page code.
+    pub fn describe_value(&mut self, value: Value) -> String {
+        let Some(object) = value.as_object() else {
+            return self.display(value);
+        };
+        let mut name = None;
+        let mut message = None;
+        let mut current = Some(object);
+        for _ in 0..32 {
+            let Some(o) = current else { break };
+            if self.is_exotic(o) {
+                break;
+            }
+            for (field, slot) in [("name", &mut name), ("message", &mut message)] {
+                if slot.is_some() {
+                    continue;
+                }
+                let Ok(key) = self.heap.key(field) else {
+                    continue;
+                };
+                if let Ok(Some(PropertyDescriptor {
+                    value: Some(found), ..
+                })) = self.ordinary_get_own_property(o, key)
+                {
+                    if let Some(text) = found.as_string() {
+                        *slot = Some(self.heap.string(text).to_text());
+                    }
+                }
+            }
+            current = self.heap.object(o).proto();
+        }
+        match (name, message) {
+            (Some(name), Some(message)) if !message.is_empty() => format!("{name}: {message}"),
+            (Some(name), _) => name,
+            (None, Some(message)) => message,
+            (None, None) if self.is_callable(value) => "function".to_owned(),
+            (None, None) => "[object Object]".to_owned(),
+        }
+    }
+
     /// Debug text for a value (strings unquoted).
     pub fn display(&self, value: Value) -> String {
         match value.kind() {

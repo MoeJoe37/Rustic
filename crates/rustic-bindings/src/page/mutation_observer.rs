@@ -879,10 +879,7 @@ fn notify(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
             });
             match result {
                 Ok(_) => {}
-                Err(Abrupt::Throw(_)) => with_page(agent, |_, page| {
-                    page.events.report_listener_error();
-                    Ok(())
-                })?,
+                Err(Abrupt::Throw(error)) => super::events::report_callback_error(agent, error)?,
                 Err(error) => return Err(error),
             }
         }
@@ -929,10 +926,10 @@ fn invoke(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let callback = args.first().copied().unwrap_or(Value::UNDEFINED);
     match agent.call(callback, Value::UNDEFINED, &[]) {
         Ok(_) => Ok(Value::UNDEFINED),
-        Err(Abrupt::Throw(_)) => with_page(agent, |_, page| {
-            page.events.report_listener_error();
+        Err(Abrupt::Throw(error)) => {
+            super::events::report_callback_error(agent, error)?;
             Ok(Value::UNDEFINED)
-        }),
+        }
         Err(error) => Err(error),
     }
 }

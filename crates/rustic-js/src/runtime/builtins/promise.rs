@@ -709,6 +709,14 @@ impl Agent {
         Ok(())
     }
 
+    /// `[[PromiseIsHandled]]` of a promise, or `None` if `promise` is not one.
+    pub fn promise_is_handled(&self, promise: ObjectId) -> Option<bool> {
+        match self.heap.object(promise).internal() {
+            Some(Internal::Promise(p)) => Some(p.handled),
+            _ => None,
+        }
+    }
+
     /// Whether promise jobs are waiting.
     pub fn has_pending_jobs(&self) -> bool {
         !self.vm.jobs.is_empty()

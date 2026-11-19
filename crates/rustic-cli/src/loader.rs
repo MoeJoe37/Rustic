@@ -398,16 +398,53 @@ fn load_scripted_document(
     )?;
     // The resource helper has already delivered each accepted completion.
     // Retain the original bounded timer loop, including for zero-delay timers.
-    while let Some(delay) = document.time_until_next_timer()? {
+    // Tasks already queued without a deadline (such as unhandled-rejection
+    // notifications) run before the clock advances, under their own bound.
+    let mut queued_turns = 0usize;
+    loop {
+        if queued_turns == MAX_SCRIPT_TIMER_TURNS {
+            return Err(LoadError::ScriptTurnLimit);
+        }
+        if document.run_next()?.is_some() {
+            queued_turns += 1;
+            continue;
+        }
+        let Some(delay) = document.time_until_next_timer()? else {
+            break;
+        };
         advance_script_timer(document.clock(), delay, &mut turns)?;
         document.run_next()?;
     }
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;
+    print_console(&document);
     Ok(LoadedDocument {
         document: document.into_document(),
         applied_files: Some(applied_files),
     })
+}
+
+/// Write the page's console messages and reported errors to standard error.
+fn print_console(document: &rustic_engine::ScriptedDocument<ManualClock>) {
+    let log = document.take_console_messages();
+    for message in &log.messages {
+        let level = match message.level {
+            rustic_engine::ConsoleLevel::Debug => "debug",
+            rustic_engine::ConsoleLevel::Log => "log",
+            rustic_engine::ConsoleLevel::Info => "info",
+            rustic_engine::ConsoleLevel::Warn => "warn",
+            rustic_engine::ConsoleLevel::Error => "error",
+        };
+        let cut = if message.truncated {
+            " [truncated]"
+        } else {
+            ""
+        };
+        eprintln!("console.{level}: {}{cut}", message.text.escape_debug());
+    }
+    if log.dropped > 0 {
+        eprintln!("console: {} further messages dropped", log.dropped);
+    }
 }
 
 /// Eagerly supply the completed parser's local stylesheet/image resources

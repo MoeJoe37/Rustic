@@ -14,9 +14,16 @@ use crate::webidl::coerce_string;
 
 use super::{identity, install_interface, prototype, read_node, required_arg, with_page, wrap};
 
+mod errors;
+mod handlers;
 mod input;
 mod state;
 mod ui;
+pub use errors::{
+    CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
+};
+pub(super) use errors::{report_exception, report_rejections};
+pub(super) use handlers::install as install_handlers;
 pub use input::{InputEvent, KeyInput, Modifiers};
 pub(super) use input::{connected, deliver, install_controls, reaches_root};
 
@@ -29,38 +36,48 @@ pub(super) const TARGET: &str = "EventTarget";
 #[derive(Debug)]
 pub(super) struct Events {
     targets: ObjectId,
+    handlers: ObjectId,
     states: ObjectId,
     is_trusted: Value,
     started: Instant,
     listener_errors: Cell<u64>,
     controls: ObjectId,
     pressed_space: Cell<Option<rustic_dom::NodeId>>,
+    pub(super) reporting: errors::Reporting,
 }
 
 impl Events {
     pub(super) fn new(agent: &mut Agent) -> JsResult<Self> {
         let targets = agent.new_weak_map()?;
+        let handlers = agent.new_weak_map()?;
         let states = agent.new_weak_map()?;
         let is_trusted = state::trusted_getter(agent)?;
         let controls = agent.new_weak_map()?;
+        let (reporting, [errors, rejections, outstanding]) = errors::Reporting::new(agent)?;
         let storage = PrivateArray::new(
             agent,
             &[
                 Value::object(targets),
+                Value::object(handlers),
                 Value::object(states),
                 is_trusted,
                 Value::object(controls),
+                errors,
+                rejections,
+                outstanding,
             ],
         )?;
         agent.root(storage.value())?;
         Ok(Self {
             targets,
+            handlers,
             states,
             is_trusted,
             started: Instant::now(),
             listener_errors: Cell::new(0),
             controls,
             pressed_space: Cell::new(None),
+            reporting,
         })
     }
 
@@ -94,7 +111,18 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         },
     )?;
     state::install(agent)?;
-    ui::install(agent)
+    ui::install(agent)?;
+    errors::install(agent)
+}
+
+/// Count a callback's exception and report it to the page (HTML "report an
+/// exception"), as listeners, observers and microtask callbacks do.
+pub(super) fn report_callback_error(agent: &mut Agent, error: Value) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        page.events.report_listener_error();
+        Ok(())
+    })?;
+    report_exception(agent, error)
 }
 
 pub(super) fn define_method(
@@ -503,6 +531,8 @@ impl Listener {
     const CAPTURE: u8 = 1;
     const ONCE: u8 = 2;
     const PASSIVE: u8 = 4;
+    /// An event handler attribute's record; the callback slot holds its entry.
+    const HANDLER: u8 = 8;
 
     fn new(agent: &mut Agent, event_type: Value, callback: Value, flags: u8) -> JsResult<Self> {
         Ok(Self(PrivateArray::new(
@@ -808,15 +838,16 @@ fn invoke(
                     list.remove(agent, listener)?;
                 }
                 event.set_passive(agent, flags & Listener::PASSIVE != 0)?;
-                call_listener(agent, callback, target, value)
+                if flags & Listener::HANDLER != 0 {
+                    handlers::call(agent, callback, target, value, event)
+                } else {
+                    call_listener(agent, callback, target, value)
+                }
             });
             event.set_passive(agent, false)?;
             match result {
                 Ok(_) => {}
-                Err(Abrupt::Throw(_)) => with_page(agent, |_, page| {
-                    page.events.report_listener_error();
-                    Ok(())
-                })?,
+                Err(Abrupt::Throw(error)) => report_callback_error(agent, error)?,
                 Err(error) => return Err(error),
             }
             if event.immediate(agent)? {

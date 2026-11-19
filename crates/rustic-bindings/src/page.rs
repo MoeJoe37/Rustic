@@ -25,10 +25,14 @@ mod dom_rect;
 mod events;
 mod html_collections;
 mod mutation_observer;
+mod node_tree;
 mod selectors;
 mod window;
 
 pub use events::LifecycleEvent;
+pub use events::{
+    CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
+};
 pub use events::{InputEvent, KeyInput, Modifiers};
 pub use window::{TimerHandler, WindowScheduler};
 
@@ -327,6 +331,7 @@ fn install_page(
         ],
         |agent, prototype| {
             character_data::install_text_content(agent, prototype)?;
+            node_tree::install(agent, prototype)?;
             for (name, behavior, length) in [
                 ("appendChild", append_child as NativeFn, 1),
                 ("insertBefore", insert_before, 2),
@@ -387,6 +392,7 @@ fn install_page(
             documents::install_body(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
             selectors::install_non_element_parent(agent, proto)?;
+            events::install_handlers(agent, proto, false)?;
             html_collections::install_lookup::<true>(agent, proto)
         },
     )?;
@@ -429,7 +435,7 @@ fn install_page(
         illegal_constructor,
         0,
         &[("offsetWidth", "get offsetWidth", offset_width)],
-        |_, _| Ok(()),
+        |agent, proto| events::install_handlers(agent, proto, false),
     )?;
     events::install_controls(agent)?;
     install_interface(
@@ -530,6 +536,33 @@ pub fn flush_mutation_records(agent: &mut Agent) -> JsResult<()> {
     mutation_observer::flush(agent, page)
 }
 
+/// HTML "report an exception" for a value thrown by a script, timer or
+/// callback the host ran: a cancelable `error` ErrorEvent at Window, then a
+/// console message unless a handler canceled it.
+pub fn report_exception(agent: &mut Agent, error: Value) -> JsResult<()> {
+    events::report_exception(agent, error)
+}
+
+/// Fire `unhandledrejection` and `rejectionhandled` for the rejection
+/// tracker's events, as HTML "notify about rejected promises" does. Call
+/// after a microtask checkpoint with [`Agent::take_rejection_events`].
+pub fn report_rejections(
+    agent: &mut Agent,
+    events: Vec<rustic_js::runtime::RejectionEvent>,
+) -> JsResult<()> {
+    events::report_rejections(agent, events)
+}
+
+/// Take the page's console messages, oldest first, and the number dropped
+/// because the bounded buffer was full.
+pub fn take_console_messages(agent: &Agent) -> ConsoleLog {
+    let host = agent.execution_host();
+    host.as_ref()
+        .and_then(|host| host.as_any().downcast_ref::<Page>())
+        .map(|page| page.events.reporting.take_console())
+        .unwrap_or_default()
+}
+
 /// Read and clear the number of exceptions reported by event listeners.
 pub fn take_listener_error_count(agent: &Agent) -> u64 {
     let host = agent.execution_host();
@@ -586,7 +619,8 @@ fn install_interface(
     )
 }
 
-/// The `Node` node-type constants on the interface object and prototype.
+/// The `Node` type and document-position constants on the interface object
+/// and prototype.
 fn install_node_constants(agent: &mut Agent) -> JsResult<()> {
     let prototype = prototype(agent, "Node")?;
     let key = PropertyKey::String(agent.names.constructor);
@@ -615,6 +649,19 @@ fn install_node_constants(agent: &mut Agent) -> JsResult<()> {
             u8::try_from(value + 1).expect("twelve constants"),
         ));
         let desc = PropertyDescriptor::data_with(number, false, true, false);
+        agent.define_property_or_throw(prototype, key, desc)?;
+        agent.define_property_or_throw(constructor, key, desc)?;
+    }
+    for (name, bit) in [
+        ("DOCUMENT_POSITION_DISCONNECTED", 0x01),
+        ("DOCUMENT_POSITION_PRECEDING", 0x02),
+        ("DOCUMENT_POSITION_FOLLOWING", 0x04),
+        ("DOCUMENT_POSITION_CONTAINS", 0x08),
+        ("DOCUMENT_POSITION_CONTAINED_BY", 0x10),
+        ("DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC", 0x20),
+    ] {
+        let key = agent.heap.key(name)?;
+        let desc = PropertyDescriptor::data_with(Value::number(f64::from(bit)), false, true, false);
         agent.define_property_or_throw(prototype, key, desc)?;
         agent.define_property_or_throw(constructor, key, desc)?;
     }

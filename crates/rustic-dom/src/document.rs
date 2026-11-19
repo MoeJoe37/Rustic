@@ -545,6 +545,132 @@ impl Document {
         Ok(())
     }
 
+    /// Replace `child` of `parent` with `node`, as DOM `replaceChild` does.
+    ///
+    /// `node` is validated like an insertion before `child` (for the
+    /// document node, after `child` leaves, so its one-element and
+    /// one-doctype rules see the final children); a failure leaves the tree
+    /// unchanged. With the journal enabled this records the DOM's entries: a
+    /// removal from `node`'s old parent (or the emptying of a fragment), then
+    /// one entry listing the inserted nodes and `child` as removed. When
+    /// `node` is `child` the tree is unchanged and the second entry lists only
+    /// the insertion, as engines and WPT expect.
+    pub fn replace_child(
+        &mut self,
+        parent: NodeId,
+        node: NodeId,
+        child: NodeId,
+    ) -> Result<(), DomError> {
+        self.node(node)?;
+        // DOM "ensure replace validity" steps 1-3: the parent's kind, then a
+        // cycle through host-including ancestors, then `child`'s parent.
+        if !matches!(
+            self.node(parent)?.kind(),
+            NodeKind::Document | NodeKind::Element(_) | NodeKind::DocumentFragment
+        ) {
+            return Err(DomError::InvalidHierarchy);
+        }
+        let mut ancestor = Some(parent);
+        while let Some(id) = ancestor {
+            if id == node {
+                return Err(DomError::Cycle);
+            }
+            let current = self.node(id)?;
+            ancestor = current.parent().or_else(|| current.owner_host());
+        }
+        if self.node(child)?.parent() != Some(parent) {
+            return Err(DomError::InvalidReference);
+        }
+        let mut reference = self.live(child).next_sibling();
+        if reference == Some(node) {
+            reference = self.live(node).next_sibling();
+        }
+        let mut previous = self.live(child).previous_sibling();
+        if previous == Some(node) {
+            previous = self.live(node).previous_sibling();
+        }
+        let fragment = matches!(self.live(node).kind(), NodeKind::DocumentFragment);
+        let recording = self.reserve_journal(2)?;
+        let (moved, first) = if recording {
+            let mut moved = Vec::new();
+            if fragment {
+                let count = self.children(node)?.count();
+                moved
+                    .try_reserve_exact(count)
+                    .map_err(|_| DomError::AllocationFailed)?;
+                moved.extend(self.children(node)?);
+            } else {
+                moved
+                    .try_reserve_exact(1)
+                    .map_err(|_| DomError::AllocationFailed)?;
+                moved.push(node);
+            }
+            let old = self.live(node);
+            let first = match (fragment, old.parent()) {
+                (true, _) if !moved.is_empty() => Some(MutationEntry::ChildList {
+                    target: node,
+                    added: Vec::new(),
+                    removed: journal::nodes(&moved)?,
+                    previous: None,
+                    next: None,
+                }),
+                // Adoption removes `node` from its old parent first, even
+                // when `node` is `child`.
+                (false, Some(old_parent)) => Some(MutationEntry::ChildList {
+                    target: old_parent,
+                    added: Vec::new(),
+                    removed: journal::nodes(&moved)?,
+                    previous: old.previous_sibling(),
+                    next: old.next_sibling(),
+                }),
+                _ => None,
+            };
+            (moved, first)
+        } else {
+            (Vec::new(), None)
+        };
+        // A child that the adoption already removed is not listed again.
+        let removed = if !recording {
+            None
+        } else if node == child {
+            Some(Vec::new())
+        } else {
+            Some(journal::nodes(&[child])?)
+        };
+        // The DOM suppresses observers for the steps below and queues the
+        // combined record itself.
+        let log = self.journal.take();
+        let result = if node == child {
+            Ok(())
+        } else if parent == self.root {
+            self.unlink(child);
+            let inserted = self.insert_before(parent, node, reference);
+            if inserted.is_err() {
+                self.link_before(parent, child, reference);
+            }
+            inserted
+        } else {
+            self.insert_before(parent, node, Some(child)).map(|()| {
+                self.unlink(child);
+            })
+        };
+        self.journal = log;
+        result?;
+        if let Some(removed) = removed {
+            if let Some(entry) = first {
+                self.push_reserved(entry);
+            }
+            self.push_reserved(MutationEntry::ChildList {
+                target: parent,
+                added: moved,
+                removed,
+                previous,
+                next: reference,
+            });
+        }
+        Ok(())
+    }
+
     /// The removal and insertion records for a validated [`Self::insert_before`].
     fn insertion_entries(
         &mut self,

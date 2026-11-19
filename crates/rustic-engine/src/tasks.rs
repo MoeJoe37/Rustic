@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use rustic_base::{Budget, DocumentId, NodeId};
 use rustic_js::Source;
-use rustic_js::runtime::{Agent, HostRoot, JsResult};
+use rustic_js::runtime::{Agent, HostRoot, JsResult, RejectionOperation};
 
 use crate::window_tasks::WindowTimer;
 use crate::{InputEvent, ScriptQueueError, TaskLimits};
@@ -78,8 +78,14 @@ impl std::fmt::Debug for ResourceCompletion {
 pub(crate) enum Task {
     Script(Source),
     Timer(WindowTimer),
-    Input { target: NodeId, event: InputEvent },
+    Input {
+        target: NodeId,
+        event: InputEvent,
+    },
     ResourceCompletion(ResourceCompletion),
+    /// HTML "notify about rejected promises": the tracker's events from one
+    /// checkpoint, with each promise rooted until the task runs.
+    PromiseRejections(Vec<(RejectionOperation, HostRoot)>),
 }
 
 impl Task {
@@ -99,7 +105,8 @@ impl Task {
                 event: InputEvent::Click { .. },
                 ..
             }
-            | Self::ResourceCompletion(_) => 0,
+            | Self::ResourceCompletion(_)
+            | Self::PromiseRejections(_) => 0,
         }
     }
 }
@@ -383,6 +390,16 @@ impl ScriptQueue {
             .release(task.units())
             .expect("charged task");
         Some(task)
+    }
+
+    /// Remove the oldest queued rejection notification, which shares the DOM
+    /// manipulation task source with the document's readiness steps.
+    pub(crate) fn take_rejection_task(&mut self) -> Option<Task> {
+        let index = self
+            .immediate
+            .iter()
+            .position(|task| matches!(task, Task::PromiseRejections(_)))?;
+        self.immediate.remove(index)
     }
 
     pub(crate) fn clear(&mut self) {

@@ -457,6 +457,9 @@ impl<C: Clock> Pending<C> {
                 .as_ref()
                 .is_none_or(ExternalScripts::deferred_is_empty)
         {
+            // Rejection notifications queued by earlier scripts share the
+            // DOM manipulation task source and run first.
+            self.document.run_rejection_notifications()?;
             self.document
                 .deliver_lifecycle(LifecycleEvent::DomContentLoaded)?;
             self.content_loaded = true;
@@ -466,6 +469,7 @@ impl<C: Clock> Pending<C> {
             && self.external.as_ref().is_none_or(ExternalScripts::is_empty)
             && !self.document.has_pending_modules()
         {
+            self.document.run_rejection_notifications()?;
             self.change_readiness(ReadyState::Complete)?;
             self.document
                 .deliver_lifecycle(LifecycleEvent::WindowLoad)?;

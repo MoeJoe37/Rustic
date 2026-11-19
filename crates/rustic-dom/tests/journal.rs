@@ -330,3 +330,91 @@ fn disabling_drops_pending_entries() {
     document.set_mutation_journal(true);
     assert!(document.take_mutation_entries().is_empty());
 }
+
+#[test]
+fn replace_child_records_adoption_then_one_combined_entry() {
+    let mut document = document();
+    let parent = element(&mut document, "div");
+    let [a, b, c] = ["a", "b", "c"].map(|name| element(&mut document, name));
+    for child in [a, b, c] {
+        document.append_child(parent, child).unwrap();
+    }
+    document.take_mutation_entries();
+    // Replacing `a` with its sibling `c`: `c` leaves first, then one entry.
+    document.replace_child(parent, c, a).unwrap();
+    assert_eq!(
+        document.take_mutation_entries(),
+        [
+            child_list(parent, &[], &[c], Some(b), None),
+            child_list(parent, &[c], &[a], None, Some(b)),
+        ]
+    );
+    assert_eq!(document.node(parent).unwrap().first_child(), Some(c));
+    // Self replacement changes nothing but still records both entries.
+    document.replace_child(parent, b, b).unwrap();
+    assert_eq!(
+        document.take_mutation_entries(),
+        [
+            child_list(parent, &[], &[b], Some(c), None),
+            child_list(parent, &[b], &[], Some(c), None),
+        ]
+    );
+    // A fragment records its emptying, and a detached node only the
+    // combined entry.
+    let fragment = document.create_document_fragment().unwrap();
+    let [x, y] = ["x", "y"].map(|name| element(&mut document, name));
+    document.append_child(fragment, x).unwrap();
+    document.append_child(fragment, y).unwrap();
+    document.take_mutation_entries();
+    document.replace_child(parent, fragment, b).unwrap();
+    assert_eq!(
+        document.take_mutation_entries(),
+        [
+            child_list(fragment, &[], &[x, y], None, None),
+            child_list(parent, &[x, y], &[b], Some(c), None),
+        ]
+    );
+    let lone = element(&mut document, "z");
+    document.replace_child(parent, lone, c).unwrap();
+    assert_eq!(
+        document.take_mutation_entries(),
+        [child_list(parent, &[lone], &[c], None, Some(x))]
+    );
+}
+
+#[test]
+fn rejected_replacements_leave_the_tree_and_journal_unchanged() {
+    let mut document = document();
+    let root = document.root();
+    let html = element(&mut document, "html");
+    document.append_child(root, html).unwrap();
+    let child = element(&mut document, "p");
+    document.append_child(html, child).unwrap();
+    let stranger = element(&mut document, "q");
+    let text = document.create_text("t").unwrap();
+    document.take_mutation_entries();
+    // `child` is not a child of the root, and an ancestor cannot replace its descendant.
+    assert_eq!(
+        document.replace_child(root, stranger, child),
+        Err(DomError::InvalidReference)
+    );
+    assert_eq!(
+        document.replace_child(html, html, child),
+        Err(DomError::Cycle)
+    );
+    // Text cannot become a document child; the document element returns.
+    assert_eq!(
+        document.replace_child(root, text, html),
+        Err(DomError::InvalidHierarchy)
+    );
+    assert_eq!(document.node(root).unwrap().first_child(), Some(html));
+    // Replacing the document element with another element is allowed.
+    document.replace_child(root, stranger, html).unwrap();
+    assert_eq!(document.node(root).unwrap().first_child(), Some(stranger));
+    let entries = document.take_mutation_entries();
+    assert_eq!(
+        entries,
+        [child_list(root, &[stranger], &[html], None, None)]
+    );
+    document.check_invariants().unwrap();
+}

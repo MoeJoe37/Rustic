@@ -147,6 +147,14 @@ pub(crate) struct AppliedLocalFiles {
     state: Rc<RefCell<AppliedFileState>>,
 }
 
+/// Validated replacement bytes, not visible to layout until committed at a
+/// host rendering-input boundary. Staging never changes the applied snapshot.
+#[derive(Debug)]
+pub(crate) struct StagedLocalFile {
+    key: String,
+    bytes: Arc<[u8]>,
+}
+
 #[derive(Debug)]
 struct AppliedFileState {
     entries: HashMap<String, Result<Arc<[u8]>, FetchError>>,
@@ -165,6 +173,72 @@ impl AppliedLocalFiles {
                 max_entries,
             })),
         }
+    }
+
+    /// Validate a resource replacement against the current applied snapshot
+    /// before publishing it. The caller must have already performed the
+    /// normal local-file security checks and fetched the complete resource.
+    /// A staged value owns its bytes and cannot observe later file changes.
+    pub(crate) fn stage(
+        &self,
+        url: &Url,
+        max_bytes: usize,
+        bytes: Vec<u8>,
+    ) -> Result<StagedLocalFile, FetchError> {
+        let key = url.serialize();
+        if key.len() > MAX_APPLIED_URL_BYTES || bytes.len() > max_bytes {
+            return Err(FetchError::TooLarge);
+        }
+        let state = self.state.try_borrow().map_err(|_| FetchError::Failed)?;
+        let old_bytes = state
+            .entries
+            .get(&key)
+            .and_then(|entry| entry.as_ref().ok())
+            .map_or(0, |bytes| bytes.len());
+        if !state.entries.contains_key(&key) && state.entries.len() >= state.max_entries {
+            return Err(FetchError::TooLarge);
+        }
+        if bytes.len() > state.max_bytes.saturating_sub(state.bytes - old_bytes) {
+            return Err(FetchError::TooLarge);
+        }
+        drop(state);
+        Ok(StagedLocalFile {
+            key,
+            bytes: Arc::<[u8]>::from(bytes),
+        })
+    }
+
+    /// Commit one already-staged replacement. Revalidate limits because
+    /// another resource may have been staged or committed since this one.
+    /// The operation never mutates the snapshot on error, and allocation is
+    /// reserved before changing the byte accounting or applied entry.
+    pub(crate) fn commit(&self, staged: StagedLocalFile) -> Result<(), FetchError> {
+        let mut state = self
+            .state
+            .try_borrow_mut()
+            .map_err(|_| FetchError::Failed)?;
+        let old_bytes = state
+            .entries
+            .get(&staged.key)
+            .and_then(|entry| entry.as_ref().ok())
+            .map_or(0, |bytes| bytes.len());
+        let existing = state.entries.contains_key(&staged.key);
+        if !existing && state.entries.len() >= state.max_entries {
+            return Err(FetchError::TooLarge);
+        }
+        let available = state.max_bytes.saturating_sub(state.bytes - old_bytes);
+        if staged.bytes.len() > available {
+            return Err(FetchError::TooLarge);
+        }
+        if !existing {
+            state
+                .entries
+                .try_reserve(1)
+                .map_err(|_| FetchError::Failed)?;
+        }
+        state.bytes = state.bytes - old_bytes + staged.bytes.len();
+        state.entries.insert(staged.key, Ok(staged.bytes));
+        Ok(())
     }
 
     /// Resolve once without exposing a partly fetched resource. The caller
@@ -262,6 +336,23 @@ impl LocalStylesheetFetcher {
     pub(crate) fn with_applied_files(mut self, applied: AppliedLocalFiles) -> Self {
         self.applied = Some(applied);
         self
+    }
+
+    /// Stage replacement bytes using the same path policy and bounded local
+    /// file read as an ordinary stylesheet or image resource. Bypass the
+    /// applied-byte cache intentionally: the host is fetching a *new* version.
+    pub(crate) fn stage_completion(
+        &self,
+        snapshot: &AppliedLocalFiles,
+        url: &Url,
+        max_bytes: usize,
+    ) -> Result<StagedLocalFile, FetchError> {
+        if self.cancellation.check().is_err() {
+            return Err(FetchError::Cancelled);
+        }
+        let path = url_path(url).ok_or(FetchError::Blocked)?;
+        let bytes = self.read(&path, max_bytes)?;
+        snapshot.stage(url, max_bytes, bytes)
     }
 
     fn read(&self, path: &Path, max_bytes: usize) -> Result<Vec<u8>, FetchError> {

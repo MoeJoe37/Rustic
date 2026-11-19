@@ -105,6 +105,10 @@ impl Agent {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::prevent_extensions(a, o)),
             Exotic::HostIndexed | Exotic::WindowProxy => Ok(false),
+            // §10.4.5.2: a typed array whose length can still change (it
+            // tracks its buffer, or views a resizable non-shared buffer)
+            // refuses, since new indices could appear later.
+            Exotic::TypedArray if !self.typed_array_is_fixed_length(o) => Ok(false),
             Exotic::Arguments | Exotic::TypedArray | Exotic::ModuleNamespace => {
                 self.heap
                     .object_mut(o)
@@ -468,5 +472,19 @@ impl Agent {
                 *slot = None;
             }
         }
+    }
+}
+
+impl Agent {
+    /// `IsTypedArrayFixedLength` (§10.4.5.14).
+    fn typed_array_is_fixed_length(&self, o: ObjectId) -> bool {
+        let Some(view) = typed_array::view_of(self, o) else {
+            return true;
+        };
+        if view.length.is_none() {
+            return false;
+        }
+        self.buffer_data(view.buffer)
+            .is_none_or(|data| data.max.is_none() || data.shared)
     }
 }

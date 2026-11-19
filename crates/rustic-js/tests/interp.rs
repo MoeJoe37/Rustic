@@ -3112,8 +3112,9 @@ fn array_buffers_and_data_views() {
         "2,4,true",
     );
     check(
-        "var b = new ArrayBuffer(8, { maxByteLength: 16 }); var v = new DataView(b, 4); b.resize(12); var grown = v.byteLength; b.resize(2); try { v.byteLength } catch (e) { grown + ',' + e.name }",
-        "8,TypeError",
+        // Out of bounds, byteLength and byteOffset read as 0 and reads throw.
+        "var b = new ArrayBuffer(8, { maxByteLength: 16 }); var v = new DataView(b, 4); b.resize(12); var grown = v.byteLength; b.resize(2); var r; try { v.getUint8(0) } catch (e) { r = e.name } [grown, v.byteLength, v.byteOffset, r].join()",
+        "8,0,0,TypeError",
     );
     check(
         "new DataView(new ArrayBuffer(1)).setInt8(0, 1n)",

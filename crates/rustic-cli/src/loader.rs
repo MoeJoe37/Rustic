@@ -1200,7 +1200,8 @@ mod tests {
         );
         let page = TempFile::new(html.as_bytes());
         let limits = LoaderLimits::default();
-        let parsed = load_document(&mut Engine::new(1), &page.0, limits).unwrap();
+        let mut engine = Engine::new(1);
+        let parsed = load_document(&mut engine, &page.0, limits).unwrap();
         let mode = parsed.parsed().mode();
         let encoding = parsed.parsed().encoding();
         let token = parsed.cancellation().clone();

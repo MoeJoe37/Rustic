@@ -107,7 +107,14 @@ image or font completion through `ScriptedDocument::apply_resource_completion`:
 a successful application bumps the applied-input revision, invalidates old
 frame tickets and offers the next rendering opportunity; a rejected completion
 does none of those. The supplied closure must apply only a fully validated
-result and must not run JavaScript. The scripted local CLI now keeps a document-scoped, bounded snapshot of
+result and must not run JavaScript. Hosts may alternatively enqueue a
+staged result using `queue_resource_completion`. The bounded document task
+pump publishes that result automatically at a later turn boundary, after
+prior JS microtasks have run; `ScriptTurn::ResourceCompletion { applied }`
+reports success or rejection. If the completion is the next eligible task,
+it publishes before an already-offered frame can use older inputs.
+Queued completions share the normal pending-task limit and are discarded on
+shutdown. The scripted local CLI now keeps a document-scoped, bounded snapshot of
 stylesheet and image bytes as they are first fetched. Later DOM-triggered
 layout flushes reuse those bytes even if the underlying files change or are
 removed; missing and rejected resources remain missing within that snapshot.
@@ -119,10 +126,10 @@ rechecks its entry and byte budgets when the host commits it through
 `apply_resource_completion`. Per-URL versions reject late
 stale completions without blocking updates to unrelated resources. A
 completion published while an initial file fetch is running also takes
-precedence over that fetch's older bytes. A CLI regression fixture
-checks staged CSS and PNG replacements, layout values, and stale frame tickets.
-There is **no automatic asynchronous resource delivery** or parser task
-integration yet. Static dump commands still read local files directly. This is a partial CSSOM surface and its
+precedence over that fetch's older bytes. A CLI regression fixture now queues actual staged CSS and PNG replacements
+through the document pump and checks layout values and stale frame tickets.
+There is **no automatic asynchronous fetch, file-change watcher or parser
+resource-delivery task** yet; the host still supplies each validated completion. Static dump commands still read local files directly. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
 
 What does **not** work yet:

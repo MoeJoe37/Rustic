@@ -484,6 +484,67 @@ mod tests {
     }
 
     #[test]
+    fn replacements_are_staged_until_committed_and_preserve_prior_byte_views() {
+        let applied = AppliedLocalFiles::new(1, 5);
+        let url = Url::parse("file:///page/theme.css", None).unwrap();
+        let first = applied.read(&url, 5, || Ok(b"old".to_vec())).unwrap();
+        let new = applied.stage(&url, 5, b"fresh".to_vec()).unwrap();
+        assert_eq!(
+            applied.read(&url, 5, || panic!("staging refetched the resource"))
+                .unwrap()
+                .as_ref(),
+            b"old",
+        );
+        assert_eq!(first.as_ref(), b"old");
+        applied.commit(new).unwrap();
+        assert_eq!(first.as_ref(), b"old");
+        assert_eq!(
+            applied.read(&url, 5, || panic!("commit refetched the resource"))
+                .unwrap()
+                .as_ref(),
+            b"fresh",
+        );
+        assert_eq!(
+            applied.stage(&url, 5, b"too-long".to_vec()).unwrap_err(),
+            FetchError::TooLarge,
+        );
+        assert_eq!(
+            applied.read(&url, 5, || panic!("failed stage mutated data"))
+                .unwrap()
+                .as_ref(),
+            b"fresh",
+        );
+    }
+
+    #[test]
+    fn a_staged_commit_rechecks_capacity_and_leaves_bytes_unchanged_on_failure() {
+        let applied = AppliedLocalFiles::new(2, 8);
+        let first = Url::parse("file:///page/first.css", None).unwrap();
+        let second = Url::parse("file:///page/second.css", None).unwrap();
+        applied.read(&first, 8, || Ok(b"old".to_vec())).unwrap();
+        let staged = applied.stage(&first, 8, b"extended".to_vec()).unwrap();
+        applied.read(&second, 8, || Ok(b"other".to_vec())).unwrap();
+        assert_eq!(applied.commit(staged), Err(FetchError::TooLarge));
+        assert_eq!(
+            applied.read(&first, 8, || panic!("lost original"))
+                .unwrap()
+                .as_ref(),
+            b"old",
+        );
+        assert_eq!(
+            applied.read(&second, 8, || panic!("lost concurrent addition"))
+                .unwrap()
+                .as_ref(),
+            b"other",
+        );
+        let missing = Url::parse("file:///page/third.css", None).unwrap();
+        assert_eq!(
+            applied.stage(&missing, 8, b"x".to_vec()).unwrap_err(),
+            FetchError::TooLarge,
+        );
+    }
+
+    #[test]
     fn cancellation_does_not_poison_an_applied_resource() {
         let snapshot = AppliedLocalFiles::new(1, 8);
         let url = Url::parse("file:///page/image.png", None).unwrap();

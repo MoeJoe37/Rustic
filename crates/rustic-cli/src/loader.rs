@@ -339,35 +339,16 @@ fn load_scripted_document(
         advance_script_timer(load.clock().expect("active load"), delay, &mut turns)?;
         load.run_next()?;
     };
-    // The parser is now complete: discover external local CSS/images in DOM
-    // order and deliver their validated bytes through normal host turns.
-    // This is synchronous local-file discovery, not an asynchronous fetcher.
-    let requests = {
-        let parsed = document.document();
-        discover_local_resources(parsed.parsed().document(), &path, limits)
-    };
-    for (url, kind) in requests {
-        let staged = match kind {
-            LocalResourceKind::Stylesheet => fetch.stage_completion(
-                &applied_files,
-                &url,
-                limits.stylesheets.max_total_bytes,
-            ),
-            LocalResourceKind::Image => crate::images::stage_image_completion(
-                &fetch,
-                &applied_files,
-                &url,
-                limits.images,
-                &cancellation,
-            ),
-        };
-        if let Ok(staged) = staged {
-            let snapshot = applied_files.clone();
-            // If another source already fills the bounded task queue, leave
-            // this resource to the existing on-demand renderer fetch path.
-            let _ = document.queue_resource_completion(move || snapshot.commit(staged));
-        }
-    }
+    // The parser is now complete. Local resource discovery and delivery
+    // happen as bounded host turns without a second pending-byte buffer.
+    queue_discovered_local_resources(
+        &mut document,
+        &path,
+        limits,
+        &fetch,
+        &applied_files,
+        &cancellation,
+    )?;
     // Drain immediate completion tasks even when there are no timers.
     // Future timers still obey the established bounded manual-clock loop.
     loop {
@@ -382,6 +363,63 @@ fn load_scripted_document(
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;
     Ok(document.into_document())
+}
+
+/// Eagerly supply the completed parser's local stylesheet/image resources
+/// through the existing bounded host task pump. At most one staged resource
+/// is retained awaiting delivery: each pending byte buffer is committed or
+/// dropped before another file is read. Failures stay broken/on-demand.
+fn queue_discovered_local_resources(
+    document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+    path: &Path,
+    limits: LoaderLimits,
+    fetch: &LocalStylesheetFetcher,
+    applied: &AppliedLocalFiles,
+    cancellation: &CancellationToken,
+) -> Result<usize, LoadError> {
+    let requests = {
+        let parsed = document.document();
+        discover_local_resources(parsed.parsed().document(), path, limits)
+    };
+    let mut delivered = 0usize;
+    for (url, kind) in requests {
+        check_cancelled(cancellation)?;
+        let staged = match kind {
+            LocalResourceKind::Stylesheet => {
+                fetch.stage_completion(applied, &url, limits.stylesheets.max_total_bytes)
+            }
+            LocalResourceKind::Image => crate::images::stage_image_completion(
+                fetch, applied, &url, limits.images, cancellation,
+            ),
+        };
+        let Ok(staged) = staged else {
+            continue;
+        };
+        let snapshot = applied.clone();
+        if document
+            .queue_resource_completion(move || snapshot.commit(staged))
+            .is_err()
+        {
+            // Existing renderer reads still use on-demand file loading when
+            // admission is exhausted; do not retain an unqueued byte buffer.
+            continue;
+        }
+        // Source alternation may select one ready timer ahead of the queued
+        // completion. Once it has run, the resource task is the next
+        // immediate source. Bound this by the same two-source alternation,
+        // rather than holding every resource's bytes until EOF.
+        for _ in 0..2 {
+            match document.run_next()? {
+                Some(rustic_engine::ScriptTurn::ResourceCompletion { applied }) => {
+                    delivered += usize::from(applied);
+                    break;
+                }
+                Some(_) => continue,
+                None => break,
+            }
+        }
+    }
+    Ok(delivered)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

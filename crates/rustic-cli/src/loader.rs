@@ -1295,6 +1295,19 @@ mod tests {
         );
         assert_eq!(measure(&scripted).offset_widths.get(&image_id), Some(&2));
         fs::write(&image.0, &second_png).unwrap();
+        // Encoded bytes fitting the budget is not enough: decoded RGBA
+        // output must fit before the new source becomes applied.
+        let too_small = crate::images::ImageLimits {
+            max_decoded_bytes: 8,
+            ..limits.images
+        };
+        assert_eq!(
+            crate::images::stage_image_completion(
+                &fetcher, &applied, &image_url, too_small, &token,
+            )
+            .unwrap_err(),
+            FetchError::TooLarge,
+        );
         let staged_image = crate::images::stage_image_completion(
             &fetcher, &applied, &image_url, limits.images, &token,
         )

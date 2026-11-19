@@ -107,9 +107,13 @@ image or font completion through `ScriptedDocument::apply_resource_completion`:
 a successful application bumps the applied-input revision, invalidates old
 frame tickets and offers the next rendering opportunity; a rejected completion
 does none of those. The supplied closure must apply only a fully validated
-result and must not run JavaScript. The current CLI still loads local resources
-synchronously inside layout; its loader is **not** yet wired to an asynchronous
-resource-completion pump. This is a partial CSSOM surface and its
+result and must not run JavaScript. The scripted local CLI now keeps a document-scoped, bounded snapshot of
+stylesheet and image bytes as they are first fetched. Later DOM-triggered
+layout flushes reuse those bytes even if the underlying files change or are
+removed; missing and rejected resources remain missing within that snapshot.
+This does **not** implement asynchronous loading or wire successful new
+resource deliveries into the completion API. Static dump commands still read
+local files directly. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
 
 What does **not** work yet:

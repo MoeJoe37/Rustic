@@ -97,6 +97,10 @@ If the host has no applied renderer, a connected computed-style read reports
 nodes use the defined empty result. The `cssText` getter is empty, while
 `setProperty`, `removeProperty` and `cssText` assignment throw
 `NoModificationAllowedError`.
+An attached renderer must provide an entry for every connected element it can
+measure: if a connected element is omitted from the computed-style snapshot,
+style reads throw `InvalidStateError`, rather than silently returning an
+empty declaration. Detached elements still read as empty.
 The CLI derives properties from the renderer's existing style cascade, not
 from a separate binding-side parser. Hosts may publish a staged stylesheet,
 image or font completion through `ScriptedDocument::apply_resource_completion`:

@@ -1268,11 +1268,12 @@ mod tests {
 
         // Prepare changed local files. The resource read does *not* commit them.
         fs::write(&stylesheet.0, b"#box { width: 43px }").unwrap();
-        fs::write(&image.0, second_png).unwrap();
+        // A broken replacement must fail validation before publication.
+        fs::write(&image.0, b"not a decodable image").unwrap();
         let fetcher = LocalStylesheetFetcher::new(
             page.0.parent().unwrap().to_path_buf(),
             limits.read_chunk_bytes,
-            token,
+            token.clone(),
         )
         .unwrap();
         let css_url = file_url(&fs::canonicalize(&stylesheet.0).unwrap()).unwrap();
@@ -1285,9 +1286,19 @@ mod tests {
         let superseded_css = fetcher
             .stage_completion(&applied, &css_url, limits.stylesheets.max_total_bytes)
             .unwrap();
-        let staged_image = fetcher
-            .stage_completion(&applied, &image_url, limits.images.max_file_bytes)
-            .unwrap();
+        assert_eq!(
+            crate::images::stage_image_completion(
+                &fetcher, &applied, &image_url, limits.images, &token,
+            )
+            .unwrap_err(),
+            FetchError::Failed,
+        );
+        assert_eq!(measure(&scripted).offset_widths.get(&image_id), Some(&2));
+        fs::write(&image.0, &second_png).unwrap();
+        let staged_image = crate::images::stage_image_completion(
+            &fetcher, &applied, &image_url, limits.images, &token,
+        )
+        .unwrap();
         assert_eq!(
             fetcher.stage_completion(
                 &applied,

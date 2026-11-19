@@ -565,6 +565,29 @@ mod tests {
     }
 
     #[test]
+    fn resource_fetched_before_a_completion_cannot_overwrite_its_new_version() {
+        let applied = AppliedLocalFiles::new(1, 32);
+        let url = Url::parse("file:///page/script.css", None).unwrap();
+        let completed = applied.clone();
+        let after = applied
+            .read(&url, 32, || {
+                // A host resource arrival between starting and finishing a
+                // bounded fetch must win over the older I/O result.
+                let staged = completed.stage(&url, 32, b"applied".to_vec()).unwrap();
+                completed.commit(staged).unwrap();
+                Ok(b"outdated".to_vec())
+            })
+            .unwrap();
+        assert_eq!(after.as_ref(), b"applied");
+        assert_eq!(
+            applied.read(&url, 32, || panic!("published completion was lost"))
+                .unwrap()
+                .as_ref(),
+            b"applied",
+        );
+    }
+
+    #[test]
     fn older_completion_for_same_url_cannot_overwrite_newer_applied_bytes() {
         let applied = AppliedLocalFiles::new(2, 32);
         let css = Url::parse("file:///page/theme.css", None).unwrap();

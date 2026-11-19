@@ -1182,7 +1182,7 @@ mod tests {
         .unwrap();
         let image = TempFile::new(&first_png);
         let html = format!(
-            "<!doctype html><link rel=stylesheet href=\"{}\">\\
+            "<!doctype html><link rel=stylesheet href=\"{}\">\
              <div id=box></div><img id=photo src=\"{}\">",
             stylesheet.0.file_name().unwrap().to_str().unwrap(),
             image.0.file_name().unwrap().to_str().unwrap(),

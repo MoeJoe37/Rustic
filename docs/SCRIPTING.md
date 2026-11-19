@@ -111,9 +111,12 @@ result and must not run JavaScript. The scripted local CLI now keeps a document-
 stylesheet and image bytes as they are first fetched. Later DOM-triggered
 layout flushes reuse those bytes even if the underlying files change or are
 removed; missing and rejected resources remain missing within that snapshot.
-This does **not** implement asynchronous loading or wire successful new
-resource deliveries into the completion API. Static dump commands still read
-local files directly. This is a partial CSSOM surface and its
+The local fetcher can also stage a replacement using the normal file-security
+policy; the applied cache rechecks its entry and byte budgets when the host
+commits it through `apply_resource_completion`. A CLI regression fixture
+checks staged CSS and PNG replacements, layout values, and stale frame tickets.
+There is **no automatic asynchronous resource delivery** or parser task
+integration yet. Static dump commands still read local files directly. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
 
 What does **not** work yet:

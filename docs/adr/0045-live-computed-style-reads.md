@@ -134,14 +134,17 @@ with the normal image budget and refuses malformed or oversized decoded pixels.
 The cache commits successfully staged resources atomically after rechecking
 aggregate and entry budgets. Per-URL version checks reject late
 out-of-order completions, while unrelated URLs may publish independently.
-An in-flight first fetch cannot overwrite an already-published completion. An integration fixture applies staged
-CSS and PNG file versions through `apply_resource_completion`, checking that
-styles, image layout and frame tickets change only after successful publication.
-The scripted loader still fetches on demand and has **no asynchronous resource
-completion scheduler**.
+An in-flight first fetch cannot overwrite an already-published completion. An integration fixture queues staged CSS and PNG versions through
+`queue_resource_completion` into the existing document task pump and checks
+that styles, image layout and frame tickets change only upon successful
+publication. This shares normal task admission limits, respects previous JS
+microtask checkpoints and can preempt an already-offered render when the
+resource is the next eligible task. Failed and cancelled completions leave
+applied frames unchanged. The loader still fetches on demand and has **no
+asynchronous fetch/notification source or parser resource-delivery integration**.
 
 This is **not** the full decision: CSSOM serialization edge cases,
 pseudo-elements, DOM adoption/GC stress,
-WPT expansion, automatic stylesheet/image completion delivery and the
-remaining resource failure/decoding behaviors still need implementation and
+WPT expansion, asynchronous stylesheet/image fetching and parser delivery,
+and the remaining resource failure/decoding behaviors still need implementation and
 passing tests. Until those arrive WEB-06 remains open.

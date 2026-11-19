@@ -738,7 +738,7 @@ impl<'a> LayoutInput<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct LocalLayout {
     path: PathBuf,
     limits: LoaderLimits,
@@ -1174,6 +1174,146 @@ mod tests {
         let parsed = load_document(&mut Engine::new(1), &file.0, limits).unwrap();
         let output = dump_dom(&parsed, &file.0, limits).unwrap();
         assert!(output.contains("local=\"data-cssom\" value=\"ok\""), "{output}");
+    }
+
+    #[test]
+    fn staged_css_and_image_completions_publish_new_layout_and_invalidate_frames() {
+        let stylesheet = TempFile::new(b"#box { width: 18px }");
+        let first_png = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(2, 3, rustic_raster::RasterLimits::default())
+                .unwrap(),
+            usize::MAX,
+        )
+        .unwrap();
+        let second_png = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(6, 3, rustic_raster::RasterLimits::default())
+                .unwrap(),
+            usize::MAX,
+        )
+        .unwrap();
+        let image = TempFile::new(&first_png);
+        let html = format!(
+            "<!doctype html><link rel=stylesheet href=\"{}\">\
+             <div id=box></div><img id=photo src=\"{}\">",
+            stylesheet.0.file_name().unwrap().to_str().unwrap(),
+            image.0.file_name().unwrap().to_str().unwrap(),
+        );
+        let page = TempFile::new(html.as_bytes());
+        let limits = LoaderLimits::default();
+        let parsed = load_document(&mut Engine::new(1), &page.0, limits).unwrap();
+        let mode = parsed.parsed().mode();
+        let encoding = parsed.parsed().encoding();
+        let token = parsed.cancellation().clone();
+        let find_id = |name: &str| {
+            let document = parsed.parsed().document();
+            document
+                .walk(document.root())
+                .unwrap()
+                .find_map(|(node, _)| {
+                    let element = rustic_style::DomElement::new(document, node)?;
+                    (crate::reftest::attribute(element, "id").as_deref() == Some(name))
+                        .then_some(node)
+                })
+                .unwrap()
+        };
+        let box_id = find_id("box");
+        let image_id = find_id("photo");
+        let applied = AppliedLocalFiles::new(
+            limits.stylesheets.max_sheets + limits.images.max_images,
+            limits.stylesheets.max_total_bytes + limits.images.max_file_bytes,
+        );
+        let layout = LocalLayout {
+            path: page.0.clone(),
+            limits,
+            cancellation: token.clone(),
+            encoding,
+            applied_files: applied.clone(),
+        };
+        let get_width = |geometry: &LayoutGeometry| {
+            geometry
+                .computed_styles
+                .get(&box_id)
+                .unwrap()
+                .longhands
+                .iter()
+                .find(|(name, _)| *name == "width")
+                .unwrap()
+                .1
+                .clone()
+        };
+        let initial = layout.measure_layout(parsed.parsed().document(), mode).unwrap();
+        assert_eq!(get_width(&initial), "18px");
+        assert_eq!(initial.offset_widths.get(&image_id), Some(&2));
+
+        let mut scripted = parsed
+            .into_scripted_with_clock(TaskLimits::default(), ManualClock::default())
+            .unwrap();
+        scripted.set_layout_source(Box::new(layout.clone())).unwrap();
+        let render = |scripted: &mut rustic_engine::ScriptedDocument<ManualClock>| {
+            match scripted.run_next_with_render(|_, _| ()).unwrap() {
+                Some(rustic_engine::DocumentTurn::Rendered { frame, .. }) => frame,
+                other => panic!("expected rendering after completion, got {other:?}"),
+            }
+        };
+        let measure = |scripted: &rustic_engine::ScriptedDocument<ManualClock>| {
+            let document = scripted.document();
+            layout
+                .measure_layout(document.parsed().document(), mode)
+                .unwrap()
+        };
+        scripted.offer_rendering_opportunity().unwrap();
+        let previous = render(&mut scripted);
+
+        // Prepare changed local files. The resource read does *not* commit them.
+        fs::write(&stylesheet.0, b"#box { width: 43px }").unwrap();
+        fs::write(&image.0, second_png).unwrap();
+        let fetcher = LocalStylesheetFetcher::new(
+            page.0.parent().unwrap().to_path_buf(),
+            limits.read_chunk_bytes,
+            token,
+        )
+        .unwrap();
+        let css_url = file_url(&fs::canonicalize(&stylesheet.0).unwrap()).unwrap();
+        let image_url = file_url(&fs::canonicalize(&image.0).unwrap()).unwrap();
+        let staged_css = fetcher
+            .stage_completion(&applied, &css_url, limits.stylesheets.max_total_bytes)
+            .unwrap();
+        let staged_image = fetcher
+            .stage_completion(&applied, &image_url, limits.images.max_file_bytes)
+            .unwrap();
+        assert_eq!(get_width(&measure(&scripted)), "18px");
+        assert_eq!(measure(&scripted).offset_widths.get(&image_id), Some(&2));
+
+        // A rejected host completion leaves the original render valid.
+        assert_eq!(
+            scripted.apply_resource_completion(|| Err::<(), _>(FetchError::Blocked)),
+            Ok(Err(FetchError::Blocked))
+        );
+        assert_eq!(scripted.accept_rendered_frame(previous), Ok(true));
+
+        scripted.offer_rendering_opportunity().unwrap();
+        let stale_css = render(&mut scripted);
+        assert_eq!(
+            scripted.apply_resource_completion(|| applied.commit(staged_css)),
+            Ok(Ok(()))
+        );
+        assert_eq!(scripted.accept_rendered_frame(stale_css), Ok(false));
+        let applied_css = measure(&scripted);
+        assert_eq!(get_width(&applied_css), "43px");
+        assert_eq!(applied_css.offset_widths.get(&image_id), Some(&2));
+        // A successful completion automatically offers the next render.
+        let stale_image = render(&mut scripted);
+
+        assert_eq!(
+            scripted.apply_resource_completion(|| applied.commit(staged_image)),
+            Ok(Ok(()))
+        );
+        assert_eq!(scripted.accept_rendered_frame(stale_image), Ok(false));
+        let applied_both = measure(&scripted);
+        assert_eq!(get_width(&applied_both), "43px");
+        assert_eq!(applied_both.offset_widths.get(&image_id), Some(&6));
+        let fresh = render(&mut scripted);
+        assert_eq!(scripted.accept_rendered_frame(fresh), Ok(true));
     }
 
     #[test]

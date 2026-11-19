@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17536 pass, 1255 fail, 111 skipped (modules, proposals).
+# 17545 pass, 1246 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -171,6 +171,8 @@ Array/length/S15.4.5.1_A1.2_T3.js
 Array/length/S15.4.5.1_A1.3_T1.js
 Array/length/S15.4.5.1_A1.3_T2.js
 Array/length/S15.4.5.2_A3_T4.js
+Array/length/define-own-prop-length-coercion-order-set.js
+Array/length/define-own-prop-length-coercion-order.js
 Array/length/define-own-prop-length-error.js
 Array/length/define-own-prop-length-no-value-order.js
 Array/length/define-own-prop-length-overflow-order.js
@@ -3824,21 +3826,27 @@ DataView/prototype/buffer/return-buffer.js
 DataView/prototype/buffer/this-has-no-dataview-internal-sab.js
 DataView/prototype/buffer/this-has-no-dataview-internal.js
 DataView/prototype/buffer/this-is-not-object.js
+DataView/prototype/byteLength/detached-buffer.js
 DataView/prototype/byteLength/invoked-as-accessor.js
 DataView/prototype/byteLength/invoked-as-func.js
 DataView/prototype/byteLength/length.js
 DataView/prototype/byteLength/name.js
 DataView/prototype/byteLength/prop-desc.js
+DataView/prototype/byteLength/resizable-array-buffer-auto.js
+DataView/prototype/byteLength/resizable-array-buffer-fixed.js
 DataView/prototype/byteLength/return-bytelength-sab.js
 DataView/prototype/byteLength/return-bytelength.js
 DataView/prototype/byteLength/this-has-no-dataview-internal-sab.js
 DataView/prototype/byteLength/this-has-no-dataview-internal.js
 DataView/prototype/byteLength/this-is-not-object.js
+DataView/prototype/byteOffset/detached-buffer.js
 DataView/prototype/byteOffset/invoked-as-accessor.js
 DataView/prototype/byteOffset/invoked-as-func.js
 DataView/prototype/byteOffset/length.js
 DataView/prototype/byteOffset/name.js
 DataView/prototype/byteOffset/prop-desc.js
+DataView/prototype/byteOffset/resizable-array-buffer-auto.js
+DataView/prototype/byteOffset/resizable-array-buffer-fixed.js
 DataView/prototype/byteOffset/return-byteoffset-sab.js
 DataView/prototype/byteOffset/return-byteoffset.js
 DataView/prototype/byteOffset/this-has-no-dataview-internal-sab.js
@@ -9450,6 +9458,7 @@ Object/freeze/not-a-constructor.js
 Object/freeze/proxy-no-ownkeys-returned-keys-order.js
 Object/freeze/proxy-with-defineProperty-handler.js
 Object/freeze/throws-when-false.js
+Object/freeze/typedarray-backed-by-resizable-buffer.js
 Object/fromEntries/empty-iterable.js
 Object/fromEntries/evaluation-order.js
 Object/fromEntries/iterator-closed-for-null-entry.js

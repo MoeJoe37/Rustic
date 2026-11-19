@@ -58,7 +58,7 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 | --- | --- | --- |
 | M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140, TD-142 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -205,7 +205,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-139 | Bad | JS | Reference evaluation order deviates in compound, update and logical assignment, `with` over proxies, destructuring targets and `super` properties; `delete super.x` does not throw | Open, M6 entry |
 | TD-140 | Bad | JS | Array destructuring assignment steps the iterator before evaluating a target and does not close it when the target reference throws (TD-100 paid the binding form only) | Open, M6 entry |
 | TD-141 | Bad | JS | Class, function and direct-eval edge semantics: derived-constructor return override in `catch`/`finally`, inferred names for symbol keys, private names on non-extensible objects, `super` and private names inside direct eval in class bodies | Open, `js.conformance` (M9) |
-| TD-142 | Bad | JS | Built-in edge bugs: array `length` conversion order and a few buffer checks are wrong (weak keys, the String Iterator tag, `Object.fromEntries` and `Object.prototype`'s prototype paid) | Partly paid, M6 entry |
+| TD-142 | Bad | JS | Built-in edge bugs: weak keys, the String Iterator tag, `Object.fromEntries`, `Object.prototype`'s prototype, array `length` order and buffer checks | Paid |
 | TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (`Array.fromAsync`, `Math.sumPrecise`, base64 on `Uint8Array`, JSON source text, iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
 | TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
@@ -2204,7 +2204,7 @@ to TD-140:
 Pay with the `js.conformance` (M9) Test262 full-rate work, or earlier if a
 selected page needs one.
 
-### TD-142 — Built-in edge bugs
+### TD-142 — Built-in edge bugs (Paid)
 
 Wrong behavior in shipped built-ins, found in the `test/built-ins` run:
 
@@ -2221,12 +2221,16 @@ Wrong behavior in shipped built-ins, found in the `test/built-ins` run:
 - ~~`Object.setPrototypeOf(Object.prototype, x)` succeeds for a non-circular
   `x`.~~ Paid 2026-11-19: `Object.prototype` is an immutable prototype
   exotic object (2 files).
-- `length` definitions on arrays convert the value in the wrong order; a
+- ~~`length` definitions on arrays convert the value in the wrong order; a
   `DataView` over a resizable buffer reports bounds errors from
   `byteLength`/`byteOffset`; `Object.freeze` accepts a length-tracking typed
-  array.
+  array.~~ Paid 2026-11-19 (9 files): `ArraySetLength` converts twice and
+  reads `length` afterwards, out-of-bounds views report 0, and typed arrays
+  whose length can change refuse `[[PreventExtensions]]`.
 
-Pay before M6 entry, the weak-key check first since it leaks memory.
+**Paid 2026-11-19** in full: 32 more `test/built-ins` files pass. The
+`DataView` `immutable-buffer` failures belong to the immutable ArrayBuffer
+proposal (TD-143).
 
 ### TD-143 — Recent-edition and stage 3 library features
 

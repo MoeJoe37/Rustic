@@ -497,9 +497,9 @@ depend on unfinished M5 tasks runs in parallel with WEB-05 to WEB-09. Done
 so far: the Encoding Standard layer, the stylesheet fallback chain, local
 HTML encoding selection and replay, URL query encoding in the
 document's encoding, base URLs on stylesheets (TD-26), and parse budgets
-that degrade like Chromium instead of failing (TD-02, ADR 0046). Next
-candidates with no M5 dependency: the JavaScript fixes due at M6 entry (TD-137 to
-TD-140, TD-142). The transport/TLS ADR and NET-01 wait for the M5
+that degrade like Chromium instead of failing (TD-02, ADR 0046), and the
+built-in bugs of TD-142. Next candidates with no M5 dependency: the
+JavaScript fixes due at M6 entry (TD-137 to TD-140). The transport/TLS ADR and NET-01 wait for the M5
 completion review, since NET-02 depends on M5.
 
 ## 10. M7 — Isolation and security gate

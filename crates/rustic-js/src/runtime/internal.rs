@@ -1021,15 +1021,19 @@ impl Agent {
 
     /// `ArraySetLength` (§10.4.2.4).
     fn array_set_length(&mut self, a: ObjectId, desc: PropertyDescriptor) -> JsResult<bool> {
-        let current = self.describe(a, Location::ArrayLength)?;
         let Some(value) = desc.value else {
+            let current = self.describe(a, Location::ArrayLength)?;
             return self.validate_length_attributes(a, desc, current);
         };
+        // Steps 3-4 convert the value twice (`ToUint32`, then `ToNumber`),
+        // and step 7 reads the current `length` only afterwards, so a
+        // `valueOf` that freezes `length` is observed.
+        let new_len = to_uint32(self.to_number(value)?);
         let number = self.to_number(value)?;
-        let new_len = to_uint32(number);
         if f64::from(new_len) != number {
             return Err(self.throw(ErrorKind::RangeError, "invalid array length"));
         }
+        let current = self.describe(a, Location::ArrayLength)?;
         let old_len = self.heap.object(a).length;
         let length_desc = PropertyDescriptor {
             value: Some(Value::number(f64::from(new_len))),

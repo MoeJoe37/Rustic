@@ -974,15 +974,37 @@ fn data_view_buffer(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Val
     Ok(Value::object(buffer))
 }
 
+/// The view's byte length, or `None` when `IsViewOutOfBounds` (the
+/// buffer is detached or no longer covers the view).
+fn view_length_in_bounds(
+    agent: &Agent,
+    buffer: ObjectId,
+    offset: usize,
+    length: Option<usize>,
+) -> Option<usize> {
+    let buffer_length = agent.buffer_len(buffer)?;
+    match length {
+        None => buffer_length.checked_sub(offset),
+        Some(length) => (offset + length <= buffer_length).then_some(length),
+    }
+}
+
+/// `get DataView.prototype.byteLength` (§25.3.4.2): +0 when the view is
+/// out of bounds, as the current specification says.
 fn data_view_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let (buffer, offset, length) = this_view(agent, this)?;
-    let length = view_byte_length(agent, buffer, offset, length)?;
+    let length = view_length_in_bounds(agent, buffer, offset, length).unwrap_or(0);
     Ok(Value::number(length as f64))
 }
 
+/// `get DataView.prototype.byteOffset` (§25.3.4.3): +0 when the view is
+/// out of bounds.
 fn data_view_byte_offset(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let (buffer, offset, length) = this_view(agent, this)?;
-    view_byte_length(agent, buffer, offset, length)?;
+    let offset = match view_length_in_bounds(agent, buffer, offset, length) {
+        Some(_) => offset,
+        None => 0,
+    };
     Ok(Value::number(offset as f64))
 }
 

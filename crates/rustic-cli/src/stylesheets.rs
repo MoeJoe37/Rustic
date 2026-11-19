@@ -9,9 +9,13 @@
 //! style loader offers, so a file that grows while being read still cannot
 //! exceed it.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf, Prefix};
+use std::rc::Rc;
+use std::sync::Arc;
 
 use rustic_base::CancellationToken;
 use rustic_encoding::Encoding;
@@ -127,6 +131,85 @@ fn root_for(first: Option<&str>) -> Option<PathBuf> {
     }
 }
 
+/// Bytes which have been applied to a scripted local document.
+///
+/// A layout read may rebuild its cascade and box tree after a DOM mutation,
+/// but it must not pick up unrelated changes to resource files. The first
+/// fetch freezes each absolute URL's bounded bytes or failure. A host-side
+/// completion path may later replace this snapshot, after staging the new
+/// resource, and publish the corresponding rendering-input revision.
+#[derive(Clone, Debug)]
+pub(crate) struct AppliedLocalFiles {
+    state: Rc<RefCell<AppliedFileState>>,
+}
+
+#[derive(Debug)]
+struct AppliedFileState {
+    entries: HashMap<String, Result<Arc<[u8]>, FetchError>>,
+    bytes: usize,
+    max_bytes: usize,
+    max_entries: usize,
+}
+
+impl AppliedLocalFiles {
+    pub(crate) fn new(max_entries: usize, max_bytes: usize) -> Self {
+        Self {
+            state: Rc::new(RefCell::new(AppliedFileState {
+                entries: HashMap::new(),
+                bytes: 0,
+                max_bytes,
+                max_entries,
+            })),
+        }
+    }
+
+    /// Resolve once without exposing a partly fetched resource. The caller
+    /// checks the URL security policy before returning bytes from `read`.
+    /// Later reads still respect their own per-request size limits.
+    pub(crate) fn read(
+        &self,
+        url: &Url,
+        max_bytes: usize,
+        fetch: impl FnOnce() -> Result<Vec<u8>, FetchError>,
+    ) -> Result<Arc<[u8]>, FetchError> {
+        let key = url.serialize();
+        if let Some(result) = self.state.borrow().entries.get(&key) {
+            return result.clone().and_then(|bytes| {
+                if bytes.len() > max_bytes {
+                    Err(FetchError::TooLarge)
+                } else {
+                    Ok(bytes)
+                }
+            });
+        }
+        let result = fetch().and_then(|bytes| {
+            if bytes.len() > max_bytes {
+                Err(FetchError::TooLarge)
+            } else {
+                Ok(Arc::<[u8]>::from(bytes))
+            }
+        });
+        let mut state = self.state.borrow_mut();
+        if state.entries.len() >= state.max_entries {
+            return Err(FetchError::TooLarge);
+        }
+        let result = result.and_then(|bytes| {
+            let remaining = state.max_bytes.saturating_sub(state.bytes);
+            if bytes.len() > remaining {
+                Err(FetchError::TooLarge)
+            } else {
+                state.bytes += bytes.len();
+                Ok(bytes)
+            }
+        });
+        // Cancellation must not poison a retryable resource snapshot.
+        if result != Err(FetchError::Cancelled) {
+            state.entries.insert(key, result.clone());
+        }
+        result
+    }
+}
+
 /// Reads stylesheets from files under one directory.
 #[derive(Debug)]
 pub struct LocalStylesheetFetcher {
@@ -138,6 +221,7 @@ pub struct LocalStylesheetFetcher {
     chunk_bytes: usize,
     cancellation: CancellationToken,
     environment_encoding: Encoding,
+    applied: Option<AppliedLocalFiles>,
 }
 
 impl LocalStylesheetFetcher {
@@ -151,11 +235,17 @@ impl LocalStylesheetFetcher {
             chunk_bytes: chunk_bytes.max(1),
             cancellation,
             environment_encoding: Encoding::Utf8,
+            applied: None,
         })
     }
 
     pub(crate) fn with_environment_encoding(mut self, encoding: Encoding) -> Self {
         self.environment_encoding = encoding;
+        self
+    }
+
+    pub(crate) fn with_applied_files(mut self, applied: AppliedLocalFiles) -> Self {
+        self.applied = Some(applied);
         self
     }
 
@@ -208,8 +298,14 @@ impl LocalStylesheetFetcher {
         if self.cancellation.check().is_err() {
             return Err(FetchError::Cancelled);
         }
+        // No policy bypass on a cached hit: a URL with a disallowed scheme,
+        // host or encoded path is rejected before looking in the snapshot.
         let path = url_path(url).ok_or(FetchError::Blocked)?;
-        self.read(&path, max_bytes)
+        if let Some(applied) = &self.applied {
+            applied.read(url, max_bytes, || self.read(&path, max_bytes)).map(|b| b.to_vec())
+        } else {
+            self.read(&path, max_bytes)
+        }
     }
 }
 

@@ -1353,7 +1353,9 @@ mod tests {
               <link rel="stylesheet" disabled href="disabled.css">
               <link rel="stylesheet" type="text/plain" href="wrong.css">
               <link rel="StyleSheet" href="site.css">
+              <link rel="stylesheet" href="site.css">
               <link rel="stylesheet" href="over-limit.css">
+              <img src="first.png">
               <img src="first.png">
               <img src="over-limit.png">"#,
         );

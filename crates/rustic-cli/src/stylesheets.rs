@@ -255,6 +255,7 @@ impl AppliedLocalFiles {
                 .map_err(|_| FetchError::Failed)?;
         }
         let version = state.next_version.checked_add(1).ok_or(FetchError::TooLarge)?;
+        let new_bytes = staged.bytes.len();
         state.entries.insert(
             staged.key,
             AppliedFileEntry {
@@ -262,12 +263,7 @@ impl AppliedLocalFiles {
                 version,
             },
         );
-        state.bytes = state.bytes - old_bytes + state
-            .entries
-            .values()
-            .find(|entry| entry.version == version)
-            .and_then(|entry| entry.result.as_ref().ok())
-            .map_or(0, |bytes| bytes.len());
+        state.bytes = state.bytes - old_bytes + new_bytes;
         state.next_version = version;
         Ok(())
     }

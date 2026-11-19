@@ -670,7 +670,14 @@ regression covers fractional pixels, transforms, atomic inline boxes, hidden
 elements, and a held declaration after its containing block resizes. The
 staged-image fixture checks the CSSOM width before and after publication.
 The pinned CSSOM `computed-style-001.html` passes all four subtests, including
-the percentage-width assertion.
+the percentage-width assertion. The box-model snapshot also resolves the
+physical padding and margins of blocks and atomic inlines. Non-auto margins
+use the same containing width as the layout solver. This preserves authored
+fixed and percentage margins when the placement equation absorbs leftover
+space. Shorthand reads combine the four resolved sides for margin, padding
+and the three border component shorthands. The pinned CSSOM
+`computed-style-005.html` passes both auto-margin subtests and the absolute
+inset subtest. Its relative-inset subtest tracks the unresolved `auto` values.
 Pseudo-elements, remaining style serialization, real asynchronous
 stylesheet/image completion delivery and broader validation remain WEB-06
 work under
@@ -680,8 +687,8 @@ marked complete by this slice.
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 23 Window WPT files. It reports 83 subtests, including 72 passes
-and 11 expected failures. The runner checks vendored files by digest and
+baseline for 24 Window WPT files. It reports 87 subtests, including 75 passes
+and 12 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.

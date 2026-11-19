@@ -65,6 +65,25 @@
       "status": "PASS"
     }
   ],
+  "css/cssom/computed-style-005.html": [
+    {
+      "name": "absolute_computed_margins",
+      "status": "PASS"
+    },
+    {
+      "name": "absolute_computed_left_and_right",
+      "status": "PASS"
+    },
+    {
+      "name": "relative_computed_margins",
+      "status": "PASS"
+    },
+    {
+      "name": "relative_computed_left_and_right",
+      "status": "FAIL",
+      "message": "assert_equals: expected \"0px\" but got \"auto\""
+    }
+  ],
   "css/cssom/getComputedStyle-property-order.html": [
     {
       "name": "Computed style properties should be sorted lexicographically",

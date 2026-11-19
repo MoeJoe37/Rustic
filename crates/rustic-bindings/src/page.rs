@@ -61,7 +61,10 @@ impl ComputedStyleSnapshot {
                 .find(|(key, _)| key == name)
                 .map(|(_, value)| value.as_str());
         }
-        let property = rustic_css::PropertyId::from_name(name)?;
+        self.get_longhand(rustic_css::PropertyId::from_name(name)?)
+    }
+
+    fn get_longhand(&self, property: rustic_css::PropertyId) -> Option<&str> {
         self.longhands
             .iter()
             .find(|(key, _)| *key == property.name())

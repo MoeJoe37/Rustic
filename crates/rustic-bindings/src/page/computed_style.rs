@@ -367,12 +367,14 @@ fn get_property_value(agent: &mut Agent, declaration: Value, args: &[Value]) -> 
     let property = creation::string(agent, argument)?;
     let name = creation::scalar_name(&property)?;
     let style = snapshot_from_element(agent, source)?;
-    value(
-        agent,
-        name.as_deref()
-            .and_then(|name| style.get(name))
-            .unwrap_or(""),
-    )
+    let Some(name) = name.as_deref() else {
+        return value(agent, "");
+    };
+    if let Some(longhand) = style.get(name) {
+        return value(agent, longhand);
+    }
+    let shorthand = rustic_css::serialize_four_sided_shorthand(name, |id| style.get_longhand(id));
+    value(agent, shorthand.as_deref().unwrap_or(""))
 }
 
 fn get_property_priority(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {

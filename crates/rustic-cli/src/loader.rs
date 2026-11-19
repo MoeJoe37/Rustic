@@ -995,25 +995,69 @@ fn cssom_longhands() -> &'static [PropertyId] {
     &ORDER
 }
 
-// CSSOM §9 exposes used dimensions for rendered boxes. Resolve them before
-// transforms and CSSOM View rounding, on the box selected by CSS Sizing §3.3.
+// CSSOM §9 uses the existing untransformed fragment for box-dependent values.
+#[derive(Clone, Copy)]
+struct CssomBox {
+    size: rustic_layout::CssSize,
+    margin: rustic_layout::Edges,
+    padding: rustic_layout::Edges,
+}
+
+impl CssomBox {
+    fn from_fragment(
+        fragment: rustic_layout::BlockFragment,
+        style: &ComputedStyle,
+    ) -> Result<Self, LayoutReadError> {
+        let size = if matches!(
+            style.get(PropertyId::BoxSizing),
+            PropertyValue::BoxSizing(BoxSizing::BorderBox)
+        ) {
+            fragment.border().size()
+        } else {
+            fragment.content().size()
+        };
+        let (margin, padding) = fragment
+            .resolved_edges(style)
+            .map_err(|_| LayoutReadError::Unavailable)?;
+        Ok(Self {
+            size,
+            margin,
+            padding,
+        })
+    }
+
+    fn length(self, property: PropertyId) -> Option<rustic_layout::CssPx> {
+        Some(match property {
+            PropertyId::Width => self.size.width(),
+            PropertyId::Height => self.size.height(),
+            PropertyId::MarginTop => self.margin.top,
+            PropertyId::MarginRight => self.margin.right,
+            PropertyId::MarginBottom => self.margin.bottom,
+            PropertyId::MarginLeft => self.margin.left,
+            PropertyId::PaddingTop => self.padding.top,
+            PropertyId::PaddingRight => self.padding.right,
+            PropertyId::PaddingBottom => self.padding.bottom,
+            PropertyId::PaddingLeft => self.padding.left,
+            _ => return None,
+        })
+    }
+}
+
 fn cssom_value(
     style: &ComputedStyle,
-    used_size: Option<rustic_layout::CssSize>,
+    layout_box: Option<CssomBox>,
     property: PropertyId,
 ) -> String {
+    if let Some(pixels) = layout_box.and_then(|b| b.length(property)) {
+        return Length::px(pixels.get()).to_string();
+    }
     let computed = style.get(property);
-    let pixels = match (property, used_size, computed) {
-        (PropertyId::Width, Some(size), _) => size.width().get(),
-        (PropertyId::Height, Some(size), _) => size.height().get(),
-        (PropertyId::LineHeight, _, PropertyValue::LineHeight(LineHeight::Number(factor))) => {
-            // Keep the serialized length finite for very large valid factors.
-            let font_size = style.font_size_px().min(f64::MAX);
-            (factor * font_size).min(f64::MAX)
-        }
-        _ => return computed.to_string(),
-    };
-    Length::px(pixels).to_string()
+    if let PropertyValue::LineHeight(LineHeight::Number(factor)) = computed {
+        // Keep the serialized length finite for very large valid factors.
+        let font_size = style.font_size_px().min(f64::MAX);
+        return Length::px((factor * font_size).min(f64::MAX)).to_string();
+    }
+    computed.to_string()
 }
 
 impl LayoutSource for LocalLayout {
@@ -1034,7 +1078,7 @@ impl LayoutSource for LocalLayout {
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
         // Public block fragments omit anonymous wrappers and include atomic
-        // inlines. Ordinary inline fragments do not have a used width/height.
+        // inlines. Ordinary inline fragments retain their computed values.
         let fragments: HashMap<_, _> = layout
             .fragments()
             .iter()
@@ -1052,22 +1096,16 @@ impl LayoutSource for LocalLayout {
                     self.cancellation
                         .check()
                         .map_err(|_| LayoutReadError::Unavailable)?;
-                    let used_size = fragments.get(&style.node).map(|fragment| {
-                        if matches!(
-                            style.computed.get(PropertyId::BoxSizing),
-                            PropertyValue::BoxSizing(BoxSizing::BorderBox)
-                        ) {
-                            fragment.border().size()
-                        } else {
-                            fragment.content().size()
-                        }
-                    });
+                    let layout_box = fragments
+                        .get(&style.node)
+                        .map(|&&fragment| CssomBox::from_fragment(fragment, &style.computed))
+                        .transpose()?;
                     let longhands = cssom_longhands()
                         .iter()
                         .map(|&property| {
                             (
                                 property.name(),
-                                cssom_value(&style.computed, used_size, property),
+                                cssom_value(&style.computed, layout_box, property),
                             )
                         })
                         .collect();
@@ -1546,6 +1584,67 @@ mod tests {
             )),
             "{output}"
         );
+    }
+
+    #[test]
+    fn cssom_resolves_box_edges_and_serializes_four_sided_shorthands() {
+        let file = TempFile::new(
+            br#"<!doctype html>
+                <style>
+                    #parent { position: relative; width: 200px; padding: 10px; }
+                    .box { width: 80px; height: 10px; padding: 5% 2.5%; margin: auto; }
+                    #box { border-width: 1px 2px 3px; border-style: solid dashed; }
+                    #box { border-color: red blue red green; }
+                    #absolute { position: absolute; left: 0; right: 0; }
+                </style>
+                <div id="parent">
+                    <div id="box" class="box"></div>
+                    <span id="absolute" class="box"></span>
+                </div>
+                <script>
+                    const parent = document.getElementById('parent');
+                    const box = document.getElementById('box');
+                    const held = getComputedStyle(box);
+                    const absolute = getComputedStyle(document.getElementById('absolute'));
+                    const read = name => held.getPropertyValue(name);
+                    const initial = [read('MARGIN'), read('padding'), read('border-width'),
+                        read('border-style'), read('border-color'), held.marginRight,
+                        absolute.getPropertyValue('margin'), absolute.paddingTop,
+                        [...held].includes('margin'), read('unsupported-property')];
+                    document.body.setAttribute('data-edges', initial.join('|'));
+                    box.setAttribute('style', 'margin: 3px 4% -2px 5%');
+                    parent.setAttribute('style', 'width: 150px');
+                    document.body.setAttribute('data-updated',
+                        [read('margin'), held.marginRight, held.marginLeft, read('padding')].join('|'));
+                    box.setAttribute('style', 'display: none; margin: 3px 4% -2px 5%');
+                    document.body.setAttribute('data-boxless',
+                        [read('margin'), read('padding')].join('|'));
+                    const detached = getComputedStyle(document.createElement('span'));
+                    document.body.setAttribute('data-detached', detached.getPropertyValue('padding'));
+                </script>"#,
+        );
+        let mut engine = Engine::new(1);
+        let limits = LoaderLimits {
+            run_scripts: true,
+            ..LoaderLimits::default()
+        };
+        let parsed = load_document(&mut engine, &file.0, limits).unwrap();
+        let output = dump_dom(&parsed, &file.0, limits).unwrap();
+        for expected in [
+            concat!(
+                "local=\"data-edges\" value=\"0px 53px|10px 5px|1px 2px 3px|solid dashed|",
+                "rgb(255, 0, 0) rgb(0, 0, 255) rgb(255, 0, 0) rgb(0, 128, 0)|",
+                "53px|0px 64.5px|11px|false|\"",
+            ),
+            "local=\"data-updated\" value=\"3px 6px -2px 7.5px|6px|7.5px|7.5px 3.75px\"",
+            "local=\"data-boxless\" value=\"3px 4% -2px 5%|5% 2.5%\"",
+            "local=\"data-detached\" value=\"\"",
+        ] {
+            assert!(
+                output.contains(expected),
+                "{expected} missing from {output}"
+            );
+        }
     }
 
     #[test]

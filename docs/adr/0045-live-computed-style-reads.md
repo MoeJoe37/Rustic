@@ -124,7 +124,13 @@ before custom properties (CSSOM §7.2). For width and height, the CLI uses the
 untransformed fragment dimensions selected by `box-sizing` when the property
 applies and the element has a box. Otherwise it serializes the computed value.
 Unitless line heights use the element's font size. These resolved values come
-from the same snapshot as geometry (CSSOM §9, CSS Sizing §3.3).
+from the same snapshot as geometry (CSSOM §9, CSS Sizing §3.3). Block and
+atomic inline fragments use the layout containing width to resolve percentage
+margins and padding. Auto margins use the distribution from layout, while
+non-auto margins exclude adjustments made for box placement.
+`getPropertyValue` uses the canonical four sides from the property catalog to
+serialize the supported margin, padding and border component shorthands.
+Numeric enumeration continues to include longhands and custom properties.
 
 The host-facing `apply_resource_completion` API publishes a staged resource
 result before advancing the applied-input epoch and offering a frame. Failed

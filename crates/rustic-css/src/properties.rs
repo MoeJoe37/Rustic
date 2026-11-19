@@ -1403,6 +1403,39 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     })
 }
 
+/// Serialize a four-sided CSSOM shorthand from its resolved longhand values.
+/// Names are ASCII case-insensitive. Missing longhands and unsupported
+/// shorthands have no serialization.
+pub fn serialize_four_sided_shorthand<'a>(
+    name: &str,
+    mut value: impl FnMut(PropertyId) -> Option<&'a str>,
+) -> Option<String> {
+    let canonical = [
+        "margin",
+        "padding",
+        "border-width",
+        "border-style",
+        "border-color",
+    ]
+    .into_iter()
+    .find(|candidate| name.eq_ignore_ascii_case(candidate))?;
+    let &[top, right, bottom, left] = longhands_of(canonical)? else {
+        return None;
+    };
+    let sides = [value(top)?, value(right)?, value(bottom)?, value(left)?];
+    let [top, right, bottom, left] = sides;
+    let count = if left != right {
+        4
+    } else if bottom != top {
+        3
+    } else if right != top {
+        2
+    } else {
+        1
+    };
+    Some(sides[..count].join(" "))
+}
+
 /// `none | <custom-ident>+`, excluding `and`, `or`, `not` and `default`
 /// (CSS Conditional 5 `<container-name>`).
 fn container_name(parts: &[&Value]) -> Option<Vec<String>> {

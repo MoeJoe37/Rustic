@@ -90,6 +90,7 @@ pub struct BlockFragment {
     padding: CssRect,
     border: CssRect,
     margin: Edges,
+    containing_width: CssPx,
     scheme: PositionScheme,
     relative: CssPoint,
     containing_block: Option<usize>,
@@ -137,6 +138,32 @@ impl BlockFragment {
     pub const fn margin(self) -> Edges {
         self.margin
     }
+    /// Resolved physical margins and padding for CSSOM.
+    ///
+    /// Margins exposed to CSSOM exclude unused space and float intrusion
+    /// that the placement equation can fold into a non-auto margin.
+    pub fn resolved_edges(self, style: &ComputedStyle) -> Result<(Edges, Edges), MeasureError> {
+        let basis = self.containing_width.get();
+        let resolve = |property, placed: CssPx| {
+            crate::sizing::auto(style, property, basis)?.map_or(Ok(placed), |value| {
+                CssPx::new(value).map_err(MeasureError::from)
+            })
+        };
+        let horizontal_auto = |placed: CssPx| match self.scheme {
+            PositionScheme::Absolute | PositionScheme::Fixed => placed,
+            _ if placed < CssPx::ZERO => CssPx::ZERO,
+            _ => placed,
+        };
+        let margin = Edges {
+            top: resolve(P::MarginTop, self.margin.top)?,
+            right: resolve(P::MarginRight, horizontal_auto(self.margin.right))?,
+            bottom: resolve(P::MarginBottom, self.margin.bottom)?,
+            left: resolve(P::MarginLeft, horizontal_auto(self.margin.left))?,
+        };
+        let (padding, _) = crate::sizing::box_edges(style, basis)?;
+        Ok((margin, padding))
+    }
+
     /// Positioning scheme.
     pub const fn scheme(self) -> PositionScheme {
         self.scheme
@@ -2490,9 +2517,19 @@ impl Engine<'_, '_> {
             };
             borders.push(origin);
         }
-        let mut fragments = Vec::with_capacity(n);
+        let mut fragments: Vec<BlockFragment> = Vec::with_capacity(n);
         for (i, node) in self.nodes.iter().enumerate() {
-            let mut f = fragment(node, borders[i])?;
+            let containing_width = match node.scheme {
+                Scheme::Absolute | Scheme::Fixed => node.containing.map_or_else(
+                    || self.viewport.width(),
+                    |parent| fragments[parent].padding().size().width(),
+                ),
+                _ => node.parent.map_or_else(
+                    || self.viewport.width(),
+                    |parent| self.nodes[parent].measure.content_width,
+                ),
+            };
+            let mut f = fragment(node, borders[i], containing_width)?;
             f.sticky = sticky[i];
             fragments.push(f);
         }
@@ -2601,7 +2638,11 @@ impl Engine<'_, '_> {
     }
 }
 
-fn fragment(node: &Node<'_>, border_origin: (f64, f64)) -> Result<BlockFragment, FlowError> {
+fn fragment(
+    node: &Node<'_>,
+    border_origin: (f64, f64),
+    containing_width: CssPx,
+) -> Result<BlockFragment, FlowError> {
     let m = node.measure;
     let point = |p: (f64, f64)| -> Result<CssPoint, GeometryError> {
         Ok(CssPoint {
@@ -2659,6 +2700,7 @@ fn fragment(node: &Node<'_>, border_origin: (f64, f64)) -> Result<BlockFragment,
         padding,
         border,
         margin: m.margin,
+        containing_width,
         scheme,
         relative: node.rel,
         containing_block: node.containing,

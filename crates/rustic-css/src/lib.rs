@@ -84,7 +84,7 @@ pub use properties::{
     Position, PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,
     TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, UnicodeBidi,
     VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, WordBreak, ZIndex,
-    parse_declaration,
+    parse_declaration, serialize_four_sided_shorthand,
 };
 pub use registered::{
     PropertySyntax, RegisteredItem, RegisteredValue, SyntaxComponent, SyntaxMultiplier, SyntaxType,

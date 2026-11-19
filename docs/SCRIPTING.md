@@ -97,7 +97,11 @@ For rendered boxes whose sizing properties apply, `width` and `height` use the
 untransformed content or border dimensions selected by `box-sizing`. Ordinary
 inlines and elements without boxes expose their computed dimensions. A unitless
 `line-height` resolves against the element's computed font size, and `normal`
-remains a keyword.
+remains a keyword. Block and atomic inline boxes also expose resolved margins
+and padding. Percentages use the layout containing block, and auto block
+margins reflect distribution by the layout algorithm. `getPropertyValue()`
+combines the four sides of `margin`, `padding`, `border-width`, `border-style`
+and `border-color` into the shortest equivalent shorthand.
 [CSSOM §9](https://drafts.csswg.org/cssom/#resolved-values)
 `getComputedStyle` uses the element for a pseudo argument without a leading
 colon. Colon-prefixed pseudo-element requests remain unsupported.
@@ -362,8 +366,8 @@ The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
 `html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
-configured to require an exact match to the checked-in **23 files,
-83 subtests, 72 passes and 11 expected failures**. The expectations record the names and diagnoses
+configured to require an exact match to the checked-in **24 files,
+87 subtests, 75 passes and 12 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -378,7 +382,9 @@ running after completion. Both remain outside the initial selection.
 The CSSOM View cases cover detached elements, fixed positioning with a
 transform and rectangle dimensions. The two new expected failures concern
 the coordinates of an empty inline in a phantom line box. The CSSOM cases cover property order, read-only declarations, and resolved
-sizes, including percentage widths.
+sizes, including percentage widths and positioned boxes' auto margins. One
+new expected failure records the separate relative-inset behavior, where the
+host returns `auto` for the left and right insets.
 
 ```sh
 cargo build --locked -p rustic-cli

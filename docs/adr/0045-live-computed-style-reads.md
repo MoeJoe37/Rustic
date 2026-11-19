@@ -130,7 +130,9 @@ failures across dirty layout reads, preventing file replacement or deletion
 from changing an already-applied resource without a host event. The static
 CLI retains its direct fetch behavior. The local fetcher can stage bounded,
 policy-checked replacement bytes, and the cache commits them atomically after
-rechecking aggregate and entry budgets. An integration fixture applies staged
+rechecking aggregate and entry budgets. Per-URL version checks reject late
+out-of-order completions, while unrelated URLs may publish independently.
+An in-flight first fetch cannot overwrite an already-published completion. An integration fixture applies staged
 CSS and PNG file versions through `apply_resource_completion`, checking that
 styles, image layout and frame tickets change only after successful publication.
 The scripted loader still fetches on demand and has **no asynchronous resource

@@ -28,5 +28,8 @@ rustic-paint = { path = "../rustic-paint" }
 rustic-raster = { path = "../rustic-raster" }
 rustic-codecs = { path = "../rustic-codecs" }
 
+[dev-dependencies]
+rustic-js = { path = "../rustic-js" }
+
 [lints]
 workspace = true

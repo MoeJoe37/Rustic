@@ -8,7 +8,9 @@ use std::time::Duration;
 
 use rustic_base::{CancellationToken, Clock, SystemClock};
 use rustic_bindings::dom_exception;
-use rustic_bindings::page::{self, ComputedStyleSnapshot, LayoutReadError, LifecycleEvent, PageTree};
+use rustic_bindings::page::{
+    self, ComputedStyleSnapshot, LayoutReadError, LifecycleEvent, PageTree,
+};
 use rustic_dom::{Document, NodeId};
 use rustic_html::{DocumentMode, HtmlDocumentParser, ParseError as HtmlParseError};
 use rustic_js::module::{GraphError, GraphLimits, ModuleEvalError, ModuleGraph};
@@ -777,6 +779,16 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(self.pending.queue.borrow().delay(self.clock.now()))
     }
 
+    /// Whether the next eligible task at the current clock time publishes a
+    /// resource without entering JS. A manual-clock host can use this to
+    /// enforce a script-turn budget before pumping the next task.
+    pub fn next_task_is_resource_completion(&self) -> bool {
+        self.pending
+            .queue
+            .borrow()
+            .next_ready_is_resource(self.clock.now())
+    }
+
     /// Offer this document a rendering opportunity at the current clock time.
     /// Offers made before the next rendering turn coalesce to the latest time.
     pub fn offer_rendering_opportunity(&mut self) -> Result<(), ScriptStop> {
@@ -799,13 +811,10 @@ impl<C: Clock> ScriptedDocument<C> {
         // A completed resource already next in task order must be published
         // before a pending render can consume the previous input revision.
         // Ordinary scripts and timers retain the existing alternating policy.
-        let ready_resource = self
-            .pending
-            .queue
-            .borrow()
-            .next_ready_is_resource(self.clock.now());
+        let now = self.clock.now();
+        let ready_resource = self.pending.queue.borrow().next_ready_is_resource(now);
         if ready_resource || !self.rendering.has_priority() {
-            if let Some(turn) = self.run_script()? {
+            if let Some(turn) = self.run_script(now)? {
                 return Ok(Some(DocumentTurn::Script(turn)));
             }
         }
@@ -849,11 +858,11 @@ impl<C: Clock> ScriptedDocument<C> {
     /// [`Self::run_next_with_render`] to service rendering offers as well.
     pub fn run_next(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
         self.check_live()?;
-        self.run_script()
+        self.run_script(self.clock.now())
     }
 
-    fn run_script(&mut self) -> Result<Option<ScriptTurn>, ScriptStop> {
-        let Some(task) = self.pending.queue.borrow_mut().pop_ready(self.clock.now()) else {
+    fn run_script(&mut self, now: Duration) -> Result<Option<ScriptTurn>, ScriptStop> {
+        let Some(task) = self.pending.queue.borrow_mut().pop_ready(now) else {
             return Ok(None);
         };
 
@@ -864,9 +873,7 @@ impl<C: Clock> ScriptedDocument<C> {
                 // The shared publication API changes the revision and queues
                 // a frame only if the already-staged commit succeeds.
                 let applied = self
-                    .apply_resource_completion(|| {
-                        if commit.apply() { Ok(()) } else { Err(()) }
-                    })?
+                    .apply_resource_completion(|| if commit.apply() { Ok(()) } else { Err(()) })?
                     .is_ok();
                 if applied {
                     self.rendering.after_script();

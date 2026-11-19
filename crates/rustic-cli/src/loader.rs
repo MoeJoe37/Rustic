@@ -20,10 +20,9 @@ use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
 use rustic_css::{CssError, CssLimits, CssParser, MediaEnvironment, PropertyId};
 use rustic_dom::{Document, DumpError};
 use rustic_engine::{
-    ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, DocumentStartError, Engine,
-    ComputedStyleSnapshot, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource,
-    ScriptLoadError, ScriptStop,
-    TaskLimits,
+    ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, ComputedStyleSnapshot,
+    DocumentStartError, Engine, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource,
+    ScriptLoadError, ScriptStop, TaskLimits,
 };
 use rustic_html::{
     DocumentMode, Encoding, LOCAL_ENCODING_PREFIX_BYTES, ParseError, ParserLimits, Scripting,
@@ -34,7 +33,9 @@ use rustic_style::{
     StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
 
-use crate::stylesheets::{AppliedLocalFiles, LocalStylesheetFetcher, MAX_APPLIED_URL_BYTES, file_url};
+use crate::stylesheets::{
+    AppliedLocalFiles, LocalStylesheetFetcher, MAX_APPLIED_URL_BYTES, file_url,
+};
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -233,6 +234,38 @@ fn looks_like_url(argument: &OsStr) -> bool {
             .all(|&byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
 }
 
+/// A local page and the resource bytes applied during its script turns.
+#[derive(Debug)]
+pub struct LoadedDocument {
+    document: EngineDocument,
+    applied_files: Option<AppliedLocalFiles>,
+}
+
+impl LoadedDocument {
+    pub fn parsed(&self) -> &rustic_html::ParsedDocument {
+        self.document.parsed()
+    }
+
+    pub fn cancellation(&self) -> &CancellationToken {
+        self.document.cancellation()
+    }
+
+    fn layout_input<'a>(
+        &'a self,
+        path: &'a Path,
+        limits: LoaderLimits,
+        view: rustic_layout::View,
+    ) -> LayoutInput<'a> {
+        LayoutInput::new(
+            &self.document,
+            path,
+            limits,
+            view,
+            self.applied_files.as_ref(),
+        )
+    }
+}
+
 /// Read one regular file in bounded chunks and build its document.
 ///
 /// The file is checked before opening (so FIFOs and devices are never opened)
@@ -243,7 +276,7 @@ pub fn load_document(
     engine: &mut Engine,
     path: &Path,
     limits: LoaderLimits,
-) -> Result<EngineDocument, LoadError> {
+) -> Result<LoadedDocument, LoadError> {
     if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
         return Err(LoadError::InvalidLimits);
     }
@@ -271,7 +304,10 @@ pub fn load_document(
             Ok(load.feed(bytes)?)
         },
     )?;
-    Ok(load.finish()?)
+    Ok(LoadedDocument {
+        document: load.finish()?,
+        applied_files: None,
+    })
 }
 
 fn load_scripted_document(
@@ -279,7 +315,7 @@ fn load_scripted_document(
     path: &Path,
     limits: LoaderLimits,
     parser_limits: ParserLimits,
-) -> Result<EngineDocument, LoadError> {
+) -> Result<LoadedDocument, LoadError> {
     let path = fs::canonicalize(path).map_err(LoadError::Io)?;
     check_regular_file(fs::metadata(&path).map_err(LoadError::Io)?, limits)?;
     let url = file_url(&path).ok_or(ScriptLoadError::InvalidDocumentUrl)?;
@@ -301,8 +337,14 @@ fn load_scripted_document(
     )
     .ok_or(ScriptLoadError::InvalidDocumentUrl)?;
     let applied_files = AppliedLocalFiles::new(
-        limits.stylesheets.max_sheets.saturating_add(limits.images.max_images),
-        limits.stylesheets.max_total_bytes.saturating_add(limits.images.max_file_bytes),
+        limits
+            .stylesheets
+            .max_sheets
+            .saturating_add(limits.images.max_images),
+        limits
+            .stylesheets
+            .max_total_bytes
+            .saturating_add(limits.images.max_file_bytes),
     );
     read_document_file(
         &path,
@@ -358,7 +400,10 @@ fn load_scripted_document(
     }
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;
-    Ok(document.into_document())
+    Ok(LoadedDocument {
+        document: document.into_document(),
+        applied_files: Some(applied_files),
+    })
 }
 
 /// Eagerly supply the completed parser's local stylesheet/image resources
@@ -386,7 +431,11 @@ fn queue_discovered_local_resources(
                 fetch.stage_completion(applied, &url, limits.stylesheets.max_total_bytes)
             }
             LocalResourceKind::Image => crate::images::stage_image_completion(
-                fetch, applied, &url, limits.images, cancellation,
+                fetch,
+                applied,
+                &url,
+                limits.images,
+                cancellation,
             ),
         };
         let Ok(staged) = staged else {
@@ -406,6 +455,11 @@ fn queue_discovered_local_resources(
         // immediate source. Bound this by the same two-source alternation,
         // rather than holding every resource's bytes until EOF.
         for _ in 0..2 {
+            if *timer_turns >= MAX_SCRIPT_TIMER_TURNS
+                && !document.next_task_is_resource_completion()
+            {
+                return Err(LoadError::ScriptTurnLimit);
+            }
             match document.run_next()? {
                 Some(rustic_engine::ScriptTurn::ResourceCompletion { applied }) => {
                     delivered += usize::from(applied);
@@ -415,9 +469,6 @@ fn queue_discovered_local_resources(
                     // A ready timer can precede the resource task under
                     // source alternation. Such JS work must still count
                     // against the existing snapshot timer-turn ceiling.
-                    if *timer_turns >= MAX_SCRIPT_TIMER_TURNS {
-                        return Err(LoadError::ScriptTurnLimit);
-                    }
                     *timer_turns += 1;
                 }
                 None => break,
@@ -481,9 +532,8 @@ fn discover_local_resources(
                     alternate |= token.eq_ignore_ascii_case("alternate");
                 }
                 let css_type = attribute(element, "type").is_none_or(|value| {
-                    let value = value.trim_matches(|c: char| {
-                        matches!(c, ' ' | '\t' | '\n' | '\x0c' | '\r')
-                    });
+                    let value = value
+                        .trim_matches(|c: char| matches!(c, ' ' | '\t' | '\n' | '\x0c' | '\r'));
                     value.is_empty() || value.eq_ignore_ascii_case("text/css")
                 });
                 if !is_stylesheet
@@ -648,7 +698,7 @@ fn check_regular_file(metadata: fs::Metadata, limits: LoaderLimits) -> Result<()
 
 /// Deterministic preorder tree dump of the whole document, never HTML.
 pub fn dump_dom(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     _path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
@@ -700,12 +750,12 @@ fn push_diagnostics(out: &mut String, indent: &str, diagnostics: &[rustic_style:
 /// [`LoaderLimits::stylesheets`]. Hrefs and import URLs are printed as
 /// written, escaped, so the dump never depends on where the files live.
 pub fn dump_style(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
     let document = parsed.parsed().document();
-    let (styles, sheets) = compute_styles(LayoutInput::new(parsed, path, limits, default_view()))?;
+    let (styles, sheets) = compute_styles(parsed.layout_input(path, limits, default_view()))?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
         let status = status_text(sheet.status);
@@ -816,22 +866,22 @@ fn compute_styles(
 /// Dump an initial principal-box snapshot, before anonymous/line box construction.
 /// This has no layout positions, shaped text, images or paint output yet.
 pub fn dump_boxes(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    box_tree(LayoutInput::new(parsed, path, limits, default_view()))?
+    box_tree(parsed.layout_input(path, limits, default_view()))?
         .dump(limits.max_dump_bytes)
         .map_err(LoadError::Layout)
 }
 
 /// Normalize flow boxes and dump anonymous wrappers/inline continuations.
 pub fn dump_formatting(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let principal = box_tree(LayoutInput::new(parsed, path, limits, default_view()))?;
+    let principal = box_tree(parsed.layout_input(path, limits, default_view()))?;
     rustic_layout::FormattingTree::build(&principal, limits.formatting, parsed.cancellation())
         .and_then(|tree| tree.dump(limits.max_dump_bytes))
         .map_err(LoadError::Formatting)
@@ -874,11 +924,11 @@ fn layout_limits(limits: LoaderLimits) -> rustic_layout::LayoutLimits {
 /// Compute used block rectangles with adjoining-margin collapse for the static subset.
 /// Unsupported formatting returns no partial output; this does not paint pixels.
 pub fn dump_layout(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let (_, layout, _, _, _) = block_layout(LayoutInput::new(parsed, path, limits, default_view()))?;
+    let (_, layout, _, _, _) = block_layout(parsed.layout_input(path, limits, default_view()))?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
@@ -907,6 +957,7 @@ impl<'a> LayoutInput<'a> {
         path: &'a Path,
         limits: LoaderLimits,
         view: rustic_layout::View,
+        applied_files: Option<&'a AppliedLocalFiles>,
     ) -> Self {
         Self {
             document: parsed.parsed().document(),
@@ -916,7 +967,7 @@ impl<'a> LayoutInput<'a> {
             limits,
             view,
             cancellation: parsed.cancellation(),
-            applied_files: None,
+            applied_files,
         }
     }
 }
@@ -928,6 +979,16 @@ struct LocalLayout {
     cancellation: CancellationToken,
     encoding: Encoding,
     applied_files: AppliedLocalFiles,
+}
+
+// CSSOM lists supported longhands in lexicographical order before custom properties.
+fn cssom_longhands() -> &'static [PropertyId] {
+    static ORDER: std::sync::LazyLock<Vec<PropertyId>> = std::sync::LazyLock::new(|| {
+        let mut properties = PropertyId::ALL.to_vec();
+        properties.sort_unstable_by_key(|property| property.name());
+        properties
+    });
+    &ORDER
 }
 
 impl LayoutSource for LocalLayout {
@@ -956,7 +1017,7 @@ impl LayoutSource for LocalLayout {
             computed_styles: styles
                 .into_iter()
                 .map(|style| {
-                    let longhands = PropertyId::ALL
+                    let longhands = cssom_longhands()
                         .iter()
                         .map(|&property| {
                             (property.name(), style.computed.get(property).to_string())
@@ -968,7 +1029,13 @@ impl LayoutSource for LocalLayout {
                         .iter()
                         .map(|(name, value)| (name.to_owned(), value.to_string()))
                         .collect();
-                    (style.node, ComputedStyleSnapshot { longhands, custom_properties })
+                    (
+                        style.node,
+                        ComputedStyleSnapshot {
+                            longhands,
+                            custom_properties,
+                        },
+                    )
                 })
                 .collect(),
         })
@@ -1034,37 +1101,31 @@ fn block_layout(
     Ok((tree, layout, viewport, images, styles))
 }
 
-fn display_list(
-    parsed: &EngineDocument,
-    path: &Path,
-    limits: LoaderLimits,
-    view: rustic_layout::View,
-) -> Result<rustic_paint::DisplayList, LoadError> {
-    let (tree, layout, viewport, images, _) =
-        block_layout(LayoutInput::new(parsed, path, limits, view))?;
+fn display_list(input: LayoutInput<'_>) -> Result<rustic_paint::DisplayList, LoadError> {
+    let (tree, layout, viewport, images, _) = block_layout(input)?;
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),
         images: images.images,
     };
     rustic_paint::DisplayList::build_with(
-        parsed.parsed().document(),
+        input.document,
         &tree,
         &layout,
         viewport,
         &resources,
         rustic_paint::PaintLimits::default(),
-        parsed.cancellation(),
+        input.cancellation,
     )
     .map_err(LoadError::Paint)
 }
 
 /// Dump the display list for the block-only layout reference.
 pub fn dump_paint(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    display_list(parsed, path, limits, default_view())?
+    display_list(parsed.layout_input(path, limits, default_view()))?
         .dump(limits.max_dump_bytes)
         .map_err(LoadError::Paint)
 }
@@ -1073,12 +1134,12 @@ pub fn dump_paint(
 /// display list and report one line per point: the box, node and element
 /// name found, or `none` outside the viewport.
 pub fn hit_test(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
     points: &[(f64, f64)],
 ) -> Result<String, LoadError> {
-    let list = display_list(parsed, path, limits, default_view())?;
+    let list = display_list(parsed.layout_input(path, limits, default_view()))?;
     let mut out = String::new();
     for &(x, y) in points {
         let point = rustic_layout::CssPx::new(x)
@@ -1110,7 +1171,7 @@ pub fn hit_test(
 /// Rasterize the display list at `scale`. Only block backgrounds and solid
 /// borders are painted.
 pub fn render_surface(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -1120,17 +1181,23 @@ pub fn render_surface(
 
 /// Rasterize like [`render_surface`], keeping the display list.
 pub fn render_list(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
 ) -> Result<(rustic_paint::DisplayList, rustic_raster::Surface), LoadError> {
-    let list = display_list(parsed, path, limits, view)?;
+    rasterize_list(parsed.layout_input(path, limits, view))
+}
+
+fn rasterize_list(
+    input: LayoutInput<'_>,
+) -> Result<(rustic_paint::DisplayList, rustic_raster::Surface), LoadError> {
+    let list = display_list(input)?;
     let surface = rustic_raster::rasterize(
         &list,
-        view.scale(),
+        input.view.scale(),
         rustic_raster::RasterLimits::default(),
-        parsed.cancellation(),
+        input.cancellation,
     )
     .map_err(LoadError::Raster)?;
     Ok((list, surface))
@@ -1165,7 +1232,7 @@ pub fn damage_repaints_exactly(
 /// Rasterize like [`render_surface`] and encode the result as PNG, within
 /// the output byte limit.
 pub fn render_png(
-    parsed: &EngineDocument,
+    parsed: &LoadedDocument,
     path: &Path,
     limits: LoaderLimits,
     view: rustic_layout::View,
@@ -1301,9 +1368,11 @@ mod tests {
                     const originalTheme = held.getPropertyValue('--Theme');
                     const missing = held.getPropertyValue('--theme');
                     const indexCountBefore = held.length;
-                    const initialIndices = held[0] === 'display' &&
-                        held[1] === 'color' &&
-                        held[2] === 'background-color' &&
+                    let sorted = true;
+                    for (let i = 1; i < indexCountBefore - 1; i++) {
+                        if (held[i - 1] >= held[i] || held.item(i) !== held[i]) sorted = false;
+                    }
+                    const initialIndices = sorted && held[indexCountBefore - 1] === '--Theme' &&
                         Object.keys(held).length === held.length;
                     box.className = 'wide';
                     box.setAttribute('class', 'wide');
@@ -1328,7 +1397,7 @@ mod tests {
                     const good = [
                         held instanceof CSSStyleDeclaration,
                         held.length > 0,
-                        held.item(0) === 'display',
+                        held.item(0) === 'align-content',
                         before === '21px',
                         namedBefore === before,
                         after === '42px',
@@ -1356,7 +1425,44 @@ mod tests {
         };
         let parsed = load_document(&mut Engine::new(1), &file.0, limits).unwrap();
         let output = dump_dom(&parsed, &file.0, limits).unwrap();
-        assert!(output.contains("local=\"data-cssom\" value=\"ok\""), "{output}");
+        assert!(
+            output.contains("local=\"data-cssom\" value=\"ok\""),
+            "{output}"
+        );
+    }
+
+    #[test]
+    fn final_scripted_output_uses_the_stylesheet_and_image_applied_at_load() {
+        let sheet = TempFile::new(b"img { border: 3px solid red }");
+        let png = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(10, 4, rustic_raster::RasterLimits::default()).unwrap(),
+            usize::MAX,
+        )
+        .unwrap();
+        let image = TempFile::new(&png);
+        let page = TempFile::new(
+            format!(
+                "<!doctype html><link rel=stylesheet href='{}'><img src='{}'>",
+                sheet.0.file_name().unwrap().to_str().unwrap(),
+                image.0.file_name().unwrap().to_str().unwrap(),
+            )
+            .as_bytes(),
+        );
+        let mut engine = Engine::new(2);
+        let limits = LoaderLimits {
+            run_scripts: true,
+            ..LoaderLimits::default()
+        };
+        let scripted = load_document(&mut engine, &page.0, limits).unwrap();
+        let plain = LoaderLimits::default();
+        let reference = load_document(&mut engine, &page.0, plain).unwrap();
+        let pixels = |doc, limits| render_png(doc, &page.0, limits, default_view()).unwrap();
+        let expected = pixels(&reference, plain);
+        fs::remove_file(&image.0).unwrap();
+        assert_ne!(pixels(&reference, plain), expected);
+        assert_eq!(pixels(&scripted, limits), expected);
+        fs::write(&sheet.0, b"img { display: none }").unwrap();
+        assert_eq!(pixels(&scripted, limits), expected);
     }
 
     #[test]
@@ -1421,8 +1527,7 @@ mod tests {
     fn completed_parser_auto_delivers_css_and_png_with_bounded_host_turns() {
         let stylesheet = TempFile::new(b"#box { width: 19px }");
         let image_bytes = rustic_raster::encode_png(
-            &rustic_raster::Surface::new(4, 3, rustic_raster::RasterLimits::default())
-                .unwrap(),
+            &rustic_raster::Surface::new(4, 3, rustic_raster::RasterLimits::default()).unwrap(),
             usize::MAX,
         )
         .unwrap();
@@ -1450,9 +1555,11 @@ mod tests {
         )
         .unwrap();
         let mut scripted = parsed
+            .document
             .into_scripted_with_clock(TaskLimits::default(), ManualClock::default())
             .unwrap();
-        let mut timer_turns = 0;
+        // A spent JS budget still admits resource-only turns.
+        let mut timer_turns = MAX_SCRIPT_TIMER_TURNS;
         let delivered = queue_discovered_local_resources(
             &mut scripted,
             &page.0,
@@ -1463,49 +1570,85 @@ mod tests {
             &mut timer_turns,
         )
         .unwrap();
-        assert_eq!(timer_turns, 0);
+        assert_eq!(timer_turns, MAX_SCRIPT_TIMER_TURNS);
         assert_eq!(delivered, 2);
         assert_eq!(scripted.run_next(), Ok(None));
+
+        // Earlier immediate work gives a ready timer priority. An exhausted
+        // host must stop before entering JS or consuming that timer.
+        let timer = scripted
+            .schedule_script(
+                Duration::ZERO,
+                rustic_js::Source::from_str_limited("0", 1).unwrap(),
+            )
+            .unwrap();
+        assert!(matches!(
+            queue_discovered_local_resources(
+                &mut scripted,
+                &page.0,
+                limits,
+                &fetch,
+                &applied,
+                &token,
+                &mut timer_turns,
+            ),
+            Err(LoadError::ScriptTurnLimit)
+        ));
+        assert_eq!(scripted.cancel_timer(timer), Ok(true));
+        assert_eq!(
+            scripted.run_next(),
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion {
+                applied: true
+            }))
+        );
 
         // If the physical file changes after the parser completion, the
         // applied bytes remain stable until a new validated host task.
         fs::write(&stylesheet.0, b"#box { width: 99px }").unwrap();
         let changed_png = rustic_raster::encode_png(
-            &rustic_raster::Surface::new(8, 3, rustic_raster::RasterLimits::default())
-                .unwrap(),
+            &rustic_raster::Surface::new(8, 3, rustic_raster::RasterLimits::default()).unwrap(),
             usize::MAX,
         )
         .unwrap();
         fs::write(&image.0, changed_png).unwrap();
-        scripted.set_layout_source(Box::new(LocalLayout {
-            path: page.0.clone(),
-            limits,
-            cancellation: token,
-            encoding,
-            applied_files: applied,
-        })).unwrap();
-        scripted.queue_script(source(
-            "const box = document.querySelector('#box');
+        scripted
+            .set_layout_source(Box::new(LocalLayout {
+                path: page.0.clone(),
+                limits,
+                cancellation: token,
+                encoding,
+                applied_files: applied,
+            }))
+            .unwrap();
+        scripted
+            .queue_script(
+                rustic_js::Source::from_str_limited(
+                    "const box = document.querySelector('#box');
              const image = document.querySelector('#photo');
              if (getComputedStyle(box).width !== '19px' ||
                  image.offsetWidth !== 4)
                  throw 'resource completion was not pinned';",
-        )).unwrap();
-        assert_eq!(scripted.run_next(), Ok(Some(rustic_engine::ScriptTurn::Completed)));
+                    4096,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            scripted.run_next(),
+            Ok(Some(rustic_engine::ScriptTurn::Completed))
+        );
     }
 
     #[test]
     fn staged_css_and_image_completions_publish_new_layout_and_invalidate_frames() {
         let stylesheet = TempFile::new(b"#box { width: 18px }");
         let first_png = rustic_raster::encode_png(
-            &rustic_raster::Surface::new(2, 3, rustic_raster::RasterLimits::default())
-                .unwrap(),
+            &rustic_raster::Surface::new(2, 3, rustic_raster::RasterLimits::default()).unwrap(),
             usize::MAX,
         )
         .unwrap();
         let second_png = rustic_raster::encode_png(
-            &rustic_raster::Surface::new(6, 3, rustic_raster::RasterLimits::default())
-                .unwrap(),
+            &rustic_raster::Surface::new(6, 3, rustic_raster::RasterLimits::default()).unwrap(),
             usize::MAX,
         )
         .unwrap();
@@ -1561,19 +1704,25 @@ mod tests {
                 .1
                 .clone()
         };
-        let initial = layout.measure_layout(parsed.parsed().document(), mode).unwrap();
+        let initial = layout
+            .measure_layout(parsed.parsed().document(), mode)
+            .unwrap();
         assert_eq!(get_width(&initial), "18px");
         assert_eq!(initial.offset_widths.get(&image_id), Some(&2));
 
         let mut scripted = parsed
+            .document
             .into_scripted_with_clock(TaskLimits::default(), ManualClock::default())
             .unwrap();
-        scripted.set_layout_source(Box::new(layout.clone())).unwrap();
-        let render = |scripted: &mut rustic_engine::ScriptedDocument<ManualClock>| {
-            match scripted.run_next_with_render(|_, _| ()).unwrap() {
-                Some(rustic_engine::DocumentTurn::Rendered { frame, .. }) => frame,
-                other => panic!("expected rendering after completion, got {other:?}"),
-            }
+        scripted
+            .set_layout_source(Box::new(layout.clone()))
+            .unwrap();
+        let render = |scripted: &mut rustic_engine::ScriptedDocument<ManualClock>| match scripted
+            .run_next_with_render(|_, _| ())
+            .unwrap()
+        {
+            Some(rustic_engine::DocumentTurn::Rendered { frame, .. }) => frame,
+            other => panic!("expected rendering after completion, got {other:?}"),
         };
         let measure = |scripted: &rustic_engine::ScriptedDocument<ManualClock>| {
             let document = scripted.document();
@@ -1606,7 +1755,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             crate::images::stage_image_completion(
-                &fetcher, &applied, &image_url, limits.images, &token,
+                &fetcher,
+                &applied,
+                &image_url,
+                limits.images,
+                &token,
             )
             .unwrap_err(),
             FetchError::Failed,
@@ -1627,15 +1780,21 @@ mod tests {
             FetchError::TooLarge,
         );
         let staged_image = crate::images::stage_image_completion(
-            &fetcher, &applied, &image_url, limits.images, &token,
+            &fetcher,
+            &applied,
+            &image_url,
+            limits.images,
+            &token,
         )
         .unwrap();
         assert_eq!(
-            fetcher.stage_completion(
-                &applied,
-                &rustic_url::Url::parse("https://outside.example/image.png", None).unwrap(),
-                limits.images.max_file_bytes,
-            ).unwrap_err(),
+            fetcher
+                .stage_completion(
+                    &applied,
+                    &rustic_url::Url::parse("https://outside.example/image.png", None).unwrap(),
+                    limits.images.max_file_bytes,
+                )
+                .unwrap_err(),
             FetchError::Blocked,
         );
         assert_eq!(get_width(&measure(&scripted)), "18px");
@@ -1647,7 +1806,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             scripted.run_next(),
-            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: false }))
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion {
+                applied: false
+            }))
         );
         assert_eq!(scripted.accept_rendered_frame(previous), Ok(true));
 
@@ -1661,7 +1822,9 @@ mod tests {
         // completion API call or another script execution.
         assert_eq!(
             scripted.run_next(),
-            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: true }))
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion {
+                applied: true
+            }))
         );
         assert_eq!(scripted.accept_rendered_frame(stale_css), Ok(false));
         let applied_css = measure(&scripted);
@@ -1675,7 +1838,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             scripted.run_next(),
-            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: false }))
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion {
+                applied: false
+            }))
         );
         assert_eq!(scripted.accept_rendered_frame(stable_css), Ok(true));
 
@@ -1687,7 +1852,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             scripted.run_next(),
-            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion { applied: true }))
+            Ok(Some(rustic_engine::ScriptTurn::ResourceCompletion {
+                applied: true
+            }))
         );
         assert_eq!(scripted.accept_rendered_frame(stale_image), Ok(false));
         let applied_both = measure(&scripted);
@@ -1701,14 +1868,12 @@ mod tests {
     fn scripted_layout_reuses_applied_stylesheet_and_image_bytes_after_file_changes() {
         let stylesheet = TempFile::new(b"#box { width: 21px }");
         let first_png = rustic_raster::encode_png(
-            &rustic_raster::Surface::new(3, 2, rustic_raster::RasterLimits::default())
-                .unwrap(),
+            &rustic_raster::Surface::new(3, 2, rustic_raster::RasterLimits::default()).unwrap(),
             usize::MAX,
         )
         .unwrap();
         let replacement_png = rustic_raster::encode_png(
-            &rustic_raster::Surface::new(7, 2, rustic_raster::RasterLimits::default())
-                .unwrap(),
+            &rustic_raster::Surface::new(7, 2, rustic_raster::RasterLimits::default()).unwrap(),
             usize::MAX,
         )
         .unwrap();
@@ -1721,7 +1886,8 @@ mod tests {
         );
         let page = TempFile::new(html.as_bytes());
         let limits = LoaderLimits::default();
-        let document = load_document(&mut Engine::new(1), &page.0, limits).unwrap();
+        let mut engine = Engine::new(1);
+        let document = load_document(&mut engine, &page.0, limits).unwrap();
         let parsed = document.parsed();
         let tree = parsed.document();
         let mode = parsed.mode();
@@ -1971,11 +2137,18 @@ mod tests {
         let view = default_view();
         let document = load_document(&mut engine, &file.0, limits).expect("load");
         let expected = render_png(&document, &file.0, limits, view).expect("direct render");
-        let mut scripts = document.into_scripted(TaskLimits::default()).unwrap();
+        let mut scripts = document
+            .document
+            .into_scripted(TaskLimits::default())
+            .unwrap();
         scripts.offer_rendering_opportunity().unwrap();
 
         let Some(DocumentTurn::Rendered { frame, output }) = scripts
-            .run_next_with_render(|document, _| render_png(document, &file.0, limits, view))
+            .run_next_with_render(|document, _| {
+                let (_, surface) =
+                    rasterize_list(LayoutInput::new(document, &file.0, limits, view, None))?;
+                rustic_raster::encode_png(&surface, limits.max_dump_bytes).map_err(LoadError::Png)
+            })
             .unwrap()
         else {
             panic!("expected the scheduled rendering turn");

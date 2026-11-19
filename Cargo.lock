@@ -141,6 +141,7 @@ dependencies = [
  "rustic-encoding",
  "rustic-engine",
  "rustic-html",
+ "rustic-js",
  "rustic-layout",
  "rustic-paint",
  "rustic-raster",

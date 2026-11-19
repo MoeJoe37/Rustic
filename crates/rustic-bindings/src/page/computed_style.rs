@@ -6,7 +6,8 @@
 use rustic_css::PropertyId;
 use rustic_dom::NodeKind;
 use rustic_js::runtime::{
-    Abrupt, Agent, JsResult, LiveIndexAccess, NativeFn, ObjectId, PropertyDescriptor, Value,
+    Abrupt, Agent, JsResult, LiveIndexAccess, NativeFn, ObjectId, PropertyDescriptor, PropertyKey,
+    Value,
 };
 
 use crate::dom_exception;
@@ -195,11 +196,13 @@ fn install_longhand_getters(agent: &mut Agent, prototype: ObjectId) -> JsResult<
             for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
                 let canonical = property.name();
                 let camel = camel_name(canonical);
-                let getter = Value::object(
-                    agent.new_native_function(behavior, &format!("get {camel}"), 0)?,
-                );
+                let getter = Value::object(agent.new_native_function(
+                    behavior,
+                    &format!("get {camel}"),
+                    0,
+                )?);
                 let getter_root = agent.root(getter)?;
-                let installed = (|| {
+                let installed: JsResult<()> = (|| {
                     for (index, name) in [canonical, camel.as_str()].into_iter().enumerate() {
                         // A one-word longhand has identical CSS and IDL spellings:
                         // install it once, rather than accidentally skipping both.
@@ -228,9 +231,9 @@ fn install_longhand_getters(agent: &mut Agent, prototype: ObjectId) -> JsResult<
 }
 
 fn set_named_longhand(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let _ = creation::string(agent, argument)?;
-    element(agent, declaration)?;
     Err(read_only(agent))
 }
 
@@ -244,8 +247,19 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         &[("length", "get length", length)],
         |agent, proto| {
             install_longhand_getters(agent, proto)?;
+            agent.define_property_or_throw(
+                proto,
+                PropertyKey::Symbol(agent.symbols.iterator),
+                PropertyDescriptor::data_with(
+                    Value::object(agent.intrinsics.array_values),
+                    true,
+                    false,
+                    true,
+                ),
+            )?;
             let getter = Value::object(agent.new_native_function(css_text, "get cssText", 0)?);
-            let setter = Value::object(agent.new_native_function(set_css_text, "set cssText", 1)?);
+            let setter =
+                Value::object(agent.new_native_function(set_css_text, "set cssText", 1)?);
             let key = agent.heap.key("cssText")?;
             agent.define_property_or_throw(
                 proto,
@@ -288,7 +302,7 @@ pub(super) fn get_computed_style(
         if let Some(&pseudo) = args.get(1) {
             if !pseudo.is_nullish() {
                 let value = creation::string(agent, pseudo)?;
-                if !value.as_units().is_empty() {
+                if value.as_units().first() == Some(&u16::from(b':')) {
                     return agent.type_error("computed pseudo-element styles are not supported");
                 }
             }
@@ -296,9 +310,8 @@ pub(super) fn get_computed_style(
         let prototype = prototype(agent, INTERFACE)?;
         // The live indexed host traces its source element and implements
         // own-key discovery, descriptors and read-only numeric indices.
-        let declaration = Value::object(
-            agent.new_indexed_view(INTERFACE, prototype, element, &STYLE_INDEX)?,
-        );
+        let declaration =
+            Value::object(agent.new_indexed_view(INTERFACE, prototype, element, &STYLE_INDEX)?);
         // The weak-map write may allocate; keep its key rooted until insertion.
         let declaration_root = agent.root(declaration)?;
         let result = with_page(agent, |agent, page| {
@@ -323,9 +336,13 @@ fn element(agent: &mut Agent, declaration: Value) -> JsResult<Value> {
 }
 
 fn snapshot_from_element(agent: &mut Agent, element: Value) -> JsResult<ComputedStyleSnapshot> {
-    read_layout(agent, element, false, ComputedStyleSnapshot::default(), |tree, id| {
-        tree.computed_style(id)
-    })
+    read_layout(
+        agent,
+        element,
+        false,
+        ComputedStyleSnapshot::default(),
+        |tree, id| tree.computed_style(id),
+    )
 }
 
 fn snapshot(agent: &mut Agent, declaration: Value) -> JsResult<ComputedStyleSnapshot> {
@@ -344,33 +361,38 @@ fn length(agent: &mut Agent, declaration: Value, _: &[Value]) -> JsResult<Value>
 }
 
 fn get_property_value(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
-    // ToString may invoke a getter or callback. Finish before borrowing layout.
+    // Brand-check before invoking author code, then read layout after conversion.
+    let source = element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let property = creation::string(agent, argument)?;
     let name = creation::scalar_name(&property)?;
-    let style = snapshot(agent, declaration)?;
-    value(agent, name.as_deref().and_then(|name| style.get(name)).unwrap_or(""))
+    let style = snapshot_from_element(agent, source)?;
+    value(
+        agent,
+        name.as_deref()
+            .and_then(|name| style.get(name))
+            .unwrap_or(""),
+    )
 }
 
-fn get_property_priority(
-    agent: &mut Agent,
-    declaration: Value,
-    args: &[Value],
-) -> JsResult<Value> {
+fn get_property_priority(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
     // Computed declarations have no author-specified priority.
+    element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let _ = creation::string(agent, argument)?;
-    element(agent, declaration)?;
     value(agent, "")
 }
 
 fn item(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    let source = element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let index = to_unsigned_long(agent, argument, IntegerConversion::Wrap)?;
-    let style = snapshot(agent, declaration)?;
+    let style = snapshot_from_element(agent, source)?;
     value(
         agent,
-        style.name_at(usize::try_from(index).map_err(|_| Abrupt::OutOfMemory)?).unwrap_or(""),
+        style
+            .name_at(usize::try_from(index).map_err(|_| Abrupt::OutOfMemory)?)
+            .unwrap_or(""),
     )
 }
 
@@ -391,31 +413,29 @@ fn css_text(agent: &mut Agent, declaration: Value, _: &[Value]) -> JsResult<Valu
 }
 
 fn set_css_text(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let _ = creation::string(agent, argument)?;
-    element(agent, declaration)?;
     Err(read_only(agent))
 }
 
 fn set_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
-    let name = required_arg(agent, args, 0)?;
-    let _ = creation::string(agent, name)?;
-    if let Some(&value) = args.get(1) {
-        if !value.is_nullish() {
-            let _ = creation::string(agent, value)?;
-        }
+    element(agent, declaration)?;
+    let value = required_arg(agent, args, 1)?;
+    let _ = creation::string(agent, args[0])?;
+    if !value.is_nullish() {
+        let _ = creation::string(agent, value)?;
     }
     if let Some(&priority) = args.get(2) {
         let _ = creation::string(agent, priority)?;
     }
-    element(agent, declaration)?;
     Err(read_only(agent))
 }
 
 fn remove_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    element(agent, declaration)?;
     let name = required_arg(agent, args, 0)?;
     let _ = creation::string(agent, name)?;
-    element(agent, declaration)?;
     Err(read_only(agent))
 }
 
@@ -448,8 +468,14 @@ mod tests {
                 .get_own_property(prototype, key)
                 .expect("property lookup")
                 .unwrap_or_else(|| panic!("missing longhand getter: {name}"));
-            assert!(descriptor.get.and_then(Value::as_object).is_some(), "{name}");
-            assert!(descriptor.set.and_then(Value::as_object).is_some(), "{name}");
+            assert!(
+                descriptor.get.and_then(Value::as_object).is_some(),
+                "{name}"
+            );
+            assert!(
+                descriptor.set.and_then(Value::as_object).is_some(),
+                "{name}"
+            );
         }
     }
 
@@ -459,7 +485,10 @@ mod tests {
         let mut seen = HashSet::new();
         for &property in PropertyId::ALL {
             let alias = camel_name(property.name());
-            assert!(seen.insert(alias.clone()), "duplicate named getter: {alias}");
+            assert!(
+                seen.insert(alias.clone()),
+                "duplicate named getter: {alias}"
+            );
         }
         assert_eq!(camel_name("background-color"), "backgroundColor");
         assert_eq!(camel_name("border-top-left-radius"), "borderTopLeftRadius");

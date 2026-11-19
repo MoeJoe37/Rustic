@@ -238,9 +238,7 @@ impl AppliedLocalFiles {
             .map_err(|_| FetchError::Failed)?;
         // Reject late completion of an older fetch for this URL, without
         // blocking independently staged updates to other resource URLs.
-        if state.entries.get(&staged.key).map(|entry| entry.version)
-            != staged.expected_version
-        {
+        if state.entries.get(&staged.key).map(|entry| entry.version) != staged.expected_version {
             return Err(FetchError::Failed);
         }
         let old_bytes = state
@@ -262,7 +260,10 @@ impl AppliedLocalFiles {
                 .try_reserve(1)
                 .map_err(|_| FetchError::Failed)?;
         }
-        let version = state.next_version.checked_add(1).ok_or(FetchError::TooLarge)?;
+        let version = state
+            .next_version
+            .checked_add(1)
+            .ok_or(FetchError::TooLarge)?;
         let new_bytes = staged.bytes.len();
         state.entries.insert(
             staged.key,
@@ -313,7 +314,10 @@ impl AppliedLocalFiles {
                 Ok(Arc::<[u8]>::from(bytes))
             }
         });
-        let mut state = self.state.try_borrow_mut().map_err(|_| FetchError::Failed)?;
+        let mut state = self
+            .state
+            .try_borrow_mut()
+            .map_err(|_| FetchError::Failed)?;
         // The bounded fetch ran outside the cache borrow. A completion may
         // have been published meanwhile; never replace it with older I/O.
         if let Some(entry) = state.entries.get(&key) {
@@ -337,8 +341,14 @@ impl AppliedLocalFiles {
         });
         // Cancellation must not poison a retryable resource snapshot.
         if result != Err(FetchError::Cancelled) {
-            let version = state.next_version.checked_add(1).ok_or(FetchError::TooLarge)?;
-            state.entries.try_reserve(1).map_err(|_| FetchError::Failed)?;
+            let version = state
+                .next_version
+                .checked_add(1)
+                .ok_or(FetchError::TooLarge)?;
+            state
+                .entries
+                .try_reserve(1)
+                .map_err(|_| FetchError::Failed)?;
             if let Ok(bytes) = &result {
                 state.bytes += bytes.len();
             }
@@ -464,7 +474,9 @@ impl LocalStylesheetFetcher {
         // host or encoded path is rejected before looking in the snapshot.
         let path = url_path(url).ok_or(FetchError::Blocked)?;
         if let Some(applied) = &self.applied {
-            applied.read(url, max_bytes, || self.read(&path, max_bytes)).map(|b| b.to_vec())
+            applied
+                .read(url, max_bytes, || self.read(&path, max_bytes))
+                .map(|b| b.to_vec())
         } else {
             self.read(&path, max_bytes)
         }
@@ -500,18 +512,25 @@ mod tests {
         let overflow = Url::parse("file:///page/overflow.css", None).unwrap();
 
         assert_eq!(
-            snapshot.read(&first, 100, || Ok(b"body".to_vec())).unwrap().as_ref(),
+            snapshot
+                .read(&first, 100, || Ok(b"body".to_vec()))
+                .unwrap()
+                .as_ref(),
             b"body",
         );
         // A hit never reads the changed underlying file and still respects
         // the per-request limit offered by the stylesheet/image loader.
         assert_eq!(
-            snapshot.read(&first, 100, || panic!("refetched applied bytes"))
-                .unwrap().as_ref(),
+            snapshot
+                .read(&first, 100, || panic!("refetched applied bytes"))
+                .unwrap()
+                .as_ref(),
             b"body",
         );
         assert_eq!(
-            snapshot.read(&first, 3, || panic!("read past cache")).unwrap_err(),
+            snapshot
+                .read(&first, 3, || panic!("read past cache"))
+                .unwrap_err(),
             FetchError::TooLarge,
         );
         assert_eq!(
@@ -533,8 +552,10 @@ mod tests {
             Err(FetchError::TooLarge),
         );
         assert_eq!(
-            snapshot.read(&first, 100, || panic!("evicted stable bytes"))
-                .unwrap().as_ref(),
+            snapshot
+                .read(&first, 100, || panic!("evicted stable bytes"))
+                .unwrap()
+                .as_ref(),
             b"body",
         );
     }
@@ -546,7 +567,8 @@ mod tests {
         let first = applied.read(&url, 5, || Ok(b"old".to_vec())).unwrap();
         let new = applied.stage(&url, 5, b"fresh".to_vec()).unwrap();
         assert_eq!(
-            applied.read(&url, 5, || panic!("staging refetched the resource"))
+            applied
+                .read(&url, 5, || panic!("staging refetched the resource"))
                 .unwrap()
                 .as_ref(),
             b"old",
@@ -555,7 +577,8 @@ mod tests {
         applied.commit(new).unwrap();
         assert_eq!(first.as_ref(), b"old");
         assert_eq!(
-            applied.read(&url, 5, || panic!("commit refetched the resource"))
+            applied
+                .read(&url, 5, || panic!("commit refetched the resource"))
                 .unwrap()
                 .as_ref(),
             b"fresh",
@@ -565,7 +588,8 @@ mod tests {
             FetchError::TooLarge,
         );
         assert_eq!(
-            applied.read(&url, 5, || panic!("failed stage mutated data"))
+            applied
+                .read(&url, 5, || panic!("failed stage mutated data"))
                 .unwrap()
                 .as_ref(),
             b"fresh",
@@ -588,7 +612,8 @@ mod tests {
             .unwrap();
         assert_eq!(after.as_ref(), b"applied");
         assert_eq!(
-            applied.read(&url, 32, || panic!("published completion was lost"))
+            applied
+                .read(&url, 32, || panic!("published completion was lost"))
                 .unwrap()
                 .as_ref(),
             b"applied",
@@ -610,13 +635,17 @@ mod tests {
         // A separate URL staged before the CSS commit can still publish.
         applied.commit(independent_image).unwrap();
         assert_eq!(
-            applied.read(&css, 32, || panic!("unexpected CSS refetch"))
-                .unwrap().as_ref(),
+            applied
+                .read(&css, 32, || panic!("unexpected CSS refetch"))
+                .unwrap()
+                .as_ref(),
             b"newer",
         );
         assert_eq!(
-            applied.read(&image, 32, || panic!("unexpected image refetch"))
-                .unwrap().as_ref(),
+            applied
+                .read(&image, 32, || panic!("unexpected image refetch"))
+                .unwrap()
+                .as_ref(),
             b"updated",
         );
     }
@@ -631,13 +660,15 @@ mod tests {
         applied.read(&second, 8, || Ok(b"other".to_vec())).unwrap();
         assert_eq!(applied.commit(staged), Err(FetchError::TooLarge));
         assert_eq!(
-            applied.read(&first, 8, || panic!("lost original"))
+            applied
+                .read(&first, 8, || panic!("lost original"))
                 .unwrap()
                 .as_ref(),
             b"old",
         );
         assert_eq!(
-            applied.read(&second, 8, || panic!("lost concurrent addition"))
+            applied
+                .read(&second, 8, || panic!("lost concurrent addition"))
                 .unwrap()
                 .as_ref(),
             b"other",
@@ -658,8 +689,10 @@ mod tests {
             Err(FetchError::Cancelled),
         );
         assert_eq!(
-            snapshot.read(&url, 8, || Ok(b"updated".to_vec()))
-                .unwrap().as_ref(),
+            snapshot
+                .read(&url, 8, || Ok(b"updated".to_vec()))
+                .unwrap()
+                .as_ref(),
             b"updated",
         );
     }

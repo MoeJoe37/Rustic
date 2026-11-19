@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 
 use rustic_base::EscapedText;
-use rustic_engine::{Engine, EngineDocument, Viewport};
+use rustic_engine::{Engine, Viewport};
 use std::path::Path;
 
 mod fonts;
@@ -13,7 +13,7 @@ mod loader;
 mod reftest;
 mod stylesheets;
 
-use loader::{LoadError, LoaderLimits};
+use loader::{LoadError, LoadedDocument, LoaderLimits};
 
 const USAGE: &str = "Rustic browser engine development tools
 
@@ -176,7 +176,7 @@ fn dump_command(
     engine: &mut Engine,
     command: &str,
     args: &[OsString],
-    dump: fn(&EngineDocument, &Path, LoaderLimits) -> Result<String, LoadError>,
+    dump: fn(&LoadedDocument, &Path, LoaderLimits) -> Result<String, LoadError>,
 ) -> ExitCode {
     let (limits, path) = match parse_dump_args(args) {
         Ok(parsed) => parsed,
@@ -196,7 +196,7 @@ fn dump_command_with(
     command: &str,
     limits: LoaderLimits,
     path: &OsString,
-    dump: impl FnOnce(&EngineDocument, &Path) -> Result<String, LoadError>,
+    dump: impl FnOnce(&LoadedDocument, &Path) -> Result<String, LoadError>,
 ) -> ExitCode {
     match load(engine, command, limits, path, dump) {
         Ok(dump) => {
@@ -220,7 +220,7 @@ fn load<T>(
     command: &str,
     limits: LoaderLimits,
     path: &std::ffi::OsStr,
-    then: impl FnOnce(&EngineDocument, &Path) -> Result<T, LoadError>,
+    then: impl FnOnce(&LoadedDocument, &Path) -> Result<T, LoadError>,
 ) -> Result<T, ExitCode> {
     let path = match loader::local_path(path) {
         Ok(path) => path,

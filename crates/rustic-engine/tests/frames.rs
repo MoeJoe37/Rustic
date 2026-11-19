@@ -257,7 +257,10 @@ impl LayoutSource for AppliedResourceFixture {
         let image = self.image_width.get();
         let width = stylesheet + image;
         for (node, _) in document.walk(document.root()).unwrap() {
-            if !matches!(document.node(node).unwrap().kind(), rustic_dom::NodeKind::Element(_)) {
+            if !matches!(
+                document.node(node).unwrap().kind(),
+                rustic_dom::NodeKind::Element(_)
+            ) {
                 continue;
             }
             geometry.offset_widths.insert(node, width);
@@ -268,10 +271,7 @@ impl LayoutSource for AppliedResourceFixture {
                 node,
                 rustic_engine::ComputedStyleSnapshot {
                     longhands: vec![("width", format!("{stylesheet}px"))],
-                    custom_properties: vec![(
-                        "--image-width".to_owned(),
-                        format!("{image}px"),
-                    )],
+                    custom_properties: vec![("--image-width".to_owned(), format!("{image}px"))],
                 },
             );
         }
@@ -360,11 +360,13 @@ fn queued_resource_completions_follow_script_checkpoints_and_refresh_layout() {
     scripts
         .set_layout_source(Box::new(LayoutFixture(width.clone())))
         .unwrap();
-    scripts.queue_script(source(
-        "var body = document.body;
+    scripts
+        .queue_script(source(
+            "var body = document.body;
          if (body.offsetWidth !== 25) throw 'old layout';
          Promise.resolve().then(() => body.setAttribute('data-checkpoint', 'done'));",
-    )).unwrap();
+        ))
+        .unwrap();
     let committed = width.clone();
     scripts
         .queue_resource_completion(move || {
@@ -372,21 +374,27 @@ fn queued_resource_completions_follow_script_checkpoints_and_refresh_layout() {
             Ok::<(), ()>(())
         })
         .unwrap();
-    scripts.queue_script(source(
-        "if (body.getAttribute('data-checkpoint') !== 'done' ||
+    scripts
+        .queue_script(source(
+            "if (body.getAttribute('data-checkpoint') !== 'done' ||
              body.offsetWidth !== 70) throw 'completion or checkpoint ordering';",
-    )).unwrap();
+        ))
+        .unwrap();
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
-    assert_eq!(width.get(), 25, "queued delivery ran inside the JS checkpoint");
+    assert_eq!(
+        width.get(),
+        25,
+        "queued delivery ran inside the JS checkpoint"
+    );
     scripts.offer_rendering_opportunity().unwrap();
     // Even with the previously offered frame selected for priority, an
     // already-ready resource task publishes before that frame sees its
     // inputs. It neither executes JS nor requires an explicit host call.
     assert_eq!(
         scripts.run_next_with_render(unexpected_render),
-        Ok(Some(DocumentTurn::Script(
-            ScriptTurn::ResourceCompletion { applied: true }
-        )))
+        Ok(Some(DocumentTurn::Script(ScriptTurn::ResourceCompletion {
+            applied: true
+        })))
     );
     assert_eq!(width.get(), 70);
     // The successful completion schedules a frame and gives it the same
@@ -459,7 +467,10 @@ fn queued_resource_completions_share_task_limits_and_drop_on_shutdown() {
         .unwrap();
     engine.shutdown();
     assert_eq!(scripts.run_next(), Err(ScriptStop::DocumentCancelled));
-    assert!(!cancelled.get(), "cancelled document applied a queued completion");
+    assert!(
+        !cancelled.get(),
+        "cancelled document applied a queued completion"
+    );
 }
 
 #[test]
@@ -516,7 +527,6 @@ fn rendering_input_revisions_are_scoped_to_their_document() {
     assert_eq!(first.accept_rendered_frame(fresh_first), Ok(true));
 }
 
-
 #[derive(Debug)]
 struct LiveStyleFixture;
 
@@ -534,15 +544,16 @@ impl LayoutSource for LiveStyleFixture {
             let rustic_dom::NodeKind::Element(element) = node.kind() else {
                 continue;
             };
-            let next = element.attributes().iter().any(|attribute| {
-                attribute.name().local() == "data-next"
-            });
+            let next = element
+                .attributes()
+                .iter()
+                .any(|attribute| attribute.name().local() == "data-next");
             geometry.computed_styles.insert(
                 id,
                 rustic_engine::ComputedStyleSnapshot {
                     longhands: vec![
-                        ("display", "block".to_owned()),
                         ("color", if next { "blue" } else { "red" }.to_owned()),
+                        ("display", "block".to_owned()),
                     ],
                     custom_properties: if next {
                         vec![
@@ -563,13 +574,17 @@ impl LayoutSource for LiveStyleFixture {
 fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
     let mut engine = Engine::new(1);
     let mut scripts = document(&mut engine, TaskLimits::default());
-    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
-    scripts.queue_script(source(
-        r#"
+    scripts
+        .set_layout_source(Box::new(LiveStyleFixture))
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
         const body = document.body;
         const style = getComputedStyle(body);
+        if (getComputedStyle(body, 'ignored').color !== 'red') throw 'non-pseudo argument';
         if (!(style instanceof CSSStyleDeclaration)) throw 'declaration brand';
-        if (style.length !== 3 || style.item(0) !== 'display' ||
+        if (style.length !== 3 || style.item(0) !== 'color' ||
             style.item(2) !== '--Case' || style.item(3) !== '') throw 'indexes';
         if (style.color !== 'red' || style.display !== 'block' ||
             style['color'] !== style.getPropertyValue('color') ||
@@ -604,7 +619,8 @@ fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
             if (error.name !== 'TypeError') throw 'wrong pseudo error';
         }
         "#,
-    )).unwrap();
+        ))
+        .unwrap();
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
     assert_eq!(scripts.take_layout_flush_count(), 3);
 }
@@ -613,22 +629,25 @@ fn held_computed_declaration_reads_live_snapshots_after_argument_reentry() {
 fn computed_style_numeric_indices_track_live_properties_and_reject_writes() {
     let mut engine = Engine::new(1);
     let mut scripts = document(&mut engine, TaskLimits::default());
-    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
-    scripts.queue_script(source(
-        r#"
+    scripts
+        .set_layout_source(Box::new(LiveStyleFixture))
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
         const body = document.body;
         const style = getComputedStyle(body);
-        if (style.length !== 3 || style[0] !== 'display' ||
-            style[1] !== 'color' || style[2] !== '--Case' ||
+        if (style.length !== 3 || style[0] !== 'color' ||
+            style[1] !== 'display' || style[2] !== '--Case' ||
             style[3] !== undefined) throw 'initial indices';
         if (!('0' in style) || '3' in style ||
             Object.keys(style).join(',') !== '0,1,2') throw 'own keys';
         const desc = Object.getOwnPropertyDescriptor(style, '0');
-        if (!desc || desc.value !== 'display' || desc.writable ||
+        if (!desc || desc.value !== 'color' || desc.writable ||
             !desc.enumerable || !desc.configurable) throw 'index descriptor';
         if (Reflect.set(style, '0', 'other') ||
             Reflect.deleteProperty(style, '0') ||
-            style[0] !== 'display') throw 'indexed mutation';
+            style[0] !== 'color') throw 'indexed mutation';
         body.setAttribute('data-next', 'yes');
         if (style.length !== 4 || style[3] !== '--Dynamic' ||
             !('3' in style) ||
@@ -641,7 +660,8 @@ fn computed_style_numeric_indices_track_live_properties_and_reject_writes() {
             throw 'index did not shrink';
         }
         "#,
-    )).unwrap();
+        ))
+        .unwrap();
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
     assert_eq!(scripts.take_layout_flush_count(), 3);
 }
@@ -650,15 +670,18 @@ fn computed_style_numeric_indices_track_live_properties_and_reject_writes() {
 fn computed_style_and_geometry_share_the_dirty_flush_quota() {
     let mut engine = Engine::new(1);
     let mut scripts = document(&mut engine, TaskLimits::default());
-    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
-    scripts.queue_script(source(&format!(
-        r#"
+    scripts
+        .set_layout_source(Box::new(LiveStyleFixture))
+        .unwrap();
+    scripts
+        .queue_script(source(&format!(
+            r#"
         const body = document.body;
         const style = getComputedStyle(body);
         for (let i = 0; i < {MAX_LAYOUT_FLUSHES_PER_TURN}; i++) {{
             body.setAttribute('data-next', String(i));
             if (style.getPropertyValue('color') !== 'blue') throw 'style value';
-            if (style[0] !== 'display' || style.length !== 4) throw 'indexed style';
+            if (style[0] !== 'color' || style.length !== 4) throw 'indexed style';
             if (body.offsetWidth !== 0) throw 'geometry value';
         }}
         body.removeAttribute('data-next');
@@ -671,7 +694,8 @@ fn computed_style_and_geometry_share_the_dirty_flush_quota() {
             if (error.name !== 'QuotaExceededError') throw 'wrong quota error';
         }}
         "#
-    ))).unwrap();
+        )))
+        .unwrap();
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
     assert_eq!(
         scripts.take_layout_flush_count(),
@@ -684,19 +708,33 @@ fn computed_style_and_geometry_share_the_dirty_flush_quota() {
     assert_eq!(scripts.take_layout_flush_count(), 1);
 }
 
-
-
 #[test]
 fn computed_style_mutation_methods_are_read_only() {
     let mut engine = Engine::new(1);
     let mut scripts = document(&mut engine, TaskLimits::default());
-    scripts.set_layout_source(Box::new(LiveStyleFixture)).unwrap();
+    scripts
+        .set_layout_source(Box::new(LiveStyleFixture))
+        .unwrap();
     scripts
         .queue_script(source(
             r#"
             const body = document.body;
             const computed = getComputedStyle(body);
             if (computed.cssText !== '') throw 'computed cssText';
+            let conversions = 0;
+            const arg = { toString() { conversions++; return 'color'; } };
+            for (const invalid of [
+                () => computed.setProperty(arg),
+                () => computed.getPropertyValue.call({}, arg),
+                () => computed.getPropertyPriority.call({}, arg),
+                () => computed.item.call({}, arg),
+                () => computed.setProperty.call({}, arg, 'green'),
+                () => computed.removeProperty.call({}, arg)
+            ]) {
+                try { invalid(); throw 'invalid call succeeded'; }
+                catch (error) { if (error.name !== 'TypeError') throw error; }
+            }
+            if (conversions !== 0) throw 'converted before checking receiver or arity';
             for (const edit of [
                 () => computed.setProperty('color', 'green'),
                 () => computed.removeProperty('color'),

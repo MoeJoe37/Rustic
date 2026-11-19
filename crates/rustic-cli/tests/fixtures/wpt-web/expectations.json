@@ -47,6 +47,12 @@
       "status": "PASS"
     }
   ],
+  "css/cssom/getComputedStyle-property-order.html": [
+    {
+      "name": "Computed style properties should be sorted lexicographically",
+      "status": "PASS"
+    }
+  ],
   "dom/collections/HTMLCollection-empty-name.html": [
     {
       "name": "Empty string as a name for Document.getElementsByTagName",

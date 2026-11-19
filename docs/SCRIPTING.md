@@ -91,7 +91,10 @@ numeric indexed properties (`style[0]`, `Object.keys`, property descriptors),
 and supported longhand named getters (both CSS spelling and camelCase)
 refresh from the same revision-keyed snapshot as geometry and respect the
 same flush budget. Custom names remain case-sensitive; unknown names return
-an empty value. Nonempty pseudo-element arguments are explicitly unsupported.
+an empty value. Indexed reads, `item()` and JavaScript iteration list supported
+longhands in lexicographical order, followed by custom properties.
+`getComputedStyle` uses the element for a pseudo argument without a leading
+colon. Colon-prefixed pseudo-element requests remain unsupported.
 If the host has no applied renderer, a connected computed-style read reports
 `InvalidStateError` rather than silently fabricating empty values; detached
 nodes use the defined empty result. The `cssText` getter is empty, while
@@ -134,7 +137,9 @@ and stages eligible files using its existing local-file grant. Each validated
 resource is queued and delivered before the next one is staged, avoiding a
 second pending-byte cache. Duplicate URLs are coalesced per resource kind and
 candidate counts and URL lengths are bounded. The original timer-turn limit
-remains in force. **This is synchronous post-parse delivery, not asynchronous
+is checked before starting an interleaved timer. Scripted dumps and final
+rasterization retain the applied resources after the JS realm closes.
+**This is synchronous post-parse delivery, not asynchronous
 fetching, live file watching or streaming parser-barrier resource scheduling.**
 Static dump commands still read local files directly. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
@@ -350,9 +355,9 @@ depends on WEB-07.
 The headless CLI runs upstream `testharness.js` unchanged at WPT revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
 `dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
-`html/webappapis/animation-frames` and `css/cssom-view`. Linux CI is
-configured to require an exact match to the checked-in **21 files,
-78 subtests, 67 passes and 11 expected failures**. The expectations record the names and diagnoses
+`html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
+configured to require an exact match to the checked-in **22 files,
+79 subtests, 68 passes and 11 expected failures**. The expectations record the names and diagnoses
 so changes in either direction require review.
 [Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
 [Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
@@ -366,7 +371,7 @@ clock and one rendering opportunity. The candidate
 running after completion. Both remain outside the initial selection.
 The CSSOM View cases cover detached elements, fixed positioning with a
 transform and rectangle dimensions. The two new expected failures concern
-the coordinates of an empty inline in a phantom line box.
+the coordinates of an empty inline in a phantom line box. The CSSOM property-order case passes using iteration over a computed declaration.
 
 ```sh
 cargo build --locked -p rustic-cli

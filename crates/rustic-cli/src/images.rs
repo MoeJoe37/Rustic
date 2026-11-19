@@ -132,7 +132,15 @@ pub fn load(
     chunk_bytes: usize,
     cancellation: &CancellationToken,
 ) -> LoadedImages {
-    load_applied(document, tree, path, limits, chunk_bytes, cancellation, None)
+    load_applied(
+        document,
+        tree,
+        path,
+        limits,
+        chunk_bytes,
+        cancellation,
+        None,
+    )
 }
 
 /// Load images against a scripted document's applied byte snapshot. Other
@@ -201,9 +209,10 @@ pub(crate) fn load_applied(
         } else {
             None
         };
-        let key = file.as_ref().map_or_else(|| url.serialize(), |file| {
-            file.to_string_lossy().into_owned()
-        });
+        let key = file.as_ref().map_or_else(
+            || url.serialize(),
+            |file| file.to_string_lossy().into_owned(),
+        );
         let id = match store.lookup(&key) {
             Some(id) => id,
             None => {
@@ -217,15 +226,13 @@ pub(crate) fn load_applied(
                         .read(&url, remaining, || {
                             let file = resolve(&src, base.as_ref(), root)
                                 .map_err(|_| FetchError::Blocked)?;
-                            read_bounded(&file, remaining, chunk_bytes)
-                                .ok_or(FetchError::Failed)
+                            read_bounded(&file, remaining, chunk_bytes).ok_or(FetchError::Failed)
                         })
                         .ok()
                         .map(|bytes| bytes.to_vec())
                 } else {
-                    file.as_deref().and_then(|path| {
-                        read_bounded(path, remaining, chunk_bytes)
-                    })
+                    file.as_deref()
+                        .and_then(|path| read_bounded(path, remaining, chunk_bytes))
                 };
                 let Some(bytes) = bytes else {
                     continue;

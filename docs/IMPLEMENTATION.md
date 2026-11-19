@@ -652,8 +652,17 @@ stylesheet/image discovery, deduplication and pinned-resource delivery).
 Cache limit,
 atomic revalidation, missing-resource and
 cancelled-load regressions are in `crates/rustic-cli/src/stylesheets.rs`.
-**Verification pending**:
-this environment has no Rust toolchain, and the hosted CI billing block remains.
+The Linux x86-64 run on Rust 1.99.1 exercises the CLI resource fixtures and
+engine frame tests. One fixture deletes a loaded image and replaces its
+stylesheet before final PNG output. The scripted render retains its original
+pixels. A separate timer test exhausts the script budget and verifies that
+the next ready timer remains pending.
+
+CSSOM indexed access, `item()` and JavaScript iteration enumerate supported
+longhands in lexicographical order, followed by custom properties. The upstream
+property-order test passes. Computed-style methods check receivers and required
+arguments before invoking author-defined conversions. The optional pseudo
+argument uses the element itself for strings without a leading colon.
 Pseudo-elements, style serialization coverage, real asynchronous
 stylesheet/image completion delivery and broader validation remain WEB-06
 work under
@@ -663,7 +672,7 @@ marked complete by this slice.
 ## WEB-09 — Initial Window conformance baseline
 
 The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 21 Window WPT files. It reports 78 subtests, including 67 passes
+baseline for 22 Window WPT files. It reports 79 subtests, including 68 passes
 and 11 expected failures. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11

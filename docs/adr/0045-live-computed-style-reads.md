@@ -117,8 +117,10 @@ from its host's computed-style entries; detached declarations return empty
 values. Supported longhands and custom properties come from the same CLI cascade pass that builds layout;
 reads share the existing revision key and eight-flush budget. Declarations
 hold their element wrappers through the page's rooted weak map and the
-indexed host object's GC-traced source. Nonempty
-pseudo-element arguments fail explicitly rather than return fabricated styles.
+indexed host object's GC-traced source. A second argument without a leading
+colon selects the element. Colon-prefixed pseudo-element requests remain open.
+Indexed access and iteration list supported longhands in lexicographical order
+before custom properties (CSSOM §7.2).
 
 The host-facing `apply_resource_completion` API publishes a staged resource
 result before advancing the applied-input epoch and offering a frame. Failed
@@ -144,7 +146,8 @@ applied frames unchanged. The local CLI also discovers linked stylesheets and
 images from the completed HTML DOM and delivers their staged bytes one at a
 time through the document pump, bounded by URL length, per-kind resource
 counts, existing task admission and timer budgets. This end-of-parse path
-coexists with on-demand CSS imports and layout reads. There is **no
+coexists with on-demand CSS imports and layout reads. The CLI retains the applied
+bytes with the parsed document for final layout and rasterization. There is **no
 asynchronous fetch/notification source or streaming parser-barrier delivery**.
 
 This is **not** the full decision: CSSOM serialization edge cases,

@@ -349,16 +349,11 @@ fn load_scripted_document(
         &applied_files,
         &cancellation,
     )?;
-    // Drain immediate completion tasks even when there are no timers.
-    // Future timers still obey the established bounded manual-clock loop.
-    loop {
-        if document.run_next()?.is_some() {
-            continue;
-        }
-        let Some(delay) = document.time_until_next_timer()? else {
-            break;
-        };
+    // The resource helper has already delivered each accepted completion.
+    // Retain the original bounded timer loop, including for zero-delay timers.
+    while let Some(delay) = document.time_until_next_timer()? {
         advance_script_timer(document.clock(), delay, &mut turns)?;
+        document.run_next()?;
     }
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;

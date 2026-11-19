@@ -610,7 +610,8 @@ limit the snapshot; each fetch also obeys its own offered byte budget. Static
 commands keep their direct-file behavior. A local fetcher can now stage
 replacement bytes with the same path containment and byte limits as normal
 loads; the applied cache validates entry/aggregate budgets both at staging and
-again at atomic commit. The host can commit those bytes using
+again at atomic commit. Per-URL version checks reject out-of-order commits;
+an in-flight first fetch also cannot overwrite a newer published resource. The host can commit those bytes using
 `ScriptedDocument::apply_resource_completion`, which invalidates the shared
 snapshot and outstanding frame ticket only on success. A CLI integration
 fixture stages changed CSS and PNG files, publishes them in separate host

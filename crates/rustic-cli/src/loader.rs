@@ -1204,20 +1204,21 @@ mod tests {
         let mode = parsed.parsed().mode();
         let encoding = parsed.parsed().encoding();
         let token = parsed.cancellation().clone();
-        let find_id = |name: &str| {
+        let (box_id, image_id) = {
             let document = parsed.parsed().document();
-            document
-                .walk(document.root())
-                .unwrap()
-                .find_map(|(node, _)| {
-                    let element = rustic_style::DomElement::new(document, node)?;
-                    (crate::reftest::attribute(element, "id").as_deref() == Some(name))
-                        .then_some(node)
-                })
-                .unwrap()
+            let find_id = |name: &str| {
+                document
+                    .walk(document.root())
+                    .unwrap()
+                    .find_map(|(node, _)| {
+                        let element = rustic_style::DomElement::new(document, node)?;
+                        (crate::reftest::attribute(element, "id").as_deref() == Some(name))
+                            .then_some(node)
+                    })
+                    .unwrap()
+            };
+            (find_id("box"), find_id("photo"))
         };
-        let box_id = find_id("box");
-        let image_id = find_id("photo");
         let applied = AppliedLocalFiles::new(
             limits.stylesheets.max_sheets + limits.images.max_images,
             limits.stylesheets.max_total_bytes + limits.images.max_file_bytes,
@@ -1281,6 +1282,14 @@ mod tests {
         let staged_image = fetcher
             .stage_completion(&applied, &image_url, limits.images.max_file_bytes)
             .unwrap();
+        assert_eq!(
+            fetcher.stage_completion(
+                &applied,
+                &rustic_url::Url::parse("https://outside.example/image.png", None).unwrap(),
+                limits.images.max_file_bytes,
+            ).unwrap_err(),
+            FetchError::Blocked,
+        );
         assert_eq!(get_width(&measure(&scripted)), "18px");
         assert_eq!(measure(&scripted).offset_widths.get(&image_id), Some(&2));
 

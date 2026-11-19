@@ -348,6 +348,7 @@ fn load_scripted_document(
         &fetch,
         &applied_files,
         &cancellation,
+        &mut turns,
     )?;
     // The resource helper has already delivered each accepted completion.
     // Retain the original bounded timer loop, including for zero-delay timers.
@@ -371,6 +372,7 @@ fn queue_discovered_local_resources(
     fetch: &LocalStylesheetFetcher,
     applied: &AppliedLocalFiles,
     cancellation: &CancellationToken,
+    timer_turns: &mut usize,
 ) -> Result<usize, LoadError> {
     let requests = {
         let parsed = document.document();
@@ -409,7 +411,15 @@ fn queue_discovered_local_resources(
                     delivered += usize::from(applied);
                     break;
                 }
-                Some(_) => continue,
+                Some(_) => {
+                    // A ready timer can precede the resource task under
+                    // source alternation. Such JS work must still count
+                    // against the existing snapshot timer-turn ceiling.
+                    if *timer_turns == MAX_SCRIPT_TIMER_TURNS {
+                        return Err(LoadError::ScriptTurnLimit);
+                    }
+                    *timer_turns += 1;
+                }
                 None => break,
             }
         }
@@ -1411,7 +1421,7 @@ mod tests {
             .into_scripted_with_clock(TaskLimits::default(), ManualClock::default())
             .unwrap();
         let delivered = queue_discovered_local_resources(
-            &mut scripted, &page.0, limits, &fetch, &applied, &token,
+            &mut scripted, &page.0, limits, &fetch, &applied, &token, &mut 0,
         )
         .unwrap();
         assert_eq!(delivered, 2);

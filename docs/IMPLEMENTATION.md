@@ -594,8 +594,9 @@ The indexed object traces the source element; the existing private weak map
 retains its declaration-to-wrapper association. Named property assignments,
 the empty `cssText` getter and
 explicit mutation methods throw `NoModificationAllowedError` for writes. Connected computed-style reads without a host
-layout source throw `InvalidStateError`, while detached nodes retain their
-empty values and geometry's no-source fallback is unchanged.
+layout source throw `InvalidStateError`; a connected element absent from an
+otherwise valid style snapshot also fails with `InvalidStateError`. Detached
+nodes retain their empty values and geometry's no-source fallback is unchanged.
 
 An explicit `ScriptedDocument::apply_resource_completion` host boundary now
 commits an already-validated resource result before advancing the applied-input

@@ -305,22 +305,35 @@ impl AppliedLocalFiles {
                 Ok(Arc::<[u8]>::from(bytes))
             }
         });
-        let mut state = self.state.borrow_mut();
+        let mut state = self.state.try_borrow_mut().map_err(|_| FetchError::Failed)?;
+        // The bounded fetch ran outside the cache borrow. A completion may
+        // have been published meanwhile; never replace it with older I/O.
+        if let Some(entry) = state.entries.get(&key) {
+            return entry.result.clone().and_then(|bytes| {
+                if bytes.len() > max_bytes {
+                    Err(FetchError::TooLarge)
+                } else {
+                    Ok(bytes)
+                }
+            });
+        }
         if state.entries.len() >= state.max_entries {
             return Err(FetchError::TooLarge);
         }
         let result = result.and_then(|bytes| {
-            let remaining = state.max_bytes.saturating_sub(state.bytes);
-            if bytes.len() > remaining {
+            if bytes.len() > state.max_bytes.saturating_sub(state.bytes) {
                 Err(FetchError::TooLarge)
             } else {
-                state.bytes += bytes.len();
                 Ok(bytes)
             }
         });
         // Cancellation must not poison a retryable resource snapshot.
         if result != Err(FetchError::Cancelled) {
             let version = state.next_version.checked_add(1).ok_or(FetchError::TooLarge)?;
+            state.entries.try_reserve(1).map_err(|_| FetchError::Failed)?;
+            if let Ok(bytes) = &result {
+                state.bytes += bytes.len();
+            }
             state.entries.insert(
                 key,
                 AppliedFileEntry {

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 34.37%** = 33.24% verified complete + 1.13% partial credit. 76/221 capabilities complete, 6 in progress.
+**Overall completion: 34.75%** = 33.61% verified complete + 1.14% partial credit. 77/221 capabilities complete, 6 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `9308529e41bff835bcd0717a6c2a1a24bb4133cadf4533925123bdc8a5715143`.
+Catalog: `engine-v4`. Source fingerprint: `c59b431ff8edd9fde032f8c8d95b4e312abd19a76a5fcca0073a9fb724b46053`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -14,10 +14,10 @@ Catalog: `engine-v4`. Source fingerprint: `9308529e41bff835bcd0717a6c2a1a24bb413
 | M2 CSS & computed style | 8/8 | 100.00% | 100.00% | 4.77% |
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
-| M5 Scripted documents | 10/12 | 89.15% | 85.61% | 5.29% |
+| M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 0/12 | 5.69% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
-| M8 Desktop & mobile alpha | 0/20 | 0.00% | 0.00% | 9.83% |
+| M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.85% |
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `9308529e41bff835bcd0717a6c2a1a24bb413
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
-| Bindings & web APIs | 6/10 | 1 | 63.75% | 60.00% | 5% | 3.18 |
+| Bindings & web APIs | 7/10 | 0 | 67.50% | 67.50% | 5% | 3.37 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -51,7 +51,7 @@ Catalog: `engine-v4`. Source fingerprint: `9308529e41bff835bcd0717a6c2a1a24bb413
 | DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
 | Extensions (MV2) | 0/10 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | uBO port & filtering | 0/8 | 0 | 0.00% | 0.00% | 2% | 0.00 |
-| Performance leadership | 0/13 | 0 | 0.00% | 0.00% | 8% | 0.00 |
+| Performance leadership | 0/13 | 1 | 2.41% | 0.00% | 8% | 0.19 |
 | Embedding & release | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 
 ## Capability evidence
@@ -218,9 +218,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `web.input` — Forms, focus, editing and user input · size 5 · M5 · 0.62% of engine ([source](../../crates/rustic-bindings/src/page/events/forms.rs), [source](../../crates/rustic-bindings/src/page/events/forms.rs), [source](../../crates/rustic-dom/src/document.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-engine/tests/forms.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [test](../../crates/rustic-cli/tests/reftests.rs))
 - **complete** `web.observers` — Timers, animation frames and observer APIs · size 3 · M5 · 0.37% of engine ([source](../../crates/rustic-bindings/src/page/window.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/timers.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/tests/frames.rs), [test](../../crates/rustic-engine/src/window_tasks.rs), [source](../../crates/rustic-bindings/src/page/resize_observer.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/resize_observers.rs), [test](../../crates/rustic-engine/tests/resize_observers.rs))
 - **planned** `web.streams` — Streams, messaging and structured clone · size 5 · M9 · 0.62% of engine
-- **in progress 50.00%** `web.conformance` — Exposed web API conformance and reentry gate · size 3 · M5 · 0.37% of engine
-  - [x] Pinned upstream Window WPT selection and exact expectation ratchet ([source](../../tools/run_wpt_web_tests.py), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json))
-  - [ ] Conformance, reentry and teardown review across the full M5 surface
+- **complete** `web.conformance` — Exposed web API conformance and reentry gate · size 3 · M5 · 0.37% of engine ([source](../../tools/run_wpt_web_tests.py), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json), [test](../../crates/rustic-engine/tests/m5_gate.rs), [test](../../crates/rustic-engine/tests/m5_gate.rs), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json), [source](../../docs/reviews/2026-11-19-m5-completion.md))
 - **planned** `web.platform` — Remaining HTML/DOM APIs: Navigation API, drag and drop, selection, pointer events, fullscreen and file APIs · size 5 · M9 · 0.62% of engine
 - **planned** `web.performance` — Performance timeline, Navigation/Resource Timing and Reporting APIs · size 3 · M11 · 0.37% of engine
 
@@ -353,7 +351,9 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Performance leadership
 
-- **planned** `perf.harness` — Cross-engine benchmark harness, reference devices and published reports · size 3 · M5 · 0.38% of engine
+- **in progress 50.00%** `perf.harness` — Cross-engine benchmark harness, reference devices and published reports · size 3 · M8 · 0.38% of engine
+  - [x] First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice) ([source](../../tools/cross_engine_bench.py), [source](../../crates/rustic-engine/examples/dom_bench.rs), [test](../../tools/tests/test_cross_engine_bench.py), [test](../../docs/reviews/2026-11-19-perf-01-m5.md))
+  - [ ] Reference devices on all five platform families with published per-device reports (M8)
 - **planned** `perf.interpreter` — Interpreter fast paths: quickening, superinstructions and call inline caches · size 5 · M12 · 0.64% of engine
 - **planned** `perf.baseline_jit` — Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback · size 8 · M12 · 1.03% of engine
 - **planned** `perf.optimizing_jit` — Optimizing JIT with speculation, deoptimization and on-stack replacement · size 8 · M12 · 1.03% of engine

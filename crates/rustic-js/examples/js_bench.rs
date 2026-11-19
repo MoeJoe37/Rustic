@@ -3,8 +3,11 @@
 //! count and the total and longest collection pause.
 //!
 //! ```text
-//! cargo run --release -p rustic-js --example js_bench -- [--size N] [--runs K] [name ...]
+//! cargo run --release -p rustic-js --example js_bench -- [--size N] [--runs K] [--samples] [name ...]
 //! ```
+//!
+//! `--samples` also prints `sample <workload> <ms> <result>` for every run,
+//! which the cross-engine harness (`tools/cross_engine_bench.py`) reads.
 //!
 //! Each run uses a fresh agent with the default heap limit. Times come
 //! from the host's monotonic clock, so they describe this machine only;
@@ -64,11 +67,13 @@ fn main() {
     let mut size = 200_000_u64;
     let mut runs = 21_usize;
     let mut names = Vec::new();
+    let mut print_samples = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--size" => size = args.next().and_then(|v| v.parse().ok()).unwrap_or(size),
             "--runs" => runs = args.next().and_then(|v| v.parse().ok()).unwrap_or(runs),
+            "--samples" => print_samples = true,
             _ => names.push(arg),
         }
     }
@@ -96,7 +101,12 @@ fn main() {
         let mut error = None;
         for _ in 0..runs {
             match run_once(&source, size) {
-                Ok(sample) => samples.push(sample),
+                Ok(sample) => {
+                    if print_samples {
+                        println!("sample {name} {} {}", millis(sample.nanos), sample.result);
+                    }
+                    samples.push(sample);
+                }
                 Err(e) => {
                     error = Some(e);
                     break;

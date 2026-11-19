@@ -7,20 +7,19 @@ Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 
-**Status (2026-11-17).** M0 has a verified baseline; only the repository-rules
-follow-up is open. M1, M2, M3 and M4 are complete for their declared catalog
+**Status (2026-11-19).** M0 has a verified baseline; only the repository-rules
+follow-up is open. M1, M2, M3, M4 and M5 are complete for their declared catalog
 scope: local HTML parses, styles, lays out, shapes text, paints and rasterizes
 to PNG on the CPU, and Rustic's own ECMAScript engine (JS-01 to JS-09, with
 Intl) runs scripts ([JS.md](JS.md)). The M4 ARM64 benchmark record is from
-QEMU emulation; native ARM64 timings are TD-125. **M5 is the current
-milestone**: the scheduler, Web IDL layer, `Window`/`Document`/node bindings,
-events, trusted input, timers and animation callbacks are done (WEB-01 to
-WEB-04, [SCRIPTING.md](SCRIPTING.md)). WEB-05 runs inline and local external
-classics and static JavaScript modules with readiness events in the opt-in CLI.
-Script-driven invalidation, forms, observers, the conformance gate and the first benchmark report
-are open ([§8](#8-m5--scripted-document-integration)). M6–M13 are unstarted.
-Native Android/iOS surfaces (MOB-03/04) did not land with M3 and are carried
-forward (see [§8](#8-m5--scripted-document-integration)). The
+QEMU emulation; native ARM64 timings are TD-125. M5 scripted documents
+(WEB-01 to WEB-09, [SCRIPTING.md](SCRIPTING.md)) closed on 2026-11-19 with the
+[completion review](reviews/2026-11-19-m5-completion.md): scripts, DOM
+bindings, events, observers, error reporting, focus, forms, the pinned WPT
+gate and the [first cross-engine report](reviews/2026-11-19-perf-01-m5.md).
+Its emulated, MSRV and cross tiers still need a run on a machine that has
+them. **M6 is the current milestone**; M7–M13 are unstarted. Native
+Android/iOS surfaces (MOB-03/04) are the first task of M8 mobile hosts. The
 [progress summary](progress/summary.md) is the measured status and
 [implementation progress](IMPLEMENTATION.md) records each completed contract;
 neither implies more than its declared scope.
@@ -326,11 +325,11 @@ stays local and deterministic; no network, no native window.
 | WEB-03 | Window/Document/Element bindings, DOM mutation/traversal and basic selectors | `web.window` | WEB-02, CSS-02 | **Done** for the declared scope (ADR 0028–0033): live `window`/`document`, node creation and mutation, selectors, NodeLists and HTMLCollections, detached documents and adoption. Open debt: TD-126, TD-127, TD-129, TD-130 |
 | WEB-04 | Event propagation, listeners, default actions, click/key input, timers and animation frames | `dom.events`, first step of `web.observers` | WEB-01, WEB-03 | **Done** (ADR 0034–0036): dispatch, trusted click and key input, button/checkbox activation, `setTimeout`/`setInterval`, `requestAnimationFrame`. Open debt: TD-131, TD-132 |
 | WEB-05 | Classic script lifecycle, parser blocking, async/defer/module order and document readiness | `html.scripts`, `web.scripts` | DOC-06, WEB-01–WEB-03 | **Done** for the local host, including bounded encoding replay before author code. [ADR 0041](adr/0041-scripted-document-readiness.md), [ADR 0044](adr/0044-local-html-encoding-replay.md) |
-| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **In progress.** Geometry and live computed declarations share bounded snapshots. Pinned WPT cases exercise CSSOM iteration, resolved dimensions and auto margins. Scripted local CSS and image completions update frame inputs and persist through final CLI output. CSSOM serialization, pseudo-elements and asynchronous delivery remain open. [ADR 0042](adr/0042-scripted-render-state.md), [ADR 0045](adr/0045-live-computed-style-reads.md) |
+| WEB-06 | Style/layout invalidation, read-induced layout flush, frame epochs and resource completion ordering | evidence for `web.conformance`; feeds `layout.incremental` (M9) | M3, WEB-03 | **Done for the M5 scope.** Geometry, live computed declarations and staged resource completions share bounded snapshots; pseudo-elements (TD-149) and asynchronous stylesheet/image delivery (TD-134) move to M6 entry. [ADR 0042](adr/0042-scripted-render-state.md), [ADR 0045](adr/0045-live-computed-style-reads.md) |
 | WEB-07 | Basic forms/focus, mutation observers, console/errors and script debugging hooks | `dom.observers`, `web.input`, rest of `web.observers` | WEB-04–WEB-06 | **Done.** `MutationObserver`, `MutationRecord` and `queueMicrotask` ([ADR 0047](adr/0047-mutation-observers.md)), error reporting, rejection events, event handler attributes and the console sink ([ADR 0048](adr/0048-error-reporting-and-event-handlers.md)), focus, text editing, validation and submission ([ADR 0049](adr/0049-focus-and-forms.md)) and `ResizeObserver` ([ADR 0050](adr/0050-resize-observer.md)) are done |
-| WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | **In progress.** Initial Window suite and exact baseline are checked in. [Results](SCRIPTING.md#pinned-window-web-platform-tests) |
-| PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | Not started; runs in parallel |
-| MOB-03/04 | Android/iOS local-fixture CPU surfaces (carried over from M3) | evidence for `platform.android`, `platform.ios` (M8) | REN-05; hosted CI or a machine with the NDK and Xcode | Blocked on CI; runs in parallel |
+| WEB-09 | M5 conformance gate: a pinned WPT selection run through `testharness.js` in the headless host, with an exact expectation list, plus the reentry and teardown tests of the gate below | `web.conformance` | WEB-05 (the harness is a script) | **Done.** 59 pinned files, 342 subtests, 272 passes and 70 diagnosed expected failures, plus the reentry and teardown gate. [Results](SCRIPTING.md#pinned-window-web-platform-tests), [review](reviews/2026-11-19-m5-completion.md) |
+| PERF-01 (M5 slice) | First cross-engine report: Rustic's JS-09 corpus and DOM microbenchmarks against V8, SpiderMonkey and JavaScriptCore | first evidence for `perf.harness` | JS-09, WEB-03 | **Done.** [First report](reviews/2026-11-19-perf-01-m5.md); `perf.harness` continues in M8 with reference devices |
+| MOB-03/04 | Android/iOS local-fixture CPU surfaces (carried over from M3) | evidence for `platform.android`, `platform.ios` (M8) | REN-05; hosted CI or a machine with the NDK and Xcode | Moved to M8 (first mobile-host task): hosted CI and NDK/Xcode runners are unavailable |
 
 ### Remaining work, in order
 
@@ -429,21 +428,24 @@ presence of a property does not count as correct API support.
 
 ### M5 exit checklist
 
-- [ ] The five demo fixtures are checked-in reftests that pass with scripts on.
-- [ ] `web.scripts`, `html.scripts`, `dom.observers`, `web.input`,
+- [x] The five demo fixtures are checked-in reftests that pass with scripts on.
+- [x] `web.scripts`, `html.scripts`, `dom.observers`, `web.input`,
       `web.observers` and `web.conformance` are complete in the catalog with
       source and test evidence.
 - [x] The WEB-09 expectation list, its WPT revision and its counts are in
       [SCRIPTING.md](SCRIPTING.md) and the [evidence table](README.md#evidence-at-a-glance).
-- [ ] The first PERF-01 report is committed under `docs/reviews/`.
+- [x] The first PERF-01 report is committed under `docs/reviews/`
+      ([2026-11-19](reviews/2026-11-19-perf-01-m5.md)).
 - [x] Fuzz targets exist for script-driven mutation with rendering and for
       the event/timer pump, and run in the smoke job.
 - [ ] The full suite passes on every tier that can run: native x86-64, the
       four emulated tiers, MSRV and the cross-checks; and on native Windows,
-      macOS and Linux aarch64 if hosted CI is back.
-- [ ] Every open TD entry whose trigger is M5 work (TD-31, TD-118, TD-126,
+      macOS and Linux aarch64 if hosted CI is back. *Native x86-64 passed on
+      2026-11-19; the emulated, MSRV and cross tiers were not available in
+      that sandbox and remain to run.*
+- [x] Every open TD entry whose trigger is M5 work (TD-31, TD-118, TD-126,
       TD-129 to TD-134) is paid or given a later, named trigger (TD-10 paid).
-- [ ] A completion review is written (`docs/reviews/YYYY-MM-DD-m5-completion.md`)
+- [x] A completion review is written ([2026-11-19](reviews/2026-11-19-m5-completion.md))
       and the status tables in this file, [README.md](README.md) and the root
       README are updated in the same change.
 
@@ -786,9 +788,9 @@ JS-09) are complete.
 | 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | Local lifecycle, CLI and all pinned html5lib records verified. |
 | 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
 | 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Done |
-| 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Initial 16-file Window baseline verified locally. |
-| 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | Planned |
-| — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Parallel; not started |
+| 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Done: 59-file Window baseline with exact expectations |
+| 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | M5 review done 2026-11-19 ([review](reviews/2026-11-19-m5-completion.md)); emulated tiers and the transport/TLS ADR remain for M6 entry |
+| — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Done on x86-64 ([report](reviews/2026-11-19-perf-01-m5.md)); ARM64 is TD-125 (M8) |
 | — | M6 entry, early (parallel): encodings | All 40 Encoding Standard encodings, stylesheet decoding (TD-28) | Done 2026-11-18: [ENCODING.md](ENCODING.md), [ADR 0043](adr/0043-encoding-standard.md). URL query encoding, TD-26 and TD-02 done 2026-11-18. Next: JS fixes due at M6 entry |
 | — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | Parallel; blocked on hosted CI |
 | — | Restore hosted CI | A green run on the full native matrix; then require the `CI` check on `main` (M0 follow-up) and re-verify the merges made since 2026-11-08 on Windows, macOS and Linux aarch64 | Waiting for GitHub Actions billing; hard prerequisite of M7 |

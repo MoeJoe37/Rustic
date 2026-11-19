@@ -4697,29 +4697,37 @@
           "label": "Exposed web API conformance and reentry gate",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Pinned upstream Window WPT selection and exact expectation ratchet",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/run_wpt_web_tests.py",
-                  "marker": "def run_case"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
-                  "marker": "dom/nodes/CharacterData-data.html"
-                }
-              ]
+              "kind": "source",
+              "path": "tools/run_wpt_web_tests.py",
+              "marker": "def run_case"
             },
             {
-              "label": "Conformance, reentry and teardown review across the full M5 surface",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "dom/nodes/CharacterData-data.html"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/m5_gate.rs",
+              "marker": "fn callbacks_and_conversions_reenter_the_new_apis"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/m5_gate.rs",
+              "marker": "fn shutdown_discards_pending_observer_rejection_and_form_work"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "html/webappapis/scripting/processing-model-2/window-onerror-runtime-error.html"
+            },
+            {
+              "kind": "source",
+              "path": "docs/reviews/2026-11-19-m5-completion.md",
+              "marker": "## Gate"
             }
           ]
         },
@@ -5573,9 +5581,42 @@
           "id": "perf.harness",
           "label": "Cross-engine benchmark harness, reference devices and published reports",
           "size": 3,
-          "milestone": "M5",
-          "status": "planned",
-          "evidence": []
+          "milestone": "M8",
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/cross_engine_bench.py",
+                  "marker": "def median_interval"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/examples/dom_bench.rs",
+                  "marker": "const WORKLOADS"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/tests/test_cross_engine_bench.py",
+                  "marker": "def test_eleven_samples_use_the_second_and_tenth_order_statistics"
+                },
+                {
+                  "kind": "test",
+                  "path": "docs/reviews/2026-11-19-perf-01-m5.md",
+                  "marker": "Every engine returned the same checksum"
+                }
+              ]
+            },
+            {
+              "label": "Reference devices on all five platform families with published per-device reports (M8)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "perf.interpreter",

@@ -63,6 +63,15 @@ implementations to raise the number.
   the overall percentage). An outlined cell is in progress; its blue fill is its
   verified step fraction.
 
+## engine-v4 milestone correction (2026-11-19)
+
+`perf.harness` moved from M5 to M8. The roadmap already scheduled the
+capability to stay open until reference devices exist on all five platform
+families (M8) and asked M5 only for the first cross-engine report. The
+capability keeps its subsystem, size and weight, so the engine total does
+not change; it is in progress with the first report as its completed step
+([M5 completion review](reviews/2026-11-19-m5-completion.md)).
+
 ## engine-v4 scope change (2026-11-11)
 
 [ADR 0018](adr/0018-parity-and-performance-leadership.md) extends the plan to a

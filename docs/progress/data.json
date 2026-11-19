@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "9308529e41bff835bcd0717a6c2a1a24bb4133cadf4533925123bdc8a5715143",
-  "percent": "34.37",
-  "verified_percent": "33.24",
-  "partial_percent": "1.13",
-  "completed": 76,
+  "source_fingerprint": "c59b431ff8edd9fde032f8c8d95b4e312abd19a76a5fcca0073a9fb724b46053",
+  "percent": "34.75",
+  "verified_percent": "33.61",
+  "partial_percent": "1.14",
+  "completed": 77,
   "in_progress": 6,
   "total": 221,
   "fully_complete": false,
@@ -54,12 +54,12 @@
     {
       "id": "M5",
       "label": "Scripted documents",
-      "share": "5.29",
-      "completed": 10,
-      "total": 12,
-      "percent": "89.15",
-      "verified_percent": "85.61",
-      "partial_percent": "3.54"
+      "share": "4.90",
+      "completed": 11,
+      "total": 11,
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "M6",
@@ -84,12 +84,12 @@
     {
       "id": "M8",
       "label": "Desktop & mobile alpha",
-      "share": "9.83",
+      "share": "10.22",
       "completed": 0,
-      "total": 20,
-      "percent": "0.00",
+      "total": 21,
+      "percent": "1.89",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "1.89"
     },
     {
       "id": "M9",
@@ -5075,32 +5075,40 @@
           "label": "Exposed web API conformance and reentry gate",
           "size": 3,
           "milestone": "M5",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Pinned upstream Window WPT selection and exact expectation ratchet",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/run_wpt_web_tests.py",
-                  "marker": "def run_case"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
-                  "marker": "dom/nodes/CharacterData-data.html"
-                }
-              ]
+              "kind": "source",
+              "path": "tools/run_wpt_web_tests.py",
+              "marker": "def run_case"
             },
             {
-              "label": "Conformance, reentry and teardown review across the full M5 surface",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "dom/nodes/CharacterData-data.html"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/m5_gate.rs",
+              "marker": "fn callbacks_and_conversions_reenter_the_new_apis"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/m5_gate.rs",
+              "marker": "fn shutdown_discards_pending_observer_rejection_and_form_work"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "html/webappapis/scripting/processing-model-2/window-onerror-runtime-error.html"
+            },
+            {
+              "kind": "source",
+              "path": "docs/reviews/2026-11-19-m5-completion.md",
+              "marker": "## Gate"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.37"
         },
         {
@@ -5125,13 +5133,13 @@
         }
       ],
       "points": 40,
-      "completed": 6,
-      "in_progress": 1,
+      "completed": 7,
+      "in_progress": 0,
       "total": 10,
-      "contribution": "3.18",
-      "percent": "63.75",
-      "verified_percent": "60.00",
-      "partial_percent": "3.75"
+      "contribution": "3.37",
+      "percent": "67.50",
+      "verified_percent": "67.50",
+      "partial_percent": "0.00"
     },
     {
       "id": "media",
@@ -6243,10 +6251,43 @@
           "id": "perf.harness",
           "label": "Cross-engine benchmark harness, reference devices and published reports",
           "size": 3,
-          "milestone": "M5",
-          "status": "planned",
+          "milestone": "M8",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "tools/cross_engine_bench.py",
+                  "marker": "def median_interval"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/examples/dom_bench.rs",
+                  "marker": "const WORKLOADS"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/tests/test_cross_engine_bench.py",
+                  "marker": "def test_eleven_samples_use_the_second_and_tenth_order_statistics"
+                },
+                {
+                  "kind": "test",
+                  "path": "docs/reviews/2026-11-19-perf-01-m5.md",
+                  "marker": "Every engine returned the same checksum"
+                }
+              ]
+            },
+            {
+              "label": "Reference devices on all five platform families with published per-device reports (M8)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.38"
         },
         {
@@ -6372,12 +6413,12 @@
       ],
       "points": 62,
       "completed": 0,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 13,
-      "contribution": "0.00",
-      "percent": "0.00",
+      "contribution": "0.19",
+      "percent": "2.41",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "2.41"
     },
     {
       "id": "release",

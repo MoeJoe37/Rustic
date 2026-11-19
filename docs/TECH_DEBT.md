@@ -52,19 +52,17 @@ applies and wins if it fires earlier. An entry that reaches its row unpaid is
 either paid then or moved to a later row in the same change, with the reason
 added to the entry. Entries are never left on a row whose milestone has closed.
 
-Scheduled 2026-11-17, updated as M5 gains scripted document support.
+Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completion review.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-06 and WEB-07 | TD-131, TD-132, TD-134, TD-149 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
-| M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
-| M6 entry (before pages load from a server) | TD-15, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
+| M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
-| M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-127, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -194,10 +192,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
 | TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
-| TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, WEB-07 and M9 |
-| TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, WEB-06, WEB-07 and M9 |
+| TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, M9 |
+| TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, M9 |
 | TD-133 | Deliberate | HTML scripting | Adoption of subtrees containing retained parser or script nodes and dynamic document markup have explicit exceptions | Open, M9 HTML lifecycle |
-| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, WEB-06 |
+| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, M6 entry |
 | TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M6 and M9 |
 | TD-136 | Bad | JS | The four URI functions and the omitted standard globals are covered by the pinned Test262 gate | Paid |
 | TD-137 | Deliberate | JS | Web-legacy library surface is missing: Annex B `escape`/`unescape` and String HTML methods, `__defineGetter__` and its siblings, legacy RegExp statics and `Error.prototype.stack`; `test/annexB` is not run | Open, M6 entry |
@@ -212,7 +210,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
 | TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Open, M7 entry |
-| TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, WEB-06 |
+| TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, M6 entry |
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M6 navigation |
@@ -1986,6 +1984,8 @@ the corpus on native ARM64 hardware (the `Linux ARM64` CI job already prints
 it to the job summary) before any ARM64 performance claim, at the latest with
 the first cross-engine report of PERF-01.
 
+**Rescheduled 2026-11-19 (M5 completion review):** M5 closed without native ARM64 hardware; the first PERF-01 report is x86-64 only. Moved to the M8 row, where reference devices are chosen.
+
 ### TD-126 — Initial DOM prototype and construction coverage
 
 The page host supports detached HTML and XML documents, explicit and
@@ -1998,6 +1998,8 @@ HTML element-specific prototypes and custom element reactions with the
 HTML interface and registry work.
 [ADR 0029](adr/0029-scripted-node-creation.md),
 [ADR 0033](adr/0033-detached-documents-and-adoption.md)
+
+**Rescheduled 2026-11-19 (M5 completion review):** M5 exposes the interfaces its gate needs (WEB-01 to WEB-07). The rest of the HTML and DOM surface is M9 compatibility work, so the review moves to the M9 row.
 
 ### TD-127 — Element and attribute names use scalar UTF-8 storage
 
@@ -2030,6 +2032,7 @@ behavior through attribute changes, subtree moves, and potential reentrancy
 during named property visibility checks.
 [ADR 0031](adr/0031-live-html-collections.md)
 
+**Rescheduled 2026-11-19 (M5 completion review):** No M5 profile shows collection scans as a cost (PERF-01 DOM microbenchmarks include `querySelectorAll`). Moved to the M9 row with the DOM performance work.
 
 ### TD-130 — Window named access and additional browsing contexts
 
@@ -2065,6 +2068,7 @@ script budget. Consider indexing when measured listener workloads warrant it.
 [ADR 0034](adr/0034-dom-event-dispatch.md),
 [ADR 0035](adr/0035-trusted-input-and-activation.md)
 
+**Rescheduled 2026-11-19 (M5 completion review):** Error reporting, focus and Tab navigation were paid in WEB-07 (ADR 0048, ADR 0049). The remaining pointer, IME, `AbortSignal` and shadow retargeting work is M9.
 
 ### TD-132 — Timer and frame integration with page policy
 
@@ -2084,6 +2088,8 @@ Until then the engine reports uncaught animation errors through a host
 counter. Test the integrated event loop against the matching Web Platform
 Tests when these facilities are present.
 [ADR 0036](adr/0036-window-timers-and-animation-callbacks.md)
+
+**Rescheduled 2026-11-19 (M5 completion review):** Timer and animation callback exceptions now reach HTML error reporting (ADR 0048). Host-time frame timestamps and timer binding remain and move to M9 with the event loop work.
 
 ### TD-133 — Outward adoption during parsing and dynamic document markup
 
@@ -2110,6 +2116,8 @@ Integrate stylesheet readiness as a blocker and order timers with pending
 fetches when WEB-06 connects the rendering lifecycle. Add tests where a
 stylesheet, script or timer becomes ready while the parser is suspended.
 [ADR 0039](adr/0039-local-external-classics.md)
+
+**Rescheduled 2026-11-19 (M5 completion review):** Stylesheet-blocking scripts and task interleaving depend on asynchronous resource loading, which arrives with NET-01; moved to the M6 entry row.
 
 ### TD-135 — Dynamic page imports, import maps and data modules
 
@@ -2341,6 +2349,8 @@ empty declaration for failures, `::slotted()` and `::part()`, and read
 generated-box styles from the same snapshot for supported pseudo-elements,
 with WPT `getComputedStyle-pseudo*` cases.
 **Trigger:** WEB-06 completion, or before M6 loads server pages.
+
+**Rescheduled 2026-11-19 (M5 completion review):** Pseudo-element styles need generated-box styles in the layout snapshot; moved to the M6 entry row, matching its own trigger (before M6 loads server pages).
 
 ### TD-150 — Dead mutation-observer registrations are dropped lazily
 

@@ -15,8 +15,8 @@ RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets
 Device shells, rendering, input, and runtime validation are still planned. See
 [platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: M5 scripted documents.** M1–M4 are complete for their
-declared scope. Rustic's own pipeline turns a local HTML file into a PNG
+**Current stage: M6 networking and browser services.** M1–M5 are complete
+for their declared scope. Rustic's own pipeline turns a local HTML file into a PNG
 through parsing, the CSS cascade, block/inline/flex layout, OpenType text,
 image decoding and a CPU rasterizer, with resize/zoom and hit testing. M4
 added Rustic's own ECMAScript engine: parser, garbage-collected heap and
@@ -29,7 +29,7 @@ memory use and interpreter speed
 [JavaScript notes](docs/JS.md) give the Test262 results, the benchmark corpus
 and what is left for later milestones.
 
-M5 connects that engine to documents. A host can already queue scripts and
+M5 connected that engine to documents. A host can queue scripts and
 trusted input against a parsed document: script sees a live `window` and
 `document`, creates, moves and queries nodes, dispatches events, and uses
 timers and `requestAnimationFrame`, with one garbage collector tracing the DOM
@@ -39,12 +39,14 @@ can opt into running inline and local external classics and static JavaScript
 modules, with document and script readiness events. `rustic render --run-scripts`
 can render the resulting page. Scripts can observe mutations with
 `MutationObserver`, report errors to `window.onerror`, move focus and
-validate and submit forms without navigation. Style and layout
-invalidation and rendering observers are still on the
-[M5 roadmap](docs/ROADMAP.md#8-m5--scripted-document-integration).
-M6 entry work has started alongside M5 where it does not depend on scripting:
-Rustic now decodes and encodes all 40 [Encoding Standard](docs/ENCODING.md)
-encodings, and stylesheets honor their `@charset`. Networking itself and
+validate and submit forms without navigation, and watch element sizes with
+`ResizeObserver`. A pinned web-platform-tests selection runs through
+upstream `testharness.js`, and a [first cross-engine report](docs/reviews/2026-11-19-perf-01-m5.md)
+compares the JavaScript engine with V8, SpiderMonkey and JavaScriptCore
+([M5 review](docs/reviews/2026-11-19-m5-completion.md)).
+M6 entry work is under way: Rustic decodes and encodes all 40
+[Encoding Standard](docs/ENCODING.md) encodings, and stylesheets honor their
+`@charset`. Networking itself and
 native app hosts are later milestones.
 See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
@@ -54,7 +56,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 34.37%** (33.24% verified complete + 1.13% partial credit) — 76/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M5 Scripted documents**, 89.15% done.
+**Overall engine completion: 34.75%** (33.61% verified complete + 1.14% partial credit) — 77/221 capabilities complete and 6 in progress across 25 subsystems. Current milestone: **M6 Networking & services**, 5.69% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -75,7 +77,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 | [CSS](docs/CSS.md) | Syntax, selectors, values, cascade, queries, invalidation and computed style |
 | [Layout](docs/LAYOUT.md), [text](docs/TEXT.md) and [paint](docs/PAINT.md) | The M3 static renderer |
 | [JavaScript](docs/JS.md) | The M4 engine: parser, heap, interpreter, standard library, Intl and its Test262 results |
-| [Scripted documents](docs/SCRIPTING.md) | The M5 integration: script turns, bindings, events, timers and what is still open |
+| [Scripted documents](docs/SCRIPTING.md) | The M5 integration: script turns, bindings, events, observers, forms and what is still open |
 | [Technical debt](docs/TECH_DEBT.md) | Known shortcuts and the rules that keep them safe |
 | [Platform and device support](docs/PLATFORMS.md) | Any device that can run a browser: portability rules and the CI target matrix |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |

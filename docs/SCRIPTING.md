@@ -128,15 +128,22 @@ stale completions without blocking updates to unrelated resources. A
 completion published while an initial file fetch is running also takes
 precedence over that fetch's older bytes. A CLI regression fixture now queues actual staged CSS and PNG replacements
 through the document pump and checks layout values and stale frame tickets.
-There is **no automatic asynchronous fetch, file-change watcher or parser
-resource-delivery task** yet; the host still supplies each validated completion. Static dump commands still read local files directly. This is a partial CSSOM surface and its
+At the end of local HTML parsing, the scripted CLI now discovers enabled
+linked stylesheets and image sources in DOM order, resolves the first base URL,
+and stages eligible files using its existing local-file grant. Each validated
+resource is queued and delivered before the next one is staged, avoiding a
+second pending-byte cache. Duplicate URLs are coalesced per resource kind and
+candidate counts and URL lengths are bounded. The original timer-turn limit
+remains in force. **This is synchronous post-parse delivery, not asynchronous
+fetching, live file watching or streaming parser-barrier resource scheduling.**
+Static dump commands still read local files directly. This is a partial CSSOM surface and its
 regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
 
 What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and wiring real stylesheet/image completions into the page pump remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
+| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |

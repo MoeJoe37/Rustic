@@ -34,7 +34,7 @@ use rustic_style::{
     StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
 
-use crate::stylesheets::{LocalStylesheetFetcher, file_url};
+use crate::stylesheets::{AppliedLocalFiles, LocalStylesheetFetcher, file_url};
 
 /// Default maximum file size, matching the tokenizer's default input budget.
 pub const DEFAULT_MAX_FILE_BYTES: usize = 8 * 1024 * 1024;
@@ -300,6 +300,10 @@ fn load_scripted_document(
         cancellation.clone(),
     )
     .ok_or(ScriptLoadError::InvalidDocumentUrl)?;
+    let applied_files = AppliedLocalFiles::new(
+        limits.stylesheets.max_sheets.saturating_add(limits.images.max_images),
+        limits.stylesheets.max_total_bytes.saturating_add(limits.images.max_file_bytes),
+    );
     read_document_file(
         &path,
         limits,
@@ -313,6 +317,7 @@ fn load_scripted_document(
                     limits,
                     cancellation: cancellation.clone(),
                     encoding,
+                    applied_files: applied_files.clone(),
                 }))?;
             }
             load.feed(bytes)?;
@@ -571,6 +576,7 @@ fn compute_styles(
         limits,
         view,
         cancellation,
+        applied_files,
     } = input;
     let node_error = |error| LoadError::Dump(DumpError::Node(error));
     check_cancelled(cancellation)?;
@@ -584,7 +590,13 @@ fn compute_styles(
             limits.read_chunk_bytes,
             cancellation.clone(),
         )
-        .map(|fetcher| fetcher.with_environment_encoding(encoding))
+        .map(|fetcher| {
+            let fetcher = fetcher.with_environment_encoding(encoding);
+            match applied_files {
+                Some(applied) => fetcher.with_applied_files(applied.clone()),
+                None => fetcher,
+            }
+        })
     });
     let mut no_fetch = NoFetch;
     let fetcher: &mut dyn StylesheetFetcher = match local.as_mut() {
@@ -703,6 +715,7 @@ struct LayoutInput<'a> {
     limits: LoaderLimits,
     view: rustic_layout::View,
     cancellation: &'a CancellationToken,
+    applied_files: Option<&'a AppliedLocalFiles>,
 }
 
 impl<'a> LayoutInput<'a> {
@@ -720,6 +733,7 @@ impl<'a> LayoutInput<'a> {
             limits,
             view,
             cancellation: parsed.cancellation(),
+            applied_files: None,
         }
     }
 }
@@ -730,6 +744,7 @@ struct LocalLayout {
     limits: LoaderLimits,
     cancellation: CancellationToken,
     encoding: Encoding,
+    applied_files: AppliedLocalFiles,
 }
 
 impl LayoutSource for LocalLayout {
@@ -746,6 +761,7 @@ impl LayoutSource for LocalLayout {
             limits: self.limits,
             view: self.limits.script_view,
             cancellation: &self.cancellation,
+            applied_files: Some(&self.applied_files),
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
         Ok(LayoutGeometry {
@@ -795,16 +811,18 @@ fn block_layout(
         limits,
         view,
         cancellation,
+        applied_files,
         ..
     } = input;
     let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
-    let images = crate::images::load(
+    let images = crate::images::load_applied(
         document,
         &tree,
         &canonical,
         limits.images,
         limits.read_chunk_bytes,
         cancellation,
+        applied_files,
     );
     if !images.sizes.is_empty() {
         tree.set_natural_sizes(&images.sizes)

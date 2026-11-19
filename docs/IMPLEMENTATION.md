@@ -627,7 +627,16 @@ and decoded-pixel budget failures before publication, retaining the old image
 and frame revision on those errors. This is still
 synchronous first-demand loading: queued *delivery of host-supplied
 completions* now works, but there is **no asynchronous fetch/notification
-source or automatic parser resource-delivery integration**.
+source or automatic resource discovery during individual parser barriers**.
+The local scripted CLI now scans the completed DOM for supported linked
+stylesheets and image URLs, checks link type/disabled/alternate state and the
+first base href, and stages each bounded, policy-approved resource through the
+existing document queue one at a time. This avoids retaining an array of large
+staged resources. Duplicate candidate URLs per kind are coalesced, parser
+candidate counts obey stylesheet/image caps and the normal timer-turn ceiling
+still covers timer work interleaved with resource delivery. This is limited to
+synchronous **post-parse** resources; CSS imports continue through the
+on-demand style loader.
 
 Regression sources: `crates/rustic-engine/tests/frames.rs` (held declarations,
 callback argument conversion, microtasks, shared eight-flush quota,
@@ -638,7 +647,9 @@ completion ordering for stylesheet/image fixture values) and
 custom names, inheritance, detached nodes and indexed enumeration after
 stylesheet mutation, stylesheet/image file replacement and deletion without
 accidental resource application, plus staged stylesheet/PNG replacement using
-the host completion boundary and frame-ticket rejection). Cache limit,
+the host completion boundary and frame-ticket rejection, plus post-parse
+stylesheet/image discovery, deduplication and pinned-resource delivery).
+Cache limit,
 atomic revalidation, missing-resource and
 cancelled-load regressions are in `crates/rustic-cli/src/stylesheets.rs`.
 **Verification pending**:

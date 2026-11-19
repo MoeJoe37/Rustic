@@ -357,6 +357,21 @@ impl ScriptQueue {
             .map(|timer| timer.deadline.saturating_sub(now))
     }
 
+    /// A ready, next-in-order resource delivery must publish before an
+    /// already-offered render; otherwise that frame could use older applied
+    /// bytes. Respect the existing script/timer source alternation: do not
+    /// overtake an older immediate task or a timer selected ahead of it.
+    pub(crate) fn next_ready_is_resource(&self, now: Duration) -> bool {
+        let timer_ready = self
+            .timers
+            .peek()
+            .is_some_and(|timer| timer.deadline <= now);
+        let timer_has_priority =
+            timer_ready && (self.prefer_timers || self.immediate.is_empty());
+        !timer_has_priority
+            && matches!(self.immediate.front(), Some(Task::ResourceCompletion(_)))
+    }
+
     pub(crate) fn pop_ready(&mut self, now: Duration) -> Option<Task> {
         let timer_ready = self
             .timers

@@ -124,10 +124,16 @@ The host-facing `apply_resource_completion` API publishes a staged resource
 result before advancing the applied-input epoch and offering a frame. Failed
 applications leave the epoch and frame ticket unchanged. A dedicated engine
 fixture tests both stylesheet and image changes against geometry and held
-computed style in the same snapshot. This is not yet wired to the local CLI's
-synchronous resource loader, nor does it implement asynchronous fetch tasks.
+computed style in the same snapshot. The scripted local CLI now uses a shared, bounded, document-scoped cache of
+applied stylesheet and image bytes. It remembers first-fetch successes and
+failures across dirty layout reads, preventing file replacement or deletion
+from changing an already-applied resource without a host event. The static
+CLI retains its direct fetch behavior. The CLI does not yet stage and apply
+new resource versions through `apply_resource_completion`, and there is no
+asynchronous fetch task pipeline.
 
 This is **not** the full decision: CSSOM serialization edge cases,
 pseudo-elements, DOM adoption/GC stress,
-WPT expansion, immutable applied-resource snapshots and real stylesheet/image
-completion delivery still need implementation and passing tests. Until those arrive WEB-06 remains open.
+WPT expansion, validated resource snapshot replacement and real
+stylesheet/image completion delivery still need implementation and passing
+tests. Until those arrive WEB-06 remains open.

@@ -376,8 +376,10 @@ ADR is accepted.
      completion rejection, budget revalidation and precommit image decoding.
      `queue_resource_completion` now delivers staged resources through bounded
      host turns before an older offered frame, with failure and cancellation
-     coverage. The local loader still needs an asynchronous fetch/completion
-     source and parser integration to enqueue these tasks automatically.
+     coverage. The local scripted loader now performs bounded, synchronous
+     end-of-parse discovery and queued delivery for linked CSS/images. Full
+     async fetch completion, CSS import scheduling and parser-barrier
+     integration remain outstanding.
 3. **WEB-07 — observers, errors, focus and forms.**
    - `MutationObserver` records are delivered at the microtask checkpoint in
      the specified order relative to promise jobs (`dom.observers`).

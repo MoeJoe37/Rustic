@@ -23,11 +23,11 @@ use rustic_codecs::{ImageStore, StoreLimits};
 use rustic_dom::{Document, NodeId};
 use rustic_layout::{BoxTree, CssPx, NaturalSize};
 use rustic_paint::Image;
-use rustic_style::DomElement;
+use rustic_style::{DomElement, FetchError};
 use rustic_url::Url;
 
 use crate::reftest::{attribute, is_html, resolve};
-use crate::stylesheets::file_url;
+use crate::stylesheets::{AppliedLocalFiles, file_url};
 
 /// Budgets for the images of one document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -90,6 +90,20 @@ pub fn load(
     chunk_bytes: usize,
     cancellation: &CancellationToken,
 ) -> LoadedImages {
+    load_applied(document, tree, path, limits, chunk_bytes, cancellation, None)
+}
+
+/// Load images against a scripted document's applied byte snapshot. Other
+/// callers retain the reference command's direct local-file behavior.
+pub(crate) fn load_applied(
+    document: &Document,
+    tree: &BoxTree,
+    path: &Path,
+    limits: ImageLimits,
+    chunk_bytes: usize,
+    cancellation: &CancellationToken,
+    applied: Option<&AppliedLocalFiles>,
+) -> LoadedImages {
     let mut loaded = LoadedImages::default();
     let replaced: HashMap<NodeId, ()> = tree
         .boxes()
@@ -131,10 +145,23 @@ pub fn load(
         if cancellation.check().is_err() {
             break;
         }
-        let Ok(file) = resolve(&src, base.as_ref(), root) else {
+        let Ok(url) = Url::parse(&src, base.as_ref()) else {
             continue;
         };
-        let key = file.to_string_lossy().into_owned();
+        // Snapshot keys use the resolved URL before filesystem inspection.
+        // If a previously applied file is replaced or removed, that change
+        // cannot leak into a later DOM-triggered layout recomputation.
+        let file = if applied.is_none() {
+            let Ok(path) = resolve(&src, base.as_ref(), root) else {
+                continue;
+            };
+            Some(path)
+        } else {
+            None
+        };
+        let key = file.as_ref().map_or_else(|| url.serialize(), |file| {
+            file.to_string_lossy().into_owned()
+        });
         let id = match store.lookup(&key) {
             Some(id) => id,
             None => {
@@ -143,7 +170,22 @@ pub fn load(
                     break;
                 }
                 let remaining = limits.max_file_bytes - stats.encoded_bytes;
-                let Some(bytes) = read_bounded(&file, remaining, chunk_bytes) else {
+                let bytes = if let Some(applied) = applied {
+                    applied
+                        .read(&url, remaining, || {
+                            let file = resolve(&src, base.as_ref(), root)
+                                .map_err(|_| FetchError::Blocked)?;
+                            read_bounded(&file, remaining, chunk_bytes)
+                                .ok_or(FetchError::Failed)
+                        })
+                        .ok()
+                        .map(|bytes| bytes.to_vec())
+                } else {
+                    file.as_deref().and_then(|path| {
+                        read_bounded(path, remaining, chunk_bytes)
+                    })
+                };
+                let Some(bytes) = bytes else {
                     continue;
                 };
                 let Ok(id) = store.insert(&key, bytes) else {

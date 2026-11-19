@@ -156,6 +156,14 @@ pub(crate) struct StagedLocalFile {
     expected_version: Option<u64>,
 }
 
+impl StagedLocalFile {
+    /// Borrow the immutable staged source for format-specific validation
+    /// before publishing it into the renderer's applied resources.
+    pub(crate) fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
 #[derive(Debug)]
 struct AppliedFileEntry {
     result: Result<Arc<[u8]>, FetchError>,

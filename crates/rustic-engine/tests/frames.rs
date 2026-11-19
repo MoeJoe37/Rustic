@@ -609,6 +609,44 @@ fn computed_style_mutation_methods_are_read_only() {
 }
 
 #[test]
+fn connected_elements_missing_from_an_applied_style_snapshot_report_invalid_state() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts
+        .set_layout_source(Box::new(LayoutFixture(Rc::new(Cell::new(30)))))
+        .unwrap();
+    scripts
+        .queue_script(source(
+            r#"
+            const body = document.body;
+            if (body.offsetWidth !== 30) throw 'fixture geometry missing';
+            const style = getComputedStyle(body);
+            for (const read of [
+                () => style.color,
+                () => style.length,
+                () => style[0],
+                () => style.getPropertyValue('color'),
+            ]) {
+                try {
+                    read();
+                    throw 'missing snapshot silently returned an empty value';
+                } catch (error) {
+                    if (error.name !== 'InvalidStateError') throw 'wrong missing-style error';
+                }
+            }
+            const detached = getComputedStyle(document.createElement('span'));
+            if (detached.getPropertyValue('color') !== '' || detached.length !== 0) {
+                throw 'detached declaration changed';
+            }
+            if (body.offsetWidth !== 30) throw 'style error damaged geometry';
+            "#,
+        ))
+        .unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 1);
+}
+
+#[test]
 fn connected_computed_styles_require_a_renderer_but_detached_reads_are_empty() {
     let mut engine = Engine::new(1);
     let mut scripts = document(&mut engine, TaskLimits::default());

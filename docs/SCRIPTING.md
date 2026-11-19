@@ -112,8 +112,11 @@ stylesheet and image bytes as they are first fetched. Later DOM-triggered
 layout flushes reuse those bytes even if the underlying files change or are
 removed; missing and rejected resources remain missing within that snapshot.
 The local fetcher can also stage a replacement using the normal file-security
-policy; the applied cache rechecks its entry and byte budgets when the host
-commits it through `apply_resource_completion`. Per-URL versions reject late
+policy; image replacements additionally pass through the existing bounded
+image decoder before they may be applied, rejecting broken images or excessive
+decoded pixel sizes without replacing a working image. The applied cache
+rechecks its entry and byte budgets when the host commits it through
+`apply_resource_completion`. Per-URL versions reject late
 stale completions without blocking updates to unrelated resources. A
 completion published while an initial file fetch is running also takes
 precedence over that fetch's older bytes. A CLI regression fixture

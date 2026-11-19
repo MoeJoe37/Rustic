@@ -602,9 +602,14 @@ An explicit `ScriptedDocument::apply_resource_completion` host boundary now
 commits an already-validated resource result before advancing the applied-input
 revision and offering a rendering turn. A failed application leaves cached
 values and pending frame tickets intact. This is a narrow host contract:
-the local CLI still loads external stylesheets and images synchronously during
-layout, and real completion delivery and applied-resource caching are not yet
-connected to the new boundary.
+the scripted local CLI now shares a bounded per-document applied-byte snapshot
+between CSS and image loading. A first fetch pins the source bytes or failure;
+later dirty style/layout measurements reuse the pinned result instead of
+silently rereading changed files. Resource count and aggregate byte budgets
+limit the snapshot; each fetch also obeys its own offered byte budget. Static
+commands keep their direct-file behavior. This is still synchronous,
+first-demand loading, **not** a real completion queue: applying staged
+replacements through the host's completion boundary remains unimplemented.
 
 Regression sources: `crates/rustic-engine/tests/frames.rs` (held declarations,
 callback argument conversion, microtasks, shared eight-flush quota,
@@ -613,10 +618,14 @@ absent-renderer/detached semantics and successful/failed host resource
 completion ordering for stylesheet/image fixture values) and
 `crates/rustic-cli/src/loader.rs` (live local style/class/inline mutations,
 custom names, inheritance, detached nodes and indexed enumeration after
-stylesheet mutation). **Verification pending**:
+stylesheet mutation, plus stylesheet/image file replacement and deletion
+without accidental resource application). Cache limit, missing-resource and
+cancelled-load regressions are in `crates/rustic-cli/src/stylesheets.rs`.
+**Verification pending**:
 this environment has no Rust toolchain, and the hosted CI billing block remains.
-Pseudo-elements, style serialization coverage, resource snapshot caching
-and real stylesheet/image completion delivery remain WEB-06 work under
+Pseudo-elements, style serialization coverage, validated replacement of
+applied snapshots and real stylesheet/image completion delivery remain WEB-06
+work under
 [ADR 0045](adr/0045-live-computed-style-reads.md). No new capability is
 marked complete by this slice.
 

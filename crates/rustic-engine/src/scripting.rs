@@ -273,7 +273,11 @@ impl PageTree for ScriptTree {
             return Err(LayoutReadError::Unavailable);
         }
         self.read_layout(ComputedStyleSnapshot::default(), |geometry| {
-            Ok(geometry.computed_styles.get(&id).cloned().unwrap_or_default())
+            geometry
+                .computed_styles
+                .get(&id)
+                .cloned()
+                .ok_or(LayoutReadError::Unavailable)
         })
     }
 

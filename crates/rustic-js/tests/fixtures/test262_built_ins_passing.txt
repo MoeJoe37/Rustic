@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17523 pass, 1268 fail, 111 skipped (modules, proposals).
+# 17536 pass, 1255 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -9451,6 +9451,16 @@ Object/freeze/proxy-no-ownkeys-returned-keys-order.js
 Object/freeze/proxy-with-defineProperty-handler.js
 Object/freeze/throws-when-false.js
 Object/fromEntries/empty-iterable.js
+Object/fromEntries/evaluation-order.js
+Object/fromEntries/iterator-closed-for-null-entry.js
+Object/fromEntries/iterator-closed-for-string-entry.js
+Object/fromEntries/iterator-closed-for-throwing-entry-key-accessor.js
+Object/fromEntries/iterator-closed-for-throwing-entry-key-tostring.js
+Object/fromEntries/iterator-closed-for-throwing-entry-value-accessor.js
+Object/fromEntries/iterator-not-closed-for-next-returning-non-object.js
+Object/fromEntries/iterator-not-closed-for-throwing-done-accessor.js
+Object/fromEntries/iterator-not-closed-for-throwing-next.js
+Object/fromEntries/iterator-not-closed-for-uncallable-next.js
 Object/fromEntries/key-order.js
 Object/fromEntries/length.js
 Object/fromEntries/name.js
@@ -9464,6 +9474,7 @@ Object/fromEntries/string-entry-string-object-succeeds.js
 Object/fromEntries/supports-symbols.js
 Object/fromEntries/to-property-key.js
 Object/fromEntries/uses-define-semantics.js
+Object/fromEntries/uses-keys-not-iterator.js
 Object/getOwnPropertyDescriptor/15.2.3.3-0-1.js
 Object/getOwnPropertyDescriptor/15.2.3.3-1-1.js
 Object/getOwnPropertyDescriptor/15.2.3.3-1-2.js
@@ -10342,6 +10353,8 @@ Object/prototype/propertyIsEnumerable/symbol_property_toString.js
 Object/prototype/propertyIsEnumerable/symbol_property_valueOf.js
 Object/prototype/proto.js
 Object/prototype/setPrototypeOf-with-different-values.js
+Object/prototype/setPrototypeOf-with-non-circular-values-__proto__.js
+Object/prototype/setPrototypeOf-with-non-circular-values.js
 Object/prototype/setPrototypeOf-with-same-value.js
 Object/prototype/toLocaleString/S15.2.4.3_A1.js
 Object/prototype/toLocaleString/S15.2.4.3_A10.js

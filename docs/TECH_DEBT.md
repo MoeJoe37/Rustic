@@ -205,7 +205,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-139 | Bad | JS | Reference evaluation order deviates in compound, update and logical assignment, `with` over proxies, destructuring targets and `super` properties; `delete super.x` does not throw | Open, M6 entry |
 | TD-140 | Bad | JS | Array destructuring assignment steps the iterator before evaluating a target and does not close it when the target reference throws (TD-100 paid the binding form only) | Open, M6 entry |
 | TD-141 | Bad | JS | Class, function and direct-eval edge semantics: derived-constructor return override in `catch`/`finally`, inferred names for symbol keys, private names on non-extensible objects, `super` and private names inside direct eval in class bodies | Open, `js.conformance` (M9) |
-| TD-142 | Bad | JS | Built-in edge bugs: `Object.fromEntries` does not close its iterator, and a few prototype, buffer and length checks are missing (weak keys and the String Iterator tag paid) | Partly paid, M6 entry |
+| TD-142 | Bad | JS | Built-in edge bugs: array `length` conversion order and a few buffer checks are wrong (weak keys, the String Iterator tag, `Object.fromEntries` and `Object.prototype`'s prototype paid) | Partly paid, M6 entry |
 | TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (`Array.fromAsync`, `Math.sumPrecise`, base64 on `Uint8Array`, JSON source text, iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
 | TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
@@ -2214,10 +2214,13 @@ Wrong behavior in shipped built-ins, found in the `test/built-ins` run:
 - ~~`%StringIteratorPrototype%[@@toStringTag]` is `"Array Iterator"`.~~
   Paid 2026-11-19: string iterators have their own prototype, tag and
   `next` (2 files).
-- `Object.fromEntries` does not close its iterator when an entry is not an
-  object or its `next`/`done` throws (11 files).
-- `Object.setPrototypeOf(Object.prototype, x)` succeeds for a non-circular
-  `x`; `Object.prototype` is an immutable prototype exotic object.
+- ~~`Object.fromEntries` does not close its iterator when an entry is not an
+  object or its `next`/`done` throws (11 files).~~ Paid 2026-11-19: it read
+  its argument as an array-like rather than an iterable; it now uses
+  `AddEntriesFromIterable` (11 files).
+- ~~`Object.setPrototypeOf(Object.prototype, x)` succeeds for a non-circular
+  `x`.~~ Paid 2026-11-19: `Object.prototype` is an immutable prototype
+  exotic object (2 files).
 - `length` definitions on arrays convert the value in the wrong order; a
   `DataView` over a resizable buffer reports bounds errors from
   `byteLength`/`byteOffset`; `Object.freeze` accepts a length-tracking typed

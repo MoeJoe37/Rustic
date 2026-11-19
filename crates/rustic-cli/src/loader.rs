@@ -1341,6 +1341,108 @@ mod tests {
     }
 
     #[test]
+    fn parser_resource_discovery_respects_link_filters_base_and_kind_limits() {
+        let file = TempFile::new(
+            br#"<!doctype html>
+              <base href=".">
+              <link rel="alternate stylesheet" href="skip.css">
+              <link rel="stylesheet" disabled href="disabled.css">
+              <link rel="stylesheet" type="text/plain" href="wrong.css">
+              <link rel="StyleSheet" href="site.css">
+              <link rel="stylesheet" href="over-limit.css">
+              <img src="first.png">
+              <img src="over-limit.png">"#,
+        );
+        let mut engine = Engine::new(1);
+        let limits = LoaderLimits {
+            stylesheets: StyleLoadLimits {
+                max_sheets: 1,
+                ..StyleLoadLimits::default()
+            },
+            images: crate::images::ImageLimits {
+                max_images: 1,
+                ..crate::images::ImageLimits::default()
+            },
+            ..LoaderLimits::default()
+        };
+        let parsed = load_document(&mut engine, &file.0, limits).unwrap();
+        let urls = discover_local_resources(parsed.parsed().document(), &file.0, limits);
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls[0].1, LocalResourceKind::Stylesheet);
+        assert_eq!(urls[1].1, LocalResourceKind::Image);
+        assert!(urls[0].0.serialize().ends_with("/site.css"));
+        assert!(urls[1].0.serialize().ends_with("/first.png"));
+    }
+
+    #[test]
+    fn completed_parser_auto_delivers_css_and_png_with_bounded_host_turns() {
+        let stylesheet = TempFile::new(b"#box { width: 19px }");
+        let image_bytes = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(4, 3, rustic_raster::RasterLimits::default())
+                .unwrap(),
+            usize::MAX,
+        )
+        .unwrap();
+        let image = TempFile::new(&image_bytes);
+        let html = format!(
+            "<!doctype html><link rel=stylesheet href=\"{}\">\
+             <div id=box></div><img id=photo src=\"{}\">",
+            stylesheet.0.file_name().unwrap().to_str().unwrap(),
+            image.0.file_name().unwrap().to_str().unwrap(),
+        );
+        let page = TempFile::new(html.as_bytes());
+        let mut engine = Engine::new(1);
+        let limits = LoaderLimits::default();
+        let parsed = load_document(&mut engine, &page.0, limits).unwrap();
+        let token = parsed.cancellation().clone();
+        let encoding = parsed.parsed().encoding();
+        let applied = AppliedLocalFiles::new(
+            limits.stylesheets.max_sheets + limits.images.max_images,
+            limits.stylesheets.max_total_bytes + limits.images.max_file_bytes,
+        );
+        let fetch = LocalStylesheetFetcher::new(
+            page.0.parent().unwrap().to_path_buf(),
+            limits.read_chunk_bytes,
+            token.clone(),
+        )
+        .unwrap();
+        let mut scripted = parsed
+            .into_scripted_with_clock(TaskLimits::default(), ManualClock::default())
+            .unwrap();
+        let delivered = queue_discovered_local_resources(
+            &mut scripted, &page.0, limits, &fetch, &applied, &token,
+        )
+        .unwrap();
+        assert_eq!(delivered, 2);
+        assert_eq!(scripted.run_next(), Ok(None));
+
+        // If the physical file changes after the parser completion, the
+        // applied bytes remain stable until a new validated host task.
+        fs::write(&stylesheet.0, b"#box { width: 99px }").unwrap();
+        let changed_png = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(8, 3, rustic_raster::RasterLimits::default())
+                .unwrap(),
+            usize::MAX,
+        ).unwrap();
+        fs::write(&image.0, changed_png).unwrap();
+        scripted.set_layout_source(Box::new(LocalLayout {
+            path: page.0.clone(),
+            limits,
+            cancellation: token,
+            encoding,
+            applied_files: applied,
+        })).unwrap();
+        scripted.queue_script(source(
+            "const box = document.querySelector('#box');
+             const image = document.querySelector('#photo');
+             if (getComputedStyle(box).width !== '19px' ||
+                 image.offsetWidth !== 4)
+                 throw 'resource completion was not pinned';",
+        )).unwrap();
+        assert_eq!(scripted.run_next(), Ok(Some(rustic_engine::ScriptTurn::Completed)));
+    }
+
+    #[test]
     fn staged_css_and_image_completions_publish_new_layout_and_invalidate_frames() {
         let stylesheet = TempFile::new(b"#box { width: 18px }");
         let first_png = rustic_raster::encode_png(

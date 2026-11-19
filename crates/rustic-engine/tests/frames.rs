@@ -353,6 +353,113 @@ fn resource_completions_publish_only_after_application_and_offer_a_frame() {
 }
 
 #[test]
+fn queued_resource_completions_follow_script_checkpoints_and_refresh_layout() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    let width = Rc::new(Cell::new(25));
+    scripts
+        .set_layout_source(Box::new(LayoutFixture(width.clone())))
+        .unwrap();
+    scripts.queue_script(source(
+        "var body = document.body;
+         if (body.offsetWidth !== 25) throw 'old layout';
+         Promise.resolve().then(() => body.setAttribute('data-checkpoint', 'done'));",
+    )).unwrap();
+    let committed = width.clone();
+    scripts
+        .queue_resource_completion(move || {
+            committed.set(70);
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+    scripts.queue_script(source(
+        "if (body.getAttribute('data-checkpoint') !== 'done' ||
+             body.offsetWidth !== 70) throw 'completion or checkpoint ordering';",
+    )).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(width.get(), 25, "queued delivery ran inside the JS checkpoint");
+    scripts.offer_rendering_opportunity().unwrap();
+    // Script-only pumping services the resource task without invoking JS or
+    // running an explicit host completion call.
+    assert_eq!(
+        scripts.run_next(),
+        Ok(Some(ScriptTurn::ResourceCompletion { applied: true }))
+    );
+    assert_eq!(width.get(), 70);
+    // The successful completion schedules a frame and gives it the same
+    // post-task opportunity as ordinary script execution.
+    let published = render_turn(&mut scripts);
+    assert_eq!(scripts.accept_rendered_frame(published), Ok(true));
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+    assert_eq!(scripts.take_layout_flush_count(), 2);
+}
+
+#[test]
+fn rejected_queued_resource_does_not_invalidate_a_frame_or_offer_another() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(&mut engine, TaskLimits::default());
+    scripts.offer_rendering_opportunity().unwrap();
+    let old = render_turn(&mut scripts);
+    scripts
+        .queue_resource_completion(|| Err::<(), _>("invalid resource"))
+        .unwrap();
+    assert_eq!(
+        scripts.run_next(),
+        Ok(Some(ScriptTurn::ResourceCompletion { applied: false }))
+    );
+    assert_eq!(scripts.accept_rendered_frame(old), Ok(true));
+    assert_eq!(scripts.run_next_with_render(unexpected_render), Ok(None));
+}
+
+#[test]
+fn queued_resource_completions_share_task_limits_and_drop_on_shutdown() {
+    let mut engine = Engine::new(1);
+    let mut scripts = document(
+        &mut engine,
+        TaskLimits {
+            pending_scripts: 1,
+            ..TaskLimits::default()
+        },
+    );
+    let applied = Rc::new(Cell::new(false));
+    let marker = applied.clone();
+    scripts
+        .queue_resource_completion(move || {
+            marker.set(true);
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+    assert_eq!(
+        scripts.queue_script(source("1")),
+        Err(rustic_engine::ScriptQueueError::Limit)
+    );
+    assert_eq!(
+        scripts.queue_resource_completion(|| Ok::<(), ()>(())),
+        Err(rustic_engine::ScriptQueueError::Limit)
+    );
+    assert!(!applied.get());
+    assert_eq!(
+        scripts.run_next(),
+        Ok(Some(ScriptTurn::ResourceCompletion { applied: true }))
+    );
+    assert!(applied.get());
+    scripts.queue_script(source("1")).unwrap();
+    assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
+
+    let cancelled = Rc::new(Cell::new(false));
+    let marker = cancelled.clone();
+    scripts
+        .queue_resource_completion(move || {
+            marker.set(true);
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+    engine.shutdown();
+    assert_eq!(scripts.run_next(), Err(ScriptStop::DocumentCancelled));
+    assert!(!cancelled.get(), "cancelled document applied a queued completion");
+}
+
+#[test]
 fn rendering_input_revisions_are_scoped_to_their_document() {
     let mut engine = Engine::new(2);
     let mut first = document(&mut engine, TaskLimits::default());

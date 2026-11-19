@@ -1165,6 +1165,88 @@ mod tests {
         assert!(output.contains("local=\"data-cssom\" value=\"ok\""), "{output}");
     }
 
+    #[test]
+    fn scripted_layout_reuses_applied_stylesheet_and_image_bytes_after_file_changes() {
+        let stylesheet = TempFile::new(b"#box { width: 21px }");
+        let first_png = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(3, 2, rustic_raster::RasterLimits::default())
+                .unwrap(),
+            usize::MAX,
+        )
+        .unwrap();
+        let replacement_png = rustic_raster::encode_png(
+            &rustic_raster::Surface::new(7, 2, rustic_raster::RasterLimits::default())
+                .unwrap(),
+            usize::MAX,
+        )
+        .unwrap();
+        let image = TempFile::new(&first_png);
+        let html = format!(
+            "<!doctype html><link rel=stylesheet href=\"{}\">\\
+             <div id=box></div><img id=photo src=\"{}\">",
+            stylesheet.0.file_name().unwrap().to_str().unwrap(),
+            image.0.file_name().unwrap().to_str().unwrap(),
+        );
+        let page = TempFile::new(html.as_bytes());
+        let limits = LoaderLimits::default();
+        let document = load_document(&mut Engine::new(1), &page.0, limits).unwrap();
+        let parsed = document.parsed();
+        let tree = parsed.document();
+        let mode = parsed.mode();
+        let element_id = |name: &str| {
+            tree.walk(tree.root())
+                .unwrap()
+                .find_map(|(node, _)| {
+                    let element = rustic_style::DomElement::new(tree, node)?;
+                    (crate::reftest::attribute(element, "id").as_deref() == Some(name))
+                        .then_some(node)
+                })
+                .unwrap()
+        };
+        let box_node = element_id("box");
+        let image_node = element_id("photo");
+        let applied = AppliedLocalFiles::new(
+            limits.stylesheets.max_sheets + limits.images.max_images,
+            limits.stylesheets.max_total_bytes + limits.images.max_file_bytes,
+        );
+        let layout = LocalLayout {
+            path: page.0.clone(),
+            limits,
+            cancellation: document.cancellation().clone(),
+            encoding: parsed.encoding(),
+            applied_files: applied,
+        };
+        let width = |snapshot: &LayoutGeometry| {
+            snapshot
+                .computed_styles
+                .get(&box_node)
+                .unwrap()
+                .longhands
+                .iter()
+                .find(|(name, _)| *name == "width")
+                .unwrap()
+                .1
+                .as_str()
+        };
+        let initial = layout.measure_layout(tree, mode).unwrap();
+        assert_eq!(width(&initial), "21px");
+        assert_eq!(initial.offset_widths.get(&image_node), Some(&3));
+
+        // These file-system edits are *not* resource-completion deliveries.
+        // A later DOM/layout recomputation must not silently apply them.
+        fs::write(&stylesheet.0, b"#box { width: 67px }").unwrap();
+        fs::write(&image.0, replacement_png).unwrap();
+        let after_replacement = layout.measure_layout(tree, mode).unwrap();
+        assert_eq!(width(&after_replacement), "21px");
+        assert_eq!(after_replacement.offset_widths.get(&image_node), Some(&3));
+
+        fs::remove_file(&stylesheet.0).unwrap();
+        fs::remove_file(&image.0).unwrap();
+        let after_removal = layout.measure_layout(tree, mode).unwrap();
+        assert_eq!(width(&after_removal), "21px");
+        assert_eq!(after_removal.offset_widths.get(&image_node), Some(&3));
+    }
+
     impl TempFile {
         fn new(contents: &[u8]) -> Self {
             static NEXT: AtomicUsize = AtomicUsize::new(0);

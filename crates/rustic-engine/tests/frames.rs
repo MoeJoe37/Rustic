@@ -379,11 +379,14 @@ fn queued_resource_completions_follow_script_checkpoints_and_refresh_layout() {
     assert_eq!(scripts.run_next(), Ok(Some(ScriptTurn::Completed)));
     assert_eq!(width.get(), 25, "queued delivery ran inside the JS checkpoint");
     scripts.offer_rendering_opportunity().unwrap();
-    // Script-only pumping services the resource task without invoking JS or
-    // running an explicit host completion call.
+    // Even with the previously offered frame selected for priority, an
+    // already-ready resource task publishes before that frame sees its
+    // inputs. It neither executes JS nor requires an explicit host call.
     assert_eq!(
-        scripts.run_next(),
-        Ok(Some(ScriptTurn::ResourceCompletion { applied: true }))
+        scripts.run_next_with_render(unexpected_render),
+        Ok(Some(DocumentTurn::Script(
+            ScriptTurn::ResourceCompletion { applied: true }
+        )))
     );
     assert_eq!(width.get(), 70);
     // The successful completion schedules a frame and gives it the same

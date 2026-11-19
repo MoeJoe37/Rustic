@@ -19,7 +19,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rustic_base::CancellationToken;
-use rustic_codecs::{ImageStore, StoreLimits};
+use rustic_codecs::{ImageError, ImageStore, StoreError, StoreLimits};
 use rustic_dom::{Document, NodeId};
 use rustic_layout::{BoxTree, CssPx, NaturalSize};
 use rustic_paint::Image;
@@ -27,7 +27,7 @@ use rustic_style::{DomElement, FetchError};
 use rustic_url::Url;
 
 use crate::reftest::{attribute, is_html, resolve};
-use crate::stylesheets::{AppliedLocalFiles, file_url};
+use crate::stylesheets::{AppliedLocalFiles, LocalStylesheetFetcher, StagedLocalFile, file_url};
 
 /// Budgets for the images of one document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,6 +77,48 @@ fn read_bounded(path: &Path, max: usize, chunk: usize) -> Option<Vec<u8>> {
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             Err(_) => return None,
         }
+    }
+}
+
+/// Read and validate an image completion *before* it is made visible to
+/// layout or paint. A failed decode leaves both the active image and its
+/// rendering-input revision untouched. The decoder uses the same budgets as
+/// an ordinary image load, rather than trusting only headers or encoded size.
+pub(crate) fn stage_image_completion(
+    fetcher: &LocalStylesheetFetcher,
+    applied: &AppliedLocalFiles,
+    url: &Url,
+    limits: ImageLimits,
+    cancellation: &CancellationToken,
+) -> Result<StagedLocalFile, FetchError> {
+    if limits.max_images == 0 {
+        return Err(FetchError::TooLarge);
+    }
+    let staged = fetcher.stage_completion(applied, url, limits.max_file_bytes)?;
+    let mut store = ImageStore::new(StoreLimits {
+        max_entries: 1,
+        max_encoded_bytes: limits.max_file_bytes,
+        max_decoded_bytes: limits.max_decoded_bytes,
+        ..StoreLimits::default()
+    });
+    let image = store
+        .insert("staged-resource", staged.bytes().to_vec())
+        .map_err(map_staged_image_error)?;
+    let animation = store
+        .decode(image, cancellation)
+        .map_err(map_staged_image_error)?;
+    let first = animation.frames.first().ok_or(FetchError::Failed)?;
+    if first.image.pixels.len() > limits.max_decoded_bytes {
+        return Err(FetchError::TooLarge);
+    }
+    Ok(staged)
+}
+
+fn map_staged_image_error(error: StoreError) -> FetchError {
+    match error {
+        StoreError::Full | StoreError::Broken(ImageError::Limit) => FetchError::TooLarge,
+        StoreError::Broken(ImageError::Cancelled) => FetchError::Cancelled,
+        StoreError::Unknown | StoreError::Broken(_) => FetchError::Failed,
     }
 }
 

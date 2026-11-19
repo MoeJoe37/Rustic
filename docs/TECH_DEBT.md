@@ -56,10 +56,10 @@ Scheduled 2026-11-17, updated as M5 gains scripted document support.
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
+| M5, with WEB-06 and WEB-07 | TD-31, TD-131, TD-132, TD-134, TD-149 | Form owners, error reporting, stylesheet readiness and the timer/frame ordering that layout flushes and observers depend on |
 | M5 exit | TD-125, TD-126, TD-129 | Review interface coverage and collection scans with the WEB-09 results. Record native ARM64 timings when hardware is available. |
 | M6 entry (before pages load from a server) | TD-15, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -211,6 +211,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
+| TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Open, M7 entry |
+| TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, WEB-06 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2291,3 +2293,34 @@ levels deep therefore loads, but flattened earlier than in Chromium.
 514 together, with deep-tree layout, paint and binding tests on every tier.
 **Trigger:** M9 layout work, or a real page that renders differently
 because of the cap.
+
+### TD-148 — Computed-style snapshots are eager and copied per read
+
+The CLI's `LayoutSource` builds `LayoutGeometry::computed_styles` on every
+layout flush, including flushes caused only by `offsetWidth` or
+`getBoundingClientRect`. It serializes each of the ~110 supported longhands
+to a `String` for every styled element, whether or not a script ever calls
+`getComputedStyle`. Each declaration read (`getPropertyValue`, a named
+getter, `item`, `length` or an index) then clones that element's whole
+`ComputedStyleSnapshot` out of the cache. Cost is bounded by the element
+and per-turn flush budgets, so it is acceptable for local fixtures, but it is
+O(elements × properties) allocation per flush and O(properties) per read.
+**Pay:** keep the `ComputedStyle` values in the snapshot and serialize one
+property on demand (or build an element's record lazily on first read), and
+return borrowed values from `PageTree::computed_style`. Keep the CSSOM WPT
+cases and add a flush-cost test on a large document.
+**Trigger:** M7 entry, or profiling a page with many elements and layout reads.
+
+### TD-149 — Pseudo-element `getComputedStyle` throws
+
+`getComputedStyle(element, pseudo)` uses the element when `pseudo` has no
+leading colon, as CSSOM requires, but throws a `TypeError` for every
+colon-prefixed value. CSSOM instead returns the pseudo-element's styles for
+supported pseudo-elements (`::before`, `::after`, `::marker`, ...) and an
+empty read-only declaration for invalid ones, so pages that probe
+`::before` fail with an exception instead of reading values.
+**Pay:** parse the argument as a `<pseudo-element-selector>`, return an
+empty declaration for failures, `::slotted()` and `::part()`, and read
+generated-box styles from the same snapshot for supported pseudo-elements,
+with WPT `getComputedStyle-pseudo*` cases.
+**Trigger:** WEB-06 completion, or before M6 loads server pages.

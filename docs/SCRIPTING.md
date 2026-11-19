@@ -158,7 +158,7 @@ What does **not** work yet:
 
 | Missing | Consequence today | Planned in |
 | --- | --- | --- |
-| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md)). | WEB-06 |
+| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md), [TD-148](TECH_DEBT.md#td-148--computed-style-snapshots-are-eager-and-copied-per-read), [TD-149](TECH_DEBT.md#td-149--pseudo-element-getcomputedstyle-throws)). | WEB-06 |
 | Mutation observers, `ResizeObserver`, `IntersectionObserver` | Not exposed | WEB-07 |
 | Focus, text input, form submission and validation | Only button and checkbox activation exist | WEB-07 |
 | Error events, `unhandledrejection`, console | Errors are counted for the host, not reported to script | WEB-07 |
@@ -407,6 +407,8 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 | TD-133 | Adoption of retained parser nodes and dynamic markup | M9 HTML lifecycle |
 | TD-134 | Classic-script ordering with stylesheet and timer tasks | WEB-06 |
 | TD-135 | Dynamic page imports, import maps and data module types | M6 and M9 |
+| TD-148 | Eager computed-style snapshots copied on each read | M7 entry |
+| TD-149 | Pseudo-element `getComputedStyle` throws | WEB-06 |
 
 See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
 

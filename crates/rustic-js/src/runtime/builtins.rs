@@ -212,6 +212,22 @@ fn install_iterators(agent: &mut Agent) -> JsResult<()> {
             PropertyDescriptor::data_with(Value::object(values), true, false, true),
         )?;
     }
+    // `%StringIteratorPrototype%` (§22.1.5.1): its own object, tag and
+    // `next`, which refuses array iterators (and the reverse).
+    let string_prototype_object = agent.new_object_with(Some(iterator_prototype))?;
+    let tag = agent.string("String Iterator")?;
+    agent.define_property_or_throw(
+        string_prototype_object,
+        PropertyKey::Symbol(agent.symbols.to_string_tag),
+        PropertyDescriptor::data_with(tag, false, false, true),
+    )?;
+    let string_next = agent.new_native_function(string_iterator_next, "next", 0)?;
+    agent.define_property_or_throw(
+        string_prototype_object,
+        PropertyKey::String(agent.names.next),
+        PropertyDescriptor::data_with(Value::object(string_next), true, false, true),
+    )?;
+    agent.intrinsics.string_iterator_prototype = string_prototype_object;
     let string_iterator = agent.new_native_function(string_iterator, "[Symbol.iterator]", 0)?;
     let string_prototype = agent.intrinsics.string_prototype;
     agent.define_property_or_throw(
@@ -230,7 +246,10 @@ pub(crate) fn new_iterator(
     target: Value,
     kind: IteratorKind,
 ) -> JsResult<Value> {
-    let prototype = agent.intrinsics.array_iterator_prototype;
+    let prototype = match kind {
+        IteratorKind::String => agent.intrinsics.string_iterator_prototype,
+        _ => agent.intrinsics.array_iterator_prototype,
+    };
     let object = agent.new_object_with(Some(prototype))?;
     agent
         .heap
@@ -317,9 +336,19 @@ pub(crate) fn iterator_result(agent: &mut Agent, value: Value, done: bool) -> Js
     Ok(Value::object(result))
 }
 
-/// `%ArrayIteratorPrototype%.next` (§23.1.5.2.1), shared with string
-/// iterators.
+/// `%ArrayIteratorPrototype%.next` (§23.1.5.2.1).
 fn iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    step_iterator(agent, this, false)
+}
+
+/// `%StringIteratorPrototype%.next` (§22.1.5.1.1).
+fn string_iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    step_iterator(agent, this, true)
+}
+
+/// One step of an array or string iterator; `string` selects which kind
+/// the receiver must be.
+fn step_iterator(agent: &mut Agent, this: Value, string: bool) -> JsResult<Value> {
     let state = this
         .as_object()
         .and_then(|o| match agent.heap.object(o).internal() {
@@ -327,7 +356,9 @@ fn iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value>
                 target,
                 index,
                 kind,
-            }) if !kind.walks_table() => Some((o, *target, *index, *kind)),
+            }) if !kind.walks_table() && (*kind == IteratorKind::String) == string => {
+                Some((o, *target, *index, *kind))
+            }
             _ => None,
         });
     let Some((iterator, target, index, kind)) = state else {

@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17513 pass, 1278 fail, 111 skipped (modules, proposals).
+# 17523 pass, 1268 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -4996,6 +4996,8 @@ FinalizationRegistry/prototype/register/return-undefined-register-object.js
 FinalizationRegistry/prototype/register/return-undefined-register-symbol.js
 FinalizationRegistry/prototype/register/this-does-not-have-internal-target-throws.js
 FinalizationRegistry/prototype/register/this-not-object-throws.js
+FinalizationRegistry/prototype/register/throws-when-target-cannot-be-held-weakly.js
+FinalizationRegistry/prototype/register/throws-when-unregisterToken-not-undefined-and-cannot-be-held-weakly.js
 FinalizationRegistry/prototype/register/unregisterToken-same-as-holdings-and-target.js
 FinalizationRegistry/prototype/register/unregisterToken-same-as-holdings.js
 FinalizationRegistry/prototype/register/unregisterToken-same-as-target.js
@@ -5006,6 +5008,7 @@ FinalizationRegistry/prototype/unregister/not-a-constructor.js
 FinalizationRegistry/prototype/unregister/prop-desc.js
 FinalizationRegistry/prototype/unregister/this-does-not-have-internal-cells-throws.js
 FinalizationRegistry/prototype/unregister/this-not-object-throws.js
+FinalizationRegistry/prototype/unregister/throws-when-unregisterToken-cannot-be-held-weakly.js
 FinalizationRegistry/prototype/unregister/unregister-object-token.js
 FinalizationRegistry/prototype/unregister/unregister-symbol-token.js
 FinalizationRegistry/returns-new-object-from-constructor.js
@@ -10390,6 +10393,7 @@ Object/prototype/toString/symbol-tag-override-primitives.js
 Object/prototype/toString/symbol-tag-promise-builtin.js
 Object/prototype/toString/symbol-tag-set-builtin.js
 Object/prototype/toString/symbol-tag-str.js
+Object/prototype/toString/symbol-tag-string-builtin.js
 Object/prototype/toString/symbol-tag-weakmap-builtin.js
 Object/prototype/toString/symbol-tag-weakset-builtin.js
 Object/prototype/valueOf/15.2.4.4-1.js
@@ -14615,6 +14619,7 @@ String/raw/template-substitutions-are-appended-on-same-index.js
 String/raw/zero-literal-segments.js
 String/symbol-string-coercion.js
 String/symbol-wrapping.js
+StringIteratorPrototype/Symbol.toStringTag.js
 StringIteratorPrototype/ancestry.js
 StringIteratorPrototype/next/length.js
 StringIteratorPrototype/next/name.js
@@ -16982,6 +16987,7 @@ WeakMap/prototype/getOrInsert/returns-value-if-key-is-not-present-symbol-key.js
 WeakMap/prototype/getOrInsert/returns-value-if-key-is-present-object-key.js
 WeakMap/prototype/getOrInsert/returns-value-if-key-is-present-symbol-key.js
 WeakMap/prototype/getOrInsert/this-not-object-throw.js
+WeakMap/prototype/getOrInsert/throw-if-key-cannot-be-held-weakly.js
 WeakMap/prototype/getOrInsertComputed/adds-object-element.js
 WeakMap/prototype/getOrInsertComputed/adds-symbol-element.js
 WeakMap/prototype/getOrInsertComputed/adds-value-different-callbackfn.js
@@ -17003,6 +17009,7 @@ WeakMap/prototype/getOrInsertComputed/returns-value-if-key-is-not-present-symbol
 WeakMap/prototype/getOrInsertComputed/returns-value-if-key-is-present-object-key.js
 WeakMap/prototype/getOrInsertComputed/returns-value-if-key-is-present-symbol-key.js
 WeakMap/prototype/getOrInsertComputed/this-not-object-throw.js
+WeakMap/prototype/getOrInsertComputed/throw-if-key-cannot-be-held-weakly.js
 WeakMap/prototype/has/does-not-have-weakmapdata-internal-slot-array.js
 WeakMap/prototype/has/does-not-have-weakmapdata-internal-slot-map.js
 WeakMap/prototype/has/does-not-have-weakmapdata-internal-slot-object.js
@@ -17043,6 +17050,7 @@ WeakMap/prototype/set/this-not-object-throw-number.js
 WeakMap/prototype/set/this-not-object-throw-string.js
 WeakMap/prototype/set/this-not-object-throw-symbol.js
 WeakMap/prototype/set/this-not-object-throw-undefined.js
+WeakMap/prototype/set/throw-if-key-cannot-be-held-weakly.js
 WeakMap/set-not-callable-throws.js
 WeakMap/undefined-newtarget.js
 WeakMap/weakmap.js
@@ -17073,6 +17081,7 @@ WeakRef/prototype/prop-desc.js
 WeakRef/prototype/proto.js
 WeakRef/returns-new-object-from-constructor-with-object-target.js
 WeakRef/returns-new-object-from-constructor-with-symbol-target.js
+WeakRef/throws-when-target-cannot-be-held-weakly.js
 WeakRef/undefined-newtarget-throws.js
 WeakSet/add-not-callable-throws.js
 WeakSet/constructor.js
@@ -17113,6 +17122,7 @@ WeakSet/prototype/add/this-not-object-throw-number.js
 WeakSet/prototype/add/this-not-object-throw-string.js
 WeakSet/prototype/add/this-not-object-throw-symbol.js
 WeakSet/prototype/add/this-not-object-throw-undefined.js
+WeakSet/prototype/add/throw-when-value-cannot-be-held-weakly.js
 WeakSet/prototype/constructor/weakset-prototype-constructor-intrinsic.js
 WeakSet/prototype/constructor/weakset-prototype-constructor.js
 WeakSet/prototype/delete/delete-entry-initial-iterable.js

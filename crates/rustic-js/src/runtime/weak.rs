@@ -51,10 +51,16 @@ impl Agent {
         }
     }
 
-    /// `CanBeHeldWeakly` (§9.14): objects and symbols. Symbols from the
-    /// global registry will be excluded when `Symbol.for` exists (JS-05).
+    /// `CanBeHeldWeakly` (§9.14): objects, and symbols that are not in the
+    /// global `Symbol.for` registry. A registered symbol can always be
+    /// recreated by its key, so it never dies and an entry keyed by it would
+    /// never be collected.
     pub fn can_be_held_weakly(&self, value: Value) -> bool {
-        matches!(value.kind(), Kind::Object(_) | Kind::Symbol(_))
+        match value.kind() {
+            Kind::Object(_) => true,
+            Kind::Symbol(symbol) => !self.heap.symbol(symbol).registered,
+            _ => false,
+        }
     }
 
     // ---- WeakRef ----------------------------------------------------

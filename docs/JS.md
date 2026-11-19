@@ -140,10 +140,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,939 | 17,513 |
-| Fail | 488 | 1,278 |
+| Pass | 21,939 | 17,523 |
+| Fail | 488 | 1,268 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 97.8% | 93.2% |
+| Pass rate of the files that run | 97.8% | 93.3% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed

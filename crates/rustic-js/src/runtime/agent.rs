@@ -221,6 +221,8 @@ pub struct Intrinsics {
     pub regexp_prototype: ObjectId,
     /// `%RegExpStringIteratorPrototype%`.
     pub regexp_string_iterator_prototype: ObjectId,
+    /// `%StringIteratorPrototype%` (§22.1.5.1).
+    pub string_iterator_prototype: ObjectId,
     /// `%ThrowTypeError%` (§10.2.4.1).
     pub throw_type_error: ObjectId,
     /// `%ArrayBuffer%`.
@@ -296,6 +298,7 @@ impl Intrinsics {
             self.regexp,
             self.regexp_prototype,
             self.regexp_string_iterator_prototype,
+            self.string_iterator_prototype,
             self.throw_type_error,
             self.array_buffer,
             self.array_buffer_prototype,
@@ -435,6 +438,7 @@ impl Agent {
                 regexp: placeholder,
                 regexp_prototype: placeholder,
                 regexp_string_iterator_prototype: placeholder,
+                string_iterator_prototype: placeholder,
                 throw_type_error: placeholder,
                 array_buffer: placeholder,
                 array_buffer_prototype: placeholder,
@@ -698,6 +702,7 @@ impl Agent {
             regexp: object_prototype,
             regexp_prototype: object_prototype,
             regexp_string_iterator_prototype: object_prototype,
+            string_iterator_prototype: object_prototype,
             throw_type_error: object_prototype,
             array_buffer: object_prototype,
             array_buffer_prototype: object_prototype,

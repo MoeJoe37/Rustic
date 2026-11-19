@@ -1511,6 +1511,17 @@ fn collections_and_reflect() {
         "var wm = new WeakMap(); var k = {}; wm.set(k, 5); var r; try { wm.set(1, 1) } catch (e) { r = e.name } wm.get(k) + ',' + wm.has({}) + ',' + (new WeakRef(k).deref() === k) + ',' + r",
         "5,false,true,TypeError",
     );
+    // CanBeHeldWeakly: registered symbols never die, so they are refused
+    // everywhere a weak key or target is taken; unique symbols are allowed.
+    check(
+        "var g = Symbol.for('g'), u = Symbol('u'), out = []; \
+         [function () { new WeakMap().set(g, 1) }, function () { new WeakSet().add(g) }, \
+          function () { new WeakRef(g) }, function () { new FinalizationRegistry(function () {}).register(g, 1) }, \
+          function () { new FinalizationRegistry(function () {}).register({}, 1, g) }] \
+         .forEach(function (f) { try { f(); out.push('ok') } catch (e) { out.push(e.name) } }); \
+         out.push(new WeakMap().has(g), new WeakMap().set(u, 2).get(u), new WeakSet().add(u).has(u)); out.join()",
+        "TypeError,TypeError,TypeError,TypeError,TypeError,false,2,true",
+    );
     check(
         "var r; try { Map() } catch (e) { r = e.name } r + (new (class extends Set {})([1]) instanceof Set)",
         "TypeErrortrue",

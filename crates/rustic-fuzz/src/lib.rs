@@ -18,6 +18,7 @@ mod encoding;
 mod formatting;
 mod harness;
 mod images;
+mod ipc;
 mod js;
 mod js_heap;
 mod js_regexp;

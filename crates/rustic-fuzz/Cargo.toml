@@ -21,6 +21,7 @@ rustic-encoding = { path = "../rustic-encoding" }
 rustic-engine = { path = "../rustic-engine" }
 rustic-html = { path = "../rustic-html" }
 rustic-js = { path = "../rustic-js" }
+rustic-ipc = { path = "../rustic-ipc" }
 rustic-layout = { path = "../rustic-layout" }
 rustic-net = { path = "../rustic-net" }
 rustic-paint = { path = "../rustic-paint" }

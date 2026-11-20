@@ -66,6 +66,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(crate::net::CookieTarget),
         Box::new(crate::net::CspTarget),
         Box::new(crate::net::CorsTarget),
+        Box::new(crate::ipc::IpcFrameTarget),
     ]
 }
 

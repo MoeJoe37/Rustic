@@ -480,7 +480,10 @@ fn offline_parsing_is_split_invariant_for_leading_blank_bytes() {
     let limits = TransportLimits::default();
     let input = b"\r\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
     let whole = parse_response(&[input], &limits, false);
-    assert_eq!(whole.as_ref().map(|(_, body)| body.as_slice()), Ok(&b"ok"[..]));
+    assert_eq!(
+        whole.as_ref().map(|(_, body)| body.as_slice()),
+        Ok(&b"ok"[..])
+    );
     let bytes: Vec<&[u8]> = input.chunks(1).collect();
     assert_eq!(parse_response(&bytes, &limits, false), whole);
     // The fuzzer's reproducer: only blank-line bytes, then the end.

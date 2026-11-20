@@ -359,6 +359,7 @@ dependencies = [
  "rustic-encoding",
  "rustic-engine",
  "rustic-html",
+ "rustic-ipc",
  "rustic-js",
  "rustic-layout",
  "rustic-net",
@@ -377,6 +378,10 @@ dependencies = [
  "rustic-dom",
  "rustic-encoding",
 ]
+
+[[package]]
+name = "rustic-ipc"
+version = "0.1.0"
 
 [[package]]
 name = "rustic-js"

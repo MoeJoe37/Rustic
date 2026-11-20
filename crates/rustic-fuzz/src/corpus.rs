@@ -55,6 +55,7 @@ pub fn seed_inputs(root: &Path, target: &str) -> io::Result<Vec<Vec<u8>>> {
         "js-run" => seeds.extend(crate::js_run::seeds(root)?),
         "js-regexp" => seeds.extend(crate::js_regexp::seeds()),
         "encoding" => seeds.extend(crate::encoding::seeds()),
+        "ipc-frame" => seeds.extend(crate::ipc::seeds()),
         "net-http-response" | "net-cookie" | "net-csp" | "net-cors" => {
             seeds.extend(crate::net::seeds(target));
         }

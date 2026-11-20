@@ -63,7 +63,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M12 (performance leadership) | TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
@@ -231,6 +231,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
 | TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives; bodies are complete byte strings (no `ReadableStream`, `arrayBuffer()`, `blob()`, `formData()`, `AbortSignal`), Headers iterators are snapshots, and the API base URL ignores `<base>` in the CLI | Open, M9 web APIs |
+| TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2686,3 +2687,14 @@ CLI's API base URL is the response URL, not the `<base>` element's.
 body tasks on the networking task source, Streams, typed-array body
 mixins and live pair iterators.
 **Trigger:** the M9 web platform APIs work (Streams, Blob, FormData).
+
+### TD-170 — IPC copies bodies and serializes requests
+
+`rustic-ipc` sends documents, images, scripts and PNG output through the
+renderer's standard streams, so large bodies cross the process boundary
+as copies, and a renderer has one request outstanding at a time.
+**Pay:** validated shared-memory regions for bulk data (behind a reviewed
+platform crate, since the workspace forbids unsafe code) and request
+multiplexing with the event-driven fetch controller (TD-161).
+**Trigger:** M12 page-load or frame-time profiles showing IPC copies, or
+the GPU process (frames need shared memory).

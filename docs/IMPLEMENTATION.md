@@ -158,6 +158,9 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [NET-07 (partial) — Session history](#net-07-partial--session-history)
+- [NET-05 (partial) — CSP, mixed content and secure contexts](#net-05-partial--csp-mixed-content-and-secure-contexts)
+- [NET-02 (partial) — Navigation, referrer policy and data: URLs](#net-02-partial--navigation-referrer-policy-and-data-urls)
 - [NET-04 (partial) — Cookie jar and sites](#net-04-partial--cookie-jar-and-sites)
 - [NET-03 (partial) — Fetch modes, CORS and filtered responses](#net-03-partial--fetch-modes-cors-and-filtered-responses)
 - [NET-02 (partial) — Redirects and response MIME types](#net-02-partial--redirects-and-response-mime-types)
@@ -2529,6 +2532,65 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## NET-07 (partial) — Session history
+
+Added 2026-11-20 as `rustic_engine::history`. `SessionHistory` is one
+top-level traversable's bounded list of entries (URL, document state,
+POST body for reload, serialized state, scroll restoration mode) with a
+current index. Every traversal reloads the document: there is no
+back/forward cache.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Push and replace | HTML "finalize a cross-document navigation": push truncates forward entries; replace swaps the current entry (`location.replace`, redirects during a reload) | `push_traverse_and_truncate` |
+| Traversal and reload | Traverse by a delta returns the entry to load, an out-of-range delta is an error; reload returns the current entry with its POST body | `push_traverse_and_truncate`, `post_entries_and_state` |
+| Bounds | At most 50 entries (Chromium's limit); the oldest entry is dropped | `the_list_is_bounded` |
+| URL rewriting | `pushState`/`replaceState` URLs must be same-origin and keep the scheme, user, host and port (for `file:` only the query and fragment may change) | `url_rewriting_rules` |
+
+Not yet: the script-facing `History` and `Location` bindings, downloads
+broker contract and the WebSocket plan (NET-07's documentation part).
+
+## NET-05 (partial) — CSP, mixed content and secure contexts
+
+Added 2026-11-20 to `rustic-net` (`csp`, `mixed_content`) with the engine
+hooks for scripts.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Parsing | CSP3 §2.2: serialized policies split on `,`, directives on `;`, names lowercase, first occurrence wins, invalid directives ignored; enforce and report-only dispositions from `Content-Security-Policy` and `-Report-Only` | `parsing_keeps_the_first_directive_and_splits_policies` |
+| Fetch directives | `script-src-elem`/`-attr` → `script-src` → `default-src`, likewise for styles; `img`, `font`, `connect`, `media`, `object`, `frame`/`child`, `worker`, `manifest` | `fetch_directives_fall_back_to_default_src` |
+| Source lists | `*` (not `data:`/`blob:`/`filesystem:`), scheme sources with the `http`→`https` upgrade, host wildcards, ports (`*`, default port upgrades), path prefixes ignored after redirects, `'self'` (including `ws`/`wss` upgrades), `'none'` | `source_expressions` |
+| Inline content | Nonces (ignored when `'unsafe-inline'` is overridden by a nonce or hash), SHA-256/384/512 hashes (`ring::digest`), `'unsafe-inline'`, `'unsafe-hashes'` for attributes | `inline_scripts_and_styles` |
+| Script URLs | Nonced elements allowed; `'strict-dynamic'` trusts non-parser-inserted scripts and drops host sources and `'unsafe-inline'` | `nonces_and_strict_dynamic_for_script_urls` |
+| Other directives | `'unsafe-eval'` (engine refuses `eval`/`Function` with `EvalError`), `form-action`, `base-uri`, `frame-ancestors`, `sandbox` flags, `upgrade-insecure-requests` | `eval_forms_base_frames_sandbox_and_upgrades` |
+| Report-only | Violations produced, nothing blocked; reports returned to the caller, not sent (TD-163) | `report_only_policies_report_without_blocking` |
+| Engine hooks | `ScriptPolicy::allows_inline_script` gates parser-inserted inline scripts; `ClassicScriptRequest` carries `nonce` and `parser_inserted` for the host's URL check; `set_string_compilation_allowed(false)` | `script_policy_refuses_inline_scripts_and_string_compilation`, `hosts_can_refuse_string_compilation` |
+| Mixed content | Secure documents upgrade `http:` images, audio and video to `https:` and block every other insecure subresource and `fetch()`; top-level navigations are not mixed content | `secure_documents_upgrade_images_and_block_the_rest` |
+| Secure contexts | Potentially trustworthy origins (`https`, `wss`, `file`, loopback, `localhost`), inherited through `about:blank`/`srcdoc`, opaque `data:` documents are not secure | `secure_contexts` |
+
+Not yet: CSP for inline `<style>` and `style` attributes in the engine
+(TD-164) and report delivery (TD-163).
+
+## NET-02 (partial) — Navigation, referrer policy and data: URLs
+
+Added 2026-11-20 to `rustic-net` (`navigation`, `referrer`, `data_url`,
+`mime::sniff_unknown`) and `rustic-url` (`form`). The engine gains
+`begin_network_scripted_document_with_clock`, whose script requests may
+name any `http(s)` URL; the local entry point still rejects them.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| State machine | `Navigation` advances one hop per `step` over `Fetcher`: request, redirect (policy rechecked, `Referrer-Policy` of the redirect applied), response, then commit, download (`Content-Disposition: attachment` or a non-renderable type) or nothing for 204/205; cancellation between hops and the redirect limit end it | `redirects_step_by_step_then_commit_with_response_policies`, `no_content_downloads_and_sniffing`, `cancellation_and_redirect_limits` |
+| Origins and policy containers | HTML "determining the origin": `about:blank` and `about:srcdoc` take the initiator's origin and a copy of its policy container, `data:` gets an opaque origin, HTTP(S) responses their URL's origin and a container built from `Content-Security-Policy` and `Referrer-Policy` | `local_schemes_inherit_or_get_opaque_origins` |
+| Forms | `application/x-www-form-urlencoded` serializer in the form's encoding and parser (URL §5); GET replaces the query, POST sends a body with `Content-Type` | `form_submissions_navigate_with_get_queries_and_post_bodies`, `serializes_with_plus_and_percent_encoding`, `legacy_encodings_and_unmappable_characters`, `parser_round_trips_and_handles_edge_cases` |
+| Referrer Policy | All eight policies, default `strict-origin-when-cross-origin`; header takes the last valid token; referrer stripped of credentials and fragment, origin-only above 4,096 bytes | `every_policy_against_same_cross_and_downgrade_targets`, `header_parsing_takes_the_last_valid_token`, `stripping_removes_credentials_and_fragments` |
+| Request metadata | `Referer`, `Sec-Fetch-Dest`/`-Mode`/`-Site`/`-User` (site across the redirect chain) and `Accept-Language` on every `Fetcher` request | `referrer_and_fetch_metadata_follow_the_policies` |
+| `data:` URLs | Fetch §4.2 processor and forgiving-base64: all 72 pinned WPT `data-urls.json` and 80 `base64.json` records pass | `data_urls` |
+| Sniffing | MIME Sniffing §7.1 unknown-type rules for responses without `Content-Type`; `X-Content-Type-Options: nosniff` disables it | `unknown_types_are_sniffed`, `no_content_downloads_and_sniffing` |
+
+Not yet: the CLI and engine load documents and subresources through
+`Navigation` (the rest of NET-02).
 
 ## NET-04 (partial) — Cookie jar and sites
 

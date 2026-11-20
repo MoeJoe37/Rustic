@@ -39,6 +39,10 @@
     "crates/rustic-net:brotli-decompressor": {
       "version": "=6.3.1",
       "default-features": false
+    },
+    "crates/rustic-net:ring": {
+      "version": "=0.17.14",
+      "default-features": false
     }
   },
   "packages": [

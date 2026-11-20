@@ -360,6 +360,9 @@ pub(crate) struct RealmRecord {
 #[derive(Debug)]
 pub struct Agent {
     id: AgentId,
+    /// HostEnsureCanCompileStrings: whether `eval` and the `Function`
+    /// constructors may compile source text (CSP `'unsafe-eval'`).
+    string_compilation: bool,
     pub(crate) execution_host: Option<std::rc::Rc<dyn super::ExecutionHost>>,
     /// All values of the agent.
     pub heap: Heap,
@@ -397,6 +400,7 @@ impl Agent {
         let id = NEXT_AGENT_ID.allocate().map_err(|_| OutOfMemory)?;
         let mut agent = Agent {
             id: AgentId(id),
+            string_compilation: true,
             execution_host: None,
             heap,
             names,
@@ -833,6 +837,38 @@ impl Agent {
         match self.new_error(kind, message) {
             Ok(error) => Abrupt::Throw(error),
             Err(abrupt) => abrupt,
+        }
+    }
+
+    /// Allow or refuse compiling strings (`eval`, `Function`, …); a
+    /// refusal throws `EvalError`. Hosts set this from the document's
+    /// Content Security Policy.
+    pub fn set_string_compilation_allowed(&mut self, allowed: bool) {
+        self.string_compilation = allowed;
+    }
+
+    /// Whether strings may be compiled.
+    pub fn string_compilation_allowed(&self) -> bool {
+        self.string_compilation
+    }
+
+    /// HostEnsureCanCompileStrings (§19.2.1.2).
+    pub(crate) fn ensure_can_compile_strings(&mut self) -> JsResult<()> {
+        if self.string_compilation {
+            Ok(())
+        } else {
+            let prototype = crate::runtime::builtins::error::named_prototype(self, "EvalError")?;
+            let error = self.new_error_object_with(prototype)?;
+            let message = self.string(
+                "code generation from strings is disallowed by the content security policy",
+            )?;
+            let key = PropertyKey::String(self.names.message);
+            self.define_property_or_throw(
+                error,
+                key,
+                PropertyDescriptor::data_with(message, true, false, true),
+            )?;
+            Err(Abrupt::Throw(Value::object(error)))
         }
     }
 

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "3f350d4d0b1f4abc127ddd56068621d10621550260caee75699640a355050583",
-  "percent": "36.15",
+  "source_fingerprint": "c4c8d332688f4ebd0086c5663f0be94f4a902744b2079789d54e78c46efc1cae",
+  "percent": "36.91",
   "verified_percent": "34.24",
-  "partial_percent": "1.91",
+  "partial_percent": "2.67",
   "completed": 78,
-  "in_progress": 9,
+  "in_progress": 11,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -67,9 +67,9 @@
       "share": "4.38",
       "completed": 1,
       "total": 12,
-      "percent": "37.51",
+      "percent": "54.75",
       "verified_percent": "14.24",
-      "partial_percent": "23.27"
+      "partial_percent": "40.51"
     },
     {
       "id": "M7",
@@ -597,9 +597,32 @@
           "label": "Navigation origin inheritance and policy integration",
           "size": 3,
           "milestone": "M6",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Origin and policy-container inheritance for about:blank, about:srcdoc and data: navigations",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/navigation.rs",
+                  "marker": "pub struct PolicyContainer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/navigation.rs",
+                  "marker": "fn local_schemes_inherit_or_get_opaque_origins"
+                }
+              ]
+            },
+            {
+              "label": "Network documents use their response URL as base and origin in the engine and CLI",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.20"
         },
         {
@@ -615,12 +638,12 @@
       ],
       "points": 30,
       "completed": 6,
-      "in_progress": 1,
+      "in_progress": 2,
       "total": 12,
-      "contribution": "1.11",
-      "percent": "55.83",
+      "contribution": "1.21",
+      "percent": "60.83",
       "verified_percent": "43.33",
-      "partial_percent": "12.50"
+      "partial_percent": "17.50"
     },
     {
       "id": "dom",
@@ -5574,8 +5597,29 @@
             },
             {
               "label": "Navigation state machine over the transport (request, response, commit, cancel)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/navigation.rs",
+                  "marker": "pub struct Navigation {"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/navigation.rs",
+                  "marker": "fn redirects_step_by_step_then_commit_with_response_policies"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/navigation.rs",
+                  "marker": "fn cancellation_and_redirect_limits"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/navigation.rs",
+                  "marker": "fn no_content_downloads_and_sniffing"
+                }
+              ]
             },
             {
               "label": "Documents and subresources load over HTTP in the engine and CLI with response charset",
@@ -5584,16 +5628,58 @@
             },
             {
               "label": "Referrer and policy container propagation across navigations and redirects",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/referrer.rs",
+                  "marker": "pub fn determine_referrer"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/navigation.rs",
+                  "marker": "pub struct PolicyContainer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/referrer.rs",
+                  "marker": "fn every_policy_against_same_cross_and_downgrade_targets"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/navigation.rs",
+                  "marker": "fn local_schemes_inherit_or_get_opaque_origins"
+                }
+              ]
             },
             {
               "label": "Session history: reload, back/forward and form navigation",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/history.rs",
+                  "marker": "pub struct SessionHistory"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-url/src/form.rs",
+                  "marker": "pub fn serialize_form"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/src/history.rs",
+                  "marker": "fn push_traverse_and_truncate"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/navigation.rs",
+                  "marker": "fn form_submissions_navigate_with_get_queries_and_post_bodies"
+                }
+              ]
             }
           ],
-          "credit": "33.33",
+          "credit": "83.33",
           "engine_share": "0.62"
         },
         {
@@ -5658,8 +5744,24 @@
             },
             {
               "label": "Decoded content codings, Referer and fetch metadata on Fetch requests",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/fetch.rs",
+                  "marker": "pub struct Fetcher"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/fetch.rs",
+                  "marker": "fn referrer_and_fetch_metadata_follow_the_policies"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/transport.rs",
+                  "marker": "fn content_codings_are_advertised_and_decoded"
+                }
+              ]
             },
             {
               "label": "Script-facing fetch(), Headers, Request and Response bindings with header guards",
@@ -5667,7 +5769,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.62"
         },
         {
@@ -5734,9 +5836,63 @@
           "label": "CSP, MIME, secure contexts and mixed-content policy",
           "size": 3,
           "milestone": "M6",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "CSP3 parsing, source lists, nonces, hashes and directives with report-only",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/csp.rs",
+                  "marker": "pub struct CspList"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/csp/tests.rs",
+                  "marker": "fn source_expressions"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/csp/tests.rs",
+                  "marker": "fn report_only_policies_report_without_blocking"
+                }
+              ]
+            },
+            {
+              "label": "Mixed content and secure contexts",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/mixed_content.rs",
+                  "marker": "pub fn"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/mixed_content.rs",
+                  "marker": "fn secure_documents_upgrade_images_and_block_the_rest"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/mixed_content.rs",
+                  "marker": "fn secure_contexts"
+                }
+              ]
+            },
+            {
+              "label": "Engine enforcement: inline scripts, eval, script URLs, inline styles and event handlers (TD-164)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Network loads apply CSP, mixed content and X-Content-Type-Options nosniff to subresources",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.37"
         },
         {
@@ -5772,12 +5928,12 @@
       ],
       "points": 32,
       "completed": 1,
-      "in_progress": 3,
+      "in_progress": 4,
       "total": 8,
-      "contribution": "1.39",
-      "percent": "34.89",
+      "contribution": "2.05",
+      "percent": "51.30",
       "verified_percent": "15.62",
-      "partial_percent": "19.27"
+      "partial_percent": "35.68"
     },
     {
       "id": "storage",

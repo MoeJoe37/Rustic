@@ -445,6 +445,14 @@ impl<C: Clock> ScriptedDocument<C> {
         })
     }
 
+    /// HostEnsureCanCompileStrings for this document's agent (CSP
+    /// `'unsafe-eval'`).
+    pub fn set_string_compilation_allowed(&mut self, allowed: bool) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        agent.set_string_compilation_allowed(allowed);
+        Ok(())
+    }
+
     /// Supply the bounded layout pipeline serving synchronous script reads.
     /// Replacing it also invalidates any outstanding render ticket.
     pub fn set_layout_source(&mut self, source: Box<dyn LayoutSource>) -> Result<(), ScriptStop> {

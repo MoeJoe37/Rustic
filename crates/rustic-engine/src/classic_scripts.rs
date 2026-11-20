@@ -77,6 +77,11 @@ pub struct ClassicScriptRequest {
     pub kind: ScriptResourceKind,
     /// Maximum bytes the host should read for this request.
     pub max_bytes: usize,
+    /// The requesting element's `nonce`, for the host's CSP check.
+    pub nonce: Option<String>,
+    /// Whether the parser inserted the requesting element (`false` for
+    /// module dependencies, which `'strict-dynamic'` trusts).
+    pub parser_inserted: bool,
 }
 
 /// How a host's local source acquisition failed.
@@ -149,9 +154,25 @@ pub(crate) struct ModuleJob {
 }
 
 impl ExternalScripts {
+    /// Scripts for a local `file:` document, confined to its directory.
     pub(crate) fn new(url: Url, limits: ClassicScriptLimits) -> Result<Self, ScriptLoadError> {
         local_file_path(&url).ok_or(ScriptLoadError::InvalidDocumentUrl)?;
-        Ok(Self {
+        Ok(Self::unchecked(url, limits))
+    }
+
+    /// Scripts for an `http(s)` document; the host applies network policy.
+    pub(crate) fn new_network(
+        url: Url,
+        limits: ClassicScriptLimits,
+    ) -> Result<Self, ScriptLoadError> {
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err(ScriptLoadError::InvalidDocumentUrl);
+        }
+        Ok(Self::unchecked(url, limits))
+    }
+
+    fn unchecked(url: Url, limits: ClassicScriptLimits) -> Self {
+        Self {
             document_url: url,
             attempts: Budget::new(limits.max_requests),
             total_bytes: Budget::new(limits.max_total_bytes),
@@ -164,7 +185,7 @@ impl ExternalScripts {
             async_modules: VecDeque::new(),
             module_requests: HashMap::new(),
             modules: LocalModules::default(),
-        })
+        }
     }
 
     pub(crate) fn admit(
@@ -181,6 +202,7 @@ impl ExternalScripts {
         let Some(url) = self.resolve(document, src)? else {
             return Ok(false);
         };
+        let nonce = element_nonce(document, element);
         let id = self.new_request(element.document())?;
         self.entries
             .try_reserve(1)
@@ -216,6 +238,8 @@ impl ExternalScripts {
             mode,
             kind: ScriptResourceKind::Classic,
             max_bytes: self.max_bytes(),
+            nonce,
+            parser_inserted: true,
         });
         Ok(true)
     }
@@ -236,7 +260,8 @@ impl ExternalScripts {
             let Some(url) = self.resolve(boundary.document, src)? else {
                 return Ok(false);
             };
-            self.fetch_module(owner, url, mode)?
+            let nonce = element_nonce(boundary.document, boundary.element);
+            self.fetch_module(owner, url, mode, nonce, true)?
         } else {
             let key = ModuleKey::Inline(boundary.element);
             let base = document_base(boundary.document, &self.document_url)?;
@@ -279,6 +304,8 @@ impl ExternalScripts {
         document: DocumentId,
         url: Url,
         mode: ClassicScriptMode,
+        nonce: Option<String>,
+        parser_inserted: bool,
     ) -> Result<ModuleKey, ScriptStop> {
         let key = ModuleKey::External(url.clone());
         if self.modules.contains(&key) {
@@ -306,6 +333,8 @@ impl ExternalScripts {
             mode,
             kind: ScriptResourceKind::JavaScriptModule,
             max_bytes: self.max_bytes(),
+            nonce,
+            parser_inserted,
         });
         Ok(key)
     }
@@ -366,7 +395,7 @@ impl ExternalScripts {
             let ModuleKey::External(url) = dependency else {
                 unreachable!("imports resolve to URLs")
             };
-            self.fetch_module(document, url, mode)?;
+            self.fetch_module(document, url, mode, None, false)?;
         }
         Ok(())
     }
@@ -530,6 +559,11 @@ impl ExternalScripts {
     }
 
     fn in_grant(&self, url: &Url) -> bool {
+        // A network document may request http(s) scripts; the host applies
+        // its network policy, CSP and mixed-content checks to each request.
+        if matches!(self.document_url.scheme(), "http" | "https") {
+            return matches!(url.scheme(), "http" | "https");
+        }
         let Some(path) = local_file_path(url) else {
             return false;
         };
@@ -537,6 +571,14 @@ impl ExternalScripts {
             .and_then(|path| path.split_last().map(|(_, directory)| directory))
             .expect("local document URL validated at admission");
         path.len() > directory.len() && path.starts_with(directory)
+    }
+}
+
+/// The `nonce` content attribute of a script element.
+pub(crate) fn element_nonce(document: &Document, element: NodeId) -> Option<String> {
+    match document.node(element).ok()?.kind() {
+        NodeKind::Element(element) => attribute(element, "nonce").map(String::from_utf16_lossy),
+        _ => None,
     }
 }
 

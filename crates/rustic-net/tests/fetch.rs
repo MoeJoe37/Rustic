@@ -647,3 +647,64 @@ fn same_origin_credentials_exclude_cross_origin_same_site_requests() {
     assert_eq!(server.requests()[2].header("cookie"), Some("sid=1"));
     assert_eq!(fetcher.cookies().len(), 2);
 }
+
+#[test]
+fn referrer_and_fetch_metadata_follow_the_policies() {
+    let server = FixtureServer::start([
+        (
+            "/hop",
+            Reply::response(
+                302,
+                &[("Location", "/end"), ("Referrer-Policy", "origin")],
+                b"",
+            ),
+        ),
+        ("/end", Reply::response(200, &[], b"")),
+    ])
+    .unwrap();
+    // 127.0.0.1 is potentially trustworthy, so fetch metadata is sent.
+    let base = server.url("/").serialize();
+    let mut fetcher = fetcher(&[(base.as_str(), &server)]);
+    fetcher.set_accept_language("de");
+    let referrer = url(&format!("{base}page?secret=1#frag"));
+    let request = |path: &str| FetchRequest {
+        referrer: Some(referrer.clone()),
+        destination: rustic_net::fetch::Destination::Image,
+        ..FetchRequest::new(server.url(path), referrer.origin())
+    };
+    fetcher.fetch(request("/end")).unwrap();
+    fetcher.fetch(request("/hop")).unwrap();
+    let log = server.requests();
+    assert_eq!(
+        log[0].header("referer"),
+        Some(format!("{base}page?secret=1").as_str())
+    );
+    assert_eq!(log[0].header("sec-fetch-dest"), Some("image"));
+    assert_eq!(log[0].header("sec-fetch-mode"), Some("no-cors"));
+    assert_eq!(log[0].header("sec-fetch-site"), Some("same-origin"));
+    assert_eq!(log[0].header("sec-fetch-user"), None);
+    assert_eq!(log[0].header("accept-language"), Some("de"));
+    // The redirect's Referrer-Policy applies to the next hop.
+    assert_eq!(
+        log[1].header("referer"),
+        Some(format!("{base}page?secret=1").as_str())
+    );
+    assert_eq!(log[2].header("referer"), Some(base.as_str()));
+    let mut typed = FetchRequest::navigation(server.url("/end"));
+    typed.referrer = None;
+    fetcher.fetch(typed).unwrap();
+    let log = server.requests();
+    assert_eq!(log[3].header("referer"), None);
+    assert_eq!(log[3].header("sec-fetch-site"), Some("none"));
+    assert_eq!(log[3].header("sec-fetch-user"), Some("?1"));
+    assert_eq!(log[3].header("sec-fetch-dest"), Some("document"));
+    // a.test is not potentially trustworthy: no metadata.
+    let other = FixtureServer::start([("/", Reply::response(200, &[], b""))]).unwrap();
+    let mut plain = self::fetcher(&[("http://a.test", &other)]);
+    plain.fetch(request_to("http://a.test/")).unwrap();
+    assert_eq!(other.requests()[0].header("sec-fetch-mode"), None);
+}
+
+fn request_to(target: &str) -> FetchRequest {
+    request(target, "http://a.test", RequestMode::NoCors)
+}

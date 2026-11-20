@@ -452,3 +452,77 @@ fn request_ids_reject_stale_and_foreign_completions_and_shutdown_cancels() {
     assert!(b.next_request().is_none());
     assert!(b.cancellation().is_none());
 }
+
+#[test]
+fn network_documents_request_http_scripts_and_local_entry_rejects_them() {
+    let mut engine = Engine::new(1);
+    let local = Url::parse("file:///fixtures/site/index.html", None).unwrap();
+    assert!(matches!(
+        engine.begin_network_scripted_document_with_clock(
+            ParserLimits::default(),
+            TaskLimits::default(),
+            local,
+            ClassicScriptLimits::default(),
+            ManualClock::default(),
+        ),
+        Err(ScriptLoadError::InvalidDocumentUrl)
+    ));
+    let mut load = engine
+        .begin_network_scripted_document_with_clock(
+            ParserLimits::default(),
+            TaskLimits::default(),
+            Url::parse("https://example.test/dir/index.html", None).unwrap(),
+            ClassicScriptLimits::default(),
+            ManualClock::default(),
+        )
+        .unwrap();
+    load.feed(
+        br#"<script src="a.js" nonce="n1"></script>
+<script src="http://other.test/b.js"></script>
+<script src="file:///etc/passwd"></script>"#,
+    )
+    .unwrap();
+    load.close_input().unwrap();
+    let first = load.next_request().unwrap();
+    assert_eq!(first.url.serialize(), "https://example.test/dir/a.js");
+    assert_eq!(first.nonce.as_deref(), Some("n1"));
+    assert!(first.parser_inserted);
+    load.complete_script(first.id, Ok(b"var a = 1;")).unwrap();
+    let second = load.next_request().unwrap();
+    assert_eq!(second.url.serialize(), "http://other.test/b.js");
+    assert_eq!(second.nonce, None);
+    load.complete_script(second.id, Ok(b"var b = 2;")).unwrap();
+    assert!(load.next_request().is_none());
+}
+
+#[derive(Debug)]
+struct NonceOnly;
+
+impl rustic_engine::ScriptPolicy for NonceOnly {
+    fn allows_inline_script(&self, nonce: Option<&str>, _source: &str) -> bool {
+        nonce == Some("ok")
+    }
+}
+
+#[test]
+fn script_policy_refuses_inline_scripts_and_string_compilation() {
+    let mut engine = Engine::new(1);
+    let mut load = load(&mut engine, ManualClock::default());
+    load.set_script_policy(Box::new(NonceOnly)).unwrap();
+    load.set_string_compilation_allowed(false).unwrap();
+    load.feed(
+        br#"<script nonce="ok">var ran = ['allowed'];
+try { eval('1'); ran.push('eval'); } catch (e) { ran.push(e.name); }
+try { Function('return 1'); ran.push('fn'); } catch (e) { ran.push(e.name); }</script>
+<script>ran.push('blocked');</script>
+<script nonce="bad">ran.push('wrong-nonce');</script>"#,
+    )
+    .unwrap();
+    load.close_input().unwrap();
+    while load.run_next().unwrap().is_some() {}
+    let mut document = load.take_document().unwrap().unwrap();
+    check(
+        &mut document,
+        "if (ran.join() !== 'allowed,EvalError,EvalError') throw ran.join();",
+    );
+}

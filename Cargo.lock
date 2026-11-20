@@ -397,6 +397,7 @@ name = "rustic-net"
 version = "0.1.0"
 dependencies = [
  "brotli-decompressor",
+ "ring",
  "rustic-base",
  "rustic-codecs",
  "rustic-encoding",

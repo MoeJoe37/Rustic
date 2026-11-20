@@ -19,13 +19,25 @@
       "path": "crates/rustic-net/tests/fixtures/wpt/content-types.json",
       "upstream_path": "fetch/content-type/resources/content-types.json",
       "sha256": "ad2e2dfc6b3f6501911e4990f3adb1bf238e6910f56b3206fd8d7e8c83459974"
+    },
+    {
+      "path": "crates/rustic-net/tests/fixtures/wpt/data-urls.json",
+      "upstream_path": "fetch/data-urls/resources/data-urls.json",
+      "sha256": "b3be3d6e1d0eb7f1b5b20d7410d30cb76216d41c9fe3d8364446abecff88bba5"
+    },
+    {
+      "path": "crates/rustic-net/tests/fixtures/wpt/base64.json",
+      "upstream_path": "fetch/data-urls/resources/base64.json",
+      "sha256": "0cdb75b4fcc46e4a6caa0e3b0005157a0d0be03e00bcf7b7054a045b1267568d"
     }
   ],
   "cases": {
     "MIME_TYPES": 74,
     "GENERATED_MIME_TYPES": 881,
-    "CONTENT_TYPES": 20
+    "CONTENT_TYPES": 20,
+    "DATA_URLS": 72,
+    "BASE64": 80
   },
   "fixture": "crates/rustic-net/tests/fixtures/mime_cases.rs",
-  "fixture_sha256": "562dadef343893934ec7a1a2f8f18572509cbffcbd213288f13ff360828693e6"
+  "fixture_sha256": "f53ad4308d2f837f8ef73a9bd337cd4149860bfb9dcb36471e36c7c15251dbb8"
 }

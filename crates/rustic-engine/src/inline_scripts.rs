@@ -112,6 +112,18 @@ struct Pending<C> {
     eof: bool,
     content_loaded: bool,
     load_delivered: bool,
+    script_policy: Option<Box<dyn ScriptPolicy>>,
+}
+
+/// The host's Content Security Policy decisions for scripts the parser
+/// finds inline. External script URLs are checked by the host when it
+/// fulfils [`ClassicScriptRequest`]s, and `eval` through
+/// [`ClassicScriptLoad::set_string_compilation_allowed`].
+pub trait ScriptPolicy: std::fmt::Debug {
+    /// Whether an inline classic or module script with this `nonce` and
+    /// source text may run. A refused script does not run and fires no
+    /// event, as in HTML's "prepare the script element".
+    fn allows_inline_script(&self, nonce: Option<&str>, source: &str) -> bool;
 }
 
 impl Engine {
@@ -169,6 +181,22 @@ impl Engine {
         Ok(ClassicScriptLoad { inner })
     }
 
+    /// Admit a scripted load for an `http(s)` document. Script requests may
+    /// name any `http(s)` URL; the host fetches them through its network
+    /// session, which applies the origin allowlist, CSP and mixed content.
+    pub fn begin_network_scripted_document_with_clock<C: Clock>(
+        &mut self,
+        parser_limits: ParserLimits,
+        task_limits: TaskLimits,
+        document_url: Url,
+        limits: ClassicScriptLimits,
+        clock: C,
+    ) -> Result<ClassicScriptLoad<C>, ScriptLoadError> {
+        let external = ExternalScripts::new_network(document_url, limits)?;
+        let inner = self.begin_classic_load(parser_limits, task_limits, clock, Some(external))?;
+        Ok(ClassicScriptLoad { inner })
+    }
+
     fn begin_classic_load<C: Clock>(
         &mut self,
         parser_limits: ParserLimits,
@@ -196,6 +224,7 @@ impl Engine {
                 eof: false,
                 content_loaded: false,
                 load_delivered: false,
+                script_policy: None,
             }),
         })
     }
@@ -273,6 +302,27 @@ impl<C: Clock> ClassicScriptLoad<C> {
     ) -> Result<(), ScriptLoadError> {
         self.inner.with_pending(|pending| {
             pending.document.set_layout_source(source)?;
+            Ok(())
+        })
+    }
+
+    /// Apply the document's Content Security Policy to inline scripts.
+    /// Call before feeding HTML.
+    pub fn set_script_policy(
+        &mut self,
+        policy: Box<dyn ScriptPolicy>,
+    ) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending.script_policy = Some(policy);
+            Ok(())
+        })
+    }
+
+    /// Allow or refuse `eval` and the `Function` constructors (CSP
+    /// `'unsafe-eval'`); a refusal throws `EvalError` in script.
+    pub fn set_string_compilation_allowed(&mut self, allowed: bool) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending.document.set_string_compilation_allowed(allowed)?;
             Ok(())
         })
     }
@@ -506,13 +556,33 @@ impl<C: Clock> Pending<C> {
                             } else {
                                 ClassicScriptMode::Defer
                             };
+                            let src = attribute(element, "src").map(trim_ascii_space);
+                            let policy = self.script_policy.as_deref();
+                            let nonce = attribute(element, "nonce").map(String::from_utf16_lossy);
+                            let mut refused = false;
                             let admitted = external.admit_module(
                                 &boundary,
                                 mode,
-                                attribute(element, "src").map(trim_ascii_space),
-                                || inline_classic_source(&boundary, self.source_limit),
+                                src,
+                                || {
+                                    let source =
+                                        inline_classic_source(&boundary, self.source_limit)?;
+                                    if let (Some(policy), Some(text)) = (policy, &source) {
+                                        if !policy.allows_inline_script(
+                                            nonce.as_deref(),
+                                            &String::from_utf16_lossy(text.units()),
+                                        ) {
+                                            refused = true;
+                                            return Ok(None);
+                                        }
+                                    }
+                                    Ok(source)
+                                },
                                 self.scope.cancellation(),
                             )?;
+                            if refused {
+                                continue;
+                            }
                             if !admitted {
                                 return Ok::<_, ScriptLoadError>(Some(Prepared::ModuleRejected(
                                     boundary.element,
@@ -547,6 +617,15 @@ impl<C: Clock> Pending<C> {
                     } else if let Some(source) =
                         inline_classic_source(&boundary, self.source_limit)?
                     {
+                        if let Some(policy) = &self.script_policy {
+                            let nonce = attribute(element, "nonce").map(String::from_utf16_lossy);
+                            if !policy.allows_inline_script(
+                                nonce.as_deref(),
+                                &String::from_utf16_lossy(source.units()),
+                            ) {
+                                continue;
+                            }
+                        }
                         return Ok(Some(Prepared::Inline(boundary.element, source)));
                     }
                 }

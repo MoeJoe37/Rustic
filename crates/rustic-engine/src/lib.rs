@@ -5,6 +5,7 @@ use std::fmt;
 
 mod classic_scripts;
 mod frames;
+pub mod history;
 mod inline_scripts;
 mod layout_reads;
 mod lifecycle;
@@ -19,7 +20,7 @@ pub use classic_scripts::{
 };
 pub use frames::RenderFrame;
 pub use inline_scripts::ScriptLoadError as InlineLoadError;
-pub use inline_scripts::{ClassicScriptLoad, InlineScriptLoad, ScriptLoadError};
+pub use inline_scripts::{ClassicScriptLoad, InlineScriptLoad, ScriptLoadError, ScriptPolicy};
 pub use layout_reads::{LayoutGeometry, LayoutSource, MAX_LAYOUT_FLUSHES_PER_TURN};
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use rustic_bindings::page::{

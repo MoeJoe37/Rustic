@@ -14,6 +14,7 @@ rustic-codecs = { path = "../rustic-codecs" }
 brotli-decompressor = { version = "=6.3.1", default-features = false }
 rustic-encoding = { path = "../rustic-encoding" }
 rustic-url = { path = "../rustic-url" }
+ring = { version = "=0.17.14", default-features = false }
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-platform-verifier = { version = "=0.7.1", default-features = false }
 

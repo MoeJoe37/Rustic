@@ -116,6 +116,7 @@ impl Agent {
         use crate::ast::{ExpressionKind, StatementKind};
         // The function is unnamed so that `anonymous` is not bound inside it;
         // its `name` is set afterwards.
+        self.ensure_can_compile_strings()?;
         let text = format!("({keyword} ({params}\n) {{\n{body}\n}})");
         let syntax_error = |agent: &mut Agent, message: &str| {
             Err(agent.throw(crate::runtime::ErrorKind::SyntaxError, message))
@@ -177,6 +178,7 @@ impl Agent {
         strict_caller: bool,
         in_function: bool,
     ) -> JsResult<CodeId> {
+        self.ensure_can_compile_strings()?;
         let units = self.heap.string(text).units().collect();
         let syntax_error =
             |agent: &mut Agent, message: &str| Err(agent.throw(ErrorKind::SyntaxError, message));

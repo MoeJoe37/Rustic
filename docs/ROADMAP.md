@@ -548,6 +548,18 @@ cookies and eviction, over a host-supplied Public Suffix List
 Next: NET-02's navigation state machine and loading documents over HTTP,
 the `fetch()` bindings, then NET-05.
 
+**NET-02, NET-05 and NET-07 cores, 2026-11-20:** `rustic_net::navigation`
+steps a navigation hop by hop to a committed document, a download or
+nothing (204/205), with origin and policy-container inheritance for
+`about:blank`, `about:srcdoc` and `data:`, form submissions, Referrer
+Policy, `Sec-Fetch-*` metadata and `data:` URLs (all pinned WPT records).
+`rustic_net::csp` and `mixed_content` decide CSP3, mixed content and secure
+contexts; the engine enforces CSP on inline scripts, `eval` and script
+requests (inline styles TD-164), and `rustic_engine::history` holds session
+history ([IMPLEMENTATION.md](IMPLEMENTATION.md#net-02-partial--navigation-referrer-policy-and-data-urls)).
+Next: load documents and subresources over HTTP in the CLI, then `fetch()`,
+the HTTP cache, profiles and storage.
+
 ## 10. M7 — Isolation and security gate
 
 - **ISO-01:** specify browsing-context/site/agent process assignment, same-origin

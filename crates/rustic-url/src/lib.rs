@@ -21,6 +21,7 @@
 mod diagnostics;
 mod encoding;
 mod error;
+mod form;
 mod host;
 pub mod idna;
 mod ipv4;
@@ -31,6 +32,7 @@ mod record;
 
 pub use diagnostics::{Diagnostic, MAX_DIAGNOSTICS, ParseReport, ValidationError};
 pub use error::ParseError;
+pub use form::{parse_form, serialize_form};
 pub use host::Host;
 pub use origin::Origin;
 pub use parser::{UrlLimits, UrlParser};

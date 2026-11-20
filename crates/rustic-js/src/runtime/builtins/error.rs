@@ -126,7 +126,7 @@ pub(crate) fn new_aggregate_error(agent: &mut Agent, errors: Value) -> JsResult<
 
 /// The prototype a native error constructor uses: `name`'s, found
 /// through the global constructor for the error without an intrinsic slot.
-fn named_prototype(agent: &mut Agent, name: &str) -> JsResult<ObjectId> {
+pub(crate) fn named_prototype(agent: &mut Agent, name: &str) -> JsResult<ObjectId> {
     let global = agent.intrinsics.global;
     let key = agent.heap.key(name)?;
     let constructor = agent.get(global, key)?;

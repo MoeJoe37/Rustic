@@ -4069,3 +4069,35 @@ fn intl_date_time_range_and_supported_lists_preserve_their_contracts() {
     "#);
     assert_eq!(result, "true,true,true,true,true,true,true,true,true");
 }
+
+#[test]
+fn hosts_can_refuse_string_compilation() {
+    let mut agent = Agent::new().expect("agent");
+    assert!(agent.string_compilation_allowed());
+    agent.set_string_compilation_allowed(false);
+    for source in [
+        "eval('1')",
+        "(0, eval)('1')",
+        "Function('return 1')",
+        "new Function('a', 'return a')",
+        "(function*(){}).constructor('yield 1')",
+        "(async function(){}).constructor('')",
+    ] {
+        let result = run_in(&mut agent, source);
+        assert!(
+            result.starts_with("!EvalError: code generation"),
+            "{source}: {result}"
+        );
+    }
+    // Non-string arguments to eval are returned unchanged, without a check.
+    assert_eq!(run_in(&mut agent, "eval(42)"), "42");
+    assert_eq!(
+        run_in(
+            &mut agent,
+            "try { eval('1') } catch (e) { e instanceof EvalError }"
+        ),
+        "true"
+    );
+    agent.set_string_compilation_allowed(true);
+    assert_eq!(run_in(&mut agent, "eval('6 * 7')"), "42");
+}

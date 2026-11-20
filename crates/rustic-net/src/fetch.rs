@@ -29,6 +29,7 @@ use crate::cors::{
 use crate::redirect::{
     MAX_REDIRECTS, RedirectError, RedirectMode, location_url, rewrite_for_redirect,
 };
+use crate::referrer::determine_referrer;
 use crate::site::{PublicSuffixList, Site, is_potentially_trustworthy_url};
 use crate::{
     Exchange, Headers, NetEvent, Request, RequestError, ResponseHead, Transport, TransportError,
@@ -72,27 +73,41 @@ pub enum ResponseType {
     OpaqueRedirect,
 }
 
-/// The referrer policy, as far as the `Origin` header needs it (Referrer
-/// Policy §3). Referrer computation itself is NET-02 work.
+pub use crate::referrer::ReferrerPolicy;
+
+/// Fetch request "destination", as sent in `Sec-Fetch-Dest`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum ReferrerPolicy {
-    /// `no-referrer`.
-    NoReferrer,
-    /// `no-referrer-when-downgrade`.
-    NoReferrerWhenDowngrade,
-    /// `same-origin`.
-    SameOrigin,
-    /// `origin`.
-    Origin,
-    /// `strict-origin`.
-    StrictOrigin,
-    /// `origin-when-cross-origin`.
-    OriginWhenCrossOrigin,
-    /// `strict-origin-when-cross-origin`, the default.
+pub enum Destination {
+    /// `fetch()`, XHR and other script-initiated requests.
     #[default]
-    StrictOriginWhenCrossOrigin,
-    /// `unsafe-url`.
-    UnsafeUrl,
+    Empty,
+    /// A top-level document.
+    Document,
+    /// A nested document.
+    Iframe,
+    /// A stylesheet.
+    Style,
+    /// A classic or module script.
+    Script,
+    /// An image.
+    Image,
+    /// A web font.
+    Font,
+}
+
+impl Destination {
+    /// The `Sec-Fetch-Dest` token.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::Document => "document",
+            Self::Iframe => "iframe",
+            Self::Style => "style",
+            Self::Script => "script",
+            Self::Image => "image",
+            Self::Font => "font",
+        }
+    }
 }
 
 /// A Fetch request before it runs.
@@ -115,8 +130,14 @@ pub struct FetchRequest {
     pub credentials: CredentialsMode,
     /// The redirect mode.
     pub redirect: RedirectMode,
-    /// The referrer policy.
+    /// The referrer policy (updated by a redirect's `Referrer-Policy`).
     pub referrer_policy: ReferrerPolicy,
+    /// The referrer URL (the client's URL), or `None` for no referrer.
+    pub referrer: Option<Url>,
+    /// The destination.
+    pub destination: Destination,
+    /// Whether a navigation was caused by user activation (`Sec-Fetch-User`).
+    pub user_activation: bool,
     /// Fetch "use-CORS-preflight flag" (upload listeners).
     pub use_cors_preflight: bool,
     /// The origin whose site is the request's "site for cookies"
@@ -141,15 +162,21 @@ impl FetchRequest {
             credentials: CredentialsMode::SameOrigin,
             redirect: RedirectMode::Follow,
             referrer_policy: ReferrerPolicy::default(),
+            referrer: None,
+            destination: Destination::Empty,
+            user_activation: false,
             use_cors_preflight: false,
             top_level_site: None,
         }
     }
 
-    /// A browser-initiated top-level navigation to `url`.
+    /// A browser-initiated top-level navigation to `url` (typed by the
+    /// user: no referrer, `Sec-Fetch-Site: none`).
     pub fn navigation(url: Url) -> Self {
         Self {
             mode: RequestMode::Navigate,
+            destination: Destination::Document,
+            user_activation: true,
             credentials: CredentialsMode::Include,
             redirect: RedirectMode::Manual,
             site_for_cookies: None,
@@ -315,6 +342,7 @@ pub struct Fetcher {
     preflight: PreflightCache,
     head_timeout: Duration,
     clock: Box<dyn Fn() -> i64 + Send>,
+    accept_language: String,
 }
 
 impl fmt::Debug for Fetcher {
@@ -344,6 +372,7 @@ struct Hop {
     tainted_origin: bool,
     tainting: ResponseTainting,
     same_site: bool,
+    referrer_policy: ReferrerPolicy,
 }
 
 impl Fetcher {
@@ -356,7 +385,14 @@ impl Fetcher {
             preflight: PreflightCache::default(),
             head_timeout,
             clock: Box::new(system_seconds),
+            accept_language: "en-US,en".to_owned(),
         }
+    }
+
+    /// Replace the `Accept-Language` value (default `en-US,en`, a value
+    /// shared by many users rather than the system's list, for privacy).
+    pub fn set_accept_language(&mut self, value: &str) {
+        value.clone_into(&mut self.accept_language);
     }
 
     /// Replace the wall clock used for cookie expiry (Unix seconds).
@@ -401,6 +437,7 @@ impl Fetcher {
             tainted_origin: false,
             tainting: ResponseTainting::Basic,
             same_site: true,
+            referrer_policy: request.referrer_policy,
         };
         loop {
             let current = hop.url_list.last().expect("non-empty").clone();
@@ -457,6 +494,10 @@ impl Fetcher {
                 RedirectMode::Follow => {}
             }
             drop(exchange);
+            // Referrer Policy §8.2 "set request's referrer policy on redirect".
+            if let Some(policy) = ReferrerPolicy::from_headers(head.headers()) {
+                hop.referrer_policy = policy;
+            }
             self.follow(&request, &mut hop, &current, location, head.status())?;
         }
     }
@@ -585,6 +626,24 @@ impl Fetcher {
             wire.header("Origin", origin.as_bytes())
                 .map_err(NetworkError::Request)?;
         }
+        if let Some(referrer) = request
+            .referrer
+            .as_ref()
+            .and_then(|referrer| determine_referrer(referrer, current, hop.referrer_policy))
+        {
+            wire.header("Referer", referrer.as_bytes())
+                .map_err(NetworkError::Request)?;
+        }
+        if !hop.headers.contains("accept-language") {
+            wire.header("Accept-Language", self.accept_language.as_bytes())
+                .map_err(NetworkError::Request)?;
+        }
+        if is_potentially_trustworthy_url(current) {
+            for (name, value) in self.fetch_metadata(request, hop) {
+                wire.header(name, value.as_bytes())
+                    .map_err(NetworkError::Request)?;
+            }
+        }
         let include_credentials = request.credentials == CredentialsMode::Include
             || (request.credentials == CredentialsMode::SameOrigin
                 && hop.tainting == ResponseTainting::Basic);
@@ -617,6 +676,44 @@ impl Fetcher {
             }
         }
         Ok((head, exchange))
+    }
+
+    /// Fetch Metadata §5: `Sec-Fetch-Dest`, `-Mode`, `-Site` (most
+    /// restrictive along the redirect chain) and `-User`.
+    fn fetch_metadata(&self, request: &FetchRequest, hop: &Hop) -> Vec<(&'static str, String)> {
+        let site = if request.mode == RequestMode::Navigate && request.site_for_cookies.is_none() {
+            "none"
+        } else {
+            let mut site = "same-origin";
+            for url in &hop.url_list {
+                let target = url.origin();
+                if request.origin.is_same_origin(&target) {
+                    continue;
+                }
+                if self.suffixes().is_same_site(&request.origin, &target) {
+                    site = "same-site";
+                } else {
+                    site = "cross-site";
+                    break;
+                }
+            }
+            site
+        };
+        let mode = match request.mode {
+            RequestMode::Navigate => "navigate",
+            RequestMode::SameOrigin => "same-origin",
+            RequestMode::NoCors => "no-cors",
+            RequestMode::Cors => "cors",
+        };
+        let mut headers = vec![
+            ("Sec-Fetch-Dest", request.destination.as_str().to_owned()),
+            ("Sec-Fetch-Mode", mode.to_owned()),
+            ("Sec-Fetch-Site", site.to_owned()),
+        ];
+        if request.mode == RequestMode::Navigate && request.user_activation {
+            headers.push(("Sec-Fetch-User", "?1".to_owned()));
+        }
+        headers
     }
 
     fn send(&self, request: Request) -> Result<(ResponseHead, Exchange), NetworkError> {
@@ -730,7 +827,7 @@ fn origin_header(
         return Some(serialized.to_owned());
     }
     let downgrade = serialized.starts_with("https:") && !is_potentially_trustworthy_url(current);
-    let null = match request.referrer_policy {
+    let null = match hop.referrer_policy {
         ReferrerPolicy::NoReferrer => true,
         ReferrerPolicy::NoReferrerWhenDowngrade
         | ReferrerPolicy::StrictOrigin

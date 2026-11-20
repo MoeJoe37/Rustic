@@ -57,14 +57,14 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M6, networking (NET-01 to NET-03) | TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
+| M6, networking (NET-01 to NET-05) | TD-161, TD-164 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
 | M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
 | M7 entry (before hostile remote content) | TD-157, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -225,7 +225,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Open, M6 profiles (NET-06) |
 | TD-162 | Deliberate | Network / codecs | `gzip` and `deflate` response bodies are buffered whole (up to `max_body_bytes`) and inflated at the end of the body; only brotli decodes incrementally | Open, M12 |
-| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, sends no `Referer`, `Sec-Fetch-*` or `Accept-Language`, takes whole request bodies and has no Lax-allowing-unsafe window | Open, M6 networking |
+| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*` and `Accept-Language` paid 2026-11-20) | Open, M6 networking |
+| TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
+| TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Open, M6 networking |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2536,13 +2538,13 @@ and an ephemeral one for private mode.
 
 `Fetcher::fetch` waits for each hop's head on the calling thread, so it is
 for tests, the CLI and a future network task, not the page's event loop.
-It has no HTTP cache (NET-04), sends no `Referer` (NET-02 referrer
-policy), `Sec-Fetch-*` metadata or `Accept-Language`, takes request bodies
+It has no HTTP cache (NET-04), takes request bodies
 as complete byte vectors, and does not implement Chromium's two-minute
 "Lax-allowing-unsafe" exception for top-level cross-site `POST`s.
 **Pay:** an event-driven fetch controller over `Exchange` events on the
 networking task source, the partitioned HTTP cache, referrer computation
-and fetch metadata, streaming request bodies with the WEB bindings for
+and fetch metadata (both done 2026-11-20: the `referrer` module and the
+`Sec-Fetch-*` and `Accept-Language` headers), streaming request bodies with the WEB bindings for
 `fetch()`.
 **Trigger:** the engine loading subresources over HTTP (NET-02 wiring) or
 the script-facing `fetch()` binding, whichever comes first.
@@ -2560,3 +2562,27 @@ window), used for PNG too, with split-invariance tests like the HTTP
 parser's.
 **Trigger:** M12 page-load measurements, or progressive rendering of large
 documents.
+
+### TD-163 — CSP violation reports are not delivered
+
+`csp::Policy` checks return violations, and report-only policies only
+produce them, but nothing sends them: no `report-uri` POST, no Reporting
+API `report-to` endpoint, and no `securitypolicyviolation` event on the
+document. Pages that rely on reports to tune their policy see nothing.
+**Pay:** a reporting queue on the networking task source that POSTs
+`application/csp-report` and Reporting API bodies, and the
+`SecurityPolicyViolationEvent` binding.
+**Trigger:** the Reporting API or `SecurityPolicyViolationEvent` work in
+M9's web APIs.
+
+### TD-164 — CSP does not cover inline styles or event handlers
+
+The engine's `ScriptPolicy` hook covers parser-inserted inline scripts,
+and hosts check script, stylesheet and image URLs and `eval` against the
+policy, but the engine applies inline `<style>` elements, `style`
+attributes and inline event-handler attributes without asking the
+policy, although `csp::Policy` can decide all three.
+**Pay:** policy hooks in the engine's stylesheet collection, the `style`
+attribute path and event-handler compilation, with tests that a
+`style-src 'nonce-…'` page drops the unnonced sheet.
+**Trigger:** the M6 network policy gate (`network.policy`).

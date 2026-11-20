@@ -293,3 +293,106 @@ mod tests {
         assert_eq!(split_header_value(b"\xe9"), ["\u{e9}"]);
     }
 }
+
+/// MIME Sniffing §7.1 "rules for identifying an unknown MIME type" with
+/// the sniff-scriptable flag set (navigations): HTML, XML and PDF
+/// signatures, the image signatures Rustic decodes, then text versus
+/// binary. `header` is the first bytes of the body (at most 1,445 are
+/// examined, the resource header length of §5.2).
+pub fn sniff_unknown(header: &[u8]) -> &'static str {
+    let header = &header[..header.len().min(1445)];
+    let start = header
+        .iter()
+        .position(|byte| !matches!(byte, b'\t' | b'\n' | 0x0c | b'\r' | b' '))
+        .unwrap_or(header.len());
+    let trimmed = &header[start..];
+    const HTML: [&[u8]; 17] = [
+        b"<!DOCTYPE HTML",
+        b"<HTML",
+        b"<HEAD",
+        b"<SCRIPT",
+        b"<IFRAME",
+        b"<H1",
+        b"<DIV",
+        b"<FONT",
+        b"<TABLE",
+        b"<A",
+        b"<STYLE",
+        b"<TITLE",
+        b"<B",
+        b"<BODY",
+        b"<BR",
+        b"<P",
+        b"<!--",
+    ];
+    for pattern in HTML {
+        if trimmed.len() > pattern.len()
+            && trimmed[..pattern.len()].eq_ignore_ascii_case(pattern)
+            && matches!(trimmed[pattern.len()], b' ' | b'>')
+        {
+            return "text/html";
+        }
+    }
+    if trimmed.starts_with(b"<?xml") {
+        return "text/xml";
+    }
+    if header.starts_with(b"%PDF-") {
+        return "application/pdf";
+    }
+    for (signature, mime) in [
+        (&b"\x89PNG\r\n\x1a\n"[..], "image/png"),
+        (b"GIF87a", "image/gif"),
+        (b"GIF89a", "image/gif"),
+        (b"\xff\xd8\xff", "image/jpeg"),
+    ] {
+        if header.starts_with(signature) {
+            return mime;
+        }
+    }
+    if header.len() >= 14 && header.starts_with(b"RIFF") && &header[8..14] == b"WEBPVP" {
+        return "image/webp";
+    }
+    // §7.1 step 8: a BOM means text; otherwise any binary data byte means
+    // binary.
+    if header.starts_with(b"\xfe\xff")
+        || header.starts_with(b"\xff\xfe")
+        || header.starts_with(b"\xef\xbb\xbf")
+    {
+        return "text/plain";
+    }
+    let binary = |byte: &u8| matches!(byte, 0x00..=0x08 | 0x0b | 0x0e..=0x1a | 0x1c..=0x1f);
+    if header.iter().any(binary) {
+        "application/octet-stream"
+    } else {
+        "text/plain"
+    }
+}
+
+#[cfg(test)]
+mod sniff_tests {
+    use super::sniff_unknown;
+
+    #[test]
+    fn unknown_types_are_sniffed() {
+        for (body, expected) in [
+            (&b"  <!doctype html><p>x"[..], "text/html"),
+            (b"<p>para", "text/html"),
+            (b"<!-- c -->", "text/html"),
+            (b"<pre>", "text/plain"),
+            (b"<a>", "text/html"),
+            (b"<abbr>", "text/plain"),
+            (b"<?xml version", "text/xml"),
+            (b"%PDF-1.7", "application/pdf"),
+            (b"\x89PNG\r\n\x1a\nrest", "image/png"),
+            (b"GIF89a", "image/gif"),
+            (b"\xff\xd8\xff\xe0", "image/jpeg"),
+            (b"RIFF\0\0\0\0WEBPVP8 ", "image/webp"),
+            (b"plain words", "text/plain"),
+            (b"\x00\x01binary", "application/octet-stream"),
+            (b"\xef\xbb\xbf\x00", "text/plain"),
+            (b"", "text/plain"),
+        ] {
+            assert_eq!(sniff_unknown(body), expected, "{body:?}");
+        }
+    }
+}

@@ -34,6 +34,14 @@ SOURCES = {
         "fetch/content-type/resources/content-types.json",
         "ad2e2dfc6b3f6501911e4990f3adb1bf238e6910f56b3206fd8d7e8c83459974",
     ),
+    "data-urls.json": (
+        "fetch/data-urls/resources/data-urls.json",
+        "b3be3d6e1d0eb7f1b5b20d7410d30cb76216d41c9fe3d8364446abecff88bba5",
+    ),
+    "base64.json": (
+        "fetch/data-urls/resources/base64.json",
+        "0cdb75b4fcc46e4a6caa0e3b0005157a0d0be03e00bcf7b7054a045b1267568d",
+    ),
 }
 
 
@@ -97,6 +105,27 @@ def generate():
         values = ", ".join(rust_str(value) for value in r["contentType"])
         lines.append(f"    (&[{values}], {rust_opt(r['encoding'])}, {rust_opt(r['mimeType'])}),")
     lines += ["];", ""]
+    data_urls = [r for r in load("data-urls.json") if isinstance(r, list)]
+    base64 = [r for r in load("base64.json") if isinstance(r, list)]
+    lines += [
+        "/// fetch/data-urls/resources/data-urls.json: (URL, MIME type",
+        "/// serialization or failure, body bytes).",
+        "pub const DATA_URLS: &[(&str, Option<&str>, &[u8])] = &[",
+    ]
+    for r in data_urls:
+        body = ", ".join(str(b) for b in (r[2] if len(r) > 2 else []))
+        lines.append(f"    ({rust_str(r[0])}, {rust_opt(r[1])}, &[{body}]),")
+    lines += [
+        "];",
+        "",
+        "/// fetch/data-urls/resources/base64.json: (input, decoded bytes or",
+        "/// failure).",
+        "pub const BASE64: &[(&str, Option<&[u8]>)] = &[",
+    ]
+    for r in base64:
+        output = "None" if r[1] is None else "Some(&[%s])" % ", ".join(str(b) for b in r[1])
+        lines.append(f"    ({rust_str(r[0])}, {output}),")
+    lines += ["];", ""]
     fixture = "\n".join(lines).encode()
     manifest = {
         "upstream_repository": "web-platform-tests/wpt",
@@ -116,6 +145,8 @@ def generate():
             "MIME_TYPES": len(mime),
             "GENERATED_MIME_TYPES": len(generated),
             "CONTENT_TYPES": len(content),
+            "DATA_URLS": len(data_urls),
+            "BASE64": len(base64),
         },
         "fixture": "crates/rustic-net/tests/fixtures/mime_cases.rs",
         "fixture_sha256": hashlib.sha256(fixture).hexdigest(),

@@ -10,7 +10,7 @@ pub(crate) mod bigint;
 pub(crate) mod buffer;
 mod collections;
 mod date;
-mod error;
+pub(crate) mod error;
 mod function;
 pub(crate) mod generator;
 mod global;

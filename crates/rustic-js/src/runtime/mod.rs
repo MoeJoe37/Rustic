@@ -5,7 +5,7 @@
 
 mod agent;
 mod bigint;
-mod builtins;
+pub(crate) mod builtins;
 mod completion;
 mod convert;
 mod env;

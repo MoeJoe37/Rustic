@@ -58,6 +58,10 @@ instead of rewriting the history of a decision.
 | [0048](0048-error-reporting-and-event-handlers.md) | Error reporting, rejection events, event handler attributes and a bounded console sink | Accepted for WEB-07 |
 | [0049](0049-focus-and-forms.md) | Focus, text controls, form owners, validation and submission without navigation | Accepted for WEB-07 (`web.input`) |
 | [0050](0050-resize-observer.md) | ResizeObserver broadcast in rendering turns from the layout snapshot | Accepted for WEB-07 (`web.observers`) |
+| [0051](0051-transport-and-tls.md) | Own HTTP/1.1, loopback origin allowlist; rustls with `ring` and platform verification for TLS | HTTP/1.1 and authority accepted for NET-01; TLS library proposed |
+| [0052](0052-network-io-model.md) | One thread per exchange, blocking sockets with short timeouts, byte-counted event window | Accepted for NET-01 |
+| [0053](0053-loopback-fixture-server.md) | In-process loopback fixture server with scripted replies | Accepted for NET-01 and later M6 tests |
+| [0054](0054-sites-and-cookie-policy.md) | Host-supplied Public Suffix List, sites, Lax-by-default cookies, blocked third-party cookies, CHIPS | Accepted; bundled list proposed |
 
 ## Records by area
 
@@ -75,7 +79,7 @@ instead of rewriting the history of a decision.
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041, 0044 |
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
-| Networking and resources (M6) | 0043 |
+| Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -87,7 +91,7 @@ authority boundary or `unsafe` code.
 
 | Decision | Needed before | Why it needs a record |
 | --- | --- | --- |
-| Transport and TLS library, certificate verification and the fixture server | NET-01 (M6) | First network dependency and first native/crypto boundary |
+| Acceptance of the TLS part of [0051](0051-transport-and-tls.md) (proposed) | TLS adapter (NET-01, M6) | First network dependency and first native/crypto boundary |
 | Profile and storage format, partition keys and schema versions | NET-06 (M6) | Persistent on-disk compatibility promise |
 | IPC format and broker capabilities | ISO-02 (M7) | Process authority |
 | Sandbox mechanism per OS: Windows, macOS, Linux, Android, iOS | ISO-03/04/08 (M7) | Platform security boundary; ADR 0004 only fixes the order |

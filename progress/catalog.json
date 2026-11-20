@@ -4980,32 +4980,262 @@
           "label": "Reviewed TLS/HTTP transport with cancellation",
           "size": 5,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Own HTTP/1.1 request serialization and split-invariant response framing under limits",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/response.rs",
+                  "marker": "pub(crate) struct BodyDecoder"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/request.rs",
+                  "marker": "pub(crate) fn serialize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/response.rs",
+                  "marker": "fn parse_all_splits"
+                }
+              ]
+            },
+            {
+              "label": "Loopback origin allowlist, connect/idle/total timeouts, cancellation and backpressure over the fixture server",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/policy.rs",
+                  "marker": "pub struct NetworkPolicy"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/transport.rs",
+                  "marker": "pub struct Exchange"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/fixture.rs",
+                  "marker": "pub struct FixtureServer"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/transport.rs",
+                  "marker": "fn a_slow_consumer_bounds_buffered_bytes"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/transport.rs",
+                  "marker": "fn origins_outside_the_policy_are_blocked_before_any_connection"
+                }
+              ]
+            },
+            {
+              "label": "TLS adapter with platform certificate verification and certificate-error fixtures (ADR 0051 TLS part)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Content-coding decoding under output limits (TD-158)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "network.navigation",
           "label": "Navigation/history state machine and redirects",
           "size": 5,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Fetch redirect handling: status rules, URL list, fragments, limit and per-hop policy checks",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/redirect.rs",
+                  "marker": "pub struct RedirectChain"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/redirects.rs",
+                  "marker": "fn every_hop_is_checked_against_the_policy"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/redirects.rs",
+                  "marker": "fn methods_and_bodies_follow_the_status_rules"
+                }
+              ]
+            },
+            {
+              "label": "Response MIME type and Content-Type charset extraction (pinned WPT mimesniff and fetch/content-type)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/mime.rs",
+                  "marker": "pub fn extract_mime_type"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/wpt_mime.rs",
+                  "marker": "fn fetch_content_type_extraction"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/wpt_mime.rs",
+                  "marker": "fn mimesniff_generated_mime_types"
+                }
+              ]
+            },
+            {
+              "label": "Navigation state machine over the transport (request, response, commit, cancel)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Documents and subresources load over HTTP in the engine and CLI with response charset",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Referrer and policy container propagation across navigations and redirects",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Session history: reload, back/forward and form navigation",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "network.fetch",
           "label": "Fetch, CORS and response filtering",
           "size": 5,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Fetch header classifications, CORS check, CORS-preflight validation and preflight cache",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/cors.rs",
+                  "marker": "pub fn cors_check"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/cors.rs",
+                  "marker": "pub struct PreflightCache"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/cors.rs",
+                  "marker": "fn preflight_validation"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/cors.rs",
+                  "marker": "fn safelisted_request_headers"
+                }
+              ]
+            },
+            {
+              "label": "Main fetch over the transport: modes, response tainting, Origin header, credentials, redirect tainting, CORP and filtered responses",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/fetch.rs",
+                  "marker": "pub struct Fetcher"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/fetch.rs",
+                  "marker": "fn cross_origin_redirects_taint_the_origin"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/fetch.rs",
+                  "marker": "fn preflights_run_validate_and_are_cached"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/fetch.rs",
+                  "marker": "fn no_cors_cross_origin_responses_are_opaque"
+                }
+              ]
+            },
+            {
+              "label": "Decoded content codings, Referer and fetch metadata on Fetch requests",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Script-facing fetch(), Headers, Request and Response bindings with header guards",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "network.cookies",
           "label": "Cookies and partitioned HTTP cache",
           "size": 3,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "RFC 6265bis cookie jar: Set-Cookie and date parsing, storage and retrieval, SameSite, prefixes, partitioned cookies, third-party blocking and eviction",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/cookie/mod.rs",
+                  "marker": "pub struct CookieJar"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/cookie/parse.rs",
+                  "marker": "pub fn parse_cookie_date"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/cookie/tests.rs",
+                  "marker": "fn random_sequences_keep_the_jar_invariants"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/fetch.rs",
+                  "marker": "fn navigations_store_lax_cookies_and_subresources_respect_same_site"
+                }
+              ]
+            },
+            {
+              "label": "Reviewed Public Suffix List source (ADR 0054 decision)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Partitioned HTTP cache and validators",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "network.policy",

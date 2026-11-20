@@ -57,13 +57,15 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M6, networking (NET-01 to NET-03) | TD-157, TD-158, TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
+| M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
+| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-159 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146, TD-156 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
@@ -217,6 +219,12 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled, body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
+| TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
+| TD-157 | Deliberate | Network | No DNS and no TLS: the transport reaches only allowlisted loopback origins, and `https` fails closed until ADR 0051's TLS part is accepted | Open, M6 networking |
+| TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Open, M6 networking |
+| TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Open, M7 entry |
+| TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Open, M6 profiles (NET-06) |
+| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, sends no `Referer`, `Sec-Fetch-*` or `Accept-Language`, takes whole request bodies and has no Lax-allowing-unsafe window | Open, M6 networking |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2452,3 +2460,82 @@ inline and SVG boxes, and add `IntersectionObserver` with scrolling.
 **Trigger:** M9 layout and scrolling work, or a heap report showing
 retained observers.
 
+### TD-156 — One thread and one connection per exchange
+
+`rustic-net` runs every exchange on its own OS thread with a fresh TCP
+connection and sends `Connection: close` ([ADR 0052](adr/0052-network-io-model.md)).
+There is no connection pool, no keep-alive reuse, no HTTP/2 or HTTP/3, and
+`TcpStream::connect_timeout` cannot be interrupted, so cancelling during a
+connect waits up to `connect_timeout`. This is correct and bounded, but
+costs a handshake and a thread per request.
+**Pay:** a bounded per-origin pool with keep-alive (after the parser has
+proved message-boundary handling under reuse), a readiness-based I/O loop
+or reviewed runtime if thread count shows in measurements, and HTTP/2 via a
+reviewed library or own code with its own ADR.
+**Trigger:** M12 page-load measurements, a page corpus with more than ~64
+parallel subresources, or HTTP/2 scheduling.
+
+### TD-157 — No DNS and no TLS in the transport
+
+`NetworkPolicy` maps allowlisted origins to loopback addresses; there is
+no name resolution and no route to any other host, and `https` returns
+`TransportError::TlsUnavailable` ([ADR 0051](adr/0051-transport-and-tls.md)).
+This is the intended M6 authority model, but it means no real site loads.
+**Pay:** accept (or replace) the TLS part of ADR 0051, add the rustls
+adapter with platform verification and certificate-error tests against a
+TLS fixture server, then add DNS under the M7 broker.
+**Trigger:** the M6 demo (styles, scripts, images, redirects, a cookie and
+fetches over the test-server allowlist) or `network.transport`
+completion, whichever comes first.
+
+### TD-158 — Content codings are not decoded
+
+Requests carry no `Accept-Encoding`, and a `Content-Encoding: gzip`,
+`deflate` or `br` response body reaches the consumer still encoded. Real
+servers mostly honour the missing header, but some send gzip regardless.
+**Pay:** decode gzip and deflate with `rustic-codecs`' bounded inflate in
+streaming form (and brotli through the reviewed decompressor already in
+the font graph, or a new review), with output limits and ratio checks
+counted against `max_body_bytes`, then advertise them.
+**Trigger:** NET-03 (Fetch), which must expose decoded bodies.
+
+### TD-159 — No bundled Public Suffix List
+
+`rustic_net::site::PublicSuffixList` implements the list's algorithm, but
+Rustic ships no list ([ADR 0054](adr/0054-sites-and-cookie-policy.md)).
+`PublicSuffixList::fallback()` applies only the implicit `*` rule, so
+`a.example.co.uk` has registrable domain `co.uk`: two unrelated
+`co.uk` sites would be same-site, and `Domain=co.uk` would be accepted.
+Only allowlisted loopback origins are reachable today (TD-157), where the
+fallback is exact.
+**Pay:** the maintainer decides ADR 0054's proposed option; then vendor a
+pinned list with a digest-checked import script (or another reviewed
+source) and an update path, and make the fallback unreachable for remote
+origins.
+**Trigger:** before DNS or any non-loopback origin (M7 entry), or the
+first test that needs a multi-label suffix.
+
+### TD-160 — Cookies and preflight cache are per fetcher, in memory
+
+The `CookieJar` and `PreflightCache` live inside one `Fetcher`, are lost
+when it is dropped and are not keyed by Fetch's network partition key.
+Profiles, private mode and storage keys are NET-06.
+**Pay:** move both behind the profile store with partition keys (top-level
+site plus frame site), a versioned on-disk schema for persistent profiles
+and an ephemeral one for private mode.
+**Trigger:** NET-06 (`storage.profiles`, `storage.partition`).
+
+### TD-161 — Fetcher is a blocking, cache-less prototype
+
+`Fetcher::fetch` waits for each hop's head on the calling thread, so it is
+for tests, the CLI and a future network task, not the page's event loop.
+It has no HTTP cache (NET-04), sends no `Referer` (NET-02 referrer
+policy), `Sec-Fetch-*` metadata or `Accept-Language`, takes request bodies
+as complete byte vectors, and does not implement Chromium's two-minute
+"Lax-allowing-unsafe" exception for top-level cross-site `POST`s.
+**Pay:** an event-driven fetch controller over `Exchange` events on the
+networking task source, the partitioned HTTP cache, referrer computation
+and fetch metadata, streaming request bodies with the WEB bindings for
+`fetch()`.
+**Trigger:** the engine loading subresources over HTTP (NET-02 wiring) or
+the script-facing `fetch()` binding, whichever comes first.

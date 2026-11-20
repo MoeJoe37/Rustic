@@ -280,6 +280,21 @@ def main() -> int:
         except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
             error(url_manifest, f"invalid WPT fixture metadata: {exc}")
 
+    net_manifest = ROOT / "crates/rustic-net/tests/fixtures/manifest.json"
+    try:
+        manifest = json.loads(net_manifest.read_text(encoding="utf-8"))
+        for source in manifest["sources"]:
+            if hashlib.sha256((ROOT / source["path"]).read_bytes()).hexdigest() != source["sha256"]:
+                error(ROOT / source["path"], "vendored WPT data differs from its manifest digest")
+        fixture = ROOT / manifest["fixture"]
+        if hashlib.sha256(fixture.read_bytes()).hexdigest() != manifest["fixture_sha256"]:
+            error(fixture, "generated MIME cases differ from the manifest; rerun tools/import_wpt_mime_tests.py")
+        if not re.fullmatch(r"[0-9a-f]{40}", manifest["upstream_revision"]):
+            error(net_manifest, "upstream_revision must be a full commit SHA")
+        if not (net_manifest.parent / "WPT-LICENSE.md").is_file():
+            error(net_manifest, "missing upstream WPT license")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        error(net_manifest, f"invalid WPT MIME fixture metadata: {exc}")
     idna_manifest = ROOT / "crates/rustic-url/tests/fixtures/idna_manifest.json"
     try:
         manifest = json.loads(idna_manifest.read_text(encoding="utf-8"))

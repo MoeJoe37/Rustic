@@ -1,0 +1,31 @@
+{
+  "upstream_repository": "web-platform-tests/wpt",
+  "upstream_revision": "8c17bfeb3e66a2986be16b0e004f85ace68db647",
+  "license": "BSD-3-Clause; WPT-LICENSE.md",
+  "generator": "tools/import_wpt_mime_tests.py",
+  "selection_policy": "all-records",
+  "sources": [
+    {
+      "path": "crates/rustic-net/tests/fixtures/wpt/mime-types.json",
+      "upstream_path": "mimesniff/mime-types/resources/mime-types.json",
+      "sha256": "016d3dd91b647e03af2a69c7ec241bf787df8bffe7953018fe566e8ec5d7b822"
+    },
+    {
+      "path": "crates/rustic-net/tests/fixtures/wpt/generated-mime-types.json",
+      "upstream_path": "mimesniff/mime-types/resources/generated-mime-types.json",
+      "sha256": "20924495060ac9633f10d57a326b95a5987863f27c5d4765b13b744304b33fed"
+    },
+    {
+      "path": "crates/rustic-net/tests/fixtures/wpt/content-types.json",
+      "upstream_path": "fetch/content-type/resources/content-types.json",
+      "sha256": "ad2e2dfc6b3f6501911e4990f3adb1bf238e6910f56b3206fd8d7e8c83459974"
+    }
+  ],
+  "cases": {
+    "MIME_TYPES": 74,
+    "GENERATED_MIME_TYPES": 881,
+    "CONTENT_TYPES": 20
+  },
+  "fixture": "crates/rustic-net/tests/fixtures/mime_cases.rs",
+  "fixture_sha256": "562dadef343893934ec7a1a2f8f18572509cbffcbd213288f13ff360828693e6"
+}

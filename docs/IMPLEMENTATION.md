@@ -156,8 +156,12 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Networking and resources (M6, started early): 1 section</summary>
+<summary>Networking and resources (M6): 5 sections</summary>
 
+- [NET-04 (partial) — Cookie jar and sites](#net-04-partial--cookie-jar-and-sites)
+- [NET-03 (partial) — Fetch modes, CORS and filtered responses](#net-03-partial--fetch-modes-cors-and-filtered-responses)
+- [NET-02 (partial) — Redirects and response MIME types](#net-02-partial--redirects-and-response-mime-types)
+- [NET-01 — HTTP/1.1 transport without TLS](#net-01--http11-transport-without-tls)
 - [M6 entry — Encoding Standard decoders and encoders](#m6-entry--encoding-standard-decoders-and-encoders)
 
 </details>
@@ -2525,6 +2529,100 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## NET-04 (partial) — Cookie jar and sites
+
+Added 2026-11-20 to `rustic-net` with NET-03. [ADR 0054](adr/0054-sites-and-cookie-policy.md)
+records the policy choices and the open Public Suffix List question.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| `site::PublicSuffixList` | Host-supplied list text (4 MiB cap, `//` comments, rule ends at whitespace, Unicode IDN rules skipped); public suffix by exception, then most labels, then the implicit `*` rule; registrable domain; trailing dots kept. `fallback()` has only the implicit rule (TD-159) | `suffixes_follow_rules_wildcards_and_exceptions`, `the_fallback_uses_the_implicit_rule`, `invalid_rules_and_oversized_lists_are_rejected` |
+| `site::Site`, same-site | HTML "obtain a site", "same site", "schemelessly same site"; IP hosts are their own site; opaque origins compare by identity | `sites_and_same_site` |
+| `site::is_potentially_trustworthy` | Secure Contexts §3.1 for `https`/`wss`, `127.0.0.0/8`, `::1`, `localhost` and `*.localhost`; `about:blank`, `about:srcdoc` and `data:` URLs | `potentially_trustworthy_origins` |
+| `cookie::parse_set_cookie` | RFC 6265bis-15 §5.6: CTLs other than tab reject the header, nameless cookies, 4,096-byte name plus value, 1,024-byte attribute values, last attribute wins, `Expires`, `Max-Age` (saturating), `Domain` (leading dot removed, lowercase, empty ignored), `Path` (must start `/`), `Secure`, `HttpOnly`, `SameSite`, `Partitioned` | `name_value_pairs`, `attributes_last_wins_and_invalid_ones_are_ignored` |
+| `cookie::parse_cookie_date` | §5.1.1 tokenizer and time/day/month/year productions, two-digit years, range checks, invalid calendar dates rejected, years from 1601 | `cookie_dates` |
+| `CookieJar` storage | §5.7: `Max-Age` over `Expires`, 400-day cap, deletion by past expiry; `Domain` domain-match and public-suffix rule (host-only when the suffix is the host); IP hosts match exactly; default-path; `Secure` only from potentially trustworthy URLs; `HttpOnly` against non-HTTP APIs and on overwrite; non-secure cookies cannot shadow secure ones; `SameSite` other than `None` only from same-site requests or top-level navigations; `SameSite=None` needs `Secure`; case-insensitive `__Secure-`/`__Host-` prefixes and nameless-cookie prefix rule; replacement keeps creation time | `host_only_and_domain_cookies`, `paths`, `expiry_max_age_and_deletion`, `replacement_keeps_creation_order`, `secure_http_only_and_shadowing`, `prefixes`, `same_site_rules` |
+| `CookieJar` retrieval | §5.8.3: host-only and domain matching, path-match, `Secure`, `HttpOnly`, `SameSite` with `Lax` and missing values allowed only on top-level navigations with safe methods (Lax-by-default), longest path then earliest creation, last-access update, `Cookie` header serialization | `paths`, `same_site_rules` |
+| Third parties and CHIPS | Cross-site subresource requests neither send nor store unpartitioned cookies by default (`ThirdPartyCookies::Block`); `Partitioned` cookies need `Secure` and a top-level site and are only sent under that site | `third_party_cookies_are_blocked_unless_partitioned` |
+| Limits | 180 per site, 3,000 total (configurable); expired first, then non-secure, then least recently used | `eviction_prefers_non_secure_and_least_recently_used`, `random_sequences_keep_the_jar_invariants` (3,000 random stores: unique identities, limits, `__Host-` invariants, nothing expired is sent) |
+
+Cookie values never appear in `Debug` output. Not yet: the partitioned
+HTTP cache and validators, persistence and partition keys (TD-160,
+NET-06), `document.cookie` and a bundled suffix list (TD-159).
+
+## NET-03 (partial) — Fetch modes, CORS and filtered responses
+
+Added 2026-11-20 to `rustic-net`. `fetch::Fetcher` runs Fetch's main fetch
+for `http`/`https` over the NET-01 transport; it is blocking and has no
+HTTP cache (TD-161). Nothing in the engine or CLI calls it yet.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Header classes (`cors`) | Fetch §2.2.2: forbidden methods and method normalization, CORS-safelisted methods, forbidden request headers (including `Proxy-`/`Sec-` prefixes and method-override values), forbidden response header names, CORS-safelisted request headers with value rules (128 bytes, unsafe bytes, language bytes, the three `Content-Type` essences, single non-suffix `Range`), no-CORS-safelisted headers, CORS-unsafe names (sorted, lowercase, the 1,024-byte rule), safelisted response names | `methods_are_classified_and_normalized`, `forbidden_request_headers`, `safelisted_request_headers`, `unsafe_names_are_sorted_lowercase_and_count_safelisted_bytes` |
+| CORS check | Fetch §4.9 over the combined `Access-Control-Allow-Origin` (two values never match), `*` only without credentials, exact `Access-Control-Allow-Credentials: true` | `cors_check_follows_the_algorithm` |
+| Preflight | Fetch §4.8: `OPTIONS` with `Accept: */*`, `Access-Control-Request-Method`, `Access-Control-Request-Headers` and `Origin`, no cookies; 2xx and CORS check; token lists for allowed methods and headers (malformed lists fail); case-sensitive methods; `*` only without credentials; `Authorization` never covered by `*`; `Max-Age` default 5 s, capped at 2 h | `preflight_validation`, `preflights_run_validate_and_are_cached` |
+| Preflight cache | Keyed by serialized origin, URL without fragment and credentials; method and header entries with expiry; wildcard entries only for uncredentialed requests; cleared for an (origin, URL) after a failed CORS check; at most 1,024 keys (expired keys first, then a full clear) | `preflight_cache_matches_expires_and_is_bounded` |
+| Main fetch | Method normalization and forbidden methods; `no-cors` requires `follow`; `same-origin` mode refuses other origins before connecting; tainting basic, cors or opaque per hop and never back to basic; CORS check on every CORS-tainted response including redirects; `Cross-Origin-Resource-Policy` for `no-cors`; default `Accept` (HTML types for navigations) | `same_origin_mode_refuses_other_origins_before_sending`, `no_cors_cross_origin_responses_are_opaque`, `cors_responses_need_allow_origin_and_filter_headers`, `resource_policy_blocks_no_cors_responses` |
+| `Origin` header | Fetch §3.1: always for CORS-tainted requests, for other non-GET/HEAD requests through the referrer policy (`null` for `no-referrer`, downgrades and cross-origin `same-origin`) | `unsafe_methods_send_origin_by_referrer_policy`, `same_origin_responses_are_basic_and_hide_set_cookie` |
+| Credentials and cookies | `include`, or `same-origin` with basic tainting; `Cookie` from the jar and `Set-Cookie` stored per hop, with same-site computed along the redirect chain from the request's site for cookies; navigations are top-level with their own site as partition | `credentialed_cors_sends_and_stores_cookies_when_allowed`, `same_origin_credentials_exclude_cross_origin_same_site_requests`, `navigations_store_lax_cookies_and_subresources_respect_same_site` |
+| Redirects | Shared `rewrite_for_redirect` with `RedirectChain`; CORS redirects to URLs with credentials fail; cross-origin hops from a cross-origin URL taint the origin (`Origin: null`); `manual` gives an opaque-redirect response; every hop goes back through the policy | `cross_origin_redirects_taint_the_origin`, `manual_redirects_are_opaque_redirects` |
+| Filtered responses | Basic drops `Set-Cookie`/`Set-Cookie2`; CORS keeps safelisted and exposed names (`*` without credentials); opaque has status 0, no headers, no URL and no visible body; opaque-redirect status 0 and no headers; `into_internal` gives the engine the unfiltered response | the tests above |
+
+Not yet: the script-facing `fetch()`, `Headers`, `Request` and `Response`
+bindings with header guards, decoded content codings (TD-158), `Referer`
+and fetch metadata (TD-161), and the HTTP cache (NET-04).
+
+## NET-02 (partial) — Redirects and response MIME types
+
+Added 2026-11-20 to `rustic-net`, on top of NET-01. Nothing loads pages
+over HTTP yet; the navigation state machine and the engine/CLI wiring are
+the rest of NET-02.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| `mime::MimeType` | MIME Sniffing §4.4 "parse a MIME type" and §4.5 serialization: HTTP whitespace trimming, lowercase type, subtype and parameter names, first parameter wins, quoted-string values with escapes, invalid parameters dropped; `charset()` through the Encoding Standard labels | All 74 records of WPT `mimesniff/mime-types/resources/mime-types.json` and all 881 of `generated-mime-types.json`, with no expected failures |
+| `mime::extract_mime_type`, `legacy_extract_encoding`, `split_header_value` | Fetch "get, decode, and split" (commas outside quoted strings), "extract a MIME type" (skips failures and `*/*`, later values win, a charset carries over within one essence) and "legacy extract an encoding" | All 20 records of WPT `fetch/content-type/resources/content-types.json`, one header line per value |
+| `redirect::RedirectChain` | Fetch §4.4 without I/O: redirect statuses 301, 302, 303, 307, 308 with a `Location`; relative locations against the current URL; the request fragment kept when the location has none; duplicate differing `Location` values and unparsable ones are errors; only `http`/`https` targets; at most 20 redirects; POST on 301/302 and non-GET/HEAD on 303 become GET without body or request-body headers; cross-origin hops drop `Authorization`; modes follow, error and manual; the URL list | `crates/rustic-net/tests/redirects.rs` |
+| `redirect::fetch_following_redirects` | Blocking driver: each hop is a new exchange through `Transport::start`, so the `NetworkPolicy` is checked again per hop and `https` still fails closed; redirect bodies are discarded | `every_hop_is_checked_against_the_policy`, `the_twenty_first_redirect_is_an_error` |
+
+The WPT data is vendored unchanged under `crates/rustic-net/tests/fixtures/wpt`
+from wpt `8c17bfeb` (the revision of the URL fixtures).
+`tools/import_wpt_mime_tests.py` checks the pinned digests and generates
+`mime_cases.rs`; `tools/check_repository.py` checks the manifest.
+
+Not yet: referrer and referrer-policy updates on redirect (NET-02).
+Request modes, CORS checks on redirect, credentials in redirect URLs and
+opaque-redirect responses came with NET-03 in `fetch::Fetcher`.
+
+## NET-01 — HTTP/1.1 transport without TLS
+
+Started 2026-11-20 after the M5 completion review. New crate `rustic-net`
+(std only, depends on `rustic-base` and `rustic-url`). [ADR 0051](adr/0051-transport-and-tls.md)
+makes HTTP/1.1 Rustic code and proposes rustls for TLS;
+[ADR 0052](adr/0052-network-io-model.md) is the I/O model and
+[ADR 0053](adr/0053-loopback-fixture-server.md) the fixture server. Nothing
+in the engine or CLI uses the transport yet; NET-02 connects it to
+navigation.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| `Request` | Token method, `http`/`https` URL with a host; origin-form target without fragment or userinfo; `Host` with non-default port; `Content-Length` for bodies and POST/PUT/PATCH; `Connection: close`. Caller-supplied `Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Keep-Alive`, `TE`, `Trailer`, `Upgrade` and CR/LF/NUL values are refused | `request.rs` tests, `content_length_response_and_request_serialization` |
+| Response head | Incremental; `HTTP/1.x NNN [reason]` (higher 1.x minors read as 1.1), bare-LF line endings, leading blank lines ignored, obsolete folding unfolded to one space, malformed lines rejected, anything that cannot start a status line (HTTP/0.9) rejected on the first bytes; 1xx skipped up to `max_interim_responses`, 101 rejected; `max_head_bytes` (256 KiB) counts interim heads too, `max_header_count` 512 | `status_lines_versions_and_reason_phrases`, `header_lines_folding_and_malformed_lines`, `head_limits_count_interim_responses_and_header_lines` |
+| Body framing | RFC 9112 §6.3: none for HEAD, 1xx, 204, 304; a single final `chunked` wins over `Content-Length` (as Chromium); other codings rejected; HTTP/1.0 with `Transfer-Encoding` reads to close; identical repeated lengths are one length, differing or non-decimal ones are errors; close-delimited otherwise; early close is `Truncated`, no byte at all is `Empty`. Chunk extensions ignored, trailers validated and dropped, chunk line and trailer sizes bounded; `max_body_bytes` bounds decoded bytes | `content_length_bodies`, `chunked_bodies_with_extensions_and_trailers`, `chunked_errors`, `chunk_line_trailer_and_body_limits`, `protocol_errors_and_limits_end_the_exchange` |
+| Split invariance | Every response in the parser tests is also parsed at every two-piece split and byte by byte, with identical results; 3,000 random inputs never panic | `parse_all_splits`, `arbitrary_input_never_panics` |
+| Authority | `NetworkPolicy` maps (scheme, host, effective port) to a loopback `SocketAddr`; non-loopback addresses are refused; anything not listed is `Blocked` before a socket opens; `https` is `TlsUnavailable` before a socket opens and never retried over `http` | `policy.rs` tests, `origins_outside_the_policy_are_blocked_before_any_connection`, `https_fails_closed_and_is_never_downgraded` |
+| Exchange | One thread per request; events `Response`, `Body`, then `Finished` or `Failed`, none after the end; `cancel()` or drop stops within one `poll_interval` (10 ms) after connecting; `connect_timeout`, `idle_timeout` (no peer progress; consumer waits excluded) and optional `total_timeout`; refused connects reported | `events_arrive_in_order_and_stop_after_the_end`, `cancellation_and_drop_stop_the_exchange`, `idle_timeout_while_waiting_for_the_head_and_the_body`, `a_dripping_peer_is_not_idle_but_hits_the_total_timeout`, `refused_connections_are_reported`, `concurrent_exchanges_are_independent` |
+| Backpressure | Body bytes count against `buffer_window` (256 KiB); the thread stops reading the socket while the window is full; a 4 MiB body through a 64 KiB window arrives byte-exact with the peak within one read of the window | `a_slow_consumer_bounds_buffered_bytes`, `pipe.rs` tests |
+| Fixture server | `127.0.0.1:0`, scripted writes, pauses, drips and holds per request-target, request log and connection count, 404 default | used by every test in `crates/rustic-net/tests/transport.rs` |
+
+Errors and `Debug` output carry no URL, header value or body
+(`Headers` prints names only, `NetworkPolicy` a count). Debt taken:
+TD-156 (thread and connection per exchange, no HTTP/2), TD-157 (no DNS or
+TLS), TD-158 (no content-coding decoding). Remaining for
+`network.transport`: the TLS adapter once ADR 0051's TLS part is accepted,
+with platform verification and certificate-error fixtures, and decoded
+content codings.
 
 ## M6 entry — Encoding Standard decoders and encoders
 

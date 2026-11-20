@@ -238,6 +238,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-net"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-encoding",
+ "rustic-url",
+]
+
+[[package]]
 name = "rustic-paint"
 version = "0.1.0"
 dependencies = [

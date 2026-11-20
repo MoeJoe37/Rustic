@@ -29,8 +29,8 @@ CSS, layout, paint, codecs and URL code stay original Rust (ADR 0001).
 
 | Service | Candidate approach | Rustic retains responsibility for |
 | --- | --- | --- |
-| TLS | Maintained Rust TLS library such as rustls with reviewed crypto/provider/root strategy | Certificate error behavior, HTTPS policy and broker authority |
-| HTTP transport | Reviewed HTTP library such as hyper, with a bounded async runtime if needed | Fetch, redirects, CORS, cookies, cache, MIME and response visibility |
+| TLS | **Proposed at M6 entry:** rustls 0.23 with the `ring` provider and `rustls-platform-verifier` ([ADR 0051](adr/0051-transport-and-tls.md); measured graph, MSRV and licenses there). Not added until accepted; `https` fails closed | Certificate error behavior, HTTPS policy and broker authority |
+| HTTP transport | **Chosen at M6 entry:** Rustic's own HTTP/1.1 in `rustic-net`, no runtime ([ADR 0051](adr/0051-transport-and-tls.md), [ADR 0052](adr/0052-network-io-model.md)); a reviewed library remains a candidate for HTTP/2 | Framing and limits, Fetch, redirects, CORS, cookies, cache, MIME and response visibility |
 | Text encodings | **Chosen at M6 entry:** original Encoding Standard decoders and encoders over indexes generated from pinned whatwg/encoding data (`rustic-encoding`, [ADR 0043](adr/0043-encoding-standard.md)), no library | Charset selection, sniffing and restart, URL and form encoding |
 | Unicode/IDNA | Chosen at M1: original UTS #46/NFC code over tables generated from pinned Unicode data (`tools/generate_idna_data.py`), no library | URL/origin algorithms, data updates and string/index semantics |
 | Font parsing/shaping | **Adopted (M3):** HarfRust 0.16.0, Skrifa 0.50.0, Wuff 0.2.10; discovery is Rustic's own host-granted walk | Font selection, CSS metrics, bidi/line breaking integration, layout |

@@ -484,6 +484,11 @@ dependency, so these are settled before NET-01 starts:
       the 32-bit x86, RISC-V and big-endian tiers. A library that needs a C
       toolchain or assembly per target is a cost to state in the ADR, not a
       surprise in CI. [DEPENDENCIES.md](DEPENDENCIES.md) gives the review steps.
+      **Split 2026-11-20:** [ADR 0051](adr/0051-transport-and-tls.md)
+      accepts HTTP/1.1 as Rustic code and the loopback allowlist, and
+      *proposes* rustls 0.23 with `ring` and `rustls-platform-verifier`
+      (measured graph, MSRV and licenses in the ADR). The TLS part waits for
+      the maintainer; until then `https` fails closed (TD-157).
 - [x] **Encoding ADR** (`url.encoding`, `url.restart`): own decoders
       generated from the pinned Encoding Standard indexes, or a reviewed
       crate. Pays TD-28. **Done 2026-11-18:** [ADR 0043](adr/0043-encoding-standard.md)
@@ -496,12 +501,15 @@ dependency, so these are settled before NET-01 starts:
       [ADR 0046](adr/0046-parse-budget-degradation.md).
 - [x] **Base URLs reach stylesheets** (TD-26) so `url()` values resolve.
       Done 2026-11-18.
-- [ ] **Loopback fixture server design.** Tests never touch the public
+- [x] **Loopback fixture server design.** Tests never touch the public
       internet; the server is in-process, binds to loopback only and works
-      under the emulated tiers.
-- [ ] **Async model.** Whether network I/O uses a reviewed runtime or
+      under the emulated tiers. **Done 2026-11-20:** [ADR 0053](adr/0053-loopback-fixture-server.md),
+      `rustic_net::fixture::FixtureServer`.
+- [x] **Async model.** Whether network I/O uses a reviewed runtime or
       Rustic's own poll loop behind the existing task sources. The scheduler
-      of ADR 0021–0023 stays the only place page-visible ordering is decided.
+      of ADR 0021–0023 stays the only place page-visible ordering is decided. **Done 2026-11-20:** [ADR 0052](adr/0052-network-io-model.md), one
+      thread per exchange with blocking sockets, short socket timeouts and a
+      byte-counted event window; no runtime.
 
 Suggested order inside M6: NET-01, then `url.encoding` with NET-02 (a real
 response needs both), NET-03, NET-05 (policy before more features), NET-04,
@@ -514,8 +522,30 @@ HTML encoding selection and replay, URL query encoding in the
 document's encoding, base URLs on stylesheets (TD-26), and parse budgets
 that degrade like Chromium instead of failing (TD-02, ADR 0046), and the
 built-in bugs of TD-142. Next candidates with no M5 dependency: the
-JavaScript fixes due at M6 entry (TD-137 to TD-140). The transport/TLS ADR and NET-01 wait for the M5
-completion review, since NET-02 depends on M5.
+JavaScript fixes due at M6 entry (TD-137 to TD-140).
+
+**NET-01 started 2026-11-20** (after the M5 review): the `rustic-net`
+crate has Rustic's own HTTP/1.1 client (framing, limits, interim
+responses), the origin allowlist, connect/idle/total timeouts,
+cancellation, a byte-counted backpressure window and the loopback fixture
+server ([IMPLEMENTATION.md](IMPLEMENTATION.md#net-01--http11-transport-without-tls)).
+Left for NET-01: the TLS adapter (after ADR 0051's TLS part is accepted)
+and content-coding decoding (TD-158). NET-02 groundwork landed the same day:
+Fetch's redirect rules with per-hop policy checks, and MIME type and
+`Content-Type` charset extraction passing all 975 pinned WPT records
+([IMPLEMENTATION.md](IMPLEMENTATION.md#net-02-partial--redirects-and-response-mime-types)).
+
+**NET-03 and NET-04 cores, 2026-11-20:** `rustic_net::fetch::Fetcher` runs
+main fetch over the transport with request modes, response tainting, the
+CORS check on every hop, preflights and their cache, the `Origin` header,
+credentials, redirect tainting, Cross-Origin-Resource-Policy and filtered
+responses ([IMPLEMENTATION.md](IMPLEMENTATION.md#net-03-partial--fetch-modes-cors-and-filtered-responses)).
+Its RFC 6265bis cookie jar enforces `Secure`, `HttpOnly`, `SameSite`
+(Lax by default), prefixes, partitioned cookies, blocked third-party
+cookies and eviction, over a host-supplied Public Suffix List
+([ADR 0054](adr/0054-sites-and-cookie-policy.md), [IMPLEMENTATION.md](IMPLEMENTATION.md#net-04-partial--cookie-jar-and-sites)).
+Next: NET-02's navigation state machine and loading documents over HTTP,
+the `fetch()` bindings, then NET-05.
 
 ## 10. M7 — Isolation and security gate
 
@@ -789,7 +819,7 @@ JS-09) are complete.
 | 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
 | 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Done |
 | 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Done: 59-file Window baseline with exact expectations |
-| 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | M5 review done 2026-11-19 ([review](reviews/2026-11-19-m5-completion.md)); emulated tiers and the transport/TLS ADR remain for M6 entry |
+| 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | M5 review done 2026-11-19 ([review](reviews/2026-11-19-m5-completion.md)); emulated tiers and the transport/TLS ADR remain for M6 entry. Fixture server and async model ADRs done and the TLS part proposed 2026-11-20 (ADR 0051–0053); NET-01 started |
 | — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Done on x86-64 ([report](reviews/2026-11-19-perf-01-m5.md)); ARM64 is TD-125 (M8) |
 | — | M6 entry, early (parallel): encodings | All 40 Encoding Standard encodings, stylesheet decoding (TD-28) | Done 2026-11-18: [ENCODING.md](ENCODING.md), [ADR 0043](adr/0043-encoding-standard.md). URL query encoding, TD-26 and TD-02 done 2026-11-18. Next: JS fixes due at M6 entry |
 | — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | Parallel; blocked on hosted CI |

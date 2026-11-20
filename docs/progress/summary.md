@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 34.75%** = 33.61% verified complete + 1.14% partial credit. 77/221 capabilities complete, 6 in progress.
+**Overall completion: 35.71%** = 33.61% verified complete + 2.10% partial credit. 77/221 capabilities complete, 10 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `c59b431ff8edd9fde032f8c8d95b4e312abd19a76a5fcca0073a9fb724b46053`.
+Catalog: `engine-v4`. Source fingerprint: `1e15a7c5d9632aa4637ec0a885b8cd347ba1047168980585526eb6689088f88d`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `c59b431ff8edd9fde032f8c8d95b4e312abd1
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
-| M6 Networking & services | 0/12 | 5.69% | 0.00% | 4.38% |
+| M6 Networking & services | 0/12 | 27.54% | 0.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -42,7 +42,7 @@ Catalog: `engine-v4`. Source fingerprint: `c59b431ff8edd9fde032f8c8d95b4e312abd1
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
-| Network & navigation | 0/8 | 0 | 0.00% | 0.00% | 4% | 0.00 |
+| Network & navigation | 0/8 | 4 | 23.95% | 0.00% | 4% | 0.95 |
 | Storage & workers | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -258,10 +258,27 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Network & navigation
 
-- **planned** `network.transport` — Reviewed TLS/HTTP transport with cancellation · size 5 · M6 · 0.62% of engine
-- **planned** `network.navigation` — Navigation/history state machine and redirects · size 5 · M6 · 0.62% of engine
-- **planned** `network.fetch` — Fetch, CORS and response filtering · size 5 · M6 · 0.62% of engine
-- **planned** `network.cookies` — Cookies and partitioned HTTP cache · size 3 · M6 · 0.37% of engine
+- **in progress 50.00%** `network.transport` — Reviewed TLS/HTTP transport with cancellation · size 5 · M6 · 0.62% of engine
+  - [x] Own HTTP/1.1 request serialization and split-invariant response framing under limits ([source](../../crates/rustic-net/src/response.rs), [source](../../crates/rustic-net/src/request.rs), [test](../../crates/rustic-net/src/response.rs))
+  - [x] Loopback origin allowlist, connect/idle/total timeouts, cancellation and backpressure over the fixture server ([source](../../crates/rustic-net/src/policy.rs), [source](../../crates/rustic-net/src/transport.rs), [source](../../crates/rustic-net/src/fixture.rs), [test](../../crates/rustic-net/tests/transport.rs), [test](../../crates/rustic-net/tests/transport.rs))
+  - [ ] TLS adapter with platform certificate verification and certificate-error fixtures (ADR 0051 TLS part)
+  - [ ] Content-coding decoding under output limits (TD-158)
+- **in progress 33.33%** `network.navigation` — Navigation/history state machine and redirects · size 5 · M6 · 0.62% of engine
+  - [x] Fetch redirect handling: status rules, URL list, fragments, limit and per-hop policy checks ([source](../../crates/rustic-net/src/redirect.rs), [test](../../crates/rustic-net/tests/redirects.rs), [test](../../crates/rustic-net/tests/redirects.rs))
+  - [x] Response MIME type and Content-Type charset extraction (pinned WPT mimesniff and fetch/content-type) ([source](../../crates/rustic-net/src/mime.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs))
+  - [ ] Navigation state machine over the transport (request, response, commit, cancel)
+  - [ ] Documents and subresources load over HTTP in the engine and CLI with response charset
+  - [ ] Referrer and policy container propagation across navigations and redirects
+  - [ ] Session history: reload, back/forward and form navigation
+- **in progress 50.00%** `network.fetch` — Fetch, CORS and response filtering · size 5 · M6 · 0.62% of engine
+  - [x] Fetch header classifications, CORS check, CORS-preflight validation and preflight cache ([source](../../crates/rustic-net/src/cors.rs), [source](../../crates/rustic-net/src/cors.rs), [test](../../crates/rustic-net/src/cors.rs), [test](../../crates/rustic-net/src/cors.rs))
+  - [x] Main fetch over the transport: modes, response tainting, Origin header, credentials, redirect tainting, CORP and filtered responses ([source](../../crates/rustic-net/src/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs))
+  - [ ] Decoded content codings, Referer and fetch metadata on Fetch requests
+  - [ ] Script-facing fetch(), Headers, Request and Response bindings with header guards
+- **in progress 33.33%** `network.cookies` — Cookies and partitioned HTTP cache · size 3 · M6 · 0.37% of engine
+  - [x] RFC 6265bis cookie jar: Set-Cookie and date parsing, storage and retrieval, SameSite, prefixes, partitioned cookies, third-party blocking and eviction ([source](../../crates/rustic-net/src/cookie/mod.rs), [source](../../crates/rustic-net/src/cookie/parse.rs), [test](../../crates/rustic-net/src/cookie/tests.rs), [test](../../crates/rustic-net/tests/fetch.rs))
+  - [ ] Reviewed Public Suffix List source (ADR 0054 decision)
+  - [ ] Partitioned HTTP cache and validators
 - **planned** `network.policy` — CSP, MIME, secure contexts and mixed-content policy · size 3 · M6 · 0.37% of engine
 - **planned** `network.protocols` — Required HTTP versions, WebSockets and referrer rules · size 5 · M9 · 0.62% of engine
 - **planned** `network.conformance` — Network policy and navigation conformance gate · size 3 · M6 · 0.37% of engine

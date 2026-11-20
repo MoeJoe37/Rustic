@@ -5702,8 +5702,78 @@
           "label": "Site/agent/process assignment and origin separation",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Process model ADR: site, origin-keyed and unique process keys, COOP group switches",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "pub fn process_key"
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0057-process-model-and-site-isolation.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "fn process_keys_follow_sites_origins_and_opaque_documents"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "fn coop_decides_browsing_context_group_switches"
+                }
+              ]
+            },
+            {
+              "label": "One fresh renderer and grant per document; no authority across navigations",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "fn spawn()"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "pub fn opaque_response_blocked"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "fn orb_blocks_cross_origin_documents_and_data"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer"
+                }
+              ]
+            },
+            {
+              "label": "Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "security.desktop",

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "2e0e98ce7b6a591032eba99861f578f19be31b86e2712d5ccdd60ec70dc5af90",
-  "percent": "39.59",
+  "source_fingerprint": "75f8643402d25ec11039f4cb14e47df9044fffa576e35a95b54d8c3c539c59b9",
+  "percent": "40.02",
   "verified_percent": "38.70",
-  "partial_percent": "0.89",
+  "partial_percent": "1.32",
   "completed": 91,
-  "in_progress": 5,
+  "in_progress": 6,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 2,
       "total": 8,
-      "percent": "18.75",
+      "percent": "30.46",
       "verified_percent": "18.75",
-      "partial_percent": "0.00"
+      "partial_percent": "11.71"
     },
     {
       "id": "M8",
@@ -6220,9 +6220,79 @@
           "label": "Site/agent/process assignment and origin separation",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Process model ADR: site, origin-keyed and unique process keys, COOP group switches",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "pub fn process_key"
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0057-process-model-and-site-isolation.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "fn process_keys_follow_sites_origins_and_opaque_documents"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "fn coop_decides_browsing_context_group_switches"
+                }
+              ]
+            },
+            {
+              "label": "One fresh renderer and grant per document; no authority across navigations",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "fn spawn()"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "pub fn opaque_response_blocked"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/src/isolation.rs",
+                  "marker": "fn orb_blocks_cross_origin_documents_and_data"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer"
+                }
+              ]
+            },
+            {
+              "label": "Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "0.58"
         },
         {
@@ -6308,12 +6378,12 @@
       ],
       "points": 43,
       "completed": 2,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 11,
-      "contribution": "0.69",
-      "percent": "13.95",
+      "contribution": "1.13",
+      "percent": "22.67",
       "verified_percent": "13.95",
-      "partial_percent": "0.00"
+      "partial_percent": "8.72"
     },
     {
       "id": "compositor",

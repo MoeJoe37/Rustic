@@ -2556,6 +2556,18 @@ restrictions are applied yet (ISO-03).
 | Output | The renderer returns its output; the broker writes standard output or the `--output` file only after `Done`. Renderer standard error is relayed with control characters escaped | `crashed_and_protocol_breaking_renderers_end_the_command_cleanly` |
 | Failure | A renderer that exits early or sends a malformed frame ends the command with status 1 and no output; the broker kills a protocol-breaking renderer; the next command starts a fresh renderer with a fresh grant | same |
 
+Site isolation ([ADR 0057](adr/0057-process-model-and-site-isolation.md),
+`rustic_net::isolation`): COOP, COEP and `Origin-Agent-Cluster` parsing for
+secure contexts, process keys (site, origin, unique), COOP group-switch
+matching, and in the broker Opaque Response Blocking and COEP
+`require-corp`/`credentialless` on every no-cors subresource
+(`policies_parse_and_apply_only_to_secure_contexts`,
+`coop_decides_browsing_context_group_switches`,
+`process_keys_follow_sites_origins_and_opaque_documents`,
+`orb_blocks_cross_origin_documents_and_data`,
+`require_corp_needs_resource_policy_cross_origin`,
+`opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer`).
+
 Test hooks `RUSTIC_TEST_RENDERER_CRASH` and
 `RUSTIC_TEST_COMPROMISED_RENDERER` change only what the renderer does,
 which the broker treats as hostile anyway; they grant nothing.

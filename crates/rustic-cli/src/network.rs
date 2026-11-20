@@ -273,6 +273,8 @@ pub(crate) struct NetworkSession {
     referrer_policy: ReferrerPolicy,
     cancellation: CancellationToken,
     charsets: RefCell<HashMap<String, String>>,
+    /// The document's COOP, COEP and origin-keying (ADR 0057).
+    isolation: rustic_net::isolation::IsolationPolicy,
 }
 
 impl fmt::Debug for NetworkSession {
@@ -412,6 +414,10 @@ pub fn navigate(
     let transport_encoding = committed.encoding;
     let policy = committed.policy.clone();
     let origin = committed.origin.clone();
+    let isolation = rustic_net::isolation::IsolationPolicy::from_headers(
+        &committed.headers,
+        mixed_content::is_secure_context(&origin, None),
+    );
     let bytes = committed
         .body
         .read_all(NETWORK_TIMEOUT)
@@ -419,7 +425,8 @@ pub fn navigate(
     if bytes.len() > max_bytes {
         return Err(NetworkLoadError::TooLarge(max_bytes));
     }
-    let session = NetworkSession::new(fetcher, document_url, origin, &policy, cancellation);
+    let mut session = NetworkSession::new(fetcher, document_url, origin, &policy, cancellation);
+    session.isolation = isolation;
     Ok(NetworkDocument {
         session: Rc::new(session),
         bytes,
@@ -468,6 +475,7 @@ impl NetworkSession {
             referrer_policy: policy.referrer_policy,
             cancellation,
             charsets: RefCell::new(HashMap::new()),
+            isolation: rustic_net::isolation::IsolationPolicy::default(),
         }
     }
 
@@ -525,6 +533,13 @@ impl NetworkSession {
             },
             credentials: if module {
                 CredentialsMode::SameOrigin
+            } else if self.isolation.embedder
+                == rustic_net::isolation::EmbedderPolicy::Credentialless
+                && !target.origin().is_same_origin(&self.origin)
+            {
+                // COEP credentialless: cross-origin no-cors requests omit
+                // credentials.
+                CredentialsMode::Omit
             } else {
                 CredentialsMode::Include
             },
@@ -584,10 +599,43 @@ impl NetworkSession {
                 .is_some_and(|first| first.trim_ascii().eq_ignore_ascii_case(b"nosniff"))
         });
         check_mime(kind, mime.as_ref(), nosniff)?;
+        let final_url = internal
+            .url_list
+            .last()
+            .cloned()
+            .unwrap_or_else(|| url.clone());
+        if !module
+            && !rustic_net::isolation::embedder_allows(
+                self.isolation.embedder,
+                &self.origin,
+                &final_url,
+                headers,
+            )
+        {
+            eprintln!("rustic: COEP require-corp: blocked a cross-origin resource without CORP");
+            return Err(FetchError::Blocked);
+        }
         let bytes = rustic_net::fetch::read_all(&internal.exchange, NETWORK_TIMEOUT)
             .map_err(|_| FetchError::Failed)?;
         if bytes.len() > max_bytes {
             return Err(FetchError::TooLarge);
+        }
+        // Opaque Response Blocking: another site's documents and data never
+        // reach the renderer through a no-cors request.
+        if !module
+            && rustic_net::isolation::opaque_response_blocked(
+                &self.origin,
+                &final_url,
+                destination,
+                headers,
+                &bytes,
+            )
+        {
+            eprintln!(
+                "rustic: ORB: blocked a cross-origin response that is not a {}",
+                destination.as_str()
+            );
+            return Err(FetchError::Blocked);
         }
         if matches!(kind, ResourceKind::Stylesheet | ResourceKind::Script { .. }) {
             let label = mime.as_ref().and_then(|mime| mime.parameter("charset"));

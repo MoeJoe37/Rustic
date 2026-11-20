@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 39.59%** = 38.70% verified complete + 0.89% partial credit. 91/221 capabilities complete, 5 in progress.
+**Overall completion: 40.02%** = 38.70% verified complete + 1.32% partial credit. 91/221 capabilities complete, 6 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `2e0e98ce7b6a591032eba99861f578f19be31b86e2712d5ccdd60ec70dc5af90`.
+Catalog: `engine-v4`. Source fingerprint: `75f8643402d25ec11039f4cb14e47df9044fffa576e35a95b54d8c3c539c59b9`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `2e0e98ce7b6a591032eba99861f578f19be31
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 2/8 | 18.75% | 18.75% | 3.72% |
+| M7 Isolation & security | 2/8 | 30.46% | 18.75% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `2e0e98ce7b6a591032eba99861f578f19be31
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 2/11 | 0 | 13.95% | 13.95% | 5% | 0.69 |
+| Security & IPC | 2/11 | 1 | 22.67% | 13.95% | 5% | 1.13 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -278,7 +278,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 - **complete** `security.ipc` — Bounded versioned hostile-peer-safe IPC · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-ipc/src/lib.rs), [source](../../crates/rustic-ipc/src/protocol.rs), [source](../../docs/adr/0056-ipc-format.md), [test](../../crates/rustic-ipc/tests/channel.rs), [test](../../crates/rustic-ipc/tests/channel.rs), [test](../../crates/rustic-fuzz/src/ipc.rs))
 - **complete** `security.authority` — Browser-assigned authority and capability brokering · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-- **planned** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine
+- **in progress 75.00%** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine
+  - [x] Process model ADR: site, origin-keyed and unique process keys, COOP group switches ([source](../../crates/rustic-net/src/isolation.rs), [source](../../docs/adr/0057-process-model-and-site-isolation.md), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs))
+  - [x] One fresh renderer and grant per document; no authority across navigations ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [x] Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource ([source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [ ] Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)
 - **planned** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
 - **planned** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
 - **planned** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine

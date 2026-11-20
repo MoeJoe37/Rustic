@@ -171,3 +171,85 @@ fn split_and_single_process_runs_agree() {
         assert_eq!(split.stderr, single.stderr, "{case:?}");
     }
 }
+
+fn png() -> Vec<u8> {
+    let surface =
+        rustic_raster::Surface::new(2, 2, rustic_raster::RasterLimits::default()).unwrap();
+    rustic_raster::encode_png(&surface, usize::MAX).unwrap()
+}
+
+#[test]
+fn opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer() {
+    let image = png();
+    let page = |coep: bool| {
+        let mut headers = vec![("Content-Type", "text/html")];
+        if coep {
+            headers.push(("Cross-Origin-Embedder-Policy", "require-corp"));
+        }
+        Reply::response(
+            200,
+            &headers,
+            b"<!doctype html><img src=http://127.0.0.1/data.json><img src=http://127.0.0.1/pic.png>\
+              <img src=http://127.0.0.1/corp.png>",
+        )
+    };
+    let server = FixtureServer::start([
+        ("/plain", page(false)),
+        ("/isolated", page(true)),
+        (
+            "/data.json",
+            Reply::response(
+                200,
+                &[("Content-Type", "application/json")],
+                b"{\"secret\":1}",
+            ),
+        ),
+        (
+            "/pic.png",
+            Reply::response(200, &[("Content-Type", "image/png")], &image),
+        ),
+        (
+            "/corp.png",
+            Reply::response(
+                200,
+                &[
+                    ("Content-Type", "image/png"),
+                    ("Cross-Origin-Resource-Policy", "cross-origin"),
+                ],
+                &image,
+            ),
+        ),
+    ])
+    .unwrap();
+    let address = server.address();
+    let grants = [
+        format!("http://localhost={address}"),
+        format!("http://127.0.0.1={address}"),
+    ];
+    // Both origins are potentially trustworthy (no mixed content), and
+    // cross-site to each other.
+    let paint = |path: &str| {
+        let url = format!("http://localhost{path}");
+        let output = rustic(
+            &[
+                "dump-paint",
+                "--allow-origin",
+                &grants[0],
+                "--allow-origin",
+                &grants[1],
+                &url,
+            ],
+            &[],
+        );
+        assert!(output.status.success(), "{}", text(&output.stderr));
+        (text(&output.stdout), text(&output.stderr))
+    };
+    let (plain, log) = paint("/plain");
+    // ORB stops the JSON; both PNGs paint.
+    assert!(log.contains("ORB: blocked"), "{log}");
+    assert_eq!(plain.matches(" image image=").count(), 2, "{plain}");
+    let (isolated, log) = paint("/isolated");
+    // COEP require-corp: only the image with CORP may load.
+    assert!(log.contains("COEP require-corp"), "{log}");
+    assert_eq!(isolated.matches(" image image=").count(), 1, "{isolated}");
+}

@@ -106,6 +106,11 @@ pub fn run() -> u8 {
     if std::env::var_os("RUSTIC_TEST_RENDERER_CRASH").is_some() {
         panic!("simulated renderer crash");
     }
+    if std::env::var_os("RUSTIC_TEST_RENDERER_HANG").is_some() {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
+    }
     if let Some(mode) = std::env::var_os("RUSTIC_TEST_COMPROMISED_RENDERER") {
         return compromised(channel, &start.document.url, &mode);
     }
@@ -174,6 +179,9 @@ pub fn run() -> u8 {
 /// report the broker's answers as the command output. `garbage` instead
 /// sends a frame the protocol does not have.
 fn compromised(mut channel: Link, document: &str, mode: &std::ffi::OsStr) -> u8 {
+    if mode == "escape" {
+        return escape(channel);
+    }
     if mode == "garbage" {
         let mut stdout = io::stdout().lock();
         let _ = stdout.write_all(&[3, 0, 0, 0, 0xEE, 0xEE, 0xEE]);
@@ -254,6 +262,69 @@ fn compromised(mut channel: Link, document: &str, mode: &std::ffi::OsStr) -> u8 
         _ => "unexpected reply".to_owned(),
     };
     report.push_str(&format!("storage: {answer}\n"));
+    let done = RendererMessage::Done {
+        status: 0,
+        output: report.into_bytes(),
+    };
+    match channel.send(&done) {
+        Ok(()) => 0,
+        Err(_) => 1,
+    }
+}
+
+/// Try to act directly on the operating system, as code running in a
+/// compromised renderer would, and report what worked. Under `--sandbox`
+/// every attempt must fail.
+fn escape(mut channel: Link) -> u8 {
+    let mut report = String::new();
+    let mut attempt = |label: &str, result: Result<String, String>| {
+        report.push_str(&match result {
+            Ok(detail) => format!("{label}: allowed ({detail})\n"),
+            Err(error) => format!("{label}: denied ({error})\n"),
+        });
+    };
+    attempt(
+        "read-etc-passwd",
+        std::fs::read("/etc/passwd")
+            .map(|bytes| format!("{} bytes", bytes.len()))
+            .map_err(|error| error.kind().to_string()),
+    );
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home".to_owned());
+    attempt(
+        "list-home",
+        std::fs::read_dir(&home)
+            .map(|entries| format!("{} entries", entries.count()))
+            .map_err(|error| error.kind().to_string()),
+    );
+    attempt(
+        "write-tmp",
+        std::fs::write("/tmp/rustic-escape-probe", b"x")
+            .map(|()| {
+                let _ = std::fs::remove_file("/tmp/rustic-escape-probe");
+                "wrote".to_owned()
+            })
+            .map_err(|error| error.kind().to_string()),
+    );
+    let address = std::env::var("RUSTIC_TEST_ESCAPE_ADDRESS").unwrap_or_default();
+    attempt(
+        "connect-loopback",
+        address
+            .parse::<std::net::SocketAddr>()
+            .map_err(|error| error.to_string())
+            .and_then(|address| {
+                std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(2))
+                    .map(|_| "connected".to_owned())
+                    .map_err(|error| error.kind().to_string())
+            }),
+    );
+    attempt(
+        "spawn-shell",
+        std::process::Command::new("/bin/sh")
+            .args(["-c", "true"])
+            .status()
+            .map(|status| status.to_string())
+            .map_err(|error| error.kind().to_string()),
+    );
     let done = RendererMessage::Done {
         status: 0,
         output: report.into_bytes(),

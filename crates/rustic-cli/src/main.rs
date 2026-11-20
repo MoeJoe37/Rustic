@@ -81,6 +81,14 @@ external classics and static JavaScript modules before producing output.
 The snapshot uses a manual clock for at most 256 timer turns and offers
 one animation frame.
 
+Process isolation: document commands (all but reftest) run their page in a
+renderer child process that asks this process for every file, network and
+storage access. --single-process runs everything in one process.
+--sandbox (Linux, needs bubblewrap; or RUSTIC_SANDBOX=1) confines the
+renderer: no files, no network, no other processes; it fails rather than
+run unconfined. --renderer-timeout SECONDS stops a renderer that runs
+longer (default 120).
+
 Network (development prototype, loopback only): any document command accepts
 an http:// or https:// URL in place of <file> when each origin it may reach is
 granted with --allow-origin ORIGIN=ADDRESS (for example

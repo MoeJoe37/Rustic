@@ -65,6 +65,7 @@ instead of rewriting the history of a decision.
 | [0055](0055-downloads-broker-and-websocket-plan.md) | Downloads only through the broker with user decision and sanitized names; WebSocket over the allowlisted transport with Fetch policy | Accepted |
 | [0056](0056-ipc-format.md) | Own bounded, versioned, canonical IPC over the child's standard streams; protocol 1 for broker and renderer | Accepted |
 | [0057](0057-process-model-and-site-isolation.md) | Site-per-process keys, origin-keyed clusters, COOP group switches, ORB and COEP in the broker | Accepted |
+| [0058](0058-linux-renderer-sandbox.md) | Linux renderer under bubblewrap: all namespaces, no files or network, fail closed, watchdog | Proposed |
 
 ## Records by area
 
@@ -83,7 +84,7 @@ instead of rewriting the history of a decision.
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
-| Isolation and security (M7) | 0055, 0056, 0057 |
+| Isolation and security (M7) | 0055, 0056, 0057, 0058 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

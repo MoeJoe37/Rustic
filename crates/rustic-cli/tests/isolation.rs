@@ -15,6 +15,10 @@ fn rustic(args: &[&str], env: &[(&str, &str)]) -> Output {
     for (name, value) in env {
         command.env(name, value);
     }
+    if args.contains(&"--single-process") {
+        // The sandbox confines a renderer process, which this run has not.
+        command.env_remove("RUSTIC_SANDBOX");
+    }
     command.output().expect("run rustic")
 }
 
@@ -252,4 +256,83 @@ fn opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer() {
     // COEP require-corp: only the image with CORP may load.
     assert!(log.contains("COEP require-corp"), "{log}");
     assert_eq!(isolated.matches(" image image=").count(), 1, "{isolated}");
+}
+
+fn bubblewrap_available() -> bool {
+    Command::new("bwrap")
+        .args(["--ro-bind", "/", "/", "true"])
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+#[test]
+fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed() {
+    let site = Site::new("sandbox");
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let probe = |sandbox: bool| {
+        let mut args = vec![];
+        if sandbox {
+            args.push("--sandbox");
+        }
+        let page = site.page();
+        args.extend_from_slice(&["dump-dom", &page]);
+        rustic(
+            &args,
+            &[
+                ("RUSTIC_TEST_COMPROMISED_RENDERER", "escape"),
+                ("RUSTIC_TEST_ESCAPE_ADDRESS", &address),
+            ],
+        )
+    };
+    if !cfg!(target_os = "linux") || !bubblewrap_available() {
+        // No sandbox here: the command refuses rather than run unconfined.
+        let output = probe(true);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        return;
+    }
+    // The unconfined control run shows the probes would work.
+    let open = text(&probe(false).stdout);
+    assert!(open.contains("read-etc-passwd: allowed"), "{open}");
+    assert!(open.contains("connect-loopback: allowed"), "{open}");
+    let output = probe(true);
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    let confined = text(&output.stdout);
+    for probe in [
+        "read-etc-passwd",
+        "list-home",
+        "write-tmp",
+        "connect-loopback",
+        "spawn-shell",
+    ] {
+        assert!(confined.contains(&format!("{probe}: denied")), "{confined}");
+    }
+    // Real rendering still works inside the sandbox.
+    let page = site.page();
+    let output = rustic(&["--sandbox", "dump-dom", &page], &[]);
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    assert!(text(&output.stdout).contains("text \"x\""));
+    // The sandbox and the single-process mode exclude each other.
+    let output = rustic(&["--sandbox", "--single-process", "dump-dom", &page], &[]);
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn a_hung_renderer_is_stopped_by_the_watchdog() {
+    let site = Site::new("hang");
+    let page = site.page();
+    let started = std::time::Instant::now();
+    let output = rustic(
+        &["--renderer-timeout", "1", "dump-dom", &page],
+        &[("RUSTIC_TEST_RENDERER_HANG", "1")],
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(
+        text(&output.stderr).contains("did not finish within 1 s"),
+        "{}",
+        text(&output.stderr)
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(20));
 }

@@ -2568,8 +2568,17 @@ matching, and in the broker Opaque Response Blocking and COEP
 `require_corp_needs_resource_policy_cross_origin`,
 `opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer`).
 
-Test hooks `RUSTIC_TEST_RENDERER_CRASH` and
-`RUSTIC_TEST_COMPROMISED_RENDERER` change only what the renderer does,
+Linux sandbox ([ADR 0058](adr/0058-linux-renderer-sandbox.md), opt-in
+`--sandbox` or `RUSTIC_SANDBOX=1`): the renderer runs under bubblewrap with
+every namespace unshared, no capabilities, a new session, a cleared
+environment and only read-only `/usr` and its executable; it fails closed
+(`the_linux_sandbox_denies_files_network_and_processes_or_fails_closed`).
+Every CLI suite and the pinned WPT selection pass sandboxed. A watchdog
+stops a renderer after `--renderer-timeout` seconds
+(`a_hung_renderer_is_stopped_by_the_watchdog`).
+
+Test hooks `RUSTIC_TEST_RENDERER_CRASH`, `RUSTIC_TEST_RENDERER_HANG` and
+`RUSTIC_TEST_COMPROMISED_RENDERER` (`1`, `garbage`, `escape`) change only what the renderer does,
 which the broker treats as hostile anyway; they grant nothing.
 
 ## NET-03 — fetch(), Headers, Request and Response

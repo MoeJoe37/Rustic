@@ -33,6 +33,18 @@ use crate::network::{NetworkSession, ResourceKind, Session};
 use crate::stylesheets::LocalStylesheetFetcher;
 
 static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
+static SANDBOX: AtomicBool = AtomicBool::new(false);
+static TIMEOUT_SECONDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(120);
+
+/// Environment variables a sandboxed renderer may keep (test hooks and
+/// backtraces; nothing that names a user, a home or a display).
+const SANDBOX_ENV: &[&str] = &[
+    "RUST_BACKTRACE",
+    "RUSTIC_TEST_RENDERER_CRASH",
+    "RUSTIC_TEST_RENDERER_HANG",
+    "RUSTIC_TEST_COMPROMISED_RENDERER",
+    "RUSTIC_TEST_ESCAPE_ADDRESS",
+];
 
 /// Remove `--single-process` from `args`.
 pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
@@ -46,9 +58,29 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
         }
         if arg == "--single-process" {
             SINGLE_PROCESS.store(true, Ordering::Relaxed);
+        } else if arg == "--sandbox" {
+            SANDBOX.store(true, Ordering::Relaxed);
+        } else if arg == "--renderer-timeout" {
+            let seconds = args
+                .next()
+                .and_then(|value| value.into_string().ok())
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|&seconds| (1..=86_400).contains(&seconds))
+                .ok_or("--renderer-timeout requires seconds from 1 to 86400")?;
+            TIMEOUT_SECONDS.store(seconds, Ordering::Relaxed);
         } else {
             output.push(arg);
         }
+    }
+    if std::env::var_os("RUSTIC_SANDBOX").is_some_and(|value| value == "1") {
+        SANDBOX.store(true, Ordering::Relaxed);
+    }
+    if SANDBOX.load(Ordering::Relaxed) && SINGLE_PROCESS.load(Ordering::Relaxed) {
+        return Err(
+            "--sandbox confines the renderer process; it cannot be used with \
+                    --single-process"
+                .into(),
+        );
     }
     Ok(output)
 }
@@ -217,9 +249,66 @@ fn document_argument(
     }
 }
 
-fn spawn() -> io::Result<(Child, ChildStdout, ChildStdin, std::thread::JoinHandle<()>)> {
-    let mut child = Command::new(std::env::current_exe()?)
-        .arg(crate::renderer::RENDERER_COMMAND)
+/// The renderer command line: the executable itself, or under `--sandbox`
+/// that executable inside bubblewrap (ADR 0058) with every namespace
+/// unshared (no network), a filesystem of the read-only system libraries
+/// and the executable only, no capabilities, a new session (no terminal
+/// injection), a cleared environment, and death with the broker.
+fn renderer_command() -> io::Result<Command> {
+    let exe = std::env::current_exe()?;
+    if !SANDBOX.load(Ordering::Relaxed) {
+        let mut command = Command::new(exe);
+        command.arg(crate::renderer::RENDERER_COMMAND);
+        return Ok(command);
+    }
+    if !cfg!(target_os = "linux") {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "--sandbox is implemented on Linux only (ISO-04 covers Windows and macOS)",
+        ));
+    }
+    let exe = exe.to_str().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the executable path is not UTF-8",
+        )
+    })?;
+    let mut command = Command::new("bwrap");
+    command.args([
+        "--unshare-all",
+        "--die-with-parent",
+        "--new-session",
+        "--cap-drop",
+        "ALL",
+        "--clearenv",
+        "--ro-bind",
+        "/usr",
+        "/usr",
+        "--symlink",
+        "usr/lib",
+        "/lib",
+        "--symlink",
+        "usr/lib64",
+        "/lib64",
+        "--ro-bind",
+        exe,
+        "/renderer",
+        "--chdir",
+        "/",
+    ]);
+    for name in SANDBOX_ENV {
+        if let Some(value) = std::env::var_os(name) {
+            command.arg("--setenv").arg(name).arg(value);
+        }
+    }
+    command.args(["/renderer", crate::renderer::RENDERER_COMMAND]);
+    Ok(command)
+}
+
+type Spawned = (Child, ChildStdout, ChildStdin, std::thread::JoinHandle<()>);
+
+fn spawn() -> io::Result<Spawned> {
+    let mut child = renderer_command()?
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -252,12 +341,36 @@ fn serve(
     let (mut child, stdout, stdin, relay) = match spawn() {
         Ok(spawned) => spawned,
         Err(error) => {
-            eprintln!("rustic {command}: cannot start the renderer process: {error}");
+            if SANDBOX.load(Ordering::Relaxed) && error.kind() == io::ErrorKind::NotFound {
+                eprintln!(
+                    "rustic {command}: --sandbox needs bubblewrap (bwrap) on PATH; the renderer \
+                     was not started without its sandbox"
+                );
+            } else {
+                eprintln!("rustic {command}: cannot start the renderer process: {error}");
+            }
             return 1;
         }
     };
+    // Watchdog: a renderer that does not finish in time is killed, and the
+    // pipe closing ends the wait below (security.recovery).
+    let seconds = TIMEOUT_SECONDS.load(Ordering::Relaxed);
+    let pid = child.id();
+    let (finished, watch) = std::sync::mpsc::channel::<()>();
+    let timed_out = std::sync::Arc::new(AtomicBool::new(false));
+    let flag = std::sync::Arc::clone(&timed_out);
+    let watchdog = std::thread::spawn(move || {
+        if watch.recv_timeout(std::time::Duration::from_secs(seconds))
+            == Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        {
+            flag.store(true, Ordering::SeqCst);
+            kill_process(pid);
+        }
+    });
+    let handshake_done = AtomicBool::new(false);
     let result = (|| -> Result<(u8, Vec<u8>), IpcError> {
         let mut channel = Channel::connect(stdout, stdin, Role::Broker, Limits::default())?;
+        handshake_done.store(true, Ordering::SeqCst);
         channel.send(&BrokerMessage::Start(start))?;
         let mut broker = Broker::new(grant, limits);
         loop {
@@ -271,6 +384,8 @@ fn serve(
             }
         }
     })();
+    let _ = finished.send(());
+    let _ = watchdog.join();
     match result {
         Ok((status, bytes)) => {
             let _ = child.wait();
@@ -302,9 +417,26 @@ fn serve(
                 }
             }
         }
+        Err(IpcError::Closed) if timed_out.load(Ordering::SeqCst) => {
+            let _ = child.wait();
+            let _ = relay.join();
+            eprintln!(
+                "rustic {command}: the renderer did not finish within {seconds} s and was \
+                 stopped; no output was written"
+            );
+            1
+        }
         Err(IpcError::Closed) => {
             let status = child.wait();
             let _ = relay.join();
+            if SANDBOX.load(Ordering::Relaxed) && !handshake_done.load(Ordering::SeqCst) {
+                eprintln!(
+                    "rustic {command}: the sandboxed renderer could not start ({}); nothing \
+                     ran unsandboxed",
+                    status.map_or_else(|error| error.to_string(), |status| status.to_string())
+                );
+                return 1;
+            }
             eprintln!(
                 "rustic {command}: the renderer process ended before finishing ({}); no output \
                  was written",
@@ -502,5 +634,23 @@ impl<'a> Broker<'a> {
                 StorageValue::Keys(keys)
             }
         }
+    }
+}
+
+/// Stop a renderer by process id from the watchdog thread (the broker's
+/// thread owns its `Child`). The `kill` utility needs no unsafe code.
+fn kill_process(pid: u32) {
+    if cfg!(unix) {
+        let _ = Command::new("kill")
+            .args(["-KILL", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    } else {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
     }
 }

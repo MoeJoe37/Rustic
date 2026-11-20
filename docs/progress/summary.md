@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 40.02%** = 38.70% verified complete + 1.32% partial credit. 91/221 capabilities complete, 6 in progress.
+**Overall completion: 40.40%** = 38.70% verified complete + 1.70% partial credit. 91/221 capabilities complete, 8 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `75f8643402d25ec11039f4cb14e47df9044fffa576e35a95b54d8c3c539c59b9`.
+Catalog: `engine-v4`. Source fingerprint: `14bd9b24ee9b8d6edfe7700ba91772fc61cbd074ab60d3044fe87a66a28edc6a`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `75f8643402d25ec11039f4cb14e47df9044ff
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 2/8 | 30.46% | 18.75% | 3.72% |
+| M7 Isolation & security | 2/8 | 40.62% | 18.75% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `75f8643402d25ec11039f4cb14e47df9044ff
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 2/11 | 1 | 22.67% | 13.95% | 5% | 1.13 |
+| Security & IPC | 2/11 | 3 | 30.23% | 13.95% | 5% | 1.51 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -283,10 +283,19 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] One fresh renderer and grant per document; no authority across navigations ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [x] Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource ([source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [ ] Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)
-- **planned** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
+- **in progress 20.00%** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
+  - [x] Linux: renderer under namespaces with no filesystem, network or capabilities, fail closed (ADR 0058) ([source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0058-linux-renderer-sandbox.md), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [ ] Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172)
+  - [ ] Linux aarch64: native verification run
+  - [ ] Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners
+  - [ ] macOS: App Sandbox or seatbelt profile with an ADR, verified on native x64 and ARM64 runners
 - **planned** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
 - **planned** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine
-- **planned** `security.recovery` — Renderer/service crash recovery without stale authority · size 3 · M7 · 0.34% of engine
+- **in progress 75.00%** `security.recovery` — Renderer/service crash recovery without stale authority · size 3 · M7 · 0.34% of engine
+  - [x] A crashed or protocol-breaking renderer ends its command without output; the broker survives ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [x] A hung renderer is stopped by the broker's watchdog ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [x] Every new renderer starts with a fresh grant; nothing carries over from a dead one ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [ ] Network and GPU service crash and restart (needs a network process, TD-161)
 - **planned** `security.brave` — Versioned Brave security comparison and independent review · size 3 · M10 · 0.34% of engine
 - **planned** `security.privacy` — Default tracking/bounce/fingerprinting defenses and privacy matrix · size 5 · M10 · 0.58% of engine
 - **planned** `security.updates` — Authenticated updates, incident response and vulnerability triage · size 3 · M10 · 0.34% of engine

@@ -5780,8 +5780,51 @@
           "label": "Verified Windows/macOS/Linux sandboxing",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Linux: renderer under namespaces with no filesystem, network or capabilities, fail closed (ADR 0058)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "fn renderer_command()"
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0058-linux-renderer-sandbox.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed"
+                }
+              ]
+            },
+            {
+              "label": "Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Linux aarch64: native verification run",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "macOS: App Sandbox or seatbelt profile with an ADR, verified on native x64 and ARM64 runners",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "security.mobile",
@@ -5804,8 +5847,63 @@
           "label": "Renderer/service crash recovery without stale authority",
           "size": 3,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "A crashed or protocol-breaking renderer ends its command without output; the broker survives",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "the renderer process ended before finishing"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "A hung renderer is stopped by the broker's watchdog",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "fn kill_process"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_hung_renderer_is_stopped_by_the_watchdog"
+                }
+              ]
+            },
+            {
+              "label": "Every new renderer starts with a fresh grant; nothing carries over from a dead one",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "enum Grant"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "Network and GPU service crash and restart (needs a network process, TD-161)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "security.brave",

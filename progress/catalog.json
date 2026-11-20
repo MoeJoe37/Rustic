@@ -5304,55 +5304,52 @@
           "label": "Cookies and partitioned HTTP cache",
           "size": 3,
           "milestone": "M6",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "RFC 6265bis cookie jar: Set-Cookie and date parsing, storage and retrieval, SameSite, prefixes, partitioned cookies, third-party blocking and eviction",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/cookie/mod.rs",
-                  "marker": "pub struct CookieJar"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/cookie/parse.rs",
-                  "marker": "pub fn parse_cookie_date"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/cookie/tests.rs",
-                  "marker": "fn random_sequences_keep_the_jar_invariants"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/fetch.rs",
-                  "marker": "fn navigations_store_lax_cookies_and_subresources_respect_same_site"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/cookie/mod.rs",
+              "marker": "pub struct CookieJar"
             },
             {
-              "label": "Reviewed Public Suffix List source (ADR 0054 decision)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/site.rs",
-                  "marker": "pub fn bundled"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/public_suffix.rs",
-                  "marker": "fn bundled_list_passes_the_upstream_test_vectors"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/cookie/parse.rs",
+              "marker": "pub fn parse_cookie_date"
             },
             {
-              "label": "Partitioned HTTP cache and validators",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-net/src/cookie/tests.rs",
+              "marker": "fn random_sequences_keep_the_jar_invariants"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/fetch.rs",
+              "marker": "fn navigations_store_lax_cookies_and_subresources_respect_same_site"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/site.rs",
+              "marker": "pub fn bundled"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/public_suffix.rs",
+              "marker": "fn bundled_list_passes_the_upstream_test_vectors"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/http_cache.rs",
+              "marker": "pub struct HttpCache"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/http_cache.rs",
+              "marker": "fn fresh_responses_are_reused_within_their_partition_only"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/http_cache.rs",
+              "marker": "fn stale_responses_revalidate_with_etags_and_304_freshens_them"
             }
           ]
         },

@@ -158,6 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [NET-04 — Partitioned HTTP cache](#net-04--partitioned-http-cache)
 - [NET-06 — Profiles, storage keys and Web Storage](#net-06--profiles-storage-keys-and-web-storage)
 - [url.restart — Encoding confidence and change the encoding](#urlrestart--encoding-confidence-and-change-the-encoding)
 - [NET-02 — Documents and subresources over HTTP in the CLI](#net-02--documents-and-subresources-over-http-in-the-cli)
@@ -2535,6 +2536,24 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## NET-04 — Partitioned HTTP cache
+
+Added 2026-11-20 (`rustic_net::http_cache`), used by every `Fetcher`
+`GET` (RFC 9111 as a private cache).
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Partitioning | Keyed by network partition key (top-level site; a navigation uses the site it goes to) and URL without fragment; one site's entries never answer another's | `fresh_responses_are_reused_within_their_partition_only` |
+| Storing | Complete `GET` responses with a cacheable status and a `Content-Length` up to 4 MiB; not `no-store` (response or request), `Vary: *`, `Authorization` requests or responses that set cookies | `uncacheable_responses_and_unsafe_methods` |
+| Freshness | `max-age`, else `Expires` − `Date` (invalid `Expires` is stale), else 10% of `Date` − `Last-Modified` capped at a day; `Age` and residence time; `no-cache`, request `no-cache`/`Pragma: no-cache` and request `max-age` force revalidation | `fresh_responses_are_reused_within_their_partition_only`, `uncacheable_responses_and_unsafe_methods` |
+| Validation | Stale entries send `If-None-Match`/`If-Modified-Since` (not over author conditionals); 304 replaces the stored header fields except framing and delivers the stored body; stale entries without validators are dropped | `stale_responses_revalidate_with_etags_and_304_freshens_them` |
+| `Vary` | Stored request values of the named headers must match | `vary_selects_on_request_headers` |
+| Invalidation | A non-error response to an unsafe method removes the URL in every partition | `uncacheable_responses_and_unsafe_methods` |
+| Bounds | 512 entries and 32 MiB of bodies; least recently used first | `the_cache_evicts_least_recently_used_entries_at_its_limits` |
+
+The cache is memory-only (persisting it with the profile is TD-168), and
+a cacheable body is read whole before it is delivered (TD-161).
 
 ## NET-06 — Profiles, storage keys and Web Storage
 

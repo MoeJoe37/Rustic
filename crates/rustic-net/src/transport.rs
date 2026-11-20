@@ -140,6 +140,23 @@ impl Exchange {
         Some(event)
     }
 
+    /// An exchange that delivers `body` and finishes, for a response
+    /// served from the HTTP cache (its head is returned separately).
+    pub(crate) fn from_body(body: Vec<u8>) -> Self {
+        let (producer, consumer) = pipe(body.len().max(1));
+        // An empty window accepts one body event, and control events are
+        // never held back, so neither push waits.
+        if !body.is_empty() {
+            let _ = producer.push(NetEvent::Body(body), Duration::ZERO, || true);
+        }
+        let _ = producer.push(NetEvent::Finished, Duration::ZERO, || true);
+        Self {
+            cancel: CancellationToken::default(),
+            consumer,
+            ended: Cell::new(false),
+        }
+    }
+
     /// Body bytes buffered now, and the most ever buffered.
     pub fn buffered_bytes(&self) -> (usize, usize) {
         self.consumer.buffered()

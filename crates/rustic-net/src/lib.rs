@@ -42,6 +42,7 @@ pub mod data_url;
 pub mod fetch;
 pub mod fixture;
 mod headers;
+pub mod http_cache;
 mod limits;
 pub mod mime;
 pub mod mixed_content;

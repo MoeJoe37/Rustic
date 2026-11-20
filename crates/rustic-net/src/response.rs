@@ -47,6 +47,14 @@ impl ResponseHead {
     pub fn headers(&self) -> &Headers {
         &self.headers
     }
+
+    /// The same status line with other header fields (cache freshening).
+    pub(crate) fn with_headers(&self, headers: Headers) -> Self {
+        Self {
+            headers,
+            ..self.clone()
+        }
+    }
 }
 
 /// A response violated HTTP/1.1 syntax or framing, or a limit.

@@ -128,7 +128,8 @@ pub struct FixtureServer {
 impl FixtureServer {
     /// Bind `127.0.0.1:0` and serve `routes`, keyed by request-target
     /// (an exact match first, then the path without its query). Unknown
-    /// targets get a 404.
+    /// targets get a 404. A route `"<target> if-none-match=<value>"` takes
+    /// precedence for requests with that `If-None-Match` value.
     pub fn start<'a>(routes: impl IntoIterator<Item = (&'a str, Reply)>) -> io::Result<Self> {
         Self::bind(routes, None)
     }
@@ -264,9 +265,14 @@ fn respond(mut stream: impl Read + Write, shared: &Shared) {
         return;
     };
     let path = request.target.split('?').next().unwrap_or_default();
-    let reply = shared
-        .routes
-        .get(&request.target)
+    // A route named `<target> if-none-match=<value>` answers conditional
+    // requests carrying that validator (HTTP cache tests).
+    let conditional = request
+        .header("if-none-match")
+        .map(|value| format!("{} if-none-match={value}", request.target));
+    let reply = conditional
+        .and_then(|key| shared.routes.get(&key))
+        .or_else(|| shared.routes.get(&request.target))
         .or_else(|| shared.routes.get(path))
         .cloned()
         .unwrap_or_else(|| Reply::response(404, &[], b"not found"));

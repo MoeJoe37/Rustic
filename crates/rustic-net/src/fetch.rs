@@ -345,6 +345,7 @@ pub struct Fetcher {
     transport: Transport,
     cookies: CookieJar,
     preflight: PreflightCache,
+    cache: crate::http_cache::HttpCache,
     head_timeout: Duration,
     clock: Box<dyn Fn() -> i64 + Send>,
     accept_language: String,
@@ -388,6 +389,7 @@ impl Fetcher {
             transport,
             cookies,
             preflight: PreflightCache::default(),
+            cache: crate::http_cache::HttpCache::default(),
             head_timeout,
             clock: Box::new(system_seconds),
             accept_language: "en-US,en".to_owned(),
@@ -414,6 +416,16 @@ impl Fetcher {
     /// management).
     pub fn cookies_mut(&mut self) -> &mut CookieJar {
         &mut self.cookies
+    }
+
+    /// The HTTP cache.
+    pub fn http_cache(&self) -> &crate::http_cache::HttpCache {
+        &self.cache
+    }
+
+    /// The HTTP cache, to clear it.
+    pub fn http_cache_mut(&mut self) -> &mut crate::http_cache::HttpCache {
+        &mut self.cache
     }
 
     /// The CORS-preflight cache.
@@ -641,6 +653,16 @@ impl Fetcher {
         }
     }
 
+    /// The HTTP cache partition of one hop: a navigation is its own
+    /// top-level document, keyed by the site it goes to.
+    fn cache_partition(&self, request: &FetchRequest, current: &Url) -> String {
+        if request.mode == RequestMode::Navigate {
+            self.suffixes().site(&current.origin()).serialize()
+        } else {
+            self.partition_key(request)
+        }
+    }
+
     /// HTTP-network-or-cache fetch without the cache: headers, cookies,
     /// the request itself and `Set-Cookie` processing.
     fn network_fetch(
@@ -709,6 +731,27 @@ impl Fetcher {
                     .map_err(NetworkError::Request)?;
             }
         }
+        // HTTP-network-or-cache fetch: a GET may be answered or
+        // revalidated from the partitioned cache.
+        let cacheable = hop.method == "GET" && hop.body.is_empty();
+        let partition = self.cache_partition(request, current);
+        let mut revalidating = false;
+        if cacheable {
+            match self.cache.lookup(&partition, current, &hop.headers, now) {
+                crate::http_cache::Lookup::Fresh(head, body) => {
+                    return Ok((head, Exchange::from_body(body)));
+                }
+                crate::http_cache::Lookup::Revalidate(conditional) => {
+                    for (name, value) in conditional {
+                        if !hop.headers.contains(name) {
+                            wire.header(name, &value).map_err(NetworkError::Request)?;
+                            revalidating = true;
+                        }
+                    }
+                }
+                crate::http_cache::Lookup::Miss => {}
+            }
+        }
         let (head, exchange) = self.send(wire)?;
         if include_credentials {
             for value in head.headers().get_all("set-cookie") {
@@ -716,6 +759,28 @@ impl Fetcher {
                 // A rejected cookie leaves the response unchanged.
                 let _ = self.cookies.set_cookie(&text, &context, now);
             }
+        }
+        if revalidating && head.status() == 304 {
+            if let Some((head, body)) = self.cache.freshen(&partition, current, &head, now) {
+                return Ok((head, Exchange::from_body(body)));
+            }
+        }
+        if !matches!(hop.method.as_str(), "GET" | "HEAD" | "OPTIONS" | "TRACE")
+            && head.status() < 400
+        {
+            self.cache.invalidate(current);
+        }
+        if cacheable && self.cache.may_store(&hop.headers, &head).is_some() {
+            let body = read_all(&exchange, self.head_timeout)?;
+            self.cache.store(
+                &partition,
+                current,
+                &hop.headers,
+                head.clone(),
+                body.clone(),
+                now,
+            );
+            return Ok((head, Exchange::from_body(body)));
         }
         Ok((head, exchange))
     }

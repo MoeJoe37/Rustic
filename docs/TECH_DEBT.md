@@ -64,7 +64,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M12 (performance leadership) | TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
@@ -230,6 +230,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
 | TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M7 browser shell |
 | TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
+| TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2629,3 +2630,14 @@ document, and there is no `StorageEvent` interface.
 documents of the key, queued on their DOM manipulation task source, and
 the `StorageEvent` binding.
 **Trigger:** a host with more than one live document (tabs or frames).
+
+### TD-168 — The HTTP cache is not persisted
+
+`rustic_net::http_cache::HttpCache` lives in the `Fetcher`, so every run
+starts cold even with `--profile`, and it implements neither
+`immutable`, `stale-while-revalidate` nor partial (range) entries.
+Correctness does not depend on any of them; repeat-visit speed does.
+**Pay:** a profile-backed store (body files plus an index record, checked
+on load like the other profile files), the extensions, and eviction under
+the profile quota.
+**Trigger:** M12 repeat-visit page-load measurements.

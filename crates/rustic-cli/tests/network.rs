@@ -432,3 +432,69 @@ fn script_fetch_applies_cors_and_connect_src() {
     assert_eq!(closed.header("origin"), Some("http://a.test"));
     assert!(stderr(&output).contains("connect-src"));
 }
+
+#[test]
+fn downloads_are_saved_only_to_the_granted_directory_without_overwriting() {
+    let server = FixtureServer::start([
+        (
+            "/report",
+            Reply::response(
+                200,
+                &[
+                    ("Content-Type", "application/pdf"),
+                    (
+                        "Content-Disposition",
+                        "attachment; filename=\"../../evil.pdf\"",
+                    ),
+                ],
+                b"%PDF-1",
+            ),
+        ),
+        (
+            "/con",
+            Reply::response(
+                200,
+                &[("Content-Disposition", "attachment; filename=\"CON.txt\"")],
+                b"x",
+            ),
+        ),
+    ])
+    .unwrap();
+    let grant = format!("http://a.test={}", server.address());
+    let dir = std::env::temp_dir().join(format!("rustic-downloads-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let download_dir = dir.to_str().unwrap();
+    // Without a download directory, nothing is written.
+    let output = rustic(&["dump-dom", "--allow-origin", &grant, "http://a.test/report"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output).contains("is a download"));
+    let save = |path: &str| {
+        let url = format!("http://a.test{path}");
+        rustic(&[
+            "dump-dom",
+            "--allow-origin",
+            &grant,
+            "--download-dir",
+            download_dir,
+            &url,
+        ])
+    };
+    for _ in 0..2 {
+        let output = save("/report");
+        assert!(stderr(&output).contains("saved as"), "{}", stderr(&output));
+        assert!(output.stdout.is_empty());
+    }
+    save("/con");
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    // The path in the filename is gone, the second copy did not overwrite
+    // the first, no .part file is left, and the device name is renamed.
+    assert_eq!(names, ["_CON.txt", "evil (1).pdf", "evil.pdf"]);
+    assert_eq!(std::fs::read(dir.join("evil.pdf")).unwrap(), b"%PDF-1");
+    assert!(!dir.parent().unwrap().join("evil.pdf").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}

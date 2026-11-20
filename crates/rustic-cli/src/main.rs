@@ -88,6 +88,8 @@ storage access. --single-process runs everything in one process.
 renderer: no files, no network, no other processes; it fails rather than
 run unconfined. --renderer-timeout SECONDS stops a renderer that runs
 longer (default 120).
+--download-dir DIR saves navigations that turn out to be downloads into DIR
+(sanitized names, never overwriting); without it downloads are refused.
 
 Network (development prototype, loopback only): any document command accepts
 an http:// or https:// URL in place of <file> when each origin it may reach is

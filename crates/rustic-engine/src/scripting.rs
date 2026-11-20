@@ -722,6 +722,20 @@ impl<C: Clock> ScriptedDocument<C> {
         std::mem::take(&mut self.module_script_errors)
     }
 
+    /// Whether the window has transient user activation (HTML §6.4.3).
+    pub fn has_transient_activation(&self) -> bool {
+        self.agent
+            .as_ref()
+            .is_ok_and(page::has_transient_activation)
+    }
+
+    /// HTML "consume user activation" for a host API that needs a gesture
+    /// (a download, a popup, a permission prompt); returns whether there
+    /// was transient activation to spend.
+    pub fn consume_user_activation(&self) -> bool {
+        self.agent.as_ref().is_ok_and(page::consume_user_activation)
+    }
+
     /// Read and clear the number of listener exceptions reported by the page.
     pub fn take_listener_error_count(&self) -> u64 {
         self.agent
@@ -1145,8 +1159,11 @@ impl<C: Clock> ScriptedDocument<C> {
 
     fn begin_turn(&mut self) -> Result<(), ScriptStop> {
         self.document.layout.borrow_mut().begin_turn();
+        let now = self.clock.now();
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         agent.set_step_budget(Some(self.limits.steps_per_turn));
+        // A page without a DOM host has no activation to time.
+        let _ = page::set_time(agent, now);
         Ok(())
     }
 

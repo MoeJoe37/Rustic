@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "14bd9b24ee9b8d6edfe7700ba91772fc61cbd074ab60d3044fe87a66a28edc6a",
-  "percent": "40.40",
+  "source_fingerprint": "1edc54fbc4ed7fa135ecc601117af701eba81b0b7339a6c3addb5732e08ba3e6",
+  "percent": "40.66",
   "verified_percent": "38.70",
-  "partial_percent": "1.70",
+  "partial_percent": "1.96",
   "completed": 91,
-  "in_progress": 8,
+  "in_progress": 9,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 2,
       "total": 8,
-      "percent": "40.62",
+      "percent": "47.65",
       "verified_percent": "18.75",
-      "partial_percent": "21.87"
+      "partial_percent": "28.90"
     },
     {
       "id": "M8",
@@ -6363,9 +6363,69 @@
           "label": "Trusted permissions, activation, files and downloads",
           "size": 3,
           "milestone": "M7",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "User activation: transient and sticky, trusted input only, consumable by hosts",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/activation.rs",
+                  "marker": "pub const TRANSIENT_ACTIVATION"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-engine/tests/input.rs",
+                  "marker": "fn trusted_input_gives_transient_and_sticky_user_activation"
+                }
+              ]
+            },
+            {
+              "label": "Downloads only through the broker: granted directory, sanitized names, no overwrite, atomic writes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/network.rs",
+                  "marker": "pub(crate) fn save_download"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/network.rs",
+                  "marker": "fn downloads_are_saved_only_to_the_granted_directory_without_overwriting"
+                }
+              ]
+            },
+            {
+              "label": "File access only through broker grants; renderers open nothing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "fn resource("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_local_grant"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed"
+                }
+              ]
+            },
+            {
+              "label": "Trusted permission prompts, address display and clipboard in the browser shell (M8, TD-173)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
           "engine_share": "0.34"
         },
         {
@@ -6476,12 +6536,12 @@
       ],
       "points": 43,
       "completed": 2,
-      "in_progress": 3,
+      "in_progress": 4,
       "total": 11,
-      "contribution": "1.51",
-      "percent": "30.23",
+      "contribution": "1.77",
+      "percent": "35.46",
       "verified_percent": "13.95",
-      "partial_percent": "16.28"
+      "partial_percent": "21.51"
     },
     {
       "id": "compositor",

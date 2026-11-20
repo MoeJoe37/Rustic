@@ -15,6 +15,7 @@ use rustic_js::runtime::{
 use crate::heap::WrapperKind;
 use crate::{DomGcError, DomHeap, dom_exception};
 
+mod activation;
 mod attributes;
 mod character_data;
 mod collections;
@@ -32,6 +33,10 @@ mod selectors;
 mod web_storage;
 mod window;
 
+pub use activation::{
+    TRANSIENT_ACTIVATION, consume as consume_user_activation,
+    has_transient as has_transient_activation,
+};
 pub use events::LifecycleEvent;
 pub use events::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
@@ -181,6 +186,12 @@ struct Page {
     fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
     fetch_records: ObjectId,
     headers_iterator: ObjectId,
+    /// `window.navigator` and its `userActivation`.
+    navigator: (Value, Value),
+    /// (last activation time, sticky activation).
+    activation: std::cell::Cell<(Option<std::time::Duration>, bool)>,
+    /// The host's current time for this document.
+    now: std::cell::Cell<std::time::Duration>,
 }
 
 impl ExecutionHost for Page {
@@ -515,6 +526,7 @@ fn install_page(
     let window = window::install(agent, scheduler.is_some())?;
     web_storage::install(agent)?;
     let headers_iterator = fetch::install(agent)?;
+    let navigator = activation::install(agent)?;
     agent.root(Value::object(headers_iterator))?;
     let fetch_records = agent.new_weak_map()?;
     agent.root(Value::object(fetch_records))?;
@@ -545,6 +557,9 @@ fn install_page(
         fetch: RefCell::new(None),
         fetch_records,
         headers_iterator,
+        navigator,
+        activation: std::cell::Cell::new((None, false)),
+        now: std::cell::Cell::new(std::time::Duration::ZERO),
     }))
 }
 
@@ -572,7 +587,21 @@ pub fn connected_input_target(document: &Document, target: NodeId) -> bool {
 
 /// Deliver host input in the active page. A target that went away is skipped.
 pub fn deliver_input(agent: &mut Agent, target: NodeId, input: &InputEvent) -> JsResult<()> {
+    // Only trusted host input reaches here; it may activate the window
+    // before its listeners run (HTML "activation notification").
+    with_page(agent, |_, page| {
+        activation::note_input(page, input);
+        Ok(())
+    })?;
     events::deliver(agent, target, input)
+}
+
+/// Tell the page the host's current time (user activation expiry).
+pub fn set_time(agent: &mut Agent, now: std::time::Duration) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        page.now.set(now);
+        Ok(())
+    })
 }
 
 /// Deliver a trusted event owned by the scripted document lifecycle.

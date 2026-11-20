@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 40.40%** = 38.70% verified complete + 1.70% partial credit. 91/221 capabilities complete, 8 in progress.
+**Overall completion: 40.66%** = 38.70% verified complete + 1.96% partial credit. 91/221 capabilities complete, 9 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `14bd9b24ee9b8d6edfe7700ba91772fc61cbd074ab60d3044fe87a66a28edc6a`.
+Catalog: `engine-v4`. Source fingerprint: `1edc54fbc4ed7fa135ecc601117af701eba81b0b7339a6c3addb5732e08ba3e6`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `14bd9b24ee9b8d6edfe7700ba91772fc61cbd
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 2/8 | 40.62% | 18.75% | 3.72% |
+| M7 Isolation & security | 2/8 | 47.65% | 18.75% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `14bd9b24ee9b8d6edfe7700ba91772fc61cbd
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 2/11 | 3 | 30.23% | 13.95% | 5% | 1.51 |
+| Security & IPC | 2/11 | 4 | 35.46% | 13.95% | 5% | 1.77 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -290,7 +290,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners
   - [ ] macOS: App Sandbox or seatbelt profile with an ADR, verified on native x64 and ARM64 runners
 - **planned** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
-- **planned** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine
+- **in progress 75.00%** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine
+  - [x] User activation: transient and sticky, trusted input only, consumable by hosts ([source](../../crates/rustic-bindings/src/page/activation.rs), [test](../../crates/rustic-engine/tests/input.rs))
+  - [x] Downloads only through the broker: granted directory, sanitized names, no overwrite, atomic writes ([source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-cli/tests/network.rs))
+  - [x] File access only through broker grants; renderers open nothing ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [ ] Trusted permission prompts, address display and clipboard in the browser shell (M8, TD-173)
 - **in progress 75.00%** `security.recovery` — Renderer/service crash recovery without stale authority · size 3 · M7 · 0.34% of engine
   - [x] A crashed or protocol-breaking renderer ends its command without output; the broker survives ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [x] A hung renderer is stopped by the broker's watchdog ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))

@@ -2577,6 +2577,18 @@ Every CLI suite and the pinned WPT selection pass sandboxed. A watchdog
 stops a renderer after `--renderer-timeout` seconds
 (`a_hung_renderer_is_stopped_by_the_watchdog`).
 
+User activation (HTML §6.4.3, `navigator.userActivation`): trusted clicks
+and non-Escape `keydown`s give 5 s of transient activation and sticky
+activation; script-dispatched events never do; hosts ask
+`ScriptedDocument::has_transient_activation` and spend it with
+`consume_user_activation`
+(`trusted_input_gives_transient_and_sticky_user_activation`). Downloads
+(ADR 0055): without `--download-dir` a download is refused; with it the
+broker saves the body under the last component of the sanitized name,
+renames Windows device names, never overwrites (` (n)`), writes an
+exclusive `.part` file and renames it, and never opens the file
+(`downloads_are_saved_only_to_the_granted_directory_without_overwriting`).
+
 Test hooks `RUSTIC_TEST_RENDERER_CRASH`, `RUSTIC_TEST_RENDERER_HANG` and
 `RUSTIC_TEST_COMPROMISED_RENDERER` (`1`, `garbage`, `escape`) change only what the renderer does,
 which the broker treats as hostile anyway; they grant nothing.

@@ -59,7 +59,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-172, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
-| M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-173, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
@@ -234,6 +234,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
 | TD-171 | Deliberate | Isolation | The split renderer is confined only with opt-in `--sandbox` on Linux (none on Windows/macOS), and `reftest` still runs single-process (watchdog paid 2026-11-20) | Open, M7 (ISO-03/ISO-04) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox has no seccomp-bpf syscall filter and leaves `/usr` readable | Open, M7 (ISO-03) |
+| TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2728,3 +2729,16 @@ reviewed unsafe module), and binding only the libraries the executable
 links (or a static build).
 **Trigger:** before the sandbox becomes the default or remote browsing is
 enabled on Linux.
+
+### TD-173 — No trusted UI for permissions; downloads are not quarantined
+
+ISO-05 needs prompts, the address display and clipboard access drawn by
+the browser, outside anything a page can paint over. The development CLI
+has no UI, so it grants no prompt-gated permission at all, which is the
+safe side but leaves the prompt flow untested. Downloads are read whole
+before they are written, and saved files get no `com.apple.quarantine`
+attribute or Windows Mark of the Web (both need platform calls).
+**Pay:** the M8 shell's permission prompts bound to transient activation,
+streamed downloads through the broker, and quarantine metadata per
+platform.
+**Trigger:** the M8 desktop shell.

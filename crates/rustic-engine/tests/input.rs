@@ -348,3 +348,81 @@ fn document_cancellation_discards_input_before_delivery() {
         Err(ScriptQueueError::Stopped(ScriptStop::DocumentCancelled))
     );
 }
+
+#[test]
+fn trusted_input_gives_transient_and_sticky_user_activation() {
+    let mut engine = Engine::new(1);
+    let mut load = engine.begin_document(ParserLimits::default()).unwrap();
+    load.feed(b"<button id=b>x</button>").unwrap();
+    let clock = rustic_base::ManualClock::default();
+    let mut page = load
+        .finish()
+        .unwrap()
+        .into_scripted_with_clock(TaskLimits::default(), clock)
+        .unwrap();
+    let button = {
+        let owner = page.document();
+        let tree = owner.parsed().document();
+        tree.walk(tree.root())
+            .unwrap()
+            .map(|(node, _)| node)
+            .find(|&node| matches!(tree.node(node).unwrap().kind(), NodeKind::Element(e) if e.name().local() == "button"))
+            .unwrap()
+    };
+    let check = |page: &mut ScriptedDocument<rustic_base::ManualClock>, text: &str| {
+        page.queue_script(source(text)).unwrap();
+        assert_eq!(page.run_next(), Ok(Some(ScriptTurn::Completed)), "{text}");
+    };
+    check(
+        &mut page,
+        "var seen = []; var a = navigator.userActivation;\
+         if (a !== navigator.userActivation || !(a instanceof UserActivation)) throw 'identity';\
+         if (a.isActive || a.hasBeenActive) throw 'initially inactive';\
+         document.getElementById('b').addEventListener('click', () => seen.push(a.isActive));\
+         document.getElementById('b').dispatchEvent(new MouseEvent('click'));\
+         if (a.isActive || a.hasBeenActive || seen.join() !== 'false') throw 'synthetic events never activate';",
+    );
+    assert!(!page.has_transient_activation());
+    page.queue_input(button, click()).unwrap();
+    assert_eq!(page.run_next(), Ok(Some(ScriptTurn::Completed)));
+    check(
+        &mut page,
+        "if (seen.join() !== 'false,true' || !navigator.userActivation.isActive) throw seen.join();",
+    );
+    page.clock()
+        .advance(std::time::Duration::from_millis(4999))
+        .unwrap();
+    check(
+        &mut page,
+        "if (!navigator.userActivation.isActive) throw 'still active';",
+    );
+    page.clock()
+        .advance(std::time::Duration::from_millis(1))
+        .unwrap();
+    check(
+        &mut page,
+        "if (navigator.userActivation.isActive || !navigator.userActivation.hasBeenActive) throw 'expired';",
+    );
+    // Escape never activates; another key does, and a consumer spends it.
+    let key = |key: &str| {
+        InputEvent::KeyDown(KeyInput {
+            key: key.into(),
+            code: key.into(),
+            repeat: false,
+            location: 0,
+            modifiers: Modifiers::default(),
+        })
+    };
+    page.queue_input(button, key("Escape")).unwrap();
+    page.run_next().unwrap();
+    assert!(!page.has_transient_activation());
+    page.queue_input(button, key("a")).unwrap();
+    page.run_next().unwrap();
+    assert!(page.has_transient_activation());
+    assert!(page.consume_user_activation());
+    assert!(!page.has_transient_activation());
+    check(
+        &mut page,
+        "if (!navigator.userActivation.hasBeenActive) throw 'sticky';",
+    );
+}

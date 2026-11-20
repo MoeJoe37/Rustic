@@ -72,8 +72,9 @@ transport's request/response model does not cover.
 
 ## Consequences
 
-The CLI keeps failing on downloads until the M7 broker exists, which is
-the safe default. Nothing in M6 opens a socket outside a request.
+Implemented 2026-11-20 in the CLI's broker: `--download-dir` (items 1, 3
+and 5 for user-typed navigations, which always have activation); without
+it downloads are refused. Quarantine metadata and streaming are TD-173. Nothing in M6 opens a socket outside a request.
 
 ## Revisit
 

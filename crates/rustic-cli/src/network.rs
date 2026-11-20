@@ -60,6 +60,9 @@ struct NetworkConfig {
     ca_pem: Option<Vec<u8>>,
     /// The user's locale, for the HTML fallback encoding (`--locale`).
     locale: Option<String>,
+    /// Where navigations that turn into downloads are saved
+    /// (`--download-dir`); without it downloads are refused.
+    download_dir: Option<std::path::PathBuf>,
 }
 
 static CONFIG: OnceLock<NetworkConfig> = OnceLock::new();
@@ -95,6 +98,13 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
             let pem = std::fs::read(&path).map_err(|e| format!("--ca-file: {e}"))?;
             TlsConfig::with_roots_pem(&pem).map_err(|e| format!("--ca-file: {e}"))?;
             config.ca_pem = Some(pem);
+        } else if arg == "--download-dir" {
+            let dir = args.next().ok_or("--download-dir requires a directory")?;
+            let dir = std::path::PathBuf::from(dir);
+            if !dir.is_dir() {
+                return Err("--download-dir must name an existing directory".into());
+            }
+            config.download_dir = Some(dir);
         } else if arg == "--locale" {
             let locale = args
                 .next()
@@ -179,6 +189,10 @@ pub enum NetworkLoadError {
     Body(NetworkError),
     /// The response was a download, not a document.
     Download(String),
+    /// The download was saved here.
+    Saved(String),
+    /// Saving the download failed.
+    DownloadFailed(String),
     /// A 204 or 205 response: there is no document.
     NoContent,
     /// The response is not HTML.
@@ -203,6 +217,12 @@ impl fmt::Display for NetworkLoadError {
                 "the response is a download ({}), not a document",
                 EscapedText(name)
             ),
+            Self::Saved(path) => write!(
+                formatter,
+                "the response is a download, not a document; saved as {}",
+                EscapedText(path)
+            ),
+            Self::DownloadFailed(error) => write!(formatter, "the download was not saved: {error}"),
             Self::NoContent => formatter.write_str("the response has no content (204 or 205)"),
             Self::NotHtml(mime) => write!(
                 formatter,
@@ -403,7 +423,14 @@ pub fn navigate(
     let committed = match outcome {
         NavigationOutcome::Commit(committed) => committed,
         NavigationOutcome::Download(download) => {
-            return Err(NetworkLoadError::Download(download.sanitized_filename()));
+            let name = download.sanitized_filename();
+            let Some(dir) = &config.download_dir else {
+                return Err(NetworkLoadError::Download(name));
+            };
+            return Err(match save_download(*download, dir, max_bytes) {
+                Ok(path) => NetworkLoadError::Saved(path.to_string_lossy().into_owned()),
+                Err(error) => NetworkLoadError::DownloadFailed(error.to_string()),
+            });
         }
         NavigationOutcome::NoContent => return Err(NetworkLoadError::NoContent),
     };
@@ -433,6 +460,85 @@ pub fn navigate(
         transport_encoding,
         policy,
     })
+}
+
+/// Names Windows reserves for devices, in any case and with any extension.
+fn is_device_name(name: &str) -> bool {
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim_end()
+        .to_ascii_uppercase();
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (stem.len() == 4
+            && (stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.as_bytes()[3].is_ascii_digit())
+}
+
+/// Save a download as ADR 0055 requires: a sanitized name, never over an
+/// existing file (` (n)` before the extension instead), written to an
+/// exclusive `.part` file within `max_bytes` and renamed when complete.
+/// The file is never opened or executed.
+pub(crate) fn save_download(
+    download: rustic_net::navigation::Download,
+    dir: &std::path::Path,
+    max_bytes: usize,
+) -> std::io::Result<std::path::PathBuf> {
+    use std::io::Write as _;
+    let mut name = download.sanitized_filename();
+    if is_device_name(&name) {
+        name.insert(0, '_');
+    }
+    let (stem, extension) = match name.rfind('.') {
+        Some(dot) if dot > 0 => (name[..dot].to_owned(), name[dot..].to_owned()),
+        _ => (name.clone(), String::new()),
+    };
+    let bytes = download
+        .body
+        .read_all(NETWORK_TIMEOUT)
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+    if bytes.len() > max_bytes {
+        return Err(std::io::Error::other(format!(
+            "larger than {max_bytes} bytes"
+        )));
+    }
+    for attempt in 0..100u32 {
+        let candidate = if attempt == 0 {
+            name.clone()
+        } else {
+            format!("{stem} ({attempt}){extension}")
+        };
+        let target = dir.join(&candidate);
+        let part = dir.join(format!("{candidate}.part"));
+        if target.exists() {
+            continue;
+        }
+        let mut file = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&part)
+        {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        };
+        let written = file.write_all(&bytes).and_then(|()| file.sync_all());
+        drop(file);
+        if let Err(error) = written {
+            let _ = std::fs::remove_file(&part);
+            return Err(error);
+        }
+        if target.exists() {
+            let _ = std::fs::remove_file(&part);
+            continue;
+        }
+        std::fs::rename(&part, &target)?;
+        return Ok(target);
+    }
+    Err(std::io::Error::other(
+        "no free file name after 100 attempts",
+    ))
 }
 
 fn build_fetcher(config: &NetworkConfig, max_bytes: usize) -> Result<Fetcher, NetworkLoadError> {

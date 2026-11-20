@@ -293,6 +293,13 @@ impl Download {
                 .unwrap_or_default()
                 .to_owned()
         });
+        // Keep only the last path component, as browsers do for both
+        // separators, so a suggested name never names a directory.
+        let source = source
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or_default()
+            .to_owned();
         let mut name: String = source
             .chars()
             .map(|character| {
@@ -753,7 +760,7 @@ mod tests {
         };
         assert_eq!(
             download(Some("../../etc/passwd"), "http://a.test/").sanitized_filename(),
-            "_.._etc_passwd"
+            "passwd"
         );
         assert_eq!(
             download(Some("..."), "http://a.test/").sanitized_filename(),

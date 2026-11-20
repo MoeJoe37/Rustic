@@ -145,6 +145,11 @@ pub fn fallback_locale() -> &'static str {
         .unwrap_or("en")
 }
 
+/// The `--locale` the user gave, if any (a broker passes it on).
+pub fn configured_locale() -> Option<&'static str> {
+    CONFIG.get().and_then(|config| config.locale.as_deref())
+}
+
 /// Whether any `--allow-origin` grant was given.
 pub fn has_grants() -> bool {
     CONFIG.get().is_some_and(|config| !config.routes.is_empty())
@@ -220,6 +225,27 @@ pub struct NetworkDocument {
     pub(crate) bytes: Vec<u8>,
     /// The `Content-Type` charset, the HTML "transport layer" encoding.
     pub(crate) transport_encoding: Option<Encoding>,
+    /// The document's policy container (CSP and referrer policy).
+    pub(crate) policy: PolicyContainer,
+}
+
+/// A document ready to parse, with the session its loads go through.
+#[derive(Debug)]
+pub(crate) struct SessionDocument {
+    pub(crate) session: Rc<dyn Session>,
+    pub(crate) bytes: Vec<u8>,
+    /// The transport-layer encoding (response `charset`).
+    pub(crate) transport_encoding: Option<Encoding>,
+}
+
+impl From<NetworkDocument> for SessionDocument {
+    fn from(document: NetworkDocument) -> Self {
+        Self {
+            session: document.session,
+            bytes: document.bytes,
+            transport_encoding: document.transport_encoding,
+        }
+    }
 }
 
 /// What a subresource request is for.
@@ -256,6 +282,81 @@ impl fmt::Debug for NetworkSession {
             .field("policies", &self.csp.policies().len())
             .field("secure", &self.secure)
             .finish_non_exhaustive()
+    }
+}
+
+/// What a document's loads go through: the network session in the
+/// process that owns the network, or an IPC proxy in a renderer.
+pub(crate) trait Session: fmt::Debug {
+    /// The document URL (its fallback base URL and origin).
+    fn document_url(&self) -> &Url;
+    /// The document's CSP, for decisions the renderer makes itself.
+    fn csp(&self) -> &CspList;
+    /// Whether the document is a local file (UTF-8 fallback, no network).
+    fn is_local(&self) -> bool {
+        false
+    }
+    /// Whether the document may compile strings (`'unsafe-eval'`).
+    fn allows_eval(&self) -> bool {
+        let verdict = self.csp().check_eval();
+        report(&verdict);
+        verdict.allowed()
+    }
+    /// Fetch one subresource, at most `max_bytes`.
+    fn fetch(
+        &self,
+        url: &Url,
+        kind: &ResourceKind,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, FetchError>;
+    /// The `charset` label of a subresource already fetched.
+    fn charset_of(&self, url: &Url) -> Option<String>;
+    /// Run a script `fetch()`.
+    fn script_fetch(
+        &self,
+        request: rustic_engine::ScriptRequest,
+    ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure>;
+    /// The document's Web Storage, or `None` for an opaque origin.
+    fn storage_host(&self) -> Result<Option<Rc<dyn rustic_engine::StorageHost>>, String>;
+    /// Persist what the load changed (cookies, the profile).
+    fn finish(&self) -> Result<(), String>;
+}
+
+impl Session for NetworkSession {
+    fn document_url(&self) -> &Url {
+        &self.document_url
+    }
+
+    fn csp(&self) -> &CspList {
+        &self.csp
+    }
+
+    fn fetch(
+        &self,
+        url: &Url,
+        kind: &ResourceKind,
+        max_bytes: usize,
+    ) -> Result<Vec<u8>, FetchError> {
+        self.fetch_resource(url, kind, max_bytes)
+    }
+
+    fn charset_of(&self, url: &Url) -> Option<String> {
+        self.charsets.borrow().get(&url.serialize()).cloned()
+    }
+
+    fn script_fetch(
+        &self,
+        request: rustic_engine::ScriptRequest,
+    ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure> {
+        self.script_fetch_impl(request)
+    }
+
+    fn storage_host(&self) -> Result<Option<Rc<dyn rustic_engine::StorageHost>>, String> {
+        crate::storage::host_for(&self.document_url).map_err(|error| error.to_string())
+    }
+
+    fn finish(&self) -> Result<(), String> {
+        self.save_cookies().map_err(|error| error.to_string())
     }
 }
 
@@ -323,6 +424,7 @@ pub fn navigate(
         session: Rc::new(session),
         bytes,
         transport_encoding,
+        policy,
     })
 }
 
@@ -375,31 +477,8 @@ impl NetworkSession {
         crate::storage::save_cookies(bytes)
     }
 
-    /// The document's response URL (its fallback base URL).
-    pub(crate) fn document_url(&self) -> &Url {
-        &self.document_url
-    }
-
-    /// The document's CSP.
-    pub(crate) fn csp(&self) -> &CspList {
-        &self.csp
-    }
-
-    /// Whether the document may compile strings (`'unsafe-eval'`).
-    pub(crate) fn allows_eval(&self) -> bool {
-        let verdict = self.csp.check_eval();
-        report(&verdict);
-        verdict.allowed()
-    }
-
-    /// The `charset` label of a stylesheet or script already fetched
-    /// through this session (CSS Syntax's "protocol encoding label").
-    pub(crate) fn charset_of(&self, url: &Url) -> Option<String> {
-        self.charsets.borrow().get(&url.serialize()).cloned()
-    }
-
     /// Fetch one subresource of the document, at most `max_bytes`.
-    pub(crate) fn fetch(
+    fn fetch_resource(
         &self,
         url: &Url,
         kind: &ResourceKind,
@@ -559,7 +638,7 @@ fn report(verdict: &Verdict) {
 
 /// The engine's inline-script CSP decisions for a network document.
 #[derive(Debug)]
-pub(crate) struct InlinePolicy(pub(crate) Rc<NetworkSession>);
+pub(crate) struct InlinePolicy(pub(crate) Rc<dyn Session>);
 
 // The engine keeps the policy only for the load, on this thread.
 impl rustic_engine::ScriptPolicy for InlinePolicy {
@@ -592,21 +671,31 @@ impl rustic_engine::FetchHost for LocalFetch {
     }
 }
 
-/// `fetch()` for a network document: the same session, with the
-/// document's CSP (`connect-src`) and mixed-content check on every hop.
+/// `fetch()` for a document, through its session.
 #[derive(Debug)]
-pub(crate) struct ScriptFetch(pub(crate) Rc<NetworkSession>);
+pub(crate) struct SessionFetch(pub(crate) Rc<dyn Session>);
 
-impl rustic_engine::FetchHost for ScriptFetch {
+impl rustic_engine::FetchHost for SessionFetch {
     fn base_url(&self) -> Option<Url> {
-        Some(self.0.document_url.clone())
+        Some(self.0.document_url().clone())
     }
 
     fn fetch(
         &self,
         request: rustic_engine::ScriptRequest,
     ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure> {
-        let session = &self.0;
+        self.0.script_fetch(request)
+    }
+}
+
+impl NetworkSession {
+    /// `fetch()` from the document: the same session, with the document's
+    /// CSP (`connect-src`) and mixed-content check on every hop.
+    fn script_fetch_impl(
+        &self,
+        request: rustic_engine::ScriptRequest,
+    ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure> {
+        let session = self;
         if session.cancellation.check().is_err() {
             return Err(rustic_engine::NetworkFailure);
         }
@@ -696,7 +785,7 @@ impl rustic_engine::FetchHost for ScriptFetch {
 
 /// The document's CSP for inline `<style>` and `style` attributes.
 #[derive(Debug)]
-pub(crate) struct StylePolicy(pub(crate) Rc<NetworkSession>);
+pub(crate) struct StylePolicy(pub(crate) Rc<dyn Session>);
 
 impl rustic_style::InlineStylePolicy for StylePolicy {
     fn allows_style_element(&self, nonce: Option<&str>, text: &str) -> bool {

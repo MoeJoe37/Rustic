@@ -40,9 +40,7 @@ use rustic_style::{
     StyleLoader, StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
 
-use crate::network::{
-    InlinePolicy, NetworkDocument, NetworkLoadError, NetworkSession, ResourceKind,
-};
+use crate::network::{InlinePolicy, NetworkLoadError, ResourceKind, Session, SessionDocument};
 use crate::stylesheets::{
     AppliedLocalFiles, LocalStylesheetFetcher, MAX_APPLIED_URL_BYTES, file_url,
 };
@@ -142,8 +140,8 @@ pub enum LoadError {
     Png(rustic_raster::PngError),
     /// A network document could not be loaded.
     Network(NetworkLoadError),
-    /// The browser profile could not be opened or written.
-    Profile(rustic_storage::ProfileError),
+    /// The broker (profile, network or the other process) failed.
+    Broker(String),
 }
 
 impl fmt::Display for LoadError {
@@ -177,7 +175,7 @@ impl fmt::Display for LoadError {
             Self::Raster(error) => error.fmt(f),
             Self::Png(error) => error.fmt(f),
             Self::Network(error) => error.fmt(f),
-            Self::Profile(error) => error.fmt(f),
+            Self::Broker(error) => f.write_str(error),
         }
     }
 }
@@ -199,7 +197,6 @@ impl Error for LoadError {
             Self::Raster(error) => Some(error),
             Self::Png(error) => Some(error),
             Self::Network(error) => Some(error),
-            Self::Profile(error) => Some(error),
             _ => None,
         }
     }
@@ -257,7 +254,7 @@ fn looks_like_url(argument: &OsStr) -> bool {
 pub struct LoadedDocument {
     document: EngineDocument,
     applied_files: Option<AppliedLocalFiles>,
-    network: Option<Rc<NetworkSession>>,
+    network: Option<Rc<dyn Session>>,
 }
 
 impl LoadedDocument {
@@ -331,6 +328,31 @@ pub fn load_document(
     })
 }
 
+/// Read the granted local file for a renderer: canonical path, regular
+/// file, at most `max_file_bytes`, with the same errors as a direct load.
+pub fn read_granted_file(
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<(PathBuf, Vec<u8>), LoadError> {
+    if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
+        return Err(LoadError::InvalidLimits);
+    }
+    check_regular_file(fs::metadata(path).map_err(LoadError::Io)?, limits)?;
+    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
+    let file = File::open(&canonical).map_err(LoadError::Io)?;
+    check_regular_file(file.metadata().map_err(LoadError::Io)?, limits)?;
+    let mut bytes = Vec::new();
+    file.take(limits.max_file_bytes as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(LoadError::Io)?;
+    if bytes.len() > limits.max_file_bytes {
+        return Err(LoadError::FileTooLarge {
+            limit: limits.max_file_bytes,
+        });
+    }
+    Ok((canonical, bytes))
+}
+
 /// A snapshot sized for every stylesheet and image a document may apply.
 fn applied_snapshot(limits: LoaderLimits) -> AppliedLocalFiles {
     AppliedLocalFiles::new(
@@ -359,22 +381,43 @@ pub fn load_network_document(
     if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
         return Err(LoadError::InvalidLimits);
     }
+    let cancellation = CancellationToken::default();
+    let network: SessionDocument =
+        crate::network::navigate(url, limits.max_file_bytes, cancellation)
+            .map_err(LoadError::Network)?
+            .into();
+    load_session_document(engine, &network, limits)
+}
+
+/// Load a document whose bytes and subresources come through `network`'s
+/// session: a network response in this process, or, in a renderer, any
+/// document the broker granted (a local file included).
+pub fn load_session_document(
+    engine: &mut Engine,
+    network: &SessionDocument,
+    limits: LoaderLimits,
+) -> Result<LoadedDocument, LoadError> {
+    if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
+        return Err(LoadError::InvalidLimits);
+    }
+    if network.bytes.len() > limits.max_file_bytes {
+        return Err(LoadError::FileTooLarge {
+            limit: limits.max_file_bytes,
+        });
+    }
     let mut parser_limits = limits.parser;
     parser_limits.tokenizer.max_input_bytes = limits.max_file_bytes;
-    let cancellation = CancellationToken::default();
-    let network = crate::network::navigate(url, limits.max_file_bytes, cancellation.clone())
-        .map_err(LoadError::Network)?;
     let mut forced = None;
     loop {
         let (document, selected) = if limits.run_scripts {
-            load_scripted_network_document(engine, &network, limits, parser_limits, forced)?
+            load_scripted_network_document(engine, network, limits, parser_limits, forced)?
         } else {
-            load_unscripted_network_document(engine, &network, limits, parser_limits, forced)?
+            load_unscripted_network_document(engine, network, limits, parser_limits, forced)?
         };
         // HTML "change the encoding": a declaration the prescan did not see
         // replaces a tentative encoding by loading the document again with
         // the declared one, now certain; it happens at most once.
-        network.session.save_cookies().map_err(LoadError::Profile)?;
+        network.session.finish().map_err(LoadError::Broker)?;
         if let Selected::Tentative(used) = selected {
             let declared = first_meta_declaration(document.parsed().document());
             if let Some(declared) = declared.filter(|&declared| declared != used) {
@@ -393,7 +436,7 @@ pub fn load_network_document(
 
 fn load_unscripted_network_document(
     engine: &mut Engine,
-    network: &NetworkDocument,
+    network: &SessionDocument,
     limits: LoaderLimits,
     parser_limits: ParserLimits,
     forced: Option<Encoding>,
@@ -465,7 +508,7 @@ fn first_meta_declaration(document: &Document) -> Option<Encoding> {
 /// then the locale's fallback encoding (both tentative). `forced` is the
 /// encoding of a reload after "change the encoding".
 fn feed_network_document(
-    network: &NetworkDocument,
+    network: &SessionDocument,
     limits: LoaderLimits,
     cancellation: &CancellationToken,
     scripting: Scripting,
@@ -476,6 +519,21 @@ fn feed_network_document(
     let bytes = &network.bytes;
     let has_bom = rustic_encoding::bom_sniff(bytes).is_some();
     let prefix = &bytes[..bytes.len().min(LOCAL_ENCODING_PREFIX_BYTES)];
+    if network.session.is_local() {
+        // A local file: BOM or `<meta>` in the prefix, else UTF-8, as
+        // `read_document_file` decides; there is no reload.
+        let encoding = select_local_encoding(prefix, scripting, cancellation.clone())?;
+        let mut encoding = Some(encoding);
+        if bytes.is_empty() {
+            feed(&[], encoding.take())?;
+        }
+        for chunk in bytes.chunks(limits.read_chunk_bytes.max(1)) {
+            check_cancelled(cancellation)?;
+            feed(chunk, encoding.take())?;
+        }
+        check_cancelled(cancellation)?;
+        return Ok(Selected::Certain);
+    }
     let (encoding, selected) = match (forced, network.transport_encoding) {
         (Some(forced), _) if !has_bom => (forced, Selected::Certain),
         (_, Some(transport)) if !has_bom => (transport, Selected::Certain),
@@ -540,26 +598,37 @@ fn load_scripted_document(
 
 fn load_scripted_network_document(
     engine: &mut Engine,
-    network: &NetworkDocument,
+    network: &SessionDocument,
     limits: LoaderLimits,
     parser_limits: ParserLimits,
     forced: Option<Encoding>,
 ) -> Result<(LoadedDocument, Selected), LoadError> {
     let session = Rc::clone(&network.session);
     let url = session.document_url().clone();
-    let mut load = engine.begin_network_scripted_document_with_clock(
-        parser_limits,
-        TaskLimits::default(),
-        url.clone(),
-        ClassicScriptLimits::default(),
-        ManualClock::default(),
-    )?;
+    // A brokered local file keeps the local script grant (its directory).
+    let mut load = if session.is_local() {
+        engine.begin_local_scripted_document_with_clock(
+            parser_limits,
+            TaskLimits::default(),
+            url.clone(),
+            ClassicScriptLimits::default(),
+            ManualClock::default(),
+        )?
+    } else {
+        engine.begin_network_scripted_document_with_clock(
+            parser_limits,
+            TaskLimits::default(),
+            url.clone(),
+            ClassicScriptLimits::default(),
+            ManualClock::default(),
+        )?
+    };
     if !session.csp().is_empty() {
         load.set_script_policy(Box::new(InlinePolicy(Rc::clone(&session))))?;
         load.set_string_compilation_allowed(session.allows_eval())?;
     }
-    load.set_fetch_host(Rc::new(crate::network::ScriptFetch(Rc::clone(&session))))?;
-    if let Some(storage) = crate::storage::host_for(&url).map_err(LoadError::Profile)? {
+    load.set_fetch_host(Rc::new(crate::network::SessionFetch(Rc::clone(&session))))?;
+    if let Some(storage) = session.storage_host().map_err(LoadError::Broker)? {
         load.set_storage_host(storage)?;
     }
     let cancellation = load.cancellation().expect("admitted load").clone();
@@ -585,7 +654,6 @@ fn load_scripted_network_document(
         )?;
         Ok(())
     })?;
-    crate::storage::flush().map_err(LoadError::Profile)?;
     Ok((document, selected))
 }
 
@@ -595,7 +663,7 @@ struct ScriptedSource {
     path: PathBuf,
     /// The document URL.
     url: rustic_url::Url,
-    network: Option<Rc<NetworkSession>>,
+    network: Option<Rc<dyn Session>>,
 }
 
 type FeedDocument<'a> = dyn FnMut(&[u8], Option<Encoding>) -> Result<(), LoadError> + 'a;
@@ -1280,7 +1348,7 @@ struct LayoutInput<'a> {
     view: rustic_layout::View,
     cancellation: &'a CancellationToken,
     applied_files: Option<&'a AppliedLocalFiles>,
-    network: Option<&'a Rc<NetworkSession>>,
+    network: Option<&'a Rc<dyn Session>>,
 }
 
 impl<'a> LayoutInput<'a> {
@@ -1290,7 +1358,7 @@ impl<'a> LayoutInput<'a> {
         limits: LoaderLimits,
         view: rustic_layout::View,
         applied_files: Option<&'a AppliedLocalFiles>,
-        network: Option<&'a Rc<NetworkSession>>,
+        network: Option<&'a Rc<dyn Session>>,
     ) -> Self {
         Self {
             document: parsed.parsed().document(),
@@ -1313,7 +1381,7 @@ struct LocalLayout {
     cancellation: CancellationToken,
     encoding: Encoding,
     applied_files: AppliedLocalFiles,
-    network: Option<Rc<NetworkSession>>,
+    network: Option<Rc<dyn Session>>,
 }
 
 // CSSOM lists supported longhands in lexicographical order before custom properties.
@@ -1517,7 +1585,7 @@ fn block_layout(
             limits.images,
             limits.read_chunk_bytes,
             cancellation,
-            Some((applied, network.map(Rc::as_ref))),
+            Some((applied, network.map(|session| &**session))),
         )
     } else {
         crate::images::load(

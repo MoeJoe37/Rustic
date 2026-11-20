@@ -48,9 +48,8 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
         return Ok(output);
     }
     let limits = FontLimits::default();
-    let mut db = FontDatabase::new();
+    let mut files = Vec::new();
     let mut input = 0usize;
-    let mut decoded = 0usize;
     for path in paths {
         let mut bytes = Vec::new();
         let file = File::open(&path).map_err(|e| format!("font file: {e}"))?;
@@ -67,7 +66,35 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
             return Err("font input byte limit exceeded".into());
         }
         input += bytes.len();
-        let index = db.load(bytes, &limits).map_err(|e| e.to_string())?;
+        files.push(bytes);
+    }
+    configure_bytes(files)?;
+    Ok(output)
+}
+
+/// The raw bytes of the granted font files, which a broker hands to its
+/// renderer (a renderer opens no files).
+pub fn granted_bytes() -> &'static [Vec<u8>] {
+    GRANTED.get().map_or(&[], Vec::as_slice)
+}
+
+static GRANTED: OnceLock<Vec<Vec<u8>>> = OnceLock::new();
+
+/// Configure fonts from file contents (the broker read them).
+pub fn configure_bytes(files: Vec<Vec<u8>>) -> Result<(), String> {
+    if files.is_empty() {
+        return Ok(());
+    }
+    if files.len() > MAX_FONT_GRANTS
+        || files.iter().map(Vec::len).sum::<usize>() > MAX_TOTAL_FONT_BYTES
+    {
+        return Err("font input byte limit exceeded".into());
+    }
+    let limits = FontLimits::default();
+    let mut db = FontDatabase::new();
+    let mut decoded = 0usize;
+    for bytes in &files {
+        let index = db.load(bytes.clone(), &limits).map_err(|e| e.to_string())?;
         decoded = decoded
             .checked_add(db.faces()[index].byte_len())
             .filter(|&n| n <= MAX_TOTAL_FONT_BYTES)
@@ -95,7 +122,8 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     CONFIG
         .set(Arc::new(db))
         .map_err(|_| "fonts already configured")?;
-    Ok(output)
+    let _ = GRANTED.set(files);
+    Ok(())
 }
 pub fn explicit() -> Option<Arc<FontDatabase>> {
     CONFIG.get().cloned()

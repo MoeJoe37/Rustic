@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -232,6 +232,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
 | TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives; bodies are complete byte strings (no `ReadableStream`, `arrayBuffer()`, `blob()`, `formData()`, `AbortSignal`), Headers iterators are snapshots, and the API base URL ignores `<base>` in the CLI | Open, M9 web APIs |
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
+| TD-171 | Deliberate | Isolation | The split renderer has no OS restrictions yet, no watchdog (a hung renderer blocks its broker until the user stops it), and `reftest` still runs single-process | Open, M7 (ISO-03/ISO-04) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2698,3 +2699,16 @@ platform crate, since the workspace forbids unsafe code) and request
 multiplexing with the event-driven fetch controller (TD-161).
 **Trigger:** M12 page-load or frame-time profiles showing IPC copies, or
 the GPU process (frames need shared memory).
+
+### TD-171 — The renderer is split but not yet confined
+
+Document commands run their content in a child process that receives no
+authority from the broker, but the operating system still lets that
+process open files and sockets itself: the separation holds against bugs
+that misuse the protocol, not against code execution in the renderer. A
+renderer that stops answering blocks the broker indefinitely (script and
+parser budgets bound the work, but not a hang in native code), and
+`reftest` renders its test and references in one process.
+**Pay:** ISO-03/ISO-04 OS sandboxes (ADR per platform), a broker-side
+deadline per request and per command, and `reftest` over renderers.
+**Trigger:** before any remote browsing (the M7 gate).

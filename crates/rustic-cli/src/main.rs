@@ -7,11 +7,13 @@ use rustic_base::EscapedText;
 use rustic_engine::{Engine, Viewport};
 use std::path::Path;
 
+mod broker;
 mod fonts;
 mod images;
 mod loader;
 mod network;
 mod reftest;
+mod renderer;
 mod storage;
 mod stylesheets;
 
@@ -120,6 +122,13 @@ Image options for layout and paint commands (exceeding one breaks the image, nev
   --max-image-decoded-bytes N    total decoded RGBA bytes (default 268435456)";
 
 fn main() -> ExitCode {
+    if env::args_os()
+        .nth(1)
+        .is_some_and(|arg| arg == renderer::RENDERER_COMMAND)
+    {
+        return ExitCode::from(renderer::run());
+    }
+
     let args = match fonts::configure(env::args_os().skip(1).collect()) {
         Ok(args) => args,
         Err(e) => {
@@ -127,7 +136,10 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let args = match network::configure(args).and_then(storage::configure) {
+    let args = match network::configure(args)
+        .and_then(storage::configure)
+        .and_then(broker::configure)
+    {
         Ok(args) => args,
         Err(e) => {
             eprintln!("rustic: {e}");
@@ -155,38 +167,12 @@ fn main() -> ExitCode {
         );
         return ExitCode::SUCCESS;
     }
+    if broker::splits(&args[0]) && !broker::single_process() {
+        return ExitCode::from(broker::run(&args[0].to_string_lossy(), &args[1..]));
+    }
     let mut engine = Engine::new(1);
-    if args[0] == "dump-dom" {
-        return dump_command(&mut engine, "dump-dom", &args[1..], loader::dump_dom);
-    }
-    if args[0] == "dump-style" {
-        return dump_command(&mut engine, "dump-style", &args[1..], loader::dump_style);
-    }
-    if args[0] == "dump-boxes" {
-        return dump_command(&mut engine, "dump-boxes", &args[1..], loader::dump_boxes);
-    }
-    if args[0] == "dump-layout" {
-        return dump_command(&mut engine, "dump-layout", &args[1..], loader::dump_layout);
-    }
-    if args[0] == "dump-paint" {
-        return dump_command(&mut engine, "dump-paint", &args[1..], loader::dump_paint);
-    }
-    if args[0] == "render" {
-        return render_command(&mut engine, &args[1..]);
-    }
-    if args[0] == "hit-test" {
-        return hit_test_command(&mut engine, &args[1..]);
-    }
-    if args[0] == "reftest" {
-        return reftest_command(&mut engine, &args[1..]);
-    }
-    if args[0] == "dump-formatting" {
-        return dump_command(
-            &mut engine,
-            "dump-formatting",
-            &args[1..],
-            loader::dump_formatting,
-        );
+    if let Some(status) = run_command(&mut engine, &args) {
+        return ExitCode::from(status);
     }
     eprintln!(
         "Unsupported command. Rendering and navigation are not implemented; see docs/ROADMAP.md."
@@ -194,17 +180,80 @@ fn main() -> ExitCode {
     ExitCode::from(2)
 }
 
+/// Run a document command in this process; `None` for an unknown command.
+/// A renderer runs the same function on its granted document.
+pub(crate) fn run_command(engine: &mut Engine, args: &[OsString]) -> Option<u8> {
+    if args[0] == "dump-dom" {
+        return Some(dump_command(
+            engine,
+            "dump-dom",
+            &args[1..],
+            loader::dump_dom,
+        ));
+    }
+    if args[0] == "dump-style" {
+        return Some(dump_command(
+            engine,
+            "dump-style",
+            &args[1..],
+            loader::dump_style,
+        ));
+    }
+    if args[0] == "dump-boxes" {
+        return Some(dump_command(
+            engine,
+            "dump-boxes",
+            &args[1..],
+            loader::dump_boxes,
+        ));
+    }
+    if args[0] == "dump-layout" {
+        return Some(dump_command(
+            engine,
+            "dump-layout",
+            &args[1..],
+            loader::dump_layout,
+        ));
+    }
+    if args[0] == "dump-paint" {
+        return Some(dump_command(
+            engine,
+            "dump-paint",
+            &args[1..],
+            loader::dump_paint,
+        ));
+    }
+    if args[0] == "render" {
+        return Some(render_command(engine, &args[1..]));
+    }
+    if args[0] == "hit-test" {
+        return Some(hit_test_command(engine, &args[1..]));
+    }
+    if args[0] == "reftest" {
+        return Some(reftest_command(engine, &args[1..]));
+    }
+    if args[0] == "dump-formatting" {
+        return Some(dump_command(
+            engine,
+            "dump-formatting",
+            &args[1..],
+            loader::dump_formatting,
+        ));
+    }
+    None
+}
+
 fn dump_command(
     engine: &mut Engine,
     command: &str,
     args: &[OsString],
     dump: fn(&LoadedDocument, &Path, LoaderLimits) -> Result<String, LoadError>,
-) -> ExitCode {
+) -> u8 {
     let (limits, path) = match parse_dump_args(args) {
         Ok(parsed) => parsed,
         Err(message) => {
             eprintln!("rustic {command}: {message}\n\n{USAGE}");
-            return ExitCode::from(2);
+            return 2;
         }
     };
     dump_command_with(engine, command, limits, &path, |parsed, path| {
@@ -219,18 +268,13 @@ fn dump_command_with(
     limits: LoaderLimits,
     path: &OsString,
     dump: impl FnOnce(&LoadedDocument, &Path) -> Result<String, LoadError>,
-) -> ExitCode {
+) -> u8 {
     match load(engine, command, limits, path, dump) {
         Ok(dump) => {
-            let mut stdout = io::stdout().lock();
-            if stdout
-                .write_all(dump.as_bytes())
-                .and_then(|()| stdout.flush())
-                .is_err()
-            {
-                return ExitCode::from(1);
+            if renderer::emit_stdout(dump.as_bytes()).is_err() {
+                return 1;
             }
-            ExitCode::SUCCESS
+            0
         }
         Err(code) => code,
     }
@@ -243,27 +287,31 @@ fn load<T>(
     limits: LoaderLimits,
     path: &std::ffi::OsStr,
     then: impl FnOnce(&LoadedDocument, &Path) -> Result<T, LoadError>,
-) -> Result<T, ExitCode> {
-    let network = network::is_network_argument(path);
+) -> Result<T, u8> {
+    // A renderer loads the document its broker granted, never the path.
+    let granted = renderer::take_granted();
+    let network = granted.is_none() && network::is_network_argument(path);
     if network && !network::has_grants() {
         eprintln!(
             "rustic {command}: network URLs need --allow-origin ORIGIN=ADDRESS for each origin; \
              nothing was sent"
         );
-        return Err(ExitCode::from(2));
+        return Err(2);
     }
-    let path = if network {
+    let path = if network || granted.is_some() {
         std::path::PathBuf::from(path)
     } else {
         match loader::local_path(path) {
             Ok(path) => path,
             Err(error) => {
                 eprintln!("rustic {command}: {error}");
-                return Err(ExitCode::from(2));
+                return Err(2);
             }
         }
     };
-    let loaded = if network {
+    let loaded = if let Some(granted) = &granted {
+        loader::load_session_document(engine, granted, limits)
+    } else if network {
         let url = path.to_str().unwrap_or_default();
         loader::load_network_document(engine, url, limits)
     } else {
@@ -287,7 +335,7 @@ fn load<T>(
         Ok(value) => Ok(value),
         Err(error @ LoadError::InvalidLimits) => {
             eprintln!("rustic {command}: {error}");
-            Err(ExitCode::from(2))
+            Err(2)
         }
         Err(error) => {
             // The path is user input: escape it so control characters in a file
@@ -296,21 +344,21 @@ fn load<T>(
                 "rustic {command}: {}: {error}",
                 EscapedText(&path.to_string_lossy())
             );
-            Err(ExitCode::from(1))
+            Err(1)
         }
     }
 }
 
 /// Arguments of the rendering commands: `--output`, the view options
 /// (`--viewport`, `--scale`, `--zoom`) and the dump options and file path.
-struct RenderArgs {
-    output: Option<OsString>,
+pub(crate) struct RenderArgs {
+    pub(crate) output: Option<OsString>,
     view: rustic_layout::View,
-    limits: LoaderLimits,
-    path: OsString,
+    pub(crate) limits: LoaderLimits,
+    pub(crate) path: OsString,
 }
 
-fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
+pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     let mut output = None;
     let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
@@ -369,10 +417,10 @@ fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     })
 }
 
-fn render_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
+fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     let usage = |message: String| {
         eprintln!("rustic render: {message}\n\n{USAGE}");
-        ExitCode::from(2)
+        2
     };
     let args = match parse_render_args(args) {
         Ok(args) => args,
@@ -388,17 +436,17 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
         Ok(png) => png,
         Err(code) => return code,
     };
-    if let Err(error) = std::fs::write(&output, png) {
+    if let Err(error) = renderer::emit_file(&output, png) {
         eprintln!(
             "rustic render: {}: {error}",
             EscapedText(&Path::new(&output).to_string_lossy())
         );
-        return ExitCode::from(1);
+        return 1;
     }
-    ExitCode::SUCCESS
+    0
 }
 
-fn hit_test_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
+fn hit_test_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     let mut points = Vec::new();
     let mut rest = Vec::new();
     let mut iter = args.iter();
@@ -432,7 +480,7 @@ fn hit_test_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
         Ok(parsed) => parsed,
         Err(message) => {
             eprintln!("rustic hit-test: {message}\n\n{USAGE}");
-            return ExitCode::from(2);
+            return 2;
         }
     };
     dump_command_with(engine, "hit-test", limits, &path, |parsed, path| {
@@ -440,7 +488,7 @@ fn hit_test_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
     })
 }
 
-fn reftest_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
+fn reftest_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     let args = match parse_render_args(args) {
         Ok(args) if args.output.is_some() => Err("--output is not accepted".into()),
         other => other,
@@ -449,7 +497,7 @@ fn reftest_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
         Ok(args) => args,
         Err(message) => {
             eprintln!("rustic reftest: {message}\n\n{USAGE}");
-            return ExitCode::from(2);
+            return 2;
         }
     };
     let (limits, view) = (args.limits, args.view);
@@ -537,16 +585,12 @@ fn reftest_command(engine: &mut Engine, args: &[OsString]) -> ExitCode {
         .and_then(|()| stdout.flush())
         .is_err()
     {
-        return ExitCode::from(1);
+        return 1;
     }
-    if all {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(1)
-    }
+    if all { 0 } else { 1 }
 }
 
-fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String> {
+pub(crate) fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsString), String> {
     let mut limits = LoaderLimits::default();
     let mut diagnostics = None;
     let mut path = None;

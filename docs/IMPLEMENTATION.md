@@ -158,6 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [ISO-02 — Split renderer process and brokered authority](#iso-02--split-renderer-process-and-brokered-authority)
 - [NET-03 — fetch(), Headers, Request and Response](#net-03--fetch-headers-request-and-response)
 - [NET-04 — Partitioned HTTP cache](#net-04--partitioned-http-cache)
 - [NET-06 — Profiles, storage keys and Web Storage](#net-06--profiles-storage-keys-and-web-storage)
@@ -2537,6 +2538,27 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## ISO-02 — Split renderer process and brokered authority
+
+Added 2026-11-20 (`rustic-ipc`, `rustic-cli/src/broker.rs`,
+`rustic-cli/src/renderer.rs`, [ADR 0056](adr/0056-ipc-format.md)). Every
+document command except `reftest` runs its document in a child process,
+`rustic __renderer`, over the IPC channel on the child's standard
+streams; `--single-process` keeps the old in-process path. No OS
+restrictions are applied yet (ISO-03).
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Channel | Role and version handshake; frames capped at 128 MiB and read in 64 KiB steps; canonical strict decoding; `Closed` on peer death | `every_message_round_trips_over_a_socket_pair`, `handshakes_must_match_protocol_version_and_role`, `hostile_frames_are_refused_without_allocating_their_claims`, `malformed_payloads_decode_to_errors`, `a_child_process_speaks_the_protocol_over_its_standard_streams`, fuzz target `ipc-frame` |
+| Grant | The broker reads the granted file (canonical, regular, bounded) or navigates to the granted URL, and sends only the bytes, URL, charset, CSP, referrer policy, storage flag and granted font bytes | `split_and_single_process_runs_agree` and every CLI test, which now run split |
+| Brokered requests | Subresources, `fetch()` and Web Storage are numbered requests the broker answers from its own grant: local documents only inside their directory (after symbolic links), network documents through the session's CSP, mixed-content, CORS and MIME checks; the renderer's byte budget never raises the broker's; local documents get no network and no storage | `a_compromised_renderer_cannot_reach_beyond_its_local_grant`, `a_compromised_renderer_cannot_reach_beyond_its_network_grant` |
+| Output | The renderer returns its output; the broker writes standard output or the `--output` file only after `Done`. Renderer standard error is relayed with control characters escaped | `crashed_and_protocol_breaking_renderers_end_the_command_cleanly` |
+| Failure | A renderer that exits early or sends a malformed frame ends the command with status 1 and no output; the broker kills a protocol-breaking renderer; the next command starts a fresh renderer with a fresh grant | same |
+
+Test hooks `RUSTIC_TEST_RENDERER_CRASH` and
+`RUSTIC_TEST_COMPROMISED_RENDERER` change only what the renderer does,
+which the broker treats as hostile anyway; they grant nothing.
 
 ## NET-03 — fetch(), Headers, Request and Response
 

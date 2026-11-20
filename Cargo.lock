@@ -298,6 +298,7 @@ dependencies = [
  "rustic-encoding",
  "rustic-engine",
  "rustic-html",
+ "rustic-ipc",
  "rustic-js",
  "rustic-layout",
  "rustic-net",

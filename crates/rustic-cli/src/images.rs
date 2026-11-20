@@ -157,7 +157,7 @@ pub(crate) fn load_applied(
     limits: ImageLimits,
     chunk_bytes: usize,
     cancellation: &CancellationToken,
-    applied: Option<(&AppliedLocalFiles, Option<&crate::network::NetworkSession>)>,
+    applied: Option<(&AppliedLocalFiles, Option<&dyn crate::network::Session>)>,
 ) -> LoadedImages {
     // A network document always reads through its applied snapshot.
     let network = applied.and_then(|(_, network)| network);

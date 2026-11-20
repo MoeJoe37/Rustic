@@ -47,7 +47,12 @@ pub struct Start {
     pub args: Vec<String>,
     /// The document.
     pub document: DocumentGrant,
+    /// Font files the user granted (the renderer opens no files).
+    pub fonts: Vec<Vec<u8>>,
 }
+
+/// Most granted font files in one [`Start`].
+pub const MAX_FONTS: usize = 64;
 
 /// What a resource request is for (decides the broker's policy checks).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -314,6 +319,10 @@ impl Message for BrokerMessage {
                 writer.strs(&document.csp_report_only);
                 writer.str(&document.referrer_policy);
                 writer.bool(document.storage);
+                writer.u32(u32::try_from(start.fonts.len()).unwrap_or(u32::MAX));
+                for font in &start.fonts {
+                    writer.bytes(font);
+                }
             }
             Self::Resource { id, result } => {
                 writer.u16(2);
@@ -398,10 +407,18 @@ impl Message for BrokerMessage {
                     referrer_policy: reader.string()?,
                     storage: reader.bool()?,
                 };
+                let count = reader.u32()? as usize;
+                if count > MAX_FONTS {
+                    return Err(DecodeError::OutOfRange);
+                }
+                let fonts = (0..count)
+                    .map(|_| reader.bytes())
+                    .collect::<Result<_, _>>()?;
                 Ok(Self::Start(Start {
                     command,
                     args,
                     document,
+                    fonts,
                 }))
             }
             2 => {

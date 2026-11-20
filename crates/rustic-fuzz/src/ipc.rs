@@ -26,6 +26,7 @@ pub(crate) fn seeds() -> Vec<Vec<u8>> {
                 csp: vec!["default-src 'self'".into()],
                 ..DocumentGrant::default()
             },
+            fonts: Vec::new(),
         })));
         seeds.push(broker);
         for message in [

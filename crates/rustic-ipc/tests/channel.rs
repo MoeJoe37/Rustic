@@ -42,6 +42,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
                 referrer_policy: "no-referrer".into(),
                 storage: true,
             },
+            fonts: vec![b"OTTO".to_vec()],
         }),
         BrokerMessage::Resource {
             id: 7,

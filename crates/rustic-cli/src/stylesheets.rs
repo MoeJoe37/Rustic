@@ -1,7 +1,7 @@
 //! Stylesheet (and shared resource) fetching for the document commands.
 //!
 //! A network document's fetcher sends every request through its
-//! [`NetworkSession`] instead (CSP, mixed content and MIME checks), and
+//! [`Session`] instead (CSP, mixed content and MIME checks), and
 //! decodes stylesheets with the response's `charset`. For a local document:
 //!
 //! The command line grants one HTML file. Its `<link rel=stylesheet>` and
@@ -26,7 +26,7 @@ use rustic_encoding::Encoding;
 use rustic_style::{FetchError, StylesheetFetcher};
 use rustic_url::{Url, UrlPath};
 
-use crate::network::{NetworkSession, ResourceKind};
+use crate::network::{ResourceKind, Session};
 
 /// The `file:` URL of an absolute, normalized path (as from
 /// [`fs::canonicalize`]), or `None` for paths that have no portable `file:`
@@ -384,7 +384,7 @@ pub struct LocalStylesheetFetcher {
     environment_encoding: Encoding,
     applied: Option<AppliedLocalFiles>,
     /// Set for a network document: every read goes through the session.
-    network: Option<Rc<NetworkSession>>,
+    network: Option<Rc<dyn Session>>,
 }
 
 impl LocalStylesheetFetcher {
@@ -405,7 +405,7 @@ impl LocalStylesheetFetcher {
 
     /// A fetcher for a network document's subresources.
     pub(crate) fn for_network(
-        session: Rc<NetworkSession>,
+        session: Rc<dyn Session>,
         chunk_bytes: usize,
         cancellation: CancellationToken,
     ) -> Self {
@@ -421,7 +421,7 @@ impl LocalStylesheetFetcher {
     }
 
     /// The network session, for a network document.
-    pub(crate) fn network(&self) -> Option<&NetworkSession> {
+    pub(crate) fn network(&self) -> Option<&dyn Session> {
         self.network.as_deref()
     }
 

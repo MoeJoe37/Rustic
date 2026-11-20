@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 38.89%** = 38.00% verified complete + 0.89% partial credit. 89/221 capabilities complete, 5 in progress.
+**Overall completion: 39.59%** = 38.70% verified complete + 0.89% partial credit. 91/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `02acb8b37e89f0eb9abfa6efe64362d6c66d75807b200e0134e2e7b255a31552`.
+Catalog: `engine-v4`. Source fingerprint: `2e0e98ce7b6a591032eba99861f578f19be31b86e2712d5ccdd60ec70dc5af90`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `02acb8b37e89f0eb9abfa6efe64362d6c66d7
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
+| M7 Isolation & security | 2/8 | 18.75% | 18.75% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `02acb8b37e89f0eb9abfa6efe64362d6c66d7
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
+| Security & IPC | 2/11 | 0 | 13.95% | 13.95% | 5% | 0.69 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -276,8 +276,8 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Security & IPC
 
-- **planned** `security.ipc` — Bounded versioned hostile-peer-safe IPC · size 3 · M7 · 0.34% of engine
-- **planned** `security.authority` — Browser-assigned authority and capability brokering · size 3 · M7 · 0.34% of engine
+- **complete** `security.ipc` — Bounded versioned hostile-peer-safe IPC · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-ipc/src/lib.rs), [source](../../crates/rustic-ipc/src/protocol.rs), [source](../../docs/adr/0056-ipc-format.md), [test](../../crates/rustic-ipc/tests/channel.rs), [test](../../crates/rustic-ipc/tests/channel.rs), [test](../../crates/rustic-fuzz/src/ipc.rs))
+- **complete** `security.authority` — Browser-assigned authority and capability brokering · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
 - **planned** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine
 - **planned** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
 - **planned** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine

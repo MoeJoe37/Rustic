@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "02acb8b37e89f0eb9abfa6efe64362d6c66d75807b200e0134e2e7b255a31552",
-  "percent": "38.89",
-  "verified_percent": "38.00",
+  "source_fingerprint": "2e0e98ce7b6a591032eba99861f578f19be31b86e2712d5ccdd60ec70dc5af90",
+  "percent": "39.59",
+  "verified_percent": "38.70",
   "partial_percent": "0.89",
-  "completed": 89,
+  "completed": 91,
   "in_progress": 5,
   "total": 221,
   "fully_complete": false,
@@ -75,10 +75,10 @@
       "id": "M7",
       "label": "Isolation & security",
       "share": "3.72",
-      "completed": 0,
+      "completed": 2,
       "total": 8,
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "percent": "18.75",
+      "verified_percent": "18.75",
       "partial_percent": "0.00"
     },
     {
@@ -629,7 +629,7 @@
             {
               "kind": "source",
               "path": "crates/rustic-cli/src/network.rs",
-              "marker": "pub(crate) fn document_url"
+              "marker": "fn document_url(&self) -> &Url"
             },
             {
               "kind": "test",
@@ -5751,7 +5751,7 @@
             {
               "kind": "source",
               "path": "crates/rustic-cli/src/network.rs",
-              "marker": "pub(crate) struct ScriptFetch"
+              "marker": "pub(crate) struct SessionFetch"
             },
             {
               "kind": "test",
@@ -6143,9 +6143,40 @@
           "label": "Bounded versioned hostile-peer-safe IPC",
           "size": 3,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-ipc/src/lib.rs",
+              "marker": "pub struct Channel"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-ipc/src/protocol.rs",
+              "marker": "pub enum RendererMessage"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0056-ipc-format.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-ipc/tests/channel.rs",
+              "marker": "fn hostile_frames_are_refused_without_allocating_their_claims"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-ipc/tests/channel.rs",
+              "marker": "fn a_child_process_speaks_the_protocol_over_its_standard_streams"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-fuzz/src/ipc.rs",
+              "marker": "fn canonical"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.34"
         },
         {
@@ -6153,9 +6184,35 @@
           "label": "Browser-assigned authority and capability brokering",
           "size": 3,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "pub(crate) struct Broker"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/renderer.rs",
+              "marker": "struct BrokeredSession"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_local_grant"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn split_and_single_process_runs_agree"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.34"
         },
         {
@@ -6250,12 +6307,12 @@
         }
       ],
       "points": 43,
-      "completed": 0,
+      "completed": 2,
       "in_progress": 0,
       "total": 11,
-      "contribution": "0.00",
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "contribution": "0.69",
+      "percent": "13.95",
+      "verified_percent": "13.95",
       "partial_percent": "0.00"
     },
     {

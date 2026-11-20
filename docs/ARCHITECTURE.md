@@ -62,7 +62,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
 | `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime, Web IDL bindings and future service interfaces | M0 onward |
-| `rustic-cli` / future `rustic-shell` | Headless test host / desktop browser chrome | engine API, platform | M0 / M8 |
+| `rustic-cli` / future `rustic-shell` | Headless test host (broker plus a `__renderer` child per document command since M7, ADR 0056) / desktop browser chrome | engine API, platform | M0 / M8 |
 | `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
 
 Dependencies form a DAG. Keep the pure tokenizer, selector parser, and JavaScript

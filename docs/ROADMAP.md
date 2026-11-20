@@ -617,13 +617,18 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       simulator or device. Restoring hosted CI (or replacing it with
       self-hosted runners) is therefore a hard prerequisite of M7, not a
       convenience ([TD-12](TECH_DEBT.md)).
-- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format, each
+- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), 2026-11-20), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
-- [ ] **The engine already runs split.** Before OS restrictions are added,
+- [x] **The engine already runs split.** Done 2026-11-20: every document
+      command except `reftest` runs in a `rustic __renderer` child over
+      ADR 0056 IPC with no OS restrictions, and the CLI suites (M3–M6) run
+      through it ([IMPLEMENTATION.md](IMPLEMENTATION.md#iso-02--split-renderer-process-and-brokered-authority)). Before OS restrictions are added,
       the renderer runs in a child process over the ISO-02 IPC on Linux with
       no restrictions, and the M5/M6 suites pass through it. Isolation bugs
       are then separable from IPC bugs.
-- [ ] **Fuzz targets for every M6 parser and policy decision** (HTTP
+- [x] **Fuzz targets for every M6 parser and policy decision** (done
+      2026-11-20: `net-http-response`, `net-cookie`, `net-csp`,
+      `net-cors`, plus `ipc-frame`) (HTTP
       framing, cookies, CSP, CORS) run in the smoke job, because M7 treats
       the network process as a hostile peer.
 

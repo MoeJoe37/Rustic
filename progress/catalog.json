@@ -5475,24 +5475,87 @@
           "label": "Ephemeral/persistent profiles and private mode",
           "size": 2,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-storage/src/profile.rs",
+              "marker": "pub enum ProfileKind"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/storage.rs",
+              "marker": "pub fn configure"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-storage/tests/profile.rs",
+              "marker": "fn persistent_profiles_survive_reopening_and_are_locked"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn profiles_keep_local_storage_and_persistent_cookies_and_private_writes_nothing"
+            }
+          ]
         },
         {
           "id": "storage.partition",
           "label": "Storage keys, quotas and schema recovery",
           "size": 3,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-storage/src/key.rs",
+              "marker": "pub struct StorageKey"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-storage/src/file.rs",
+              "marker": "pub const FORMAT_VERSION"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-storage/tests/profile.rs",
+              "marker": "fn corrupt_files_are_quarantined_and_newer_formats_refused"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-storage/tests/profile.rs",
+              "marker": "fn per_key_total_and_key_count_quotas_hold_exactly"
+            }
+          ]
         },
         {
           "id": "storage.webstorage",
           "label": "Local/session storage",
           "size": 1,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/web_storage.rs",
+              "marker": "pub trait StorageHost"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/runtime/host_named.rs",
+              "marker": "pub struct NamedPropertyAccess"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/classic_scripts.rs",
+              "marker": "fn web_storage_reflects_the_host_and_throws_without_one"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/interp.rs",
+              "marker": "fn named_getters_setters_and_deleters_follow_web_idl"
+            }
+          ]
         },
         {
           "id": "storage.indexeddb",

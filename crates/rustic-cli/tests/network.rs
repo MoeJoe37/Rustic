@@ -280,3 +280,63 @@ fn undeclared_encodings_fall_back_by_locale_and_late_declarations_reload() {
     assert!(stdout(&output).contains("text \"caf\u{e9}\""));
     assert!(!stderr(&output).contains("reloading"));
 }
+
+#[test]
+fn profiles_keep_local_storage_and_persistent_cookies_and_private_writes_nothing() {
+    let server = FixtureServer::start([(
+        "/",
+        Reply::response(
+            200,
+            &[
+                ("Content-Type", "text/html"),
+                ("Set-Cookie", "kept=1; Max-Age=3600"),
+                ("Set-Cookie", "session=1"),
+            ],
+            b"<!doctype html><script>\
+              var n = Number(localStorage.getItem('n') || 0) + 1;\
+              localStorage.setItem('n', n);\
+              sessionStorage.setItem('s', 'x');\
+              document.documentElement.setAttribute('data-n', n);\
+              </script>",
+        ),
+    )])
+    .unwrap();
+    let grant = format!("http://a.test={}", server.address());
+    let dir = std::env::temp_dir().join(format!("rustic-cli-profile-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let profile = dir.to_str().unwrap().to_owned();
+    let run = |extra: &[&str]| {
+        let mut args = vec!["dump-dom", "--run-scripts", "--allow-origin", &grant];
+        args.extend_from_slice(extra);
+        args.push("http://a.test/");
+        let output = rustic(&args);
+        assert!(output.status.success(), "{}", stderr(&output));
+        stdout(&output)
+    };
+    let count = |dom: &str| {
+        dom.split("local=\"data-n\" value=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .map(str::to_owned)
+    };
+    assert_eq!(count(&run(&["--profile", &profile])).as_deref(), Some("1"));
+    assert_eq!(count(&run(&["--profile", &profile])).as_deref(), Some("2"));
+    // The second run sent only the persistent cookie saved by the first.
+    let requests = server.requests();
+    assert_eq!(requests[0].header("cookie"), None);
+    assert_eq!(requests[1].header("cookie"), Some("kept=1"));
+    // Ephemeral and private runs start empty and leave the profile alone.
+    assert_eq!(count(&run(&[])).as_deref(), Some("1"));
+    assert_eq!(count(&run(&["--private"])).as_deref(), Some("1"));
+    assert_eq!(count(&run(&["--profile", &profile])).as_deref(), Some("3"));
+    // A held lock refuses a second user of the profile.
+    std::fs::write(dir.join("LOCK"), "1\n").unwrap();
+    let mut args = vec!["dump-dom", "--run-scripts", "--allow-origin", &grant];
+    args.extend_from_slice(&["--profile", &profile, "http://a.test/"]);
+    let output = rustic(&args);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output).contains("in use"), "{}", stderr(&output));
+    let output = rustic(&["dump-dom", "--profile", &profile, "--private", "x.html"]);
+    assert_eq!(output.status.code(), Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+}

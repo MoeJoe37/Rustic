@@ -158,6 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [NET-06 — Profiles, storage keys and Web Storage](#net-06--profiles-storage-keys-and-web-storage)
 - [url.restart — Encoding confidence and change the encoding](#urlrestart--encoding-confidence-and-change-the-encoding)
 - [NET-02 — Documents and subresources over HTTP in the CLI](#net-02--documents-and-subresources-over-http-in-the-cli)
 - [NET-07 (partial) — Session history](#net-07-partial--session-history)
@@ -2534,6 +2535,27 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## NET-06 — Profiles, storage keys and Web Storage
+
+Added 2026-11-20: the `rustic-storage` crate, the `Storage` binding and
+the CLI's `--profile DIR` and `--private`.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Profiles | Ephemeral (default), private (never written) and persistent profiles; a persistent profile is a directory claimed by an exclusive `LOCK` file for the life of the `Profile` | `persistent_profiles_survive_reopening_and_are_locked`, `private_and_ephemeral_profiles_write_nothing` |
+| Files | `RUSTICPF`, format version, payload length, payload, CRC-32; written to `<name>.tmp`, synced, renamed and the directory synced; a newer format refuses to open the profile and leaves the file untouched; a bad checksum, malformed payload or quota breach moves the file to `<name>.corrupt-N` and starts that store empty, reported as a `Recovery` | `files_round_trip_and_damage_is_detected`, `corrupt_files_are_quarantined_and_newer_formats_refused`, `readers_check_counts_before_allocating` |
+| Storage keys | Serialized origin plus serialized top-level site; opaque origins have no key; `clear_origin` clears an origin in every partition | `keys_refuse_opaque_and_malformed_parts_and_round_trip`, `storage_is_partitioned_by_top_level_site_and_cleared_per_origin` |
+| Quotas | Two bytes per UTF-16 code unit of keys and values: 5 MiB per storage key, 256 MiB per profile (shared with service records), at most 4,096 keys; a failed write changes nothing | `quota_boundaries_leave_the_area_unchanged`, `per_key_total_and_key_count_quotas_hold_exactly` |
+| `Storage` | HTML §12.2.1 `length`, `key()`, `getItem()`, `setItem()`, `removeItem()`, `clear()`, and named properties through `rustic-js`'s new `HostNamed` exotic object (Web IDL §3.9 legacy platform object: visible names only, setter on `[[Set]]` and `[[DefineOwnProperty]]`, deleter, `[[PreventExtensions]]` refused); `QuotaExceededError` and `SecurityError` `DOMException`s; one object per getter | `named_getters_setters_and_deleters_follow_web_idl`, `web_storage_reflects_the_host_and_throws_without_one` |
+| Session storage | `SessionStorage` per top-level session, memory only, copyable for auxiliary contexts | `session_storage_is_separate_and_copyable` |
+| Cookies | Persistent cookies (with an expiry) are saved in the profile's `cookies` record after each network document and restored before the next navigation, revalidated and limited on import; session cookies are not saved | `persistent_cookies_round_trip_and_session_cookies_do_not`, `profiles_keep_local_storage_and_persistent_cookies_and_private_writes_nothing` |
+| Preflight cache | Keyed by the network partition key (top-level site) too | `preflight_grants_do_not_cross_network_partitions` |
+| CLI | Network documents get `localStorage` for (origin, own site); local files get none (opaque origin) | `profiles_keep_local_storage_and_persistent_cookies_and_private_writes_nothing` |
+
+Not yet: `storage` events to other documents of the same storage key
+(TD-167), a stale-lock check (TD-166), IndexedDB and the Storage
+Standard's `navigator.storage` (M9).
 
 ## url.restart — Encoding confidence and change the encoding
 

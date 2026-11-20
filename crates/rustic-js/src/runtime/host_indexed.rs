@@ -221,7 +221,7 @@ impl Agent {
         self.prototype_allows_name(parent, key)
     }
 
-    fn prototype_allows_name(
+    pub(crate) fn prototype_allows_name(
         &mut self,
         mut parent: Option<ObjectId>,
         key: PropertyKey,

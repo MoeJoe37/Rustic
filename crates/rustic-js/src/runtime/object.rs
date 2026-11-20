@@ -337,6 +337,8 @@ pub(crate) enum Internal {
     Host(u64),
     /// A read-only Web IDL indexed property getter and its source.
     HostIndexed(super::host_indexed::IndexedHost),
+    /// A Web IDL named getter/setter/deleter and its source.
+    HostNamed(super::host_named::NamedHost),
     /// The ordinary Window of a local browsing realm.
     WindowProxy(ObjectId),
     /// Private string state of a branded host exception.

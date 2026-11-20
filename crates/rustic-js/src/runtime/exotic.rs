@@ -25,6 +25,7 @@ enum Exotic {
     TypedArray,
     ModuleNamespace,
     HostIndexed,
+    HostNamed,
     WindowProxy,
 }
 
@@ -36,6 +37,7 @@ impl Agent {
             Some(Internal::TypedArray { .. }) => Exotic::TypedArray,
             Some(Internal::ModuleNamespace(..)) => Exotic::ModuleNamespace,
             Some(Internal::HostIndexed(_)) => Exotic::HostIndexed,
+            Some(Internal::HostNamed(_)) => Exotic::HostNamed,
             Some(Internal::WindowProxy(_)) => Exotic::WindowProxy,
             _ => unreachable!("only exotic objects carry the exotic flag"),
         }
@@ -69,7 +71,8 @@ impl Agent {
             Exotic::Arguments
             | Exotic::TypedArray
             | Exotic::ModuleNamespace
-            | Exotic::HostIndexed => Ok(self.heap.object(o).proto()),
+            | Exotic::HostIndexed
+            | Exotic::HostNamed => Ok(self.heap.object(o).proto()),
         }
     }
 
@@ -84,7 +87,8 @@ impl Agent {
             Exotic::Arguments
             | Exotic::TypedArray
             | Exotic::ModuleNamespace
-            | Exotic::HostIndexed => Ok(self.ordinary_set_prototype_of(o, proto)),
+            | Exotic::HostIndexed
+            | Exotic::HostNamed => Ok(self.ordinary_set_prototype_of(o, proto)),
         }
     }
 
@@ -95,16 +99,15 @@ impl Agent {
             Exotic::Arguments
             | Exotic::TypedArray
             | Exotic::ModuleNamespace
-            | Exotic::HostIndexed => {
-                Ok(self.heap.object(o).has_flag(super::object::FLAG_EXTENSIBLE))
-            }
+            | Exotic::HostIndexed
+            | Exotic::HostNamed => Ok(self.heap.object(o).has_flag(super::object::FLAG_EXTENSIBLE)),
         }
     }
 
     pub(crate) fn exotic_prevent_extensions(&mut self, o: ObjectId) -> JsResult<bool> {
         match self.exotic_kind(o) {
             Exotic::Proxy => self.in_proxy(|a| proxy::prevent_extensions(a, o)),
-            Exotic::HostIndexed | Exotic::WindowProxy => Ok(false),
+            Exotic::HostIndexed | Exotic::HostNamed | Exotic::WindowProxy => Ok(false),
             // §10.4.5.2: a typed array whose length can still change (it
             // tracks its buffer, or views a resizable non-shared buffer)
             // refuses, since new indices could appear later.
@@ -128,6 +131,7 @@ impl Agent {
             Exotic::WindowProxy => self.ordinary_get_own_property(self.window_proxy_target(o), key),
             Exotic::Proxy => self.in_proxy(|a| proxy::get_own_property(a, o, key)),
             Exotic::TypedArray => typed_array::get_own_property(self, o, key),
+            Exotic::HostNamed => self.host_named_get_own_property(o, key),
             Exotic::HostIndexed => {
                 if let Some(value) = self.host_indexed_value(o, key)? {
                     return Ok(Some(PropertyDescriptor::data_with(
@@ -176,6 +180,7 @@ impl Agent {
             }
             Exotic::Proxy => self.in_proxy(|a| proxy::define_own_property(a, o, key, desc)),
             Exotic::TypedArray => typed_array::define_own_property(self, o, key, desc),
+            Exotic::HostNamed => self.host_named_define_own_property(o, key, desc),
             Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => Ok(false),
             Exotic::HostIndexed => {
                 if self.ordinary_get_own_property(o, key)?.is_none()
@@ -241,6 +246,7 @@ impl Agent {
             Exotic::Proxy => self.in_proxy(|a| proxy::has_property(a, o, key)),
             Exotic::TypedArray => typed_array::has_property(self, o, key),
             Exotic::Arguments => self.has_property_from(o, key, true),
+            Exotic::HostNamed => self.host_named_has_property(o, key),
             Exotic::HostIndexed => Ok(self.host_index_is_supported(o, key)?
                 || self.host_named_is_visible(o, key)?
                 || self.has_property_from(o, key, true)?),
@@ -265,6 +271,7 @@ impl Agent {
             Exotic::WindowProxy => self.get_from(self.window_proxy_target(o), key, receiver, true),
             Exotic::Proxy => self.in_proxy(|a| proxy::get(a, o, key, receiver)),
             Exotic::TypedArray => typed_array::get(self, o, key, receiver),
+            Exotic::HostNamed => self.host_named_get(o, key, receiver),
             Exotic::HostIndexed => {
                 if let Some(value) = self.host_indexed_value(o, key)? {
                     return Ok(value);
@@ -300,6 +307,7 @@ impl Agent {
             }
             Exotic::Proxy => self.in_proxy(|a| proxy::set(a, o, key, value, receiver)),
             Exotic::TypedArray => typed_array::set(self, o, key, value, receiver),
+            Exotic::HostNamed => self.host_named_set(o, key, value, receiver),
             Exotic::HostIndexed => {
                 if self.host_index_is_supported(o, key)? {
                     return Ok(false);
@@ -326,6 +334,7 @@ impl Agent {
             Exotic::WindowProxy => self.ordinary_delete(self.window_proxy_target(o), key),
             Exotic::Proxy => self.in_proxy(|a| proxy::delete(a, o, key)),
             Exotic::TypedArray => typed_array::delete(self, o, key),
+            Exotic::HostNamed => self.host_named_delete(o, key),
             Exotic::HostIndexed if matches!(key, PropertyKey::Index(_)) => {
                 Ok(!self.host_index_is_supported(o, key)?)
             }
@@ -366,6 +375,7 @@ impl Agent {
                 .collect()),
             Exotic::Arguments => Ok(self.ordinary_own_property_keys(o)),
             Exotic::HostIndexed => self.host_indexed_keys(o),
+            Exotic::HostNamed => self.host_named_keys(o),
         }
     }
 

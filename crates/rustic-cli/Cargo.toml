@@ -20,6 +20,7 @@ rustic-encoding = { path = "../rustic-encoding" }
 rustic-engine = { path = "../rustic-engine" }
 rustic-html = { path = "../rustic-html" }
 rustic-net = { path = "../rustic-net" }
+rustic-storage = { path = "../rustic-storage" }
 rustic-style = { path = "../rustic-style" }
 rustic-url = { path = "../rustic-url" }
 

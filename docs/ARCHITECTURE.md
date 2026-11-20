@@ -27,7 +27,7 @@ The required product scope includes GPU/Wasm, a native MV2 extension ecosystem
 and a Rustic uBlock Origin port, with comparative security/privacy and performance
 gates. See [PRODUCT.md](PRODUCT.md) and [ADR 0007](adr/0007-product-scope.md).
 
-`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-engine`, `rustic-cli` and the
+`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-storage`, `rustic-engine`, `rustic-cli` and the
 `rustic-fuzz` development tool now exist; see
 [implementation progress](IMPLEMENTATION.md) for their actual scope. The following
 is the target decomposition, not a requirement to create empty crates today.
@@ -51,7 +51,7 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-bindings` | Web IDL tooling, JS/DOM wrappers, exception conversion, selector queries, tracing edges | JS, DOM, CSS parser, style matcher; generated from pinned IDL | M5 |
 | `rustic-web` | Browser APIs beyond the DOM core (fetch, storage, workers, messaging). Not created: in M5 the Window, events and timers live in `rustic-bindings` and the task pump in `rustic-engine` ([SCRIPTING.md](SCRIPTING.md)). Split this crate out when M6 adds APIs that need service interfaces | JS, bindings, DOM, service interfaces | M6 |
 | `rustic-net` | Origin allowlist, own HTTP/1.1 transport with limits, timeouts, cancellation and backpressure, loopback fixture server (NET-01); redirects and MIME types (NET-02 part); Fetch modes, CORS, preflight cache and filtered responses (NET-03 part); cookie jar and sites (NET-04 part, ADR 0054); later the HTTP cache and the TLS adapter | URL, base; reviewed TLS library once ADR 0051's TLS part is accepted | M6 |
-| `rustic-storage` | Partitioned profile data, quotas, transactions, eviction/private mode | base, origin/storage keys, database adapter | M6/M9 |
+| `rustic-storage` | Profiles (ephemeral, private, persistent with a lock), storage keys partitioned by top-level site, quotas, versioned checksummed atomic files with quarantine, Web Storage areas (NET-06); later IndexedDB and eviction | none (std only); callers supply origins and sites | M6/M9 |
 | `rustic-extensions` | Rustic MV2 package/identity, isolated worlds, APIs, lifecycle and permissions | JS/web, broker/service interfaces; no ambient page authority | M5/M6 prototypes, M8/M9 delivery |
 | `rustic-filter` | Bounded reference/optimized filtering, list snapshots and broker policy hooks | URL/base, controlled DOM/CSS interfaces | M6–M9 |
 | `rustic-ipc` | Versioned messages, validation, resource handles, bounded transport | base, selected serialization adapter | M7 |

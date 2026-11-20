@@ -454,6 +454,7 @@ pub fn validate_preflight(
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct CacheKey {
+    partition: String,
     origin: String,
     url: String,
     credentials: bool,
@@ -467,9 +468,11 @@ struct CacheEntry {
 
 /// Fetch's CORS-preflight cache, bounded in keys.
 ///
-/// Keyed by byte-serialized origin, URL (without fragment) and whether
-/// credentials were included. Network partition keys join the key with
-/// NET-06 (TD-160).
+/// Keyed by the network partition key (the serialized top-level site),
+/// byte-serialized origin, URL (without fragment) and whether credentials
+/// were included, so one top-level site's preflights never answer for
+/// another's (Fetch §4.8, "network partition key"). The methods without
+/// `_in` use the empty partition.
 #[derive(Debug)]
 pub struct PreflightCache {
     entries: HashMap<CacheKey, CacheEntry>,
@@ -493,8 +496,9 @@ impl PreflightCache {
         }
     }
 
-    fn key(origin: &str, url: &Url, credentials: bool) -> CacheKey {
+    fn key(partition: &str, origin: &str, url: &Url, credentials: bool) -> CacheKey {
         CacheKey {
+            partition: partition.to_owned(),
             origin: origin.to_owned(),
             url: url.serialize_without_fragment(),
             credentials,
@@ -510,7 +514,20 @@ impl PreflightCache {
         grant: &PreflightGrant,
         now: Instant,
     ) {
-        let key = Self::key(origin, url, credentials);
+        self.insert_in("", origin, url, credentials, grant, now);
+    }
+
+    /// [`Self::insert`] in network partition `partition`.
+    pub fn insert_in(
+        &mut self,
+        partition: &str,
+        origin: &str,
+        url: &Url,
+        credentials: bool,
+        grant: &PreflightGrant,
+        now: Instant,
+    ) {
+        let key = Self::key(partition, origin, url, credentials);
         if !self.entries.contains_key(&key) && self.entries.len() >= self.max_keys {
             self.entries.retain(|_, entry| {
                 entry
@@ -542,7 +559,20 @@ impl PreflightCache {
         method: &str,
         now: Instant,
     ) -> bool {
-        self.lookup(origin, url, credentials, |entry| {
+        self.allows_method_in("", origin, url, credentials, method, now)
+    }
+
+    /// [`Self::allows_method`] in network partition `partition`.
+    pub fn allows_method_in(
+        &self,
+        partition: &str,
+        origin: &str,
+        url: &Url,
+        credentials: bool,
+        method: &str,
+        now: Instant,
+    ) -> bool {
+        self.lookup(partition, origin, url, credentials, |entry| {
             entry.methods.iter().any(|(name, expiry)| {
                 *expiry > now && (name == method || (!credentials && name == "*"))
             })
@@ -558,7 +588,20 @@ impl PreflightCache {
         header: &str,
         now: Instant,
     ) -> bool {
-        self.lookup(origin, url, credentials, |entry| {
+        self.allows_header_in("", origin, url, credentials, header, now)
+    }
+
+    /// [`Self::allows_header`] in network partition `partition`.
+    pub fn allows_header_in(
+        &self,
+        partition: &str,
+        origin: &str,
+        url: &Url,
+        credentials: bool,
+        header: &str,
+        now: Instant,
+    ) -> bool {
+        self.lookup(partition, origin, url, credentials, |entry| {
             entry.headers.iter().any(|(name, expiry)| {
                 *expiry > now
                     && (name.eq_ignore_ascii_case(header)
@@ -571,18 +614,19 @@ impl PreflightCache {
 
     fn lookup(
         &self,
+        partition: &str,
         origin: &str,
         url: &Url,
         credentials: bool,
         found: impl Fn(&CacheEntry) -> bool,
     ) -> bool {
         self.entries
-            .get(&Self::key(origin, url, credentials))
+            .get(&Self::key(partition, origin, url, credentials))
             .is_some_and(found)
     }
 
     /// Fetch: on a failed CORS check for a request, clear entries for its
-    /// (origin, URL) pair.
+    /// (origin, URL) pair, in every partition.
     pub fn clear_for(&mut self, origin: &str, url: &Url) {
         let target = url.serialize_without_fragment();
         self.entries

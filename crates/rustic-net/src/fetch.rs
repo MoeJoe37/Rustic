@@ -582,14 +582,26 @@ impl Fetcher {
         }
         let credentialed = request.credentials == CredentialsMode::Include;
         let now = Instant::now();
+        let partition = self.partition_key(request);
         let method_cached = (is_cors_safelisted_method(&hop.method) && !request.use_cors_preflight)
-            || self
-                .preflight
-                .allows_method(origin, current, credentialed, &hop.method, now);
+            || self.preflight.allows_method_in(
+                &partition,
+                origin,
+                current,
+                credentialed,
+                &hop.method,
+                now,
+            );
         let cached = method_cached
             && unsafe_names.iter().all(|name| {
-                self.preflight
-                    .allows_header(origin, current, credentialed, name, now)
+                self.preflight.allows_header_in(
+                    &partition,
+                    origin,
+                    current,
+                    credentialed,
+                    name,
+                    now,
+                )
             });
         if cached {
             return Ok(());
@@ -616,8 +628,17 @@ impl Fetcher {
         )
         .map_err(NetworkError::Preflight)?;
         self.preflight
-            .insert(origin, current, credentialed, &grant, now);
+            .insert_in(&partition, origin, current, credentialed, &grant, now);
         Ok(())
+    }
+
+    /// Fetch "determine the network partition key": the top-level site, or
+    /// for a top-level client the site of its own origin.
+    fn partition_key(&self, request: &FetchRequest) -> String {
+        match &request.top_level_site {
+            Some(site) => site.serialize(),
+            None => self.suffixes().site(&request.origin).serialize(),
+        }
     }
 
     /// HTTP-network-or-cache fetch without the cache: headers, cookies,

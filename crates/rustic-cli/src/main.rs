@@ -12,6 +12,7 @@ mod images;
 mod loader;
 mod network;
 mod reftest;
+mod storage;
 mod stylesheets;
 
 use loader::{LoadError, LoadedDocument, LoaderLimits};
@@ -126,7 +127,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let args = match network::configure(args) {
+    let args = match network::configure(args).and_then(storage::configure) {
         Ok(args) => args,
         Err(e) => {
             eprintln!("rustic: {e}");

@@ -180,6 +180,8 @@ pub enum NetworkLoadError {
     NotHtml(String),
     /// The body exceeded `--max-input-bytes`.
     TooLarge(usize),
+    /// The profile could not be read.
+    Profile(String),
 }
 
 impl fmt::Display for NetworkLoadError {
@@ -203,6 +205,7 @@ impl fmt::Display for NetworkLoadError {
                 EscapedText(mime)
             ),
             Self::TooLarge(limit) => write!(formatter, "the response exceeds {limit} bytes"),
+            Self::Profile(error) => write!(formatter, "profile: {error}"),
         }
     }
 }
@@ -256,6 +259,15 @@ impl fmt::Debug for NetworkSession {
     }
 }
 
+/// Unix seconds, the cookie jar's clock.
+fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX)
+        })
+}
+
 /// Navigate to `url` with the configured grants and read the document,
 /// at most `max_bytes` of it.
 pub fn navigate(
@@ -269,6 +281,18 @@ pub fn navigate(
         return Err(NetworkLoadError::NoGrants);
     }
     let mut fetcher = build_fetcher(config, max_bytes)?;
+    // A persistent profile's cookies outlive the run.
+    let saved =
+        crate::storage::saved_cookies().map_err(|e| NetworkLoadError::Profile(e.to_string()))?;
+    if let Some(saved) = saved {
+        if fetcher
+            .cookies_mut()
+            .import_persistent(&saved, now())
+            .is_none()
+        {
+            eprintln!("rustic: profile: the saved cookies are malformed; ignored");
+        }
+    }
     let navigation = Navigation::new(NavigationRequest::browser(url), NETWORK_TIMEOUT);
     let outcome = navigation
         .run(&mut fetcher)
@@ -343,6 +367,12 @@ impl NetworkSession {
             cancellation,
             charsets: RefCell::new(HashMap::new()),
         }
+    }
+
+    /// Save the jar's persistent cookies in the profile.
+    pub(crate) fn save_cookies(&self) -> Result<(), rustic_storage::ProfileError> {
+        let bytes = self.fetcher.borrow().cookies().export_persistent(now());
+        crate::storage::save_cookies(bytes)
     }
 
     /// The document's response URL (its fallback base URL).

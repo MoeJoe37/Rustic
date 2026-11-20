@@ -28,6 +28,7 @@ mod mutation_observer;
 mod node_tree;
 mod resize_observer;
 mod selectors;
+mod web_storage;
 mod window;
 
 pub use events::LifecycleEvent;
@@ -36,6 +37,7 @@ pub use events::{
 };
 pub use events::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
 pub use events::{InputEvent, KeyInput, Modifiers};
+pub use web_storage::{QuotaExceeded, StorageHost, StorageKind};
 pub use window::{TimerHandler, WindowScheduler};
 
 /// A rendered layout read could not produce a result.
@@ -172,6 +174,8 @@ struct Page {
     child_index: RefCell<collections::ChildIndex>,
     observers: mutation_observer::Observers,
     resize_observers: resize_observer::ResizeObservers,
+    storage: RefCell<Option<Rc<dyn web_storage::StorageHost>>>,
+    storage_objects: RefCell<[Option<(Value, rustic_js::runtime::HostRoot)>; 2]>,
 }
 
 impl ExecutionHost for Page {
@@ -504,6 +508,7 @@ fn install_page(
     let main = document.id();
     drop(document);
     let window = window::install(agent, scheduler.is_some())?;
+    web_storage::install(agent)?;
     let events = events::Events::new(agent)?;
     let rects = agent.new_weak_map()?;
     agent.root(Value::object(rects))?;
@@ -526,7 +531,18 @@ fn install_page(
         child_index: RefCell::new(collections::ChildIndex::default()),
         observers,
         resize_observers,
+        storage: RefCell::new(None),
+        storage_objects: RefCell::new([None, None]),
     }))
+}
+
+/// Give the attached page its Web Storage areas (`localStorage` and
+/// `sessionStorage`). Without a host both getters throw `SecurityError`.
+pub fn attach_storage(agent: &mut Agent, host: Rc<dyn StorageHost>) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        *page.storage.borrow_mut() = Some(host);
+        Ok(())
+    })
 }
 
 /// Whether a host input target has an unbroken parent path to this document.

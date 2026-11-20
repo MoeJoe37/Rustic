@@ -58,13 +58,12 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | --- | --- | --- |
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M6, networking (NET-01 to NET-05) | TD-161, TD-164 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
-| M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
-| M7 entry (before hostile remote content) | TD-157, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-157, TD-165, TD-166, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -223,12 +222,14 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-157 | Deliberate | Network | No DNS: the transport reaches only allowlisted loopback origins (TLS paid 2026-11-20) | Open, M7 entry |
 | TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Paid 2026-11-20 |
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
-| TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Open, M6 profiles (NET-06) |
+| TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Paid 2026-11-20 |
 | TD-162 | Deliberate | Network / codecs | `gzip` and `deflate` response bodies are buffered whole (up to `max_body_bytes`) and inflated at the end of the body; only brotli decodes incrementally | Open, M12 |
 | TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*` and `Accept-Language` paid 2026-11-20) | Open, M6 networking |
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
 | TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Open, M6 networking |
 | TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
+| TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M7 browser shell |
+| TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2525,7 +2526,9 @@ origins.
 **Trigger:** before DNS or any non-loopback origin (M7 entry), or the
 first test that needs a multi-label suffix.
 
-### TD-160 — Cookies and preflight cache are per fetcher, in memory
+### TD-160 — Cookies and preflight cache are per fetcher, in memory (Paid)
+
+**Paid 2026-11-20:** persistent profiles keep the cookie jar's persistent cookies (`CookieJar::export_persistent`/`import_persistent`, revalidated on import) in a checksummed profile record, and the CORS-preflight cache is keyed by the network partition key (`PreflightCache::insert_in`). Evidence: `persistent_cookies_round_trip_and_session_cookies_do_not`, `preflight_grants_do_not_cross_network_partitions`, `profiles_keep_local_storage_and_persistent_cookies_and_private_writes_nothing`.
 
 The `CookieJar` and `PreflightCache` live inside one `Fetcher`, are lost
 when it is dropped and are not keyed by Fetch's network partition key.
@@ -2602,3 +2605,25 @@ arrive and running subresource fetches concurrently; pass the document
 mode to the stylesheet check.
 **Trigger:** the M7 browser shell's network process, or a page-load
 measurement over HTTP.
+
+### TD-166 — Profile locks are not checked for a dead owner
+
+`ProfileLock` creates `LOCK` exclusively and removes it when dropped. A
+process that crashes leaves it, and the next run reports the profile as in
+use. Checking the recorded process id is not portable, and the declared
+MSRV (1.85) predates `File::try_lock`.
+**Pay:** an OS file lock (`File::try_lock` once the MSRV allows it, or a
+reviewed platform call) held for the profile's life, with the `LOCK` file
+kept only as a hint.
+**Trigger:** the M7 browser shell, which opens the user's real profile.
+
+### TD-167 — No `storage` events
+
+HTML §12.2.4 fires `storage` at every other `Window` whose document has
+the same storage key when an area changes. Rustic's areas report each
+change (`StorageChange`), but nothing dispatches it: the CLI has one
+document, and there is no `StorageEvent` interface.
+**Pay:** a per-profile broadcast of `StorageChange`s to the other live
+documents of the key, queued on their DOM manipulation task source, and
+the `StorageEvent` binding.
+**Trigger:** a host with more than one live document (tabs or frames).

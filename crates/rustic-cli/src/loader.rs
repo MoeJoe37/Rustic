@@ -142,6 +142,8 @@ pub enum LoadError {
     Png(rustic_raster::PngError),
     /// A network document could not be loaded.
     Network(NetworkLoadError),
+    /// The browser profile could not be opened or written.
+    Profile(rustic_storage::ProfileError),
 }
 
 impl fmt::Display for LoadError {
@@ -175,6 +177,7 @@ impl fmt::Display for LoadError {
             Self::Raster(error) => error.fmt(f),
             Self::Png(error) => error.fmt(f),
             Self::Network(error) => error.fmt(f),
+            Self::Profile(error) => error.fmt(f),
         }
     }
 }
@@ -196,6 +199,7 @@ impl Error for LoadError {
             Self::Raster(error) => Some(error),
             Self::Png(error) => Some(error),
             Self::Network(error) => Some(error),
+            Self::Profile(error) => Some(error),
             _ => None,
         }
     }
@@ -370,6 +374,7 @@ pub fn load_network_document(
         // HTML "change the encoding": a declaration the prescan did not see
         // replaces a tentative encoding by loading the document again with
         // the declared one, now certain; it happens at most once.
+        network.session.save_cookies().map_err(LoadError::Profile)?;
         if let Selected::Tentative(used) = selected {
             let declared = first_meta_declaration(document.parsed().document());
             if let Some(declared) = declared.filter(|&declared| declared != used) {
@@ -552,6 +557,9 @@ fn load_scripted_network_document(
         load.set_script_policy(Box::new(InlinePolicy(Rc::clone(&session))))?;
         load.set_string_compilation_allowed(session.allows_eval())?;
     }
+    if let Some(storage) = crate::storage::host_for(&url).map_err(LoadError::Profile)? {
+        load.set_storage_host(storage)?;
+    }
     let cancellation = load.cancellation().expect("admitted load").clone();
     let fetch = LocalStylesheetFetcher::for_network(
         Rc::clone(&session),
@@ -575,6 +583,7 @@ fn load_scripted_network_document(
         )?;
         Ok(())
     })?;
+    crate::storage::flush().map_err(LoadError::Profile)?;
     Ok((document, selected))
 }
 

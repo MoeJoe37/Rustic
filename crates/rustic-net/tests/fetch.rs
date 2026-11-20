@@ -739,3 +739,38 @@ fn client_policy_is_asked_before_every_hop() {
     // The refused hop was never sent.
     assert_eq!(server.requests().len(), 1);
 }
+
+#[test]
+fn preflight_grants_do_not_cross_network_partitions() {
+    let server = FixtureServer::start([(
+        "/ok",
+        Reply::response(
+            204,
+            &[
+                ("Access-Control-Allow-Origin", "http://a.test"),
+                ("Access-Control-Allow-Methods", "PUT"),
+                ("Access-Control-Max-Age", "600"),
+            ],
+            b"",
+        ),
+    )])
+    .unwrap();
+    let mut fetcher = fetcher(&[("http://b.test", &server)]);
+    let suffixes = PublicSuffixList::parse("test\n").unwrap();
+    let put = |top: &str| {
+        let mut put = request("http://b.test/ok", "http://a.test", RequestMode::Cors);
+        put.method = "PUT".to_owned();
+        put.top_level_site = Some(suffixes.site(&origin(top)));
+        put
+    };
+    fetcher.fetch(put("http://a.test")).unwrap();
+    fetcher.fetch(put("http://a.test")).unwrap();
+    // Two requests, one preflight, within one top-level site.
+    assert_eq!(server.requests().len(), 3);
+    // The same frame origin under another top-level site preflights again.
+    fetcher.fetch(put("http://c.test")).unwrap();
+    let log = server.requests();
+    assert_eq!(log.len(), 5);
+    assert_eq!(log[3].method, "OPTIONS");
+    assert_eq!(fetcher.preflight_cache().len(), 2);
+}

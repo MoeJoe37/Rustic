@@ -14,6 +14,7 @@
 //! (Brave's default); limits are 180 cookies per site and 3,000 in all.
 
 mod parse;
+mod persist;
 
 use std::fmt;
 

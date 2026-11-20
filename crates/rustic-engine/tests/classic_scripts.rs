@@ -526,3 +526,109 @@ try { Function('return 1'); ran.push('fn'); } catch (e) { ran.push(e.name); }</s
         "if (ran.join() !== 'allowed,EvalError,EvalError') throw ran.join();",
     );
 }
+
+#[derive(Debug, Default)]
+struct MemoryStorage {
+    areas: std::cell::RefCell<[std::collections::BTreeMap<Vec<u16>, Vec<u16>>; 2]>,
+}
+
+impl MemoryStorage {
+    fn area(kind: rustic_engine::StorageKind) -> usize {
+        match kind {
+            rustic_engine::StorageKind::Local => 0,
+            rustic_engine::StorageKind::Session => 1,
+        }
+    }
+}
+
+impl rustic_engine::StorageHost for MemoryStorage {
+    fn length(&self, kind: rustic_engine::StorageKind) -> u32 {
+        self.areas.borrow()[Self::area(kind)].len() as u32
+    }
+    fn key(&self, kind: rustic_engine::StorageKind, index: u32) -> Option<Vec<u16>> {
+        self.areas.borrow()[Self::area(kind)]
+            .keys()
+            .nth(index as usize)
+            .cloned()
+    }
+    fn get(&self, kind: rustic_engine::StorageKind, key: &[u16]) -> Option<Vec<u16>> {
+        self.areas.borrow()[Self::area(kind)].get(key).cloned()
+    }
+    fn set(
+        &self,
+        kind: rustic_engine::StorageKind,
+        key: &[u16],
+        value: &[u16],
+    ) -> Result<(), rustic_engine::QuotaExceeded> {
+        if value.len() > 8 {
+            return Err(rustic_engine::QuotaExceeded);
+        }
+        self.areas.borrow_mut()[Self::area(kind)].insert(key.to_vec(), value.to_vec());
+        Ok(())
+    }
+    fn remove(&self, kind: rustic_engine::StorageKind, key: &[u16]) {
+        self.areas.borrow_mut()[Self::area(kind)].remove(key);
+    }
+    fn clear(&self, kind: rustic_engine::StorageKind) {
+        self.areas.borrow_mut()[Self::area(kind)].clear();
+    }
+    fn keys(&self, kind: rustic_engine::StorageKind) -> Vec<Vec<u16>> {
+        self.areas.borrow()[Self::area(kind)]
+            .keys()
+            .cloned()
+            .collect()
+    }
+}
+
+#[test]
+fn web_storage_reflects_the_host_and_throws_without_one() {
+    let mut engine = Engine::new(1);
+    let mut plain = load(&mut engine, ManualClock::default());
+    plain.close_input().unwrap();
+    let mut document = plain.take_document().unwrap().unwrap();
+    check(
+        &mut document,
+        "try { localStorage; throw 'no error' } catch (e) { \
+         if (!(e instanceof DOMException) || e.name !== 'SecurityError') throw e; }",
+    );
+    drop(document);
+
+    let host = std::rc::Rc::new(MemoryStorage::default());
+    let mut load = load(&mut engine, ManualClock::default());
+    load.set_storage_host(host.clone()).unwrap();
+    load.close_input().unwrap();
+    let mut document = load.take_document().unwrap().unwrap();
+    check(
+        &mut document,
+        r#"
+        if (localStorage !== localStorage) throw 'identity';
+        if (!(localStorage instanceof Storage)) throw 'interface';
+        localStorage.setItem('b', 1);
+        localStorage.a = 'x';
+        localStorage['0'] = 'zero';
+        sessionStorage.s = 'only';
+        if (localStorage.length !== 3) throw 'length ' + localStorage.length;
+        if (localStorage.getItem('b') !== '1') throw 'getItem';
+        if (localStorage.getItem('missing') !== null) throw 'missing';
+        if (localStorage.key(0) !== '0' || localStorage.key(9) !== null) throw 'key';
+        if (Object.keys(localStorage).join() !== '0,a,b') throw Object.keys(localStorage);
+        if (localStorage.s !== undefined || sessionStorage.s !== 'only') throw 'areas';
+        delete localStorage.a;
+        localStorage.removeItem('b');
+        if (localStorage.length !== 1) throw 'removed';
+        try { localStorage.setItem('big', 'more than eight'); throw 'no quota'; }
+        catch (e) { if (e.name !== 'QuotaExceededError') throw e; }
+        try { localStorage.big = 'more than eight'; throw 'no quota'; }
+        catch (e) { if (e.name !== 'QuotaExceededError') throw e; }
+        sessionStorage.clear();
+        if (sessionStorage.length !== 0) throw 'clear';
+        try { Storage.prototype.getItem.call({}, 'a'); throw 'brand'; }
+        catch (e) { if (!(e instanceof TypeError)) throw e; }
+        "#,
+    );
+    let zero: Vec<u16> = "0".encode_utf16().collect();
+    assert_eq!(
+        rustic_engine::StorageHost::get(&*host, rustic_engine::StorageKind::Local, &zero),
+        Some("zero".encode_utf16().collect())
+    );
+}

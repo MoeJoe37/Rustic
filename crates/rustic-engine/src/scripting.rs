@@ -453,6 +453,16 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(())
     }
 
+    /// Give the document `localStorage` and `sessionStorage` (HTML §12.2)
+    /// backed by the host's areas for its storage key.
+    pub fn set_storage_host(
+        &mut self,
+        host: std::rc::Rc<dyn crate::StorageHost>,
+    ) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        page::attach_storage(agent, host).map_err(|_| ScriptStop::OutOfMemory)
+    }
+
     /// Supply the bounded layout pipeline serving synchronous script reads.
     /// Replacing it also invalidates any outstanding render ticket.
     pub fn set_layout_source(&mut self, source: Box<dyn LayoutSource>) -> Result<(), ScriptStop> {

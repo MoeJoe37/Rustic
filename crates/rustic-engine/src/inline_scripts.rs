@@ -318,6 +318,17 @@ impl<C: Clock> ClassicScriptLoad<C> {
         })
     }
 
+    /// Give the document Web Storage areas; call before feeding HTML.
+    pub fn set_storage_host(
+        &mut self,
+        host: std::rc::Rc<dyn crate::StorageHost>,
+    ) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending.document.set_storage_host(host)?;
+            Ok(())
+        })
+    }
+
     /// Allow or refuse `eval` and the `Function` constructors (CSP
     /// `'unsafe-eval'`); a refusal throws `EvalError` in script.
     pub fn set_string_compilation_allowed(&mut self, allowed: bool) -> Result<(), ScriptLoadError> {

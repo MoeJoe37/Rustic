@@ -396,6 +396,11 @@ impl Marker<'_> {
                         self.value(value);
                     }
                 }
+                Some(Internal::HostNamed(data)) => {
+                    for &value in data.roots() {
+                        self.value(value);
+                    }
+                }
                 Some(Internal::HostError { name, message, .. }) => {
                     self.string(*name);
                     self.string(*message);

@@ -461,3 +461,30 @@ fn random_sequences_keep_the_jar_invariants() {
         assert!(sent.iter().all(|cookie| !cookie.is_expired(now)));
     }
 }
+
+#[test]
+fn persistent_cookies_round_trip_and_session_cookies_do_not() {
+    let mut jar = jar();
+    set(&mut jar, "https://a.test/", "session=1").unwrap();
+    set(
+        &mut jar,
+        "https://a.test/",
+        "kept=2; Max-Age=600; Secure; HttpOnly",
+    )
+    .unwrap();
+    set(&mut jar, "https://a.test/", "short=3; Max-Age=5").unwrap();
+    let saved = jar.export_persistent(NOW);
+    let mut restored = super::tests::jar();
+    assert_eq!(restored.import_persistent(&saved, NOW + 10), Some(1));
+    let cookie = &restored.cookies()[0];
+    assert_eq!((cookie.name(), cookie.value()), ("kept", "2"));
+    assert!(cookie.secure_only() && cookie.http_only());
+    assert_eq!(cookie.expiry(), Some(NOW + 600));
+    // Importing again adds nothing; malformed data changes nothing.
+    assert_eq!(restored.import_persistent(&saved, NOW + 10), Some(0));
+    let mut truncated = saved.clone();
+    truncated.pop();
+    assert_eq!(restored.import_persistent(&truncated, NOW), None);
+    assert_eq!(restored.import_persistent(b"XXXX", NOW), None);
+    assert_eq!(restored.len(), 1);
+}

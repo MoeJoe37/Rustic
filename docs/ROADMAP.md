@@ -561,7 +561,15 @@ The CLI now loads documents, stylesheets, scripts and images over HTTP(S)
 from granted loopback origins (`--allow-origin`, `--ca-file`) with response
 charsets, per-hop CSP and mixed-content checks and `nosniff`
 ([IMPLEMENTATION.md](IMPLEMENTATION.md#net-02--documents-and-subresources-over-http-in-the-cli)).
-Next: `fetch()`, the HTTP cache, profiles and storage.
+**NET-06, 2026-11-20:** the new `rustic-storage` crate holds ephemeral,
+private and locked persistent profiles with versioned, checksummed,
+atomically replaced files (corrupt ones quarantined), storage keys
+partitioned by top-level site, quotas, and Web Storage areas; `Storage`,
+`localStorage` and `sessionStorage` run on a new named-property exotic in
+`rustic-js`; persistent cookies live in the profile and the preflight cache
+is partitioned (TD-160 paid). The CLI takes `--profile DIR` and `--private`
+([IMPLEMENTATION.md](IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)).
+Next: `fetch()` bindings, the HTTP cache, the network conformance gate.
 
 ## 10. M7 — Isolation and security gate
 

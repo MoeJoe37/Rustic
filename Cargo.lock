@@ -301,6 +301,7 @@ dependencies = [
  "rustic-net",
  "rustic-paint",
  "rustic-raster",
+ "rustic-storage",
  "rustic-style",
  "rustic-text",
  "rustic-url",
@@ -433,6 +434,10 @@ dependencies = [
  "rustic-style",
  "rustic-text",
 ]
+
+[[package]]
+name = "rustic-storage"
+version = "0.1.0"
 
 [[package]]
 name = "rustic-style"

@@ -4101,3 +4101,120 @@ fn hosts_can_refuse_string_compilation() {
     agent.set_string_compilation_allowed(true);
     assert_eq!(run_in(&mut agent, "eval('6 * 7')"), "42");
 }
+
+mod named_host {
+    use rustic_js::runtime::{Agent, ErrorKind, JsResult, NamedPropertyAccess, StringId, Value};
+
+    /// A store backed by a plain object; the name "full" is refused like a
+    /// quota error.
+    fn store(_: &mut Agent, source: Value) -> rustic_js::runtime::ObjectId {
+        source.as_object().expect("store object")
+    }
+
+    fn contains(agent: &mut Agent, source: Value, name: StringId) -> JsResult<bool> {
+        let key = agent.heap.key_for_string(name)?;
+        let object = store(agent, source);
+        Ok(agent.get_own_property(object, key)?.is_some())
+    }
+
+    fn get(agent: &mut Agent, source: Value, name: StringId) -> JsResult<Option<Value>> {
+        if !contains(agent, source, name)? {
+            return Ok(None);
+        }
+        let key = agent.heap.key_for_string(name)?;
+        let object = store(agent, source);
+        agent.get(object, key).map(Some)
+    }
+
+    fn set(agent: &mut Agent, source: Value, name: StringId, value: Value) -> JsResult<()> {
+        if agent.heap.string(name).to_text() == "full" {
+            return Err(agent.throw(ErrorKind::RangeError, "quota"));
+        }
+        let text = agent.to_string(value)?;
+        let key = agent.heap.key_for_string(name)?;
+        let object = store(agent, source);
+        agent.create_data_property(object, key, Value::string(text))?;
+        Ok(())
+    }
+
+    fn delete(agent: &mut Agent, source: Value, name: StringId) -> JsResult<()> {
+        let key = agent.heap.key_for_string(name)?;
+        let object = store(agent, source);
+        agent.delete(object, key)?;
+        Ok(())
+    }
+
+    fn names(agent: &mut Agent, source: Value) -> JsResult<Vec<StringId>> {
+        let object = store(agent, source);
+        let keys = agent.own_property_keys(object)?;
+        let mut names = Vec::new();
+        for key in keys {
+            let value = agent.key_to_value(key)?;
+            names.push(agent.to_string(value)?);
+        }
+        Ok(names)
+    }
+
+    static ACCESS: NamedPropertyAccess = NamedPropertyAccess {
+        contains,
+        get,
+        set,
+        delete,
+        names,
+    };
+
+    #[test]
+    fn named_getters_setters_and_deleters_follow_web_idl() {
+        let mut agent = Agent::new().expect("agent");
+        let source = agent.new_object().unwrap();
+        let proto = agent.new_object().unwrap();
+        let method = agent.heap.key("method").unwrap();
+        agent
+            .create_data_property(proto, method, Value::number(1.0))
+            .unwrap();
+        let host = agent
+            .new_named_host("Store", proto, Value::object(source), &ACCESS)
+            .unwrap();
+        assert_eq!(
+            agent.named_host_source(host, "Store"),
+            Some(Value::object(source))
+        );
+        assert_eq!(agent.named_host_source(host, "Other"), None);
+        let global = agent.intrinsics.global;
+        let name = agent.heap.key("store").unwrap();
+        agent
+            .create_data_property(global, name, Value::object(host))
+            .unwrap();
+        let cases = [
+            ("store.a = 5; store.a", "5"),
+            // Values go through the setter's conversion.
+            ("typeof store.a", "string"),
+            ("store[0] = 'zero'; store['0']", "zero"),
+            ("'a' in store && 'b' in store", "false"),
+            ("Object.keys(store).join()", "0,a"),
+            (
+                "JSON.stringify(Object.getOwnPropertyDescriptor(store, 'a'))",
+                "{\"value\":\"5\",\"writable\":true,\"enumerable\":true,\"configurable\":true}",
+            ),
+            // Prototype members shadow names for reads but not for writes.
+            ("store.method = 'x'; store.method", "1"),
+            // The stored name is supported but not visible past the prototype.
+            ("Object.keys(store).join()", "0,a"),
+            ("delete store.a; 'a' in store", "false"),
+            (
+                "Object.defineProperty(store, 'd', { value: 7 }); store.d",
+                "7",
+            ),
+            ("Reflect.defineProperty(store, 'g', { get() {} })", "false"),
+            ("try { store.full = 1 } catch (e) { e.name }", "RangeError"),
+            (
+                "try { Object.preventExtensions(store) } catch (e) { e.name }",
+                "TypeError",
+            ),
+        ];
+        for (source, expected) in cases {
+            let result = super::run_in(&mut agent, source);
+            assert_eq!(result, expected, "{source}");
+        }
+    }
+}

@@ -14,6 +14,7 @@ mod gc;
 mod heap;
 mod host;
 mod host_indexed;
+mod host_named;
 mod internal;
 mod number;
 mod object;
@@ -51,6 +52,7 @@ pub use gc::{GcStats, HostRoot, HostTracer, MIN_GC_THRESHOLD, Roots};
 pub use heap::{DEFAULT_HEAP_BYTES, Heap, OutOfMemory, Symbol};
 pub use host::ExecutionHost;
 pub use host_indexed::{LiveIndexAccess, LiveNameAccess};
+pub use host_named::NamedPropertyAccess;
 pub use internal::IntegrityLevel;
 pub use number::{
     number_to_string, string_to_number, to_int32, to_integer_or_infinity, to_length, to_uint16,

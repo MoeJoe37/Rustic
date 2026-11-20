@@ -1,0 +1,14 @@
+[package]
+name = "rustic-storage"
+description = "Profiles, storage keys, quotas and Web Storage areas for Rustic"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

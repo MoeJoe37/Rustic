@@ -241,6 +241,26 @@ enum SiteKind {
 }
 
 impl Site {
+    /// Parse a non-opaque site's serialization (`scheme://host`), as
+    /// saved in a profile.
+    pub fn parse_serialized(text: &str) -> Option<Self> {
+        let (scheme, host) = text.split_once("://")?;
+        let valid = |part: &str| {
+            !part.is_empty()
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_graphic() && byte != b'/' && byte != b'\\')
+        };
+        (valid(scheme) && valid(host) && scheme.bytes().all(|byte| byte.is_ascii_lowercase())).then(
+            || {
+                Self(SiteKind::Scheme {
+                    scheme: scheme.to_owned(),
+                    host: host.to_owned(),
+                })
+            },
+        )
+    }
+
     /// HTML "serialize a site": `null` or `scheme://host`.
     pub fn serialize(&self) -> String {
         match &self.0 {

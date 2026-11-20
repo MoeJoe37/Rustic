@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 37.42%** = 35.53% verified complete + 1.89% partial credit. 82/221 capabilities complete, 8 in progress.
+**Overall completion: 38.14%** = 36.25% verified complete + 1.89% partial credit. 85/221 capabilities complete, 8 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `54d561a996bac86bad9734f4442278e156a69eaccce0a5f5d80df3723206c71c`.
+Catalog: `engine-v4`. Source fingerprint: `f85fd91e356012e186dce1e765e1acca79cb572aec1efbaef70b1a984cd7eca9`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `54d561a996bac86bad9734f4442278e156a69
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
-| M6 Networking & services | 5/12 | 66.48% | 43.69% | 4.38% |
+| M6 Networking & services | 8/12 | 82.90% | 60.10% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -43,7 +43,7 @@ Catalog: `engine-v4`. Source fingerprint: `54d561a996bac86bad9734f4442278e156a69
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 2/8 | 3 | 56.25% | 31.25% | 4% | 2.25 |
-| Storage & workers | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
+| Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
@@ -276,9 +276,9 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Storage & workers
 
-- **planned** `storage.profiles` — Ephemeral/persistent profiles and private mode · size 2 · M6 · 0.24% of engine
-- **planned** `storage.partition` — Storage keys, quotas and schema recovery · size 3 · M6 · 0.36% of engine
-- **planned** `storage.webstorage` — Local/session storage · size 1 · M6 · 0.12% of engine
+- **complete** `storage.profiles` — Ephemeral/persistent profiles and private mode · size 2 · M6 · 0.24% of engine ([source](../../crates/rustic-storage/src/profile.rs), [source](../../crates/rustic-cli/src/storage.rs), [test](../../crates/rustic-storage/tests/profile.rs), [test](../../crates/rustic-cli/tests/network.rs))
+- **complete** `storage.partition` — Storage keys, quotas and schema recovery · size 3 · M6 · 0.36% of engine ([source](../../crates/rustic-storage/src/key.rs), [source](../../crates/rustic-storage/src/file.rs), [test](../../crates/rustic-storage/tests/profile.rs), [test](../../crates/rustic-storage/tests/profile.rs))
+- **complete** `storage.webstorage` — Local/session storage · size 1 · M6 · 0.12% of engine ([source](../../crates/rustic-bindings/src/page/web_storage.rs), [source](../../crates/rustic-js/src/runtime/host_named.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [test](../../crates/rustic-js/tests/interp.rs))
 - **planned** `storage.indexeddb` — IndexedDB transactions and crash recovery · size 5 · M9 · 0.60% of engine
 - **planned** `storage.workers` — Worker agents, lifetimes and messaging · size 3 · M9 · 0.36% of engine
 - **planned** `storage.offline` — Service workers and Cache API · size 5 · M9 · 0.60% of engine

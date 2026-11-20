@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "1e15a7c5d9632aa4637ec0a885b8cd347ba1047168980585526eb6689088f88d",
-  "percent": "35.71",
+  "source_fingerprint": "ce40eedb2dbb11f114dbe936734f69ae6f2894031c4c2c0093449232c704de1d",
+  "percent": "35.84",
   "verified_percent": "33.61",
-  "partial_percent": "2.10",
+  "partial_percent": "2.23",
   "completed": 77,
   "in_progress": 10,
   "total": 221,
@@ -67,9 +67,9 @@
       "share": "4.38",
       "completed": 0,
       "total": 12,
-      "percent": "27.54",
+      "percent": "30.39",
       "verified_percent": "0.00",
-      "partial_percent": "27.54"
+      "partial_percent": "30.39"
     },
     {
       "id": "M7",
@@ -5699,8 +5699,19 @@
             },
             {
               "label": "Reviewed Public Suffix List source (ADR 0054 decision)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/site.rs",
+                  "marker": "pub fn bundled"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/public_suffix.rs",
+                  "marker": "fn bundled_list_passes_the_upstream_test_vectors"
+                }
+              ]
             },
             {
               "label": "Partitioned HTTP cache and validators",
@@ -5708,7 +5719,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.37"
         },
         {
@@ -5756,10 +5767,10 @@
       "completed": 0,
       "in_progress": 4,
       "total": 8,
-      "contribution": "0.95",
-      "percent": "23.95",
+      "contribution": "1.08",
+      "percent": "27.08",
       "verified_percent": "0.00",
-      "partial_percent": "23.95"
+      "partial_percent": "27.08"
     },
     {
       "id": "storage",

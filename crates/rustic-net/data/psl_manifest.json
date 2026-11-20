@@ -1,0 +1,18 @@
+{
+  "upstream_repository": "publicsuffix/list",
+  "upstream_revision": "d7d7f1fd55166aaf73ad2f526e72634490acd9c8",
+  "license": "MPL-2.0 (list); public domain (tests); third_party/licenses/public-suffix-list-MPL-2.0.txt",
+  "generator": "tools/import_public_suffix_list.py",
+  "sources": [
+    {
+      "path": "crates/rustic-net/data/public_suffix_list.dat",
+      "upstream_path": "public_suffix_list.dat",
+      "sha256": "3084c6ca4ac1dfb6e32461504b5dc494cc58ace521957e9e978ed0f870b2de94"
+    },
+    {
+      "path": "crates/rustic-net/tests/fixtures/psl_tests.txt",
+      "upstream_path": "tests/tests.txt",
+      "sha256": "61a3a502cf471d1a919d5e43c10e910023b0c4230e1db506f8e2ff0b47d2234e"
+    }
+  ]
+}

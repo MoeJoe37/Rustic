@@ -61,7 +61,7 @@ instead of rewriting the history of a decision.
 | [0051](0051-transport-and-tls.md) | Own HTTP/1.1, loopback origin allowlist; rustls with `ring` and platform verification for TLS | HTTP/1.1 and authority accepted for NET-01; TLS library proposed |
 | [0052](0052-network-io-model.md) | One thread per exchange, blocking sockets with short timeouts, byte-counted event window | Accepted for NET-01 |
 | [0053](0053-loopback-fixture-server.md) | In-process loopback fixture server with scripted replies | Accepted for NET-01 and later M6 tests |
-| [0054](0054-sites-and-cookie-policy.md) | Host-supplied Public Suffix List, sites, Lax-by-default cookies, blocked third-party cookies, CHIPS | Accepted; bundled list proposed |
+| [0054](0054-sites-and-cookie-policy.md) | Host-supplied Public Suffix List, sites, Lax-by-default cookies, blocked third-party cookies, CHIPS | Accepted |
 
 ## Records by area
 

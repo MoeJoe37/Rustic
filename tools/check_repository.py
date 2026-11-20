@@ -295,6 +295,18 @@ def main() -> int:
             error(net_manifest, "missing upstream WPT license")
     except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         error(net_manifest, f"invalid WPT MIME fixture metadata: {exc}")
+    psl_manifest = ROOT / "crates/rustic-net/data/psl_manifest.json"
+    try:
+        manifest = json.loads(psl_manifest.read_text(encoding="utf-8"))
+        for source in manifest["sources"]:
+            if hashlib.sha256((ROOT / source["path"]).read_bytes()).hexdigest() != source["sha256"]:
+                error(ROOT / source["path"], "vendored Public Suffix List data differs from manifest digest")
+        if not re.fullmatch(r"[0-9a-f]{40}", manifest["upstream_revision"]):
+            error(psl_manifest, "upstream_revision must be a full commit SHA")
+        if not (ROOT / "third_party/licenses/public-suffix-list-MPL-2.0.txt").is_file():
+            error(psl_manifest, "missing MPL-2.0 notice for the Public Suffix List")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        error(psl_manifest, f"invalid Public Suffix List metadata: {exc}")
     idna_manifest = ROOT / "crates/rustic-url/tests/fixtures/idna_manifest.json"
     try:
         manifest = json.loads(idna_manifest.read_text(encoding="utf-8"))

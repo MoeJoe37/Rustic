@@ -233,7 +233,7 @@ impl fmt::Debug for CookieJar {
 
 impl Default for CookieJar {
     fn default() -> Self {
-        Self::new(PublicSuffixList::fallback(), CookieLimits::default())
+        Self::new(PublicSuffixList::bundled(), CookieLimits::default())
     }
 }
 

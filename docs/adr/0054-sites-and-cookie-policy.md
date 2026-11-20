@@ -1,15 +1,14 @@
 # ADR 0054 — Sites, the Public Suffix List and cookie policy
 
 Date: 2026-11-20
-Status: Accepted for NET-03/NET-04; the bundled-list question is
-*Proposed* and waits for the maintainer
+Status: Accepted (bundled list accepted by the maintainer 2026-11-20)
 
 ## Context
 
 Cookies (RFC 6265bis), `SameSite`, Cross-Origin-Resource-Policy,
 partitioned storage (NET-06) and the HTML "site" concept all need the
 registrable domain of a host, which comes from the Public Suffix List
-(PSL). The PSL is data under MPL-2.0, about 230 KiB of text, updated
+(PSL). The PSL is data under MPL-2.0, about 340 KiB of text, updated
 several times a month. Bundling it is a data dependency that
 [DEPENDENCIES.md](../DEPENDENCIES.md) asks to review; it also goes stale
 in a shipped binary unless the browser updates it.
@@ -23,10 +22,11 @@ and whether `Secure` cookies work on `http://localhost`.
 1. `rustic_net::site::PublicSuffixList` implements the PSL's published
    algorithm (rules, `*.` wildcards, `!` exceptions, the implicit `*`
    rule) over **text the host supplies** (`PublicSuffixList::parse`), like
-   host-granted font discovery. Rustic does not vendor the list in this
-   change. `PublicSuffixList::fallback()` applies only the implicit rule,
-   which is exact for the loopback test origins the transport can reach
-   before M7 (TD-159).
+   host-granted font discovery, and **vendors the list** at a pinned
+   publicsuffix/list revision (`PublicSuffixList::bundled()`, digests in
+   `crates/rustic-net/data/psl_manifest.json`, MPL-2.0 notice in
+   `third_party/licenses`). Unicode rules go through domain-to-ASCII.
+   `fallback()` (implicit rule only) remains for tests.
 2. Sites, same-site and schemelessly-same-site follow HTML; potentially
    trustworthy origins follow Secure Contexts (`https`, `wss`,
    `127.0.0.0/8`, `::1`, `localhost` and `*.localhost`).
@@ -61,21 +61,20 @@ and whether `Secure` cookies work on `http://localhost`.
 
 ## Consequences
 
-- Until a list is supplied, `example.co.uk` and `other.co.uk` count as
-  the same site (`co.uk`), and a page on `a.co.uk` could set a cookie for
-  `co.uk`. No such host is reachable before DNS exists (TD-157), so this
-  is safe now and must be paid before M7 remote browsing.
+- The vendored list goes stale; `tools/import_public_suffix_list.py`
+  re-pins it, and a profile may supply a newer list at runtime.
 - Lax-by-default breaks some cross-site `POST` login flows that Chromium
   works around with a two-minute "Lax-allowing-unsafe" window; Rustic
   does not have that window.
 
 ## Validation
 
+`crates/rustic-net/tests/public_suffix.rs` (all 78 upstream vectors),
 `site.rs`, `cookie/` and `crates/rustic-net/tests/fetch.rs` tests;
 `random_sequences_keep_the_jar_invariants` checks jar invariants over
 3,000 random stores.
 
 ## Revisit when
 
-The maintainer decides the bundled-list question, before DNS is added
-under the M7 broker, or when profiles persist cookies (NET-06).
+The list needs updating for a release, or profiles persist cookies
+(NET-06).

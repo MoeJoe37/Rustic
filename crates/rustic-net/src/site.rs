@@ -2,15 +2,13 @@
 //! "host public suffix" and "host registrable domain", HTML "site" and
 //! "same site").
 //!
-//! Rustic ships no Public Suffix List. A host supplies the list's text
-//! through [`PublicSuffixList::parse`] (ADR 0054); without one,
-//! [`PublicSuffixList::fallback`] applies the list's implicit `*` rule
-//! only, so every domain's last label is its public suffix. That is
-//! correct for the loopback test origins the transport can reach and is
-//! recorded as TD-159 until a reviewed list is bundled.
+//! [`PublicSuffixList::bundled`] is the list vendored at a pinned
+//! revision (`crates/rustic-net/data`, ADR 0054); a host may supply a newer
+//! one through [`PublicSuffixList::parse`].
 
 use std::collections::HashSet;
 use std::fmt;
+use std::sync::{Arc, OnceLock};
 
 use rustic_url::{Host, Origin, Url};
 
@@ -21,11 +19,18 @@ use rustic_url::{Host, Origin, Url};
 /// otherwise the rule with the most labels; with no match the implicit
 /// rule `*` applies.
 #[derive(Clone, Default)]
-pub struct PublicSuffixList {
+pub struct PublicSuffixList(Arc<Rules>);
+
+#[derive(Default)]
+struct Rules {
     rules: HashSet<String>,
     wildcards: HashSet<String>,
     exceptions: HashSet<String>,
 }
+
+/// The vendored list (publicsuffix/list at the revision in
+/// `data/psl_manifest.json`).
+const BUNDLED: &str = include_str!("../data/public_suffix_list.dat");
 
 /// Limits for [`PublicSuffixList::parse`].
 const MAX_LIST_BYTES: usize = 4 * 1024 * 1024;
@@ -54,31 +59,38 @@ impl fmt::Display for PublicSuffixError {
 impl std::error::Error for PublicSuffixError {}
 
 impl PublicSuffixList {
-    /// Only the implicit `*` rule (TD-159).
+    /// Only the implicit `*` rule: every domain's last label is its
+    /// public suffix. For tests that want no list.
     pub fn fallback() -> Self {
         Self::default()
     }
 
+    /// The vendored list, parsed once per process and shared.
+    pub fn bundled() -> Self {
+        static LIST: OnceLock<PublicSuffixList> = OnceLock::new();
+        LIST.get_or_init(|| Self::parse(BUNDLED).expect("the vendored list is valid"))
+            .clone()
+    }
+
     /// Parse the list's text format: one rule per line, `//` comments,
     /// rules end at the first whitespace, `*.` wildcards and `!`
-    /// exceptions. Rules must already be in ASCII (punycode) form; the
-    /// published list is, apart from IDN rules, which are skipped when
-    /// they contain non-ASCII characters because hosts reach this module
-    /// already in their ASCII form.
+    /// exceptions. Unicode rules are converted with the URL Standard's
+    /// domain-to-ASCII, because hosts reach this module in ASCII form.
     pub fn parse(text: &str) -> Result<Self, PublicSuffixError> {
         if text.len() > MAX_LIST_BYTES {
             return Err(PublicSuffixError::TooLarge);
         }
-        let mut list = Self::default();
+        let mut list = Rules::default();
         for (index, line) in text.lines().enumerate() {
             let rule = line.split_whitespace().next().unwrap_or("");
             if rule.is_empty() || rule.starts_with("//") {
                 continue;
             }
-            if !rule.is_ascii() {
-                continue;
-            }
-            let rule = rule.to_ascii_lowercase();
+            let rule = if rule.is_ascii() {
+                rule.to_ascii_lowercase()
+            } else {
+                to_ascii_rule(rule).ok_or(PublicSuffixError::InvalidRule(index + 1))?
+            };
             let (set, body) = if let Some(body) = rule.strip_prefix('!') {
                 (&mut list.exceptions, body)
             } else if let Some(body) = rule.strip_prefix("*.") {
@@ -96,12 +108,12 @@ impl PublicSuffixList {
             }
             set.insert(body.to_owned());
         }
-        Ok(list)
+        Ok(Self(Arc::new(list)))
     }
 
     /// Number of rules of every kind.
     pub fn len(&self) -> usize {
-        self.rules.len() + self.wildcards.len() + self.exceptions.len()
+        self.0.rules.len() + self.0.wildcards.len() + self.0.exceptions.len()
     }
 
     /// Whether only the implicit rule applies.
@@ -123,18 +135,19 @@ impl PublicSuffixList {
         // Byte offsets where each suffix starts, longest first.
         let mut starts = vec![0];
         starts.extend(trimmed.match_indices('.').map(|(index, _)| index + 1));
+        let rules = &*self.0;
         let mut best = None::<usize>;
         for (position, &start) in starts.iter().enumerate() {
             let suffix = &trimmed[start..];
-            if self.exceptions.contains(suffix) {
+            if rules.exceptions.contains(suffix) {
                 // The suffix is the exception rule minus its first label.
                 let next = starts.get(position + 1).copied();
                 return next.map(|next| &domain[next..trimmed.len() + dot]);
             }
             if best.is_none() {
-                if self.rules.contains(suffix) {
+                if rules.rules.contains(suffix) {
                     best = Some(start);
-                } else if position > 0 && self.wildcards.contains(suffix) {
+                } else if position > 0 && rules.wildcards.contains(suffix) {
                     // `*.suffix` covers one more label than `suffix`.
                     best = Some(starts[position - 1]);
                 }
@@ -191,6 +204,20 @@ impl PublicSuffixList {
             _ => false,
         }
     }
+}
+
+/// Domain-to-ASCII for a Unicode rule, keeping a `!` or `*.` marker.
+fn to_ascii_rule(rule: &str) -> Option<String> {
+    let (marker, body) = if let Some(body) = rule.strip_prefix('!') {
+        ("!", body)
+    } else if let Some(body) = rule.strip_prefix("*.") {
+        ("*.", body)
+    } else {
+        ("", rule)
+    };
+    let url = Url::parse(&format!("http://{body}/"), None).ok()?;
+    let domain = url.host()?.domain()?.to_owned();
+    Some(format!("{marker}{domain}"))
 }
 
 impl fmt::Debug for PublicSuffixList {
@@ -328,8 +355,9 @@ mod tests {
             PublicSuffixList::parse(&big).unwrap_err(),
             PublicSuffixError::TooLarge
         );
-        // IDN rules in Unicode form are skipped, not errors.
-        assert_eq!(PublicSuffixList::parse("公司.cn\ncn").unwrap().len(), 1);
+        // IDN rules are converted to their ASCII form.
+        let idn = PublicSuffixList::parse("公司.cn\ncn").unwrap();
+        assert_eq!(idn.public_suffix("a.xn--55qx5d.cn"), Some("xn--55qx5d.cn"));
     }
 
     fn origin(input: &str) -> Origin {

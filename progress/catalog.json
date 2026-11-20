@@ -5227,8 +5227,19 @@
             },
             {
               "label": "Reviewed Public Suffix List source (ADR 0054 decision)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/site.rs",
+                  "marker": "pub fn bundled"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/public_suffix.rs",
+                  "marker": "fn bundled_list_passes_the_upstream_test_vectors"
+                }
+              ]
             },
             {
               "label": "Partitioned HTTP cache and validators",

@@ -79,6 +79,11 @@ in separately. Generated artifacts go under ignored `artifacts` or `target`.
 Generated source must identify its input revision and reproducible generator;
 test whether checked-in generated output is fresh once generators exist.
 
+`rustic-net` vendors the Public Suffix List (MPL-2.0 data, not code) at a
+pinned revision with `tools/import_public_suffix_list.py`, which checks
+SHA-256 digests; `tools/check_repository.py` checks the manifest and the
+license notice ([ADR 0054](adr/0054-sites-and-cookie-policy.md)).
+
 The bindings crate vendors selected WHATWG DOM Web IDL declarations, a
 revision and checksum manifest, and the upstream license. The offline
 generator verifies those inputs and reproduces the committed Rust metadata.

@@ -59,7 +59,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M6, networking (NET-01 to NET-03) | TD-157, TD-158, TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
 | M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
-| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-159 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -222,7 +222,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
 | TD-157 | Deliberate | Network | No DNS and no TLS: the transport reaches only allowlisted loopback origins, and `https` fails closed until ADR 0051's TLS part is accepted | Open, M6 networking |
 | TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Open, M6 networking |
-| TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Open, M7 entry |
+| TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Open, M6 profiles (NET-06) |
 | TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, sends no `Referer`, `Sec-Fetch-*` or `Accept-Language`, takes whole request bodies and has no Lax-allowing-unsafe window | Open, M6 networking |
 
@@ -2499,7 +2499,9 @@ the font graph, or a new review), with output limits and ratio checks
 counted against `max_body_bytes`, then advertise them.
 **Trigger:** NET-03 (Fetch), which must expose decoded bodies.
 
-### TD-159 — No bundled Public Suffix List
+### TD-159 — No bundled Public Suffix List (Paid)
+
+**Paid 2026-11-20:** the Public Suffix List is vendored at publicsuffix/list `d7d7f1fd` (`crates/rustic-net/data`, `tools/import_public_suffix_list.py`) and `PublicSuffixList::bundled()` passes all 78 upstream test vectors; the cookie jar defaults to it.
 
 `rustic_net::site::PublicSuffixList` implements the list's algorithm, but
 Rustic ships no list ([ADR 0054](adr/0054-sites-and-cookie-policy.md)).

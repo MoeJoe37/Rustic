@@ -2537,7 +2537,7 @@ records the policy choices and the open Public Suffix List question.
 
 | Contract | Behavior | Regression evidence |
 | --- | --- | --- |
-| `site::PublicSuffixList` | Host-supplied list text (4 MiB cap, `//` comments, rule ends at whitespace, Unicode IDN rules skipped); public suffix by exception, then most labels, then the implicit `*` rule; registrable domain; trailing dots kept. `fallback()` has only the implicit rule (TD-159) | `suffixes_follow_rules_wildcards_and_exceptions`, `the_fallback_uses_the_implicit_rule`, `invalid_rules_and_oversized_lists_are_rejected` |
+| `site::PublicSuffixList` | `bundled()`: publicsuffix/list `d7d7f1fd` vendored and parsed once per process; host-supplied text (4 MiB cap, `//` comments, rule ends at whitespace, Unicode rules through domain-to-ASCII); public suffix by exception, then most labels, then the implicit `*` rule; registrable domain; trailing dots kept. `fallback()` has only the implicit rule | All 78 upstream `tests/tests.txt` vectors (`bundled_list_passes_the_upstream_test_vectors`), `suffixes_follow_rules_wildcards_and_exceptions`, `invalid_rules_and_oversized_lists_are_rejected` |
 | `site::Site`, same-site | HTML "obtain a site", "same site", "schemelessly same site"; IP hosts are their own site; opaque origins compare by identity | `sites_and_same_site` |
 | `site::is_potentially_trustworthy` | Secure Contexts §3.1 for `https`/`wss`, `127.0.0.0/8`, `::1`, `localhost` and `*.localhost`; `about:blank`, `about:srcdoc` and `data:` URLs | `potentially_trustworthy_origins` |
 | `cookie::parse_set_cookie` | RFC 6265bis-15 §5.6: CTLs other than tab reject the header, nameless cookies, 4,096-byte name plus value, 1,024-byte attribute values, last attribute wins, `Expires`, `Max-Age` (saturating), `Domain` (leading dot removed, lowercase, empty ignored), `Path` (must start `/`), `Secure`, `HttpOnly`, `SameSite`, `Partitioned` | `name_value_pairs`, `attributes_last_wins_and_invalid_ones_are_ignored` |
@@ -2549,7 +2549,7 @@ records the policy choices and the open Public Suffix List question.
 
 Cookie values never appear in `Debug` output. Not yet: the partitioned
 HTTP cache and validators, persistence and partition keys (TD-160,
-NET-06), `document.cookie` and a bundled suffix list (TD-159).
+NET-06) and `document.cookie`.
 
 ## NET-03 (partial) — Fetch modes, CORS and filtered responses
 

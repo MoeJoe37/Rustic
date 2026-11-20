@@ -371,3 +371,64 @@ fn csp_blocks_unnonced_inline_styles_and_style_attributes() {
     assert!(!dump.contains("padding-left: 5px"), "{dump}");
     assert!(stderr(&output).contains("style-src"), "{}", stderr(&output));
 }
+
+#[test]
+fn script_fetch_applies_cors_and_connect_src() {
+    let server = FixtureServer::start([
+        (
+            "/",
+            Reply::response(
+                200,
+                &[
+                    ("Content-Type", "text/html"),
+                    ("Content-Security-Policy", "connect-src 'self' http://b.test"),
+                ],
+                b"<!doctype html><script>\
+                  var out = [];\
+                  function mark(name, value) { out.push(name + '=' + value);\
+                    document.documentElement.setAttribute('data-log', out.sort().join(' ')); }\
+                  fetch('/api').then(r => r.json()).then(v => mark('self', v.n));\
+                  fetch('http://b.test/open').then(r => r.text()).then(t => mark('open', t));\
+                  fetch('http://b.test/closed').then(() => mark('closed', 'read'), e => mark('closed', e.name));\
+                  fetch('http://c.test/x').then(() => mark('csp', 'read'), e => mark('csp', e.name));\
+                  </script>",
+            ),
+        ),
+        (
+            "/api",
+            Reply::response(200, &[("Content-Type", "application/json")], b"{\"n\":7}"),
+        ),
+        (
+            "/open",
+            Reply::response(200, &[("Access-Control-Allow-Origin", "*")], b"shared"),
+        ),
+        ("/closed", Reply::response(200, &[], b"secret")),
+        ("/x", Reply::response(200, &[], b"never")),
+    ])
+    .unwrap();
+    let address = server.address();
+    let grants: Vec<String> = ["a", "b", "c"]
+        .iter()
+        .map(|host| format!("http://{host}.test={address}"))
+        .collect();
+    let mut args = vec!["dump-dom", "--run-scripts"];
+    for grant in &grants {
+        args.extend_from_slice(&["--allow-origin", grant]);
+    }
+    args.push("http://a.test/");
+    let output = rustic(&args);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dom = stdout(&output);
+    assert!(
+        dom.contains("value=\"closed=TypeError csp=TypeError open=shared self=7\""),
+        "{dom}"
+    );
+    // The CORS-denied response was fetched but never exposed; the CSP
+    // refusal never reached the network.
+    let requests = server.requests();
+    assert!(requests.iter().any(|r| r.target == "/closed"));
+    assert!(!requests.iter().any(|r| r.target == "/x"));
+    let closed = requests.iter().find(|r| r.target == "/closed").unwrap();
+    assert_eq!(closed.header("origin"), Some("http://a.test"));
+    assert!(stderr(&output).contains("connect-src"));
+}

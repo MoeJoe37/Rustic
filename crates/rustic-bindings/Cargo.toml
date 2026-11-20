@@ -13,7 +13,9 @@ rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-js = { path = "../rustic-js" }
+rustic-net = { path = "../rustic-net" }
 rustic-style = { path = "../rustic-style" }
+rustic-url = { path = "../rustic-url" }
 
 [lints]
 workspace = true

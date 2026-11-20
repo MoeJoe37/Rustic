@@ -158,6 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [NET-03 — fetch(), Headers, Request and Response](#net-03--fetch-headers-request-and-response)
 - [NET-04 — Partitioned HTTP cache](#net-04--partitioned-http-cache)
 - [NET-06 — Profiles, storage keys and Web Storage](#net-06--profiles-storage-keys-and-web-storage)
 - [url.restart — Encoding confidence and change the encoding](#urlrestart--encoding-confidence-and-change-the-encoding)
@@ -2536,6 +2537,23 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## NET-03 — fetch(), Headers, Request and Response
+
+Added 2026-11-20 (`rustic-bindings/src/page/fetch.rs`). The embedder gives a
+document its network with `FetchHost` (`ScriptedDocument::set_fetch_host`);
+the CLI's host is the document's network session.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| `Headers` | Fetch §5.2: construction from pairs, records or `Headers`; `append`, `delete`, `get`, `getSetCookie`, `has`, `set`, `forEach`, `entries`/`keys`/`values`/`@@iterator` over "sort and combine" (`set-cookie` kept apart); name and value validation and normalization; guards `request` (forbidden request headers ignored), `request-no-cors` (only no-CORS-safelisted), `response` (`Set-Cookie` ignored), `immutable` (throws), using `rustic-net`'s classifications | `fetch_headers_request_and_response_follow_the_fetch_standard` |
+| `Request` | URL parsed against the host's base URL, credentials in URLs refused; `method` (token, forbidden methods refused, normalized), `headers`, `body` (string; `text/plain;charset=UTF-8` by default), `mode` (`navigate` refused), `credentials`, `redirect`, `referrerPolicy`; no-CORS needs a safelisted method; GET/HEAD with a body refused; `clone()`, `text()`, `json()`, `bodyUsed` | same |
+| `Response` | Constructor with `status` 200–599 (`RangeError`), `statusText`, `headers` (response guard), null-body statuses; `Response.error()`; `type`, `url`, `redirected`, `status`, `ok`, `statusText`, `headers`, `bodyUsed`, `text()`, `json()`, `clone()` | same |
+| `fetch()` | Builds a `Request`; any error rejects; the host runs it and the filtered response resolves with immutable headers; a network error rejects with `TypeError` | same, `script_fetch_applies_cors_and_connect_src` |
+| CLI host | Same session, cookies and cache as the document; CORS mode by default (`Origin` sent, cross-origin needs `Access-Control-Allow-Origin`); `connect-src` and mixed content rechecked on every hop before sending | `script_fetch_applies_cors_and_connect_src` |
+
+Bodies are whole byte strings and `fetch()` waits for the response on the
+script's thread (TD-169).
 
 ## NET-04 — Partitioned HTTP cache
 

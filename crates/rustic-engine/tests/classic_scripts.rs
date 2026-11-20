@@ -25,11 +25,13 @@ fn check<C: rustic_base::Clock>(document: &mut ScriptedDocument<C>, script: &str
     document
         .queue_script(Source::from_str_limited(script, 4096).unwrap())
         .unwrap();
-    assert_eq!(
-        document.run_next(),
-        Ok(Some(ScriptTurn::Completed)),
-        "{script}"
-    );
+    let turn = document.run_next();
+    if turn != Ok(Some(ScriptTurn::Completed)) {
+        for message in document.take_console_messages().messages {
+            eprintln!("console: {}", message.text);
+        }
+    }
+    assert_eq!(turn, Ok(Some(ScriptTurn::Completed)), "{script}");
 }
 
 #[test]
@@ -630,5 +632,113 @@ fn web_storage_reflects_the_host_and_throws_without_one() {
     assert_eq!(
         rustic_engine::StorageHost::get(&*host, rustic_engine::StorageKind::Local, &zero),
         Some("zero".encode_utf16().collect())
+    );
+}
+
+#[derive(Debug, Default)]
+struct EchoNetwork {
+    seen: std::cell::RefCell<Vec<rustic_engine::ScriptRequest>>,
+}
+
+impl rustic_engine::FetchHost for EchoNetwork {
+    fn base_url(&self) -> Option<Url> {
+        Url::parse("https://a.test/dir/page.html", None).ok()
+    }
+    fn fetch(
+        &self,
+        request: rustic_engine::ScriptRequest,
+    ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure> {
+        if request.url.pathname() == "/fail" {
+            return Err(rustic_engine::NetworkFailure);
+        }
+        let body = format!(
+            "{{\"method\":\"{}\",\"body\":\"{}\"}}",
+            request.method,
+            String::from_utf8_lossy(request.body.as_deref().unwrap_or_default())
+        );
+        let url = request.url.clone();
+        self.seen.borrow_mut().push(request);
+        Ok(rustic_engine::ScriptResponse {
+            kind: "basic",
+            url: Some(url),
+            redirected: false,
+            status: 201,
+            status_text: b"Created".to_vec(),
+            headers: vec![
+                ("Content-Type".to_owned(), b"application/json".to_vec()),
+                ("X-B".to_owned(), b"2".to_vec()),
+                ("x-a".to_owned(), b"1".to_vec()),
+            ],
+            body: body.into_bytes(),
+        })
+    }
+}
+
+#[test]
+fn fetch_headers_request_and_response_follow_the_fetch_standard() {
+    let mut engine = Engine::new(1);
+    let host = std::rc::Rc::new(EchoNetwork::default());
+    let mut load = load(&mut engine, ManualClock::default());
+    load.set_fetch_host(host.clone()).unwrap();
+    load.close_input().unwrap();
+    let mut document = load.take_document().unwrap().unwrap();
+    check(
+        &mut document,
+        r#"
+        var log = [];
+        var h = new Headers({ 'X-One': ' 1 ', b: '2' });
+        h.append('x-one', '3');
+        h.set('Set-Cookie', 'a'); h.append('set-cookie', 'b');
+        if (h.get('X-ONE') !== '1, 3') throw 'combine ' + h.get('x-one');
+        if ([...h.keys()].join() !== 'b,set-cookie,set-cookie,x-one') throw [...h.keys()];
+        if (h.getSetCookie().join() !== 'a,b') throw 'set-cookie';
+        try { h.append('bad name', 'x'); throw 'name'; } catch (e) { if (!(e instanceof TypeError)) throw e; }
+        try { h.append('x', 'a\nb'); throw 'value'; } catch (e) { if (!(e instanceof TypeError)) throw e; }
+        var r = new Request('sub?q=1', { method: 'post', body: 'hi', headers: [['Cookie', 'no'], ['X-K', 'v']] });
+        if (r.url !== 'https://a.test/dir/sub?q=1') throw r.url;
+        if (r.method !== 'POST' || r.mode !== 'cors' || r.credentials !== 'same-origin') throw 'defaults';
+        if (r.headers.has('cookie')) throw 'forbidden header kept';
+        if (r.headers.get('content-type') !== 'text/plain;charset=UTF-8') throw 'content-type';
+        try { new Request('x', { method: 'GET', body: 'b' }); throw 'get body'; } catch (e) { if (!(e instanceof TypeError)) throw e; }
+        try { new Request('x', { mode: 'no-cors', method: 'PUT' }); throw 'no-cors'; } catch (e) { if (!(e instanceof TypeError)) throw e; }
+        try { new Request('https://u:p@a.test/'); throw 'credentials'; } catch (e) { if (!(e instanceof TypeError)) throw e; }
+        var nc = new Request('x', { mode: 'no-cors', headers: { 'X-Custom': '1', Accept: 'a' } });
+        if (nc.headers.has('x-custom') || nc.headers.get('accept') !== 'a') throw 'no-cors guard';
+        var made = new Response('{"a":1}', { status: 202, headers: { 'Set-Cookie': 'x' } });
+        if (made.headers.has('set-cookie') || made.type !== 'default' || !made.ok) throw 'response guard';
+        try { new Response('', { status: 99 }); throw 'range'; } catch (e) { if (!(e instanceof RangeError)) throw e; }
+        try { new Response('x', { status: 204 }); throw 'null body'; } catch (e) { if (!(e instanceof TypeError)) throw e; }
+        if (Response.error().type !== 'error' || Response.error().status !== 0) throw 'error';
+        made.json().then(function (v) { log.push('json ' + v.a); });
+        made.text().catch(function (e) { log.push('used ' + e.name); });
+        fetch(r).then(function (response) {
+          log.push(response.status + ' ' + response.statusText + ' ' + response.type);
+          log.push([...response.headers].map(function (p) { return p.join(':'); }).join());
+          try { response.headers.set('x', '1'); } catch (e) { log.push('immutable ' + e.name); }
+          return response.json();
+        }).then(function (body) { log.push(body.method + ' ' + body.body); });
+        fetch('/fail').catch(function (e) { log.push('fail ' + e.name); });
+        fetch('x', { method: 'TRACE' }).catch(function (e) { log.push('trace ' + e.name); });
+        "#,
+    );
+    check(
+        &mut document,
+        r#"
+        var expected = [
+          'json 1', 'used TypeError', '201 Created basic',
+          'content-type:application/json,x-a:1,x-b:2', 'immutable TypeError',
+          'fail TypeError', 'trace TypeError', 'POST hi'
+        ].join('|');
+        if (log.join('|') !== expected) throw log.join('|');
+        "#,
+    );
+    let seen = host.seen.borrow();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].mode, "cors");
+    assert!(
+        seen[0]
+            .headers
+            .iter()
+            .any(|(name, value)| name == "X-K" && value == b"v")
     );
 }

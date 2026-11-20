@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 38.36%** = 37.00% verified complete + 1.36% partial credit. 87/221 capabilities complete, 6 in progress.
+**Overall completion: 38.52%** = 37.63% verified complete + 0.89% partial credit. 88/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `a5507e7763b2abc0c7541571a16dfec00fb8d721f561bec4fdc917c51670b39c`.
+Catalog: `engine-v4`. Source fingerprint: `7f61eb1bd9944a5dbe867fc43e50d25937f458b768618128dd90fc38c1573310`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `a5507e7763b2abc0c7541571a16dfec00fb8d
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
-| M6 Networking & services | 10/12 | 87.88% | 77.20% | 4.38% |
+| M6 Networking & services | 11/12 | 91.45% | 91.45% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -42,7 +42,7 @@ Catalog: `engine-v4`. Source fingerprint: `a5507e7763b2abc0c7541571a16dfec00fb8d
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
-| Network & navigation | 4/8 | 1 | 61.71% | 50.00% | 4% | 2.46 |
+| Network & navigation | 5/8 | 0 | 65.62% | 65.62% | 4% | 2.62 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -256,11 +256,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 - **complete** `network.transport` — Reviewed TLS/HTTP transport with cancellation · size 5 · M6 · 0.62% of engine ([source](../../crates/rustic-net/src/response.rs), [source](../../crates/rustic-net/src/request.rs), [test](../../crates/rustic-net/src/response.rs), [source](../../crates/rustic-net/src/policy.rs), [source](../../crates/rustic-net/src/transport.rs), [source](../../crates/rustic-net/src/fixture.rs), [test](../../crates/rustic-net/tests/transport.rs), [test](../../crates/rustic-net/tests/transport.rs), [source](../../crates/rustic-net/src/tls.rs), [test](../../crates/rustic-net/tests/tls.rs), [test](../../crates/rustic-net/tests/tls.rs), [source](../../crates/rustic-net/src/coding.rs), [source](../../crates/rustic-codecs/src/gzip.rs), [test](../../crates/rustic-net/tests/transport.rs))
 - **complete** `network.navigation` — Navigation/history state machine and redirects · size 5 · M6 · 0.62% of engine ([source](../../crates/rustic-net/src/redirect.rs), [test](../../crates/rustic-net/tests/redirects.rs), [test](../../crates/rustic-net/tests/redirects.rs), [source](../../crates/rustic-net/src/mime.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs), [source](../../crates/rustic-net/src/navigation.rs), [test](../../crates/rustic-net/tests/navigation.rs), [test](../../crates/rustic-net/tests/navigation.rs), [test](../../crates/rustic-net/tests/navigation.rs), [source](../../crates/rustic-cli/src/network.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/network.rs), [test](../../crates/rustic-cli/tests/network.rs), [source](../../crates/rustic-net/src/referrer.rs), [source](../../crates/rustic-net/src/navigation.rs), [test](../../crates/rustic-net/src/referrer.rs), [test](../../crates/rustic-net/tests/navigation.rs), [source](../../crates/rustic-engine/src/history.rs), [source](../../crates/rustic-url/src/form.rs), [test](../../crates/rustic-engine/src/history.rs), [test](../../crates/rustic-net/tests/navigation.rs))
-- **in progress 75.00%** `network.fetch` — Fetch, CORS and response filtering · size 5 · M6 · 0.62% of engine
-  - [x] Fetch header classifications, CORS check, CORS-preflight validation and preflight cache ([source](../../crates/rustic-net/src/cors.rs), [source](../../crates/rustic-net/src/cors.rs), [test](../../crates/rustic-net/src/cors.rs), [test](../../crates/rustic-net/src/cors.rs))
-  - [x] Main fetch over the transport: modes, response tainting, Origin header, credentials, redirect tainting, CORP and filtered responses ([source](../../crates/rustic-net/src/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs))
-  - [x] Decoded content codings, Referer and fetch metadata on Fetch requests ([source](../../crates/rustic-net/src/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/transport.rs))
-  - [ ] Script-facing fetch(), Headers, Request and Response bindings with header guards
+- **complete** `network.fetch` — Fetch, CORS and response filtering · size 5 · M6 · 0.62% of engine ([source](../../crates/rustic-net/src/cors.rs), [source](../../crates/rustic-net/src/cors.rs), [test](../../crates/rustic-net/src/cors.rs), [test](../../crates/rustic-net/src/cors.rs), [source](../../crates/rustic-net/src/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [source](../../crates/rustic-net/src/fetch.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-net/tests/transport.rs), [source](../../crates/rustic-bindings/src/page/fetch.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [test](../../crates/rustic-cli/tests/network.rs))
 - **complete** `network.cookies` — Cookies and partitioned HTTP cache · size 3 · M6 · 0.37% of engine ([source](../../crates/rustic-net/src/cookie/mod.rs), [source](../../crates/rustic-net/src/cookie/parse.rs), [test](../../crates/rustic-net/src/cookie/tests.rs), [test](../../crates/rustic-net/tests/fetch.rs), [source](../../crates/rustic-net/src/site.rs), [test](../../crates/rustic-net/tests/public_suffix.rs), [source](../../crates/rustic-net/src/http_cache.rs), [test](../../crates/rustic-net/tests/http_cache.rs), [test](../../crates/rustic-net/tests/http_cache.rs))
 - **complete** `network.policy` — CSP, MIME, secure contexts and mixed-content policy · size 3 · M6 · 0.37% of engine ([source](../../crates/rustic-net/src/csp.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [source](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [source](../../crates/rustic-style/src/loading.rs), [source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-cli/tests/network.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [source](../../crates/rustic-net/src/fetch.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-cli/tests/network.rs))
 - **planned** `network.protocols` — Required HTTP versions, WebSockets and referrer rules · size 5 · M9 · 0.62% of engine

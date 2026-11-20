@@ -282,7 +282,9 @@ dependencies = [
  "rustic-css",
  "rustic-dom",
  "rustic-js",
+ "rustic-net",
  "rustic-style",
+ "rustic-url",
 ]
 
 [[package]]

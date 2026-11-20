@@ -57,7 +57,7 @@ pub mod site;
 pub mod tls;
 mod transport;
 
-pub use headers::{HeaderError, Headers};
+pub use headers::{HeaderError, Headers, is_token, is_valid_value as is_valid_header_value};
 pub use limits::{LimitsError, TransportLimits};
 pub use policy::{NetworkPolicy, PolicyError};
 pub use request::{Request, RequestError};

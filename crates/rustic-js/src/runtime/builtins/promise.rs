@@ -653,6 +653,34 @@ fn species_constructor(agent: &mut Agent, o: ObjectId) -> JsResult<Value> {
 // ---- jobs --------------------------------------------------------------------
 
 impl Agent {
+    /// A new pending `%Promise%` that only the host settles, for host
+    /// operations such as `fetch()` (Web IDL "a new promise").
+    pub fn new_host_promise(&mut self) -> JsResult<ObjectId> {
+        new_intrinsic_promise(self)
+    }
+
+    /// Web IDL "resolve" a host promise with `value` (thenables are
+    /// adopted in a later job). A settled promise is left unchanged.
+    pub fn resolve_host_promise(&mut self, promise: ObjectId, value: Value) -> JsResult<()> {
+        if self.promise_rejected(promise).is_some() {
+            return Ok(());
+        }
+        resolve_promise(self, promise, value)
+    }
+
+    /// Web IDL "reject" a host promise. A settled promise is unchanged.
+    pub fn reject_host_promise(&mut self, promise: ObjectId, reason: Value) {
+        if self.promise_rejected(promise).is_none() {
+            reject_promise(self, promise, reason);
+        }
+    }
+
+    /// `JSON.parse` of UTF-16 text without a reviver (Fetch's "parse JSON
+    /// from bytes").
+    pub fn parse_json(&mut self, text: &[u16]) -> JsResult<Value> {
+        super::json::parse_json_units(self, text)
+    }
+
     /// The rejection tracker calls since the last call of this function,
     /// oldest first: a promise rejected without a handler, or a handler
     /// added to a promise reported earlier. A rejection that got its

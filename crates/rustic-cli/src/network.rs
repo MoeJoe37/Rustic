@@ -573,6 +573,108 @@ impl rustic_engine::ScriptPolicy for InlinePolicy {
     }
 }
 
+/// `fetch()` for a network document: the same session, with the
+/// document's CSP (`connect-src`) and mixed-content check on every hop.
+#[derive(Debug)]
+pub(crate) struct ScriptFetch(pub(crate) Rc<NetworkSession>);
+
+impl rustic_engine::FetchHost for ScriptFetch {
+    fn base_url(&self) -> Option<Url> {
+        Some(self.0.document_url.clone())
+    }
+
+    fn fetch(
+        &self,
+        request: rustic_engine::ScriptRequest,
+    ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure> {
+        let session = &self.0;
+        if session.cancellation.check().is_err() {
+            return Err(rustic_engine::NetworkFailure);
+        }
+        let mut headers = rustic_net::Headers::new();
+        for (name, value) in &request.headers {
+            headers
+                .append(name, value)
+                .map_err(|_| rustic_engine::NetworkFailure)?;
+        }
+        let fetch_request = FetchRequest {
+            method: request.method,
+            headers,
+            body: request.body.unwrap_or_default(),
+            mode: match request.mode.as_str() {
+                "same-origin" => RequestMode::SameOrigin,
+                "no-cors" => RequestMode::NoCors,
+                _ => RequestMode::Cors,
+            },
+            credentials: match request.credentials.as_str() {
+                "omit" => CredentialsMode::Omit,
+                "include" => CredentialsMode::Include,
+                _ => CredentialsMode::SameOrigin,
+            },
+            redirect: match request.redirect.as_str() {
+                "error" => rustic_net::redirect::RedirectMode::Error,
+                "manual" => rustic_net::redirect::RedirectMode::Manual,
+                _ => rustic_net::redirect::RedirectMode::Follow,
+            },
+            referrer: Some(session.document_url.clone()),
+            referrer_policy: ReferrerPolicy::from_token(&request.referrer_policy)
+                .unwrap_or(session.referrer_policy),
+            destination: Destination::Empty,
+            ..FetchRequest::new(request.url, session.origin.clone())
+        };
+        let mut fetcher = session
+            .fetcher
+            .try_borrow_mut()
+            .map_err(|_| rustic_engine::NetworkFailure)?;
+        let response = fetcher
+            .fetch_checked(fetch_request, &mut |hop, redirects| {
+                if mixed_content::check(hop, Destination::Empty, session.secure)
+                    != MixedContent::Allowed
+                {
+                    eprintln!("rustic: mixed content: blocked an insecure fetch()");
+                    return false;
+                }
+                let verdict = session.csp.check_request(
+                    hop,
+                    FetchDirective::Connect,
+                    &session.origin,
+                    redirects,
+                );
+                report(&verdict);
+                verdict.allowed()
+            })
+            .map_err(|_| rustic_engine::NetworkFailure)?;
+        drop(fetcher);
+        let kind = match response.response_type() {
+            rustic_net::fetch::ResponseType::Basic => "basic",
+            rustic_net::fetch::ResponseType::Cors => "cors",
+            rustic_net::fetch::ResponseType::Opaque => "opaque",
+            rustic_net::fetch::ResponseType::OpaqueRedirect => "opaqueredirect",
+        };
+        let url = response.url().cloned();
+        let redirected = response.redirected();
+        let status = response.status();
+        let status_text = response.status_message().to_vec();
+        let headers = response
+            .headers()
+            .iter()
+            .map(|(name, value)| (name.to_owned(), value.to_vec()))
+            .collect();
+        let body = response
+            .read_body(NETWORK_TIMEOUT)
+            .map_err(|_| rustic_engine::NetworkFailure)?;
+        Ok(rustic_engine::ScriptResponse {
+            kind,
+            url,
+            redirected,
+            status,
+            status_text,
+            headers,
+            body,
+        })
+    }
+}
+
 /// The document's CSP for inline `<style>` and `style` attributes.
 #[derive(Debug)]
 pub(crate) struct StylePolicy(pub(crate) Rc<NetworkSession>);

@@ -318,6 +318,17 @@ impl<C: Clock> ClassicScriptLoad<C> {
         })
     }
 
+    /// Give the document `fetch()`; call before feeding HTML.
+    pub fn set_fetch_host(
+        &mut self,
+        host: std::rc::Rc<dyn crate::FetchHost>,
+    ) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending.document.set_fetch_host(host)?;
+            Ok(())
+        })
+    }
+
     /// Give the document Web Storage areas; call before feeding HTML.
     pub fn set_storage_host(
         &mut self,

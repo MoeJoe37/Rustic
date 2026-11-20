@@ -5216,86 +5216,82 @@
           "label": "Fetch, CORS and response filtering",
           "size": 5,
           "milestone": "M6",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Fetch header classifications, CORS check, CORS-preflight validation and preflight cache",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/cors.rs",
-                  "marker": "pub fn cors_check"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/cors.rs",
-                  "marker": "pub struct PreflightCache"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/cors.rs",
-                  "marker": "fn preflight_validation"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/cors.rs",
-                  "marker": "fn safelisted_request_headers"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/cors.rs",
+              "marker": "pub fn cors_check"
             },
             {
-              "label": "Main fetch over the transport: modes, response tainting, Origin header, credentials, redirect tainting, CORP and filtered responses",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/fetch.rs",
-                  "marker": "pub struct Fetcher"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/fetch.rs",
-                  "marker": "fn cross_origin_redirects_taint_the_origin"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/fetch.rs",
-                  "marker": "fn preflights_run_validate_and_are_cached"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/fetch.rs",
-                  "marker": "fn no_cors_cross_origin_responses_are_opaque"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/cors.rs",
+              "marker": "pub struct PreflightCache"
             },
             {
-              "label": "Decoded content codings, Referer and fetch metadata on Fetch requests",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/fetch.rs",
-                  "marker": "pub struct Fetcher"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/fetch.rs",
-                  "marker": "fn referrer_and_fetch_metadata_follow_the_policies"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/transport.rs",
-                  "marker": "fn content_codings_are_advertised_and_decoded"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/src/cors.rs",
+              "marker": "fn preflight_validation"
             },
             {
-              "label": "Script-facing fetch(), Headers, Request and Response bindings with header guards",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-net/src/cors.rs",
+              "marker": "fn safelisted_request_headers"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/fetch.rs",
+              "marker": "pub struct Fetcher"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/fetch.rs",
+              "marker": "fn cross_origin_redirects_taint_the_origin"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/fetch.rs",
+              "marker": "fn preflights_run_validate_and_are_cached"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/fetch.rs",
+              "marker": "fn no_cors_cross_origin_responses_are_opaque"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/fetch.rs",
+              "marker": "pub struct Fetcher"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/fetch.rs",
+              "marker": "fn referrer_and_fetch_metadata_follow_the_policies"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/transport.rs",
+              "marker": "fn content_codings_are_advertised_and_decoded"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/fetch.rs",
+              "marker": "pub trait FetchHost"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/network.rs",
+              "marker": "pub(crate) struct ScriptFetch"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/classic_scripts.rs",
+              "marker": "fn fetch_headers_request_and_response_follow_the_fetch_standard"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn script_fetch_applies_cors_and_connect_src"
             }
           ]
         },

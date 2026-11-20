@@ -23,6 +23,7 @@ mod creation;
 mod documents;
 mod dom_rect;
 mod events;
+mod fetch;
 mod html_collections;
 mod mutation_observer;
 mod node_tree;
@@ -37,6 +38,7 @@ pub use events::{
 };
 pub use events::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
 pub use events::{InputEvent, KeyInput, Modifiers};
+pub use fetch::{FetchHost, NetworkFailure, ScriptRequest, ScriptResponse};
 pub use web_storage::{QuotaExceeded, StorageHost, StorageKind};
 pub use window::{TimerHandler, WindowScheduler};
 
@@ -176,6 +178,8 @@ struct Page {
     resize_observers: resize_observer::ResizeObservers,
     storage: RefCell<Option<Rc<dyn web_storage::StorageHost>>>,
     storage_objects: RefCell<[Option<(Value, rustic_js::runtime::HostRoot)>; 2]>,
+    fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
+    fetch_records: ObjectId,
 }
 
 impl ExecutionHost for Page {
@@ -509,6 +513,9 @@ fn install_page(
     drop(document);
     let window = window::install(agent, scheduler.is_some())?;
     web_storage::install(agent)?;
+    fetch::install(agent)?;
+    let fetch_records = agent.new_weak_map()?;
+    agent.root(Value::object(fetch_records))?;
     let events = events::Events::new(agent)?;
     let rects = agent.new_weak_map()?;
     agent.root(Value::object(rects))?;
@@ -533,7 +540,17 @@ fn install_page(
         resize_observers,
         storage: RefCell::new(None),
         storage_objects: RefCell::new([None, None]),
+        fetch: RefCell::new(None),
+        fetch_records,
     }))
+}
+
+/// Give the attached page its network for `fetch()`.
+pub fn attach_fetch(agent: &mut Agent, host: Rc<dyn FetchHost>) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        *page.fetch.borrow_mut() = Some(host);
+        Ok(())
+    })
 }
 
 /// Give the attached page its Web Storage areas (`localStorage` and

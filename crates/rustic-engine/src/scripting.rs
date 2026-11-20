@@ -453,6 +453,15 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(())
     }
 
+    /// Give the document `fetch()`, backed by the host's network session.
+    pub fn set_fetch_host(
+        &mut self,
+        host: std::rc::Rc<dyn crate::FetchHost>,
+    ) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        page::attach_fetch(agent, host).map_err(|_| ScriptStop::OutOfMemory)
+    }
+
     /// Give the document `localStorage` and `sessionStorage` (HTML §12.2)
     /// backed by the host's areas for its storage key.
     pub fn set_storage_host(

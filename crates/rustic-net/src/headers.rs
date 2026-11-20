@@ -127,14 +127,16 @@ impl fmt::Display for HeaderError {
 impl std::error::Error for HeaderError {}
 
 /// RFC 9110 §5.6.2 `token`.
-pub(crate) fn is_token(bytes: &[u8]) -> bool {
+pub fn is_token(bytes: &[u8]) -> bool {
     !bytes.is_empty()
         && bytes
             .iter()
             .all(|&byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
 }
 
-pub(crate) fn is_valid_value(bytes: &[u8]) -> bool {
+/// Whether bytes are a valid field value (Fetch "header value": no NUL,
+/// CR or LF, no leading or trailing HTTP whitespace is required by callers).
+pub fn is_valid_value(bytes: &[u8]) -> bool {
     !bytes.iter().any(|&byte| matches!(byte, 0 | b'\r' | b'\n'))
 }
 

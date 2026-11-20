@@ -62,6 +62,7 @@ instead of rewriting the history of a decision.
 | [0052](0052-network-io-model.md) | One thread per exchange, blocking sockets with short timeouts, byte-counted event window | Accepted for NET-01 |
 | [0053](0053-loopback-fixture-server.md) | In-process loopback fixture server with scripted replies | Accepted for NET-01 and later M6 tests |
 | [0054](0054-sites-and-cookie-policy.md) | Host-supplied Public Suffix List, sites, Lax-by-default cookies, blocked third-party cookies, CHIPS | Accepted |
+| [0055](0055-downloads-broker-and-websocket-plan.md) | Downloads only through the broker with user decision and sanitized names; WebSocket over the allowlisted transport with Fetch policy | Accepted |
 
 ## Records by area
 
@@ -79,7 +80,7 @@ instead of rewriting the history of a decision.
 | Script loading (M5, WEB-05) | 0037, 0038, 0039, 0040, 0041, 0044 |
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
-| Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054 |
+| Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

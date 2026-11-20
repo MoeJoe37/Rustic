@@ -5441,8 +5441,39 @@
           "label": "Network policy and navigation conformance gate",
           "size": 3,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "tools/run_wpt_web_tests.py",
+              "marker": "def run_case"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "fetch/api/headers/headers-basic.any.js"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/m6_gate.rs",
+              "marker": "fn m6_demo_loads_an_allowlisted_site_and_denies_cross_origin_reads"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/m6_gate.rs",
+              "marker": "fn m6_gate_refuses_unlisted_origins_and_bad_certificates_without_bypass"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/wpt_mime.rs",
+              "marker": "fn data_urls"
+            },
+            {
+              "kind": "source",
+              "path": "docs/reviews/2026-11-20-m6-completion.md",
+              "marker": "## Gate"
+            }
+          ]
         },
         {
           "id": "network.webtransport",

@@ -510,13 +510,14 @@ fn load_scripted_document(
     let path = fs::canonicalize(path).map_err(LoadError::Io)?;
     check_regular_file(fs::metadata(&path).map_err(LoadError::Io)?, limits)?;
     let url = file_url(&path).ok_or(ScriptLoadError::InvalidDocumentUrl)?;
-    let load = engine.begin_local_scripted_document_with_clock(
+    let mut load = engine.begin_local_scripted_document_with_clock(
         parser_limits,
         TaskLimits::default(),
         url.clone(),
         ClassicScriptLimits::default(),
         ManualClock::default(),
     )?;
+    load.set_fetch_host(Rc::new(crate::network::LocalFetch(url.clone())))?;
     let cancellation = load.cancellation().expect("admitted load").clone();
     let root = path
         .parent()

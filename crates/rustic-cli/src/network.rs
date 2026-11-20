@@ -573,6 +573,25 @@ impl rustic_engine::ScriptPolicy for InlinePolicy {
     }
 }
 
+/// `fetch()` for a local file: URLs resolve against the file, and every
+/// fetch is a network error (local documents have no network, and
+/// `file:` fetches are network errors in Fetch).
+#[derive(Debug)]
+pub(crate) struct LocalFetch(pub(crate) Url);
+
+impl rustic_engine::FetchHost for LocalFetch {
+    fn base_url(&self) -> Option<Url> {
+        Some(self.0.clone())
+    }
+
+    fn fetch(
+        &self,
+        _: rustic_engine::ScriptRequest,
+    ) -> Result<rustic_engine::ScriptResponse, rustic_engine::NetworkFailure> {
+        Err(rustic_engine::NetworkFailure)
+    }
+}
+
 /// `fetch()` for a network document: the same session, with the
 /// document's CSP (`connect-src`) and mixed-content check on every hop.
 #[derive(Debug)]

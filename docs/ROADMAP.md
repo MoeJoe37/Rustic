@@ -18,7 +18,11 @@ QEMU emulation; native ARM64 timings are TD-125. M5 scripted documents
 bindings, events, observers, error reporting, focus, forms, the pinned WPT
 gate and the [first cross-engine report](reviews/2026-11-19-perf-01-m5.md).
 Its emulated, MSRV and cross tiers still need a run on a machine that has
-them. **M6 is the current milestone**; M7–M13 are unstarted. Native
+them. M6 controlled networking (NET-01 to NET-07) closed on 2026-11-20 with
+its [completion review](reviews/2026-11-20-m6-completion.md): HTTP(S) to
+allowlisted loopback origins, Fetch and `fetch()`, cookies, the HTTP
+cache, CSP, mixed content, profiles and Web Storage; its emulated and cross
+tiers were not run. **M7 is the current milestone**; M8–M13 are unstarted. Native
 Android/iOS surfaces (MOB-03/04) are the first task of M8 mobile hosts. The
 [progress summary](progress/summary.md) is the measured status and
 [implementation progress](IMPLEMENTATION.md) records each completed contract;
@@ -569,7 +573,12 @@ partitioned by top-level site, quotas, and Web Storage areas; `Storage`,
 `rustic-js`; persistent cookies live in the profile and the preflight cache
 is partitioned (TD-160 paid). The CLI takes `--profile DIR` and `--private`
 ([IMPLEMENTATION.md](IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)).
-Next: `fetch()` bindings, the HTTP cache, the network conformance gate.
+**M6 complete, 2026-11-20:** the partitioned HTTP cache, `fetch()` with
+`Headers`/`Request`/`Response`, inline-style CSP, 11 pinned Fetch API WPT
+files (114 of 119 subtests) and the demo and gate tests
+(`rustic-cli/tests/m6_gate.rs`) close the milestone; downloads and
+WebSocket are planned in [ADR 0055](adr/0055-downloads-broker-and-websocket-plan.md).
+[Completion review](reviews/2026-11-20-m6-completion.md).
 
 ## 10. M7 — Isolation and security gate
 

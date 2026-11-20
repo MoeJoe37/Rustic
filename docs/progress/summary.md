@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 38.52%** = 37.63% verified complete + 0.89% partial credit. 88/221 capabilities complete, 5 in progress.
+**Overall completion: 38.89%** = 38.00% verified complete + 0.89% partial credit. 89/221 capabilities complete, 5 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `7f61eb1bd9944a5dbe867fc43e50d25937f458b768618128dd90fc38c1573310`.
+Catalog: `engine-v4`. Source fingerprint: `02acb8b37e89f0eb9abfa6efe64362d6c66d75807b200e0134e2e7b255a31552`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `7f61eb1bd9944a5dbe867fc43e50d25937f45
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
-| M6 Networking & services | 11/12 | 91.45% | 91.45% | 4.38% |
+| M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -42,7 +42,7 @@ Catalog: `engine-v4`. Source fingerprint: `7f61eb1bd9944a5dbe867fc43e50d25937f45
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
-| Network & navigation | 5/8 | 0 | 65.62% | 65.62% | 4% | 2.62 |
+| Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -260,7 +260,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `network.cookies` — Cookies and partitioned HTTP cache · size 3 · M6 · 0.37% of engine ([source](../../crates/rustic-net/src/cookie/mod.rs), [source](../../crates/rustic-net/src/cookie/parse.rs), [test](../../crates/rustic-net/src/cookie/tests.rs), [test](../../crates/rustic-net/tests/fetch.rs), [source](../../crates/rustic-net/src/site.rs), [test](../../crates/rustic-net/tests/public_suffix.rs), [source](../../crates/rustic-net/src/http_cache.rs), [test](../../crates/rustic-net/tests/http_cache.rs), [test](../../crates/rustic-net/tests/http_cache.rs))
 - **complete** `network.policy` — CSP, MIME, secure contexts and mixed-content policy · size 3 · M6 · 0.37% of engine ([source](../../crates/rustic-net/src/csp.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [source](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [source](../../crates/rustic-style/src/loading.rs), [source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-cli/tests/network.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [source](../../crates/rustic-net/src/fetch.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-cli/tests/network.rs))
 - **planned** `network.protocols` — Required HTTP versions, WebSockets and referrer rules · size 5 · M9 · 0.62% of engine
-- **planned** `network.conformance` — Network policy and navigation conformance gate · size 3 · M6 · 0.37% of engine
+- **complete** `network.conformance` — Network policy and navigation conformance gate · size 3 · M6 · 0.37% of engine ([source](../../tools/run_wpt_web_tests.py), [test](../../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json), [test](../../crates/rustic-cli/tests/m6_gate.rs), [test](../../crates/rustic-cli/tests/m6_gate.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs), [source](../../docs/reviews/2026-11-20-m6-completion.md))
 - **planned** `network.webtransport` — WebTransport, fetch priorities and Early Hints · size 3 · M11 · 0.37% of engine
 
 ### Storage & workers

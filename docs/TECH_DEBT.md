@@ -56,14 +56,13 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M6, networking (NET-01 to NET-05) | TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
-| M7 entry (before hostile remote content) | TD-157, TD-165, TD-166, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
-| M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -93,7 +92,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
-| TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, pay with byte-offset mapping |
+| TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, M7 browser shell (DevTools) |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Paid with wrapper retargeting |
 | TD-17 | Deliberate | DOM / JS | DOM/JS collection was bound to one document and adoption discarded wrapper identity | Paid |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
@@ -156,7 +155,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
 | TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and the other numeric conversions are missing | Paid |
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Paid |
-| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, review at M6 entry |
+| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, M7 entry |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, `perf.gc` (M12); measured by JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 | TD-97 | Deliberate | JS | Syntax the bytecode compiler rejected; asynchronous module execution, dynamic imports and host-provided module metadata (what remains is TD-105 and TD-110) | Paid |
@@ -170,9 +169,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, `js.conformance` (M9) |
 | TD-106 | Deliberate | JS | `Function.prototype.toString` prints every function in the native form (eval paid) | Open, `js.conformance` (M9) |
 | TD-107 | Deliberate | JS | CLDR collation still needs full tailorings, implicit weights and conformance evidence | Open, `js.conformance` (M9) |
-| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, M6 entry |
+| TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, M9 language and web APIs |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
-| TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, M6 entry |
+| TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, M9 language and web APIs |
 | TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, `perf.interpreter` (M12) |
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
@@ -180,7 +179,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-115 | Deliberate | JS | A `SharedArrayBuffer` is shared within one agent only (no cross-agent byte store until workers); typed array elements are read through the generic property path | Open, M9 workers / `perf.interpreter` |
 | TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
-| TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, before frames (M6) |
+| TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, M9 language and web APIs |
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
 | TD-120 | Deliberate | JS | Intl embeds 8 MB of all-locale data packs, keeps a second copy of the plural rules and approximates ICU's range and currency-spacing rules | Open |
 | TD-121 | Deliberate | JS | Intl.Segmenter uses the untailored UAX #29 rules: no dictionary words for Chinese, Japanese or Thai, no sentence suppressions, and a second grapheme implementation beside rustic-text | Open |
@@ -192,17 +191,17 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
-| TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, HTML and navigation integration |
+| TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, M7 (ISO-01 browsing contexts) |
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, M9 |
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, M9 |
 | TD-133 | Deliberate | HTML scripting | Adoption of subtrees containing retained parser or script nodes and dynamic document markup have explicit exceptions | Open, M9 HTML lifecycle |
-| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, M6 entry |
-| TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M6 and M9 |
+| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, M7 entry |
+| TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M9 language and web APIs |
 | TD-136 | Bad | JS | The four URI functions and the omitted standard globals are covered by the pinned Test262 gate | Paid |
-| TD-137 | Deliberate | JS | Web-legacy library surface is missing: Annex B `escape`/`unescape` and String HTML methods, `__defineGetter__` and its siblings, legacy RegExp statics and `Error.prototype.stack`; `test/annexB` is not run | Open, M6 entry |
-| TD-138 | Bad | JS | Some statement completion values are wrong, and parameter defaults and `for-in`/`for-of` heads miss their TDZ errors | Open, M6 entry |
-| TD-139 | Bad | JS | Reference evaluation order deviates in compound, update and logical assignment, `with` over proxies, destructuring targets and `super` properties; `delete super.x` does not throw | Open, M6 entry |
-| TD-140 | Bad | JS | Array destructuring assignment steps the iterator before evaluating a target and does not close it when the target reference throws (TD-100 paid the binding form only) | Open, M6 entry |
+| TD-137 | Deliberate | JS | Web-legacy library surface is missing: Annex B `escape`/`unescape` and String HTML methods, `__defineGetter__` and its siblings, legacy RegExp statics and `Error.prototype.stack`; `test/annexB` is not run | Open, M9 language and web APIs (`js.conformance`) |
+| TD-138 | Bad | JS | Some statement completion values are wrong, and parameter defaults and `for-in`/`for-of` heads miss their TDZ errors | Open, M9 language and web APIs (`js.conformance`) |
+| TD-139 | Bad | JS | Reference evaluation order deviates in compound, update and logical assignment, `with` over proxies, destructuring targets and `super` properties; `delete super.x` does not throw | Open, M9 language and web APIs (`js.conformance`) |
+| TD-140 | Bad | JS | Array destructuring assignment steps the iterator before evaluating a target and does not close it when the target reference throws (TD-100 paid the binding form only) | Open, M9 language and web APIs (`js.conformance`) |
 | TD-141 | Bad | JS | Class, function and direct-eval edge semantics: derived-constructor return override in `catch`/`finally`, inferred names for symbol keys, private names on non-extensible objects, `super` and private names inside direct eval in class bodies | Open, `js.conformance` (M9) |
 | TD-142 | Bad | JS | Built-in edge bugs: weak keys, the String Iterator tag, `Object.fromEntries`, `Object.prototype`'s prototype, array `length` order and buffer checks | Paid |
 | TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (`Array.fromAsync`, `Math.sumPrecise`, base64 on `Uint8Array`, JSON source text, iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
@@ -211,10 +210,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
 | TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Open, M7 entry |
-| TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, M6 entry |
+| TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, M9 CSS, layout and paint |
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
-| TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M6 navigation |
+| TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M7 browser shell (DevTools) |
 | TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled (their compilation must apply CSP `script-src-attr`, see TD-164), body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
@@ -224,7 +223,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Paid 2026-11-20 |
 | TD-162 | Deliberate | Network / codecs | `gzip` and `deflate` response bodies are buffered whole (up to `max_body_bytes`) and inflated at the end of the body; only brotli decodes incrementally | Open, M12 |
-| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*` and `Accept-Language` paid 2026-11-20) | Open, M6 networking |
+| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*`, `Accept-Language` and the HTTP cache paid 2026-11-20) | Open, M7 entry |
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
 | TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Paid 2026-11-20 |
 | TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
@@ -405,6 +404,8 @@ are not constrained. **Pay:** restrict `push` to the default and `feature`
 branches. **Trigger:** queue times or minutes become a problem.
 
 ### TD-15 — HTML diagnostics not yet routed through `rustic-base` diagnostics
+
+**Rescheduled 2026-11-20 (M6 completion):** Diagnostics only feed a developer console; DEV-01 is their first consumer and defines the byte-offset mapping they need. Nothing an M6 page does depends on them.
 
 `rustic-base` now has the shared `Diagnostic`/`DiagnosticLog` contract with
 source revisions and redaction (DOC-01c in [IMPLEMENTATION.md](IMPLEMENTATION.md)).
@@ -1477,6 +1478,8 @@ environment are TD-104.
 
 ### TD-94 — Collection only at caller safe points
 
+**Rescheduled 2026-11-20 (M6 completion):** M6 pages are loopback fixtures; a native function growing memory without a safe point is an attack-surface concern for hostile remote content, reviewed with the other M7 entry budget items.
+
 A handle in a Rust local is not a root, so allocation never collects on its
 own (ADR 0016). The interpreter will poll `Agent::should_collect` between
 instructions, but one native function that allocates in a long loop (a
@@ -1681,6 +1684,8 @@ conformance data.
 
 ### TD-108 — Date local time is a fixed offset
 
+**Rescheduled 2026-11-20 (M6 completion):** Needs reviewed time-zone data, decided with the Intl data work (TD-107 family); no M6 network behavior depends on local time.
+
 `Date` computes local time as UTC plus the offset the embedder passes to
 `Agent::set_time_zone_offset` (zero by default). The Date local-time default does not select an IANA zone, so its offset
 cannot change with daylight saving time or with a
@@ -1720,6 +1725,8 @@ handled before then is withdrawn. The events root their promises until taken.
 The HTML events themselves are M5 work.
 
 ### TD-110 — RegExp Unicode property escapes cannot run
+
+**Rescheduled 2026-11-20 (M6 completion):** Needs Unicode property data shared with Intl (`js.conformance`); unrelated to networking.
 
 The pattern parser accepts `\p{…}` and `\P{…}` in `u` and `v` mode and the
 v-mode properties of strings, so such patterns are valid at parse time, but
@@ -1852,6 +1859,8 @@ implementing the next service that needs these rules or adding a conformance
 case for a contextual form.
 
 ### TD-118 — Realms live as long as their agent
+
+**Rescheduled 2026-11-20 (M6 completion):** Only frames create additional realms; frames arrive with ISO-01/M9 HTML work, and one realm per CLI run cannot leak.
 
 `Agent::create_realm` adds a realm record that the collector treats as a
 root: the realm's global object, global environment and named intrinsics
@@ -2051,6 +2060,8 @@ during named property visibility checks.
 
 ### TD-130 — Window named access and additional browsing contexts
 
+**Rescheduled 2026-11-20 (M6 completion):** Named properties, navigation and origin checks on Window need the browsing-context and agent-cluster model ISO-01 designs; M6 has one top-level document per run.
+
 The page host has one top-level browsing context per script agent and a
 fixed WindowProxy target for the active document's lifetime. This gives event and
 script integration one global identity. Extend the Window prototype chain with named access alongside the remaining
@@ -2123,6 +2134,8 @@ reentry limits, and the lifetime of a document replaced by `document.open`.
 
 ### TD-134 — Classic completion and the page event loop
 
+**Rescheduled 2026-11-20 (M6 completion):** The CLI now loads subresources over HTTP one at a time (TD-165); stylesheet-blocking scripts and task interleaving matter once loads run concurrently on the network process, which M7 introduces.
+
 The opt-in local host delivers request completions explicitly. Async classics
 execute when delivered, and document publication waits for EOF and all
 results. Script element events and readiness transitions landed in
@@ -2135,6 +2148,8 @@ stylesheet, script or timer becomes ready while the parser is suspended.
 **Rescheduled 2026-11-19 (M5 completion review):** Stylesheet-blocking scripts and task interleaving depend on asynchronous resource loading, which arrives with NET-01; moved to the M6 entry row.
 
 ### TD-135 — Dynamic page imports, import maps and data modules
+
+**Rescheduled 2026-11-20 (M6 completion):** Dynamic `import()` over HTTP needs the event-driven fetch controller (TD-161, TD-169); import maps are an HTML-integration item of M9.
 
 The local page host accepts static JavaScript imports using URL specifiers.
 Connect dynamic import to the shared page module map when the M6 fetch layer
@@ -2156,6 +2171,8 @@ test with a 400-million-step limit.
 [Test262 conformance](JS.md#conformance)
 
 ### TD-137 — Web-legacy library surface
+
+**Rescheduled 2026-11-20 (M6 completion):** Web-legacy library surface is measured by `test/annexB`, which the M9 Test262 full-rate work runs; M6 fixtures do not use it.
 
 Browsers keep a layer of library features that pages still use and that
 the specification puts in Annex B or that are de facto standards. Rustic
@@ -2181,6 +2198,8 @@ missing pieces, run `test/annexB` as a pinned passing list, and give
 
 ### TD-138 — Completion values and binding TDZ
 
+**Rescheduled 2026-11-20 (M6 completion):** Spec-edge completion values and TDZ checks are tracked by failing Test262 files in the committed lists; fixing them belongs to the `js.conformance` full-rate gate, not the network milestone. Still bad debt: prioritise first in that gate.
+
 The audit's run of `test/language` at the pinned revision found two groups
 of wrong results with no error:
 
@@ -2198,6 +2217,8 @@ of wrong results with no error:
 Pay before M6 entry, with compiler tests for each statement kind.
 
 ### TD-139 — Reference evaluation order
+
+**Rescheduled 2026-11-20 (M6 completion):** Reference evaluation-order deviations are tracked by failing Test262 files; scheduled first in the `js.conformance` gate. Still bad debt.
 
 The compiler evaluates some operand pieces in a different order from the
 specification (65 `test/language` files):
@@ -2218,6 +2239,8 @@ Pay before M6 entry: real pages mostly cannot observe this, but proxies,
 getters and `with` libraries can.
 
 ### TD-140 — Destructuring assignment does not close iterators on target errors
+
+**Rescheduled 2026-11-20 (M6 completion):** Tracked by failing Test262 files; scheduled first in the `js.conformance` gate. Still bad debt.
 
 TD-100 paid the binding form. The assignment form (`[o[f()]] = iterable`,
 and `for ([a.b] of …)` heads) calls `next` before evaluating the target
@@ -2353,6 +2376,8 @@ cases and add a flush-cost test on a large document.
 
 ### TD-149 — Pseudo-element `getComputedStyle` throws
 
+**Rescheduled 2026-11-20 (M6 completion):** Pseudo-element computed styles need generated-content layout (M9); returning empty styles would be wrong for `::before`/`::after` with content.
+
 `getComputedStyle(element, pseudo)` uses the element when `pseudo` has no
 leading colon, as CSSOM requires, but throws a `TypeError` for every
 colon-prefixed value. CSSOM instead returns the pseudo-element's styles for
@@ -2403,6 +2428,8 @@ token run.
 depends on it.
 
 ### TD-152 — Error reports lack source locations and console formatting
+
+**Rescheduled 2026-11-20 (M6 completion):** M6 now tracks document URLs, but script URLs, lines and `location` belong to the History/Location bindings and DEV-01 error display, not to the network gate.
 
 `ErrorEvent.filename` is empty and `lineno` and `colno` are zero, because
 script sources carry no URL and thrown values no position the host can
@@ -2541,6 +2568,8 @@ and an ephemeral one for private mode.
 **Trigger:** NET-06 (`storage.profiles`, `storage.partition`).
 
 ### TD-161 — Fetcher is a blocking, cache-less prototype
+
+**Rescheduled 2026-11-20 (M6 completion):** the HTTP cache, referrer computation and fetch metadata are done. What remains is the event-driven controller, which belongs to the M7 network process (ISO-02), and the Lax-allowing-unsafe exception, a Chromium compatibility allowance Rustic may never adopt (decide with M7 cookie policy review).
 
 `Fetcher::fetch` waits for each hop's head on the calling thread, so it is
 for tests, the CLI and a future network task, not the page's event loop.

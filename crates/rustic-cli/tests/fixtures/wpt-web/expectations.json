@@ -1329,6 +1329,513 @@
       "status": "PASS"
     }
   ],
+  "fetch/api/headers/headers-basic.any.js": [
+    {
+      "name": "Create headers from no parameter",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers from undefined parameter",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers from empty object",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers with null should throw",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers with 1 should throw",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers with sequence",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers with record",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers with existing headers",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers with existing headers with custom iterator",
+      "status": "PASS"
+    },
+    {
+      "name": "Check append method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check set method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check has method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check delete method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check get method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check keys method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check values method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check entries method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check Symbol.iterator method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check forEach method",
+      "status": "PASS"
+    },
+    {
+      "name": "Iteration skips elements removed while iterating",
+      "status": "PASS"
+    },
+    {
+      "name": "Removing elements already iterated over causes an element to be skipped during iteration",
+      "status": "PASS"
+    },
+    {
+      "name": "Appending a value pair during iteration causes it to be reached during iteration",
+      "status": "PASS"
+    },
+    {
+      "name": "Prepending a value pair before the current element position causes it to be skipped during iteration and adds the current element a second time",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/headers/headers-casing.any.js": [
+    {
+      "name": "Create headers, names use characters with different case",
+      "status": "PASS"
+    },
+    {
+      "name": "Check append method, names use characters with different case",
+      "status": "PASS"
+    },
+    {
+      "name": "Check set method, names use characters with different case",
+      "status": "PASS"
+    },
+    {
+      "name": "Check delete method, names use characters with different case",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/headers/headers-combine.any.js": [
+    {
+      "name": "Create headers using same name for different values",
+      "status": "PASS"
+    },
+    {
+      "name": "Check delete and has methods when using same name for different values",
+      "status": "PASS"
+    },
+    {
+      "name": "Check set methods when called with already used name",
+      "status": "PASS"
+    },
+    {
+      "name": "Check append methods when called with already used name",
+      "status": "PASS"
+    },
+    {
+      "name": "Iterate combined values",
+      "status": "PASS"
+    },
+    {
+      "name": "Iterate combined values in sorted order",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/headers/headers-errors.any.js": [
+    {
+      "name": "Create headers giving an array having one string as init argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers giving an array having three strings as init argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers giving bad header name as init argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Create headers giving bad header value as init argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers get with an invalid name invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers get with an invalid name [object Object]",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers delete with an invalid name invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers delete with an invalid name [object Object]",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers has with an invalid name invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers has with an invalid name [object Object]",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers set with an invalid name invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers set with an invalid name [object Object]",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers set with an invalid value invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers append with an invalid name invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers append with an invalid name [object Object]",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers append with an invalid value invalid\u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers forEach throws if argument is not callable",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers forEach loop should stop if callback is throwing exception",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/headers/headers-normalize.any.js": [
+    {
+      "name": "Create headers with not normalized values",
+      "status": "PASS"
+    },
+    {
+      "name": "Check append method with not normalized values",
+      "status": "PASS"
+    },
+    {
+      "name": "Check set method with not normalized values",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/headers/headers-record.any.js": [
+    {
+      "name": "Passing nothing to Headers constructor",
+      "status": "PASS"
+    },
+    {
+      "name": "Passing undefined to Headers constructor",
+      "status": "PASS"
+    },
+    {
+      "name": "Passing null to Headers constructor",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic operation with one property",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic operation with one property and a proto",
+      "status": "PASS"
+    },
+    {
+      "name": "Correct operation ordering with two properties",
+      "status": "PASS"
+    },
+    {
+      "name": "Correct operation ordering with two properties one of which has an invalid name",
+      "status": "PASS"
+    },
+    {
+      "name": "Correct operation ordering with two properties one of which has an invalid value",
+      "status": "PASS"
+    },
+    {
+      "name": "Correct operation ordering with non-enumerable properties",
+      "status": "PASS"
+    },
+    {
+      "name": "Correct operation ordering with undefined descriptors",
+      "status": "PASS"
+    },
+    {
+      "name": "Correct operation ordering with repeated keys",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic operation with Symbol keys",
+      "status": "PASS"
+    },
+    {
+      "name": "Operation with non-enumerable Symbol keys",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/headers/headers-structure.any.js": [
+    {
+      "name": "Headers has append method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has delete method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has get method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has has method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has set method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has entries method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has keys method",
+      "status": "PASS"
+    },
+    {
+      "name": "Headers has values method",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/request/request-structure.any.js": [
+    {
+      "name": "Request has clone method",
+      "status": "PASS"
+    },
+    {
+      "name": "Request has arrayBuffer method",
+      "status": "FAIL",
+      "message": "assert_true: request has arrayBuffer method expected true got false"
+    },
+    {
+      "name": "Request has blob method",
+      "status": "FAIL",
+      "message": "assert_true: request has blob method expected true got false"
+    },
+    {
+      "name": "Request has formData method",
+      "status": "FAIL",
+      "message": "assert_true: request has formData method expected true got false"
+    },
+    {
+      "name": "Request has json method",
+      "status": "PASS"
+    },
+    {
+      "name": "Request has text method",
+      "status": "PASS"
+    },
+    {
+      "name": "Check method attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check url attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check headers attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check destination attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check referrer attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check referrerPolicy attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check mode attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check credentials attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check cache attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check redirect attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check integrity attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check isReloadNavigation attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check isHistoryNavigation attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check duplex attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check bodyUsed attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Request does not expose priority attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Request does not expose internalpriority attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Request does not expose blocking attribute",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/response/response-error.any.js": [
+    {
+      "name": "Throws RangeError when responseInit's status is 0",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws RangeError when responseInit's status is 100",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws RangeError when responseInit's status is 199",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws RangeError when responseInit's status is 600",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws RangeError when responseInit's status is 1000",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws TypeError when responseInit's statusText is \n",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws TypeError when responseInit's statusText is \u0100",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws TypeError when building a response with body and a body status of 204",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws TypeError when building a response with body and a body status of 205",
+      "status": "PASS"
+    },
+    {
+      "name": "Throws TypeError when building a response with body and a body status of 304",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/response/response-init-001.any.js": [
+    {
+      "name": "Check default value for type attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check default value for url attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check default value for ok attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check default value for status attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check default value for statusText attribute",
+      "status": "PASS"
+    },
+    {
+      "name": "Check default value for body attribute",
+      "status": "FAIL",
+      "message": "assert_equals: Expect default response.body is null expected (object) null but got (undefined) undefined"
+    },
+    {
+      "name": "Check status init values and associated getter",
+      "status": "PASS"
+    },
+    {
+      "name": "Check statusText init values and associated getter",
+      "status": "PASS"
+    },
+    {
+      "name": "Test that Response.headers has the [SameObject] extended attribute",
+      "status": "PASS"
+    }
+  ],
+  "fetch/api/response/response-static-error.any.js": [
+    {
+      "name": "Check response returned by static method error()",
+      "status": "FAIL",
+      "message": "assert_equals: Network error response's body is null expected (object) null but got (undefined) undefined"
+    },
+    {
+      "name": "the 'guard' of the Headers instance should be immutable",
+      "status": "PASS"
+    }
+  ],
   "html/webappapis/animation-frames/callback-handle.html": [
     {
       "name": "Check window.requestAnimationFrame can return a valid callback handle",

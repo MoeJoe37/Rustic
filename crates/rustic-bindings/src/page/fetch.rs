@@ -107,7 +107,11 @@ const R_HEADERS_RESPONSE: u32 = 5;
 const R_BODY_RESPONSE: u32 = 6;
 const R_USED_RESPONSE: u32 = 7;
 
-pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
+const HEADERS_ITERATOR: &str = "Headers Iterator";
+
+/// Install the interfaces; returns the `Headers Iterator` prototype, which
+/// the page keeps.
+pub(super) fn install(agent: &mut Agent) -> JsResult<ObjectId> {
     install_interface(
         agent,
         HEADERS,
@@ -156,6 +160,21 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
             ("referrerPolicy", "get referrerPolicy", request_get::<7>),
             ("bodyUsed", "get bodyUsed", request_get::<9>),
             ("destination", "get destination", request_destination),
+            ("referrer", "get referrer", request_constant::<0>),
+            ("cache", "get cache", request_constant::<1>),
+            ("integrity", "get integrity", request_constant::<2>),
+            (
+                "isReloadNavigation",
+                "get isReloadNavigation",
+                request_constant::<3>,
+            ),
+            (
+                "isHistoryNavigation",
+                "get isHistoryNavigation",
+                request_constant::<3>,
+            ),
+            ("duplex", "get duplex", request_constant::<4>),
+            ("keepalive", "get keepalive", request_constant::<3>),
         ],
         |agent, proto| {
             define_method(agent, proto, "text", body_text::<false, false>, 0)?;
@@ -194,7 +213,19 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let global = agent.intrinsics.global;
     define_method(agent, global, "fetch", fetch, 1)?;
     let _ = illegal_constructor;
-    Ok(())
+    // Web IDL §3.7.10.1: the pair iterator prototype inherits from
+    // %IteratorPrototype% and has an enumerable `next`.
+    let array_iterator = agent.intrinsics.array_iterator_prototype;
+    let iterator_prototype = agent.get_prototype_of(array_iterator)?;
+    let prototype = agent.new_object_with(iterator_prototype)?;
+    define_method(agent, prototype, "next", headers_iterator_next, 0)?;
+    let tag = Value::string(agent.heap.intern_str(HEADERS_ITERATOR)?);
+    agent.define_property_or_throw(
+        prototype,
+        PropertyKey::Symbol(agent.symbols.to_string_tag),
+        rustic_js::runtime::PropertyDescriptor::data_with(tag, false, false, true),
+    )?;
+    Ok(prototype)
 }
 
 // ---- records ------------------------------------------------------------
@@ -435,14 +466,14 @@ fn fill(agent: &mut Agent, guard: f64, list: &mut HeaderList, init: Value) -> Js
     } else {
         with_root(agent, init, |agent| {
             for key in agent.own_property_keys(object)? {
-                if matches!(key, PropertyKey::Symbol(_)) {
-                    continue;
-                }
                 let Some(desc) = agent.get_own_property(object, key)? else {
                     continue;
                 };
                 if desc.enumerable != Some(true) {
                     continue;
+                }
+                if matches!(key, PropertyKey::Symbol(_)) {
+                    return Err(type_error(agent, "a symbol cannot be a header name"));
                 }
                 let name = agent.key_to_value(key)?;
                 let name = to_byte_string(agent, name)?;
@@ -586,24 +617,55 @@ fn headers_for_each(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<
     Ok(Value::UNDEFINED)
 }
 
-/// `entries()`, `keys()` and `values()` over a snapshot of the sorted and
-/// combined list (Web IDL's iterators are live; TD-169).
+/// `entries()`, `keys()` and `values()`: a live pair iterator whose index
+/// walks the current sorted and combined list on every `next()`.
 fn headers_entries<const KIND: u8>(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    let record = record(agent, this, HEADERS)?;
-    let (_, list) = read_list(agent, record)?;
-    let mut items = Vec::new();
-    for (name, value) in sort_and_combine(&list) {
-        let name = text_value(agent, &name)?;
-        let value = bytes_value(agent, &value)?;
-        items.push(match KIND {
-            0 => Value::object(agent.create_array_from_list(&[name, value])?),
-            1 => name,
-            _ => value,
-        });
-    }
-    let array = Value::object(agent.create_array_from_list(&items)?);
-    let values = Value::object(agent.intrinsics.array_values);
-    agent.call(values, array, &[])
+    record(agent, this, HEADERS)?;
+    let prototype = with_page(agent, |_, page| Ok(page.headers_iterator))?;
+    let iterator = Value::object(agent.new_object_with(Some(prototype))?);
+    let tag = text_value(agent, HEADERS_ITERATOR)?;
+    new_record(
+        agent,
+        iterator,
+        &[
+            tag,
+            this,
+            Value::number(f64::from(KIND)),
+            Value::number(0.0),
+        ],
+    )?;
+    Ok(iterator)
+}
+
+fn headers_iterator_next(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let state = record(agent, this, HEADERS_ITERATOR)?;
+    let headers = state.get(agent, 1)?;
+    let kind = state.get(agent, 2)?.as_number().unwrap_or(0.0);
+    let index = state.get(agent, 3)?.as_number().unwrap_or(0.0) as usize;
+    let list = record(agent, headers, HEADERS)?;
+    let (_, list) = read_list(agent, list)?;
+    let pairs = sort_and_combine(&list);
+    let result = agent.new_object()?;
+    let value_key = PropertyKey::String(agent.names.value);
+    let done_key = PropertyKey::String(agent.names.done);
+    let Some((name, value)) = pairs.get(index) else {
+        agent.create_data_property_or_throw(result, value_key, Value::UNDEFINED)?;
+        agent.create_data_property_or_throw(result, done_key, Value::TRUE)?;
+        return Ok(Value::object(result));
+    };
+    state.set(agent, 3, Value::number((index + 1) as f64))?;
+    let name = text_value(agent, name)?;
+    let value = bytes_value(agent, value)?;
+    let item = if kind == 0.0 {
+        Value::object(agent.create_array_from_list(&[name, value])?)
+    } else if kind == 1.0 {
+        name
+    } else {
+        value
+    };
+    agent.create_data_property_or_throw(result, value_key, item)?;
+    agent.create_data_property_or_throw(result, done_key, Value::FALSE)?;
+    Ok(Value::object(result))
 }
 
 // ---- dictionaries ---------------------------------------------------------
@@ -892,6 +954,24 @@ fn request_get<const SLOT: u32>(agent: &mut Agent, this: Value, _: &[Value]) -> 
 fn request_destination(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     record(agent, this, REQUEST)?;
     text_value(agent, "")
+}
+
+/// Members this implementation never varies: `referrer` is always the
+/// client (`about:client`), `cache` `default`, `integrity` empty, the
+/// navigation flags and `keepalive` false, `duplex` `half` (TD-169).
+fn request_constant<const MEMBER: u8>(
+    agent: &mut Agent,
+    this: Value,
+    _: &[Value],
+) -> JsResult<Value> {
+    record(agent, this, REQUEST)?;
+    match MEMBER {
+        0 => text_value(agent, "about:client"),
+        1 => text_value(agent, "default"),
+        2 => text_value(agent, ""),
+        3 => Ok(Value::FALSE),
+        _ => text_value(agent, "half"),
+    }
 }
 
 fn request_clone(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {

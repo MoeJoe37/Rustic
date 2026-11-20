@@ -180,6 +180,7 @@ struct Page {
     storage_objects: RefCell<[Option<(Value, rustic_js::runtime::HostRoot)>; 2]>,
     fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
     fetch_records: ObjectId,
+    headers_iterator: ObjectId,
 }
 
 impl ExecutionHost for Page {
@@ -513,7 +514,8 @@ fn install_page(
     drop(document);
     let window = window::install(agent, scheduler.is_some())?;
     web_storage::install(agent)?;
-    fetch::install(agent)?;
+    let headers_iterator = fetch::install(agent)?;
+    agent.root(Value::object(headers_iterator))?;
     let fetch_records = agent.new_weak_map()?;
     agent.root(Value::object(fetch_records))?;
     let events = events::Events::new(agent)?;
@@ -542,6 +544,7 @@ fn install_page(
         storage_objects: RefCell::new([None, None]),
         fetch: RefCell::new(None),
         fetch_records,
+        headers_iterator,
     }))
 }
 

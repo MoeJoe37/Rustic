@@ -11,9 +11,10 @@
 //!
 //! Authority is explicit: a [`NetworkPolicy`] lists the origins that may be
 //! contacted and the loopback address each one maps to. There is no DNS
-//! and no route to remote hosts before the M7 isolation gate. `https` fails
-//! closed with [`TransportError::TlsUnavailable`] until the TLS adapter of
-//! ADR 0051 is accepted; it is never downgraded to `http`.
+//! and no route to remote hosts before the M7 isolation gate. `https` uses
+//! the [`tls`] adapter (rustls with platform certificate verification,
+//! ADR 0051); a refused certificate is never bypassed or downgraded to
+//! `http`.
 //!
 //! Above the transport, [`mime`] parses MIME types and extracts a
 //! response's `Content-Type` and charset as Fetch does, and [`redirect`]
@@ -46,6 +47,7 @@ pub mod redirect;
 mod request;
 mod response;
 pub mod site;
+pub mod tls;
 mod transport;
 
 pub use headers::{HeaderError, Headers};

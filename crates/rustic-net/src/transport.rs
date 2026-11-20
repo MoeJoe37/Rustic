@@ -9,6 +9,7 @@ use rustic_base::CancellationToken;
 
 use crate::pipe::{Consumer, Producer, Wait, pipe};
 use crate::response::{BodyDecoder, HeadParser, ProtocolError, ResponseHead, framing};
+use crate::tls::{CertificateError, TlsConfig, TlsFailure, classify};
 use crate::{LimitsError, NetworkPolicy, Request, TransportLimits};
 
 /// Starts HTTP/1.1 exchanges with origins the [`NetworkPolicy`] allows.
@@ -21,6 +22,7 @@ use crate::{LimitsError, NetworkPolicy, Request, TransportLimits};
 pub struct Transport {
     policy: Arc<NetworkPolicy>,
     limits: TransportLimits,
+    tls: Arc<std::sync::OnceLock<Option<TlsConfig>>>,
 }
 
 impl Transport {
@@ -30,7 +32,21 @@ impl Transport {
         Ok(Self {
             policy: Arc::new(policy),
             limits,
+            tls: Arc::new(std::sync::OnceLock::new()),
         })
+    }
+
+    /// Verify `https` certificates with `tls` instead of the platform
+    /// verifier (enterprise roots or a test CA). Verification itself can
+    /// never be turned off.
+    pub fn with_tls(mut self, tls: TlsConfig) -> Self {
+        self.tls = Arc::new(std::sync::OnceLock::from(Some(tls)));
+        self
+    }
+
+    /// The TLS configuration, creating the platform one on first use.
+    fn tls(&self) -> Option<TlsConfig> {
+        self.tls.get_or_init(|| TlsConfig::platform().ok()).clone()
     }
 
     /// The limits every exchange uses.
@@ -38,23 +54,26 @@ impl Transport {
         &self.limits
     }
 
-    /// Start an exchange. Policy and scheme failures are reported here,
-    /// before any socket is opened; everything later arrives as a
+    /// Start an exchange. Policy failures are reported here, before any
+    /// socket is opened; everything later arrives as
     /// [`NetEvent::Failed`].
     ///
-    /// `https` fails with [`TransportError::TlsUnavailable`] until the
-    /// TLS adapter of ADR 0051 lands. It is never retried over `http`.
+    /// `https` verifies the server certificate (ADR 0051); a failure is
+    /// [`TransportError::Certificate`] and is never retried over `http`.
     pub fn start(&self, request: Request) -> Result<Exchange, TransportError> {
         let address = self
             .policy
             .route(request.url())
             .ok_or(TransportError::Blocked)?;
-        if request.url().scheme() == "https" {
-            return Err(TransportError::TlsUnavailable);
-        }
+        let tls = if request.url().scheme() == "https" {
+            Some(self.tls().ok_or(TransportError::TlsUnavailable)?)
+        } else {
+            None
+        };
         let cancel = CancellationToken::default();
         let (producer, consumer) = pipe(self.limits.buffer_window);
         let run = Run {
+            tls,
             limits: self.limits.clone(),
             cancel: cancel.clone(),
             producer,
@@ -171,8 +190,13 @@ pub enum TimeoutKind {
 pub enum TransportError {
     /// The origin is not in the [`NetworkPolicy`].
     Blocked,
-    /// `https` needs the TLS adapter, which is not built yet (ADR 0051).
+    /// No TLS configuration is available for `https` (the platform
+    /// verifier could not be created and none was given).
     TlsUnavailable,
+    /// The server certificate was refused. There is no override.
+    Certificate(CertificateError),
+    /// The TLS handshake or record layer failed for another reason.
+    Tls,
     /// The connection could not be established.
     Connect(io::ErrorKind),
     /// Connecting took longer than `connect_timeout`.
@@ -191,7 +215,9 @@ impl fmt::Display for TransportError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Blocked => formatter.write_str("origin not allowed by the network policy"),
-            Self::TlsUnavailable => formatter.write_str("https is not available yet"),
+            Self::TlsUnavailable => formatter.write_str("no TLS configuration is available"),
+            Self::Certificate(error) => error.fmt(formatter),
+            Self::Tls => formatter.write_str("TLS handshake failed"),
             Self::Connect(kind) => write!(formatter, "connection failed: {kind}"),
             Self::ConnectTimeout => formatter.write_str("connection timed out"),
             Self::Io(kind) => write!(formatter, "network error: {kind}"),
@@ -217,6 +243,7 @@ impl From<ProtocolError> for TransportError {
 
 /// The network thread's state for one exchange.
 struct Run {
+    tls: Option<TlsConfig>,
     limits: TransportLimits,
     cancel: CancellationToken,
     producer: Producer,
@@ -256,17 +283,59 @@ impl Run {
                 TransportError::Connect(error.kind())
             }
         })?;
-        let result = self.over(&mut stream, request);
+        let tick = self.limits.poll_interval;
+        let setup = |error: io::Error| TransportError::Io(error.kind());
+        stream.set_nodelay(true).map_err(setup)?;
+        stream.set_read_timeout(Some(tick)).map_err(setup)?;
+        stream.set_write_timeout(Some(tick)).map_err(setup)?;
+        let result = match &self.tls {
+            None => self.over(&mut stream, request),
+            Some(tls) => {
+                let connection = tls
+                    .connect(request.url())
+                    .map_err(TransportError::Certificate)?;
+                let mut secure = rustls::StreamOwned::new(connection, stream);
+                let result = self
+                    .handshake(&mut secure)
+                    .and_then(|()| self.over(&mut secure, request));
+                secure.conn.send_close_notify();
+                let _ = secure.flush();
+                stream = secure.sock;
+                result
+            }
+        };
         let _ = stream.shutdown(Shutdown::Both);
         result
     }
 
-    fn over(&self, stream: &mut TcpStream, request: &Request) -> Result<(), TransportError> {
-        let tick = self.limits.poll_interval;
-        let io = |error: io::Error| TransportError::Io(error.kind());
-        stream.set_nodelay(true).map_err(io)?;
-        stream.set_read_timeout(Some(tick)).map_err(io)?;
-        stream.set_write_timeout(Some(tick)).map_err(io)?;
+    /// Complete the TLS handshake, honouring cancellation and timeouts.
+    /// End of stream during the handshake is a TLS failure.
+    fn handshake(
+        &self,
+        stream: &mut rustls::StreamOwned<rustls::ClientConnection, TcpStream>,
+    ) -> Result<(), TransportError> {
+        let mut last_progress = Instant::now();
+        while stream.conn.is_handshaking() {
+            match stream.conn.complete_io(&mut stream.sock) {
+                Ok((0, 0)) => return Err(TransportError::Tls),
+                Ok(_) => last_progress = Instant::now(),
+                Err(error) if waits(&error) => {}
+                Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
+                    return Err(TransportError::Tls);
+                }
+                Err(error) => return Err(io_error(error)),
+            }
+            self.check_idle(last_progress)?;
+        }
+        Ok(())
+    }
+
+    fn over(
+        &self,
+        stream: &mut (impl Read + Write),
+        request: &Request,
+    ) -> Result<(), TransportError> {
+        let io = io_error;
         self.check_stopped()?;
         self.write_all(stream, &request.serialize())?;
 
@@ -282,6 +351,14 @@ impl Run {
                 Err(error) if waits(&error) => {
                     self.check_idle(last_progress)?;
                     continue;
+                }
+                // A TLS peer that closes without close_notify: treated as
+                // end of stream, as browsers do; framing still detects
+                // truncated length-delimited and chunked bodies.
+                Err(error)
+                    if self.tls.is_some() && error.kind() == io::ErrorKind::UnexpectedEof =>
+                {
+                    0
                 }
                 Err(error) => return Err(io(error)),
             };
@@ -323,7 +400,7 @@ impl Run {
         }
     }
 
-    fn write_all(&self, stream: &mut TcpStream, bytes: &[u8]) -> Result<(), TransportError> {
+    fn write_all(&self, stream: &mut impl Write, bytes: &[u8]) -> Result<(), TransportError> {
         let mut written = 0;
         let mut last_progress = Instant::now();
         while written < bytes.len() {
@@ -334,11 +411,17 @@ impl Run {
                     last_progress = Instant::now();
                 }
                 Err(error) if waits(&error) => {}
-                Err(error) => return Err(TransportError::Io(error.kind())),
+                Err(error) => return Err(io_error(error)),
             }
             self.check_idle(last_progress)?;
         }
-        Ok(())
+        loop {
+            match stream.flush() {
+                Ok(()) => return Ok(()),
+                Err(error) if waits(&error) => self.check_idle(last_progress)?,
+                Err(error) => return Err(io_error(error)),
+            }
+        }
     }
 
     fn emit(&self, event: NetEvent) -> Result<(), TransportError> {
@@ -376,6 +459,15 @@ impl Run {
             return Err(TransportError::Timeout(TimeoutKind::Idle));
         }
         Ok(())
+    }
+}
+
+/// Map a socket or TLS error.
+fn io_error(error: io::Error) -> TransportError {
+    match classify(&error) {
+        Some(TlsFailure::Certificate(reason)) => TransportError::Certificate(reason),
+        Some(TlsFailure::Handshake) => TransportError::Tls,
+        None => TransportError::Io(error.kind()),
     }
 }
 

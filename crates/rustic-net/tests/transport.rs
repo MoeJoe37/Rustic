@@ -157,24 +157,6 @@ fn origins_outside_the_policy_are_blocked_before_any_connection() {
 }
 
 #[test]
-fn https_fails_closed_and_is_never_downgraded() {
-    let server = FixtureServer::start([("/", Reply::response(200, &[], b"plaintext"))]).unwrap();
-    let mut policy = NetworkPolicy::deny_all();
-    let secure = Url::parse(
-        &format!("https://app.test:{}/", server.address().port()),
-        None,
-    )
-    .unwrap();
-    policy.allow(&secure, server.address()).unwrap();
-    let transport = Transport::new(policy, TransportLimits::default()).unwrap();
-    assert_eq!(
-        transport.start(Request::get(secure).unwrap()).unwrap_err(),
-        TransportError::TlsUnavailable
-    );
-    assert_eq!(server.connections(), 0);
-}
-
-#[test]
 fn refused_connections_are_reported() {
     // Bind and drop a listener to find a loopback port nobody listens on.
     let address: SocketAddr = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))

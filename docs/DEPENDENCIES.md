@@ -20,8 +20,10 @@ This distinction is the project's chosen scope, recorded in
 
 ## Candidate evaluation map
 
-**Adopted so far:** only the font adapters HarfRust, Skrifa and Wuff
-([ADR 0014](adr/0014-reviewed-font-adapters.md), see "M3 font adoption" below).
+**Adopted so far:** the font adapters HarfRust, Skrifa and Wuff
+([ADR 0014](adr/0014-reviewed-font-adapters.md), see "M3 font adoption" below)
+and the TLS stack rustls with `ring` and `rustls-platform-verifier`
+([ADR 0051](adr/0051-transport-and-tls.md)).
 Every other name in this table is a candidate to evaluate at the relevant
 milestone, not an installed package, version recommendation or compatibility
 guarantee. The JavaScript engine (and its RegExp engine), Wasm runtime, HTML,
@@ -29,7 +31,7 @@ CSS, layout, paint, codecs and URL code stay original Rust (ADR 0001).
 
 | Service | Candidate approach | Rustic retains responsibility for |
 | --- | --- | --- |
-| TLS | **Proposed at M6 entry:** rustls 0.23 with the `ring` provider and `rustls-platform-verifier` ([ADR 0051](adr/0051-transport-and-tls.md); measured graph, MSRV and licenses there). Not added until accepted; `https` fails closed | Certificate error behavior, HTTPS policy and broker authority |
+| TLS | **Adopted (M6):** rustls 0.23.46 with the `ring` provider and `rustls-platform-verifier` 0.7.1 in `rustic-net::tls` ([ADR 0051](adr/0051-transport-and-tls.md); graph, MSRV and licenses there) | Certificate error behavior, HTTPS policy and broker authority |
 | HTTP transport | **Chosen at M6 entry:** Rustic's own HTTP/1.1 in `rustic-net`, no runtime ([ADR 0051](adr/0051-transport-and-tls.md), [ADR 0052](adr/0052-network-io-model.md)); a reviewed library remains a candidate for HTTP/2 | Framing and limits, Fetch, redirects, CORS, cookies, cache, MIME and response visibility |
 | Text encodings | **Chosen at M6 entry:** original Encoding Standard decoders and encoders over indexes generated from pinned whatwg/encoding data (`rustic-encoding`, [ADR 0043](adr/0043-encoding-standard.md)), no library | Charset selection, sniffing and restart, URL and form encoding |
 | Unicode/IDNA | Chosen at M1: original UTS #46/NFC code over tables generated from pinned Unicode data (`tools/generate_idna_data.py`), no library | URL/origin algorithms, data updates and string/index semantics |

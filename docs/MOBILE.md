@@ -87,6 +87,13 @@ backgrounding, low memory and app/service death. Renderer separation must use
 mechanisms available to an ordinary app on supported Android versions, without
 assuming root or desktop namespace/seccomp/process privileges.
 
+Certificate verification uses the Android system verifier through
+`rustls-platform-verifier` (ADR 0051). The host app must ship that crate's
+Kotlin component (`rustls-platform-verifier-android`) and call its
+`init_hosted` JNI initializer before the first `https` request; until then
+`TlsConfig::platform()` fails and `https` requests end with
+`TransportError::TlsUnavailable`, never without verification.
+
 Reference: [Android NDK ABI guide](https://developer.android.com/ndk/guides/abis).
 
 ## iOS and iPadOS

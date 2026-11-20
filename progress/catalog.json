@@ -5037,8 +5037,24 @@
             },
             {
               "label": "TLS adapter with platform certificate verification and certificate-error fixtures (ADR 0051 TLS part)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/tls.rs",
+                  "marker": "pub struct TlsConfig"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/tls.rs",
+                  "marker": "fn certificate_errors_are_typed_and_never_bypassed"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/tls.rs",
+                  "marker": "fn the_platform_verifier_does_not_trust_the_test_ca"
+                }
+              ]
             },
             {
               "label": "Content-coding decoding under output limits (TD-158)",

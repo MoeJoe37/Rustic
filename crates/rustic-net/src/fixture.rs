@@ -111,6 +111,7 @@ impl RecordedRequest {
 }
 
 struct Shared {
+    tls: Option<Arc<rustls::ServerConfig>>,
     routes: HashMap<String, Reply>,
     stop: AtomicBool,
     log: Mutex<Vec<RecordedRequest>>,
@@ -129,9 +130,44 @@ impl FixtureServer {
     /// (an exact match first, then the path without its query). Unknown
     /// targets get a 404.
     pub fn start<'a>(routes: impl IntoIterator<Item = (&'a str, Reply)>) -> io::Result<Self> {
+        Self::bind(routes, None)
+    }
+
+    /// Like [`Self::start`], but every connection is TLS with the given
+    /// PEM certificate chain and PKCS#8 PEM key (test-only material under
+    /// `tests/fixtures/tls`). [`Self::url`] then uses `https`.
+    pub fn start_tls<'a>(
+        routes: impl IntoIterator<Item = (&'a str, Reply)>,
+        certificate_pem: &[u8],
+        key_pem: &[u8],
+    ) -> io::Result<Self> {
+        use rustls::pki_types::pem::PemObject;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+        let invalid = |_| io::Error::from(io::ErrorKind::InvalidInput);
+        let chain = CertificateDer::pem_slice_iter(certificate_pem)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(invalid)?;
+        let key = PrivateKeyDer::from_pem_slice(key_pem).map_err(invalid)?;
+        let mut config = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
+        .map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?
+        .with_no_client_auth()
+        .with_single_cert(chain, key)
+        .map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        Self::bind(routes, Some(Arc::new(config)))
+    }
+
+    fn bind<'a>(
+        routes: impl IntoIterator<Item = (&'a str, Reply)>,
+        tls: Option<Arc<rustls::ServerConfig>>,
+    ) -> io::Result<Self> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let address = listener.local_addr()?;
         let shared = Arc::new(Shared {
+            tls,
             routes: routes
                 .into_iter()
                 .map(|(target, reply)| (target.to_owned(), reply))
@@ -156,9 +192,15 @@ impl FixtureServer {
         self.address
     }
 
-    /// `http://127.0.0.1:<port>` plus `path`, parsed.
+    /// `http://127.0.0.1:<port>` (or `https` for a TLS server) plus `path`, parsed.
     pub fn url(&self, path: &str) -> Url {
-        Url::parse(&format!("http://{}{path}", self.address), None).expect("fixture URLs are valid")
+        let scheme = if self.shared.tls.is_some() {
+            "https"
+        } else {
+            "http"
+        };
+        Url::parse(&format!("{scheme}://{}{path}", self.address), None)
+            .expect("fixture URLs are valid")
     }
 
     /// Requests read so far, in arrival order.
@@ -201,8 +243,23 @@ fn accept_loop(listener: &TcpListener, shared: &Arc<Shared>) {
     }
 }
 
-fn serve(mut stream: TcpStream, shared: &Shared) {
+fn serve(stream: TcpStream, shared: &Shared) {
     let _ = stream.set_nodelay(true);
+    if stream.set_read_timeout(Some(TICK)).is_err() {
+        return;
+    }
+    match &shared.tls {
+        None => respond(stream, shared),
+        Some(config) => {
+            let Ok(connection) = rustls::ServerConnection::new(Arc::clone(config)) else {
+                return;
+            };
+            respond(rustls::StreamOwned::new(connection, stream), shared);
+        }
+    }
+}
+
+fn respond(mut stream: impl Read + Write, shared: &Shared) {
     let Some(request) = read_request(&mut stream, shared) else {
         return;
     };
@@ -237,7 +294,6 @@ fn serve(mut stream: TcpStream, shared: &Shared) {
                 }
             }
             Action::Hold => {
-                let _ = stream.set_read_timeout(Some(TICK));
                 let mut byte = [0; 1];
                 while !stopped() {
                     match stream.read(&mut byte) {
@@ -259,8 +315,7 @@ fn serve(mut stream: TcpStream, shared: &Shared) {
     }
 }
 
-fn read_request(stream: &mut TcpStream, shared: &Shared) -> Option<RecordedRequest> {
-    stream.set_read_timeout(Some(TICK)).ok()?;
+fn read_request(stream: &mut (impl Read + Write), shared: &Shared) -> Option<RecordedRequest> {
     let started = Instant::now();
     let mut data = Vec::new();
     let mut buffer = [0; 4096];
@@ -268,8 +323,13 @@ fn read_request(stream: &mut TcpStream, shared: &Shared) -> Option<RecordedReque
         if let Some(end) = data.windows(4).position(|window| window == b"\r\n\r\n") {
             break end + 4;
         }
+        // A TLS ClientHello (record type 22) to a plain server: close, as
+        // a real HTTP server would after failing to parse it.
+        if data.first() == Some(&0x16) {
+            return None;
+        }
         if data.len() > MAX_REQUEST_HEAD {
-            let _ = stream.write_all(&Reply::response(431, &[], b"").actions_bytes());
+            let _ = Write::write_all(stream, &Reply::response(431, &[], b"").actions_bytes());
             return None;
         }
         if shared.stop.load(Ordering::SeqCst) || started.elapsed() > REQUEST_TIMEOUT {

@@ -1,10 +1,9 @@
 # ADR 0051 — Own HTTP/1.1, explicit network authority, rustls for TLS
 
 Date: 2026-11-20
-Status: Split. **Accepted** for HTTP/1.1 as Rustic code and the
-origin-allowlist authority model (NET-01, `rustic-net`). **Proposed**, not
-yet accepted, for the TLS library: no TLS dependency is added until the
-maintainer accepts that part. Until then `https` fails closed.
+Status: **Accepted.** HTTP/1.1 as Rustic code and the origin-allowlist
+authority model (NET-01, 2026-11-20); the TLS stack accepted by the
+maintainer on 2026-11-20 and implemented in `rustic_net::tls`.
 
 ## Context
 
@@ -56,7 +55,7 @@ webpki path building. Rustic keeps HTTPS policy, certificate error
 behaviour and the "no bypass" rule; the adapter never offers an
 "accept invalid certificates" switch in non-test builds.
 
-Until the TLS part is accepted, `https` requests fail with
+Before the TLS part was accepted, `https` requests failed with
 `TransportError::TlsUnavailable`. They are never retried over `http`.
 
 ## Measured evidence (2026-11-20, x86-64 Linux)
@@ -135,3 +134,23 @@ and `rustls-platform-verifier` 0.7.1 built with Rust 1.99.1:
 - `ring` stops being maintained or fails to build on a release tier.
 - HTTP/2 is scheduled (NET-07 or M9), or the M7 broker takes over the
   allowlist.
+
+## Implementation (2026-11-20)
+
+`rustic_net::tls::TlsConfig` builds a rustls `ClientConfig` with the
+`ring` provider, TLS 1.3 and 1.2 and ALPN `http/1.1`, verified either by
+`rustls-platform-verifier` (the default, created on first `https` use) or
+by an explicit PEM root set (`with_roots_pem`, for enterprise roots and the
+test CA). There is no constructor that skips verification. The transport
+completes the handshake before writing the request, under the same
+cancellation and idle checks, and maps rustls certificate errors to
+`TransportError::Certificate` (unknown issuer, expired, wrong name,
+revoked, invalid) and other handshake failures to `TransportError::Tls`.
+A TLS peer closing without `close_notify` ends the stream as in browsers;
+length and chunked framing still detect truncation. The fixture server
+gained `start_tls`; `tools/generate_tls_fixtures.sh` makes the test CA and
+the good, expired, wrong-host and untrusted certificates. Evidence:
+`crates/rustic-net/tests/tls.rs`. The 53 lockfile packages (all targets)
+are pinned with their notices in `third_party/rust-dependencies.json`.
+Android hosts must initialize the verifier's JNI bridge
+([MOBILE.md](../MOBILE.md)).

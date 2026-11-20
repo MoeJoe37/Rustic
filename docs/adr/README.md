@@ -58,7 +58,7 @@ instead of rewriting the history of a decision.
 | [0048](0048-error-reporting-and-event-handlers.md) | Error reporting, rejection events, event handler attributes and a bounded console sink | Accepted for WEB-07 |
 | [0049](0049-focus-and-forms.md) | Focus, text controls, form owners, validation and submission without navigation | Accepted for WEB-07 (`web.input`) |
 | [0050](0050-resize-observer.md) | ResizeObserver broadcast in rendering turns from the layout snapshot | Accepted for WEB-07 (`web.observers`) |
-| [0051](0051-transport-and-tls.md) | Own HTTP/1.1, loopback origin allowlist; rustls with `ring` and platform verification for TLS | HTTP/1.1 and authority accepted for NET-01; TLS library proposed |
+| [0051](0051-transport-and-tls.md) | Own HTTP/1.1, loopback origin allowlist; rustls with `ring` and platform verification for TLS | Accepted |
 | [0052](0052-network-io-model.md) | One thread per exchange, blocking sockets with short timeouts, byte-counted event window | Accepted for NET-01 |
 | [0053](0053-loopback-fixture-server.md) | In-process loopback fixture server with scripted replies | Accepted for NET-01 and later M6 tests |
 | [0054](0054-sites-and-cookie-policy.md) | Host-supplied Public Suffix List, sites, Lax-by-default cookies, blocked third-party cookies, CHIPS | Accepted |

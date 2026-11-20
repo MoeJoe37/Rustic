@@ -178,7 +178,7 @@ fn every_hop_is_checked_against_the_policy() {
     .unwrap();
     assert_eq!(body(fetched), b"ok");
 
-    // An allowed https origin still fails closed rather than downgrading.
+    // An allowed https origin fails in TLS rather than downgrading.
     let mut policy = NetworkPolicy::deny_all();
     policy.allow(&start.url("/"), start.address()).unwrap();
     let https = Url::parse(
@@ -194,7 +194,9 @@ fn every_hop_is_checked_against_the_policy() {
         RedirectMode::Follow,
     )
     .unwrap_err();
-    assert_eq!(error, FetchError::Transport(TransportError::TlsUnavailable));
+    // The plain server cannot complete a TLS handshake.
+    assert_eq!(error, FetchError::Transport(TransportError::Tls));
+    assert_eq!(allowed.requests().len(), 1, "never retried over http");
 }
 
 #[test]

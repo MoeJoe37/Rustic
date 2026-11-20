@@ -2,13 +2,21 @@
 yanked = "deny"
 
 [licenses]
-allow = ["AGPL-3.0-only", "MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "Zlib"]
+# ISC: ring, rustls-webpki, untrusted. CDLA-Permissive-2.0: the Android
+# fallback root data in webpki-root-certs (ADR 0051).
+allow = ["AGPL-3.0-only", "MIT", "Apache-2.0", "BSD-3-Clause", "ISC", "CDLA-Permissive-2.0", "Unicode-3.0", "Zlib"]
 confidence-threshold = 0.8
 
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
 allow-wildcard-paths = true
+# Second versions only on targets other than Linux (ADR 0051): ring pins
+# windows-sys 0.52 on Windows, and the Android JNI macros still use syn 2.
+skip = [
+    { crate = "windows-sys@0.52.0", reason = "ring 0.17 on Windows; rustls-platform-verifier uses 0.61" },
+    { crate = "syn@2.0.119", reason = "jni-macros and jni-sys-macros (Android only) have not moved to syn 3" },
+]
 
 [sources]
 unknown-registry = "deny"

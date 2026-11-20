@@ -475,7 +475,7 @@ network prototype. General remote browsing is still gated on M7.
 M6 adds Rustic's first network code and probably its first non-font
 dependency, so these are settled before NET-01 starts:
 
-- [ ] **Transport and TLS ADR.** Which reviewed library (or libraries)
+- [x] **Transport and TLS ADR.** Which reviewed library (or libraries)
       provides TLS and certificate verification, and whether HTTP/1.1 is
       Rustic's own code on top. The choice must build and verify certificates
       on every release platform: Windows x64 and ARM64, macOS x64 and ARM64,
@@ -488,7 +488,8 @@ dependency, so these are settled before NET-01 starts:
       accepts HTTP/1.1 as Rustic code and the loopback allowlist, and
       *proposes* rustls 0.23 with `ring` and `rustls-platform-verifier`
       (measured graph, MSRV and licenses in the ADR). The TLS part waits for
-      the maintainer; until then `https` fails closed (TD-157).
+      the maintainer; **accepted 2026-11-20** and implemented in
+      `rustic_net::tls` with certificate-error fixtures (`tests/tls.rs`).
 - [x] **Encoding ADR** (`url.encoding`, `url.restart`): own decoders
       generated from the pinned Encoding Standard indexes, or a reviewed
       crate. Pays TD-28. **Done 2026-11-18:** [ADR 0043](adr/0043-encoding-standard.md)

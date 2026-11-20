@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "ce40eedb2dbb11f114dbe936734f69ae6f2894031c4c2c0093449232c704de1d",
-  "percent": "35.84",
+  "source_fingerprint": "0372323cd9d3e4d0134ea89a97b0aa1017de6f8f8ced9c3b92645d9754462fe5",
+  "percent": "35.99",
   "verified_percent": "33.61",
-  "partial_percent": "2.23",
+  "partial_percent": "2.38",
   "completed": 77,
   "in_progress": 10,
   "total": 221,
@@ -67,9 +67,9 @@
       "share": "4.38",
       "completed": 0,
       "total": 12,
-      "percent": "30.39",
+      "percent": "33.95",
       "verified_percent": "0.00",
-      "partial_percent": "30.39"
+      "partial_percent": "33.95"
     },
     {
       "id": "M7",
@@ -5503,8 +5503,24 @@
             },
             {
               "label": "TLS adapter with platform certificate verification and certificate-error fixtures (ADR 0051 TLS part)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/tls.rs",
+                  "marker": "pub struct TlsConfig"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/tls.rs",
+                  "marker": "fn certificate_errors_are_typed_and_never_bypassed"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/tls.rs",
+                  "marker": "fn the_platform_verifier_does_not_trust_the_test_ca"
+                }
+              ]
             },
             {
               "label": "Content-coding decoding under output limits (TD-158)",
@@ -5512,7 +5528,7 @@
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.62"
         },
         {
@@ -5767,10 +5783,10 @@
       "completed": 0,
       "in_progress": 4,
       "total": 8,
-      "contribution": "1.08",
-      "percent": "27.08",
+      "contribution": "1.23",
+      "percent": "30.98",
       "verified_percent": "0.00",
-      "partial_percent": "27.08"
+      "partial_percent": "30.98"
     },
     {
       "id": "storage",

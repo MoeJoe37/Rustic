@@ -57,9 +57,9 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M6, networking (NET-01 to NET-03) | TD-157, TD-158, TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
+| M6, networking (NET-01 to NET-03) | TD-158, TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
 | M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
-| M7 entry (before hostile remote content) | TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-157, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -220,7 +220,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
-| TD-157 | Deliberate | Network | No DNS and no TLS: the transport reaches only allowlisted loopback origins, and `https` fails closed until ADR 0051's TLS part is accepted | Open, M6 networking |
+| TD-157 | Deliberate | Network | No DNS: the transport reaches only allowlisted loopback origins (TLS paid 2026-11-20) | Open, M7 entry |
 | TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Open, M6 networking |
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Open, M6 profiles (NET-06) |
@@ -2475,18 +2475,20 @@ reviewed library or own code with its own ADR.
 **Trigger:** M12 page-load measurements, a page corpus with more than ~64
 parallel subresources, or HTTP/2 scheduling.
 
-### TD-157 — No DNS and no TLS in the transport
+### TD-157 — No DNS: only allowlisted loopback origins are reachable
 
 `NetworkPolicy` maps allowlisted origins to loopback addresses; there is
-no name resolution and no route to any other host, and `https` returns
-`TransportError::TlsUnavailable` ([ADR 0051](adr/0051-transport-and-tls.md)).
-This is the intended M6 authority model, but it means no real site loads.
-**Pay:** accept (or replace) the TLS part of ADR 0051, add the rustls
-adapter with platform verification and certificate-error tests against a
-TLS fixture server, then add DNS under the M7 broker.
-**Trigger:** the M6 demo (styles, scripts, images, redirects, a cookie and
-fetches over the test-server allowlist) or `network.transport`
-completion, whichever comes first.
+no name resolution and no route to any other host
+([ADR 0051](adr/0051-transport-and-tls.md)). This is the intended
+pre-M7 authority model.
+**Update 2026-11-20:** the TLS half is paid: `https` now uses rustls with
+platform certificate verification (`rustic_net::tls`, `tests/tls.rs`), so
+the entry moves from the M6 networking row to M7 entry, where the broker
+owns name resolution.
+**Pay:** add DNS (system resolver or a reviewed resolver) behind the M7
+network broker capability, with the allowlist replaced by broker policy.
+**Trigger:** M7 entry (remote browsing) or the first non-loopback test
+host.
 
 ### TD-158 — Content codings are not decoded
 

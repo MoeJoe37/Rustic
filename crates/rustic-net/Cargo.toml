@@ -12,6 +12,8 @@ publish.workspace = true
 rustic-base = { path = "../rustic-base" }
 rustic-encoding = { path = "../rustic-encoding" }
 rustic-url = { path = "../rustic-url" }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-platform-verifier = { version = "=0.7.1", default-features = false }
 
 [lints]
 workspace = true

@@ -2615,13 +2615,14 @@ navigation.
 | Exchange | One thread per request; events `Response`, `Body`, then `Finished` or `Failed`, none after the end; `cancel()` or drop stops within one `poll_interval` (10 ms) after connecting; `connect_timeout`, `idle_timeout` (no peer progress; consumer waits excluded) and optional `total_timeout`; refused connects reported | `events_arrive_in_order_and_stop_after_the_end`, `cancellation_and_drop_stop_the_exchange`, `idle_timeout_while_waiting_for_the_head_and_the_body`, `a_dripping_peer_is_not_idle_but_hits_the_total_timeout`, `refused_connections_are_reported`, `concurrent_exchanges_are_independent` |
 | Backpressure | Body bytes count against `buffer_window` (256 KiB); the thread stops reading the socket while the window is full; a 4 MiB body through a 64 KiB window arrives byte-exact with the peak within one read of the window | `a_slow_consumer_bounds_buffered_bytes`, `pipe.rs` tests |
 | Fixture server | `127.0.0.1:0`, scripted writes, pauses, drips and holds per request-target, request log and connection count, 404 default; `start_tls` serves the same scripts over TLS with a test certificate; a plain server closes on a TLS ClientHello | used by every test in `crates/rustic-net/tests/transport.rs` and `tls.rs` |
+| Content codings | `Accept-Encoding: gzip, deflate, br` unless the request has its own or a `Range`; `Content-Encoding` undone last-applied first: `gzip`/`x-gzip` (RFC 1952 in `rustic-codecs`, members, flags, header CRC, CRC-32 and size), `deflate` (zlib, falling back to raw DEFLATE), `br` (incremental, `brotli-decompressor` without `std`); `identity` ignored, unknown codings passed through; output bounded by `max_body_bytes` (bombs stop at the limit), corrupt or truncated bodies are `InvalidContentCoding`; `HEAD`, 204 and 304 untouched; gzip/deflate buffer (TD-162) | `coding.rs` tests (every split, stacked `gzip, br`, 16 MiB bombs), `gzip.rs` tests, `content_codings_are_advertised_and_decoded` |
 | TLS (ADR 0051) | rustls 0.23 with `ring`, TLS 1.3/1.2, ALPN `http/1.1`; `TlsConfig::platform()` (default, created on first `https` use) or `with_roots_pem`; no way to skip verification; handshake completed before the request under cancellation and idle checks; SNI for domains, IP SAN checks for addresses; certificate failures as `TransportError::Certificate` (unknown issuer, expired, wrong name, revoked, invalid), other failures as `TransportError::Tls`, never retried over `http`; close without `close_notify` is end of stream | `a_trusted_certificate_carries_the_exchange`, `certificate_errors_are_typed_and_never_bypassed`, `the_platform_verifier_does_not_trust_the_test_ca`, `tls_against_a_plaintext_peer_fails_without_downgrading`, `an_http_to_https_redirect_is_verified`, `secure_cookies_over_https` |
 
 Errors and `Debug` output carry no URL, header value or body
 (`Headers` prints names only, `NetworkPolicy` a count). Debt taken:
 TD-156 (thread and connection per exchange, no HTTP/2), TD-157 (no DNS;
 its TLS half was paid by the TLS adapter), TD-158 (no content-coding
-decoding).
+decoding, paid the same day with content codings).
 
 ## M6 entry — Encoding Standard decoders and encoders
 

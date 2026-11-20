@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use rustic_base::CancellationToken;
 
+use crate::coding::ContentDecoder;
 use crate::pipe::{Consumer, Producer, Wait, pipe};
 use crate::response::{BodyDecoder, HeadParser, ProtocolError, ResponseHead, framing};
 use crate::tls::{CertificateError, TlsConfig, TlsFailure, classify};
@@ -341,6 +342,7 @@ impl Run {
 
         let mut head_parser = HeadParser::new(&self.limits);
         let mut body: Option<BodyDecoder> = None;
+        let mut content: Option<ContentDecoder> = None;
         let mut received_any = false;
         let mut buffer = vec![0; self.limits.read_chunk];
         let mut decoded = Vec::new();
@@ -366,7 +368,7 @@ impl Run {
                 return match &mut body {
                     Some(decoder) => {
                         decoder.finish()?;
-                        Ok(())
+                        self.finish_content(content.as_mut())
                     }
                     None if received_any => Err(ProtocolError::Truncated.into()),
                     None => Err(ProtocolError::Empty.into()),
@@ -380,13 +382,23 @@ impl Run {
                 Some(decoder) => decoder.feed(input, &mut decoded)?,
                 None => {
                     if let Some((head, rest)) = head_parser.feed(input)? {
-                        let mut decoder =
-                            BodyDecoder::new(framing(&head, request.is_head())?, &self.limits);
+                        let body_framing = framing(&head, request.is_head())?;
+                        if body_framing != crate::response::Framing::Empty {
+                            content = ContentDecoder::for_response(
+                                head.headers(),
+                                self.limits.max_body_bytes,
+                            );
+                        }
+                        let mut decoder = BodyDecoder::new(body_framing, &self.limits);
                         self.emit(NetEvent::Response(head))?;
                         decoder.feed(&rest, &mut decoded)?;
                         body = Some(decoder);
                     }
                 }
+            }
+            if let Some(content) = &mut content {
+                let wire = std::mem::take(&mut decoded);
+                content.feed(&wire, &mut decoded)?;
             }
             if !decoded.is_empty() {
                 self.emit(NetEvent::Body(std::mem::take(&mut decoded)))?;
@@ -395,9 +407,22 @@ impl Run {
             }
             self.check_stopped()?;
             if body.as_ref().is_some_and(BodyDecoder::is_done) {
-                return Ok(());
+                return self.finish_content(content.as_mut());
             }
         }
+    }
+
+    /// Flush the content decoder at the end of the body.
+    fn finish_content(&self, content: Option<&mut ContentDecoder>) -> Result<(), TransportError> {
+        let Some(content) = content else {
+            return Ok(());
+        };
+        let mut rest = Vec::new();
+        content.finish(&mut rest)?;
+        for piece in rest.chunks(self.limits.read_chunk.max(1)) {
+            self.emit(NetEvent::Body(piece.to_vec()))?;
+        }
+        Ok(())
     }
 
     fn write_all(&self, stream: &mut impl Write, bytes: &[u8]) -> Result<(), TransportError> {

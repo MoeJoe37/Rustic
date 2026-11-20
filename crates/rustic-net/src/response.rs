@@ -73,6 +73,8 @@ pub enum ProtocolError {
     InvalidTrailer,
     /// The decoded body exceeds `max_body_bytes`.
     BodyTooLarge,
+    /// A `Content-Encoding` body is corrupt or truncated.
+    InvalidContentCoding,
     /// The connection closed before the framing said the message ended.
     Truncated,
     /// The connection closed before any response byte arrived.
@@ -92,6 +94,7 @@ impl fmt::Display for ProtocolError {
             Self::InvalidChunk => "invalid chunked encoding",
             Self::InvalidTrailer => "invalid chunked trailer section",
             Self::BodyTooLarge => "HTTP response body too large",
+            Self::InvalidContentCoding => "invalid content-coded response body",
             Self::Truncated => "connection closed before the response ended",
             Self::Empty => "connection closed without a response",
         })

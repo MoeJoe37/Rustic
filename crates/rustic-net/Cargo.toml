@@ -10,6 +10,8 @@ publish.workspace = true
 
 [dependencies]
 rustic-base = { path = "../rustic-base" }
+rustic-codecs = { path = "../rustic-codecs" }
+brotli-decompressor = { version = "=6.3.1", default-features = false }
 rustic-encoding = { path = "../rustic-encoding" }
 rustic-url = { path = "../rustic-url" }
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }

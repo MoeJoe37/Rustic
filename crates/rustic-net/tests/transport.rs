@@ -390,3 +390,86 @@ fn concurrent_exchanges_are_independent() {
         (404, &b"not found"[..])
     );
 }
+
+#[test]
+fn content_codings_are_advertised_and_decoded() {
+    let gzip = include_bytes!("fixtures/coding/hello.gz");
+    let brotli = include_bytes!("fixtures/coding/hello.br");
+    let bomb = include_bytes!("fixtures/coding/zeros-16m.br");
+    let chunked_brotli = {
+        let mut bytes =
+            b"HTTP/1.1 200 OK\r\nContent-Encoding: br\r\nTransfer-Encoding: chunked\r\n\r\n"
+                .to_vec();
+        for piece in brotli.chunks(5) {
+            bytes.extend_from_slice(format!("{:x}\r\n", piece.len()).as_bytes());
+            bytes.extend_from_slice(piece);
+            bytes.extend_from_slice(b"\r\n");
+        }
+        bytes.extend_from_slice(b"0\r\n\r\n");
+        bytes
+    };
+    let server = FixtureServer::start([
+        (
+            "/gzip",
+            Reply::response(200, &[("Content-Encoding", "gzip")], gzip),
+        ),
+        ("/br", Reply::new().send(chunked_brotli)),
+        (
+            "/zstd",
+            Reply::response(200, &[("Content-Encoding", "zstd")], b"raw"),
+        ),
+        (
+            "/bomb",
+            Reply::response(200, &[("Content-Encoding", "br")], bomb),
+        ),
+        (
+            "/corrupt",
+            Reply::response(200, &[("Content-Encoding", "gzip")], b"not gzip"),
+        ),
+        (
+            "/head",
+            Reply::response(200, &[("Content-Encoding", "gzip")], b""),
+        ),
+    ])
+    .unwrap();
+    let mut policy = NetworkPolicy::deny_all();
+    policy.allow(&server.url("/"), server.address()).unwrap();
+    let limits = TransportLimits {
+        max_body_bytes: 1 << 20,
+        ..TransportLimits::default()
+    };
+    let transport = Transport::new(policy, limits).unwrap();
+    let get = |path: &str| {
+        transport
+            .start(Request::get(server.url(path)).unwrap())
+            .unwrap()
+            .collect()
+            .map(|(_, body)| body)
+    };
+    assert_eq!(get("/gzip").unwrap(), b"hello hello hello\n");
+    assert_eq!(get("/br").unwrap(), b"hello hello hello\n");
+    assert_eq!(get("/zstd").unwrap(), b"raw");
+    assert_eq!(
+        get("/bomb").unwrap_err(),
+        TransportError::Protocol(ProtocolError::BodyTooLarge)
+    );
+    assert_eq!(
+        get("/corrupt").unwrap_err(),
+        TransportError::Protocol(ProtocolError::InvalidContentCoding)
+    );
+    let head = transport
+        .start(Request::new("HEAD", server.url("/head")).unwrap())
+        .unwrap()
+        .collect()
+        .unwrap();
+    assert!(head.1.is_empty());
+    let log = server.requests();
+    assert_eq!(log[0].header("accept-encoding"), Some("gzip, deflate, br"));
+    let mut ranged = Request::get(server.url("/zstd")).unwrap();
+    ranged.header("Range", b"bytes=0-").unwrap();
+    transport.start(ranged).unwrap().collect().unwrap();
+    assert_eq!(
+        server.requests().last().unwrap().header("accept-encoding"),
+        None
+    );
+}

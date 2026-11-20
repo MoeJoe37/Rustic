@@ -167,6 +167,13 @@ impl Request {
             output.extend_from_slice(self.body.len().to_string().as_bytes());
             output.extend_from_slice(b"\r\n");
         }
+        // Advertise the codings the transport decodes, except for range
+        // requests, whose offsets refer to the unencoded representation.
+        if !self.headers.contains("accept-encoding") && !self.headers.contains("range") {
+            output.extend_from_slice(b"Accept-Encoding: ");
+            output.extend_from_slice(crate::coding::ACCEPT_ENCODING);
+            output.extend_from_slice(b"\r\n");
+        }
         output.extend_from_slice(b"Connection: close\r\n\r\n");
         output.extend_from_slice(&self.body);
         output
@@ -233,12 +240,12 @@ mod tests {
         assert_eq!(
             text,
             "POST /a%20b?q=1 HTTP/1.1\r\nHost: example.test:8080\r\nAccept: text/html\r\n\
-             Content-Length: 5\r\nConnection: close\r\n\r\nhello"
+             Content-Length: 5\r\nAccept-Encoding: gzip, deflate, br\r\nConnection: close\r\n\r\nhello"
         );
         let get = Request::get(url("http://example.test")).unwrap();
         assert_eq!(
             String::from_utf8(get.serialize()).unwrap(),
-            "GET / HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n"
+            "GET / HTTP/1.1\r\nHost: example.test\r\nAccept-Encoding: gzip, deflate, br\r\nConnection: close\r\n\r\n"
         );
         let empty_post = Request::new("POST", url("http://[::1]:80/")).unwrap();
         assert!(

@@ -35,6 +35,10 @@
     "crates/rustic-net:rustls-platform-verifier": {
       "version": "=0.7.1",
       "default-features": false
+    },
+    "crates/rustic-net:brotli-decompressor": {
+      "version": "=6.3.1",
+      "default-features": false
     }
   },
   "packages": [

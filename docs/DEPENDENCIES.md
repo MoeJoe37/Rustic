@@ -81,6 +81,11 @@ in separately. Generated artifacts go under ignored `artifacts` or `target`.
 Generated source must identify its input revision and reproducible generator;
 test whether checked-in generated output is fresh once generators exist.
 
+`rustic-net` also uses `brotli-decompressor` 6.3.1 (already reviewed in the
+font graph for WOFF2) without default features for `Content-Encoding: br`,
+with its own safe allocator cells so the crate's `std`/`unsafe` allocator
+stays off.
+
 `rustic-net` vendors the Public Suffix List (MPL-2.0 data, not code) at a
 pinned revision with `tools/import_public_suffix_list.py`, which checks
 SHA-256 digests; `tools/check_repository.py` checks the manifest and the

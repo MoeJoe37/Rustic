@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "0372323cd9d3e4d0134ea89a97b0aa1017de6f8f8ced9c3b92645d9754462fe5",
-  "percent": "35.99",
-  "verified_percent": "33.61",
-  "partial_percent": "2.38",
-  "completed": 77,
-  "in_progress": 10,
+  "source_fingerprint": "3f350d4d0b1f4abc127ddd56068621d10621550260caee75699640a355050583",
+  "percent": "36.15",
+  "verified_percent": "34.24",
+  "partial_percent": "1.91",
+  "completed": 78,
+  "in_progress": 9,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -65,11 +65,11 @@
       "id": "M6",
       "label": "Networking & services",
       "share": "4.38",
-      "completed": 0,
+      "completed": 1,
       "total": 12,
-      "percent": "33.95",
-      "verified_percent": "0.00",
-      "partial_percent": "33.95"
+      "percent": "37.51",
+      "verified_percent": "14.24",
+      "partial_percent": "23.27"
     },
     {
       "id": "M7",
@@ -5446,89 +5446,80 @@
           "label": "Reviewed TLS/HTTP transport with cancellation",
           "size": 5,
           "milestone": "M6",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Own HTTP/1.1 request serialization and split-invariant response framing under limits",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/response.rs",
-                  "marker": "pub(crate) struct BodyDecoder"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/request.rs",
-                  "marker": "pub(crate) fn serialize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/response.rs",
-                  "marker": "fn parse_all_splits"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/response.rs",
+              "marker": "pub(crate) struct BodyDecoder"
             },
             {
-              "label": "Loopback origin allowlist, connect/idle/total timeouts, cancellation and backpressure over the fixture server",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/policy.rs",
-                  "marker": "pub struct NetworkPolicy"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/transport.rs",
-                  "marker": "pub struct Exchange"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/fixture.rs",
-                  "marker": "pub struct FixtureServer"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/transport.rs",
-                  "marker": "fn a_slow_consumer_bounds_buffered_bytes"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/transport.rs",
-                  "marker": "fn origins_outside_the_policy_are_blocked_before_any_connection"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/request.rs",
+              "marker": "pub(crate) fn serialize"
             },
             {
-              "label": "TLS adapter with platform certificate verification and certificate-error fixtures (ADR 0051 TLS part)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/tls.rs",
-                  "marker": "pub struct TlsConfig"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/tls.rs",
-                  "marker": "fn certificate_errors_are_typed_and_never_bypassed"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/tls.rs",
-                  "marker": "fn the_platform_verifier_does_not_trust_the_test_ca"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/src/response.rs",
+              "marker": "fn parse_all_splits"
             },
             {
-              "label": "Content-coding decoding under output limits (TD-158)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-net/src/policy.rs",
+              "marker": "pub struct NetworkPolicy"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/transport.rs",
+              "marker": "pub struct Exchange"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/fixture.rs",
+              "marker": "pub struct FixtureServer"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/transport.rs",
+              "marker": "fn a_slow_consumer_bounds_buffered_bytes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/transport.rs",
+              "marker": "fn origins_outside_the_policy_are_blocked_before_any_connection"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/tls.rs",
+              "marker": "pub struct TlsConfig"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/tls.rs",
+              "marker": "fn certificate_errors_are_typed_and_never_bypassed"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/tls.rs",
+              "marker": "fn the_platform_verifier_does_not_trust_the_test_ca"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/coding.rs",
+              "marker": "pub(crate) struct ContentDecoder"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-codecs/src/gzip.rs",
+              "marker": "pub fn gzip_decompress"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/transport.rs",
+              "marker": "fn content_codings_are_advertised_and_decoded"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.62"
         },
         {
@@ -5780,13 +5771,13 @@
         }
       ],
       "points": 32,
-      "completed": 0,
-      "in_progress": 4,
+      "completed": 1,
+      "in_progress": 3,
       "total": 8,
-      "contribution": "1.23",
-      "percent": "30.98",
-      "verified_percent": "0.00",
-      "partial_percent": "30.98"
+      "contribution": "1.39",
+      "percent": "34.89",
+      "verified_percent": "15.62",
+      "partial_percent": "19.27"
     },
     {
       "id": "storage",

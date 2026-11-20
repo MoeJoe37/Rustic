@@ -100,7 +100,7 @@ const CRC_TABLE: [u32; 256] = {
     table
 };
 
-fn crc32(kind: &[u8], data: &[u8]) -> u32 {
+pub(crate) fn crc32(kind: &[u8], data: &[u8]) -> u32 {
     let mut c = 0xffff_ffffu32;
     for &b in kind.iter().chain(data) {
         c = CRC_TABLE[((c ^ u32::from(b)) & 0xff) as usize] ^ (c >> 8);

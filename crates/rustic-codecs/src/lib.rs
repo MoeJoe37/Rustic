@@ -4,12 +4,13 @@
 //! allocating, bounds total output and work, checks cancellation, and fails
 //! atomically with a typed error. No `unsafe`, platform codec or third-party
 //! crate is used; formats are implemented from their specifications
-//! (RFC 1950/1951, PNG Third Edition, ITU-T T.81 JPEG, GIF89a and the WebP
+//! (RFC 1950/1951/1952, PNG Third Edition, ITU-T T.81 JPEG, GIF89a and the WebP
 //! container, lossless and VP8 (RFC 6386, RFC 9649) bitstreams).
 
 #![warn(missing_docs)]
 
 mod gif;
+mod gzip;
 mod image;
 mod inflate;
 mod jpeg;
@@ -21,6 +22,7 @@ mod vp8l;
 mod webp;
 
 pub use gif::decode_gif;
+pub use gzip::gzip_decompress;
 pub use image::{
     Animation, DecodeLimits, Frame, ImageError, ImageFormat, decode_animation, decode_image, sniff,
 };

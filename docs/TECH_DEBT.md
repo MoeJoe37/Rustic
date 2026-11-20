@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M6, networking (NET-01 to NET-03) | TD-158, TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
+| M6, networking (NET-01 to NET-03) | TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
 | M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
 | M7 entry (before hostile remote content) | TD-157, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
@@ -65,7 +65,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146, TD-156 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M12 (performance leadership) | TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
@@ -221,9 +221,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
 | TD-157 | Deliberate | Network | No DNS: the transport reaches only allowlisted loopback origins (TLS paid 2026-11-20) | Open, M7 entry |
-| TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Open, M6 networking |
+| TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Paid 2026-11-20 |
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Open, M6 profiles (NET-06) |
+| TD-162 | Deliberate | Network / codecs | `gzip` and `deflate` response bodies are buffered whole (up to `max_body_bytes`) and inflated at the end of the body; only brotli decodes incrementally | Open, M12 |
 | TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, sends no `Referer`, `Sec-Fetch-*` or `Accept-Language`, takes whole request bodies and has no Lax-allowing-unsafe window | Open, M6 networking |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -2490,7 +2491,9 @@ network broker capability, with the allowlist replaced by broker policy.
 **Trigger:** M7 entry (remote browsing) or the first non-loopback test
 host.
 
-### TD-158 — Content codings are not decoded
+### TD-158 — Content codings are not decoded (Paid)
+
+**Paid 2026-11-20:** `rustic-net` advertises `Accept-Encoding: gzip, deflate, br` (not on range requests) and undoes `gzip`/`x-gzip`, `deflate` (zlib, or raw DEFLATE) and `br` in `Content-Encoding` order under `max_body_bytes`; unknown codings pass through. gzip is new RFC 1952 code in `rustic-codecs`; brotli streams through the already-reviewed `brotli-decompressor` without its `std` feature. gzip and deflate still buffer (TD-162). Evidence: `coding.rs` tests, `content_codings_are_advertised_and_decoded`.
 
 Requests carry no `Accept-Encoding`, and a `Content-Encoding: gzip`,
 `deflate` or `br` response body reaches the consumer still encoded. Real
@@ -2543,3 +2546,17 @@ and fetch metadata, streaming request bodies with the WEB bindings for
 `fetch()`.
 **Trigger:** the engine loading subresources over HTTP (NET-02 wiring) or
 the script-facing `fetch()` binding, whichever comes first.
+
+### TD-162 — gzip and deflate bodies are not streamed
+
+`rustic-codecs`' DEFLATE decoder is one-shot, so `ContentDecoder` keeps a
+`gzip` or `deflate` body until it ends and then inflates it (brotli
+decodes as it arrives). Memory is bounded by `max_body_bytes` for the
+input and the output, but a large compressed page reaches the parser only
+after its last byte, and a slow server delays first paint.
+**Pay:** a resumable inflate state machine in `rustic-codecs` (bit
+reader, block and Huffman state carried across `feed` calls, a 32 KiB
+window), used for PNG too, with split-invariance tests like the HTTP
+parser's.
+**Trigger:** M12 page-load measurements, or progressive rendering of large
+documents.

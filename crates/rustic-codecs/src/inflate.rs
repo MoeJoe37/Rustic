@@ -256,7 +256,7 @@ fn dynamic(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman), InflateError> {
     ))
 }
 
-fn raw(
+pub(crate) fn raw(
     data: &[u8],
     max_output: usize,
     cancellation: &CancellationToken,

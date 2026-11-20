@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 35.99%** = 33.61% verified complete + 2.38% partial credit. 77/221 capabilities complete, 10 in progress.
+**Overall completion: 36.15%** = 34.24% verified complete + 1.91% partial credit. 78/221 capabilities complete, 9 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `0372323cd9d3e4d0134ea89a97b0aa1017de6f8f8ced9c3b92645d9754462fe5`.
+Catalog: `engine-v4`. Source fingerprint: `3f350d4d0b1f4abc127ddd56068621d10621550260caee75699640a355050583`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `0372323cd9d3e4d0134ea89a97b0aa1017de6
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
-| M6 Networking & services | 0/12 | 33.95% | 0.00% | 4.38% |
+| M6 Networking & services | 1/12 | 37.51% | 14.24% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -42,7 +42,7 @@ Catalog: `engine-v4`. Source fingerprint: `0372323cd9d3e4d0134ea89a97b0aa1017de6
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
-| Network & navigation | 0/8 | 4 | 30.98% | 0.00% | 4% | 1.23 |
+| Network & navigation | 1/8 | 3 | 34.89% | 15.62% | 4% | 1.39 |
 | Storage & workers | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -258,11 +258,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Network & navigation
 
-- **in progress 75.00%** `network.transport` — Reviewed TLS/HTTP transport with cancellation · size 5 · M6 · 0.62% of engine
-  - [x] Own HTTP/1.1 request serialization and split-invariant response framing under limits ([source](../../crates/rustic-net/src/response.rs), [source](../../crates/rustic-net/src/request.rs), [test](../../crates/rustic-net/src/response.rs))
-  - [x] Loopback origin allowlist, connect/idle/total timeouts, cancellation and backpressure over the fixture server ([source](../../crates/rustic-net/src/policy.rs), [source](../../crates/rustic-net/src/transport.rs), [source](../../crates/rustic-net/src/fixture.rs), [test](../../crates/rustic-net/tests/transport.rs), [test](../../crates/rustic-net/tests/transport.rs))
-  - [x] TLS adapter with platform certificate verification and certificate-error fixtures (ADR 0051 TLS part) ([source](../../crates/rustic-net/src/tls.rs), [test](../../crates/rustic-net/tests/tls.rs), [test](../../crates/rustic-net/tests/tls.rs))
-  - [ ] Content-coding decoding under output limits (TD-158)
+- **complete** `network.transport` — Reviewed TLS/HTTP transport with cancellation · size 5 · M6 · 0.62% of engine ([source](../../crates/rustic-net/src/response.rs), [source](../../crates/rustic-net/src/request.rs), [test](../../crates/rustic-net/src/response.rs), [source](../../crates/rustic-net/src/policy.rs), [source](../../crates/rustic-net/src/transport.rs), [source](../../crates/rustic-net/src/fixture.rs), [test](../../crates/rustic-net/tests/transport.rs), [test](../../crates/rustic-net/tests/transport.rs), [source](../../crates/rustic-net/src/tls.rs), [test](../../crates/rustic-net/tests/tls.rs), [test](../../crates/rustic-net/tests/tls.rs), [source](../../crates/rustic-net/src/coding.rs), [source](../../crates/rustic-codecs/src/gzip.rs), [test](../../crates/rustic-net/tests/transport.rs))
 - **in progress 33.33%** `network.navigation` — Navigation/history state machine and redirects · size 5 · M6 · 0.62% of engine
   - [x] Fetch redirect handling: status rules, URL list, fragments, limit and per-hop policy checks ([source](../../crates/rustic-net/src/redirect.rs), [test](../../crates/rustic-net/tests/redirects.rs), [test](../../crates/rustic-net/tests/redirects.rs))
   - [x] Response MIME type and Content-Type charset extraction (pinned WPT mimesniff and fetch/content-type) ([source](../../crates/rustic-net/src/mime.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs), [test](../../crates/rustic-net/tests/wpt_mime.rs))

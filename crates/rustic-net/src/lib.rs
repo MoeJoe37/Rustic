@@ -34,6 +34,7 @@
 
 #![warn(missing_docs)]
 
+mod coding;
 pub mod cookie;
 pub mod cors;
 pub mod fetch;

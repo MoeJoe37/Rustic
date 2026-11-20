@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "e81f0b01ac104e280670efcded87aafd2a3e88ae5b04f94df5db949fc2ddc7fa",
-  "percent": "37.29",
-  "verified_percent": "35.40",
+  "source_fingerprint": "54d561a996bac86bad9734f4442278e156a69eaccce0a5f5d80df3723206c71c",
+  "percent": "37.42",
+  "verified_percent": "35.53",
   "partial_percent": "1.89",
-  "completed": 81,
+  "completed": 82,
   "in_progress": 8,
   "total": 221,
   "fully_complete": false,
@@ -65,10 +65,10 @@
       "id": "M6",
       "label": "Networking & services",
       "share": "4.38",
-      "completed": 4,
+      "completed": 5,
       "total": 12,
-      "percent": "63.44",
-      "verified_percent": "40.65",
+      "percent": "66.48",
+      "verified_percent": "43.69",
       "partial_percent": "22.79"
     },
     {
@@ -562,9 +562,30 @@
           "label": "Encoding sniff/restart integration",
           "size": 2,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/local_encoding.rs",
+              "marker": "pub fn locale_fallback_encoding"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/src/local_encoding.rs",
+              "marker": "fn declarations_and_locale_fallbacks"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn first_meta_declaration"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn undeclared_encodings_fall_back_by_locale_and_late_declarations_reload"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.13"
         },
         {
@@ -631,12 +652,12 @@
         }
       ],
       "points": 30,
-      "completed": 8,
+      "completed": 9,
       "in_progress": 0,
       "total": 12,
-      "contribution": "1.40",
-      "percent": "70.00",
-      "verified_percent": "70.00",
+      "contribution": "1.53",
+      "percent": "76.66",
+      "verified_percent": "76.66",
       "partial_percent": "0.00"
     },
     {

@@ -17,13 +17,14 @@ was still in progress, because nothing in it depends on scripting.
 | Hooks | `decode` (BOM sniff, then the fallback encoding), `bom_sniff`, `encode` (HTML forms, `&#NNNN;`), `utf8_decode`, `utf8_decode_without_bom`, `utf8_decode_without_bom_or_fail`, "get an output encoding" |
 | Stylesheets | CSS Syntax §3.2: BOM, then the transport `charset`, then a leading `@charset "…";`, then the referring document's encoding, then UTF-8 (`rustic_css::decode_stylesheet`). `dump-style`, `dump-layout` and `render` load local sheets through it |
 | Local HTML | BOM or the first effective HTML charset declaration within the bounded 64 KiB prefix. The local host replays the prefix before executing scripts. The document's encoding supplies the environment fallback for local stylesheets and classic scripts. [ADR 0044](adr/0044-local-html-encoding-replay.md) |
+| Network HTML | HTML encoding sniffing: BOM, then the response `charset` (both *certain*), then the `<meta>` prescan of the 64 KiB prefix, then the HTML §13.2.3.3 fallback for `--locale` (default `en`, windows-1252), both *tentative* (`sniff_declared_encoding`, `locale_fallback_encoding`). "Change the encoding": a later `<meta>` that names another encoding while the confidence is tentative loads the document again in it, once, with certain confidence (`url.restart`) |
 | URL queries | `UrlParser::with_query_encoding` implements "percent-encode after encoding": the queries of `ftp`, `file`, `http` and `https` URLs use the document's output encoding, unmappable characters become `%26%23NNN%3B`, and `ws`/`wss`, non-special URLs and every other component stay UTF-8. `StyleLoader::with_document_encoding` applies it to `<base href>` and `<link href>`; `@import` stays UTF-8 |
 
 ## What does not work yet
 
 | Missing | Where it lands |
 | --- | --- |
-| Transport charset confidence, locale-dependent fallback and navigation replacement after publishing a page | `url.restart`, with NET-02 |
+| A late declaration in a *local* file (beyond its 64 KiB prefix) is ignored; only network documents reload | Local replay is ADR 0044's design; revisit with M7 file navigation |
 | `<script src>`, `<img src>` and module specifiers resolving their query in the document's encoding (local files ignore the query, so nothing observable changes yet) | NET-02, when these URLs reach a server |
 | `TextDecoder`, `TextEncoder` and their stream variants | Web IDL bindings (M9 platform APIs) |
 | Form submission encodings (`application/x-www-form-urlencoded`, `multipart/form-data` in a legacy encoding) | NET-07 |

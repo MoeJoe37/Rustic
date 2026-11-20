@@ -58,11 +58,13 @@ const MAX_REMEMBERED_CHARSETS: usize = 4096;
 struct NetworkConfig {
     routes: Vec<(Url, SocketAddr)>,
     ca_pem: Option<Vec<u8>>,
+    /// The user's locale, for the HTML fallback encoding (`--locale`).
+    locale: Option<String>,
 }
 
 static CONFIG: OnceLock<NetworkConfig> = OnceLock::new();
 
-/// Remove `--allow-origin` and `--ca-file` options from `args` and keep
+/// Remove `--allow-origin`, `--ca-file` and `--locale` options from `args` and keep
 /// them for the run. Values are validated here, so a bad grant is a usage
 /// error before any command runs.
 pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
@@ -93,6 +95,18 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
             let pem = std::fs::read(&path).map_err(|e| format!("--ca-file: {e}"))?;
             TlsConfig::with_roots_pem(&pem).map_err(|e| format!("--ca-file: {e}"))?;
             config.ca_pem = Some(pem);
+        } else if arg == "--locale" {
+            let locale = args
+                .next()
+                .and_then(|value| value.into_string().ok())
+                .filter(|value| {
+                    (1..=35).contains(&value.len())
+                        && value
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+                })
+                .ok_or("--locale requires a language tag such as en or zh-TW")?;
+            config.locale = Some(locale);
         } else {
             output.push(arg);
         }
@@ -119,6 +133,16 @@ fn parse_grant(value: &str) -> Result<(Url, SocketAddr), String> {
         .allow(&origin, address)
         .map_err(|_| invalid())?;
     Ok((origin, address))
+}
+
+/// The locale whose HTML fallback encoding a network document without an
+/// encoding declaration uses: `--locale`, else `en` (windows-1252), so
+/// output does not depend on the environment.
+pub fn fallback_locale() -> &'static str {
+    CONFIG
+        .get()
+        .and_then(|config| config.locale.as_deref())
+        .unwrap_or("en")
 }
 
 /// Whether any `--allow-origin` grant was given.

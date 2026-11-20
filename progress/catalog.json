@@ -436,8 +436,29 @@
           "label": "Encoding sniff/restart integration",
           "size": 2,
           "milestone": "M6",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/local_encoding.rs",
+              "marker": "pub fn locale_fallback_encoding"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/src/local_encoding.rs",
+              "marker": "fn declarations_and_locale_fallbacks"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn first_meta_declaration"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn undeclared_encodings_fall_back_by_locale_and_late_declarations_reload"
+            }
+          ]
         },
         {
           "id": "url.diagnostics",

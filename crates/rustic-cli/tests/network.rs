@@ -231,3 +231,52 @@ fn https_documents_verify_certificates_against_the_given_roots() {
         stderr(&output)
     );
 }
+
+#[test]
+fn undeclared_encodings_fall_back_by_locale_and_late_declarations_reload() {
+    // The declaration lies beyond the 64 KiB prescan.
+    let mut late = b"<!doctype html><p>caf\xe9</p>".to_vec();
+    for _ in 0..8 * 1024 {
+        late.extend_from_slice(b"<b>x</b> ");
+    }
+    late.extend_from_slice(b"<meta charset=koi8-r>");
+    let server = FixtureServer::start([
+        (
+            "/plain",
+            Reply::response(200, &[("Content-Type", "text/html")], b"<p>caf\xe9"),
+        ),
+        (
+            "/late",
+            Reply::response(200, &[("Content-Type", "text/html")], &late),
+        ),
+        (
+            "/certain",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/html; charset=windows-1252")],
+                &late,
+            ),
+        ),
+    ])
+    .unwrap();
+    let grant = format!("http://a.test={}", server.address());
+    let dump = |extra: &[&str], path: &str| {
+        let url = format!("http://a.test{path}");
+        let mut args = vec!["dump-dom", "--allow-origin", &grant];
+        args.extend_from_slice(extra);
+        args.push(&url);
+        let output = rustic(&args);
+        assert!(output.status.success(), "{}", stderr(&output));
+        output
+    };
+    assert!(stdout(&dump(&[], "/plain")).contains("text \"caf\u{e9}\""));
+    assert!(stdout(&dump(&["--locale", "ru"], "/plain")).contains("text \"caf\u{439}\""));
+    // KOI8-R maps 0xE9 to U+0418; the reload is announced.
+    let output = dump(&[], "/late");
+    assert!(stdout(&output).contains("text \"caf\u{418}\""));
+    assert!(stderr(&output).contains("reloading the document as KOI8-R"));
+    // A response charset is certain: the late declaration is ignored.
+    let output = dump(&[], "/certain");
+    assert!(stdout(&output).contains("text \"caf\u{e9}\""));
+    assert!(!stderr(&output).contains("reloading"));
+}

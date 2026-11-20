@@ -33,7 +33,7 @@ use rustic_engine::{
 };
 use rustic_html::{
     DocumentMode, Encoding, LOCAL_ENCODING_PREFIX_BYTES, ParseError, ParserLimits, Scripting,
-    select_local_encoding,
+    select_local_encoding, sniff_declared_encoding,
 };
 use rustic_style::{
     ComputeContext, ComputedStyle, FetchError, MatchContext, NoFetch, SheetStatus, StyleLoadLimits,
@@ -360,9 +360,39 @@ pub fn load_network_document(
     let cancellation = CancellationToken::default();
     let network = crate::network::navigate(url, limits.max_file_bytes, cancellation.clone())
         .map_err(LoadError::Network)?;
-    if limits.run_scripts {
-        return load_scripted_network_document(engine, network, limits, parser_limits);
+    let mut forced = None;
+    loop {
+        let (document, selected) = if limits.run_scripts {
+            load_scripted_network_document(engine, &network, limits, parser_limits, forced)?
+        } else {
+            load_unscripted_network_document(engine, &network, limits, parser_limits, forced)?
+        };
+        // HTML "change the encoding": a declaration the prescan did not see
+        // replaces a tentative encoding by loading the document again with
+        // the declared one, now certain; it happens at most once.
+        if let Selected::Tentative(used) = selected {
+            let declared = first_meta_declaration(document.parsed().document());
+            if let Some(declared) = declared.filter(|&declared| declared != used) {
+                eprintln!(
+                    "rustic: reloading the document as {} (declared after the prescanned prefix)",
+                    declared.name()
+                );
+                drop(document);
+                forced = Some(declared);
+                continue;
+            }
+        }
+        return Ok(document);
     }
+}
+
+fn load_unscripted_network_document(
+    engine: &mut Engine,
+    network: &NetworkDocument,
+    limits: LoaderLimits,
+    parser_limits: ParserLimits,
+    forced: Option<Encoding>,
+) -> Result<(LoadedDocument, Selected), LoadError> {
     let mut load = engine
         .begin_document(parser_limits)
         .map_err(|error| match error {
@@ -370,11 +400,12 @@ pub fn load_network_document(
             other => LoadError::Engine(other),
         })?;
     let cancellation = load.cancellation().expect("admitted load").clone();
-    feed_network_document(
-        &network,
+    let selected = feed_network_document(
+        network,
         limits,
         &cancellation,
         Scripting::Disabled,
+        forced,
         |bytes, encoding| {
             if let Some(encoding) = encoding {
                 load.set_initial_encoding(encoding)?;
@@ -382,34 +413,76 @@ pub fn load_network_document(
             Ok(load.feed(bytes)?)
         },
     )?;
-    Ok(LoadedDocument {
+    let document = LoadedDocument {
         document: load.finish()?,
         applied_files: Some(applied_snapshot(limits)),
-        network: Some(network.session),
-    })
+        network: Some(Rc::clone(&network.session)),
+    };
+    Ok((document, selected))
 }
 
-/// Feed a network document's bytes like [`read_document_file`]: a byte
-/// order mark wins, then the response charset, then the `<meta>` prescan
-/// of the bounded prefix (HTML "encoding sniffing algorithm").
+/// The encoding a network document was decoded with, and its HTML
+/// "confidence".
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Selected {
+    /// From a byte order mark, the response charset or a reload.
+    Certain,
+    /// From the `<meta>` prescan or the locale fallback.
+    Tentative(Encoding),
+}
+
+/// The first `<meta>` encoding declaration in tree order (template
+/// contents are not in the tree), as the tree builder would act on it.
+fn first_meta_declaration(document: &Document) -> Option<Encoding> {
+    use crate::reftest::{attribute, is_html};
+    for (node, _) in document.walk(document.root()).ok()? {
+        let Some(element) = rustic_style::DomElement::new(document, node) else {
+            continue;
+        };
+        if !is_html(element, "meta") {
+            continue;
+        }
+        let declared = rustic_html::meta_charset(
+            attribute(element, "charset").as_deref(),
+            attribute(element, "http-equiv").as_deref(),
+            attribute(element, "content").as_deref(),
+        );
+        if declared.is_some() {
+            return declared;
+        }
+    }
+    None
+}
+
+/// Feed a network document's bytes like [`read_document_file`], with the
+/// HTML encoding sniffing algorithm: a byte order mark, then the response
+/// charset (both certain), then the `<meta>` prescan of the bounded prefix,
+/// then the locale's fallback encoding (both tentative). `forced` is the
+/// encoding of a reload after "change the encoding".
 fn feed_network_document(
     network: &NetworkDocument,
     limits: LoaderLimits,
     cancellation: &CancellationToken,
     scripting: Scripting,
+    forced: Option<Encoding>,
     mut feed: impl FnMut(&[u8], Option<Encoding>) -> Result<(), LoadError>,
-) -> Result<(), LoadError> {
+) -> Result<Selected, LoadError> {
     check_cancelled(cancellation)?;
     let bytes = &network.bytes;
-    let has_bom = bytes.starts_with(&[0xEF, 0xBB, 0xBF])
-        || bytes.starts_with(&[0xFE, 0xFF])
-        || bytes.starts_with(&[0xFF, 0xFE]);
-    let encoding = match network.transport_encoding {
-        Some(encoding) if !has_bom => encoding,
-        _ => {
-            let prefix = &bytes[..bytes.len().min(LOCAL_ENCODING_PREFIX_BYTES)];
-            select_local_encoding(prefix, scripting, cancellation.clone())?
-        }
+    let has_bom = rustic_encoding::bom_sniff(bytes).is_some();
+    let prefix = &bytes[..bytes.len().min(LOCAL_ENCODING_PREFIX_BYTES)];
+    let (encoding, selected) = match (forced, network.transport_encoding) {
+        (Some(forced), _) if !has_bom => (forced, Selected::Certain),
+        (_, Some(transport)) if !has_bom => (transport, Selected::Certain),
+        _ => match sniff_declared_encoding(prefix, scripting, cancellation.clone())? {
+            Some(encoding) if has_bom => (encoding, Selected::Certain),
+            Some(encoding) => (encoding, Selected::Tentative(encoding)),
+            None => {
+                let fallback =
+                    rustic_html::locale_fallback_encoding(crate::network::fallback_locale());
+                (fallback, Selected::Tentative(fallback))
+            }
+        },
     };
     let mut encoding = Some(encoding);
     if bytes.is_empty() {
@@ -419,7 +492,8 @@ fn feed_network_document(
         check_cancelled(cancellation)?;
         feed(chunk, encoding.take())?;
     }
-    check_cancelled(cancellation)
+    check_cancelled(cancellation)?;
+    Ok(selected)
 }
 
 fn load_scripted_document(
@@ -460,10 +534,11 @@ fn load_scripted_document(
 
 fn load_scripted_network_document(
     engine: &mut Engine,
-    network: NetworkDocument,
+    network: &NetworkDocument,
     limits: LoaderLimits,
     parser_limits: ParserLimits,
-) -> Result<LoadedDocument, LoadError> {
+    forced: Option<Encoding>,
+) -> Result<(LoadedDocument, Selected), LoadError> {
     let session = Rc::clone(&network.session);
     let url = session.document_url().clone();
     let mut load = engine.begin_network_scripted_document_with_clock(
@@ -488,9 +563,19 @@ fn load_scripted_network_document(
         url,
         network: Some(session),
     };
-    run_scripted_load(load, fetch, source, limits, |feed| {
-        feed_network_document(&network, limits, &cancellation, Scripting::Enabled, feed)
-    })
+    let mut selected = Selected::Certain;
+    let document = run_scripted_load(load, fetch, source, limits, |feed| {
+        selected = feed_network_document(
+            network,
+            limits,
+            &cancellation,
+            Scripting::Enabled,
+            forced,
+            feed,
+        )?;
+        Ok(())
+    })?;
+    Ok((document, selected))
 }
 
 /// Where a scripted document came from.

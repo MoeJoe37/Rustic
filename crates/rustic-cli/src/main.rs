@@ -85,7 +85,10 @@ granted with --allow-origin ORIGIN=ADDRESS (for example
 there is no DNS; repeat up to 64). Redirects, cookies, CORS, CSP, mixed
 content and nosniff apply to the document's stylesheets, scripts and images;
 other origins are blocked. --ca-file PEM trusts only the given roots instead
-of the platform store; certificate errors are never bypassed.
+of the platform store; certificate errors are never bypassed. A response
+without a BOM, charset or <meta> declaration decodes with the --locale TAG
+fallback encoding (HTML's table; default en, windows-1252); a declaration
+found after the prescanned prefix reloads the document once in it.
 
 Limits for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):

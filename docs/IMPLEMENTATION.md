@@ -158,6 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [url.restart — Encoding confidence and change the encoding](#urlrestart--encoding-confidence-and-change-the-encoding)
 - [NET-02 — Documents and subresources over HTTP in the CLI](#net-02--documents-and-subresources-over-http-in-the-cli)
 - [NET-07 (partial) — Session history](#net-07-partial--session-history)
 - [NET-05 (partial) — CSP, mixed content and secure contexts](#net-05-partial--csp-mixed-content-and-secure-contexts)
@@ -2533,6 +2534,21 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## url.restart — Encoding confidence and change the encoding
+
+Added 2026-11-20 for network documents ([ENCODING.md](ENCODING.md)).
+`rustic_html::sniff_declared_encoding` returns the BOM or prescanned
+`<meta>` encoding or nothing, `meta_charset` maps a declaration as the tree
+builder does, and `locale_fallback_encoding` is HTML §13.2.3.3's table
+(`zh-TW`/`HK`/`MO`/`Hant` Big5, other Chinese GB18030, unknown locales
+windows-1252). The CLI records whether the encoding is certain (BOM,
+response charset, reload) or tentative (prescan, fallback); after a
+tentative load it looks for the first `<meta>` declaration in tree order
+and, if it names a different encoding, loads the same response bytes again
+with it (scripts run again, as after HTML's "navigate to the document
+again"). Regression evidence: `declarations_and_locale_fallbacks`,
+`undeclared_encodings_fall_back_by_locale_and_late_declarations_reload`.
 
 ## NET-02 — Documents and subresources over HTTP in the CLI
 

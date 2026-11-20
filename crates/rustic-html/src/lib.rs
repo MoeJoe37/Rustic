@@ -61,7 +61,10 @@ mod tokenizer;
 
 pub use error::{Diagnostic, DiagnosticKind, HtmlError};
 pub use input::HtmlInput as Utf8Input;
-pub use local_encoding::{LOCAL_ENCODING_PREFIX_BYTES, select_local_encoding};
+pub use local_encoding::{
+    LOCAL_ENCODING_PREFIX_BYTES, locale_fallback_encoding, meta_charset, select_local_encoding,
+    sniff_declared_encoding,
+};
 pub use parser::{
     ContextNamespace, DocumentMode, FragmentContext, HtmlDocumentParser, HtmlFragmentParser,
     ParseError, ParsedDocument, ParsedFragment, ParserLimits, ScriptBoundary, Scripting,

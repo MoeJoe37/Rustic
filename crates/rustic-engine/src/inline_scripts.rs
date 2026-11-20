@@ -379,6 +379,18 @@ impl<C: Clock> ClassicScriptLoad<C> {
         id: ClassicRequestId,
         result: Result<&[u8], ClassicFetchError>,
     ) -> Result<(), ScriptLoadError> {
+        self.complete_script_with_charset(id, result, None)
+    }
+
+    /// Like [`Self::complete_script`], with the response's `Content-Type`
+    /// charset, which a classic script uses instead of the document's
+    /// encoding (a byte order mark still wins). Modules are always UTF-8.
+    pub fn complete_script_with_charset(
+        &mut self,
+        id: ClassicRequestId,
+        result: Result<&[u8], ClassicFetchError>,
+        charset: Option<rustic_encoding::Encoding>,
+    ) -> Result<(), ScriptLoadError> {
         if self.inner.pending.is_none() {
             return Err(ScriptLoadError::UnknownScriptRequest);
         }
@@ -390,6 +402,7 @@ impl<C: Clock> ClassicScriptLoad<C> {
             if let Some(ready) = external.complete(
                 id,
                 result,
+                charset,
                 pending.source_limit,
                 pending.scope.cancellation(),
             )? {

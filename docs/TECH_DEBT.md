@@ -59,7 +59,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
 | M6, networking (NET-01 to NET-05) | TD-161, TD-164 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
 | M6, profiles and storage (NET-06) | TD-160 | Cookies and the preflight cache must be partitioned and persisted with profiles before the M6 gate checks storage separation |
-| M7 entry (before hostile remote content) | TD-157, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 entry (before hostile remote content) | TD-157, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -228,6 +228,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*` and `Accept-Language` paid 2026-11-20) | Open, M6 networking |
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
 | TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Open, M6 networking |
+| TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2586,3 +2587,18 @@ policy, although `csp::Policy` can decide all three.
 attribute path and event-handler compilation, with tests that a
 `style-src 'nonce-…'` page drops the unnonced sheet.
 **Trigger:** the M6 network policy gate (`network.policy`).
+
+### TD-165 — CLI network loads are sequential and buffered
+
+`rustic-cli`'s `NetworkSession` reads a document's body completely before
+the parser sees it, and fetches each stylesheet, script and image one at
+a time, blocking, in discovery order. A slow subresource delays
+everything after it, and a document cannot render progressively. Its
+stylesheet check also requires `text/css` everywhere, while HTML lets a
+quirks-mode document use a same-origin sheet of another type.
+**Pay:** the event-driven fetch controller of TD-161 on the networking
+task source, streaming the body into the parser as `Exchange` events
+arrive and running subresource fetches concurrently; pass the document
+mode to the stylesheet check.
+**Trigger:** the M7 browser shell's network process, or a page-load
+measurement over HTTP.

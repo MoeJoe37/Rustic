@@ -1,9 +1,11 @@
-//! Local-only bounded HTML loading for development commands.
+//! Bounded HTML loading for development commands.
 //!
-//! The command line grants exactly one file path. Page content may name other
-//! local subresources only inside that file's directory tree. Scripts run
-//! only when the caller opts in. Encoding selection uses a bounded local
-//! prefix. The loader has no network access.
+//! The command line grants exactly one file path, or one `http(s)` URL when
+//! origins are granted with `--allow-origin` (see [`crate::network`]). Page
+//! content may name other local subresources only inside that file's
+//! directory tree; a network document's subresources go through its
+//! network session and policies. Scripts run only when the caller opts in.
+//! Encoding selection uses a bounded prefix (and the response charset).
 //! Input is read in fixed
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
@@ -15,6 +17,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 
 use rustic_base::{CancellationToken, ClockOverflow, EscapedText, ManualClock};
@@ -37,6 +40,9 @@ use rustic_style::{
     StyleLoader, StylesheetFetcher, document_cascade_with, dump_computed_styles, style_tree,
 };
 
+use crate::network::{
+    InlinePolicy, NetworkDocument, NetworkLoadError, NetworkSession, ResourceKind,
+};
 use crate::stylesheets::{
     AppliedLocalFiles, LocalStylesheetFetcher, MAX_APPLIED_URL_BYTES, file_url,
 };
@@ -134,6 +140,8 @@ pub enum LoadError {
     Raster(rustic_raster::RasterError),
     /// The PNG would exceed the output limit.
     Png(rustic_raster::PngError),
+    /// A network document could not be loaded.
+    Network(NetworkLoadError),
 }
 
 impl fmt::Display for LoadError {
@@ -166,6 +174,7 @@ impl fmt::Display for LoadError {
             Self::Paint(error) => error.fmt(f),
             Self::Raster(error) => error.fmt(f),
             Self::Png(error) => error.fmt(f),
+            Self::Network(error) => error.fmt(f),
         }
     }
 }
@@ -186,6 +195,7 @@ impl Error for LoadError {
             Self::Paint(error) => Some(error),
             Self::Raster(error) => Some(error),
             Self::Png(error) => Some(error),
+            Self::Network(error) => Some(error),
             _ => None,
         }
     }
@@ -243,6 +253,7 @@ fn looks_like_url(argument: &OsStr) -> bool {
 pub struct LoadedDocument {
     document: EngineDocument,
     applied_files: Option<AppliedLocalFiles>,
+    network: Option<Rc<NetworkSession>>,
 }
 
 impl LoadedDocument {
@@ -266,6 +277,7 @@ impl LoadedDocument {
             limits,
             view,
             self.applied_files.as_ref(),
+            self.network.as_ref(),
         )
     }
 }
@@ -311,7 +323,103 @@ pub fn load_document(
     Ok(LoadedDocument {
         document: load.finish()?,
         applied_files: None,
+        network: None,
     })
+}
+
+/// A snapshot sized for every stylesheet and image a document may apply.
+fn applied_snapshot(limits: LoaderLimits) -> AppliedLocalFiles {
+    AppliedLocalFiles::new(
+        limits
+            .stylesheets
+            .max_sheets
+            .saturating_add(limits.images.max_images),
+        limits
+            .stylesheets
+            .max_total_bytes
+            .saturating_add(limits.images.max_file_bytes),
+    )
+}
+
+/// Navigate to an `http(s)` URL with the granted origins and build its
+/// document. Its response URL is the base URL, its `Content-Type` charset
+/// the transport encoding, and its subresources load through the same
+/// session under the document's CSP and mixed-content checks. Every
+/// stylesheet and image is pinned on first read, so repeated layout reads
+/// see the same bytes.
+pub fn load_network_document(
+    engine: &mut Engine,
+    url: &str,
+    limits: LoaderLimits,
+) -> Result<LoadedDocument, LoadError> {
+    if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
+        return Err(LoadError::InvalidLimits);
+    }
+    let mut parser_limits = limits.parser;
+    parser_limits.tokenizer.max_input_bytes = limits.max_file_bytes;
+    let cancellation = CancellationToken::default();
+    let network = crate::network::navigate(url, limits.max_file_bytes, cancellation.clone())
+        .map_err(LoadError::Network)?;
+    if limits.run_scripts {
+        return load_scripted_network_document(engine, network, limits, parser_limits);
+    }
+    let mut load = engine
+        .begin_document(parser_limits)
+        .map_err(|error| match error {
+            DocumentStartError::Parser(error) => LoadError::Parse(error),
+            other => LoadError::Engine(other),
+        })?;
+    let cancellation = load.cancellation().expect("admitted load").clone();
+    feed_network_document(
+        &network,
+        limits,
+        &cancellation,
+        Scripting::Disabled,
+        |bytes, encoding| {
+            if let Some(encoding) = encoding {
+                load.set_initial_encoding(encoding)?;
+            }
+            Ok(load.feed(bytes)?)
+        },
+    )?;
+    Ok(LoadedDocument {
+        document: load.finish()?,
+        applied_files: Some(applied_snapshot(limits)),
+        network: Some(network.session),
+    })
+}
+
+/// Feed a network document's bytes like [`read_document_file`]: a byte
+/// order mark wins, then the response charset, then the `<meta>` prescan
+/// of the bounded prefix (HTML "encoding sniffing algorithm").
+fn feed_network_document(
+    network: &NetworkDocument,
+    limits: LoaderLimits,
+    cancellation: &CancellationToken,
+    scripting: Scripting,
+    mut feed: impl FnMut(&[u8], Option<Encoding>) -> Result<(), LoadError>,
+) -> Result<(), LoadError> {
+    check_cancelled(cancellation)?;
+    let bytes = &network.bytes;
+    let has_bom = bytes.starts_with(&[0xEF, 0xBB, 0xBF])
+        || bytes.starts_with(&[0xFE, 0xFF])
+        || bytes.starts_with(&[0xFF, 0xFE]);
+    let encoding = match network.transport_encoding {
+        Some(encoding) if !has_bom => encoding,
+        _ => {
+            let prefix = &bytes[..bytes.len().min(LOCAL_ENCODING_PREFIX_BYTES)];
+            select_local_encoding(prefix, scripting, cancellation.clone())?
+        }
+    };
+    let mut encoding = Some(encoding);
+    if bytes.is_empty() {
+        feed(&[], encoding.take())?;
+    }
+    for chunk in bytes.chunks(limits.read_chunk_bytes.max(1)) {
+        check_cancelled(cancellation)?;
+        feed(chunk, encoding.take())?;
+    }
+    check_cancelled(cancellation)
 }
 
 fn load_scripted_document(
@@ -323,10 +431,10 @@ fn load_scripted_document(
     let path = fs::canonicalize(path).map_err(LoadError::Io)?;
     check_regular_file(fs::metadata(&path).map_err(LoadError::Io)?, limits)?;
     let url = file_url(&path).ok_or(ScriptLoadError::InvalidDocumentUrl)?;
-    let mut load = engine.begin_local_scripted_document_with_clock(
+    let load = engine.begin_local_scripted_document_with_clock(
         parser_limits,
         TaskLimits::default(),
-        url,
+        url.clone(),
         ClassicScriptLimits::default(),
         ManualClock::default(),
     )?;
@@ -340,38 +448,88 @@ fn load_scripted_document(
         cancellation.clone(),
     )
     .ok_or(ScriptLoadError::InvalidDocumentUrl)?;
-    let applied_files = AppliedLocalFiles::new(
-        limits
-            .stylesheets
-            .max_sheets
-            .saturating_add(limits.images.max_images),
-        limits
-            .stylesheets
-            .max_total_bytes
-            .saturating_add(limits.images.max_file_bytes),
-    );
-    read_document_file(
-        &path,
-        limits,
-        &cancellation,
-        Scripting::Enabled,
-        |bytes, encoding| {
-            if let Some(encoding) = encoding {
-                load.set_initial_encoding(encoding)?;
-                load.set_layout_source(Box::new(LocalLayout {
-                    path: path.clone(),
-                    limits,
-                    cancellation: cancellation.clone(),
-                    encoding,
-                    applied_files: applied_files.clone(),
-                }))?;
-            }
-            load.feed(bytes)?;
-            // Service requests at parser barriers and EOF, independent of file chunks.
-            while load.is_parser_blocked() && complete_next_script_request(&mut load, &fetch)? {}
-            Ok(())
-        },
+    let source = ScriptedSource {
+        path: path.clone(),
+        url,
+        network: None,
+    };
+    run_scripted_load(load, fetch, source, limits, |feed| {
+        read_document_file(&path, limits, &cancellation, Scripting::Enabled, feed)
+    })
+}
+
+fn load_scripted_network_document(
+    engine: &mut Engine,
+    network: NetworkDocument,
+    limits: LoaderLimits,
+    parser_limits: ParserLimits,
+) -> Result<LoadedDocument, LoadError> {
+    let session = Rc::clone(&network.session);
+    let url = session.document_url().clone();
+    let mut load = engine.begin_network_scripted_document_with_clock(
+        parser_limits,
+        TaskLimits::default(),
+        url.clone(),
+        ClassicScriptLimits::default(),
+        ManualClock::default(),
     )?;
+    if !session.csp().is_empty() {
+        load.set_script_policy(Box::new(InlinePolicy(Rc::clone(&session))))?;
+        load.set_string_compilation_allowed(session.allows_eval())?;
+    }
+    let cancellation = load.cancellation().expect("admitted load").clone();
+    let fetch = LocalStylesheetFetcher::for_network(
+        Rc::clone(&session),
+        limits.read_chunk_bytes,
+        cancellation.clone(),
+    );
+    let source = ScriptedSource {
+        path: PathBuf::new(),
+        url,
+        network: Some(session),
+    };
+    run_scripted_load(load, fetch, source, limits, |feed| {
+        feed_network_document(&network, limits, &cancellation, Scripting::Enabled, feed)
+    })
+}
+
+/// Where a scripted document came from.
+struct ScriptedSource {
+    /// The canonical file (empty for a network document).
+    path: PathBuf,
+    /// The document URL.
+    url: rustic_url::Url,
+    network: Option<Rc<NetworkSession>>,
+}
+
+type FeedDocument<'a> = dyn FnMut(&[u8], Option<Encoding>) -> Result<(), LoadError> + 'a;
+
+fn run_scripted_load(
+    mut load: ClassicScriptLoad<ManualClock>,
+    fetch: LocalStylesheetFetcher,
+    source: ScriptedSource,
+    limits: LoaderLimits,
+    read: impl FnOnce(&mut FeedDocument<'_>) -> Result<(), LoadError>,
+) -> Result<LoadedDocument, LoadError> {
+    let cancellation = load.cancellation().expect("admitted load").clone();
+    let applied_files = applied_snapshot(limits);
+    read(&mut |bytes, encoding| {
+        if let Some(encoding) = encoding {
+            load.set_initial_encoding(encoding)?;
+            load.set_layout_source(Box::new(LocalLayout {
+                path: source.path.clone(),
+                limits,
+                cancellation: cancellation.clone(),
+                encoding,
+                applied_files: applied_files.clone(),
+                network: source.network.clone(),
+            }))?;
+        }
+        load.feed(bytes)?;
+        // Service requests at parser barriers and EOF, independent of file chunks.
+        while load.is_parser_blocked() && complete_next_script_request(&mut load, &fetch)? {}
+        Ok(())
+    })?;
     load.close_input()?;
     let mut turns = 0;
     let mut document = loop {
@@ -386,18 +544,18 @@ fn load_scripted_document(
         load.run_next()?;
     };
     // The parser is now complete. Local resource discovery and delivery
-    // happen as bounded host turns without a second pending-byte buffer.
+    // happen in bounded host turns without a second pending-byte buffer.
     queue_discovered_local_resources(
         &mut document,
-        &path,
+        &source.url,
         limits,
         &fetch,
         &applied_files,
         &cancellation,
         &mut turns,
     )?;
-    // The resource helper has already delivered each accepted completion.
-    // Retain the original bounded timer loop, including for zero-delay timers.
+    // The resource helper already delivered each accepted completion.
+    // Retain the original bounded timer loop, including zero-delay timers.
     // Tasks already queued without a deadline (such as unhandled-rejection
     // notifications) run before the clock advances, under their own bound.
     let mut queued_turns = 0usize;
@@ -421,6 +579,7 @@ fn load_scripted_document(
     Ok(LoadedDocument {
         document: document.into_document(),
         applied_files: Some(applied_files),
+        network: source.network,
     })
 }
 
@@ -453,7 +612,7 @@ fn print_console(document: &rustic_engine::ScriptedDocument<ManualClock>) {
 /// dropped before another file is read. Failures stay broken/on-demand.
 fn queue_discovered_local_resources(
     document: &mut rustic_engine::ScriptedDocument<ManualClock>,
-    path: &Path,
+    document_url: &rustic_url::Url,
     limits: LoaderLimits,
     fetch: &LocalStylesheetFetcher,
     applied: &AppliedLocalFiles,
@@ -462,7 +621,7 @@ fn queue_discovered_local_resources(
 ) -> Result<usize, LoadError> {
     let requests = {
         let parsed = document.document();
-        discover_local_resources(parsed.parsed().document(), path, limits)
+        discover_local_resources(parsed.parsed().document(), document_url, limits)
     };
     let mut delivered = 0usize;
     for (url, kind) in requests {
@@ -531,14 +690,11 @@ enum LocalResourceKind {
 /// and rejects all unsupported schemes and escaping links.
 fn discover_local_resources(
     document: &Document,
-    path: &Path,
+    document_url: &rustic_url::Url,
     limits: LoaderLimits,
 ) -> Vec<(rustic_url::Url, LocalResourceKind)> {
     use crate::reftest::{attribute, is_html};
 
-    let Some(document_url) = file_url(path) else {
-        return Vec::new();
-    };
     let mut base = document_url.clone();
     if let Ok(walk) = document.walk(document.root()) {
         for (node, _) in walk {
@@ -547,7 +703,7 @@ fn discover_local_resources(
             };
             if is_html(element, "base") {
                 if let Some(href) = attribute(element, "href") {
-                    if let Ok(url) = rustic_url::Url::parse(&href, Some(&document_url)) {
+                    if let Ok(url) = rustic_url::Url::parse(&href, Some(document_url)) {
                         base = url;
                     }
                     break;
@@ -642,7 +798,19 @@ fn complete_next_script_request(
     let Some(request) = load.next_request() else {
         return Ok(false);
     };
-    let source = match fetch.fetch_bytes(&request.url, request.max_bytes) {
+    let fetched = match fetch.network() {
+        Some(session) => session.fetch(
+            &request.url,
+            &ResourceKind::Script {
+                nonce: request.nonce.clone(),
+                parser_inserted: request.parser_inserted,
+                module: request.kind == rustic_engine::ScriptResourceKind::JavaScriptModule,
+            },
+            request.max_bytes,
+        ),
+        None => fetch.fetch_bytes(&request.url, request.max_bytes),
+    };
+    let source = match fetched {
         Ok(source) => Ok(source),
         Err(FetchError::Blocked) => Err(ClassicFetchError::Blocked),
         Err(FetchError::NotFound) => Err(ClassicFetchError::NotFound),
@@ -650,7 +818,15 @@ fn complete_next_script_request(
         Err(FetchError::Failed) => Err(ClassicFetchError::Failed),
         Err(FetchError::Cancelled) => return Err(LoadError::Cancelled),
     };
-    load.complete_script(request.id, source.as_deref().map_err(|error| *error))?;
+    let charset = fetch
+        .network()
+        .and_then(|session| session.charset_of(&request.url))
+        .and_then(|label| Encoding::for_label(&label));
+    load.complete_script_with_charset(
+        request.id,
+        source.as_deref().map_err(|error| *error),
+        charset,
+    )?;
     Ok(true)
 }
 
@@ -851,26 +1027,39 @@ fn compute_styles(
         view,
         cancellation,
         applied_files,
+        network,
     } = input;
     let node_error = |error| LoadError::Dump(DumpError::Node(error));
     check_cancelled(cancellation)?;
     let parser =
         CssParser::new(CssLimits::default(), cancellation.clone()).map_err(LoadError::Css)?;
-    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
-    let document_url = file_url(&canonical);
-    let mut local = canonical.parent().and_then(|root| {
-        LocalStylesheetFetcher::new(
-            root.to_path_buf(),
-            limits.read_chunk_bytes,
-            cancellation.clone(),
-        )
-        .map(|fetcher| {
-            let fetcher = fetcher.with_environment_encoding(encoding);
-            match applied_files {
-                Some(applied) => fetcher.with_applied_files(applied.clone()),
-                None => fetcher,
-            }
-        })
+    let (document_url, fetcher) = match network {
+        Some(session) => (
+            Some(session.document_url().clone()),
+            Some(LocalStylesheetFetcher::for_network(
+                Rc::clone(session),
+                limits.read_chunk_bytes,
+                cancellation.clone(),
+            )),
+        ),
+        None => {
+            let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
+            let fetcher = canonical.parent().and_then(|root| {
+                LocalStylesheetFetcher::new(
+                    root.to_path_buf(),
+                    limits.read_chunk_bytes,
+                    cancellation.clone(),
+                )
+            });
+            (file_url(&canonical), fetcher)
+        }
+    };
+    let mut local = fetcher.map(|fetcher| {
+        let fetcher = fetcher.with_environment_encoding(encoding);
+        match applied_files {
+            Some(applied) => fetcher.with_applied_files(applied.clone()),
+            None => fetcher,
+        }
     });
     let mut no_fetch = NoFetch;
     let fetcher: &mut dyn StylesheetFetcher = match local.as_mut() {
@@ -990,6 +1179,7 @@ struct LayoutInput<'a> {
     view: rustic_layout::View,
     cancellation: &'a CancellationToken,
     applied_files: Option<&'a AppliedLocalFiles>,
+    network: Option<&'a Rc<NetworkSession>>,
 }
 
 impl<'a> LayoutInput<'a> {
@@ -999,6 +1189,7 @@ impl<'a> LayoutInput<'a> {
         limits: LoaderLimits,
         view: rustic_layout::View,
         applied_files: Option<&'a AppliedLocalFiles>,
+        network: Option<&'a Rc<NetworkSession>>,
     ) -> Self {
         Self {
             document: parsed.parsed().document(),
@@ -1009,6 +1200,7 @@ impl<'a> LayoutInput<'a> {
             view,
             cancellation: parsed.cancellation(),
             applied_files,
+            network,
         }
     }
 }
@@ -1020,6 +1212,7 @@ struct LocalLayout {
     cancellation: CancellationToken,
     encoding: Encoding,
     applied_files: AppliedLocalFiles,
+    network: Option<Rc<NetworkSession>>,
 }
 
 // CSSOM lists supported longhands in lexicographical order before custom properties.
@@ -1112,6 +1305,7 @@ impl LayoutSource for LocalLayout {
             view: self.limits.script_view,
             cancellation: &self.cancellation,
             applied_files: Some(&self.applied_files),
+            network: self.network.as_ref(),
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
         // Public block fragments omit anonymous wrappers and include atomic
@@ -1207,9 +1401,13 @@ fn block_layout(
         view,
         cancellation,
         applied_files,
+        network,
         ..
     } = input;
-    let canonical = fs::canonicalize(path).map_err(LoadError::Io)?;
+    let canonical = match network {
+        Some(_) => PathBuf::new(),
+        None => fs::canonicalize(path).map_err(LoadError::Io)?,
+    };
     let images = if let Some(applied) = applied_files {
         crate::images::load_applied(
             document,
@@ -1218,7 +1416,7 @@ fn block_layout(
             limits.images,
             limits.read_chunk_bytes,
             cancellation,
-            Some(applied),
+            Some((applied, network.map(Rc::as_ref))),
         )
     } else {
         crate::images::load(
@@ -1391,6 +1589,10 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+
+    fn test_url(path: &Path) -> rustic_url::Url {
+        file_url(&fs::canonicalize(path).unwrap()).unwrap()
+    }
 
     struct TempFile(PathBuf);
 
@@ -1768,7 +1970,7 @@ mod tests {
             ..LoaderLimits::default()
         };
         let parsed = load_document(&mut engine, &file.0, limits).unwrap();
-        let urls = discover_local_resources(parsed.parsed().document(), &file.0, limits);
+        let urls = discover_local_resources(parsed.parsed().document(), &test_url(&file.0), limits);
         assert_eq!(urls.len(), 2);
         assert_eq!(urls[0].1, LocalResourceKind::Stylesheet);
         assert_eq!(urls[1].1, LocalResourceKind::Image);
@@ -1788,7 +1990,8 @@ mod tests {
             },
             ..LoaderLimits::default()
         };
-        let unique = discover_local_resources(parsed.parsed().document(), &file.0, wider);
+        let unique =
+            discover_local_resources(parsed.parsed().document(), &test_url(&file.0), wider);
         assert_eq!(unique.len(), 4);
         assert_eq!(unique[0].1, LocalResourceKind::Stylesheet);
         assert_eq!(unique[1].1, LocalResourceKind::Stylesheet);
@@ -1837,7 +2040,7 @@ mod tests {
         let mut timer_turns = MAX_SCRIPT_TIMER_TURNS;
         let delivered = queue_discovered_local_resources(
             &mut scripted,
-            &page.0,
+            &test_url(&page.0),
             limits,
             &fetch,
             &applied,
@@ -1860,7 +2063,7 @@ mod tests {
         assert!(matches!(
             queue_discovered_local_resources(
                 &mut scripted,
-                &page.0,
+                &test_url(&page.0),
                 limits,
                 &fetch,
                 &applied,
@@ -1893,6 +2096,7 @@ mod tests {
                 cancellation: token,
                 encoding,
                 applied_files: applied,
+                network: None,
             }))
             .unwrap();
         scripted
@@ -1966,6 +2170,7 @@ mod tests {
             cancellation: token.clone(),
             encoding,
             applied_files: applied.clone(),
+            network: None,
         };
         let get_width = |geometry: &LayoutGeometry, node| {
             geometry
@@ -2193,6 +2398,7 @@ mod tests {
             cancellation: document.cancellation().clone(),
             encoding: parsed.encoding(),
             applied_files: applied,
+            network: None,
         };
         let width = |snapshot: &LayoutGeometry| {
             snapshot
@@ -2425,8 +2631,9 @@ mod tests {
 
         let Some(DocumentTurn::Rendered { frame, output }) = scripts
             .run_next_with_render(|document, _| {
-                let (_, surface) =
-                    rasterize_list(LayoutInput::new(document, &file.0, limits, view, None))?;
+                let (_, surface) = rasterize_list(LayoutInput::new(
+                    document, &file.0, limits, view, None, None,
+                ))?;
                 rustic_raster::encode_png(&surface, limits.max_dump_bytes).map_err(LoadError::Png)
             })
             .unwrap()

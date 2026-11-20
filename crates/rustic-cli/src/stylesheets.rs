@@ -1,4 +1,8 @@
-//! Local-only stylesheet fetching for `dump-style`.
+//! Stylesheet (and shared resource) fetching for the document commands.
+//!
+//! A network document's fetcher sends every request through its
+//! [`NetworkSession`] instead (CSP, mixed content and MIME checks), and
+//! decodes stylesheets with the response's `charset`. For a local document:
 //!
 //! The command line grants one HTML file. Its `<link rel=stylesheet>` and
 //! `@import` URLs may name other files, but only `file:` URLs inside the
@@ -21,6 +25,8 @@ use rustic_base::CancellationToken;
 use rustic_encoding::Encoding;
 use rustic_style::{FetchError, StylesheetFetcher};
 use rustic_url::{Url, UrlPath};
+
+use crate::network::{NetworkSession, ResourceKind};
 
 /// The `file:` URL of an absolute, normalized path (as from
 /// [`fs::canonicalize`]), or `None` for paths that have no portable `file:`
@@ -377,6 +383,8 @@ pub struct LocalStylesheetFetcher {
     cancellation: CancellationToken,
     environment_encoding: Encoding,
     applied: Option<AppliedLocalFiles>,
+    /// Set for a network document: every read goes through the session.
+    network: Option<Rc<NetworkSession>>,
 }
 
 impl LocalStylesheetFetcher {
@@ -391,7 +399,30 @@ impl LocalStylesheetFetcher {
             cancellation,
             environment_encoding: Encoding::Utf8,
             applied: None,
+            network: None,
         })
+    }
+
+    /// A fetcher for a network document's subresources.
+    pub(crate) fn for_network(
+        session: Rc<NetworkSession>,
+        chunk_bytes: usize,
+        cancellation: CancellationToken,
+    ) -> Self {
+        Self {
+            root: PathBuf::new(),
+            url_root: PathBuf::new(),
+            chunk_bytes: chunk_bytes.max(1),
+            cancellation,
+            environment_encoding: Encoding::Utf8,
+            applied: None,
+            network: Some(session),
+        }
+    }
+
+    /// The network session, for a network document.
+    pub(crate) fn network(&self) -> Option<&NetworkSession> {
+        self.network.as_deref()
     }
 
     pub(crate) fn with_environment_encoding(mut self, encoding: Encoding) -> Self {
@@ -413,8 +444,24 @@ impl LocalStylesheetFetcher {
         url: &Url,
         max_bytes: usize,
     ) -> Result<StagedLocalFile, FetchError> {
+        self.stage_completion_as(snapshot, url, max_bytes, &ResourceKind::Stylesheet)
+    }
+
+    /// [`Self::stage_completion`] for a resource of `kind` (it decides a
+    /// network document's CSP directive and MIME checks).
+    pub(crate) fn stage_completion_as(
+        &self,
+        snapshot: &AppliedLocalFiles,
+        url: &Url,
+        max_bytes: usize,
+        kind: &ResourceKind,
+    ) -> Result<StagedLocalFile, FetchError> {
         if self.cancellation.check().is_err() {
             return Err(FetchError::Cancelled);
+        }
+        if let Some(session) = &self.network {
+            let bytes = session.fetch(url, kind, max_bytes)?;
+            return snapshot.stage(url, max_bytes, bytes);
         }
         let path = url_path(url).ok_or(FetchError::Blocked)?;
         let bytes = self.read(&path, max_bytes)?;
@@ -470,6 +517,13 @@ impl LocalStylesheetFetcher {
         if self.cancellation.check().is_err() {
             return Err(FetchError::Cancelled);
         }
+        if let Some(session) = &self.network {
+            let fetch = || session.fetch(url, &ResourceKind::Stylesheet, max_bytes);
+            return match &self.applied {
+                Some(applied) => applied.read(url, max_bytes, fetch).map(|b| b.to_vec()),
+                None => fetch(),
+            };
+        }
         // No policy bypass on a cached hit: a URL with a disallowed scheme,
         // host or encoded path is rejected before looking in the snapshot.
         let path = url_path(url).ok_or(FetchError::Blocked)?;
@@ -490,7 +544,15 @@ impl StylesheetFetcher for LocalStylesheetFetcher {
     /// have no transport `charset`.
     fn fetch(&mut self, url: &Url, max_bytes: usize) -> Result<String, FetchError> {
         let bytes = self.fetch_bytes(url, max_bytes)?;
-        let text = rustic_css::decode_stylesheet(&bytes, None, Some(self.environment_encoding));
+        let transport = self
+            .network
+            .as_ref()
+            .and_then(|session| session.charset_of(url));
+        let text = rustic_css::decode_stylesheet(
+            &bytes,
+            transport.as_deref().map(str::as_bytes),
+            Some(self.environment_encoding),
+        );
         // Replacement characters can make the text longer than the bytes.
         if text.len() > max_bytes {
             return Err(FetchError::TooLarge);

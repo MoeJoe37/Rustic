@@ -115,6 +115,17 @@ impl MimeType {
         }
     }
 
+    /// MIME Sniffing §4.6 "JavaScript MIME type" (by essence).
+    pub fn is_javascript(&self) -> bool {
+        is_javascript_essence(&self.essence())
+    }
+
+    /// Fetch §3.5 / HTML "destination is script-like": the types never
+    /// executed as script (`audio/*`, `image/*`, `video/*`, `text/csv`).
+    pub fn is_blocked_for_script(&self) -> bool {
+        matches!(self.kind.as_str(), "audio" | "image" | "video") || self.essence() == "text/csv"
+    }
+
     /// The encoding named by the `charset` parameter, if any is valid.
     pub fn charset(&self) -> Option<Encoding> {
         self.parameter("charset").and_then(Encoding::for_label)
@@ -254,6 +265,29 @@ fn is_quoted_string_token_char(character: char) -> bool {
     matches!(character, '\t' | ' '..='~' | '\u{80}'..='\u{ff}')
 }
 
+/// MIME Sniffing §4.6: the sixteen JavaScript MIME type essences.
+pub fn is_javascript_essence(essence: &str) -> bool {
+    matches!(
+        essence,
+        "application/ecmascript"
+            | "application/javascript"
+            | "application/x-ecmascript"
+            | "application/x-javascript"
+            | "text/ecmascript"
+            | "text/javascript"
+            | "text/javascript1.0"
+            | "text/javascript1.1"
+            | "text/javascript1.2"
+            | "text/javascript1.3"
+            | "text/javascript1.4"
+            | "text/javascript1.5"
+            | "text/jscript"
+            | "text/livescript"
+            | "text/x-ecmascript"
+            | "text/x-javascript"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,7 +404,7 @@ pub fn sniff_unknown(header: &[u8]) -> &'static str {
 
 #[cfg(test)]
 mod sniff_tests {
-    use super::sniff_unknown;
+    use super::{MimeType, sniff_unknown};
 
     #[test]
     fn unknown_types_are_sniffed() {
@@ -394,5 +428,17 @@ mod sniff_tests {
         ] {
             assert_eq!(sniff_unknown(body), expected, "{body:?}");
         }
+    }
+
+    #[test]
+    fn javascript_and_script_blocked_types() {
+        let mime = |input: &str| MimeType::parse(input).unwrap();
+        assert!(mime("text/javascript;charset=utf-8").is_javascript());
+        assert!(mime("Application/X-JavaScript").is_javascript());
+        assert!(!mime("text/plain").is_javascript());
+        assert!(!mime("application/json").is_javascript());
+        assert!(mime("image/png").is_blocked_for_script());
+        assert!(mime("text/csv").is_blocked_for_script());
+        assert!(!mime("text/plain").is_blocked_for_script());
     }
 }

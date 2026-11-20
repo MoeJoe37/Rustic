@@ -557,8 +557,11 @@ Policy, `Sec-Fetch-*` metadata and `data:` URLs (all pinned WPT records).
 contexts; the engine enforces CSP on inline scripts, `eval` and script
 requests (inline styles TD-164), and `rustic_engine::history` holds session
 history ([IMPLEMENTATION.md](IMPLEMENTATION.md#net-02-partial--navigation-referrer-policy-and-data-urls)).
-Next: load documents and subresources over HTTP in the CLI, then `fetch()`,
-the HTTP cache, profiles and storage.
+The CLI now loads documents, stylesheets, scripts and images over HTTP(S)
+from granted loopback origins (`--allow-origin`, `--ca-file`) with response
+charsets, per-hop CSP and mixed-content checks and `nosniff`
+([IMPLEMENTATION.md](IMPLEMENTATION.md#net-02--documents-and-subresources-over-http-in-the-cli)).
+Next: `fetch()`, the HTTP cache, profiles and storage.
 
 ## 10. M7 — Isolation and security gate
 

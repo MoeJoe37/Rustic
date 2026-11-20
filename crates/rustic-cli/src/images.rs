@@ -94,7 +94,12 @@ pub(crate) fn stage_image_completion(
     if limits.max_images == 0 {
         return Err(FetchError::TooLarge);
     }
-    let staged = fetcher.stage_completion(applied, url, limits.max_file_bytes)?;
+    let staged = fetcher.stage_completion_as(
+        applied,
+        url,
+        limits.max_file_bytes,
+        &crate::network::ResourceKind::Image,
+    )?;
     let mut store = ImageStore::new(StoreLimits {
         max_entries: 1,
         max_encoded_bytes: limits.max_file_bytes,
@@ -152,8 +157,11 @@ pub(crate) fn load_applied(
     limits: ImageLimits,
     chunk_bytes: usize,
     cancellation: &CancellationToken,
-    applied: Option<&AppliedLocalFiles>,
+    applied: Option<(&AppliedLocalFiles, Option<&crate::network::NetworkSession>)>,
 ) -> LoadedImages {
+    // A network document always reads through its applied snapshot.
+    let network = applied.and_then(|(_, network)| network);
+    let applied = applied.map(|(applied, _)| applied);
     let mut loaded = LoadedImages::default();
     let replaced: HashMap<NodeId, ()> = tree
         .boxes()
@@ -161,7 +169,10 @@ pub(crate) fn load_applied(
         .filter(|b| b.natural_size().is_some())
         .map(|b| (b.node(), ()))
         .collect();
-    let document_url = file_url(path);
+    let document_url = match network {
+        Some(session) => Some(session.document_url().clone()),
+        None => file_url(path),
+    };
     let root = path.parent();
     let Ok(walk) = document.walk(document.root()) else {
         return loaded;
@@ -224,6 +235,13 @@ pub(crate) fn load_applied(
                 let bytes = if let Some(applied) = applied {
                     applied
                         .read(&url, remaining, || {
+                            if let Some(session) = network {
+                                return session.fetch(
+                                    &url,
+                                    &crate::network::ResourceKind::Image,
+                                    remaining,
+                                );
+                            }
                             let file = resolve(&src, base.as_ref(), root)
                                 .map_err(|_| FetchError::Blocked)?;
                             read_bounded(&file, remaining, chunk_bytes).ok_or(FetchError::Failed)

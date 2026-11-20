@@ -418,6 +418,7 @@ impl ExternalScripts {
         &mut self,
         id: ClassicRequestId,
         result: Result<&[u8], ClassicFetchError>,
+        transport: Option<Encoding>,
         source_limit: usize,
         cancellation: &CancellationToken,
     ) -> Result<Option<ReadyClassic>, ScriptLoadError> {
@@ -456,7 +457,9 @@ impl ExternalScripts {
         };
         let mode = entry.mode;
         let element = entry.element;
-        let encoding = entry.encoding;
+        // HTML "fetch a classic script": the response's `charset` wins over
+        // the element's fallback; `decode` still lets a BOM override both.
+        let encoding = transport.unwrap_or(entry.encoding);
         let source = result
             .ok()
             .and_then(|bytes| self.decode(bytes, source_limit, Some(encoding)));

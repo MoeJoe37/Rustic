@@ -214,6 +214,8 @@ pub enum NetworkError {
     RedirectWithCredentials,
     /// `Cross-Origin-Resource-Policy` blocked a no-CORS response.
     BlockedByResourcePolicy,
+    /// The client's policy (CSP or mixed content) refused a hop.
+    BlockedByClientPolicy,
 }
 
 impl fmt::Display for NetworkError {
@@ -238,6 +240,9 @@ impl fmt::Display for NetworkError {
             }
             Self::BlockedByResourcePolicy => {
                 formatter.write_str("blocked by Cross-Origin-Resource-Policy")
+            }
+            Self::BlockedByClientPolicy => {
+                formatter.write_str("blocked by the document's content policy")
             }
         }
     }
@@ -422,6 +427,19 @@ impl Fetcher {
 
     /// Run `request` (Fetch "main fetch" and what it calls).
     pub fn fetch(&mut self, request: FetchRequest) -> Result<FetchResponse, NetworkError> {
+        self.fetch_checked(request, &mut |_, _| true)
+    }
+
+    /// Like [`Self::fetch`], asking `allow(url, redirect_count)` before
+    /// every hop, the first included, so a client's policies (CSP, mixed
+    /// content) are rechecked after each redirect before anything is sent
+    /// (Fetch main fetch step 7 and §4.4 step 20). A refusal is
+    /// [`NetworkError::BlockedByClientPolicy`].
+    pub fn fetch_checked(
+        &mut self,
+        request: FetchRequest,
+        allow: &mut dyn FnMut(&Url, usize) -> bool,
+    ) -> Result<FetchResponse, NetworkError> {
         let method = normalize_method(&request.method);
         if is_forbidden_method(&method) {
             return Err(NetworkError::ForbiddenMethod);
@@ -443,6 +461,9 @@ impl Fetcher {
             let current = hop.url_list.last().expect("non-empty").clone();
             if !matches!(current.scheme(), "http" | "https") {
                 return Err(NetworkError::UnsupportedScheme);
+            }
+            if !allow(&current, hop.url_list.len() - 1) {
+                return Err(NetworkError::BlockedByClientPolicy);
             }
             hop.same_site &= request
                 .site_for_cookies

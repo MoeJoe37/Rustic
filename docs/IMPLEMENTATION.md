@@ -158,6 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Networking and resources (M6): 5 sections</summary>
 
+- [NET-02 — Documents and subresources over HTTP in the CLI](#net-02--documents-and-subresources-over-http-in-the-cli)
 - [NET-07 (partial) — Session history](#net-07-partial--session-history)
 - [NET-05 (partial) — CSP, mixed content and secure contexts](#net-05-partial--csp-mixed-content-and-secure-contexts)
 - [NET-02 (partial) — Navigation, referrer policy and data: URLs](#net-02-partial--navigation-referrer-policy-and-data-urls)
@@ -2533,6 +2534,29 @@ service step. The existing 128 KiB limit test still passes after removing tempor
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
 
+## NET-02 — Documents and subresources over HTTP in the CLI
+
+Added 2026-11-20 (`rustic-cli/src/network.rs`). Every document command
+accepts an `http://` or `https://` URL in place of the file when each
+origin it may reach is granted with `--allow-origin ORIGIN=ADDRESS`
+(loopback addresses only, no DNS); `--ca-file PEM` replaces the platform
+trust store. Without grants an `http(s)` argument is a usage error and
+nothing is sent.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Document | `Navigation` over one `Fetcher` per run (cookie jar, preflight cache); downloads, 204/205 and non-HTML responses are errors; the response URL is the base URL and the document URL, its origin the document origin | `documents_load_over_http_with_policies_applied`, `ungranted_origins_and_bad_grants_fail_without_sending` |
+| Encoding | HTML encoding sniffing: BOM, then the `Content-Type` charset, then the `<meta>` prescan; classic scripts use their response charset before the document's encoding (`complete_script_with_charset`), stylesheets pass it to CSS Syntax §3.2 | `documents_load_over_http_with_policies_applied`, `stylesheets_follow_redirects_and_need_text_css` |
+| Subresources | Stylesheets, `@import`s, images and scripts go through `NetworkSession::fetch`: no-cors with credentials for classic elements, CORS for modules, `Referer` by the document's referrer policy, cookies from the document's responses | `documents_load_over_http_with_policies_applied` |
+| Per-hop policy | `Fetcher::fetch_checked` asks before every hop, so CSP (`script-src`, `style-src`, `img-src`, nonces and `'strict-dynamic'`) and mixed content are rechecked after redirects before a request is sent | `client_policy_is_asked_before_every_hop`, `documents_load_over_http_with_policies_applied` |
+| Inline script CSP and `eval` | The document's CSP is the engine's `ScriptPolicy`; `'unsafe-eval'` decides string compilation; violations print to standard error | `documents_load_over_http_with_policies_applied` |
+| MIME checks | Scripts: `audio/*`, `image/*`, `video/*`, `text/csv` never run, `nosniff` requires a JavaScript MIME type; stylesheets must be `text/css` | `script_and_style_mime_checks`, `javascript_and_script_blocked_types`, `stylesheets_follow_redirects_and_need_text_css` |
+| TLS | Certificates verify against the platform store or `--ca-file`; a failure fails the load, with no override | `https_documents_verify_certificates_against_the_given_roots` |
+| Pinning | Stylesheet and image bytes are pinned in the document's applied snapshot on first read, so repeated layout reads see the same bytes and make no new requests | the tests above |
+
+Bodies are read whole, one request at a time, and the quirks-mode
+stylesheet MIME exception is not implemented (TD-165).
+
 ## NET-07 (partial) — Session history
 
 Added 2026-11-20 as `rustic_engine::history`. `SessionHistory` is one
@@ -2589,8 +2613,8 @@ name any `http(s)` URL; the local entry point still rejects them.
 | `data:` URLs | Fetch §4.2 processor and forgiving-base64: all 72 pinned WPT `data-urls.json` and 80 `base64.json` records pass | `data_urls` |
 | Sniffing | MIME Sniffing §7.1 unknown-type rules for responses without `Content-Type`; `X-Content-Type-Options: nosniff` disables it | `unknown_types_are_sniffed`, `no_content_downloads_and_sniffing` |
 
-Not yet: the CLI and engine load documents and subresources through
-`Navigation` (the rest of NET-02).
+The CLI loads documents and subresources through `Navigation` (next
+section).
 
 ## NET-04 (partial) — Cookie jar and sites
 

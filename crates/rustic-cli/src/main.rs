@@ -10,6 +10,7 @@ use std::path::Path;
 mod fonts;
 mod images;
 mod loader;
+mod network;
 mod reftest;
 mod stylesheets;
 
@@ -36,7 +37,8 @@ applies the HTML user-agent stylesheet, the document's <style> elements and
 its <link rel=stylesheet> and @import sheets, and prints each element's
 computed style for a 1280x720 viewport. Linked and imported sheets load only
 from files in the document's directory or below it; network URLs and paths
-outside it are blocked. URLs are rejected as the file argument.
+outside it are blocked. URLs are rejected as the file argument unless network
+origins are granted (below).
 
 dump-boxes loads the same styles and prints a principal-box snapshot (no
 anonymous/line boxes, layout positions or painting yet).
@@ -76,6 +78,15 @@ external classics and static JavaScript modules before producing output.
 The snapshot uses a manual clock for at most 256 timer turns and offers
 one animation frame.
 
+Network (development prototype, loopback only): any document command accepts
+an http:// or https:// URL in place of <file> when each origin it may reach is
+granted with --allow-origin ORIGIN=ADDRESS (for example
+--allow-origin http://a.test:8080=127.0.0.1:8080; ADDRESS must be loopback,
+there is no DNS; repeat up to 64). Redirects, cookies, CORS, CSP, mixed
+content and nosniff apply to the document's stylesheets, scripts and images;
+other origins are blocked. --ca-file PEM trusts only the given roots instead
+of the platform store; certificate errors are never bypassed.
+
 Limits for all dump commands (positive integers; exceeding any limit except
 --max-diagnostics fails the load):
   --font FILE            explicit TTF/OTF/WOFF/WOFF2 (repeat up to 64; bounded local files)
@@ -112,6 +123,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let args = match network::configure(args) {
+        Ok(args) => args,
+        Err(e) => {
+            eprintln!("rustic: {e}");
+            return ExitCode::from(2);
+        }
+    };
     if args.is_empty() || (args.len() == 1 && args[0] == "--help") {
         println!("{USAGE}");
         return ExitCode::SUCCESS;
@@ -129,7 +147,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; OpenType text shaping and CSS wrapping available; JavaScript and networking: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; OpenType text shaping and CSS wrapping available; JavaScript via --run-scripts; HTTP(S) to loopback origins granted with --allow-origin; general remote browsing: not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -222,14 +240,32 @@ fn load<T>(
     path: &std::ffi::OsStr,
     then: impl FnOnce(&LoadedDocument, &Path) -> Result<T, LoadError>,
 ) -> Result<T, ExitCode> {
-    let path = match loader::local_path(path) {
-        Ok(path) => path,
-        Err(error) => {
-            eprintln!("rustic {command}: {error}");
-            return Err(ExitCode::from(2));
+    let network = network::is_network_argument(path);
+    if network && !network::has_grants() {
+        eprintln!(
+            "rustic {command}: network URLs need --allow-origin ORIGIN=ADDRESS for each origin; \
+             nothing was sent"
+        );
+        return Err(ExitCode::from(2));
+    }
+    let path = if network {
+        std::path::PathBuf::from(path)
+    } else {
+        match loader::local_path(path) {
+            Ok(path) => path,
+            Err(error) => {
+                eprintln!("rustic {command}: {error}");
+                return Err(ExitCode::from(2));
+            }
         }
     };
-    let result = loader::load_document(engine, &path, limits).and_then(|parsed| {
+    let loaded = if network {
+        let url = path.to_str().unwrap_or_default();
+        loader::load_network_document(engine, url, limits)
+    } else {
+        loader::load_document(engine, &path, limits)
+    };
+    let result = loaded.and_then(|parsed| {
         if parsed.parsed().truncated() {
             // A page over its node or payload budget degrades visibly
             // (ADR 0046): the output covers the content before that point.

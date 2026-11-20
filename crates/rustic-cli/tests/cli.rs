@@ -96,6 +96,9 @@ fn dump_dom_rejects_urls_without_touching_the_network() {
         let output = rustic(&["dump-dom", url]);
         assert_eq!(output.status.code(), Some(2), "{url}");
         assert!(stderr(&output).contains("URLs"), "{url}");
+        if url.starts_with("http") {
+            assert!(stderr(&output).contains("--allow-origin"), "{url}");
+        }
         assert!(output.stdout.is_empty());
     }
 }

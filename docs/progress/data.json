@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "c4c8d332688f4ebd0086c5663f0be94f4a902744b2079789d54e78c46efc1cae",
-  "percent": "36.91",
-  "verified_percent": "34.24",
-  "partial_percent": "2.67",
-  "completed": 78,
-  "in_progress": 11,
+  "source_fingerprint": "e81f0b01ac104e280670efcded87aafd2a3e88ae5b04f94df5db949fc2ddc7fa",
+  "percent": "37.29",
+  "verified_percent": "35.40",
+  "partial_percent": "1.89",
+  "completed": 81,
+  "in_progress": 8,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -65,11 +65,11 @@
       "id": "M6",
       "label": "Networking & services",
       "share": "4.38",
-      "completed": 1,
+      "completed": 4,
       "total": 12,
-      "percent": "54.75",
-      "verified_percent": "14.24",
-      "partial_percent": "40.51"
+      "percent": "63.44",
+      "verified_percent": "40.65",
+      "partial_percent": "22.79"
     },
     {
       "id": "M7",
@@ -501,64 +501,60 @@
           "label": "Required legacy decoders and charset selection",
           "size": 5,
           "milestone": "M6",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Encoding Standard labels, decoders, encoders and hooks for all 40 encodings",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-encoding/src/decoder.rs",
-                  "marker": "impl Iso2022JpDecoder"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-encoding/tests/encoding.rs",
-                  "marker": "fn every_encodable_scalar_round_trips"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-encoding/src/decoder.rs",
+              "marker": "impl Iso2022JpDecoder"
             },
             {
-              "label": "Stylesheet charset selection (CSS Syntax 3.2: BOM, transport, @charset, document)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/decode.rs",
-                  "marker": "pub fn stylesheet_fallback_encoding"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn stylesheets_decode_with_their_charset_rule"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-encoding/tests/encoding.rs",
+              "marker": "fn every_encodable_scalar_round_trips"
             },
             {
-              "label": "URL query encoding in the document's encoding (parser and stylesheet links)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-url/src/encoding.rs",
-                  "marker": "pub(crate) fn encode_legacy_query"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-url/tests/query_encoding.rs",
-                  "marker": "fn special_queries_use_the_document_encoding"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/decode.rs",
+              "marker": "pub fn stylesheet_fallback_encoding"
             },
             {
-              "label": "Response charset from Content-Type for documents, scripts and stylesheets",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn stylesheets_decode_with_their_charset_rule"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/encoding.rs",
+              "marker": "pub(crate) fn encode_legacy_query"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-url/tests/query_encoding.rs",
+              "marker": "fn special_queries_use_the_document_encoding"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/inline_scripts.rs",
+              "marker": "pub fn complete_script_with_charset"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn feed_network_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn documents_load_over_http_with_policies_applied"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn stylesheets_follow_redirects_and_need_text_css"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.33"
         },
         {
@@ -597,32 +593,30 @@
           "label": "Navigation origin inheritance and policy integration",
           "size": 3,
           "milestone": "M6",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Origin and policy-container inheritance for about:blank, about:srcdoc and data: navigations",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/navigation.rs",
-                  "marker": "pub struct PolicyContainer"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/navigation.rs",
-                  "marker": "fn local_schemes_inherit_or_get_opaque_origins"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/navigation.rs",
+              "marker": "pub struct PolicyContainer"
             },
             {
-              "label": "Network documents use their response URL as base and origin in the engine and CLI",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn local_schemes_inherit_or_get_opaque_origins"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/network.rs",
+              "marker": "pub(crate) fn document_url"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn documents_load_over_http_with_policies_applied"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.20"
         },
         {
@@ -637,13 +631,13 @@
         }
       ],
       "points": 30,
-      "completed": 6,
-      "in_progress": 2,
+      "completed": 8,
+      "in_progress": 0,
       "total": 12,
-      "contribution": "1.21",
-      "percent": "60.83",
-      "verified_percent": "43.33",
-      "partial_percent": "17.50"
+      "contribution": "1.40",
+      "percent": "70.00",
+      "verified_percent": "70.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "dom",
@@ -5550,136 +5544,120 @@
           "label": "Navigation/history state machine and redirects",
           "size": 5,
           "milestone": "M6",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Fetch redirect handling: status rules, URL list, fragments, limit and per-hop policy checks",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/redirect.rs",
-                  "marker": "pub struct RedirectChain"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/redirects.rs",
-                  "marker": "fn every_hop_is_checked_against_the_policy"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/redirects.rs",
-                  "marker": "fn methods_and_bodies_follow_the_status_rules"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/redirect.rs",
+              "marker": "pub struct RedirectChain"
             },
             {
-              "label": "Response MIME type and Content-Type charset extraction (pinned WPT mimesniff and fetch/content-type)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/mime.rs",
-                  "marker": "pub fn extract_mime_type"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/wpt_mime.rs",
-                  "marker": "fn fetch_content_type_extraction"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/wpt_mime.rs",
-                  "marker": "fn mimesniff_generated_mime_types"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/tests/redirects.rs",
+              "marker": "fn every_hop_is_checked_against_the_policy"
             },
             {
-              "label": "Navigation state machine over the transport (request, response, commit, cancel)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/navigation.rs",
-                  "marker": "pub struct Navigation {"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/navigation.rs",
-                  "marker": "fn redirects_step_by_step_then_commit_with_response_policies"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/navigation.rs",
-                  "marker": "fn cancellation_and_redirect_limits"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/navigation.rs",
-                  "marker": "fn no_content_downloads_and_sniffing"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/tests/redirects.rs",
+              "marker": "fn methods_and_bodies_follow_the_status_rules"
             },
             {
-              "label": "Documents and subresources load over HTTP in the engine and CLI with response charset",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-net/src/mime.rs",
+              "marker": "pub fn extract_mime_type"
             },
             {
-              "label": "Referrer and policy container propagation across navigations and redirects",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/referrer.rs",
-                  "marker": "pub fn determine_referrer"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/navigation.rs",
-                  "marker": "pub struct PolicyContainer"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/referrer.rs",
-                  "marker": "fn every_policy_against_same_cross_and_downgrade_targets"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/navigation.rs",
-                  "marker": "fn local_schemes_inherit_or_get_opaque_origins"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/tests/wpt_mime.rs",
+              "marker": "fn fetch_content_type_extraction"
             },
             {
-              "label": "Session history: reload, back/forward and form navigation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/history.rs",
-                  "marker": "pub struct SessionHistory"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-url/src/form.rs",
-                  "marker": "pub fn serialize_form"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/src/history.rs",
-                  "marker": "fn push_traverse_and_truncate"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/navigation.rs",
-                  "marker": "fn form_submissions_navigate_with_get_queries_and_post_bodies"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/tests/wpt_mime.rs",
+              "marker": "fn mimesniff_generated_mime_types"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/navigation.rs",
+              "marker": "pub struct Navigation {"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn redirects_step_by_step_then_commit_with_response_policies"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn cancellation_and_redirect_limits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn no_content_downloads_and_sniffing"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/network.rs",
+              "marker": "pub(crate) struct NetworkSession"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "pub fn load_network_document"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn documents_load_over_http_with_policies_applied"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn https_documents_verify_certificates_against_the_given_roots"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/referrer.rs",
+              "marker": "pub fn determine_referrer"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/navigation.rs",
+              "marker": "pub struct PolicyContainer"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/src/referrer.rs",
+              "marker": "fn every_policy_against_same_cross_and_downgrade_targets"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn local_schemes_inherit_or_get_opaque_origins"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/history.rs",
+              "marker": "pub struct SessionHistory"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/form.rs",
+              "marker": "pub fn serialize_form"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/src/history.rs",
+              "marker": "fn push_traverse_and_truncate"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn form_submissions_navigate_with_get_queries_and_post_bodies"
             }
           ],
-          "credit": "83.33",
+          "credit": "100.00",
           "engine_share": "0.62"
         },
         {
@@ -5888,11 +5866,32 @@
             },
             {
               "label": "Network loads apply CSP, mixed content and X-Content-Type-Options nosniff to subresources",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-net/src/fetch.rs",
+                  "marker": "pub fn fetch_checked"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/network.rs",
+                  "marker": "fn check_mime"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/fetch.rs",
+                  "marker": "fn client_policy_is_asked_before_every_hop"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/network.rs",
+                  "marker": "fn stylesheets_follow_redirects_and_need_text_css"
+                }
+              ]
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.37"
         },
         {
@@ -5927,13 +5926,13 @@
         }
       ],
       "points": 32,
-      "completed": 1,
-      "in_progress": 4,
+      "completed": 2,
+      "in_progress": 3,
       "total": 8,
-      "contribution": "2.05",
-      "percent": "51.30",
-      "verified_percent": "15.62",
-      "partial_percent": "35.68"
+      "contribution": "2.25",
+      "percent": "56.25",
+      "verified_percent": "31.25",
+      "partial_percent": "25.00"
     },
     {
       "id": "storage",

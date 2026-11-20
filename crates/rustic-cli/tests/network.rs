@@ -1,0 +1,233 @@
+//! The CLI loading a document, its stylesheets, scripts and images over
+//! HTTP from a loopback fixture server (the M6 demo shape): response
+//! charset, redirects, cookies, CSP and a blocked cross-origin resource.
+
+use std::process::{Command, Output};
+
+use rustic_net::fixture::{FixtureServer, Reply};
+
+fn rustic(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_rustic"))
+        .args(args)
+        .output()
+        .expect("run rustic")
+}
+
+fn stdout(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+fn stderr(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+const PAGE: &[u8] = b"<!doctype html><html><head>\
+<link rel=stylesheet href=/moved.css>\
+<link rel=stylesheet href=/plain.txt>\
+<script src=/app.js></script>\
+<script src=http://b.test/evil.js></script>\
+<script>document.body.setAttribute('data-inline', 'blocked');</script>\
+<script nonce=n1>document.documentElement.setAttribute('data-nonce', 'ran');</script>\
+</head><body><p id=t>caf\xe9</p><img src=/missing.png></body></html>";
+
+fn server() -> FixtureServer {
+    FixtureServer::start([
+        (
+            "/",
+            Reply::response(
+                200,
+                &[
+                    ("Content-Type", "text/html; charset=windows-1252"),
+                    (
+                        "Content-Security-Policy",
+                        "script-src 'self' 'nonce-n1'; style-src 'self'",
+                    ),
+                    ("Set-Cookie", "session=1; Path=/"),
+                ],
+                PAGE,
+            ),
+        ),
+        (
+            "/moved.css",
+            Reply::response(302, &[("Location", "/style.css")], b""),
+        ),
+        (
+            "/style.css",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/css")],
+                b"#t { color: rgb(1, 2, 3) }",
+            ),
+        ),
+        (
+            "/plain.txt",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/plain")],
+                b"#t { margin-left: 7px }",
+            ),
+        ),
+        (
+            "/app.js",
+            Reply::response(
+                200,
+                &[
+                    ("Content-Type", "text/javascript; charset=utf-8"),
+                    ("X-Content-Type-Options", "nosniff"),
+                ],
+                "document.documentElement.setAttribute('data-app', 'r\u{e1}n');".as_bytes(),
+            ),
+        ),
+        (
+            "/evil.js",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/javascript")],
+                b"document.documentElement.setAttribute('data-evil', 'ran');",
+            ),
+        ),
+    ])
+    .unwrap()
+}
+
+fn grants(server: &FixtureServer) -> [String; 2] {
+    let address = server.address();
+    [
+        format!("http://a.test={address}"),
+        format!("http://b.test={address}"),
+    ]
+}
+
+#[test]
+fn documents_load_over_http_with_policies_applied() {
+    let server = server();
+    let [a, b] = grants(&server);
+    let args = [
+        "dump-dom",
+        "--run-scripts",
+        "--allow-origin",
+        &a,
+        "--allow-origin",
+        &b,
+        "http://a.test/",
+    ];
+    let output = rustic(&args);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dom = stdout(&output);
+    // The response charset decodes byte 0xE9.
+    assert!(dom.contains("café"), "{dom}");
+    // Same-origin script ran; the cross-origin one and the unnonced inline
+    // script were refused by CSP; the nonced inline script ran.
+    // The script's UTF-8 `charset` wins over the document's windows-1252.
+    assert!(
+        dom.contains("local=\"data-app\" value=\"r\u{e1}n\""),
+        "{dom}"
+    );
+    assert!(dom.contains("local=\"data-nonce\" value=\"ran\""), "{dom}");
+    assert!(!dom.contains("local=\"data-evil\""), "{dom}");
+    assert!(!dom.contains("local=\"data-inline\""), "{dom}");
+    let log = stderr(&output);
+    assert!(log.contains("CSP: Refused"), "{log}");
+    // The CSP refusal happened before any request reached b.test.
+    let requests = server.requests();
+    assert!(!requests.iter().any(|r| r.target == "/evil.js"));
+    // The cookie set by the document is sent with its subresources.
+    let script = requests.iter().find(|r| r.target == "/app.js").unwrap();
+    assert_eq!(script.header("cookie"), Some("session=1"));
+    // Fetch metadata goes only to potentially trustworthy URLs.
+    assert_eq!(script.header("sec-fetch-dest"), None);
+    assert_eq!(script.header("referer"), Some("http://a.test/"));
+}
+
+#[test]
+fn stylesheets_follow_redirects_and_need_text_css() {
+    let server = server();
+    let [a, b] = grants(&server);
+    let output = rustic(&[
+        "dump-style",
+        "--allow-origin",
+        &a,
+        "--allow-origin",
+        &b,
+        "http://a.test/",
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dump = stdout(&output);
+    assert!(dump.contains("rgb(1, 2, 3)"), "{dump}");
+    assert!(!dump.contains("margin-left: 7px"), "{dump}");
+    assert!(stderr(&output).contains("not text/css"));
+}
+
+#[test]
+fn ungranted_origins_and_bad_grants_fail_without_sending() {
+    let server = server();
+    let [a, _] = grants(&server);
+    // c.test is not granted: the navigation fails in the transport.
+    let output = rustic(&["dump-dom", "--allow-origin", &a, "http://c.test/"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        stderr(&output).contains("navigation failed"),
+        "{}",
+        stderr(&output)
+    );
+    // Grants must route to loopback.
+    let output = rustic(&[
+        "dump-dom",
+        "--allow-origin",
+        "http://a.test=192.0.2.1:80",
+        "http://a.test/",
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(server.requests().is_empty());
+}
+
+#[test]
+fn https_documents_verify_certificates_against_the_given_roots() {
+    let tls = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../rustic-net/tests/fixtures/tls/"
+    );
+    let read = |name: &str| std::fs::read(format!("{tls}{name}")).unwrap();
+    let server = FixtureServer::start_tls(
+        [(
+            "/",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/html")],
+                b"<!doctype html><p>secure",
+            ),
+        )],
+        &read("good.pem"),
+        &read("good.key"),
+    )
+    .unwrap();
+    let grant = format!("https://a.test={}", server.address());
+    let ca = format!("{tls}ca.pem");
+    let output = rustic(&[
+        "dump-dom",
+        "--ca-file",
+        &ca,
+        "--allow-origin",
+        &grant,
+        "https://a.test/",
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(stdout(&output).contains("text \"secure\""));
+    // Other roots: the certificate is refused and nothing is bypassed.
+    let other = format!("{tls}untrusted-ca.pem");
+    let output = rustic(&[
+        "dump-dom",
+        "--ca-file",
+        &other,
+        "--allow-origin",
+        &grant,
+        "https://a.test/",
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout(&output).is_empty());
+    assert!(
+        stderr(&output).contains("certificate"),
+        "{}",
+        stderr(&output)
+    );
+}

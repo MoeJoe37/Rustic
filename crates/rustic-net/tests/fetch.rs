@@ -708,3 +708,34 @@ fn referrer_and_fetch_metadata_follow_the_policies() {
 fn request_to(target: &str) -> FetchRequest {
     request(target, "http://a.test", RequestMode::NoCors)
 }
+
+#[test]
+fn client_policy_is_asked_before_every_hop() {
+    let server = FixtureServer::start([
+        (
+            "/r",
+            Reply::response(302, &[("Location", "http://b.test/blocked")], b""),
+        ),
+        ("/blocked", Reply::response(200, &[], b"secret")),
+    ])
+    .unwrap();
+    let mut fetcher = fetcher(&[("http://a.test", &server), ("http://b.test", &server)]);
+    let mut asked = Vec::new();
+    let result = fetcher.fetch_checked(
+        request("http://a.test/r", "http://a.test", RequestMode::NoCors),
+        &mut |url, redirects| {
+            asked.push((url.serialize(), redirects));
+            url.host().is_some_and(|host| host.serialize() == "a.test")
+        },
+    );
+    assert!(matches!(result, Err(NetworkError::BlockedByClientPolicy)));
+    assert_eq!(
+        asked,
+        [
+            ("http://a.test/r".to_owned(), 0),
+            ("http://b.test/blocked".to_owned(), 1)
+        ]
+    );
+    // The refused hop was never sent.
+    assert_eq!(server.requests().len(), 1);
+}

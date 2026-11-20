@@ -218,6 +218,7 @@ pub fn document_cascade_with(
     let base = base_url(document, document_url, loader)?;
     let mut cascade = Cascade::new();
     cascade.set_document_base_url(base.clone());
+    cascade.set_inline_policy(loader.inline_policy().cloned());
     cascade.push(html_user_agent_sheet(parser));
     let mut reports = Vec::new();
     // An explicit stack of (walk, tree) pairs for nested shadow trees.
@@ -256,19 +257,18 @@ pub fn document_cascade_with(
             None => Ok(None),
         };
         let loaded = if is_html(element, "style") {
+            let text = child_text(document, id);
+            let nonce = attribute(element, "nonce");
             if !css_type {
                 Err(SheetStatus::NotCss)
+            } else if loader
+                .inline_policy()
+                .is_some_and(|policy| !policy.allows_style_element(nonce.as_deref(), &text))
+            {
+                Err(SheetStatus::BlockedByPolicy)
             } else {
                 media
-                    .and_then(|media| {
-                        loader.load_tree(
-                            parser,
-                            &child_text(document, id),
-                            base.as_ref(),
-                            None,
-                            media,
-                        )
-                    })
+                    .and_then(|media| loader.load_tree(parser, &text, base.as_ref(), None, media))
                     .map_err(|_| SheetStatus::ResourceLimit)
             }
         } else if is_html(element, "link") {

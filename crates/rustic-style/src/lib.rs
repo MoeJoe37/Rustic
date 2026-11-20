@@ -71,7 +71,8 @@ pub use invalidation::{InvalidationMap, Mutation, RestyleStats, StyledDocument};
 pub use layer::{LayerName, LayerSegment};
 pub use loading::{
     DEFAULT_MAX_EXTERNAL_BYTES, DEFAULT_MAX_EXTERNAL_SHEETS, DEFAULT_MAX_IMPORT_DEPTH, FetchError,
-    ImportReport, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader, StylesheetFetcher,
+    ImportReport, InlineStylePolicy, NoFetch, SheetStatus, StyleLoadLimits, StyleLoader,
+    StylesheetFetcher,
 };
 pub use matching::{MatchContext, matches, matches_complex};
 pub use rustic_text::EmRatios;

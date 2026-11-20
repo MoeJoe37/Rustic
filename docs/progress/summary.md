@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 38.14%** = 36.25% verified complete + 1.89% partial credit. 85/221 capabilities complete, 8 in progress.
+**Overall completion: 38.23%** = 36.63% verified complete + 1.60% partial credit. 86/221 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `f85fd91e356012e186dce1e765e1acca79cb572aec1efbaef70b1a984cd7eca9`.
+Catalog: `engine-v4`. Source fingerprint: `3a474a856df594278e888e21d8ed4d7394d9a28c97b3ff4deb6f6aab1fe8e0d0`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -15,7 +15,7 @@ Catalog: `engine-v4`. Source fingerprint: `f85fd91e356012e186dce1e765e1acca79cb5
 | M3 Static renderer | 17/17 | 100.00% | 100.00% | 7.74% |
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
-| M6 Networking & services | 8/12 | 82.90% | 60.10% | 4.38% |
+| M6 Networking & services | 9/12 | 85.03% | 68.65% | 4.38% |
 | M7 Isolation & security | 0/8 | 0.00% | 0.00% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
@@ -42,7 +42,7 @@ Catalog: `engine-v4`. Source fingerprint: `f85fd91e356012e186dce1e765e1acca79cb5
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
-| Network & navigation | 2/8 | 3 | 56.25% | 31.25% | 4% | 2.25 |
+| Network & navigation | 3/8 | 2 | 58.59% | 40.62% | 4% | 2.34 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 0/11 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -265,11 +265,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] RFC 6265bis cookie jar: Set-Cookie and date parsing, storage and retrieval, SameSite, prefixes, partitioned cookies, third-party blocking and eviction ([source](../../crates/rustic-net/src/cookie/mod.rs), [source](../../crates/rustic-net/src/cookie/parse.rs), [test](../../crates/rustic-net/src/cookie/tests.rs), [test](../../crates/rustic-net/tests/fetch.rs))
   - [x] Reviewed Public Suffix List source (ADR 0054 decision) ([source](../../crates/rustic-net/src/site.rs), [test](../../crates/rustic-net/tests/public_suffix.rs))
   - [ ] Partitioned HTTP cache and validators
-- **in progress 75.00%** `network.policy` — CSP, MIME, secure contexts and mixed-content policy · size 3 · M6 · 0.37% of engine
-  - [x] CSP3 parsing, source lists, nonces, hashes and directives with report-only ([source](../../crates/rustic-net/src/csp.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [test](../../crates/rustic-net/src/csp/tests.rs))
-  - [x] Mixed content and secure contexts ([source](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs))
-  - [ ] Engine enforcement: inline scripts, eval, script URLs, inline styles and event handlers (TD-164)
-  - [x] Network loads apply CSP, mixed content and X-Content-Type-Options nosniff to subresources ([source](../../crates/rustic-net/src/fetch.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-cli/tests/network.rs))
+- **complete** `network.policy` — CSP, MIME, secure contexts and mixed-content policy · size 3 · M6 · 0.37% of engine ([source](../../crates/rustic-net/src/csp.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [test](../../crates/rustic-net/src/csp/tests.rs), [source](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [test](../../crates/rustic-net/src/mixed_content.rs), [source](../../crates/rustic-style/src/loading.rs), [source](../../crates/rustic-engine/src/inline_scripts.rs), [test](../../crates/rustic-cli/tests/network.rs), [test](../../crates/rustic-engine/tests/classic_scripts.rs), [source](../../crates/rustic-net/src/fetch.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-net/tests/fetch.rs), [test](../../crates/rustic-cli/tests/network.rs))
 - **planned** `network.protocols` — Required HTTP versions, WebSockets and referrer rules · size 5 · M9 · 0.62% of engine
 - **planned** `network.conformance` — Network policy and navigation conformance gate · size 3 · M6 · 0.37% of engine
 - **planned** `network.webtransport` — WebTransport, fetch priorities and Early Hints · size 3 · M11 · 0.37% of engine

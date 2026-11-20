@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M6 entry (before pages load from a server) | TD-15, TD-134, TD-149, TD-152, TD-94, TD-108, TD-110, TD-118, TD-130, TD-135, TD-137, TD-138, TD-139, TD-140 | Review large pages, encodings, relative URLs, local time, regular expressions, browsing contexts and module loading before broadening the host. Fix the JavaScript conformance bugs the 2026-11-17 M4 audit found, since real pages hit them silently. [M6 entry checklist](ROADMAP.md#m6-entry-checklist) |
-| M6, networking (NET-01 to NET-05) | TD-161, TD-164 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
+| M6, networking (NET-01 to NET-05) | TD-161 | TLS and content codings are needed before any real server can be loaded; the M6 demo and gate need both ([ADR 0051](adr/0051-transport-and-tls.md)) |
 | M7 entry (before hostile remote content) | TD-157, TD-165, TD-166, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -215,7 +215,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M6 navigation |
-| TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled, body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
+| TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled (their compilation must apply CSP `script-src-attr`, see TD-164), body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
@@ -226,7 +226,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-162 | Deliberate | Network / codecs | `gzip` and `deflate` response bodies are buffered whole (up to `max_body_bytes`) and inflated at the end of the body; only brotli decodes incrementally | Open, M12 |
 | TD-161 | Deliberate | Network | `Fetcher` blocks per hop, has no HTTP cache, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*` and `Accept-Language` paid 2026-11-20) | Open, M6 networking |
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
-| TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Open, M6 networking |
+| TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Paid 2026-11-20 |
 | TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
 | TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M7 browser shell |
 | TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
@@ -2579,7 +2579,9 @@ document. Pages that rely on reports to tune their policy see nothing.
 **Trigger:** the Reporting API or `SecurityPolicyViolationEvent` work in
 M9's web APIs.
 
-### TD-164 — CSP does not cover inline styles or event handlers
+### TD-164 — CSP does not cover inline styles or event handlers (Paid)
+
+**Paid 2026-11-20:** `rustic_style::InlineStylePolicy` gates inline `<style>` elements (`SheetStatus::BlockedByPolicy`) and `style` attributes through `StyleLoader::with_inline_policy` and the cascade; the CLI supplies the document's CSP (`style-src-elem`/`-attr`, nonces, hashes). Inline event-handler attributes are not compiled at all yet (TD-153); when they are, their compilation must ask `CspList::check_inline(InlineKind::ScriptAttribute, …)`, which already decides them. Evidence: `csp_blocks_unnonced_inline_styles_and_style_attributes`.
 
 The engine's `ScriptPolicy` hook covers parser-inserted inline scripts,
 and hosts check script, stylesheet and image URLs and `eval` against the

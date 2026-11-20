@@ -609,7 +609,8 @@ pub(crate) fn style_walk<'a>(
                 let style_attribute = element
                     .attributes()
                     .find(|a| a.namespace.is_none() && a.local == "style")
-                    .map(|a| String::from_utf16_lossy(a.value));
+                    .map(|a| String::from_utf16_lossy(a.value))
+                    .filter(|source| cascade.allows_style_attribute(source));
                 let (mut inline, inline_diagnostics) = match style_attribute {
                     Some(source) => parse_style_attribute(parser, &source).unwrap_or_default(),
                     None => Default::default(),

@@ -2631,8 +2631,10 @@ hooks for scripts.
 | Mixed content | Secure documents upgrade `http:` images, audio and video to `https:` and block every other insecure subresource and `fetch()`; top-level navigations are not mixed content | `secure_documents_upgrade_images_and_block_the_rest` |
 | Secure contexts | Potentially trustworthy origins (`https`, `wss`, `file`, loopback, `localhost`), inherited through `about:blank`/`srcdoc`, opaque `data:` documents are not secure | `secure_contexts` |
 
-Not yet: CSP for inline `<style>` and `style` attributes in the engine
-(TD-164) and report delivery (TD-163).
+Inline `<style>` elements and `style` attributes are checked through
+`rustic_style::InlineStylePolicy` (`csp_blocks_unnonced_inline_styles_and_style_attributes`);
+event-handler content attributes are not compiled yet (TD-153). Not yet:
+report delivery (TD-163).
 
 ## NET-02 (partial) — Navigation, referrer policy and data: URLs
 

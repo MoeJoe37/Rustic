@@ -1037,6 +1037,7 @@ fn status_text(status: SheetStatus) -> &'static str {
         SheetStatus::Fetch(FetchError::Failed) => "skipped: unreadable",
         SheetStatus::Fetch(FetchError::Cancelled) => "skipped: cancelled",
         SheetStatus::ResourceLimit => "skipped: CSS parser limit",
+        SheetStatus::BlockedByPolicy => "blocked: Content Security Policy",
     }
 }
 
@@ -1161,6 +1162,10 @@ fn compute_styles(
         None => &mut no_fetch,
     };
     let mut loader = StyleLoader::new(fetcher, limits.stylesheets).with_document_encoding(encoding);
+    if let Some(session) = network.filter(|session| !session.csp().is_empty()) {
+        loader =
+            loader.with_inline_policy(Rc::new(crate::network::StylePolicy(Rc::clone(session))));
+    }
     let (mut cascade, sheets) =
         document_cascade_with(document, &parser, document_url.as_ref(), &mut loader)
             .map_err(node_error)?;

@@ -573,6 +573,30 @@ impl rustic_engine::ScriptPolicy for InlinePolicy {
     }
 }
 
+/// The document's CSP for inline `<style>` and `style` attributes.
+#[derive(Debug)]
+pub(crate) struct StylePolicy(pub(crate) Rc<NetworkSession>);
+
+impl rustic_style::InlineStylePolicy for StylePolicy {
+    fn allows_style_element(&self, nonce: Option<&str>, text: &str) -> bool {
+        let verdict =
+            self.0
+                .csp()
+                .check_inline(rustic_net::csp::InlineKind::StyleElement, nonce, text);
+        report(&verdict);
+        verdict.allowed()
+    }
+
+    fn allows_style_attribute(&self, value: &str) -> bool {
+        let verdict =
+            self.0
+                .csp()
+                .check_inline(rustic_net::csp::InlineKind::StyleAttribute, None, value);
+        report(&verdict);
+        verdict.allowed()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

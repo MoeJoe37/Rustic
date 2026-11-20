@@ -309,6 +309,8 @@ pub struct Cascade {
     /// The document base URL, which `url()` values in `style` attributes
     /// resolve against.
     document_base_url: Option<Url>,
+    /// The document's CSP for `style` attributes.
+    inline_policy: Option<std::rc::Rc<dyn crate::InlineStylePolicy>>,
 }
 
 impl PartialEq for Cascade {
@@ -342,6 +344,18 @@ impl Cascade {
     /// values against (sheets carry their own, [`StyleSheet::base_url`]).
     pub fn set_document_base_url(&mut self, base: Option<Url>) {
         self.document_base_url = base;
+    }
+
+    /// Apply a Content Security Policy to `style` attributes.
+    pub fn set_inline_policy(&mut self, policy: Option<std::rc::Rc<dyn crate::InlineStylePolicy>>) {
+        self.inline_policy = policy;
+    }
+
+    /// Whether a `style` attribute with this value may apply.
+    pub fn allows_style_attribute(&self, value: &str) -> bool {
+        self.inline_policy
+            .as_ref()
+            .is_none_or(|policy| policy.allows_style_attribute(value))
     }
 
     /// The document base URL set with [`Cascade::set_document_base_url`].

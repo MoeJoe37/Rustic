@@ -108,6 +108,18 @@ pub enum SheetStatus {
     Fetch(FetchError),
     /// Its text exceeded the CSS parser's limits.
     ResourceLimit,
+    /// The document's Content Security Policy refused an inline sheet.
+    BlockedByPolicy,
+}
+
+/// The document's Content Security Policy for inline CSS (CSP3 §6.7.3.3
+/// "does element match source list", for `style-src-elem` and
+/// `style-src-attr`). External sheet URLs are checked by the fetcher.
+pub trait InlineStylePolicy: std::fmt::Debug {
+    /// Whether a `<style>` element with this `nonce` and text may apply.
+    fn allows_style_element(&self, nonce: Option<&str>, text: &str) -> bool;
+    /// Whether a `style` attribute with this value may apply.
+    fn allows_style_attribute(&self, value: &str) -> bool;
 }
 
 /// One `@import` found while loading a sheet, with its own outcome.
@@ -135,6 +147,7 @@ pub struct StyleLoader<'a> {
     bytes_used: usize,
     cache: HashMap<String, Result<String, FetchError>>,
     document_encoding: Encoding,
+    inline_policy: Option<std::rc::Rc<dyn InlineStylePolicy>>,
 }
 
 impl std::fmt::Debug for StyleLoader<'_> {
@@ -177,6 +190,7 @@ impl<'a> StyleLoader<'a> {
             bytes_used: 0,
             cache: HashMap::new(),
             document_encoding: Encoding::Utf8,
+            inline_policy: None,
         }
     }
 
@@ -188,6 +202,18 @@ impl<'a> StyleLoader<'a> {
     pub fn with_document_encoding(mut self, encoding: Encoding) -> Self {
         self.document_encoding = encoding;
         self
+    }
+
+    /// Apply a Content Security Policy to inline `<style>` elements and,
+    /// through the cascade it builds, to `style` attributes.
+    pub fn with_inline_policy(mut self, policy: std::rc::Rc<dyn InlineStylePolicy>) -> Self {
+        self.inline_policy = Some(policy);
+        self
+    }
+
+    /// The inline style policy, if any.
+    pub fn inline_policy(&self) -> Option<&std::rc::Rc<dyn InlineStylePolicy>> {
+        self.inline_policy.as_ref()
     }
 
     /// Parse a URL from document markup in the document's encoding.

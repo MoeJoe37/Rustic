@@ -340,3 +340,34 @@ fn profiles_keep_local_storage_and_persistent_cookies_and_private_writes_nothing
     assert_eq!(output.status.code(), Some(2));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn csp_blocks_unnonced_inline_styles_and_style_attributes() {
+    let server = FixtureServer::start([(
+        "/",
+        Reply::response(
+            200,
+            &[
+                ("Content-Type", "text/html"),
+                ("Content-Security-Policy", "style-src 'nonce-ok'"),
+            ],
+            b"<!doctype html><style nonce=ok>#a { color: rgb(1, 1, 1) }</style>\
+              <style>#a { margin-left: 9px }</style>\
+              <p id=a style=\"padding-left: 5px\">x</p>",
+        ),
+    )])
+    .unwrap();
+    let grant = format!("http://a.test={}", server.address());
+    let output = rustic(&["dump-style", "--allow-origin", &grant, "http://a.test/"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dump = stdout(&output);
+    assert!(dump.contains("@style 1: applied"), "{dump}");
+    assert!(
+        dump.contains("@style 2: blocked: Content Security Policy"),
+        "{dump}"
+    );
+    assert!(dump.contains("rgb(1, 1, 1)"), "{dump}");
+    assert!(!dump.contains("margin-left: 9px"), "{dump}");
+    assert!(!dump.contains("padding-left: 5px"), "{dump}");
+    assert!(stderr(&output).contains("style-src"), "{}", stderr(&output));
+}

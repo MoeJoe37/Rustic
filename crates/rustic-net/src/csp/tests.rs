@@ -353,3 +353,21 @@ fn report_only_policies_report_without_blocking() {
             .starts_with("Refused to load")
     );
 }
+
+#[test]
+fn non_ascii_tokens_never_split_characters() {
+    let list = CspList::from_container(&PolicyContainer {
+        csp: vec!["script-src 'self'\u{e9}w 'nonce-\u{e9}\u{e9}'".to_owned()],
+        ..PolicyContainer::default()
+    });
+    let url = Url::parse("https://a.test/x.js", None).unwrap();
+    let verdict = list.check_request_with_nonce(
+        &url,
+        FetchDirective::ScriptElement,
+        &me(),
+        0,
+        Some("\u{e9}\u{e9}"),
+        true,
+    );
+    assert!(verdict.allowed());
+}

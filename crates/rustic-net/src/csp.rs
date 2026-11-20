@@ -449,10 +449,13 @@ fn has_keyword(list: &[String], keyword: &str) -> bool {
 fn matches_nonce(list: &[String], nonce: &str) -> bool {
     !nonce.is_empty()
         && list.iter().any(|token| {
-            token.len() > 8
-                && token[..7].eq_ignore_ascii_case("'nonce-")
+            // Byte comparisons: a token may hold non-ASCII text, and a
+            // string slice at byte 7 could split a character.
+            let bytes = token.as_bytes();
+            bytes.len() > 8
+                && bytes[..7].eq_ignore_ascii_case(b"'nonce-")
                 && token.ends_with('\'')
-                && &token[7..token.len() - 1] == nonce
+                && &bytes[7..bytes.len() - 1] == nonce.as_bytes()
         })
 }
 

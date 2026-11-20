@@ -23,6 +23,7 @@ mod js_heap;
 mod js_regexp;
 mod js_run;
 mod mutate;
+mod net;
 mod paint;
 mod png;
 mod rng;

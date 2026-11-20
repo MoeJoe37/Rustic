@@ -61,5 +61,5 @@ pub use headers::{HeaderError, Headers, is_token, is_valid_value as is_valid_hea
 pub use limits::{LimitsError, TransportLimits};
 pub use policy::{NetworkPolicy, PolicyError};
 pub use request::{Request, RequestError};
-pub use response::{HttpVersion, ProtocolError, ResponseHead};
+pub use response::{HttpVersion, ProtocolError, ResponseHead, parse_response};
 pub use transport::{Exchange, NetEvent, TimeoutKind, Transport, TransportError};

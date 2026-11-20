@@ -170,3 +170,17 @@ The 21st target, `js-regexp`, reads a flags byte, a pattern and a subject.
 reports as unsupported, every capture must lie inside the subject, and the
 subject must match the same way stored as Latin-1 and as UTF-16. A poll
 budget cancels exponential patterns.
+
+Four targets cover the M6 network code, which M7 treats as fed by a
+hostile peer (`crates/rustic-fuzz/src/net.rs`). `net-http-response` runs
+`rustic_net::parse_response`, the transport's framing without a socket:
+the head, body or error must not depend on how the bytes are split, and
+the body never passes `max_body_bytes`. `net-cookie` stores any
+`Set-Cookie` sequence and checks the size, prefix and jar limits and that
+`Cookie` headers have no line breaks. `net-csp` runs every CSP check:
+deterministic, and report-only policies never block. `net-cors` runs the
+CORS check and preflight validation: a credentialed success needs the
+exact origin and `Access-Control-Allow-Credentials: true`, and grants are
+never cached longer than two hours. Their first campaigns found a panic
+on non-ASCII CSP tokens and a split-dependent result for leading
+blank-line bytes; both reproducers are regression seeds.

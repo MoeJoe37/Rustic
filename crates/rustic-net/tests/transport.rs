@@ -473,3 +473,23 @@ fn content_codings_are_advertised_and_decoded() {
         None
     );
 }
+
+#[test]
+fn offline_parsing_is_split_invariant_for_leading_blank_bytes() {
+    use rustic_net::{ProtocolError, parse_response};
+    let limits = TransportLimits::default();
+    let input = b"\r\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok";
+    let whole = parse_response(&[input], &limits, false);
+    assert_eq!(whole.as_ref().map(|(_, body)| body.as_slice()), Ok(&b"ok"[..]));
+    let bytes: Vec<&[u8]> = input.chunks(1).collect();
+    assert_eq!(parse_response(&bytes, &limits, false), whole);
+    // The fuzzer's reproducer: only blank-line bytes, then the end.
+    assert_eq!(
+        parse_response(&[b"\r", b"\r", b"\n"], &limits, false),
+        parse_response(&[b"\r\r\n"], &limits, false)
+    );
+    assert_eq!(
+        parse_response(&[b"\r\r\n"], &limits, false).map(|_| ()),
+        Err(ProtocolError::Truncated)
+    );
+}

@@ -361,6 +361,7 @@ dependencies = [
  "rustic-html",
  "rustic-js",
  "rustic-layout",
+ "rustic-net",
  "rustic-paint",
  "rustic-raster",
  "rustic-style",

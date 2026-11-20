@@ -124,6 +124,72 @@ pub(crate) enum Framing {
     UntilClose,
 }
 
+/// Parse a complete response that arrives as `chunks` and then the end of
+/// the stream, exactly as the transport would: interim responses skipped,
+/// body framing, content codings, every [`TransportLimits`] bound. The
+/// result must not depend on how the bytes are split; fuzzing and replay
+/// tools use this, the transport runs the same steps over a socket.
+pub fn parse_response(
+    chunks: &[&[u8]],
+    limits: &TransportLimits,
+    head_request: bool,
+) -> Result<(ResponseHead, Vec<u8>), ProtocolError> {
+    let mut head_parser = HeadParser::new(limits);
+    let mut state: Option<(
+        ResponseHead,
+        BodyDecoder,
+        Option<crate::coding::ContentDecoder>,
+    )> = None;
+    let mut body = Vec::new();
+    let mut received_any = false;
+    for &input in chunks {
+        if input.is_empty() {
+            continue;
+        }
+        received_any = true;
+        let mut wire = Vec::new();
+        match &mut state {
+            Some((_, decoder, _)) => decoder.feed(input, &mut wire)?,
+            None => {
+                if let Some((head, rest)) = head_parser.feed(input)? {
+                    let body_framing = framing(&head, head_request)?;
+                    let content = if body_framing == Framing::Empty {
+                        None
+                    } else {
+                        crate::coding::ContentDecoder::for_response(
+                            head.headers(),
+                            limits.max_body_bytes,
+                        )
+                    };
+                    let mut decoder = BodyDecoder::new(body_framing, limits);
+                    decoder.feed(&rest, &mut wire)?;
+                    state = Some((head, decoder, content));
+                }
+            }
+        }
+        if let Some((_, decoder, content)) = &mut state {
+            match content {
+                Some(content) => content.feed(&wire, &mut body)?,
+                None => body.extend_from_slice(&wire),
+            }
+            if decoder.is_done() {
+                break;
+            }
+        }
+    }
+    match state {
+        Some((head, mut decoder, mut content)) => {
+            decoder.finish()?;
+            if let Some(content) = &mut content {
+                content.finish(&mut body)?;
+            }
+            Ok((head, body))
+        }
+        None if received_any => Err(ProtocolError::Truncated),
+        None => Err(ProtocolError::Empty),
+    }
+}
+
 const STATUS_PREFIX: &[u8] = b"HTTP/1.";
 
 /// Incremental parser for the response head, skipping interim responses.
@@ -164,8 +230,10 @@ impl HeadParser {
             // Fail as soon as the input cannot be a status line, so an
             // HTTP/0.9-style body is refused without waiting for EOF.
             let prefix = self.buffer.len().min(STATUS_PREFIX.len());
+            // Bytes that are all CR or LF may still become blank lines
+            // (RFC 9112 §2.2), however they are split.
             if self.buffer[..prefix] != STATUS_PREFIX[..prefix]
-                && !matches!(self.buffer.as_slice(), [b'\r'])
+                && !self.buffer.iter().all(|byte| matches!(byte, b'\r' | b'\n'))
             {
                 return Err(ProtocolError::InvalidStatusLine);
             }

@@ -22,6 +22,7 @@ rustic-engine = { path = "../rustic-engine" }
 rustic-html = { path = "../rustic-html" }
 rustic-js = { path = "../rustic-js" }
 rustic-layout = { path = "../rustic-layout" }
+rustic-net = { path = "../rustic-net" }
 rustic-paint = { path = "../rustic-paint" }
 rustic-raster = { path = "../rustic-raster" }
 rustic-style = { path = "../rustic-style" }

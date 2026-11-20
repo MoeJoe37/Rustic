@@ -5831,8 +5831,36 @@
           "label": "Verified Android/iOS process and broker restrictions",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Android and iOS isolation design over the shared broker protocol (ADR 0059)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0059-mobile-renderer-isolation.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-ipc/tests/channel.rs",
+                  "marker": "fn a_child_process_speaks_the_protocol_over_its_standard_streams"
+                }
+              ]
+            },
+            {
+              "label": "Android: isolated-process renderer service verified on emulator and device, with crash recovery",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "iOS: BrowserEngineKit web content and networking extensions verified on simulator and device, with the engine entitlement",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "security.permissions",
@@ -5994,8 +6022,89 @@
           "label": "Fuzz/native-memory review and security release gate",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Fuzz targets for every untrusted input, including network parsers, policy decisions and IPC, with a recorded smoke campaign",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/net.rs",
+                  "marker": "pub(crate) struct HttpResponseTarget"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/ipc.rs",
+                  "marker": "pub(crate) struct IpcFrameTarget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "Native and unsafe code inventory of the dependency graph",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/reviews/2026-11-20-m7-security-review.md",
+                  "marker": "## Native and unsafe code"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "AddressSanitizer run over the network, IPC, storage, codec, HTML, bindings, engine and CLI tests, native C included",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/reviews/2026-11-20-m7-security-review.md",
+                  "marker": "## Dynamic checks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/tls.rs",
+                  "marker": "fn"
+                }
+              ]
+            },
+            {
+              "label": "Renderer compromise and site/profile separation tests",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/renderer.rs",
+                  "marker": "fn compromised"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-storage/tests/profile.rs",
+                  "marker": "fn storage_is_partitioned_by_top_level_site_and_cleared_per_origin"
+                }
+              ]
+            },
+            {
+              "label": "Independent external security review",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         }
       ]
     },

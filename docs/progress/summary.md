@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 40.66%** = 38.70% verified complete + 1.96% partial credit. 91/221 capabilities complete, 9 in progress.
+**Overall completion: 41.32%** = 38.70% verified complete + 2.62% partial credit. 91/221 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `1edc54fbc4ed7fa135ecc601117af701eba81b0b7339a6c3addb5732e08ba3e6`.
+Catalog: `engine-v4`. Source fingerprint: `d991b0a2e88f55694b587a08089a944aeb7553021c1db0ef6da00ed259111c2d`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `1edc54fbc4ed7fa135ecc601117af701eba81
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 2/8 | 47.65% | 18.75% | 3.72% |
+| M7 Isolation & security | 2/8 | 65.36% | 18.75% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `1edc54fbc4ed7fa135ecc601117af701eba81
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 2/11 | 4 | 35.46% | 13.95% | 5% | 1.77 |
+| Security & IPC | 2/11 | 6 | 48.64% | 13.95% | 5% | 2.43 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -289,7 +289,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Linux aarch64: native verification run
   - [ ] Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners
   - [ ] macOS: App Sandbox or seatbelt profile with an ADR, verified on native x64 and ARM64 runners
-- **planned** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
+- **in progress 33.33%** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
+  - [x] Android and iOS isolation design over the shared broker protocol (ADR 0059) ([source](../../docs/adr/0059-mobile-renderer-isolation.md), [test](../../crates/rustic-ipc/tests/channel.rs))
+  - [ ] Android: isolated-process renderer service verified on emulator and device, with crash recovery
+  - [ ] iOS: BrowserEngineKit web content and networking extensions verified on simulator and device, with the engine entitlement
 - **in progress 75.00%** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine
   - [x] User activation: transient and sticky, trusted input only, consumable by hosts ([source](../../crates/rustic-bindings/src/page/activation.rs), [test](../../crates/rustic-engine/tests/input.rs))
   - [x] Downloads only through the broker: granted directory, sanitized names, no overwrite, atomic writes ([source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-cli/tests/network.rs))
@@ -303,7 +306,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **planned** `security.brave` — Versioned Brave security comparison and independent review · size 3 · M10 · 0.34% of engine
 - **planned** `security.privacy` — Default tracking/bounce/fingerprinting defenses and privacy matrix · size 5 · M10 · 0.58% of engine
 - **planned** `security.updates` — Authenticated updates, incident response and vulnerability triage · size 3 · M10 · 0.34% of engine
-- **planned** `security.audit` — Fuzz/native-memory review and security release gate · size 5 · M7 · 0.58% of engine
+- **in progress 80.00%** `security.audit` — Fuzz/native-memory review and security release gate · size 5 · M7 · 0.58% of engine
+  - [x] Fuzz targets for every untrusted input, including network parsers, policy decisions and IPC, with a recorded smoke campaign ([source](../../crates/rustic-fuzz/src/net.rs), [source](../../crates/rustic-fuzz/src/ipc.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
+  - [x] Native and unsafe code inventory of the dependency graph ([source](../../docs/reviews/2026-11-20-m7-security-review.md), [test](../../crates/rustic-fuzz/tests/harness.rs))
+  - [x] AddressSanitizer run over the network, IPC, storage, codec, HTML, bindings, engine and CLI tests, native C included ([source](../../docs/reviews/2026-11-20-m7-security-review.md), [test](../../crates/rustic-net/tests/tls.rs))
+  - [x] Renderer compromise and site/profile separation tests ([source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-storage/tests/profile.rs))
+  - [ ] Independent external security review
 
 ### Compositor & GPU
 

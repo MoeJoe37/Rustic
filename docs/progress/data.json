@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "1edc54fbc4ed7fa135ecc601117af701eba81b0b7339a6c3addb5732e08ba3e6",
-  "percent": "40.66",
+  "source_fingerprint": "d991b0a2e88f55694b587a08089a944aeb7553021c1db0ef6da00ed259111c2d",
+  "percent": "41.32",
   "verified_percent": "38.70",
-  "partial_percent": "1.96",
+  "partial_percent": "2.62",
   "completed": 91,
-  "in_progress": 9,
+  "in_progress": 11,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 2,
       "total": 8,
-      "percent": "47.65",
+      "percent": "65.36",
       "verified_percent": "18.75",
-      "partial_percent": "28.90"
+      "partial_percent": "46.61"
     },
     {
       "id": "M8",
@@ -6353,9 +6353,37 @@
           "label": "Verified Android/iOS process and broker restrictions",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Android and iOS isolation design over the shared broker protocol (ADR 0059)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0059-mobile-renderer-isolation.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-ipc/tests/channel.rs",
+                  "marker": "fn a_child_process_speaks_the_protocol_over_its_standard_streams"
+                }
+              ]
+            },
+            {
+              "label": "Android: isolated-process renderer service verified on emulator and device, with crash recovery",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "iOS: BrowserEngineKit web content and networking extensions verified on simulator and device, with the engine entitlement",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.58"
         },
         {
@@ -6528,20 +6556,101 @@
           "label": "Fuzz/native-memory review and security release gate",
           "size": 5,
           "milestone": "M7",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Fuzz targets for every untrusted input, including network parsers, policy decisions and IPC, with a recorded smoke campaign",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/net.rs",
+                  "marker": "pub(crate) struct HttpResponseTarget"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-fuzz/src/ipc.rs",
+                  "marker": "pub(crate) struct IpcFrameTarget"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "Native and unsafe code inventory of the dependency graph",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/reviews/2026-11-20-m7-security-review.md",
+                  "marker": "## Native and unsafe code"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-fuzz/tests/harness.rs",
+                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
+                }
+              ]
+            },
+            {
+              "label": "AddressSanitizer run over the network, IPC, storage, codec, HTML, bindings, engine and CLI tests, native C included",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/reviews/2026-11-20-m7-security-review.md",
+                  "marker": "## Dynamic checks"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-net/tests/tls.rs",
+                  "marker": "fn"
+                }
+              ]
+            },
+            {
+              "label": "Renderer compromise and site/profile separation tests",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/renderer.rs",
+                  "marker": "fn compromised"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-storage/tests/profile.rs",
+                  "marker": "fn storage_is_partitioned_by_top_level_site_and_cleared_per_origin"
+                }
+              ]
+            },
+            {
+              "label": "Independent external security review",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "80.00",
           "engine_share": "0.58"
         }
       ],
       "points": 43,
       "completed": 2,
-      "in_progress": 4,
+      "in_progress": 6,
       "total": 11,
-      "contribution": "1.77",
-      "percent": "35.46",
+      "contribution": "2.43",
+      "percent": "48.64",
       "verified_percent": "13.95",
-      "partial_percent": "21.51"
+      "partial_percent": "34.69"
     },
     {
       "id": "compositor",

@@ -82,7 +82,10 @@ allowlist with a disposable profile; it remains unsuitable for arbitrary browsin
 M7 introduces mandatory process boundaries, sandbox launch verification, brokered
 services and cross-origin frame/site-assignment policy. The reference browser
 must refuse remote mode if the selected platform's required isolation is absent.
-An explicitly separate test harness is never advertised as protected browsing.
+An explicitly separate test harness is never advertised as protected browsing. Status
+2026-11-20: renderers are separate processes with brokered authority on
+every platform the CLI runs on, and confined only by the opt-in Linux
+sandbox; see the [M7 security review](reviews/2026-11-20-m7-security-review.md).
 
 The OS implementation is platform-specific. Linux namespace/seccomp policy,
 Windows token/AppContainer/job policy, and macOS feasibility each need practical

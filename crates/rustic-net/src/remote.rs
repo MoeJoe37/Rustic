@@ -13,6 +13,7 @@
 
 use std::cell::Cell;
 use std::fmt;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,7 +21,10 @@ use std::time::Duration;
 use rustic_base::CancellationToken;
 
 use crate::pipe::{Producer, Wait, pipe};
-use crate::{Exchange, NetEvent, Request, TransportError, TransportLimits};
+use crate::tls::CertificateError;
+use crate::{
+    Exchange, NetEvent, ProtocolError, Request, TimeoutKind, TransportError, TransportLimits,
+};
 
 /// Runs granted requests somewhere else, typically a network process.
 pub trait Connector: Send + Sync + fmt::Debug {
@@ -166,6 +170,108 @@ pub fn remote_exchange(window: usize, hooks: Arc<dyn ExchangeHooks>) -> (RemoteF
     (feed, exchange)
 }
 
+/// I/O error kinds that cross a process boundary by index; anything
+/// else becomes `Other`.
+const IO_KINDS: [io::ErrorKind; 14] = [
+    io::ErrorKind::Other,
+    io::ErrorKind::NotFound,
+    io::ErrorKind::PermissionDenied,
+    io::ErrorKind::ConnectionRefused,
+    io::ErrorKind::ConnectionReset,
+    io::ErrorKind::ConnectionAborted,
+    io::ErrorKind::NotConnected,
+    io::ErrorKind::AddrInUse,
+    io::ErrorKind::AddrNotAvailable,
+    io::ErrorKind::BrokenPipe,
+    io::ErrorKind::TimedOut,
+    io::ErrorKind::UnexpectedEof,
+    io::ErrorKind::Interrupted,
+    io::ErrorKind::WouldBlock,
+];
+
+const CERTIFICATE_ERRORS: [CertificateError; 6] = [
+    CertificateError::UnknownIssuer,
+    CertificateError::Expired,
+    CertificateError::NotValidForName,
+    CertificateError::Revoked,
+    CertificateError::Invalid,
+    CertificateError::Other,
+];
+
+const PROTOCOL_ERRORS: [ProtocolError; 13] = [
+    ProtocolError::InvalidStatusLine,
+    ProtocolError::InvalidHeader,
+    ProtocolError::HeadTooLarge,
+    ProtocolError::TooManyInterimResponses,
+    ProtocolError::UnexpectedUpgrade,
+    ProtocolError::InvalidContentLength,
+    ProtocolError::UnsupportedTransferCoding,
+    ProtocolError::InvalidChunk,
+    ProtocolError::InvalidTrailer,
+    ProtocolError::BodyTooLarge,
+    ProtocolError::InvalidContentCoding,
+    ProtocolError::Truncated,
+    ProtocolError::Empty,
+];
+
+fn index_of<T: PartialEq>(table: &[T], value: &T) -> u16 {
+    table
+        .iter()
+        .position(|entry| entry == value)
+        .and_then(|index| u16::try_from(index).ok())
+        .unwrap_or(0)
+}
+
+/// A transport error as two numbers, for [`error_from_code`] in another
+/// process.
+pub fn error_code(error: TransportError) -> (u16, u16) {
+    match error {
+        TransportError::Blocked => (1, 0),
+        TransportError::TlsUnavailable => (2, 0),
+        TransportError::Certificate(kind) => (3, index_of(&CERTIFICATE_ERRORS, &kind)),
+        TransportError::Tls => (4, 0),
+        TransportError::Connect(kind) => (5, index_of(&IO_KINDS, &kind)),
+        TransportError::ConnectTimeout => (6, 0),
+        TransportError::Io(kind) => (7, index_of(&IO_KINDS, &kind)),
+        TransportError::Timeout(TimeoutKind::Idle) => (8, 0),
+        TransportError::Timeout(TimeoutKind::Total) => (8, 1),
+        TransportError::Cancelled => (9, 0),
+        TransportError::Protocol(kind) => (10, index_of(&PROTOCOL_ERRORS, &kind)),
+        TransportError::NetworkProcess => (11, 0),
+    }
+}
+
+/// The transport error [`error_code`] encoded, or `None` for numbers it
+/// never produces (a broken peer).
+pub fn error_from_code(code: u16, detail: u16) -> Option<TransportError> {
+    let detail = usize::from(detail);
+    let plain = |error| (detail == 0).then_some(error);
+    match code {
+        1 => plain(TransportError::Blocked),
+        2 => plain(TransportError::TlsUnavailable),
+        3 => CERTIFICATE_ERRORS
+            .get(detail)
+            .map(|&kind| TransportError::Certificate(kind)),
+        4 => plain(TransportError::Tls),
+        5 => IO_KINDS
+            .get(detail)
+            .map(|&kind| TransportError::Connect(kind)),
+        6 => plain(TransportError::ConnectTimeout),
+        7 => IO_KINDS.get(detail).map(|&kind| TransportError::Io(kind)),
+        8 => match detail {
+            0 => Some(TransportError::Timeout(TimeoutKind::Idle)),
+            1 => Some(TransportError::Timeout(TimeoutKind::Total)),
+            _ => None,
+        },
+        9 => plain(TransportError::Cancelled),
+        10 => PROTOCOL_ERRORS
+            .get(detail)
+            .map(|&kind| TransportError::Protocol(kind)),
+        11 => plain(TransportError::NetworkProcess),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
@@ -263,6 +369,36 @@ mod tests {
         drop(exchange);
         assert!(*hooks.cancelled.lock().unwrap() >= 1);
         assert_eq!(feed.push(NetEvent::Finished), Err(FeedError::ConsumerGone));
+    }
+
+    #[test]
+    fn every_transport_error_survives_its_code() {
+        let mut errors = vec![
+            TransportError::Blocked,
+            TransportError::TlsUnavailable,
+            TransportError::Tls,
+            TransportError::ConnectTimeout,
+            TransportError::Timeout(TimeoutKind::Idle),
+            TransportError::Timeout(TimeoutKind::Total),
+            TransportError::Cancelled,
+            TransportError::NetworkProcess,
+        ];
+        errors.extend(CERTIFICATE_ERRORS.map(TransportError::Certificate));
+        errors.extend(IO_KINDS.map(TransportError::Connect));
+        errors.extend(IO_KINDS.map(TransportError::Io));
+        errors.extend(PROTOCOL_ERRORS.map(TransportError::Protocol));
+        for error in errors {
+            let (code, detail) = error_code(error);
+            assert_eq!(error_from_code(code, detail), Some(error));
+        }
+        assert_eq!(
+            error_code(TransportError::Io(io::ErrorKind::OutOfMemory)),
+            error_code(TransportError::Io(io::ErrorKind::Other)),
+            "unlisted I/O kinds travel as Other"
+        );
+        for (code, detail) in [(0, 0), (1, 1), (3, 6), (8, 2), (12, 0), (u16::MAX, 0)] {
+            assert_eq!(error_from_code(code, detail), None);
+        }
     }
 
     #[test]

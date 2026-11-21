@@ -16,6 +16,7 @@
 
 #![warn(missing_docs)]
 
+pub mod network;
 pub mod protocol;
 mod wire;
 
@@ -37,6 +38,10 @@ pub enum Role {
     Broker,
     /// A renderer: parses and runs content, asks the broker for everything.
     Renderer,
+    /// The network process: runs sockets, TLS, HTTP framing and content
+    /// decoding for exchanges the broker has already granted
+    /// ([`network`] protocol).
+    Network,
 }
 
 impl Role {
@@ -44,13 +49,16 @@ impl Role {
         match self {
             Self::Broker => 1,
             Self::Renderer => 2,
+            Self::Network => 3,
         }
     }
 
+    /// The default peer: the broker talks to renderers unless
+    /// [`Channel::connect_to`] names another role.
     fn peer(self) -> Self {
         match self {
             Self::Broker => Self::Renderer,
-            Self::Renderer => Self::Broker,
+            Self::Renderer | Self::Network => Self::Broker,
         }
     }
 }
@@ -140,6 +148,18 @@ impl<R, W> fmt::Debug for Channel<R, W> {
 impl<R: Read, W: Write> Channel<R, W> {
     /// Connect as `role`: send our handshake, then check the peer's.
     pub fn connect(reader: R, writer: W, role: Role, limits: Limits) -> Result<Self, IpcError> {
+        Self::connect_to(reader, writer, role, role.peer(), limits)
+    }
+
+    /// Connect as `role` to a peer that must announce itself as `peer`
+    /// (the broker connecting to its network process).
+    pub fn connect_to(
+        reader: R,
+        writer: W,
+        role: Role,
+        peer: Role,
+        limits: Limits,
+    ) -> Result<Self, IpcError> {
         let mut channel = Self {
             reader,
             writer,
@@ -150,11 +170,12 @@ impl<R: Read, W: Write> Channel<R, W> {
         hello.push(role.byte());
         channel.writer.write_all(&hello).map_err(io_error)?;
         channel.writer.flush().map_err(io_error)?;
+        let peer_role = peer;
         let mut peer = [0u8; 11];
         channel.reader.read_exact(&mut peer).map_err(io_error)?;
         if peer[..8] != MAGIC[..]
             || peer[8..10] != PROTOCOL_VERSION.to_le_bytes()
-            || peer[10] != role.peer().byte()
+            || peer[10] != peer_role.byte()
         {
             return Err(IpcError::Handshake);
         }
@@ -163,44 +184,103 @@ impl<R: Read, W: Write> Channel<R, W> {
 
     /// Send one message.
     pub fn send<M: Message>(&mut self, message: &M) -> Result<(), IpcError> {
-        let mut writer = Writer::new();
-        message.encode(&mut writer);
-        let payload = writer.into_bytes();
-        if payload.len() > self.limits.max_frame_bytes {
-            return Err(IpcError::FrameTooLarge(payload.len() as u64));
-        }
-        let length = u32::try_from(payload.len())
-            .map_err(|_| IpcError::FrameTooLarge(payload.len() as u64))?;
-        self.writer
-            .write_all(&length.to_le_bytes())
-            .map_err(io_error)?;
-        self.writer.write_all(&payload).map_err(io_error)?;
-        self.writer.flush().map_err(io_error)
+        send_frame(&mut self.writer, self.limits, message)
     }
 
     /// Receive one message, refusing oversized or malformed frames.
     pub fn recv<M: Message>(&mut self) -> Result<M, IpcError> {
-        let mut length = [0u8; 4];
-        self.reader.read_exact(&mut length).map_err(io_error)?;
-        let length = u32::from_le_bytes(length) as u64;
-        if length > self.limits.max_frame_bytes as u64 {
-            return Err(IpcError::FrameTooLarge(length));
-        }
-        // Read in bounded steps: a peer that announces a large frame and
-        // then stops costs at most what it actually sent.
-        let mut payload = Vec::new();
-        let mut remaining = length as usize;
-        let mut chunk = [0u8; 64 * 1024];
-        while remaining > 0 {
-            let want = remaining.min(chunk.len());
-            self.reader
-                .read_exact(&mut chunk[..want])
-                .map_err(io_error)?;
-            payload.extend_from_slice(&chunk[..want]);
-            remaining -= want;
-        }
-        decode_frame(&payload)
+        recv_frame(&mut self.reader, self.limits)
     }
+
+    /// Separate the receiving and sending halves, so one thread can wait
+    /// for messages while others send.
+    pub fn split(self) -> (Receiver<R>, Sender<W>) {
+        (
+            Receiver {
+                reader: self.reader,
+                limits: self.limits,
+            },
+            Sender {
+                writer: self.writer,
+                limits: self.limits,
+            },
+        )
+    }
+}
+
+/// The receiving half of a [`Channel`].
+pub struct Receiver<R> {
+    reader: R,
+    limits: Limits,
+}
+
+impl<R> fmt::Debug for Receiver<R> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Receiver").finish_non_exhaustive()
+    }
+}
+
+impl<R: Read> Receiver<R> {
+    /// Receive one message, refusing oversized or malformed frames.
+    pub fn recv<M: Message>(&mut self) -> Result<M, IpcError> {
+        recv_frame(&mut self.reader, self.limits)
+    }
+}
+
+/// The sending half of a [`Channel`].
+pub struct Sender<W> {
+    writer: W,
+    limits: Limits,
+}
+
+impl<W> fmt::Debug for Sender<W> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Sender").finish_non_exhaustive()
+    }
+}
+
+impl<W: Write> Sender<W> {
+    /// Send one message.
+    pub fn send<M: Message>(&mut self, message: &M) -> Result<(), IpcError> {
+        send_frame(&mut self.writer, self.limits, message)
+    }
+}
+
+fn send_frame<M: Message>(
+    writer: &mut impl Write,
+    limits: Limits,
+    message: &M,
+) -> Result<(), IpcError> {
+    let payload = encode_frame(message);
+    if payload.len() > limits.max_frame_bytes {
+        return Err(IpcError::FrameTooLarge(payload.len() as u64));
+    }
+    let length =
+        u32::try_from(payload.len()).map_err(|_| IpcError::FrameTooLarge(payload.len() as u64))?;
+    writer.write_all(&length.to_le_bytes()).map_err(io_error)?;
+    writer.write_all(&payload).map_err(io_error)?;
+    writer.flush().map_err(io_error)
+}
+
+fn recv_frame<M: Message>(reader: &mut impl Read, limits: Limits) -> Result<M, IpcError> {
+    let mut length = [0u8; 4];
+    reader.read_exact(&mut length).map_err(io_error)?;
+    let length = u32::from_le_bytes(length) as u64;
+    if length > limits.max_frame_bytes as u64 {
+        return Err(IpcError::FrameTooLarge(length));
+    }
+    // Read in bounded steps: a peer that announces a large frame and
+    // then stops costs at most what it actually sent.
+    let mut payload = Vec::new();
+    let mut remaining = length as usize;
+    let mut chunk = [0u8; 64 * 1024];
+    while remaining > 0 {
+        let want = remaining.min(chunk.len());
+        reader.read_exact(&mut chunk[..want]).map_err(io_error)?;
+        payload.extend_from_slice(&chunk[..want]);
+        remaining -= want;
+    }
+    decode_frame(&payload)
 }
 
 /// Decode one complete frame payload (also used by the fuzz target).

@@ -251,7 +251,7 @@ pub enum RendererMessage {
     },
 }
 
-fn put_headers(writer: &mut Writer, headers: &[(String, Vec<u8>)]) {
+pub(crate) fn put_headers(writer: &mut Writer, headers: &[(String, Vec<u8>)]) {
     writer.u32(u32::try_from(headers.len()).unwrap_or(u32::MAX));
     for (name, value) in headers {
         writer.str(name);
@@ -259,7 +259,7 @@ fn put_headers(writer: &mut Writer, headers: &[(String, Vec<u8>)]) {
     }
 }
 
-fn get_headers(reader: &mut Reader<'_>) -> Result<Vec<(String, Vec<u8>)>, DecodeError> {
+pub(crate) fn get_headers(reader: &mut Reader<'_>) -> Result<Vec<(String, Vec<u8>)>, DecodeError> {
     let count = reader.u32()? as usize;
     if count > MAX_HEADERS {
         return Err(DecodeError::OutOfRange);
@@ -285,7 +285,7 @@ fn get_units(reader: &mut Reader<'_>) -> Result<Vec<u16>, DecodeError> {
         .collect())
 }
 
-fn put_opt_bytes(writer: &mut Writer, value: Option<&[u8]>) {
+pub(crate) fn put_opt_bytes(writer: &mut Writer, value: Option<&[u8]>) {
     match value {
         Some(bytes) => {
             writer.u8(1);
@@ -295,7 +295,7 @@ fn put_opt_bytes(writer: &mut Writer, value: Option<&[u8]>) {
     }
 }
 
-fn get_opt_bytes(reader: &mut Reader<'_>) -> Result<Option<Vec<u8>>, DecodeError> {
+pub(crate) fn get_opt_bytes(reader: &mut Reader<'_>) -> Result<Option<Vec<u8>>, DecodeError> {
     match reader.u8()? {
         0 => Ok(None),
         1 => reader.bytes().map(Some),

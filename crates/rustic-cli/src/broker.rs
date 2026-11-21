@@ -40,6 +40,8 @@ static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
 static SANDBOX: AtomicBool = AtomicBool::new(false);
 
 /// Whether renderers (and the network process) are confined in this run.
+/// (Windows does not confine the network process yet, TD-176.)
+#[cfg(not(windows))]
 pub(crate) fn sandboxed() -> bool {
     SANDBOX.load(Ordering::Relaxed)
 }

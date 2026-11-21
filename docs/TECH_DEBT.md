@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-174, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-174, TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-173, TD-175, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -237,6 +237,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 | TD-174 | Deliberate | Isolation | macOS has no renderer sandbox: `--sandbox` is an error there and renderers run unconfined by default | Open, M7 (ISO-04) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
+| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is not OS-confined: it runs with the user's rights, so it isolates crashes but does not contain a compromise | Open, M7 (ISO-03/ISO-04) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2774,3 +2775,19 @@ could replace.
 renderer), and launch a packaged, path-pinned bubblewrap or Rustic's
 own namespace setup.
 **Trigger:** M8 packaging, or a library-disclosure finding.
+
+### TD-176 — The network process is not OS-confined
+
+Split runs move sockets, TLS, HTTP framing and content decoding into a
+`rustic __network` child (ADR 0061), and the broker treats its replies as
+hostile. The child itself is started like an unconfined renderer: it can
+read the user's files and reach any loopback service, so code execution
+in it (a TLS or decoder bug) is contained only by what the broker refuses
+to accept from it.
+**Pay:** confine it on each platform with what it needs and nothing
+else: on Linux bubblewrap without `--unshare-net`, read-only trust-store
+paths and a seccomp allowlist that adds `socket`/`connect`; on Windows an
+AppContainer with the client network capability; macOS with TD-174.
+Same probe tests as the renderer, minus networking.
+**Trigger:** before remote browsing (the M7 gate), or when DNS moves into
+the network process (TD-157).

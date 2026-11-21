@@ -619,11 +619,17 @@ Windows 11 x64; the first project `unsafe`, confined to `rustic-sandbox`);
 macOS has none (TD-174). ISO-05: user activation and brokered downloads;
 prompts wait for the M8 shell. ISO-06: [security review](reviews/2026-11-20-m7-security-review.md)
 with fuzzing, an unsafe/native inventory and an AddressSanitizer run.
-ISO-07: crash, protocol-violation and hang recovery for renderers.
+ISO-07: crash, protocol-violation and hang recovery for renderers, and
+a network process ([ADR 0061](adr/0061-network-process.md)): in split
+runs sockets, TLS, HTTP framing and content decoding run in a
+`rustic __network` child whose replies the broker revalidates under
+credit-based flow control; a crashed or protocol-breaking one fails only
+its in-flight requests and is replaced (at most four per run).
 ISO-08 is a design only ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
 Still open: native Linux aarch64, Windows ARM64, macOS, Android and iOS
-runs (TD-12), the macOS sandbox, cross-origin frames, a network process,
-trusted prompts and an independent external review. The demo runs:
+runs (TD-12), the macOS sandbox, OS confinement of the network process
+(TD-176), cross-origin frames, trusted prompts and an independent
+external review. The demo runs:
 `crates/rustic-cli/tests/isolation.rs`.
 
 **Gate:** all applicable [security gates](SECURITY.md) pass with recorded evidence
@@ -640,7 +646,7 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       simulator or device. Restoring hosted CI (or replacing it with
       self-hosted runners) is therefore a hard prerequisite of M7, not a
       convenience ([TD-12](TECH_DEBT.md)).
-- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: none yet, TD-174), each
+- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: none yet, TD-174), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
 - [x] **The engine already runs split.** Done 2026-11-20: every document
       command except `reftest` runs in a `rustic __renderer` child over

@@ -1,7 +1,9 @@
-//! `ipc-frame`: the broker/renderer protocol decoder (`rustic-ipc`) over
-//! arbitrary frames from a hostile peer. Decoding never panics, and the
-//! encoding is canonical: a frame that decodes re-encodes to the same bytes.
+//! `ipc-frame`: the broker/renderer and broker/network-process protocol
+//! decoders (`rustic-ipc`) over arbitrary frames from a hostile peer.
+//! Decoding never panics, and the encoding is canonical: a frame that
+//! decodes re-encodes to the same bytes.
 
+use rustic_ipc::network::{ExchangeLimits, Head, NetworkCommand, NetworkEvent, Open};
 use rustic_ipc::protocol::{
     BrokerMessage, DocumentGrant, RendererMessage, ResourceKind, Start, StorageArea, StorageOp,
 };
@@ -58,6 +60,49 @@ pub(crate) fn seeds() -> Vec<Vec<u8>> {
             renderer.extend(encode_frame(&message));
             seeds.push(renderer);
         }
+        let id = u64::from(id);
+        for command in [
+            NetworkCommand::Open(Box::new(Open {
+                id,
+                method: "GET".into(),
+                url: format!("https://a.test/{id}"),
+                headers: vec![("Accept".into(), b"*/*".to_vec())],
+                body: vec![b'b'; (id % 5) as usize],
+                address: "127.0.0.1:8443".into(),
+                limits: ExchangeLimits {
+                    window: id * 1024,
+                    total_ms: (id % 2 == 0).then_some(id),
+                    ..ExchangeLimits::default()
+                },
+            })),
+            NetworkCommand::Credit { id, bytes: id * 7 },
+        ] {
+            let mut frame = vec![2u8];
+            frame.extend(encode_frame(&command));
+            seeds.push(frame);
+        }
+        for event in [
+            NetworkEvent::Head(Box::new(Head {
+                id,
+                http11: id % 2 == 0,
+                status: 200 + id as u16,
+                reason: b"OK".to_vec(),
+                headers: vec![("Content-Type".into(), b"text/html".to_vec())],
+            })),
+            NetworkEvent::Body {
+                id,
+                bytes: vec![id as u8; id as usize],
+            },
+            NetworkEvent::Failed {
+                id,
+                code: (id % 12) as u16,
+                detail: (id % 3) as u16,
+            },
+        ] {
+            let mut frame = vec![3u8];
+            frame.extend(encode_frame(&event));
+            seeds.push(frame);
+        }
     }
     seeds
 }
@@ -98,10 +143,11 @@ impl Target for IpcFrameTarget {
         let Some((&side, payload)) = input.split_first() else {
             return Ok(());
         };
-        if side & 1 == 0 {
-            canonical::<BrokerMessage>(payload)
-        } else {
-            canonical::<RendererMessage>(payload)
+        match side & 3 {
+            0 => canonical::<BrokerMessage>(payload),
+            1 => canonical::<RendererMessage>(payload),
+            2 => canonical::<NetworkCommand>(payload),
+            _ => canonical::<NetworkEvent>(payload),
         }
     }
 }

@@ -6034,7 +6034,28 @@
               ]
             },
             {
-              "label": "Network and GPU service crash and restart (needs a network process, TD-161)",
+              "label": "Network process: exchanges run in a separate process; a crashed or protocol-breaking one fails only its requests and is replaced (ADR 0061)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/netproc.rs",
+                  "marker": "fn fail_all"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_crashed_network_process_fails_its_requests_and_is_replaced"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_network_process_is_cut_off_by_the_broker"
+                }
+              ]
+            },
+            {
+              "label": "GPU process crash and restart (needs the M8 GPU process)",
               "status": "planned",
               "evidence": []
             }

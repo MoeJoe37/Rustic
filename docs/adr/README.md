@@ -68,6 +68,7 @@ instead of rewriting the history of a decision.
 | [0058](0058-linux-renderer-sandbox.md) | Linux renderer under bubblewrap and a seccomp allowlist: all namespaces, no files, sockets or network, on by default, fail closed, watchdog | Accepted |
 | [0059](0059-mobile-renderer-isolation.md) | Android isolated-process renderer service and iOS BrowserEngineKit extensions over the same IPC | Proposed |
 | [0060](0060-windows-renderer-sandbox.md) | Windows renderer in a capability-less LPAC AppContainer and a kill-on-close job; `rustic-sandbox` holds the first project `unsafe` | Accepted |
+| [0061](0061-network-process.md) | Exchanges (sockets, TLS, HTTP framing, content codings) run in a `rustic __network` child; the broker keeps every decision and revalidates replies under credit-based flow control | Accepted |
 
 ## Records by area
 
@@ -86,7 +87,7 @@ instead of rewriting the history of a decision.
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
-| Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060 |
+| Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

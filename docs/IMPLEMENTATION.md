@@ -156,9 +156,17 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Networking and resources (M6): 5 sections</summary>
+<summary>Isolation and security (M7): 3 sections</summary>
 
+- [ISO-07 — Network process](#iso-07--network-process)
+- [ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)](#iso-03iso-04--renderer-sandboxes-on-by-default-linux-windows)
 - [ISO-02 — Split renderer process and brokered authority](#iso-02--split-renderer-process-and-brokered-authority)
+
+</details>
+
+<details>
+<summary>Networking and resources (M6): 13 sections</summary>
+
 - [NET-03 — fetch(), Headers, Request and Response](#net-03--fetch-headers-request-and-response)
 - [NET-04 — Partitioned HTTP cache](#net-04--partitioned-http-cache)
 - [NET-06 — Profiles, storage keys and Web Storage](#net-06--profiles-storage-keys-and-web-storage)
@@ -2538,6 +2546,28 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## ISO-07 — Network process
+
+Added 2026-11-21 (`rustic_net::remote`, `rustic_ipc::network`,
+`rustic-cli/src/netproc.rs`, [ADR 0061](adr/0061-network-process.md)).
+In a split run every exchange the broker's policy grants runs in a
+`rustic __network` child: socket, TLS, HTTP/1.1 framing and content
+decoding. The broker keeps grants, CSP, mixed content, CORS, cookies,
+the HTTP cache and ORB. `--single-process` keeps exchanges in process.
+The child is not OS-confined yet (TD-176).
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Hand-off | `Transport::with_connector` passes a request only after `NetworkPolicy::route` granted it, with the granted address and the exchange limits; the child re-checks the grant (loopback only) | every CLI network suite, which now runs through the network process |
+| Protocol | `Role::Network` handshake; `Configure`, `Open`, `Cancel`, `Credit` / `Head`, `Body`, `Finished`, `Failed`; 16 MiB frames; every prefix and trailing byte refused; transport errors as checked numeric codes | `every_message_round_trips_and_every_prefix_is_refused`, `unknown_tags_and_oversized_bundles_are_refused`, `every_transport_error_survives_its_code`, fuzz target `ipc-frame` (sides 2 and 3) |
+| Hostile replies | Heads revalidated (`ResponseHead::from_parts`, `Headers::append`, header count); body bytes beyond the credit window, events out of order, unknown exchange ids and unknown error codes kill the process | `events_flow_in_order_and_consumption_is_reported`, `out_of_order_events_are_refused`, `a_compromised_network_process_is_cut_off_by_the_broker` (credit overrun, `101` head, foreign id, unknown error) |
+| Flow control | The child sends at most one window per exchange before the consumer returns credit; cancelling or dropping an exchange sends `Cancel` and fails it locally | `dropping_an_unfinished_exchange_reports_cancellation`, `a_failed_feed_ends_the_exchange` |
+| Crash recovery | A dead or protocol-breaking process fails only its in-flight exchanges (`TransportError::NetworkProcess`), and the next request starts a fresh one, at most four per run; no request is retried | `a_crashed_network_process_fails_its_requests_and_is_replaced`, `a_network_process_that_crashes_every_time_cannot_loop` |
+
+Test hook `RUSTIC_TEST_NETWORK_PROCESS` (`crash`, `crash-on:PATH`,
+`credit-overrun`, `bad-status`, `foreign-exchange`, `unknown-error`)
+changes only what the network process does; it grants nothing.
 
 ## ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)
 

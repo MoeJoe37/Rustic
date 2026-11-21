@@ -72,7 +72,7 @@ No dependency is new in M7.
 | Renderer sandbox launches with verified restrictions on each OS | Linux only, opt-in, no seccomp (ADR 0058, TD-172); not met elsewhere |
 | Hostile renderer IPC cannot mint capabilities, escape budgets or reach other documents | Met for the CLI broker |
 | Infinite scripts, decompression bombs, deep inputs terminate | Met (budgets, watchdog, bomb test) |
-| Crashes cancel work without killing chrome | Met for renderers; no separate network or GPU process exists |
+| Crashes cancel work without killing chrome | Met for renderers and (addendum 2026-11-21) the network process; no GPU process exists |
 | GC tracing, codecs, FFI, shared memory have stress/fuzz coverage | Met; no shared memory exists (TD-170) |
 | Certificate verification on, no silent fallback | Met |
 | No unintended remote listener | Met: the CLI opens no listening socket |
@@ -117,3 +117,24 @@ Winsock cannot start.
 Still blocking remote browsing: macOS has no sandbox (TD-174); Linux
 aarch64, Windows ARM64, macOS, Android and iOS have no native run
 (TD-12); no independent external review.
+
+## Addendum 2026-11-21 — network process
+
+The broker no longer parses server bytes in split runs: sockets, TLS
+(rustls), HTTP/1.1 framing and content decoding (gzip, deflate, brotli)
+run in a `rustic __network` child ([ADR 0061](../adr/0061-network-process.md)).
+Reviewed as broker code, `rustic-cli/src/netproc.rs` treats the child as
+hostile: heads are rebuilt through the same validators the parser uses,
+body bytes beyond the per-exchange credit window, events out of order,
+answers for exchanges never opened and unknown error codes kill the
+child, and its standard error is relayed escaped. A crashed child fails
+only its in-flight requests; restarts are capped at four per run. Tests
+cover a crash with replacement, a child that always crashes, and four
+compromised behaviours; the IPC decoder is in the `ipc-frame` fuzz
+target.
+
+The "crashes cancel work without killing chrome" gate is now met for the
+network process as well as renderers (no GPU process exists). New debt:
+the child is not OS-confined (TD-176), so a compromise of it is
+contained only by what the broker refuses; this joins the items that
+block remote browsing.

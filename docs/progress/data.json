@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "fb0732883ea2b988bfdc5ea2ae59a6285b30aebf6b6deb67309b22aad2f31087",
-  "percent": "41.50",
+  "source_fingerprint": "8779aa28c0e30717fa8bed033ed33b98f13f93d7936f038f88e9dc3ee7b8faa5",
+  "percent": "41.52",
   "verified_percent": "38.70",
-  "partial_percent": "2.80",
+  "partial_percent": "2.82",
   "completed": 91,
   "in_progress": 11,
   "total": 221,
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 2,
       "total": 8,
-      "percent": "70.05",
+      "percent": "70.52",
       "verified_percent": "18.75",
-      "partial_percent": "51.30"
+      "partial_percent": "51.77"
     },
     {
       "id": "M8",
@@ -6560,12 +6560,33 @@
               ]
             },
             {
-              "label": "Network and GPU service crash and restart (needs a network process, TD-161)",
+              "label": "Network process: exchanges run in a separate process; a crashed or protocol-breaking one fails only its requests and is replaced (ADR 0061)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/netproc.rs",
+                  "marker": "fn fail_all"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_crashed_network_process_fails_its_requests_and_is_replaced"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_network_process_is_cut_off_by_the_broker"
+                }
+              ]
+            },
+            {
+              "label": "GPU process crash and restart (needs the M8 GPU process)",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "75.00",
+          "credit": "80.00",
           "engine_share": "0.34"
         },
         {
@@ -6694,10 +6715,10 @@
       "completed": 2,
       "in_progress": 6,
       "total": 11,
-      "contribution": "2.60",
-      "percent": "52.13",
+      "contribution": "2.62",
+      "percent": "52.48",
       "verified_percent": "13.95",
-      "partial_percent": "38.18"
+      "partial_percent": "38.53"
     },
     {
       "id": "compositor",

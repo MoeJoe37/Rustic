@@ -751,6 +751,14 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or_else(|_| page::ConsoleLog::default(), page::take_console_messages)
     }
 
+    /// Take the popups `window.open()` asked for with transient activation;
+    /// the host opens them (ADR 0062).
+    pub fn take_popups(&self) -> Vec<page::PopupRequest> {
+        self.agent
+            .as_ref()
+            .map_or_else(|_| Vec::new(), page::take_popups)
+    }
+
     /// Take the form submissions that passed validation; nothing navigates.
     pub fn take_form_submissions(&self) -> page::FormSubmissions {
         self.agent.as_ref().map_or_else(

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "5fff1047f9ab88fd3892adacf94569008f5cd1b4e6279b8dd1a5227db3362a48",
-  "percent": "41.52",
-  "verified_percent": "38.70",
-  "partial_percent": "2.82",
-  "completed": 91,
-  "in_progress": 11,
+  "source_fingerprint": "782e1e783189f64cfe59364fff6c0de4beaa518c28da05f254f29edc9199b943",
+  "percent": "41.66",
+  "verified_percent": "39.28",
+  "partial_percent": "2.38",
+  "completed": 92,
+  "in_progress": 10,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -75,11 +75,11 @@
       "id": "M7",
       "label": "Isolation & security",
       "share": "3.72",
-      "completed": 2,
+      "completed": 3,
       "total": 8,
-      "percent": "70.52",
-      "verified_percent": "18.75",
-      "partial_percent": "51.77"
+      "percent": "74.42",
+      "verified_percent": "34.37",
+      "partial_percent": "40.05"
     },
     {
       "id": "M8",
@@ -6220,79 +6220,90 @@
           "label": "Site/agent/process assignment and origin separation",
           "size": 5,
           "milestone": "M7",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Process model ADR: site, origin-keyed and unique process keys, COOP group switches",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/isolation.rs",
-                  "marker": "pub fn process_key"
-                },
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0057-process-model-and-site-isolation.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/isolation.rs",
-                  "marker": "fn process_keys_follow_sites_origins_and_opaque_documents"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/isolation.rs",
-                  "marker": "fn coop_decides_browsing_context_group_switches"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-net/src/isolation.rs",
+              "marker": "pub fn process_key"
             },
             {
-              "label": "One fresh renderer and grant per document; no authority across navigations",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "fn spawn()"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0057-process-model-and-site-isolation.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-net/src/isolation.rs",
-                  "marker": "pub fn opaque_response_blocked"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/src/isolation.rs",
-                  "marker": "fn orb_blocks_cross_origin_documents_and_data"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-net/src/isolation.rs",
+              "marker": "fn process_keys_follow_sites_origins_and_opaque_documents"
             },
             {
-              "label": "Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-net/src/isolation.rs",
+              "marker": "fn coop_decides_browsing_context_group_switches"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "fn spawn()"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-net/src/isolation.rs",
+              "marker": "pub fn opaque_response_blocked"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/src/isolation.rs",
+              "marker": "fn orb_blocks_cross_origin_documents_and_data"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "fn open_frame("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "fn open_popup("
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0062-out-of-process-frames.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames.rs",
+              "marker": "fn local_frames_render_in_their_own_renderers_under_parent_content"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames.rs",
+              "marker": "fn network_frames_follow_frame_policies_and_third_party_rules"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames.rs",
+              "marker": "fn popups_need_a_gesture_and_coop_decides_their_browsing_context_group"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-net/tests/navigation.rs",
+              "marker": "fn frames_obey_frame_ancestors_x_frame_options_sandbox_and_cookie_context"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.58"
         },
         {
@@ -6712,13 +6723,13 @@
         }
       ],
       "points": 43,
-      "completed": 2,
-      "in_progress": 6,
+      "completed": 3,
+      "in_progress": 5,
       "total": 11,
-      "contribution": "2.62",
-      "percent": "52.48",
-      "verified_percent": "13.95",
-      "partial_percent": "38.53"
+      "contribution": "2.76",
+      "percent": "55.38",
+      "verified_percent": "25.58",
+      "partial_percent": "29.80"
     },
     {
       "id": "compositor",

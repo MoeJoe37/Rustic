@@ -28,6 +28,7 @@ mod fetch;
 mod html_collections;
 mod mutation_observer;
 mod node_tree;
+mod popups;
 mod resize_observer;
 mod selectors;
 mod web_storage;
@@ -44,6 +45,7 @@ pub use events::{
 pub use events::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
 pub use events::{InputEvent, KeyInput, Modifiers};
 pub use fetch::{FetchHost, NetworkFailure, ScriptRequest, ScriptResponse};
+pub use popups::{POPUP_CAPACITY, PopupRequest};
 pub use web_storage::{QuotaExceeded, StorageHost, StorageKind};
 pub use window::{TimerHandler, WindowScheduler};
 
@@ -192,6 +194,8 @@ struct Page {
     activation: std::cell::Cell<(Option<std::time::Duration>, bool)>,
     /// The host's current time for this document.
     now: std::cell::Cell<std::time::Duration>,
+    /// `window.open()` requests for the host.
+    popups: popups::Popups,
 }
 
 impl ExecutionHost for Page {
@@ -527,6 +531,7 @@ fn install_page(
     web_storage::install(agent)?;
     let headers_iterator = fetch::install(agent)?;
     let navigator = activation::install(agent)?;
+    popups::install(agent)?;
     agent.root(Value::object(headers_iterator))?;
     let fetch_records = agent.new_weak_map()?;
     agent.root(Value::object(fetch_records))?;
@@ -560,6 +565,7 @@ fn install_page(
         navigator,
         activation: std::cell::Cell::new((None, false)),
         now: std::cell::Cell::new(std::time::Duration::ZERO),
+        popups: popups::Popups::default(),
     }))
 }
 
@@ -671,6 +677,16 @@ pub fn take_form_submissions(agent: &Agent) -> FormSubmissions {
     host.as_ref()
         .and_then(|host| host.as_any().downcast_ref::<Page>())
         .map(|page| page.events.forms.take_submissions())
+        .unwrap_or_default()
+}
+
+/// Take the popups the page opened (with transient activation) since the
+/// last call, oldest first.
+pub fn take_popups(agent: &Agent) -> Vec<PopupRequest> {
+    let host = agent.execution_host();
+    host.as_ref()
+        .and_then(|host| host.as_any().downcast_ref::<Page>())
+        .map(|page| page.popups.take())
         .unwrap_or_default()
 }
 

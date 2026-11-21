@@ -314,3 +314,149 @@ fn network_frames_follow_frame_policies_and_third_party_rules() {
     assert_eq!(pixel(&pixels, 180, 10), BLUE);
     assert!(text(&output.stderr).contains("frame-src"));
 }
+
+/// A page whose button opens `targets[n]` on its n-th click; it also
+/// tries a popup without a gesture, which the blocker refuses.
+fn opener_page(targets: &[&str]) -> String {
+    let list = targets
+        .iter()
+        .map(|target| format!("{target:?}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "<!doctype html><body style=\"margin:0\">\
+         <div id=b style=\"width:100px;height:40px;background:#00f\"></div>\
+         <script>\
+           window.open('http://b.test/blocked');\
+           var targets = [{list}], next = 0;\
+           document.getElementById('b').addEventListener('click', () => {{\
+             var [url, features] = targets[next++].split(' ');\
+             window.open(url, '_blank', features || '');\
+           }});\
+         </script>"
+    )
+}
+
+#[test]
+fn popups_need_a_gesture_and_coop_decides_their_browsing_context_group() {
+    let html = ("Content-Type", "text/html");
+    let page = b"<!doctype html><p>popup";
+    let plain = FixtureServer::start([
+        (
+            "/opener",
+            Reply::response(
+                200,
+                &[html],
+                opener_page(&["/popup", "/popup noreferrer"]).as_bytes(),
+            ),
+        ),
+        ("/popup", Reply::response(200, &[html], page)),
+        ("/blocked", Reply::response(200, &[html], page)),
+    ])
+    .unwrap();
+    let tls = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../rustic-net/tests/fixtures/tls/"
+    );
+    let read = |name: &str| std::fs::read(format!("{tls}{name}")).unwrap();
+    let coop = |value: &'static str| ("Cross-Origin-Opener-Policy", value);
+    let secure = FixtureServer::start_tls(
+        [
+            (
+                "/coop",
+                Reply::response(
+                    200,
+                    &[html, coop("same-origin")],
+                    opener_page(&["/plain", "/same"]).as_bytes(),
+                ),
+            ),
+            (
+                "/allow",
+                Reply::response(
+                    200,
+                    &[html, coop("same-origin-allow-popups")],
+                    opener_page(&["http://b.test/popup"]).as_bytes(),
+                ),
+            ),
+            ("/plain", Reply::response(200, &[html], page)),
+            (
+                "/same",
+                Reply::response(200, &[html, coop("same-origin")], page),
+            ),
+        ],
+        &read("good.pem"),
+        &read("good.key"),
+    )
+    .unwrap();
+    let a = format!("https://a.test={}", secure.address());
+    let b = format!("http://b.test={}", plain.address());
+    let ca = format!("{tls}ca.pem");
+    let run = |target: &str, clicks: &[&str]| {
+        let mut args = vec![
+            "dump-dom",
+            "--run-scripts",
+            "--ca-file",
+            &ca,
+            "--allow-origin",
+            &a,
+            "--allow-origin",
+            &b,
+        ];
+        for click in clicks {
+            args.extend(["--click", click]);
+        }
+        args.push(target);
+        let output = rustic(&args, &[]);
+        assert!(output.status.success(), "{}", text(&output.stderr));
+        text(&output.stderr)
+    };
+    // Without a gesture nothing opens.
+    run("http://b.test/opener", &[]);
+    assert!(plain.requests().iter().all(|r| r.target != "/popup"));
+    // Each click opens one popup in its own renderer; noreferrer drops
+    // the Referer and the opener.
+    let stderr = run("http://b.test/opener", &["10,10", "10,10"]);
+    let popups: Vec<_> = plain
+        .requests()
+        .into_iter()
+        .filter(|r| r.target == "/popup")
+        .collect();
+    assert_eq!(popups.len(), 2, "{stderr}");
+    assert_eq!(popups[0].header("referer"), Some("http://b.test/opener"));
+    assert_eq!(popups[1].header("referer"), None);
+    assert!(
+        stderr.contains("opened in a renderer of its own (site http://b.test); opener kept"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("opener severed (noopener)"), "{stderr}");
+    assert!(plain.requests().iter().all(|r| r.target != "/blocked"));
+    // COOP same-origin: a popup without the same COOP switches group.
+    let stderr = run("https://a.test/coop", &["10,10", "10,10"]);
+    assert!(
+        stderr.contains("https://a.test/plain\": opened in a renderer of its own (site https://a.test); opener severed (COOP"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("https://a.test/same\": opened in a renderer of its own (site https://a.test); opener kept"),
+        "{stderr}"
+    );
+    // same-origin-allow-popups keeps a cross-site unsafe-none popup.
+    let stderr = run("https://a.test/allow", &["10,10"]);
+    assert!(
+        stderr.contains("http://b.test/popup\": opened in a renderer of its own (site http://b.test); opener kept"),
+        "{stderr}"
+    );
+    // A click needs scripts; a page without them takes no input.
+    let output = rustic(
+        &[
+            "dump-dom",
+            "--click",
+            "1,1",
+            "--allow-origin",
+            &b,
+            "http://b.test/opener",
+        ],
+        &[],
+    );
+    assert_eq!(output.status.code(), Some(2));
+}

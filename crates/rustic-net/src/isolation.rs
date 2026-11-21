@@ -128,9 +128,12 @@ pub fn requires_group_switch(
     if current == OpenerPolicy::UnsafeNone && next == OpenerPolicy::UnsafeNone {
         return false;
     }
+    // A popup's initial about:blank inherits its opener's
+    // `same-origin-allow-popups`; navigating it to an `unsafe-none`
+    // response keeps the opener (that is what "allow popups" allows).
     if is_initial_about_blank
-        && current == OpenerPolicy::UnsafeNone
-        && next == OpenerPolicy::SameOriginAllowPopups
+        && current == OpenerPolicy::SameOriginAllowPopups
+        && next == OpenerPolicy::UnsafeNone
     {
         return false;
     }
@@ -339,6 +342,22 @@ mod tests {
         ));
         assert!(requires_group_switch(false, SameOrigin, &a, SameOrigin, &b));
         assert!(!requires_group_switch(
+            true,
+            SameOriginAllowPopups,
+            &a,
+            UnsafeNone,
+            &b
+        ));
+        // The exception is for the initial about:blank only, and only that
+        // way round.
+        assert!(requires_group_switch(
+            false,
+            SameOriginAllowPopups,
+            &a,
+            UnsafeNone,
+            &b
+        ));
+        assert!(requires_group_switch(
             true,
             UnsafeNone,
             &a,

@@ -490,7 +490,8 @@ impl BrokerLink {
             BrokerMessage::Resource { id, .. }
             | BrokerMessage::Fetch { id, .. }
             | BrokerMessage::Storage { id, .. }
-            | BrokerMessage::Frame { id, .. } => Some(*id),
+            | BrokerMessage::Frame { id, .. }
+            | BrokerMessage::Popup { id, .. } => Some(*id),
             BrokerMessage::Start(_) => None,
         };
         if reply_id != Some(id) {
@@ -632,6 +633,23 @@ impl Session for BrokeredSession {
             headers: response.headers,
             body: response.body,
         })
+    }
+
+    fn open_popup(&self, popup: &rustic_engine::PopupRequest) -> Result<(), String> {
+        let reply = self
+            .link
+            .request(|id| RendererMessage::Popup {
+                id,
+                url: popup.url.serialize(),
+                noopener: popup.noopener,
+                noreferrer: popup.noreferrer,
+            })
+            .unwrap_or_else(|error| lost(&error));
+        match reply {
+            // The broker reported the outcome itself.
+            BrokerMessage::Popup { .. } => Ok(()),
+            _ => Err("the broker did not answer".to_owned()),
+        }
     }
 
     fn storage_host(&self) -> Result<Option<Rc<dyn StorageHost>>, String> {

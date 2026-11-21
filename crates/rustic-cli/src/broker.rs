@@ -177,7 +177,13 @@ struct FrameContext {
     ancestors: Vec<rustic_url::Origin>,
     /// Whether the document's renderer may run scripts.
     scripts: bool,
+    /// Popups this command may still open, or `None` where this document
+    /// may open none (frames and popups themselves).
+    popups: Option<Rc<std::cell::Cell<usize>>>,
 }
+
+/// Popups one command opens at most (ADR 0057 §3).
+const MAX_POPUPS_PER_COMMAND: usize = 4;
 
 /// The arguments for a frame's renderer: the parent's limits and locale,
 /// scripts only if allowed, and the frame's own view.
@@ -187,7 +193,31 @@ fn frame_args(
     factor: f64,
     scripts: bool,
 ) -> Vec<String> {
-    const VIEW: &[&str] = &["--viewport", "--scale", "--zoom", "--output", "--at"];
+    let mut args = child_args(parent, scripts);
+    args.extend([
+        "--viewport".to_owned(),
+        format!("{width}x{height}"),
+        "--scale".to_owned(),
+        format!("{factor}"),
+        "--output".to_owned(),
+        "frame.png".to_owned(),
+        "--".to_owned(),
+        "frame".to_owned(),
+    ]);
+    args
+}
+
+/// The parent's limits and locale for another document's renderer, and
+/// `--run-scripts` only if `scripts`: no view, output or input options.
+fn child_args(parent: &[String], scripts: bool) -> Vec<String> {
+    const VIEW: &[&str] = &[
+        "--viewport",
+        "--scale",
+        "--zoom",
+        "--output",
+        "--at",
+        "--click",
+    ];
     let mut args = Vec::new();
     let mut iter = parent.iter();
     while let Some(arg) = iter.next() {
@@ -210,16 +240,6 @@ fn frame_args(
             _ => {}
         }
     }
-    args.extend([
-        "--viewport".to_owned(),
-        format!("{width}x{height}"),
-        "--scale".to_owned(),
-        format!("{factor}"),
-        "--output".to_owned(),
-        "frame.png".to_owned(),
-        "--".to_owned(),
-        "frame".to_owned(),
-    ]);
     args
 }
 
@@ -327,6 +347,7 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
         },
         origin,
         ancestors: Vec::new(),
+        popups: Some(Rc::new(std::cell::Cell::new(MAX_POPUPS_PER_COMMAND))),
     };
     let start = Start {
         command: command.to_owned(),
@@ -1008,6 +1029,7 @@ impl<'a> Broker<'a> {
             origin: child_origin,
             ancestors,
             scripts,
+            popups: None,
         };
         let start = Start {
             command: "render".to_owned(),
@@ -1053,6 +1075,105 @@ impl<'a> Broker<'a> {
         }
         self.frames.push(surface);
         Ok((self.frames.len() - 1) as u32)
+    }
+
+    /// Open a popup (ADR 0057 §3): a top-level navigation initiated by this
+    /// document, in a renderer of its own with its own grant. The opener
+    /// relationship survives only without `noopener` and when COOP needs
+    /// no browsing context group switch; the decision and the popup's
+    /// process key are reported. The popup's output is not shown (there
+    /// is no window to show it in, TD-178).
+    fn open_popup(&mut self, url: &str, noopener: bool, noreferrer: bool) -> bool {
+        let context = self.context;
+        let shown = EscapedText(url).to_string();
+        let Some(budget) = context.popups.as_ref().filter(|budget| budget.get() > 0) else {
+            eprintln!("rustic: popup {shown}: refused (no popups from here, or too many)");
+            return false;
+        };
+        let Grant::Network(session) = self.grant else {
+            eprintln!("rustic: popup {shown}: refused (popups open from network documents only)");
+            return false;
+        };
+        let Ok(url) = Url::parse(url, None) else {
+            return false;
+        };
+        budget.set(budget.get() - 1);
+        let navigated = match session.open_popup(&url, noreferrer, self.limits.max_file_bytes) {
+            Ok(navigated) => navigated,
+            Err(error) => {
+                eprintln!("rustic: popup {shown}: {error}");
+                return false;
+            }
+        };
+        let popup = Rc::clone(&navigated.session);
+        let opener = session.isolation();
+        // The popup's initial about:blank inherits the opener's COOP.
+        let switch = rustic_net::isolation::requires_group_switch(
+            true,
+            opener.opener,
+            session.origin(),
+            popup.isolation().opener,
+            popup.origin(),
+        );
+        let relation = match (noopener, switch) {
+            (true, _) => "opener severed (noopener)",
+            (false, true) => "opener severed (COOP: new browsing context group)",
+            (false, false) => "opener kept (same browsing context group)",
+        };
+        let mut unique = 0;
+        let key = match rustic_net::isolation::process_key(
+            popup.document_url(),
+            &popup.isolation(),
+            &rustic_net::site::PublicSuffixList::bundled(),
+            &mut unique,
+        ) {
+            rustic_net::isolation::ProcessKey::Site(site) => format!("site {site}"),
+            rustic_net::isolation::ProcessKey::Origin(origin) => format!("origin {origin}"),
+            rustic_net::isolation::ProcessKey::Unique(_) => "unique".to_owned(),
+        };
+        eprintln!(
+            "rustic: popup {}: opened in a renderer of its own ({key}); {relation}",
+            EscapedText(&popup.document_url().serialize())
+        );
+        let document = DocumentGrant {
+            url: popup.document_url().serialize(),
+            bytes: navigated.bytes,
+            transport_charset: navigated.transport_encoding.map(|e| e.name().to_owned()),
+            local: false,
+            csp: navigated.policy.csp.clone(),
+            csp_report_only: navigated.policy.csp_report_only.clone(),
+            referrer_policy: navigated.policy.referrer_policy.as_str().to_owned(),
+            storage: !popup.origin().is_opaque(),
+        };
+        let child = FrameContext {
+            depth: 0,
+            budget: Rc::clone(&context.budget),
+            factor: None,
+            args: context.args.clone(),
+            document: DocumentGrant {
+                bytes: Vec::new(),
+                ..document.clone()
+            },
+            origin: popup.origin().clone(),
+            ancestors: Vec::new(),
+            scripts: context.scripts,
+            popups: None,
+        };
+        let mut args = child_args(&context.args, context.scripts);
+        args.extend(["--".to_owned(), "popup".to_owned()]);
+        let start = Start {
+            command: "dump-dom".to_owned(),
+            args,
+            document,
+            fonts: crate::fonts::granted_bytes().to_vec(),
+        };
+        match run_renderer(start, &Grant::Network(popup), self.limits, &child) {
+            Ok(Finished { status: 0, .. }) => true,
+            _ => {
+                eprintln!("rustic: popup {shown}: its renderer did not finish");
+                false
+            }
+        }
     }
 
     /// The frame's document and the grant its renderer gets; `None` for
@@ -1188,6 +1309,15 @@ impl<'a> Broker<'a> {
             RendererMessage::Frame { id, request } => BrokerMessage::Frame {
                 id,
                 result: self.open_frame(request),
+            },
+            RendererMessage::Popup {
+                id,
+                url,
+                noopener,
+                noreferrer,
+            } => BrokerMessage::Popup {
+                id,
+                opened: self.open_popup(&url, noopener || noreferrer, noreferrer),
             },
             // The loop handles Diagnostic, Surface and Done; anything else
             // is a request this broker refuses.

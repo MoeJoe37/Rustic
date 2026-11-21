@@ -270,6 +270,14 @@ pub enum BrokerMessage {
         /// The handle.
         result: Result<u32, ResourceFailure>,
     },
+    /// The reply to [`RendererMessage::Popup`] number `id`: whether the
+    /// popup opened.
+    Popup {
+        /// The request number.
+        id: u32,
+        /// Whether it opened.
+        opened: bool,
+    },
 }
 
 /// Renderer to broker.
@@ -313,6 +321,18 @@ pub enum RendererMessage {
     },
     /// The rendered surface (`render` only), sent before [`Self::Done`].
     Surface(Surface),
+    /// Open a popup the page asked for with transient activation; the
+    /// broker decides its browsing context group (ADR 0057 §3).
+    Popup {
+        /// The request number.
+        id: u32,
+        /// The resolved URL.
+        url: String,
+        /// `noopener` (implied by `noreferrer`).
+        noopener: bool,
+        /// `noreferrer`.
+        noreferrer: bool,
+    },
     /// The job finished: an exit status and the command's output.
     Done {
         /// 0 success, 1 load failure, 2 usage error.
@@ -465,6 +485,11 @@ impl Message for BrokerMessage {
                     Err(failure) => writer.u8(failure_tag(*failure)),
                 }
             }
+            Self::Popup { id, opened } => {
+                writer.u16(6);
+                writer.u32(*id);
+                writer.bool(*opened);
+            }
         }
     }
 
@@ -560,6 +585,10 @@ impl Message for BrokerMessage {
                 };
                 Ok(Self::Frame { id, result })
             }
+            6 => Ok(Self::Popup {
+                id: reader.u32()?,
+                opened: reader.bool()?,
+            }),
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }
@@ -695,6 +724,18 @@ impl Message for RendererMessage {
                     writer.bytes(&layer.coverage);
                 }
             }
+            Self::Popup {
+                id,
+                url,
+                noopener,
+                noreferrer,
+            } => {
+                writer.u16(8);
+                writer.u32(*id);
+                writer.str(url);
+                writer.bool(*noopener);
+                writer.bool(*noreferrer);
+            }
         }
     }
 
@@ -801,6 +842,12 @@ impl Message for RendererMessage {
                     layers,
                 }))
             }
+            8 => Ok(Self::Popup {
+                id: reader.u32()?,
+                url: reader.string()?,
+                noopener: reader.bool()?,
+                noreferrer: reader.bool()?,
+            }),
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }

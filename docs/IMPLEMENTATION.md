@@ -158,7 +158,7 @@ status is the [progress summary](progress/summary.md).
 <details>
 <summary>Isolation and security (M7): 4 sections</summary>
 
-- [ISO-01 — Out-of-process frames](#iso-01--out-of-process-frames)
+- [ISO-01 — Out-of-process frames and popups](#iso-01--out-of-process-frames-and-popups)
 - [ISO-07 — Network process](#iso-07--network-process)
 - [ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)](#iso-03iso-04--renderer-sandboxes-on-by-default-linux-windows)
 - [ISO-02 — Split renderer process and brokered authority](#iso-02--split-renderer-process-and-brokered-authority)
@@ -2548,7 +2548,7 @@ service step. The existing 128 KiB limit test still passes after removing tempor
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
 
-## ISO-01 — Out-of-process frames
+## ISO-01 — Out-of-process frames and popups
 
 Added 2026-11-21 (`rustic-cli/src/loader.rs` `render_layers`,
 `rustic-cli/src/broker.rs` `open_frame`, `rustic_net::navigation::FrameContainer`,
@@ -2566,13 +2566,16 @@ coverage the embedder reports.
 | Grants | Local frames only inside the embedder's directory, granted their own directory; `data:` and sandboxed local `srcdoc` frames get nothing; `srcdoc` inherits the embedder's grant; sandboxed frames get no storage and no scripts without `allow-scripts` | `local_frames_render_in_their_own_renderers_under_parent_content`, `a_frame_grant_is_its_own_directory_and_a_failing_frame_costs_only_its_pixels` |
 | Compositing | The embedder paints accepted frames black, re-rasterizes each frame rectangle with it white and sends one coverage byte per pixel; the broker validates the surface (budgets, premultiplied, bounds, issued handles) and adds coverage × frame pixel, then encodes the PNG | `foreign_surfaces_are_checked_and_frames_add_by_coverage`, overlay pixel in `local_frames_render_in_their_own_renderers_under_parent_content` |
 | Failure | Refused, missing, crashing, protocol-breaking, late or wrong-size frames paint white with one diagnostic; 16 frames per document, depth 3, 32 per command | `a_frame_grant_is_its_own_directory_and_a_failing_frame_costs_only_its_pixels` (crash, forged handle, self-framing page) |
+| Popups | `window.open()` needs and consumes transient activation (`--click X,Y` is trusted host input), records the resolved URL, `noopener` and `noreferrer` (HTML feature tokenizing) and returns `null`; `_self`/`_parent`/`_top` open nothing | `window_open_needs_and_spends_transient_activation`, `boolean_features_follow_html_tokenizing` |
+| Opener groups | The broker navigates each popup (opener as initiator, `no-referrer` for `noreferrer`) into its own renderer and grant, at most 4 per command and none from frames or popups; COOP of the opener (inherited by the initial `about:blank`) against the popup's decides the group; `noopener` always severs | `popups_need_a_gesture_and_coop_decides_their_browsing_context_group`, `coop_decides_browsing_context_group_switches` (the initial-`about:blank` exception now matches HTML: an opener's `same-origin-allow-popups` keeps an `unsafe-none` popup) |
 
 Test hook `RUSTIC_TEST_FAULT` (`crash`, `probe`, `forge`) applies only to
 renderers whose document URL contains `RUSTIC_TEST_FAULT_URL`; it grants
 nothing. Open: transforms, non-linear blending and transparent frame
 canvases (TD-177); frame scripting, single-process frames and frames in
-dumps (TD-178); `width`/`height` attributes (TD-179); `window.open` and
-opener groups (TD-130).
+dumps, `window.opener` and popup output (TD-178); `width`/`height`
+attributes (TD-179); Window named access and cross-origin WindowProxy
+objects (TD-130).
 
 ## ISO-07 — Network process
 

@@ -346,6 +346,11 @@ pub(crate) trait Session: fmt::Debug {
     fn storage_host(&self) -> Result<Option<Rc<dyn rustic_engine::StorageHost>>, String>;
     /// Persist what the load changed (cookies, the profile).
     fn finish(&self) -> Result<(), String>;
+    /// Open a popup the page asked for (ADR 0062): only a split run's
+    /// broker can, in a renderer of its own.
+    fn open_popup(&self, _popup: &rustic_engine::PopupRequest) -> Result<(), String> {
+        Err("popups open only in a split run (TD-178)".to_owned())
+    }
 }
 
 impl Session for NetworkSession {
@@ -600,6 +605,96 @@ impl NetworkSession {
     /// The document's origin.
     pub(crate) fn origin(&self) -> &Origin {
         &self.origin
+    }
+
+    /// The document's COOP, COEP and origin-keying.
+    pub(crate) fn isolation(&self) -> rustic_net::isolation::IsolationPolicy {
+        self.isolation
+    }
+
+    /// Navigate a popup this document opened to `url`: a top-level
+    /// navigation it initiated with user activation, sharing the cookie
+    /// jar and cache, without a referrer for `noreferrer`.
+    pub(crate) fn open_popup(
+        &self,
+        url: &Url,
+        noreferrer: bool,
+        max_bytes: usize,
+    ) -> Result<NetworkDocument, NetworkLoadError> {
+        if !matches!(url.scheme(), "http" | "https") {
+            return Err(NetworkLoadError::Navigation(
+                NavigationError::UnsupportedScheme,
+            ));
+        }
+        let request = NavigationRequest {
+            initiator: Some(rustic_net::navigation::Initiator {
+                origin: self.origin.clone(),
+                url: self.document_url.clone(),
+                policy: PolicyContainer {
+                    referrer_policy: if noreferrer {
+                        ReferrerPolicy::NoReferrer
+                    } else {
+                        self.referrer_policy
+                    },
+                    ..PolicyContainer::default()
+                },
+            }),
+            user_activation: true,
+            ..NavigationRequest::browser(url.clone())
+        };
+        let outcome = {
+            let mut fetcher = self
+                .fetcher
+                .try_borrow_mut()
+                .map_err(|_| NetworkLoadError::NoContent)?;
+            Navigation::new(request, NETWORK_TIMEOUT)
+                .run(&mut fetcher)
+                .map_err(NetworkLoadError::Navigation)?
+        };
+        let committed = match outcome {
+            NavigationOutcome::Commit(committed) => committed,
+            NavigationOutcome::Download(download) => {
+                return Err(NetworkLoadError::Download(download.sanitized_filename()));
+            }
+            NavigationOutcome::NoContent => return Err(NetworkLoadError::NoContent),
+        };
+        if committed.kind != DocumentKind::Html {
+            return Err(NetworkLoadError::NotHtml(committed.mime.essence()));
+        }
+        let document_url = committed.url().clone();
+        let origin = committed.origin.clone();
+        let isolation = rustic_net::isolation::IsolationPolicy::from_headers(
+            &committed.headers,
+            mixed_content::is_secure_context(&origin, None),
+        );
+        let transport_encoding = committed.encoding;
+        let policy = committed.policy.clone();
+        let bytes = committed
+            .body
+            .read_all(NETWORK_TIMEOUT)
+            .map_err(NetworkLoadError::Body)?;
+        if bytes.len() > max_bytes {
+            return Err(NetworkLoadError::TooLarge(max_bytes));
+        }
+        let secure = mixed_content::is_secure_context(&origin, None);
+        let session = Self {
+            fetcher: Rc::clone(&self.fetcher),
+            document_url,
+            csp: CspList::from_container(&policy),
+            secure,
+            referrer_policy: policy.referrer_policy,
+            cancellation: self.cancellation.clone(),
+            charsets: RefCell::new(HashMap::new()),
+            isolation,
+            frame: None,
+            origin,
+        };
+        Ok(NetworkDocument {
+            session: Rc::new(session),
+            bytes,
+            transport_encoding,
+            policy,
+        })
     }
 
     /// The top-level site and whether the ancestors so far are all

@@ -80,7 +80,16 @@ visibility; the root element when no box is hit), or none outside the
 Use --run-scripts with any document command to run inline classics, local
 external classics and static JavaScript modules before producing output.
 The snapshot uses a manual clock for at most 256 timer turns and offers
-one animation frame.
+one animation frame. --click X,Y (repeat up to 8; needs --run-scripts)
+then delivers a trusted primary click at that point in CSS pixels, which
+gives the page transient user activation.
+
+Frames and popups: render loads each <iframe> into a renderer of its own
+and composites it (split runs only; one process paints frames white).
+window.open() opens a popup only with transient activation, in a renderer
+of its own (network documents, at most 4 per command); its DOM is not
+printed, and a line on standard error reports its process key and whether
+COOP or noopener severed the opener.
 
 Process isolation: document commands (all but reftest) run their page in a
 renderer child process that asks this process for every file, network and
@@ -646,6 +655,22 @@ pub(crate) fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsStri
                     limits.run_scripts = true;
                     continue;
                 }
+                Some("--click") => {
+                    let point = iter
+                        .next()
+                        .and_then(|value| value.to_str())
+                        .and_then(|value| value.split_once(','))
+                        .and_then(|(x, y)| Some((x.parse::<f64>().ok()?, y.parse::<f64>().ok()?)))
+                        .filter(|&(x, y)| x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0)
+                        .ok_or("--click requires X,Y in CSS pixels")?;
+                    let slot = limits
+                        .clicks
+                        .iter_mut()
+                        .find(|slot| slot.is_none())
+                        .ok_or("at most 8 --click points")?;
+                    *slot = Some(point);
+                    continue;
+                }
                 Some("--max-input-bytes") => Some(&mut limits.max_file_bytes),
                 Some("--max-output-bytes") => Some(&mut limits.max_dump_bytes),
                 Some("--chunk-bytes") => Some(&mut limits.read_chunk_bytes),
@@ -685,6 +710,9 @@ pub(crate) fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsStri
         if path.replace(arg.clone()).is_some() {
             return Err("expected exactly one file path".into());
         }
+    }
+    if limits.clicks[0].is_some() && !limits.run_scripts {
+        return Err("--click needs --run-scripts".into());
     }
     if let Some(diagnostics) = diagnostics {
         limits.parser.tokenizer.max_diagnostics = diagnostics;

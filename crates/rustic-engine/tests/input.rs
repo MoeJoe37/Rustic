@@ -426,3 +426,53 @@ fn trusted_input_gives_transient_and_sticky_user_activation() {
         "if (!navigator.userActivation.hasBeenActive) throw 'sticky';",
     );
 }
+
+#[test]
+fn window_open_needs_and_spends_transient_activation() {
+    let mut engine = Engine::new(1);
+    let mut page = page(&mut engine, "<button id=b></button>", TaskLimits::default());
+    run(
+        &mut page,
+        "document.getElementById('b').onclick = () => { window.result = \
+           [open('https://b.test/one'), open('https://b.test/two')] };",
+    );
+    // No gesture: the popup blocker answers null and records nothing.
+    run(
+        &mut page,
+        "window.blocked = open('https://b.test/blocked'); \
+         window.self_target = open('https://b.test/', '_self');",
+    );
+    assert!(page.take_popups().is_empty());
+    // One click opens one popup; the second call has no activation left.
+    let button = id(&page, "b");
+    deliver(&mut page, button, click());
+    let popups = page.take_popups();
+    assert_eq!(popups.len(), 1);
+    assert_eq!(popups[0].url.serialize(), "https://b.test/one");
+    assert!(!popups[0].noopener && !popups[0].noreferrer);
+    assert!(!page.has_transient_activation());
+    run(
+        &mut page,
+        "document.getElementById('b').onclick = () => \
+           open('https://b.test/x', 'name', 'noreferrer');",
+    );
+    deliver(&mut page, button, click());
+    let popups = page.take_popups();
+    assert!(popups[0].noopener && popups[0].noreferrer);
+    // An invalid URL throws a SyntaxError without spending activation.
+    run(
+        &mut page,
+        "document.getElementById('b').onclick = () => { \
+           try { open('http://[') } catch (e) { window.error = e.name } \
+           open('about:blank', '', 'noopener') };",
+    );
+    deliver(&mut page, button, click());
+    let popups = page.take_popups();
+    assert_eq!(popups.len(), 1);
+    assert_eq!(popups[0].url.serialize(), "about:blank");
+    assert!(popups[0].noopener);
+    run(
+        &mut page,
+        "if (window.error !== 'SyntaxError' || window.blocked !== null) throw 1",
+    );
+}

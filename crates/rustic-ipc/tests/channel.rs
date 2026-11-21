@@ -90,6 +90,10 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             id: 15,
             result: Err(ResourceFailure::Cancelled),
         },
+        BrokerMessage::Popup {
+            id: 16,
+            opened: true,
+        },
     ];
     let renderer = vec![
         RendererMessage::Resource {
@@ -140,6 +144,12 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
         RendererMessage::Frame {
             id: 6,
             request: FrameRequest::default(),
+        },
+        RendererMessage::Popup {
+            id: 7,
+            url: "https://b.test/".into(),
+            noopener: true,
+            noreferrer: false,
         },
         RendererMessage::Surface(Surface {
             width: 2,

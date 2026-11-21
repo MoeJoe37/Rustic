@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 41.52%** = 38.70% verified complete + 2.82% partial credit. 91/221 capabilities complete, 11 in progress.
+**Overall completion: 41.66%** = 39.28% verified complete + 2.38% partial credit. 92/221 capabilities complete, 10 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `5fff1047f9ab88fd3892adacf94569008f5cd1b4e6279b8dd1a5227db3362a48`.
+Catalog: `engine-v4`. Source fingerprint: `782e1e783189f64cfe59364fff6c0de4beaa518c28da05f254f29edc9199b943`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `5fff1047f9ab88fd3892adacf94569008f5cd
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 2/8 | 70.52% | 18.75% | 3.72% |
+| M7 Isolation & security | 3/8 | 74.42% | 34.37% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `5fff1047f9ab88fd3892adacf94569008f5cd
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 2/11 | 6 | 52.48% | 13.95% | 5% | 2.62 |
+| Security & IPC | 3/11 | 5 | 55.38% | 25.58% | 5% | 2.76 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -278,11 +278,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 - **complete** `security.ipc` — Bounded versioned hostile-peer-safe IPC · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-ipc/src/lib.rs), [source](../../crates/rustic-ipc/src/protocol.rs), [source](../../docs/adr/0056-ipc-format.md), [test](../../crates/rustic-ipc/tests/channel.rs), [test](../../crates/rustic-ipc/tests/channel.rs), [test](../../crates/rustic-fuzz/src/ipc.rs))
 - **complete** `security.authority` — Browser-assigned authority and capability brokering · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-- **in progress 75.00%** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine
-  - [x] Process model ADR: site, origin-keyed and unique process keys, COOP group switches ([source](../../crates/rustic-net/src/isolation.rs), [source](../../docs/adr/0057-process-model-and-site-isolation.md), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs))
-  - [x] One fresh renderer and grant per document; no authority across navigations ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [x] Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource ([source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [ ] Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)
+- **complete** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine ([source](../../crates/rustic-net/src/isolation.rs), [source](../../docs/adr/0057-process-model-and-site-isolation.md), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0062-out-of-process-frames.md), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-net/tests/navigation.rs))
 - **in progress 50.00%** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
   - [x] Linux: renderer under namespaces with no filesystem, network or capabilities, fail closed (ADR 0058) ([source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0058-linux-renderer-sandbox.md), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [x] Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172) ([source](../../crates/rustic-sandbox/src/seccomp.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-sandbox/src/seccomp.rs), [test](../../crates/rustic-cli/tests/isolation.rs))

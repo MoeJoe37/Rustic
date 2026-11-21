@@ -1,7 +1,7 @@
 # ADR 0057 — Process model and site isolation
 
 Date: 2026-11-20
-Status: Accepted for documents, subresources and frames (ADR 0062); popups apply it when they exist
+Status: Accepted for documents, subresources, frames (ADR 0062) and popups
 
 ## Context
 
@@ -39,12 +39,25 @@ cross-site data must never be sent to a renderer that does not own it
    `credentialless` omits their credentials. CORS-mode requests remain
    governed by CORS.
 5. **Frames and popups** (frames: [ADR 0062](0062-out-of-process-frames.md),
-   every frame in a renderer of its own; popups not implemented yet,
-   TD-130): a cross-site iframe gets its own renderer keyed like a
-   top-level document;
+   every frame in a renderer of its own; popups: 2026-11-21, below): a
+   cross-site iframe gets its own renderer keyed like a top-level document;
    same-origin access across documents requires the same agent cluster;
    `window.open` stays in the opener's group unless COOP requires a
    switch.
+
+6. **Popups** (2026-11-21). `window.open()` needs transient user
+   activation, which it consumes; the page records the request and the
+   broker navigates the popup as a top-level navigation the opener
+   initiated (its referrer policy, `no-referrer` for `noreferrer`), in a
+   renderer of its own with its own grant. Its initial `about:blank`
+   inherits the opener's COOP, so `requires_group_switch(true, opener
+   COOP, opener origin, popup COOP, popup origin)` decides whether the
+   opener relationship survives; `noopener` (or `noreferrer`) always
+   severs it. The broker reports the popup's process key and the
+   decision. The opener never gets a WindowProxy for the popup
+   (`open()` returns `null`) and the popup has no `window.opener`: they
+   live in different processes and the CLI has no cross-process
+   WindowProxy (TD-178).
 
 ## Consequences
 

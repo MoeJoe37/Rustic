@@ -74,7 +74,13 @@ pub struct LoaderLimits {
     pub formatting: rustic_layout::FormattingLimits,
     /// `<img>` loading budgets for layout and paint.
     pub images: crate::images::ImageLimits,
+    /// `--click X,Y` points (CSS pixels), delivered as trusted primary
+    /// clicks after the load's script turns.
+    pub clicks: [Option<(f64, f64)>; MAX_CLICKS],
 }
+
+/// Most `--click` points one command takes.
+pub const MAX_CLICKS: usize = 8;
 
 impl Default for LoaderLimits {
     fn default() -> Self {
@@ -88,6 +94,7 @@ impl Default for LoaderLimits {
             stylesheets: StyleLoadLimits::default(),
             formatting: rustic_layout::FormattingLimits::default(),
             images: crate::images::ImageLimits::default(),
+            clicks: [None; MAX_CLICKS],
         }
     }
 }
@@ -723,19 +730,48 @@ fn run_scripted_load(
     // Tasks already queued without a deadline (such as unhandled-rejection
     // notifications) run before the clock advances, under their own bound.
     let mut queued_turns = 0usize;
-    loop {
-        if queued_turns == MAX_SCRIPT_TIMER_TURNS {
-            return Err(LoadError::ScriptTurnLimit);
-        }
-        if document.run_next()?.is_some() {
-            queued_turns += 1;
+    settle(&mut document, &mut queued_turns, &mut turns)?;
+    // Trusted host input: each `--click` hits the topmost box at its point
+    // and gives the page transient activation (HTML §6.4.3).
+    for &(x, y) in limits.clicks.iter().flatten() {
+        let list = display_list(LayoutInput::new(
+            &document.document(),
+            &source.path,
+            limits,
+            limits.script_view,
+            Some(&applied_files),
+            source.network.as_ref(),
+        ))?;
+        let point = rustic_layout::CssPx::new(x)
+            .and_then(|x| Ok((x, rustic_layout::CssPx::new(y)?)))
+            .map(|(x, y)| rustic_layout::CssPoint { x, y });
+        let Some(hit) = point.ok().and_then(|point| list.hit_test(point)) else {
+            eprintln!("rustic: --click {x},{y} hits nothing");
+            continue;
+        };
+        let event = rustic_engine::InputEvent::Click {
+            client_x: x as i32,
+            client_y: y as i32,
+            modifiers: rustic_engine::Modifiers::default(),
+        };
+        if document.queue_input(hit.node, event).is_err() {
+            eprintln!("rustic: --click {x},{y}: the page took no input");
             continue;
         }
-        let Some(delay) = document.time_until_next_timer()? else {
-            break;
+        settle(&mut document, &mut queued_turns, &mut turns)?;
+    }
+    // Popups open in renderers of their own, through the broker (ADR 0062).
+    for popup in document.take_popups() {
+        let opened = match &source.network {
+            Some(session) => session.open_popup(&popup),
+            None => Err("popups open only in a split run (TD-178)".to_owned()),
         };
-        advance_script_timer(document.clock(), delay, &mut turns)?;
-        document.run_next()?;
+        if let Err(why) = opened {
+            eprintln!(
+                "rustic: popup {}: {why}",
+                EscapedText(&popup.url.serialize())
+            );
+        }
     }
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;
@@ -745,6 +781,29 @@ fn run_scripted_load(
         applied_files: Some(applied_files),
         network: source.network,
     })
+}
+
+/// Run queued tasks and due timers until none remain, within the load's
+/// task and timer-turn budgets.
+fn settle(
+    document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+    queued_turns: &mut usize,
+    turns: &mut usize,
+) -> Result<(), LoadError> {
+    loop {
+        if *queued_turns == MAX_SCRIPT_TIMER_TURNS {
+            return Err(LoadError::ScriptTurnLimit);
+        }
+        if document.run_next()?.is_some() {
+            *queued_turns += 1;
+            continue;
+        }
+        let Some(delay) = document.time_until_next_timer()? else {
+            return Ok(());
+        };
+        advance_script_timer(document.clock(), delay, turns)?;
+        document.run_next()?;
+    }
 }
 
 /// Write the page's console messages and reported errors to standard error.

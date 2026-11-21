@@ -57,9 +57,9 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-174, TD-176, TD-178, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-174, TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
-| M8 (hosts, GPU and platform services) | TD-173, TD-175, TD-177, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-173, TD-175, TD-177, TD-178, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
@@ -239,7 +239,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
 | TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined only on Linux (bubblewrap with the network kept, Internet-socket seccomp filter, 2026-11-21); on Windows and macOS it runs with the user's rights | Open, M7 (ISO-04) |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
-| TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once | Open, M7 browser shell |
+| TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -2831,15 +2831,20 @@ Every frame document renders in a renderer of its own (ADR 0062), the
 strict end of ADR 0057's process keys, so same-origin frames cannot script
 each other: there is no `contentWindow`, `contentDocument`, `window.parent`,
 `window.frames` or `postMessage`, no frame `load` event, and frames render
-once at the end of the embedder's script turns. Only `render` in a split
+once at the end of the embedder's script turns. Popups (ADR 0057 §6)
+have the same limit: `window.open()` returns `null`, the popup has no
+`window.opener` even when COOP keeps the group, the CLI does not show the
+popup's document, and `_self`, `_parent` and `_top` targets open nothing.
+Only `render` in a split
 run loads frames; `--single-process` and `reftest` (single-process, TD-171)
 paint them white, and the dump commands and `hit-test` do not descend into
 them.
 **Pay:** with the M8 browser shell's long-lived renderers, put same-site
 frames of one agent cluster in one renderer (ADR 0057 §1), add WindowProxy
 retargeting and cross-origin property access (TD-130) and cross-renderer
-`postMessage` through the broker, and load frames in single-process runs
-for `reftest`.
+`postMessage` through the broker, give popups and openers WindowProxies
+across renderers and show popups in the shell, and load frames in
+single-process runs for `reftest`.
 
 ### TD-179 — HTML presentational hints are not mapped
 

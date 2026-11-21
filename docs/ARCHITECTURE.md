@@ -379,7 +379,11 @@ Target: browser/broker process, renderer processes grouped by validated site/age
 policy, network/storage services, and optionally a GPU process. Do not promise a
 literal process-per-tab or process-per-origin mapping: cross-origin frames,
 same-origin synchronous access, opener relationships, and agent clusters require
-an isolation policy designed together. M7 defines the mapping and tests.
+an isolation policy designed together. M7 defines the mapping and tests
+(ADR 0057). Frames render in renderers of their own and the broker
+composites them, so an embedder never holds a frame's bytes or pixels
+(ADR 0062); same-site frames sharing an agent cluster wait for the M8
+shell (TD-178).
 
 Renderers receive narrow handles instead of ambient OS privileges. Linux uses
 namespace/seccomp/broker controls (bubblewrap, ADR 0058); Windows a

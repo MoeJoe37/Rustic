@@ -16,8 +16,8 @@ use std::rc::Rc;
 
 use rustic_engine::{Engine, QuotaExceeded, StorageHost, StorageKind};
 use rustic_ipc::protocol::{
-    BrokerMessage, FetchRequest, RendererMessage, ResourceFailure, StorageArea, StorageOp,
-    StorageValue,
+    BrokerMessage, FetchRequest, FrameRequest, RendererMessage, ResourceFailure, StorageArea,
+    StorageOp, StorageValue, Surface,
 };
 use rustic_ipc::{Channel, IpcError, Limits, Role};
 use rustic_net::csp::CspList;
@@ -38,6 +38,40 @@ thread_local! {
     static OUTPUT: RefCell<Option<Vec<u8>>> = const { RefCell::new(None) };
     /// The document the broker granted, consumed by the command's load.
     static GRANTED: RefCell<Option<SessionDocument>> = const { RefCell::new(None) };
+    /// The broker, which loads this document's frames (renderer mode only).
+    static FRAMES: RefCell<Option<Rc<BrokerLink>>> = const { RefCell::new(None) };
+    /// The rendered surface, sent before `Done` (`render` only).
+    static SURFACE: RefCell<Option<Surface>> = const { RefCell::new(None) };
+}
+
+/// Where `render` sends frame requests: the broker, in a renderer.
+pub(crate) fn frame_host() -> Option<Rc<dyn crate::loader::FrameHost>> {
+    FRAMES.with(|frames| {
+        frames
+            .borrow()
+            .as_ref()
+            .map(|link| Rc::clone(link) as Rc<dyn crate::loader::FrameHost>)
+    })
+}
+
+/// Hand the rendered surface to the broker, which composites the frames
+/// and writes the PNG.
+pub(crate) fn emit_surface(surface: Surface) {
+    SURFACE.with(|slot| *slot.borrow_mut() = Some(surface));
+}
+
+impl crate::loader::FrameHost for BrokerLink {
+    fn open(&self, request: FrameRequest) -> Option<u32> {
+        match self
+            .request(|id| RendererMessage::Frame { id, request })
+            .unwrap_or_else(|error| lost(&error))
+        {
+            BrokerMessage::Frame {
+                result: Ok(handle), ..
+            } => Some(handle),
+            _ => None,
+        }
+    }
 }
 
 /// Write command output: to standard output, or, in a renderer, to the
@@ -114,6 +148,17 @@ pub fn run() -> u8 {
     if let Some(mode) = std::env::var_os("RUSTIC_TEST_COMPROMISED_RENDERER") {
         return compromised(channel, &start.document.url, &mode);
     }
+    // A fault in only the renderers whose document URL contains
+    // RUSTIC_TEST_FAULT_URL (a frame's, ADR 0062).
+    let fault = std::env::var("RUSTIC_TEST_FAULT_URL")
+        .ok()
+        .filter(|part| start.document.url.contains(part.as_str()))
+        .and_then(|_| std::env::var("RUSTIC_TEST_FAULT").ok());
+    match fault.as_deref() {
+        Some("crash") => panic!("simulated frame renderer crash"),
+        Some("probe") => probe(&mut channel, &start.document.url),
+        _ => {}
+    }
     if let Err(error) = crate::fonts::configure_bytes(start.fonts) {
         eprintln!("rustic renderer: fonts: {error}");
         return 1;
@@ -161,18 +206,76 @@ pub fn run() -> u8 {
         })
     });
     OUTPUT.with(|output| *output.borrow_mut() = Some(Vec::new()));
+    FRAMES.with(|frames| *frames.borrow_mut() = Some(Rc::clone(&link)));
     let mut engine = Engine::new(1);
     let command = std::iter::once(OsString::from(&start.command))
         .chain(args)
         .collect::<Vec<_>>();
     let status = crate::run_command(&mut engine, &command).unwrap_or(2);
     let output = OUTPUT.with(|output| output.borrow_mut().take().unwrap_or_default());
+    FRAMES.with(|frames| frames.borrow_mut().take());
+    if let Some(mut surface) = SURFACE.with(|slot| slot.borrow_mut().take()) {
+        if fault.as_deref() == Some("forge") {
+            // Claim a frame this renderer was never given.
+            surface.layers.push(rustic_ipc::protocol::FrameLayer {
+                handle: 99,
+                width: 1,
+                height: 1,
+                coverage: vec![255],
+                ..rustic_ipc::protocol::FrameLayer::default()
+            });
+        }
+        if let Err(error) = link
+            .channel
+            .borrow_mut()
+            .send(&RendererMessage::Surface(surface))
+        {
+            eprintln!("rustic renderer: {error}");
+            return 1;
+        }
+    }
     let done = RendererMessage::Done { status, output };
     if let Err(error) = link.channel.borrow_mut().send(&done) {
         eprintln!("rustic renderer: {error}");
         return 1;
     }
     0
+}
+
+/// A compromised frame renderer's probe: ask for its parent's file and
+/// another site's resource, and report the answers as diagnostics.
+fn probe(channel: &mut Link, document: &str) {
+    let base = Url::parse(document, None).ok();
+    let parent = base
+        .as_ref()
+        .and_then(|base| Url::parse("../inside.txt", Some(base)).ok())
+        .map_or_else(String::new, |url| url.serialize());
+    for (index, (label, url)) in [
+        ("parent-file", parent),
+        ("other-site", "http://a.test/".into()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let asked = channel.send(&RendererMessage::Resource {
+            id: 1_000 + index as u32,
+            url,
+            kind: rustic_ipc::protocol::ResourceKind::Image,
+            max_bytes: u64::MAX,
+        });
+        let answer = match asked.and_then(|()| channel.recv::<BrokerMessage>()) {
+            Ok(BrokerMessage::Resource {
+                result: Ok(body), ..
+            }) => format!("read {} bytes", body.bytes.len()),
+            Ok(BrokerMessage::Resource {
+                result: Err(error), ..
+            }) => format!("{error:?}"),
+            _ => "unexpected reply".to_owned(),
+        };
+        let _ = channel.send(&RendererMessage::Diagnostic(format!(
+            "frame probe {label}: {answer}"
+        )));
+    }
 }
 
 /// Behave like a compromised renderer: ask for what the grant forbids and
@@ -386,7 +489,8 @@ impl BrokerLink {
         let reply_id = match &reply {
             BrokerMessage::Resource { id, .. }
             | BrokerMessage::Fetch { id, .. }
-            | BrokerMessage::Storage { id, .. } => Some(*id),
+            | BrokerMessage::Storage { id, .. }
+            | BrokerMessage::Frame { id, .. } => Some(*id),
             BrokerMessage::Start(_) => None,
         };
         if reply_id != Some(id) {

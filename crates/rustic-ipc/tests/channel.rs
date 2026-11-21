@@ -5,8 +5,9 @@ use std::io::{Cursor, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 
 use rustic_ipc::protocol::{
-    BrokerMessage, DocumentGrant, FetchRequest, FetchResponse, RendererMessage, ResourceBody,
-    ResourceFailure, ResourceKind, Start, StorageArea, StorageOp, StorageValue,
+    BrokerMessage, DocumentGrant, FetchRequest, FetchResponse, FrameLayer, FrameRequest,
+    RendererMessage, ResourceBody, ResourceFailure, ResourceKind, Start, StorageArea, StorageOp,
+    StorageValue, Surface,
 };
 use rustic_ipc::{
     Channel, DecodeError, IpcError, Limits, MAGIC, PROTOCOL_VERSION, Role, decode_frame,
@@ -81,6 +82,14 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             id: 13,
             value: StorageValue::QuotaExceeded,
         },
+        BrokerMessage::Frame {
+            id: 14,
+            result: Ok(3),
+        },
+        BrokerMessage::Frame {
+            id: 15,
+            result: Err(ResourceFailure::Cancelled),
+        },
     ];
     let renderer = vec![
         RendererMessage::Resource {
@@ -118,6 +127,33 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             op: StorageOp::Set(vec![1, 2], vec![0xDC00]),
         },
         RendererMessage::Diagnostic("console.log: hi".into()),
+        RendererMessage::Frame {
+            id: 5,
+            request: FrameRequest {
+                url: "about:srcdoc".into(),
+                srcdoc: Some("<p>x".into()),
+                sandbox: Some(vec!["allow-scripts".into()]),
+                width: 300,
+                height: 150,
+            },
+        },
+        RendererMessage::Frame {
+            id: 6,
+            request: FrameRequest::default(),
+        },
+        RendererMessage::Surface(Surface {
+            width: 2,
+            height: 1,
+            pixels: vec![0, 0, 0, 255, 1, 2, 3, 4],
+            layers: vec![FrameLayer {
+                handle: 3,
+                x: 1,
+                y: 0,
+                width: 1,
+                height: 1,
+                coverage: vec![200],
+            }],
+        }),
         RendererMessage::Done {
             status: 0,
             output: b"#document\n".to_vec(),

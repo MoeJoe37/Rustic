@@ -1,4 +1,5 @@
-//! Protocol version 1 between the broker and a renderer (ADR 0056).
+//! Protocol version 2 between the broker and a renderer (ADR 0056;
+//! frames and surfaces, ADR 0062).
 //!
 //! The broker starts the renderer with one [`Start`]: the command to run
 //! and the document bytes it is allowed to see. Everything else the
@@ -53,6 +54,59 @@ pub struct Start {
 
 /// Most granted font files in one [`Start`].
 pub const MAX_FONTS: usize = 64;
+
+/// Most frames one document may ask for, and most layers in a [`Surface`].
+pub const MAX_FRAMES: usize = 16;
+
+/// An `iframe` the renderer asks the broker to load and render in another
+/// renderer (ADR 0062). The renderer never receives the frame's document
+/// or pixels, only a handle to place them with.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FrameRequest {
+    /// The resolved `src` URL, `about:srcdoc` or `about:blank`.
+    pub url: String,
+    /// The `srcdoc` attribute.
+    pub srcdoc: Option<String>,
+    /// The `sandbox` attribute's tokens, when it has the attribute.
+    pub sandbox: Option<Vec<String>>,
+    /// The frame's viewport width in CSS pixels.
+    pub width: u32,
+    /// The frame's viewport height in CSS pixels.
+    pub height: u32,
+}
+
+/// Where a frame's pixels go: within the `width × height` rectangle at
+/// `x, y` of a [`Surface`], each output pixel gains `coverage / 255` of
+/// the frame's pixel at the same offset from the rectangle's origin.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FrameLayer {
+    /// The handle the broker gave the frame.
+    pub handle: u32,
+    /// Left edge in surface pixels.
+    pub x: u32,
+    /// Top edge in surface pixels.
+    pub y: u32,
+    /// Width in pixels.
+    pub width: u32,
+    /// Height in pixels.
+    pub height: u32,
+    /// One weight per pixel, row by row.
+    pub coverage: Vec<u8>,
+}
+
+/// A rendered page: premultiplied RGBA rows and the frames to composite
+/// into it (`render` in a renderer sends this instead of a PNG).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Surface {
+    /// Width in pixels.
+    pub width: u32,
+    /// Height in pixels.
+    pub height: u32,
+    /// Premultiplied RGBA, four bytes per pixel, row by row.
+    pub pixels: Vec<u8>,
+    /// Frame layers, in paint order.
+    pub layers: Vec<FrameLayer>,
+}
 
 /// What a resource request is for (decides the broker's policy checks).
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -208,6 +262,14 @@ pub enum BrokerMessage {
         /// The result.
         value: StorageValue,
     },
+    /// The reply to [`RendererMessage::Frame`] number `id`: a handle for
+    /// the frame's layer, or why it is not shown.
+    Frame {
+        /// The request number.
+        id: u32,
+        /// The handle.
+        result: Result<u32, ResourceFailure>,
+    },
 }
 
 /// Renderer to broker.
@@ -242,6 +304,15 @@ pub enum RendererMessage {
     },
     /// A line for the user's diagnostics (console, CSP reports).
     Diagnostic(String),
+    /// Load and render an `iframe` in another renderer.
+    Frame {
+        /// The request number.
+        id: u32,
+        /// The frame.
+        request: FrameRequest,
+    },
+    /// The rendered surface (`render` only), sent before [`Self::Done`].
+    Surface(Surface),
     /// The job finished: an exit status and the command's output.
     Done {
         /// 0 success, 1 load failure, 2 usage error.
@@ -333,13 +404,7 @@ impl Message for BrokerMessage {
                         writer.bytes(&body.bytes);
                         writer.opt_str(body.charset.as_deref());
                     }
-                    Err(failure) => writer.u8(match failure {
-                        ResourceFailure::Blocked => 1,
-                        ResourceFailure::NotFound => 2,
-                        ResourceFailure::TooLarge => 3,
-                        ResourceFailure::Failed => 4,
-                        ResourceFailure::Cancelled => 5,
-                    }),
+                    Err(failure) => writer.u8(failure_tag(*failure)),
                 }
             }
             Self::Fetch { id, result } => {
@@ -389,6 +454,17 @@ impl Message for BrokerMessage {
                     StorageValue::Refused => writer.u8(5),
                 }
             }
+            Self::Frame { id, result } => {
+                writer.u16(5);
+                writer.u32(*id);
+                match result {
+                    Ok(handle) => {
+                        writer.u8(0);
+                        writer.u32(*handle);
+                    }
+                    Err(failure) => writer.u8(failure_tag(*failure)),
+                }
+            }
         }
     }
 
@@ -428,12 +504,7 @@ impl Message for BrokerMessage {
                         bytes: reader.bytes()?,
                         charset: reader.opt_string()?,
                     }),
-                    1 => Err(ResourceFailure::Blocked),
-                    2 => Err(ResourceFailure::NotFound),
-                    3 => Err(ResourceFailure::TooLarge),
-                    4 => Err(ResourceFailure::Failed),
-                    5 => Err(ResourceFailure::Cancelled),
-                    tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+                    tag => Err(failure_of(tag)?),
                 };
                 Ok(Self::Resource { id, result })
             }
@@ -481,9 +552,38 @@ impl Message for BrokerMessage {
                 };
                 Ok(Self::Storage { id, value })
             }
+            5 => {
+                let id = reader.u32()?;
+                let result = match reader.u8()? {
+                    0 => Ok(reader.u32()?),
+                    tag => Err(failure_of(tag)?),
+                };
+                Ok(Self::Frame { id, result })
+            }
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }
+}
+
+fn failure_tag(failure: ResourceFailure) -> u8 {
+    match failure {
+        ResourceFailure::Blocked => 1,
+        ResourceFailure::NotFound => 2,
+        ResourceFailure::TooLarge => 3,
+        ResourceFailure::Failed => 4,
+        ResourceFailure::Cancelled => 5,
+    }
+}
+
+fn failure_of(tag: u8) -> Result<ResourceFailure, DecodeError> {
+    Ok(match tag {
+        1 => ResourceFailure::Blocked,
+        2 => ResourceFailure::NotFound,
+        3 => ResourceFailure::TooLarge,
+        4 => ResourceFailure::Failed,
+        5 => ResourceFailure::Cancelled,
+        tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+    })
 }
 
 impl Message for RendererMessage {
@@ -565,6 +665,36 @@ impl Message for RendererMessage {
                 writer.u8(*status);
                 writer.bytes(output);
             }
+            Self::Frame { id, request } => {
+                writer.u16(6);
+                writer.u32(*id);
+                writer.str(&request.url);
+                writer.opt_str(request.srcdoc.as_deref());
+                match &request.sandbox {
+                    Some(tokens) => {
+                        writer.u8(1);
+                        writer.strs(tokens);
+                    }
+                    None => writer.u8(0),
+                }
+                writer.u32(request.width);
+                writer.u32(request.height);
+            }
+            Self::Surface(surface) => {
+                writer.u16(7);
+                writer.u32(surface.width);
+                writer.u32(surface.height);
+                writer.bytes(&surface.pixels);
+                writer.u32(u32::try_from(surface.layers.len()).unwrap_or(u32::MAX));
+                for layer in &surface.layers {
+                    writer.u32(layer.handle);
+                    writer.u32(layer.x);
+                    writer.u32(layer.y);
+                    writer.u32(layer.width);
+                    writer.u32(layer.height);
+                    writer.bytes(&layer.coverage);
+                }
+            }
         }
     }
 
@@ -629,6 +759,48 @@ impl Message for RendererMessage {
                 status: reader.u8()?,
                 output: reader.bytes()?,
             }),
+            6 => {
+                let id = reader.u32()?;
+                let request = FrameRequest {
+                    url: reader.string()?,
+                    srcdoc: reader.opt_string()?,
+                    sandbox: match reader.u8()? {
+                        0 => None,
+                        1 => Some(reader.strings(MAX_STRINGS)?),
+                        _ => return Err(DecodeError::InvalidFlag),
+                    },
+                    width: reader.u32()?,
+                    height: reader.u32()?,
+                };
+                Ok(Self::Frame { id, request })
+            }
+            7 => {
+                let width = reader.u32()?;
+                let height = reader.u32()?;
+                let pixels = reader.bytes()?;
+                let count = reader.u32()? as usize;
+                if count > MAX_FRAMES {
+                    return Err(DecodeError::OutOfRange);
+                }
+                let layers = (0..count)
+                    .map(|_| {
+                        Ok(FrameLayer {
+                            handle: reader.u32()?,
+                            x: reader.u32()?,
+                            y: reader.u32()?,
+                            width: reader.u32()?,
+                            height: reader.u32()?,
+                            coverage: reader.bytes()?,
+                        })
+                    })
+                    .collect::<Result<_, DecodeError>>()?;
+                Ok(Self::Surface(Surface {
+                    width,
+                    height,
+                    pixels,
+                    layers,
+                }))
+            }
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }

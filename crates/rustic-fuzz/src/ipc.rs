@@ -5,7 +5,8 @@
 
 use rustic_ipc::network::{ExchangeLimits, Head, NetworkCommand, NetworkEvent, Open};
 use rustic_ipc::protocol::{
-    BrokerMessage, DocumentGrant, RendererMessage, ResourceKind, Start, StorageArea, StorageOp,
+    BrokerMessage, DocumentGrant, FrameLayer, FrameRequest, RendererMessage, ResourceKind, Start,
+    StorageArea, StorageOp, Surface,
 };
 use rustic_ipc::{Message, decode_frame, encode_frame};
 
@@ -55,6 +56,28 @@ pub(crate) fn seeds() -> Vec<Vec<u8>> {
                 status: (id % 3) as u8,
                 output: vec![b'x'; id as usize],
             },
+            RendererMessage::Frame {
+                id,
+                request: FrameRequest {
+                    url: "about:srcdoc".into(),
+                    srcdoc: Some("<p>".into()),
+                    sandbox: (id % 2 == 0).then(|| vec!["allow-scripts".into()]),
+                    width: id,
+                    height: 150,
+                },
+            },
+            RendererMessage::Surface(Surface {
+                width: 1,
+                height: 1,
+                pixels: vec![0, 0, 0, 255],
+                layers: vec![FrameLayer {
+                    handle: id,
+                    width: 1,
+                    height: 1,
+                    coverage: vec![id as u8],
+                    ..FrameLayer::default()
+                }],
+            }),
         ] {
             let mut renderer = vec![1u8];
             renderer.extend(encode_frame(&message));

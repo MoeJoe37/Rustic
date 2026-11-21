@@ -1,7 +1,7 @@
 # ADR 0057 — Process model and site isolation
 
 Date: 2026-11-20
-Status: Accepted for documents and subresources; frames and popups apply it when they exist
+Status: Accepted for documents, subresources and frames (ADR 0062); popups apply it when they exist
 
 ## Context
 
@@ -38,8 +38,10 @@ cross-site data must never be sent to a renderer that does not own it
    `Cross-Origin-Resource-Policy` on cross-origin no-cors resources, and
    `credentialless` omits their credentials. CORS-mode requests remain
    governed by CORS.
-5. **Frames and popups** (not implemented yet, TD-130): a cross-site
-   iframe gets its own renderer keyed like a top-level document;
+5. **Frames and popups** (frames: [ADR 0062](0062-out-of-process-frames.md),
+   every frame in a renderer of its own; popups not implemented yet,
+   TD-130): a cross-site iframe gets its own renderer keyed like a
+   top-level document;
    same-origin access across documents requires the same agent cluster;
    `window.open` stays in the opener's group unless COOP requires a
    switch.

@@ -26,6 +26,7 @@ use crate::redirect::{
     MAX_REDIRECTS, RedirectError, RedirectMode, location_url, rewrite_for_redirect,
 };
 use crate::referrer::ReferrerPolicy;
+use crate::site::Site;
 use crate::{Exchange, Headers, NetEvent};
 
 /// HTML "policy container": the policies a document carries and passes to
@@ -76,6 +77,42 @@ pub struct Initiator {
     pub policy: PolicyContainer,
 }
 
+/// The child navigable a nested navigation loads into (an `iframe`): HTML
+/// "navigable container" facts the navigation needs. Its absence means a
+/// top-level traversable.
+#[derive(Clone, Debug)]
+pub struct FrameContainer {
+    /// The origins of the ancestor documents: the parent first, the
+    /// top-level document last.
+    pub ancestors: Vec<Origin>,
+    /// The top-level document's site (cookie partitions, the HTTP cache).
+    pub top_level_site: Site,
+    /// Whether every ancestor is same-site with the top-level document,
+    /// so the frame's requests may count as same-site (RFC 6265bis §5.2.1,
+    /// "site for cookies").
+    pub same_site_ancestors: bool,
+    /// The container's `sandbox` attribute tokens (ASCII-lowercased),
+    /// when it has the attribute.
+    pub sandbox: Option<Vec<String>>,
+}
+
+impl FrameContainer {
+    /// Whether the sandbox attribute forces an opaque origin (no
+    /// `allow-same-origin` token).
+    pub fn sandboxes_origin(&self) -> bool {
+        self.sandbox
+            .as_ref()
+            .is_some_and(|tokens| !tokens.iter().any(|token| token == "allow-same-origin"))
+    }
+
+    /// Whether scripts may run (`allow-scripts`, or no sandbox).
+    pub fn allows_scripts(&self) -> bool {
+        self.sandbox
+            .as_ref()
+            .is_none_or(|tokens| tokens.iter().any(|token| token == "allow-scripts"))
+    }
+}
+
 /// What to navigate to and how.
 #[derive(Clone, Debug)]
 pub struct NavigationRequest {
@@ -93,6 +130,8 @@ pub struct NavigationRequest {
     pub user_activation: bool,
     /// The `srcdoc` text for `about:srcdoc`.
     pub srcdoc: Option<String>,
+    /// The frame being navigated; `None` for a top-level navigation.
+    pub container: Option<FrameContainer>,
 }
 
 impl NavigationRequest {
@@ -106,6 +145,7 @@ impl NavigationRequest {
             initiator: None,
             user_activation: true,
             srcdoc: None,
+            container: None,
         }
     }
 
@@ -176,6 +216,9 @@ pub enum NavigationError {
     InvalidSrcdoc,
     /// [`Navigation::cancel`] was called.
     Cancelled,
+    /// The response refuses to be framed here (CSP `frame-ancestors` or
+    /// `X-Frame-Options`).
+    FrameRefused,
 }
 
 impl fmt::Display for NavigationError {
@@ -188,6 +231,10 @@ impl fmt::Display for NavigationError {
             Self::InvalidDataUrl => formatter.write_str("invalid data: URL"),
             Self::InvalidSrcdoc => formatter.write_str("about:srcdoc needs srcdoc text"),
             Self::Cancelled => formatter.write_str("navigation cancelled"),
+            Self::FrameRefused => formatter.write_str(
+                "the response refuses to be framed by this document (frame-ancestors or \
+                 X-Frame-Options)",
+            ),
         }
     }
 }
@@ -452,6 +499,10 @@ impl Navigation {
         fetch.credentials = CredentialsMode::Include;
         fetch.redirect = RedirectMode::Manual;
         fetch.destination = Destination::Document;
+        if let Some(container) = &self.request.container {
+            fetch.destination = Destination::Iframe;
+            fetch.top_level_site = Some(container.top_level_site.clone());
+        }
         if let Some(content_type) = &self.request.content_type {
             fetch
                 .headers
@@ -462,6 +513,18 @@ impl Navigation {
             fetch.origin = initiator.origin.clone();
             fetch.referrer = Some(initiator.url.clone());
             fetch.site_for_cookies = Some(initiator.origin.clone());
+        }
+        if let Some(container) = &self.request.container {
+            // A frame under a cross-site ancestor is never same-site.
+            fetch.site_for_cookies = Some(if container.same_site_ancestors {
+                container
+                    .ancestors
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(Origin::opaque)
+            } else {
+                Origin::opaque()
+            });
         }
         let response = fetcher.fetch(fetch).map_err(NavigationError::Network)?;
         if self.cancel.is_cancelled() {
@@ -576,8 +639,18 @@ impl Navigation {
             )));
         };
         let policy = PolicyContainer::from_response(&headers);
+        if let Some(container) = &self.request.container {
+            if !frame_allowed(&policy, &headers, &container.ancestors, &url.origin()) {
+                return Err(NavigationError::FrameRefused);
+            }
+        }
         let url_list = self.url_list.clone();
-        let origin = if crate::csp::sandboxes_origin(&policy.csp) {
+        let sandboxed = self
+            .request
+            .container
+            .as_ref()
+            .is_some_and(FrameContainer::sandboxes_origin);
+        let origin = if sandboxed || crate::csp::sandboxes_origin(&policy.csp) {
             Origin::opaque()
         } else {
             url.origin()
@@ -620,6 +693,12 @@ impl Navigation {
             }
             _ => return Err(NavigationError::UnsupportedScheme),
         };
+        let sandboxed = self
+            .request
+            .container
+            .as_ref()
+            .is_some_and(FrameContainer::sandboxes_origin);
+        let origin = if sandboxed { Origin::opaque() } else { origin };
         Ok(NavigationOutcome::Commit(Box::new(CommittedNavigation {
             url_list: self.url_list.clone(),
             status: 200,
@@ -633,10 +712,10 @@ impl Navigation {
         })))
     }
 
-    /// `data:` documents: only browser-initiated at the top level; opaque
-    /// origin; policy container copied from the initiator.
+    /// `data:` documents: at the top level only browser-initiated; in a
+    /// frame from any initiator. Always an opaque origin.
     fn local_data(&self, url: &Url) -> Result<NavigationOutcome, NavigationError> {
-        if self.request.initiator.is_some() {
+        if self.request.initiator.is_some() && self.request.container.is_none() {
             return Err(NavigationError::DataUrlBlocked);
         }
         let data = process_data_url(url).ok_or(NavigationError::InvalidDataUrl)?;
@@ -664,6 +743,47 @@ impl Navigation {
             body: DocumentBody::Bytes(data.body),
         })))
     }
+}
+
+/// Whether a framed response may be shown under `ancestors` (parent
+/// first): CSP `frame-ancestors` (CSP3 §6.4.2) when an enforced policy has
+/// it, otherwise HTML "check a navigation response's adherence to
+/// `X-Frame-Options`".
+pub fn frame_allowed(
+    policy: &PolicyContainer,
+    headers: &Headers,
+    ancestors: &[Origin],
+    origin: &Origin,
+) -> bool {
+    let csp = crate::csp::CspList::from_container(policy);
+    if csp.policies().iter().any(|policy| {
+        policy.disposition() == crate::csp::Disposition::Enforce
+            && policy.directive("frame-ancestors").is_some()
+    }) {
+        return csp.check_frame_ancestors(ancestors, origin).allowed();
+    }
+    let mut options: Vec<String> = Vec::new();
+    for value in headers.get_all("x-frame-options") {
+        for part in value.split(|&byte| byte == b',') {
+            let token = String::from_utf8_lossy(part.trim_ascii()).to_ascii_lowercase();
+            if !options.contains(&token) {
+                options.push(token);
+            }
+        }
+    }
+    let known = |name: &str| options.iter().any(|token| token == name);
+    if options.len() > 1 {
+        return !(known("deny") || known("allowall") || known("sameorigin"));
+    }
+    if known("deny") {
+        return false;
+    }
+    if known("sameorigin") {
+        return ancestors
+            .iter()
+            .all(|ancestor| ancestor.is_same_origin(origin));
+    }
+    true
 }
 
 /// RFC 6266 `Content-Disposition`: whether it is `attachment`, and the

@@ -608,8 +608,11 @@ run in a `__renderer` child over the bounded IPC of
 [ADR 0056](adr/0056-ipc-format.md), and the broker answers every file,
 network, `fetch()` and storage request from its own grant. ISO-01: process
 keys, COOP group switches, ORB and COEP
-([ADR 0057](adr/0057-process-model-and-site-isolation.md)); frames and
-popups wait for iframes. ISO-03: bubblewrap with a measured seccomp-bpf
+([ADR 0057](adr/0057-process-model-and-site-isolation.md)); iframes render
+out of process, each in its own renderer with its own grant, composited by
+the broker without the embedder seeing them
+([ADR 0062](adr/0062-out-of-process-frames.md)); popups and opener groups
+wait for `window.open`. ISO-03: bubblewrap with a measured seccomp-bpf
 allowlist, on by default and failing closed
 ([ADR 0058](adr/0058-linux-renderer-sandbox.md), verified on native
 Linux x86-64). ISO-04: the Windows renderer runs in a capability-less
@@ -630,8 +633,8 @@ that admits Internet sockets only.
 ISO-08 is a design only ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
 Still open: native Linux aarch64, Windows ARM64, macOS, Android and iOS
 runs (TD-12), the macOS sandbox, Windows/macOS confinement of the network
-process (TD-176), cross-origin frames, trusted prompts and an independent
-external review. The demo runs:
+process (TD-176), `window.open` and opener groups, trusted prompts and an
+independent external review. The demo runs:
 `crates/rustic-cli/tests/isolation.rs`.
 
 **Gate:** all applicable [security gates](SECURITY.md) pass with recorded evidence

@@ -42,6 +42,11 @@ generality; Rustic's message set is small.
    Storage operation with a numbered request and gets one reply; it ends
    with `Done` (status and output). Requests carry claims (URLs, nonces,
    kinds) that the broker re-validates against its own grant.
+   **Protocol 2** (2026-11-21, [ADR 0062](0062-out-of-process-frames.md))
+   adds `Frame` requests (an `iframe` to load in another renderer,
+   answered with a handle) and the `Surface` a `render` sends before
+   `Done`: premultiplied pixels and frame layers, which the broker
+   validates, composites and encodes.
 6. **No shared memory yet.** Bulk data is copied through the pipe
    (TD-170). Shared memory needs platform calls behind unsafe code or a
    reviewed crate, and validation of every mapped read.

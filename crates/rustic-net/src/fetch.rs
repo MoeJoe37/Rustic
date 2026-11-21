@@ -656,7 +656,7 @@ impl Fetcher {
     /// The HTTP cache partition of one hop: a navigation is its own
     /// top-level document, keyed by the site it goes to.
     fn cache_partition(&self, request: &FetchRequest, current: &Url) -> String {
-        if request.mode == RequestMode::Navigate {
+        if request.mode == RequestMode::Navigate && request.top_level_site.is_none() {
             self.suffixes().site(&current.origin()).serialize()
         } else {
             self.partition_key(request)
@@ -712,15 +712,20 @@ impl Fetcher {
             || (request.credentials == CredentialsMode::SameOrigin
                 && hop.tainting == ResponseTainting::Basic);
         let now = (self.clock)();
-        let top_level_site = if request.mode == RequestMode::Navigate {
-            Some(self.suffixes().site(&current.origin()))
-        } else {
-            request.top_level_site.clone()
+        // A top-level navigation is its own top-level site; a nested one
+        // (an iframe) carries its top-level document's.
+        let top_level_site = match &request.top_level_site {
+            Some(site) => Some(site.clone()),
+            None if request.mode == RequestMode::Navigate => {
+                Some(self.suffixes().site(&current.origin()))
+            }
+            None => None,
         };
         let context = CookieContext {
             url: current,
             same_site: hop.same_site,
-            top_level_navigation: request.mode == RequestMode::Navigate,
+            top_level_navigation: request.mode == RequestMode::Navigate
+                && request.destination == Destination::Document,
             safe_method: matches!(hop.method.as_str(), "GET" | "HEAD" | "OPTIONS"),
             http_api: true,
             top_level_site,

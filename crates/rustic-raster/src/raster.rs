@@ -95,6 +95,72 @@ impl Surface {
         })
     }
 
+    /// A surface from premultiplied RGBA bytes another process produced:
+    /// `None` unless the size passes every budget, `pixels` holds exactly
+    /// four bytes per pixel and no color channel exceeds its alpha.
+    pub fn from_premultiplied(
+        width: u32,
+        height: u32,
+        pixels: Vec<u8>,
+        limits: RasterLimits,
+    ) -> Option<Self> {
+        let expected = Self::new(width, height, limits).ok()?.pixels.len();
+        let premultiplied = pixels
+            .chunks_exact(4)
+            .all(|p| p[0] <= p[3] && p[1] <= p[3] && p[2] <= p[3]);
+        (pixels.len() == expected && premultiplied).then_some(Self {
+            width,
+            height,
+            pixels,
+        })
+    }
+
+    /// Composite `frame` into the `width × height` rectangle at `x, y`:
+    /// each pixel gains `coverage / 255` of the frame pixel at the same
+    /// offset (the frame's edge pixel past its size), saturating. Fails
+    /// without changing anything when the rectangle leaves the surface or
+    /// `coverage` is not one byte per pixel. This is the arithmetic of
+    /// ADR 0062: the embedder painted the frame opaque black, and
+    /// `coverage` is how much an opaque white frame would have added.
+    pub fn add_frame(
+        &mut self,
+        frame: &Surface,
+        (x, y, width, height): (u32, u32, u32, u32),
+        coverage: &[u8],
+    ) -> Result<(), RasterError> {
+        let fits = |start: u32, extent: u32, limit: u32| {
+            start.checked_add(extent).is_some_and(|end| end <= limit)
+        };
+        let count = usize::try_from(u64::from(width) * u64::from(height))
+            .map_err(|_| RasterError::SurfaceSize)?;
+        if !fits(x, width, self.width) || !fits(y, height, self.height) || coverage.len() != count {
+            return Err(RasterError::SurfaceSize);
+        }
+        if frame.width == 0 || frame.height == 0 {
+            return Ok(());
+        }
+        for row in 0..height {
+            let source_row = row.min(frame.height - 1) as usize;
+            for column in 0..width {
+                let weight = u32::from(coverage[(row * width + column) as usize]);
+                if weight == 0 {
+                    continue;
+                }
+                let source_column = column.min(frame.width - 1) as usize;
+                let source = (source_row * frame.width as usize + source_column) * 4;
+                let target =
+                    (((y + row) as usize) * self.width as usize + (x + column) as usize) * 4;
+                let alpha = u32::from(self.pixels[target + 3]);
+                for channel in 0..3 {
+                    let added = (weight * u32::from(frame.pixels[source + channel]) + 127) / 255;
+                    let value = (u32::from(self.pixels[target + channel]) + added).min(alpha);
+                    self.pixels[target + channel] = value as u8;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Width in device pixels.
     pub const fn width(&self) -> u32 {
         self.width
@@ -2185,6 +2251,47 @@ fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn foreign_surfaces_are_checked_and_frames_add_by_coverage() {
+        let limits = RasterLimits::default();
+        assert!(Surface::from_premultiplied(1, 1, vec![0, 0, 0, 255], limits).is_some());
+        // Wrong length, color above alpha, empty or over-budget sizes.
+        assert!(Surface::from_premultiplied(1, 1, vec![0; 3], limits).is_none());
+        assert!(Surface::from_premultiplied(1, 1, vec![9, 0, 0, 8], limits).is_none());
+        assert!(Surface::from_premultiplied(0, 1, Vec::new(), limits).is_none());
+        assert!(Surface::from_premultiplied(u32::MAX, 1, Vec::new(), limits).is_none());
+        // A 2x1 page whose right pixel is a black frame seen through 50%
+        // opacity over white: half the frame's color shows through.
+        let mut page =
+            Surface::from_premultiplied(2, 1, vec![255, 255, 255, 255, 128, 128, 128, 255], limits)
+                .unwrap();
+        let frame = Surface::from_premultiplied(1, 1, vec![0, 0, 255, 255], limits).unwrap();
+        let before = page.clone();
+        assert_eq!(
+            page.add_frame(&frame, (1, 0, 2, 1), &[255, 255]),
+            Err(RasterError::SurfaceSize)
+        );
+        assert_eq!(
+            page.add_frame(&frame, (1, 0, 1, 1), &[]),
+            Err(RasterError::SurfaceSize)
+        );
+        assert_eq!(
+            page.add_frame(&frame, (u32::MAX, 0, 2, 1), &[0, 0]),
+            Err(RasterError::SurfaceSize)
+        );
+        assert_eq!(page, before);
+        page.add_frame(&frame, (1, 0, 1, 1), &[127]).unwrap();
+        assert_eq!(
+            page.premultiplied(),
+            &[255, 255, 255, 255, 128, 128, 255, 255]
+        );
+        // Color never exceeds alpha, and the frame's edge pixel extends.
+        let mut faint =
+            Surface::from_premultiplied(2, 1, vec![0, 0, 0, 100, 0, 0, 0, 100], limits).unwrap();
+        faint.add_frame(&frame, (0, 0, 2, 1), &[255, 255]).unwrap();
+        assert_eq!(faint.premultiplied(), &[0, 0, 100, 100, 0, 0, 100, 100]);
+    }
 
     fn polygon_area(points: &[Point]) -> f64 {
         let n = points.len();

@@ -156,8 +156,9 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Isolation and security (M7): 3 sections</summary>
+<summary>Isolation and security (M7): 4 sections</summary>
 
+- [ISO-01 — Out-of-process frames](#iso-01--out-of-process-frames)
 - [ISO-07 — Network process](#iso-07--network-process)
 - [ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)](#iso-03iso-04--renderer-sandboxes-on-by-default-linux-windows)
 - [ISO-02 — Split renderer process and brokered authority](#iso-02--split-renderer-process-and-brokered-authority)
@@ -2546,6 +2547,32 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## ISO-01 — Out-of-process frames
+
+Added 2026-11-21 (`rustic-cli/src/loader.rs` `render_layers`,
+`rustic-cli/src/broker.rs` `open_frame`, `rustic_net::navigation::FrameContainer`,
+`rustic_raster::Surface::add_frame`, IPC protocol version 2,
+[ADR 0062](adr/0062-out-of-process-frames.md)). In a split `render`, each
+`<iframe>` document is loaded by the broker and rendered in a renderer of
+its own with its own grant; the embedding renderer receives a handle, never
+the frame's bytes or pixels, and the broker composites the frame by the
+coverage the embedder reports.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Nested navigation | `FrameContainer`: `Destination::Iframe`, the top-level site for cookies and cache, no Lax cookies or same-site status under a cross-site ancestor, `data:` frames allowed (opaque), `sandbox` without `allow-same-origin` opaque; `frame-ancestors` (enforced) or else `X-Frame-Options` with HTML's multi-value rules | `frames_obey_frame_ancestors_x_frame_options_sandbox_and_cookie_context` |
+| Embedder policy | CSP `frame-src`/`child-src`/`default-src` and mixed content on every hop (`Navigation::step`), the embedder's COEP `require-corp` | `network_frames_follow_frame_policies_and_third_party_rules` |
+| Grants | Local frames only inside the embedder's directory, granted their own directory; `data:` and sandboxed local `srcdoc` frames get nothing; `srcdoc` inherits the embedder's grant; sandboxed frames get no storage and no scripts without `allow-scripts` | `local_frames_render_in_their_own_renderers_under_parent_content`, `a_frame_grant_is_its_own_directory_and_a_failing_frame_costs_only_its_pixels` |
+| Compositing | The embedder paints accepted frames black, re-rasterizes each frame rectangle with it white and sends one coverage byte per pixel; the broker validates the surface (budgets, premultiplied, bounds, issued handles) and adds coverage × frame pixel, then encodes the PNG | `foreign_surfaces_are_checked_and_frames_add_by_coverage`, overlay pixel in `local_frames_render_in_their_own_renderers_under_parent_content` |
+| Failure | Refused, missing, crashing, protocol-breaking, late or wrong-size frames paint white with one diagnostic; 16 frames per document, depth 3, 32 per command | `a_frame_grant_is_its_own_directory_and_a_failing_frame_costs_only_its_pixels` (crash, forged handle, self-framing page) |
+
+Test hook `RUSTIC_TEST_FAULT` (`crash`, `probe`, `forge`) applies only to
+renderers whose document URL contains `RUSTIC_TEST_FAULT_URL`; it grants
+nothing. Open: transforms, non-linear blending and transparent frame
+canvases (TD-177); frame scripting, single-process frames and frames in
+dumps (TD-178); `width`/`height` attributes (TD-179); `window.open` and
+opener groups (TD-130).
 
 ## ISO-07 — Network process
 

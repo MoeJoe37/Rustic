@@ -141,3 +141,28 @@ only; the escape probe reads a file, lists a directory, starts a shell
 and connects to an abstract Unix socket, all denied). On Windows and
 macOS it is not confined (TD-176), which joins the items that block
 remote browsing there.
+
+## Addendum 2026-11-21 — out-of-process frames
+
+`<iframe>` documents now render in renderers of their own
+([ADR 0062](../adr/0062-out-of-process-frames.md)). New broker-side input
+from a renderer: `Frame` requests (a URL, `srcdoc`, sandbox tokens and a
+size) and the `Surface` a `render` ends with. Reviewed as broker code: the
+frame's document and grant come from the broker's own record of the
+embedder (a local frame must resolve inside the embedder's directory after
+symbolic links and is granted its own directory; a network frame is a
+nested navigation through the embedder's session with `frame-src`, mixed
+content, `frame-ancestors`/`X-Frame-Options` and COEP), sizes are bounded
+(1–16384 CSS pixels, 16 frames per document, depth 3, 32 per command), and
+`Surface::from_premultiplied` refuses any surface over the raster budget,
+of the wrong length or not premultiplied. `add_frame` uses checked bounds,
+refuses layers outside the surface and handles it never issued, and keeps
+every color at or below its alpha. The embedder never receives a frame's
+bytes or pixels; a renderer that misreports coverage can only misplace
+pixels it cannot see. A crashing, protocol-breaking or forging frame
+renderer costs only its frame; tests cover a crash, a forged handle, a
+compromised frame probing its parent's files and another site, and a page
+that frames itself. The IPC decoder for the new messages is covered by
+the `ipc-frame` fuzz target (sides 0 and 1, with `Frame` and `Surface` seeds). Same-origin frames do
+not share a renderer, so no cross-frame scripting exists to review yet
+(TD-178).

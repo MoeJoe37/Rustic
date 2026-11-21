@@ -38,7 +38,7 @@ use rustic_net::navigation::{
     PolicyContainer,
 };
 use rustic_net::referrer::ReferrerPolicy;
-use rustic_net::site::PublicSuffixList;
+use rustic_net::site::{PublicSuffixList, Site};
 use rustic_net::tls::TlsConfig;
 use rustic_net::{NetworkPolicy, Transport, TransportLimits};
 use rustic_style::FetchError;
@@ -285,7 +285,8 @@ pub(crate) enum ResourceKind {
 
 /// The connection state one network document's subresources share.
 pub(crate) struct NetworkSession {
-    fetcher: RefCell<Fetcher>,
+    /// Shared with the session's frames (one cookie jar and cache).
+    fetcher: Rc<RefCell<Fetcher>>,
     document_url: Url,
     origin: Origin,
     csp: CspList,
@@ -295,6 +296,9 @@ pub(crate) struct NetworkSession {
     charsets: RefCell<HashMap<String, String>>,
     /// The document's COOP, COEP and origin-keying (ADR 0057).
     isolation: rustic_net::isolation::IsolationPolicy,
+    /// For a frame's document: the top-level site and the site for
+    /// cookies of its requests (ADR 0062); `None` at the top level.
+    frame: Option<(Site, Origin)>,
 }
 
 impl fmt::Debug for NetworkSession {
@@ -580,7 +584,7 @@ impl NetworkSession {
     ) -> Self {
         let secure = mixed_content::is_secure_context(&origin, None);
         Self {
-            fetcher: RefCell::new(fetcher),
+            fetcher: Rc::new(RefCell::new(fetcher)),
             document_url,
             origin,
             csp: CspList::from_container(policy),
@@ -589,7 +593,163 @@ impl NetworkSession {
             cancellation,
             charsets: RefCell::new(HashMap::new()),
             isolation: rustic_net::isolation::IsolationPolicy::default(),
+            frame: None,
         }
+    }
+
+    /// The document's origin.
+    pub(crate) fn origin(&self) -> &Origin {
+        &self.origin
+    }
+
+    /// The top-level site and whether the ancestors so far are all
+    /// same-site with it, for a frame of this document.
+    pub(crate) fn frame_context(&self) -> (Site, bool) {
+        match &self.frame {
+            Some((site, for_cookies)) => (site.clone(), !for_cookies.is_opaque()),
+            None => (PublicSuffixList::bundled().site(&self.origin), true),
+        }
+    }
+
+    /// Navigate an `iframe` of this document to `url` (ADR 0062): the
+    /// document's CSP `frame-src` and mixed-content rules on every hop, the
+    /// response's `frame-ancestors` or `X-Frame-Options`, and the
+    /// document's COEP. The frame's own session shares this one's cookie
+    /// jar and cache, as a third party when `container` says so.
+    pub(crate) fn open_frame(
+        &self,
+        url: &Url,
+        container: rustic_net::navigation::FrameContainer,
+        max_bytes: usize,
+    ) -> Result<NetworkDocument, NetworkLoadError> {
+        let allowed = |hop: &Url, redirects: usize| {
+            if hop.scheme() != "data"
+                && mixed_content::check(hop, Destination::Iframe, self.secure)
+                    == MixedContent::Blocked
+            {
+                eprintln!("rustic: mixed content: blocked insecure iframe navigation");
+                return false;
+            }
+            let verdict =
+                self.csp
+                    .check_request(hop, FetchDirective::Frame, &self.origin, redirects);
+            report(&verdict);
+            verdict.allowed()
+        };
+        if !allowed(url, 0) {
+            return Err(NetworkLoadError::Navigation(NavigationError::FrameRefused));
+        }
+        let target = match mixed_content::check(url, Destination::Iframe, self.secure) {
+            MixedContent::Upgrade(upgraded) => upgraded,
+            _ => url.clone(),
+        };
+        let top_level_site = container.top_level_site.clone();
+        let for_cookies = if container.same_site_ancestors {
+            container
+                .ancestors
+                .last()
+                .cloned()
+                .unwrap_or_else(Origin::opaque)
+        } else {
+            Origin::opaque()
+        };
+        let request = NavigationRequest {
+            initiator: Some(rustic_net::navigation::Initiator {
+                origin: self.origin.clone(),
+                url: self.document_url.clone(),
+                policy: PolicyContainer {
+                    referrer_policy: self.referrer_policy,
+                    ..PolicyContainer::default()
+                },
+            }),
+            user_activation: false,
+            container: Some(container),
+            ..NavigationRequest::browser(target)
+        };
+        let mut navigation = Navigation::new(request, NETWORK_TIMEOUT);
+        let mut redirects = 0;
+        let outcome = loop {
+            let mut fetcher = self
+                .fetcher
+                .try_borrow_mut()
+                .map_err(|_| NetworkLoadError::NoContent)?;
+            match navigation
+                .step(&mut fetcher)
+                .map_err(NetworkLoadError::Navigation)?
+            {
+                rustic_net::navigation::NavigationStep::Redirected(next) => {
+                    redirects += 1;
+                    drop(fetcher);
+                    if !allowed(&next, redirects) {
+                        navigation.cancel();
+                        return Err(NetworkLoadError::Navigation(NavigationError::FrameRefused));
+                    }
+                }
+                rustic_net::navigation::NavigationStep::Finished(outcome) => break outcome,
+            }
+        };
+        let committed = match outcome {
+            NavigationOutcome::Commit(committed) => committed,
+            NavigationOutcome::Download(download) => {
+                return Err(NetworkLoadError::Download(download.sanitized_filename()));
+            }
+            NavigationOutcome::NoContent => return Err(NetworkLoadError::NoContent),
+        };
+        if committed.kind != DocumentKind::Html {
+            return Err(NetworkLoadError::NotHtml(committed.mime.essence()));
+        }
+        let document_url = committed.url().clone();
+        let origin = committed.origin.clone();
+        let isolation = rustic_net::isolation::IsolationPolicy::from_headers(
+            &committed.headers,
+            mixed_content::is_secure_context(&origin, None),
+        );
+        // HTML "check a navigation response's adherence to its embedder
+        // policy": a require-corp embedder takes only frames that set a
+        // COEP, and cross-origin ones that also send CORP.
+        if self.isolation.embedder == rustic_net::isolation::EmbedderPolicy::RequireCorp
+            && (isolation.embedder == rustic_net::isolation::EmbedderPolicy::UnsafeNone
+                || !rustic_net::isolation::embedder_allows(
+                    self.isolation.embedder,
+                    &self.origin,
+                    &document_url,
+                    &committed.headers,
+                ))
+        {
+            eprintln!(
+                "rustic: Cross-Origin-Embedder-Policy: blocked a frame without a compatible \
+                 embedder policy"
+            );
+            return Err(NetworkLoadError::Navigation(NavigationError::FrameRefused));
+        }
+        let transport_encoding = committed.encoding;
+        let policy = committed.policy.clone();
+        let bytes = committed
+            .body
+            .read_all(NETWORK_TIMEOUT)
+            .map_err(NetworkLoadError::Body)?;
+        if bytes.len() > max_bytes {
+            return Err(NetworkLoadError::TooLarge(max_bytes));
+        }
+        let secure = mixed_content::is_secure_context(&origin, None);
+        let session = Self {
+            fetcher: Rc::clone(&self.fetcher),
+            document_url,
+            csp: CspList::from_container(&policy),
+            secure,
+            referrer_policy: policy.referrer_policy,
+            cancellation: self.cancellation.clone(),
+            charsets: RefCell::new(HashMap::new()),
+            isolation,
+            frame: Some((top_level_site, for_cookies)),
+            origin,
+        };
+        Ok(NetworkDocument {
+            session: Rc::new(session),
+            bytes,
+            transport_encoding,
+            policy,
+        })
     }
 
     /// Save the jar's persistent cookies in the profile.
@@ -659,7 +819,11 @@ impl NetworkSession {
             destination,
             referrer: Some(self.document_url.clone()),
             referrer_policy: self.referrer_policy,
-            top_level_site: None,
+            top_level_site: self.frame.as_ref().map(|(site, _)| site.clone()),
+            site_for_cookies: self.frame.as_ref().map_or_else(
+                || Some(self.origin.clone()),
+                |(_, for_cookies)| Some(for_cookies.clone()),
+            ),
             ..FetchRequest::new(target, self.origin.clone())
         };
         let mut fetcher = self
@@ -889,6 +1053,11 @@ impl NetworkSession {
             referrer_policy: ReferrerPolicy::from_token(&request.referrer_policy)
                 .unwrap_or(session.referrer_policy),
             destination: Destination::Empty,
+            top_level_site: session.frame.as_ref().map(|(site, _)| site.clone()),
+            site_for_cookies: session.frame.as_ref().map_or_else(
+                || Some(session.origin.clone()),
+                |(_, for_cookies)| Some(for_cookies.clone()),
+            ),
             ..FetchRequest::new(request.url, session.origin.clone())
         };
         let mut fetcher = session

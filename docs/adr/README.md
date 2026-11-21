@@ -69,6 +69,7 @@ instead of rewriting the history of a decision.
 | [0059](0059-mobile-renderer-isolation.md) | Android isolated-process renderer service and iOS BrowserEngineKit extensions over the same IPC | Proposed |
 | [0060](0060-windows-renderer-sandbox.md) | Windows renderer in a capability-less LPAC AppContainer and a kill-on-close job; `rustic-sandbox` holds the first project `unsafe` | Accepted |
 | [0061](0061-network-process.md) | Exchanges (sockets, TLS, HTTP framing, content codings) run in a `rustic __network` child; the broker keeps every decision and revalidates replies under credit-based flow control | Accepted |
+| [0062](0062-out-of-process-frames.md) | Every `iframe` document renders in a renderer of its own with its own grant; the embedder sends black-painted pixels and per-frame coverage, and the broker composites the frame it never showed the embedder | Accepted |
 
 ## Records by area
 

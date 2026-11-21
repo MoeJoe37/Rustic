@@ -450,12 +450,31 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
         return usage("missing --output".into());
     };
     let (limits, view) = (args.limits, args.view);
-    let png = match load(engine, "render", limits, &args.path, |parsed, path| {
-        loader::render_png(parsed, path, limits, view)
-    }) {
+    // A renderer hands its surface and frame layers to the broker, which
+    // composites the frames (ADR 0062) and writes the PNG.
+    let host = renderer::frame_host();
+    let png = match load(
+        engine,
+        "render",
+        limits,
+        &args.path,
+        |parsed, path| match &host {
+            Some(host) => {
+                loader::render_layers(parsed, path, limits, view, &**host).map(|surface| {
+                    renderer::emit_surface(surface);
+                    Vec::new()
+                })
+            }
+            // One process has no frame renderers: frames paint white (TD-178).
+            None => loader::render_png_without_frames(parsed, path, limits, view),
+        },
+    ) {
         Ok(png) => png,
         Err(code) => return code,
     };
+    if host.is_some() {
+        return 0;
+    }
     if let Err(error) = renderer::emit_file(&output, png) {
         eprintln!(
             "rustic render: {}: {error}",

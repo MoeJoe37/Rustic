@@ -1680,8 +1680,9 @@ pub fn hit_test(
     Ok(out)
 }
 
-/// Rasterize the display list at `scale`. Only block backgrounds and solid
-/// borders are painted.
+/// Rasterize the display list at `scale` (no frames; the tests' direct
+/// path).
+#[cfg(test)]
 pub fn render_surface(
     parsed: &LoadedDocument,
     path: &Path,
@@ -1691,7 +1692,7 @@ pub fn render_surface(
     render_list(parsed, path, limits, view).map(|(_, surface)| surface)
 }
 
-/// Rasterize like [`render_surface`], keeping the display list.
+/// Rasterize the display list at the view's scale, keeping the list.
 pub fn render_list(
     parsed: &LoadedDocument,
     path: &Path,
@@ -1741,8 +1742,310 @@ pub fn damage_repaints_exactly(
     Ok(surface.premultiplied() == new_surface.premultiplied())
 }
 
-/// Rasterize like [`render_surface`] and encode the result as PNG, within
+/// An `iframe` of the document: its element and the frame it asks for.
+struct FrameSite {
+    node: rustic_dom::NodeId,
+    url: String,
+    srcdoc: Option<String>,
+    sandbox: Option<Vec<String>>,
+}
+
+/// The document's `iframe` elements in tree order, with `src` resolved
+/// against the document base URL (an empty or invalid `src` is
+/// `about:blank`; `srcdoc` wins over `src`).
+fn frame_sites(document: &Document, document_url: Option<&rustic_url::Url>) -> Vec<FrameSite> {
+    use crate::reftest::{attribute, is_html};
+    let mut sites = Vec::new();
+    let Ok(walk) = document.walk(document.root()) else {
+        return sites;
+    };
+    let mut base: Option<Option<rustic_url::Url>> = None;
+    let mut found = Vec::new();
+    for (id, _) in walk {
+        let Some(element) = rustic_style::DomElement::new(document, id) else {
+            continue;
+        };
+        if is_html(element, "base") && base.is_none() {
+            if let Some(href) = attribute(element, "href") {
+                base = Some(rustic_url::Url::parse(&href, document_url).ok());
+            }
+        } else if is_html(element, "iframe") {
+            found.push((
+                id,
+                attribute(element, "src"),
+                attribute(element, "srcdoc"),
+                attribute(element, "sandbox"),
+            ));
+        }
+    }
+    let base = base.flatten().or_else(|| document_url.cloned());
+    for (node, src, srcdoc, sandbox) in found {
+        let url = if srcdoc.is_some() {
+            "about:srcdoc".to_owned()
+        } else {
+            src.filter(|src| !src.trim().is_empty())
+                .and_then(|src| rustic_url::Url::parse(src.trim(), base.as_ref()).ok())
+                .map_or_else(|| "about:blank".to_owned(), |url| url.serialize())
+        };
+        let sandbox = sandbox.map(|value| {
+            value
+                .split(['\t', '\n', '\x0c', '\r', ' '])
+                .filter(|token| !token.is_empty())
+                .map(str::to_ascii_lowercase)
+                .collect()
+        });
+        sites.push(FrameSite {
+            node,
+            url,
+            srcdoc,
+            sandbox,
+        });
+    }
+    sites
+}
+
+/// Asks for a frame to be loaded and rendered elsewhere (ADR 0062).
+pub(crate) trait FrameHost {
+    /// A handle for the frame's layer, or `None` when it is not shown.
+    fn open(&self, request: rustic_ipc::protocol::FrameRequest) -> Option<u32>;
+}
+
+/// One color, as the content of every pixel of a frame's content box.
+fn solid(color: u8) -> std::sync::Arc<rustic_paint::Image> {
+    std::sync::Arc::new(
+        rustic_paint::Image::new(1, 1, vec![color, color, color, 255]).expect("one pixel"),
+    )
+}
+
+/// Rasterize the document with its `iframe`s as layers (ADR 0062). Each
+/// frame the host accepts is painted opaque black in the returned
+/// surface, and its layer's coverage is how much painting it opaque white
+/// instead adds to each pixel, so whoever holds the frame's pixels can
+/// composite them exactly under everything painted above it, through
+/// clips and opacity. The frame's pixels never reach this process. Frames
+/// the host refuses, frames under a transform (TD-177) and frames past
+/// [`rustic_ipc::protocol::MAX_FRAMES`] paint white.
+pub(crate) fn render_layers(
+    parsed: &LoadedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    view: rustic_layout::View,
+    host: &dyn FrameHost,
+) -> Result<rustic_ipc::protocol::Surface, LoadError> {
+    use rustic_ipc::protocol::{FrameLayer, FrameRequest, MAX_FRAMES, Surface};
+    use rustic_paint::{DisplayCommand, ItemRole, Shape};
+    let input = parsed.layout_input(path, limits, view);
+    let cancellation = input.cancellation;
+    let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let document_url = input.network.map(|session| session.document_url().clone());
+    let sites = frame_sites(input.document, document_url.as_ref());
+    let build = |images: HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>| {
+        let resources = rustic_paint::Resources {
+            fonts: Some(fonts()),
+            images,
+        };
+        rustic_paint::DisplayList::build_with(
+            input.document,
+            &tree,
+            &layout,
+            viewport,
+            &resources,
+            rustic_paint::PaintLimits::default(),
+            cancellation,
+        )
+        .map_err(LoadError::Paint)
+    };
+    let raster = |list: &rustic_paint::DisplayList| {
+        rustic_raster::rasterize(
+            list,
+            view.scale(),
+            rustic_raster::RasterLimits::default(),
+            cancellation,
+        )
+        .map_err(LoadError::Raster)
+    };
+    let with = |colors: &[(rustic_dom::NodeId, u8)]| {
+        let mut all = images.images.clone();
+        for &(node, color) in colors {
+            all.insert(node, solid(color));
+        }
+        all
+    };
+    if sites.is_empty() {
+        let base = raster(&build(with(&[]))?)?;
+        return Ok(Surface {
+            width: base.width(),
+            height: base.height(),
+            pixels: base.premultiplied().to_vec(),
+            layers: Vec::new(),
+        });
+    }
+    // Where each frame's content box is painted, outside any transform.
+    let probe = build(with(
+        &sites.iter().map(|site| (site.node, 0)).collect::<Vec<_>>(),
+    ))?;
+    let mut depth = 0usize;
+    let mut placed: HashMap<rustic_dom::NodeId, rustic_layout::CssRect> = HashMap::new();
+    let mut transformed = std::collections::HashSet::new();
+    for command in probe.commands() {
+        match command {
+            DisplayCommand::BeginTransform { .. } => depth += 1,
+            DisplayCommand::EndTransform => depth = depth.saturating_sub(1),
+            DisplayCommand::Fill(item) if item.role == ItemRole::Image => {
+                if let Shape::Image { rect, .. } = item.shape {
+                    if sites.iter().any(|site| site.node == item.node) {
+                        if depth > 0 {
+                            transformed.insert(item.node);
+                        }
+                        placed.entry(item.node).or_insert(rect);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let factor = rustic_layout::CssPx::new(1.0)
+        .map(|one| one.to_device(view.scale()).get())
+        .unwrap_or(1.0);
+    let mut opened: Vec<(rustic_dom::NodeId, u32, rustic_layout::CssRect)> = Vec::new();
+    for site in &sites {
+        let Some(&rect) = placed.get(&site.node) else {
+            continue;
+        };
+        if transformed.contains(&site.node) {
+            eprintln!(
+                "rustic: an iframe under a CSS transform is not composited yet (TD-177); it \
+                 paints white"
+            );
+            continue;
+        }
+        if opened.len() >= MAX_FRAMES {
+            eprintln!("rustic: more than {MAX_FRAMES} iframes; the rest paint white");
+            break;
+        }
+        let size = |css: f64| (css.round().clamp(0.0, 16_384.0)) as u32;
+        let (width, height) = (
+            size(rect.size().width().get()),
+            size(rect.size().height().get()),
+        );
+        if width == 0 || height == 0 {
+            continue;
+        }
+        let request = FrameRequest {
+            url: site.url.clone(),
+            srcdoc: site.srcdoc.clone(),
+            sandbox: site.sandbox.clone(),
+            width,
+            height,
+        };
+        if let Some(handle) = host.open(request) {
+            opened.push((site.node, handle, rect));
+        }
+    }
+    let colors = |white: Option<rustic_dom::NodeId>| {
+        sites
+            .iter()
+            .map(|site| {
+                let layered = opened.iter().any(|&(node, _, _)| node == site.node);
+                let color = if !layered || white == Some(site.node) {
+                    255
+                } else {
+                    0
+                };
+                (site.node, color)
+            })
+            .collect::<Vec<_>>()
+    };
+    let base_list = build(with(&colors(None)))?;
+    let base = raster(&base_list)?;
+    let mut layers = Vec::new();
+    for &(node, handle, rect) in &opened {
+        let device = |css: f64| css * factor;
+        let left = device(rect.origin().x.get()).floor().max(0.0);
+        let top = device(rect.origin().y.get()).floor().max(0.0);
+        let right = device(rect.origin().x.get() + rect.size().width().get())
+            .ceil()
+            .min(f64::from(base.width()));
+        let bottom = device(rect.origin().y.get() + rect.size().height().get())
+            .ceil()
+            .min(f64::from(base.height()));
+        if right <= left || bottom <= top {
+            continue;
+        }
+        let region = rustic_raster::DeviceRect {
+            x: left as u32,
+            y: top as u32,
+            width: (right - left) as u32,
+            height: (bottom - top) as u32,
+        };
+        let white = rustic_raster::rasterize_region(
+            &build(with(&colors(Some(node))))?,
+            view.scale(),
+            region,
+            rustic_raster::RasterLimits::default(),
+            cancellation,
+        )
+        .map_err(LoadError::Raster)?;
+        let mut coverage = Vec::with_capacity((region.width * region.height) as usize);
+        for row in 0..region.height {
+            for column in 0..region.width {
+                let at = |surface: &rustic_raster::Surface, x: u32, y: u32| {
+                    let index = ((y * surface.width() + x) * 4 + 1) as usize;
+                    surface.premultiplied()[index]
+                };
+                let lit = at(&white, column, row);
+                let dark = at(&base, region.x + column, region.y + row);
+                coverage.push(lit.saturating_sub(dark));
+            }
+        }
+        layers.push(FrameLayer {
+            handle,
+            x: region.x,
+            y: region.y,
+            width: region.width,
+            height: region.height,
+            coverage,
+        });
+    }
+    Ok(Surface {
+        width: base.width(),
+        height: base.height(),
+        pixels: base.premultiplied().to_vec(),
+        layers,
+    })
+}
+
+/// Refuses every frame.
+struct NoFrames;
+
+impl FrameHost for NoFrames {
+    fn open(&self, _: rustic_ipc::protocol::FrameRequest) -> Option<u32> {
+        None
+    }
+}
+
+/// Render to PNG in this process, where frames have no renderer of their
+/// own: they paint white (TD-178).
+pub fn render_png_without_frames(
+    parsed: &LoadedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    view: rustic_layout::View,
+) -> Result<Vec<u8>, LoadError> {
+    let surface = render_layers(parsed, path, limits, view, &NoFrames)?;
+    let surface = rustic_raster::Surface::from_premultiplied(
+        surface.width,
+        surface.height,
+        surface.pixels,
+        rustic_raster::RasterLimits::default(),
+    )
+    .ok_or(LoadError::Raster(rustic_raster::RasterError::SurfaceSize))?;
+    rustic_raster::encode_png(&surface, limits.max_dump_bytes).map_err(LoadError::Png)
+}
+
+/// Rasterize like `render_surface` and encode the result as PNG, within
 /// the output byte limit.
+#[cfg(test)]
 pub fn render_png(
     parsed: &LoadedDocument,
     path: &Path,

@@ -9,12 +9,12 @@ use rustic_net::cookie::{CookieJar, CookieLimits};
 use rustic_net::fetch::{Fetcher, NetworkError};
 use rustic_net::fixture::{FixtureServer, Reply};
 use rustic_net::navigation::{
-    DocumentKind, Initiator, Navigation, NavigationError, NavigationOutcome, NavigationRequest,
-    NavigationState, NavigationStep, PolicyContainer,
+    DocumentKind, FrameContainer, Initiator, Navigation, NavigationError, NavigationOutcome,
+    NavigationRequest, NavigationState, NavigationStep, PolicyContainer,
 };
 use rustic_net::redirect::RedirectError;
 use rustic_net::referrer::ReferrerPolicy;
-use rustic_net::site::PublicSuffixList;
+use rustic_net::site::{PublicSuffixList, Site};
 use rustic_net::{NetworkPolicy, Transport, TransportLimits};
 use rustic_url::{Origin, Url};
 
@@ -406,4 +406,193 @@ fn cancellation_and_redirect_limits() {
     );
     assert_eq!(server.requests().len(), 1 + 21);
     let _ = Origin::opaque();
+}
+
+fn frame(src: &str, parent: &str, sandbox: Option<&[&str]>) -> NavigationRequest {
+    let parent_origin = url(parent).origin();
+    let same_site = parent_origin.is_same_origin(&url(src).origin());
+    NavigationRequest {
+        initiator: Some(initiator(parent, PolicyContainer::default())),
+        user_activation: false,
+        container: Some(FrameContainer {
+            top_level_site: PublicSuffixList::bundled().site(&parent_origin),
+            ancestors: vec![parent_origin],
+            same_site_ancestors: same_site,
+            sandbox: sandbox.map(|tokens| tokens.iter().map(|&t| t.to_owned()).collect()),
+        }),
+        ..NavigationRequest::browser(url(src))
+    }
+}
+
+#[test]
+fn frames_obey_frame_ancestors_x_frame_options_sandbox_and_cookie_context() {
+    let html = ("Content-Type", "text/html");
+    let server = FixtureServer::start([
+        (
+            "/set",
+            Reply::response(200, &[html, ("Set-Cookie", "lax=1; SameSite=Lax")], b"set"),
+        ),
+        ("/plain", Reply::response(200, &[html], b"<p>frame")),
+        (
+            "/deny",
+            Reply::response(200, &[html, ("X-Frame-Options", "DENY")], b""),
+        ),
+        (
+            "/same",
+            Reply::response(200, &[html, ("X-Frame-Options", "sameorigin")], b""),
+        ),
+        (
+            "/conflict",
+            Reply::response(
+                200,
+                &[html, ("X-Frame-Options", "SAMEORIGIN, ALLOWALL")],
+                b"",
+            ),
+        ),
+        (
+            "/ancestors",
+            Reply::response(
+                200,
+                &[
+                    html,
+                    ("X-Frame-Options", "DENY"),
+                    ("Content-Security-Policy", "frame-ancestors http://a.test"),
+                ],
+                b"",
+            ),
+        ),
+    ])
+    .unwrap();
+    let mut fetcher = fetcher(&server);
+    commit(
+        Navigation::new(
+            NavigationRequest::browser(url("http://b.test/set")),
+            TIMEOUT,
+        )
+        .run(&mut fetcher)
+        .unwrap(),
+    );
+    let run = |fetcher: &mut Fetcher, request| Navigation::new(request, TIMEOUT).run(fetcher);
+    // A cross-site frame is a nested navigation: iframe destination, no
+    // SameSite=Lax cookies (the top level is another site).
+    let committed = commit(
+        run(
+            &mut fetcher,
+            frame("http://b.test/plain", "http://a.test/", None),
+        )
+        .unwrap(),
+    );
+    assert_eq!(committed.origin, url("http://b.test/").origin());
+    let log = server.requests();
+    let request = log.last().unwrap();
+    assert_eq!(request.header("cookie"), None);
+    // A same-site frame sends them.
+    commit(
+        run(
+            &mut fetcher,
+            frame("http://b.test/plain", "http://b.test/", None),
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        server.requests().last().unwrap().header("cookie"),
+        Some("lax=1")
+    );
+    // X-Frame-Options.
+    let refused = |fetcher: &mut Fetcher, src: &str, parent: &str| {
+        matches!(
+            run(fetcher, frame(src, parent, None)),
+            Err(NavigationError::FrameRefused)
+        )
+    };
+    assert!(refused(
+        &mut fetcher,
+        "http://b.test/deny",
+        "http://b.test/"
+    ));
+    assert!(refused(
+        &mut fetcher,
+        "http://b.test/same",
+        "http://a.test/"
+    ));
+    assert!(!refused(
+        &mut fetcher,
+        "http://b.test/same",
+        "http://b.test/"
+    ));
+    assert!(refused(
+        &mut fetcher,
+        "http://b.test/conflict",
+        "http://b.test/"
+    ));
+    // frame-ancestors replaces X-Frame-Options.
+    assert!(!refused(
+        &mut fetcher,
+        "http://b.test/ancestors",
+        "http://a.test/"
+    ));
+    assert!(refused(
+        &mut fetcher,
+        "http://b.test/ancestors",
+        "http://b.test/"
+    ));
+    // Top-level navigations ignore both.
+    commit(
+        run(
+            &mut fetcher,
+            NavigationRequest::browser(url("http://b.test/deny")),
+        )
+        .unwrap(),
+    );
+    // sandbox without allow-same-origin: an opaque origin; srcdoc too.
+    let sandboxed = commit(
+        run(
+            &mut fetcher,
+            frame(
+                "http://b.test/plain",
+                "http://a.test/",
+                Some(&["allow-scripts"]),
+            ),
+        )
+        .unwrap(),
+    );
+    assert!(sandboxed.origin.is_opaque());
+    let kept = commit(
+        run(
+            &mut fetcher,
+            frame(
+                "http://b.test/plain",
+                "http://a.test/",
+                Some(&["allow-same-origin"]),
+            ),
+        )
+        .unwrap(),
+    );
+    assert!(!kept.origin.is_opaque());
+    let srcdoc = NavigationRequest {
+        srcdoc: Some("<p>x".to_owned()),
+        ..frame("about:srcdoc", "http://a.test/", Some(&[]))
+    };
+    assert!(
+        commit(run(&mut fetcher, srcdoc).unwrap())
+            .origin
+            .is_opaque()
+    );
+    // data: frames load (opaque), unlike data: navigations of a top level
+    // from a page.
+    let data = commit(
+        run(
+            &mut fetcher,
+            frame("data:text/html,<p>d", "http://a.test/", None),
+        )
+        .unwrap(),
+    );
+    assert!(data.origin.is_opaque());
+    let container = FrameContainer {
+        ancestors: Vec::new(),
+        top_level_site: Site::parse_serialized("http://a.test").unwrap(),
+        same_site_ancestors: false,
+        sandbox: Some(vec!["allow-scripts".to_owned()]),
+    };
+    assert!(container.allows_scripts() && container.sandboxes_origin());
 }

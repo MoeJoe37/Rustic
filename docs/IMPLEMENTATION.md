@@ -2610,7 +2610,11 @@ Added 2026-11-21 (`rustic-sandbox`, `rustic-cli/src/broker.rs`,
 [ADR 0060](adr/0060-windows-renderer-sandbox.md)). Split document
 commands confine their renderer by default; `--no-sandbox` or
 `RUSTIC_SANDBOX=0` opts out, `--sandbox` or `RUSTIC_SANDBOX=1` demands a
-sandbox (an error on macOS, TD-174), any other `RUSTIC_SANDBOX` value is
+sandbox (on macOS the proposed Seatbelt profile of
+[ADR 0063](adr/0063-macos-renderer-sandbox.md) through `sandbox-exec`,
+not yet verified on a Mac and so not the default there, TD-174;
+`the_profile_denies_by_default_and_names_only_the_renderer`,
+`paths_are_quoted_or_refused`), any other `RUSTIC_SANDBOX` value is
 a usage error (`a_bad_sandbox_setting_is_a_usage_error`), and a sandbox
 that cannot start is an error, never an unconfined run.
 

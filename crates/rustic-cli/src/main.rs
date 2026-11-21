@@ -99,7 +99,9 @@ filter; x86-64 and aarch64) and Windows (a capability-less AppContainer):
 no files, no network, no other processes. Without a working sandbox the
 command fails rather than run unconfined. --no-sandbox (or
 RUSTIC_SANDBOX=0) accepts an unconfined renderer; --sandbox (or
-RUSTIC_SANDBOX=1) demands one, also where none exists (macOS: an error).
+RUSTIC_SANDBOX=1) demands one, also where none exists (an error). On
+macOS --sandbox uses a proposed Seatbelt profile (ADR 0063) that is not
+yet verified there, so renderers are not confined by default.
 --renderer-timeout SECONDS stops a renderer that runs longer (default 120).
 --download-dir DIR saves navigations that turn out to be downloads into DIR
 (sanitized names, never overwriting); without it downloads are refused.

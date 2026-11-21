@@ -46,7 +46,10 @@ pub(crate) fn sandboxed() -> bool {
     SANDBOX.load(Ordering::Relaxed)
 }
 
-/// Whether this platform has a renderer sandbox (ADR 0058, ADR 0060).
+/// Whether renderers are confined by default here: the verified
+/// sandboxes (ADR 0058 Linux, ADR 0060 Windows). macOS has a proposed
+/// Seatbelt sandbox (ADR 0063) that `--sandbox` turns on; it becomes the
+/// default once it is verified on native Macs (TD-174).
 pub const SANDBOX_AVAILABLE: bool = cfg!(any(target_os = "linux", windows));
 static TIMEOUT_SECONDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(120);
 
@@ -405,12 +408,13 @@ fn document_argument(
     }
 }
 
-/// A renderer process: unconfined, or in the Windows AppContainer.
+/// A renderer process: unconfined (or under `sandbox-exec` on macOS), in
+/// bubblewrap, or in the Windows AppContainer.
 enum Process {
     Child(Child),
     /// A bubblewrap renderer and its filter file, which lives until the
     /// launcher has opened (and removed) it or the process is gone.
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     Sandboxed {
         child: Child,
         _filter: SeccompFile,
@@ -423,7 +427,7 @@ impl Process {
     fn id(&self) -> u32 {
         match self {
             Self::Child(child) => child.id(),
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "macos")))]
             Self::Sandboxed { child, .. } => child.id(),
             #[cfg(windows)]
             Self::Confined(confined) => confined.id(),
@@ -433,7 +437,7 @@ impl Process {
     fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
         match self {
             Self::Child(child) => child.wait(),
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "macos")))]
             Self::Sandboxed { child, .. } => child.wait(),
             #[cfg(windows)]
             Self::Confined(confined) => confined.wait(),
@@ -443,7 +447,7 @@ impl Process {
     fn kill(&mut self) -> io::Result<()> {
         match self {
             Self::Child(child) => child.kill(),
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "macos")))]
             Self::Sandboxed { child, .. } => child.kill(),
             #[cfg(windows)]
             Self::Confined(confined) => confined.kill(),
@@ -530,6 +534,31 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
     ))
 }
 
+/// macOS (ADR 0063, Proposed): the executable under `sandbox-exec` with
+/// the deny-by-default Seatbelt profile of `rustic_sandbox::seatbelt` and
+/// a cleared environment. A renderer has no parent-death signal here; it
+/// ends when its IPC pipe closes, and the watchdog stops a hung one.
+#[cfg(target_os = "macos")]
+fn spawn_confined(exe: &Path) -> io::Result<Started> {
+    let exe = std::fs::canonicalize(exe)?;
+    let profile = rustic_sandbox::seatbelt::renderer_profile(&exe)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+    let mut child = Command::new("/usr/bin/sandbox-exec")
+        .arg("-p")
+        .arg(profile)
+        .arg(&exe)
+        .arg(crate::renderer::RENDERER_COMMAND)
+        .env_clear()
+        .envs(sandbox_env())
+        .current_dir("/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let (stdout, stdin, stderr) = pipes(&mut child);
+    Ok((Process::Child(child), stdout, stdin, stderr))
+}
+
 /// Linux: the executable inside bubblewrap with every namespace unshared
 /// (no network), a filesystem of the read-only system libraries and the
 /// executable only, no capabilities, a new session (no terminal
@@ -537,7 +566,7 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
 /// seccomp-bpf filter of `rustic_sandbox::seccomp` (ADR 0058). `/bin/sh`
 /// opens the filter as descriptor 3 for `bwrap --seccomp` (std cannot pass
 /// a descriptor without unsafe code) and removes the file first.
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn spawn_confined(exe: &Path) -> io::Result<Started> {
     let (child, filter, stdout, stdin, stderr) =
         spawn_bubblewrap(exe, crate::renderer::RENDERER_COMMAND, false)?;
@@ -576,7 +605,7 @@ pub(crate) fn spawn_bubblewrap(
     if !cfg!(target_os = "linux") {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            "--sandbox is implemented on Linux and Windows only (macOS: TD-174)",
+            "--sandbox is implemented on Linux, Windows and (proposed, ADR 0063) macOS only",
         ));
     }
     let arch = rustic_sandbox::seccomp::Arch::current().ok_or_else(|| {
@@ -824,9 +853,14 @@ fn serve(
         Ok(finished) => finished,
         Err(Ended::NotStarted(error)) => {
             if SANDBOX.load(Ordering::Relaxed) && error.kind() == io::ErrorKind::NotFound {
+                let tool = if cfg!(target_os = "macos") {
+                    "/usr/bin/sandbox-exec"
+                } else {
+                    "bubblewrap (bwrap) on PATH"
+                };
                 eprintln!(
-                    "rustic {command}: --sandbox needs bubblewrap (bwrap) on PATH; the renderer \
-                     was not started without its sandbox"
+                    "rustic {command}: --sandbox needs {tool}; the renderer was not started \
+                     without its sandbox"
                 );
             } else {
                 eprintln!("rustic {command}: cannot start the renderer process: {error}");

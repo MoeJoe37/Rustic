@@ -1,6 +1,6 @@
 [package]
 name = "rustic-sandbox"
-description = "Operating-system confinement for Rustic renderer processes: the Windows AppContainer launcher and the Linux seccomp-bpf filter"
+description = "Operating-system confinement for Rustic renderer processes: the Windows AppContainer launcher, the Linux seccomp-bpf filter and the macOS Seatbelt profile"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -620,7 +620,7 @@ Linux x86-64). ISO-04: the Windows renderer runs in a capability-less
 LPAC AppContainer and a kill-on-close job, on by default
 ([ADR 0060](adr/0060-windows-renderer-sandbox.md), verified on native
 Windows 11 x64; the first project `unsafe`, confined to `rustic-sandbox`);
-macOS has none (TD-174). ISO-05: user activation and brokered downloads;
+macOS has a proposed Seatbelt sandbox behind `--sandbox`, not yet verified on a Mac ([ADR 0063](adr/0063-macos-renderer-sandbox.md), TD-174). ISO-05: user activation and brokered downloads;
 prompts wait for the M8 shell. ISO-06: [security review](reviews/2026-11-20-m7-security-review.md)
 with fuzzing, an unsafe/native inventory and an AddressSanitizer run.
 ISO-07: crash, protocol-violation and hang recovery for renderers, and
@@ -651,7 +651,7 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       simulator or device. Restoring hosted CI (or replacing it with
       self-hosted runners) is therefore a hard prerequisite of M7, not a
       convenience ([TD-12](TECH_DEBT.md)).
-- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: none yet, TD-174), each
+- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: [ADR 0063](adr/0063-macos-renderer-sandbox.md), Proposed, TD-174), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
 - [x] **The engine already runs split.** Done 2026-11-20: every document
       command except `reftest` runs in a `rustic __renderer` child over

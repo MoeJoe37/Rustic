@@ -276,6 +276,12 @@ fn sandbox_available() -> bool {
         && bubblewrap_available()
 }
 
+/// macOS: the proposed Seatbelt sandbox (ADR 0063), which `--sandbox`
+/// turns on but which is not the default until verified on native Macs.
+fn proposed_sandbox_available() -> bool {
+    cfg!(target_os = "macos") && Path::new("/usr/bin/sandbox-exec").exists()
+}
+
 const ESCAPES: [&str; 5] = [
     "read-user-file",
     "list-home",
@@ -307,6 +313,31 @@ fn the_sandbox_denies_files_network_and_processes_or_fails_closed() {
             .env("RUSTIC_TEST_ESCAPE_DIR", &home);
         command.output().expect("run rustic")
     };
+    if proposed_sandbox_available() {
+        // The first native macOS run verifies ADR 0063: every probe works
+        // unconfined (also by default, for now) and fails under --sandbox.
+        for mode in [Some("--no-sandbox"), None] {
+            let open = text(&probe(mode).stdout);
+            for escape in ESCAPES {
+                assert!(open.contains(&format!("{escape}: allowed")), "{open}");
+            }
+        }
+        let output = probe(Some("--sandbox"));
+        assert!(output.status.success(), "{}", text(&output.stderr));
+        let confined = text(&output.stdout);
+        for escape in ESCAPES {
+            assert!(
+                confined.contains(&format!("{escape}: denied")),
+                "{confined}"
+            );
+        }
+        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "secret");
+        let page = site.page();
+        let output = rustic(&["--sandbox", "dump-dom", &page], &[]);
+        assert!(output.status.success(), "{}", text(&output.stderr));
+        assert!(text(&output.stdout).contains("text \"x\""));
+        return;
+    }
     if !sandbox_available() {
         // No sandbox here: asking for one fails rather than run unconfined.
         let output = probe(Some("--sandbox"));

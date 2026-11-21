@@ -235,7 +235,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-171 | Deliberate | Isolation | The renderer is confined by default only on Linux and Windows (macOS: TD-174), and `reftest` still runs single-process (watchdog paid 2026-11-20, Linux and Windows sandboxes 2026-11-21) | Open, M7 (ISO-04) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox had no seccomp-bpf syscall filter | Paid |
 | TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
-| TD-174 | Deliberate | Isolation | macOS has no renderer sandbox: `--sandbox` is an error there and renderers run unconfined by default | Open, M7 (ISO-04) |
+| TD-174 | Deliberate | Isolation | macOS renderers are not confined by default: the Seatbelt sandbox of ADR 0063 (Proposed, 2026-11-21) runs only with `--sandbox` and has not been verified on a Mac | Open, M7 (ISO-04, native macOS runs) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
 | TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined only on Linux (bubblewrap with the network kept, Internet-socket seccomp filter, 2026-11-21); on Windows and macOS it runs with the user's rights | Open, M7 (ISO-04) |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
@@ -2757,6 +2757,14 @@ platform.
 **Trigger:** the M8 desktop shell.
 
 ### TD-174 — macOS has no renderer sandbox
+
+**Partly paid 2026-11-21:** ADR 0063 (Proposed) adds a deny-by-default
+Seatbelt profile (`rustic_sandbox::seatbelt`) started through
+`sandbox-exec` when `--sandbox` is given; it is unit-tested and
+type-checked for both macOS targets on Linux, and the escape-probe test
+has a macOS branch. What remains: run that test on native macOS x64 and
+ARM64, adjust the profile if a system path is missing, then make it the
+default (`SANDBOX_AVAILABLE`) and accept the ADR.
 
 Linux and Windows confine the renderer by default (ADR 0058, ADR 0060);
 on macOS the renderer is a separate process with brokered authority but

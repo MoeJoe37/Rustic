@@ -2,7 +2,7 @@
 //! frames and peer death.
 
 use std::io::{Cursor, Read, Write};
-use std::os::unix::net::UnixStream;
+use std::net::{Ipv4Addr, TcpListener, TcpStream};
 
 use rustic_ipc::protocol::{
     BrokerMessage, DocumentGrant, FetchRequest, FetchResponse, RendererMessage, ResourceBody,
@@ -13,13 +13,11 @@ use rustic_ipc::{
     encode_frame,
 };
 
-fn pair(
-    limits: Limits,
-) -> (
-    Channel<UnixStream, UnixStream>,
-    Channel<UnixStream, UnixStream>,
-) {
-    let (a, b) = UnixStream::pair().unwrap();
+fn pair(limits: Limits) -> (Channel<TcpStream, TcpStream>, Channel<TcpStream, TcpStream>) {
+    // A loopback connection: a portable full-duplex byte stream.
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let a = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (b, _) = listener.accept().unwrap();
     let (a2, b2) = (a.try_clone().unwrap(), b.try_clone().unwrap());
     let renderer =
         std::thread::spawn(move || Channel::connect(b, b2, Role::Renderer, limits).unwrap());
@@ -129,7 +127,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
 }
 
 #[test]
-fn every_message_round_trips_over_a_socket_pair() {
+fn every_message_round_trips_over_a_stream_pair() {
     let (mut broker, mut renderer) = pair(Limits::default());
     let (to_renderer, to_broker) = samples();
     for message in &to_renderer {

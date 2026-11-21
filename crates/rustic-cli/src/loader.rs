@@ -2196,7 +2196,7 @@ mod tests {
             limits.stylesheets.max_total_bytes + limits.images.max_file_bytes,
         );
         let fetch = LocalStylesheetFetcher::new(
-            page.0.parent().unwrap().to_path_buf(),
+            fs::canonicalize(page.0.parent().unwrap()).unwrap(),
             limits.read_chunk_bytes,
             token.clone(),
         )
@@ -2388,7 +2388,7 @@ mod tests {
         // A broken replacement must fail validation before publication.
         fs::write(&image.0, b"not a decodable image").unwrap();
         let fetcher = LocalStylesheetFetcher::new(
-            page.0.parent().unwrap().to_path_buf(),
+            fs::canonicalize(page.0.parent().unwrap()).unwrap(),
             limits.read_chunk_bytes,
             token.clone(),
         )

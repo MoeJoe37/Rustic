@@ -327,7 +327,9 @@ impl Run {
     }
 
     /// Complete the TLS handshake, honouring cancellation and timeouts.
-    /// End of stream during the handshake is a TLS failure.
+    /// End of stream during the handshake is a TLS failure, and so is a
+    /// reset: Windows resets a connection its peer closed with our
+    /// ClientHello unread, where Unix reports end of stream.
     fn handshake(
         &self,
         stream: &mut rustls::StreamOwned<rustls::ClientConnection, TcpStream>,
@@ -338,7 +340,14 @@ impl Run {
                 Ok((0, 0)) => return Err(TransportError::Tls),
                 Ok(_) => last_progress = Instant::now(),
                 Err(error) if waits(&error) => {}
-                Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::UnexpectedEof
+                            | io::ErrorKind::ConnectionReset
+                            | io::ErrorKind::ConnectionAborted
+                    ) =>
+                {
                     return Err(TransportError::Tls);
                 }
                 Err(error) => return Err(io_error(error)),

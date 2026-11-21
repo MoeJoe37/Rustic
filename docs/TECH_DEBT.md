@@ -237,7 +237,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 | TD-174 | Deliberate | Isolation | macOS has no renderer sandbox: `--sandbox` is an error there and renderers run unconfined by default | Open, M7 (ISO-04) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
-| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is not OS-confined: it runs with the user's rights, so it isolates crashes but does not contain a compromise | Open, M7 (ISO-03/ISO-04) |
+| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined only on Linux (bubblewrap with the network kept, Internet-socket seccomp filter, 2026-11-21); on Windows and macOS it runs with the user's rights | Open, M7 (ISO-04) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2791,3 +2791,16 @@ AppContainer with the client network capability; macOS with TD-174.
 Same probe tests as the renderer, minus networking.
 **Trigger:** before remote browsing (the M7 gate), or when DNS moves into
 the network process (TD-157).
+**Update 2026-11-21 (Linux paid):** under the sandbox (the default on
+Linux) the network process runs in bubblewrap with every namespace but
+the network unshared, read-only `/usr`, its executable and the trust
+store (`/etc/ssl`, `/etc/pki`, `/etc/ca-certificates`), and
+`rustic_sandbox::seccomp::network_filter`: the renderer allowlist plus
+client socket calls, `socket` only for `AF_INET`/`AF_INET6`
+(`the_network_filter_adds_internet_client_sockets_only`,
+`the_sandboxed_network_process_reaches_only_internet_sockets`, which
+reads a file, lists a directory, starts a shell and connects to an
+abstract Unix socket: allowed unconfined, denied confined). Windows
+(an AppContainer with only the client network capability, in the
+`unsafe` launcher of ADR 0060) and macOS (with TD-174) remain; both need
+native runs.

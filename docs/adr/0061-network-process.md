@@ -1,7 +1,7 @@
 # ADR 0061 — Network process
 
 Date: 2026-11-21
-Status: Accepted for the CLI prototype (verified on Linux x86-64 in the sandbox gate; the process is not yet OS-confined, TD-176)
+Status: Accepted for the CLI prototype (verified on Linux x86-64 in the sandbox gate; OS-confined on Linux only, TD-176)
 
 ## Context
 
@@ -47,15 +47,27 @@ service and Gecko's socket process make the same split.
    could repeat a side effect).
 5. **Diagnostics.** The child's standard error is relayed with control
    characters escaped, as for renderers.
+6. **Confinement (Linux).** When renderers are sandboxed (the Linux
+   default), the network process runs under the same bubblewrap launcher
+   with `--share-net` added back, the trust-store directories bound
+   read-only, and `seccomp::network_filter`: the renderer allowlist plus
+   `connect`, `send*`/`recv*`, `{get,set}sockopt`, `getsockname`,
+   `getpeername` and `shutdown`, with `socket` admitted only for
+   `AF_INET` and `AF_INET6`. Unix-domain sockets are refused because a
+   shared network namespace exposes abstract sockets (X11, D-Bus,
+   container runtimes). Setup failure is an error, as for renderers.
+   Windows and macOS start it unconfined for now (TD-176).
 
 ## Consequences
 
 The broker no longer links its decisions to code that parses server
 bytes, and a parser crash costs the requests in flight rather than the
 browser. Each run pays one more process start and one copy of every body
-through a pipe (TD-170). The child is not yet confined: it runs with the
-user's rights (TD-176), so today the split buys crash isolation and a
-narrower broker, not containment of a compromised network process.
+through a pipe (TD-170). On Linux a compromised child can reach only
+loopback TCP origins (which the broker could reach anyway) and nothing on
+disk but system libraries and trust roots; on Windows and macOS it still
+runs with the user's rights (TD-176), so there the split buys crash
+isolation and a narrower broker, not containment.
 
 ## Revisit
 

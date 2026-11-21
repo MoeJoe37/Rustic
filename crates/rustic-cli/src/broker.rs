@@ -39,6 +39,11 @@ static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
 /// exists).
 static SANDBOX: AtomicBool = AtomicBool::new(false);
 
+/// Whether renderers (and the network process) are confined in this run.
+pub(crate) fn sandboxed() -> bool {
+    SANDBOX.load(Ordering::Relaxed)
+}
+
 /// Whether this platform has a renderer sandbox (ADR 0058, ADR 0060).
 pub const SANDBOX_AVAILABLE: bool = cfg!(any(target_os = "linux", windows));
 static TIMEOUT_SECONDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(120);
@@ -54,6 +59,8 @@ const SANDBOX_ENV: &[&str] = &[
     "RUSTIC_TEST_ESCAPE_FILE",
     "RUSTIC_TEST_ESCAPE_HOME",
     "RUSTIC_TEST_ESCAPE_DIR",
+    "RUSTIC_TEST_NETWORK_PROCESS",
+    "RUSTIC_TEST_ESCAPE_ABSTRACT",
 ];
 
 /// Remove the process options (`--single-process`, `--sandbox`,
@@ -319,7 +326,7 @@ impl Process {
 }
 
 /// The renderer's standard error, whichever way it was started.
-enum RendererStderr {
+pub(crate) enum RendererStderr {
     Pipe(std::process::ChildStderr),
     #[cfg(windows)]
     File(std::fs::File),
@@ -406,6 +413,40 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
 /// a descriptor without unsafe code) and removes the file first.
 #[cfg(not(windows))]
 fn spawn_confined(exe: &Path) -> io::Result<Started> {
+    let (child, filter, stdout, stdin, stderr) =
+        spawn_bubblewrap(exe, crate::renderer::RENDERER_COMMAND, false)?;
+    Ok((
+        Process::Sandboxed {
+            child,
+            _filter: filter,
+        },
+        stdout,
+        stdin,
+        stderr,
+    ))
+}
+
+/// A confined child started by [`spawn_bubblewrap`], with its pipes.
+#[cfg(not(windows))]
+pub(crate) type Bubblewrapped = (
+    Child,
+    SeccompFile,
+    Box<dyn Read + Send>,
+    Box<dyn Write + Send>,
+    RendererStderr,
+);
+
+/// Start `exe command` under bubblewrap and seccomp. A renderer
+/// (`network == false`) gets every namespace unshared and the renderer
+/// filter; the network process (ADR 0061, TD-176) keeps the network
+/// namespace, read-only trust-store directories and the network filter,
+/// which admits only Internet-family client sockets.
+#[cfg(not(windows))]
+pub(crate) fn spawn_bubblewrap(
+    exe: &Path,
+    command_name: &str,
+    network: bool,
+) -> io::Result<Bubblewrapped> {
     if !cfg!(target_os = "linux") {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -425,17 +466,23 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
             "the executable path is not UTF-8",
         )
     })?;
-    let filter = SeccompFile::create(&rustic_sandbox::seccomp::to_bytes(
-        &rustic_sandbox::seccomp::renderer_filter(arch),
-    ))?;
+    let program = if network {
+        rustic_sandbox::seccomp::network_filter(arch)
+    } else {
+        rustic_sandbox::seccomp::renderer_filter(arch)
+    };
+    let filter = SeccompFile::create(&rustic_sandbox::seccomp::to_bytes(&program))?;
     let mut command = Command::new("/bin/sh");
     command.args([
         "-c",
         "exec 3<\"$0\" && rm -f -- \"$0\" && exec bwrap --seccomp 3 \"$@\"",
     ]);
     command.arg(&filter.0);
+    command.arg("--unshare-all");
+    if network {
+        command.arg("--share-net");
+    }
     command.args([
-        "--unshare-all",
         "--die-with-parent",
         "--new-session",
         "--cap-drop",
@@ -456,31 +503,31 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
         "--chdir",
         "/",
     ]);
+    if network {
+        // The platform verifier reads the system trust store; nothing
+        // else under /etc (no resolver configuration: there is no DNS,
+        // TD-157).
+        for path in ["/etc/ssl", "/etc/pki", "/etc/ca-certificates"] {
+            command.args(["--ro-bind-try", path, path]);
+        }
+    }
     for (name, value) in sandbox_env() {
         command.arg("--setenv").arg(name).arg(value);
     }
-    command.args(["/renderer", crate::renderer::RENDERER_COMMAND]);
+    command.args(["/renderer", command_name]);
     let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
     let (stdout, stdin, stderr) = pipes(&mut child);
-    Ok((
-        Process::Sandboxed {
-            child,
-            _filter: filter,
-        },
-        stdout,
-        stdin,
-        stderr,
-    ))
+    Ok((child, filter, stdout, stdin, stderr))
 }
 
 /// The filter program in a new private file, removed on drop unless the
 /// launcher has removed it already.
 #[cfg(not(windows))]
-struct SeccompFile(PathBuf);
+pub(crate) struct SeccompFile(PathBuf);
 
 #[cfg(not(windows))]
 impl SeccompFile {

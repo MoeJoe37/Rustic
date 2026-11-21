@@ -19,9 +19,10 @@
 //! one: the broker keeps the cookies and cache, the child only sockets.
 
 use std::collections::HashMap;
-use std::io::{self, BufRead, BufReader, Stdout};
+use std::fmt;
+use std::io::{self, BufRead, BufReader, Read, Stdout, Write};
 use std::net::SocketAddr;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError, Weak};
 use std::time::Duration;
@@ -193,28 +194,69 @@ impl Connector for NetworkProcess {
 type Slot = Arc<Mutex<RemoteFeed>>;
 
 /// One running network process.
-#[derive(Debug)]
 struct Link {
     child: Mutex<Child>,
-    sender: Mutex<Sender<ChildStdin>>,
+    /// The bubblewrap filter file, kept until the launcher removed it.
+    #[cfg(not(windows))]
+    _filter: Option<crate::broker::SeccompFile>,
+    sender: Mutex<Sender<Box<dyn Write + Send>>>,
     exchanges: Mutex<HashMap<u64, Slot>>,
     next_id: AtomicU64,
     dead: AtomicBool,
     max_header_count: usize,
 }
 
+impl fmt::Debug for Link {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Link")
+            .field("dead", &self.dead)
+            .finish_non_exhaustive()
+    }
+}
+
+type Pipes = (
+    Child,
+    Box<dyn Read + Send>,
+    Box<dyn Write + Send>,
+    Box<dyn Read + Send>,
+);
+
+/// Start the child unconfined.
+fn spawn_plain(exe: &std::path::Path) -> io::Result<Pipes> {
+    let mut child = Command::new(exe)
+        .arg(NETWORK_COMMAND)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdin = child.stdin.take().expect("piped");
+    let stdout = child.stdout.take().expect("piped");
+    let stderr = child.stderr.take().expect("piped");
+    Ok((child, Box::new(stdout), Box::new(stdin), Box::new(stderr)))
+}
+
 impl Link {
     fn start(ca_pem: Option<Vec<u8>>) -> io::Result<Arc<Self>> {
         let exe = std::env::current_exe()?;
-        let mut child = Command::new(exe)
-            .arg(NETWORK_COMMAND)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-        let stdin = child.stdin.take().expect("piped");
-        let stdout = child.stdout.take().expect("piped");
-        let stderr = child.stderr.take().expect("piped");
+        // Under the sandbox the Linux network process is confined like a
+        // renderer, but keeps the network (TD-176); a setup failure is an
+        // error, never an unconfined start. Windows and macOS start it
+        // unconfined for now (TD-176, TD-174).
+        #[cfg(not(windows))]
+        let (child, stdout, stdin, stderr, filter) =
+            if crate::broker::sandboxed() && cfg!(target_os = "linux") {
+                let (child, filter, stdout, stdin, stderr) =
+                    crate::broker::spawn_bubblewrap(&exe, NETWORK_COMMAND, true)?;
+                let stderr: Box<dyn Read + Send> = Box::new(stderr);
+                (child, stdout, stdin, stderr, Some(filter))
+            } else {
+                let (child, stdout, stdin, stderr) = spawn_plain(&exe)?;
+                (child, stdout, stdin, stderr, None)
+            };
+        #[cfg(windows)]
+        let (child, stdout, stdin, stderr) = spawn_plain(&exe)?;
+        let mut child = child;
         // Relay the child's diagnostics escaped: it is untrusted and must
         // not write control sequences to the user's terminal.
         std::thread::Builder::new()
@@ -243,6 +285,8 @@ impl Link {
         }
         let link = Arc::new(Self {
             child: Mutex::new(child),
+            #[cfg(not(windows))]
+            _filter: filter,
             sender: Mutex::new(sender),
             exchanges: Mutex::new(HashMap::new()),
             next_id: AtomicU64::new(1),
@@ -264,7 +308,7 @@ impl Link {
     }
 
     /// Read events until the channel ends or the peer misbehaves.
-    fn dispatch(self: Arc<Self>, mut receiver: Receiver<std::process::ChildStdout>) {
+    fn dispatch(self: Arc<Self>, mut receiver: Receiver<Box<dyn Read + Send>>) {
         let reason = loop {
             match receiver.recv::<NetworkEvent>() {
                 Ok(event) => {
@@ -647,6 +691,10 @@ fn misbehave(mode: &str, out: &Out, id: u64, url: &str) -> bool {
         }))
     };
     match mode {
+        "escape" => {
+            escape_probes();
+            false
+        }
         "crash" => panic!("simulated network process crash"),
         _ if mode
             .strip_prefix("crash-on:")
@@ -679,6 +727,43 @@ fn misbehave(mode: &str, out: &Out, id: u64, url: &str) -> bool {
             true
         }
         _ => false,
+    }
+}
+
+/// Try what a compromised network process would (TD-176) and report
+/// each attempt on standard error as `network-escape NAME: allowed` or
+/// `denied`. Connecting to loopback TCP is its job and is not probed.
+fn escape_probes() {
+    let report = |name: &str, allowed: bool| {
+        eprintln!(
+            "network-escape {name}: {}",
+            if allowed { "allowed" } else { "denied" }
+        );
+    };
+    let var = |name| std::env::var_os(name).unwrap_or_default();
+    report(
+        "read-user-file",
+        std::fs::read(var("RUSTIC_TEST_ESCAPE_FILE")).is_ok(),
+    );
+    report(
+        "list-home",
+        std::fs::read_dir(var("RUSTIC_TEST_ESCAPE_DIR")).is_ok(),
+    );
+    report(
+        "spawn-shell",
+        Command::new("/bin/sh")
+            .args(["-c", "exit 0"])
+            .status()
+            .is_ok_and(|status| status.success()),
+    );
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::linux::net::SocketAddrExt;
+        let name = var("RUSTIC_TEST_ESCAPE_ABSTRACT");
+        let reached = std::os::unix::net::SocketAddr::from_abstract_name(name.as_encoded_bytes())
+            .and_then(|address| std::os::unix::net::UnixStream::connect_addr(&address))
+            .is_ok();
+        report("connect-abstract-socket", reached);
     }
 }
 

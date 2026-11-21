@@ -624,11 +624,13 @@ a network process ([ADR 0061](adr/0061-network-process.md)): in split
 runs sockets, TLS, HTTP framing and content decoding run in a
 `rustic __network` child whose replies the broker revalidates under
 credit-based flow control; a crashed or protocol-breaking one fails only
-its in-flight requests and is replaced (at most four per run).
+its in-flight requests and is replaced (at most four per run). On Linux
+it runs in bubblewrap with only the network kept and a seccomp filter
+that admits Internet sockets only.
 ISO-08 is a design only ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
 Still open: native Linux aarch64, Windows ARM64, macOS, Android and iOS
-runs (TD-12), the macOS sandbox, OS confinement of the network process
-(TD-176), cross-origin frames, trusted prompts and an independent
+runs (TD-12), the macOS sandbox, Windows/macOS confinement of the network
+process (TD-176), cross-origin frames, trusted prompts and an independent
 external review. The demo runs:
 `crates/rustic-cli/tests/isolation.rs`.
 

@@ -2555,7 +2555,9 @@ In a split run every exchange the broker's policy grants runs in a
 `rustic __network` child: socket, TLS, HTTP/1.1 framing and content
 decoding. The broker keeps grants, CSP, mixed content, CORS, cookies,
 the HTTP cache and ORB. `--single-process` keeps exchanges in process.
-The child is not OS-confined yet (TD-176).
+Under the sandbox on Linux the child runs in bubblewrap with only the
+network namespace shared and an Internet-socket seccomp filter; Windows
+and macOS start it unconfined (TD-176).
 
 | Contract | Behavior | Regression evidence |
 | --- | --- | --- |
@@ -2564,10 +2566,12 @@ The child is not OS-confined yet (TD-176).
 | Hostile replies | Heads revalidated (`ResponseHead::from_parts`, `Headers::append`, header count); body bytes beyond the credit window, events out of order, unknown exchange ids and unknown error codes kill the process | `events_flow_in_order_and_consumption_is_reported`, `out_of_order_events_are_refused`, `a_compromised_network_process_is_cut_off_by_the_broker` (credit overrun, `101` head, foreign id, unknown error) |
 | Flow control | The child sends at most one window per exchange before the consumer returns credit; cancelling or dropping an exchange sends `Cancel` and fails it locally | `dropping_an_unfinished_exchange_reports_cancellation`, `a_failed_feed_ends_the_exchange` |
 | Crash recovery | A dead or protocol-breaking process fails only its in-flight exchanges (`TransportError::NetworkProcess`), and the next request starts a fresh one, at most four per run; no request is retried | `a_crashed_network_process_fails_its_requests_and_is_replaced`, `a_network_process_that_crashes_every_time_cannot_loop` |
+| Linux confinement | bubblewrap `--unshare-all --share-net`, read-only `/usr`, executable and trust store, cleared environment; seccomp `network_filter` admits `socket` only for `AF_INET`/`AF_INET6`; file reads, directory listing, process starts and Unix-domain (abstract) connections fail | `the_network_filter_adds_internet_client_sockets_only`, `the_sandboxed_network_process_reaches_only_internet_sockets` |
 
 Test hook `RUSTIC_TEST_NETWORK_PROCESS` (`crash`, `crash-on:PATH`,
-`credit-overrun`, `bad-status`, `foreign-exchange`, `unknown-error`)
-changes only what the network process does; it grants nothing.
+`credit-overrun`, `bad-status`, `foreign-exchange`, `unknown-error`,
+`escape` with `RUSTIC_TEST_ESCAPE_FILE`, `_DIR` and `_ABSTRACT`) changes
+only what the network process does; it grants nothing.
 
 ## ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)
 

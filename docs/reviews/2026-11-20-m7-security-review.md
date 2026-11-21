@@ -134,7 +134,10 @@ compromised behaviours; the IPC decoder is in the `ipc-frame` fuzz
 target.
 
 The "crashes cancel work without killing chrome" gate is now met for the
-network process as well as renderers (no GPU process exists). New debt:
-the child is not OS-confined (TD-176), so a compromise of it is
-contained only by what the broker refuses; this joins the items that
-block remote browsing.
+network process as well as renderers (no GPU process exists). On Linux
+the child is confined by default (bubblewrap keeping only the network
+namespace, a seccomp filter that admits `AF_INET`/`AF_INET6` sockets
+only; the escape probe reads a file, lists a directory, starts a shell
+and connects to an abstract Unix socket, all denied). On Windows and
+macOS it is not confined (TD-176), which joins the items that block
+remote browsing there.

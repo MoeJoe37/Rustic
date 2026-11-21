@@ -2575,8 +2575,9 @@ an unscrolled layout in one pass, without laying out again; `dump-paint`,
 
 | Viewport scenes | `rustic_raster::Scene`: lazily rasterized, cached content tiles at unscrolled coordinates plus a fixed/viewport-sticky overlay over a transparent canvas; frames copy visible tiles at the snapped offset, content changes drop only damaged tiles; layering refused unless the overlay is painted last; incremental frames equal fresh scenes byte for byte | `scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes`, `scrolled_frames_reuse_cached_content_under_a_fixed_overlay` |
 
-Next ([ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)): layers for
-scroll containers inside the page (TD-181). Script-scrolling gaps: TD-180.
+| Container layers | Top-level scroll containers get `Scroller` layers: contents painted without their own and ancestors' clips (`without_clips_above`), composited through the scrollport at the snapped offset; the page splits into segments around them in paint order; ineligible containers (split runs, groups, rounded clips) paint into the page | `a_scroll_containers_contents_can_be_unclipped_for_a_layer`, `scroller_layers_show_their_contents_through_the_port_at_their_offset`, `scroll_containers_scroll_from_cached_layers` |
+
+Remaining limits: TD-181 (scenes), TD-180 (script scrolling).
 
 ## ISO-01 — Out-of-process frames and popups
 

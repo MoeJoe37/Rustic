@@ -1,17 +1,22 @@
-//! Layer scenes (UI-05, ADR 0064 step 2, first part): a page scroll
-//! re-composites cached content instead of repainting it.
+//! Layer scenes (UI-05, ADR 0064 step 2): scrolling re-composites cached
+//! content instead of repainting it.
 //!
-//! A scene has a **content layer**, the page's display list at unscrolled
-//! coordinates over its whole scrollable area, rasterized lazily in
-//! [`TILE_SIZE`] tiles that stay cached between frames, and an optional
-//! **overlay layer** (fixed and viewport-sticky boxes) over a transparent
-//! canvas at window coordinates. A frame copies the visible content tiles
-//! at the viewport's scroll offset (whole device pixels) and composites
-//! the overlay over them. Content changes invalidate only the tiles
-//! [`crate::damage`] reports. The scene's output is the reference for
-//! scrolled frames: compositing the overlay separately can differ from a
-//! one-pass rasterization by rounding (at most 1/255 per channel), and an
-//! incremental scene frame equals a full rebuild of the same scene exactly.
+//! A scene is a stack of layers in paint order. Every layer's display
+//! list is at unscrolled page coordinates over the page's whole
+//! scrollable area and is rasterized lazily in [`TILE_SIZE`] tiles that
+//! stay cached between frames; a content change drops only the tiles
+//! [`crate::damage`] reports for that layer. **Page** layers move with
+//! the viewport. A **scroller** layer holds one scroll container's
+//! contents, painted without the container's clip, and is composited
+//! through its scrollport at the container's own scroll offset. The first
+//! layer is opaque; the others, and the **overlay** (fixed and
+//! viewport-sticky boxes at window coordinates), are over transparent
+//! canvases and composited source-over in order.
+//!
+//! The scene's output is the reference for scrolled pages: compositing
+//! layers can differ from one-pass rasterization by rounding (at most
+//! 1/255 per channel where layers overlap), and an incremental scene
+//! frame equals a fresh scene of the same frame exactly.
 
 use std::collections::HashMap;
 
@@ -24,22 +29,46 @@ use crate::raster::{DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE};
 /// What one scene frame cost.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SceneStats {
-    /// Content tiles rasterized for this frame.
+    /// Layer tiles rasterized for this frame.
     pub painted_tiles: usize,
-    /// Visible content tiles taken from the cache.
+    /// Visible layer tiles taken from the cache.
     pub reused_tiles: usize,
     /// Overlay pixels rasterized (the window, when there is an overlay).
     pub overlay_pixels: u64,
 }
 
+/// How a layer moves.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LayerKind {
+    /// It moves with the viewport.
+    Page,
+    /// A scroll container's contents: shown only inside `port` (the
+    /// scrollport within its ancestors' clips, in unscrolled page device
+    /// pixels), shifted by the container's `scroll` offset.
+    Scroller {
+        /// The visible area in unscrolled page device pixels.
+        port: DeviceRect,
+        /// The container's scroll offset in device pixels.
+        scroll: (u32, u32),
+    },
+}
+
+/// One layer of a frame.
+#[derive(Clone, Copy, Debug)]
+pub struct SceneLayer<'a> {
+    /// The layer's list: unscrolled, its viewport the page's whole
+    /// scrollable area, over a transparent canvas unless first.
+    pub list: &'a DisplayList,
+    /// How it moves.
+    pub kind: LayerKind,
+}
+
 /// A frame's inputs.
 #[derive(Debug)]
 pub struct SceneFrame<'a> {
-    /// The content layer: unscrolled, its viewport the whole scrollable
-    /// area.
-    pub content: &'a DisplayList,
-    /// The overlay layer at window coordinates over a transparent canvas,
-    /// or `None`.
+    /// The layers in paint order; the first is opaque and a page layer.
+    pub layers: Vec<SceneLayer<'a>>,
+    /// The overlay at window coordinates over a transparent canvas.
     pub overlay: Option<&'a DisplayList>,
     /// The viewport's scroll offset in device pixels.
     pub offset: (u32, u32),
@@ -47,30 +76,57 @@ pub struct SceneFrame<'a> {
     pub size: (u32, u32),
 }
 
-/// Cached content tiles and the list they were painted from.
+#[derive(Debug)]
+struct Cached {
+    list: DisplayList,
+    kind: LayerKind,
+    tiles: HashMap<(u32, u32), Surface>,
+}
+
+/// Cached tiles of each layer and the lists they were painted from.
 #[derive(Debug)]
 pub struct Scene {
     scale: DeviceScale,
     limits: RasterLimits,
-    content: Option<DisplayList>,
-    tiles: HashMap<(u32, u32), Surface>,
+    layers: Vec<Cached>,
 }
 
 fn overlaps(a: DeviceRect, b: DeviceRect) -> bool {
     a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 }
 
-/// Composite premultiplied `top` over `bottom`, source-over, rounding.
-fn over(bottom: &mut [u8], top: &[u8]) {
-    for (b, t) in bottom.chunks_exact_mut(4).zip(top.chunks_exact(4)) {
-        let keep = 255 - u32::from(t[3]);
-        if keep == 255 {
-            continue;
-        }
-        for channel in 0..4 {
-            let below = (u32::from(b[channel]) * keep + 127) / 255;
-            b[channel] = (u32::from(t[channel]) + below).min(255) as u8;
-        }
+fn intersect(a: DeviceRect, b: DeviceRect) -> Option<DeviceRect> {
+    let x0 = a.x.max(b.x);
+    let y0 = a.y.max(b.y);
+    let x1 = (a.x + a.width).min(b.x + b.width);
+    let y1 = (a.y + a.height).min(b.y + b.height);
+    (x0 < x1 && y0 < y1).then(|| DeviceRect {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+    })
+}
+
+/// Whether a cached layer's tiles serve `next`: the same kind (and for a
+/// scroller the same port); the scroll offset only moves what is shown.
+fn same_layer(cached: LayerKind, next: LayerKind) -> bool {
+    match (cached, next) {
+        (LayerKind::Page, LayerKind::Page) => true,
+        (LayerKind::Scroller { port: a, .. }, LayerKind::Scroller { port: b, .. }) => a == b,
+        _ => false,
+    }
+}
+
+/// Source-over one premultiplied pixel.
+fn blend(bottom: &mut [u8], top: &[u8]) {
+    let keep = 255 - u32::from(top[3]);
+    if keep == 255 {
+        return;
+    }
+    for channel in 0..4 {
+        let below = (u32::from(bottom[channel]) * keep + 127) / 255;
+        bottom[channel] = (u32::from(top[channel]) + below).min(255) as u8;
     }
 }
 
@@ -80,12 +136,11 @@ impl Scene {
         Self {
             scale,
             limits,
-            content: None,
-            tiles: HashMap::new(),
+            layers: Vec::new(),
         }
     }
 
-    /// Render one frame. On failure the cache is dropped, so the next
+    /// Render one frame. On failure every cache is dropped, so the next
     /// frame starts afresh.
     pub fn submit(
         &mut self,
@@ -94,10 +149,52 @@ impl Scene {
     ) -> Result<(Surface, SceneStats), RasterError> {
         let result = self.render(frame, cancellation);
         if result.is_err() {
-            self.content = None;
-            self.tiles.clear();
+            self.layers.clear();
         }
         result
+    }
+
+    /// Bring layer `index`'s cache up to `list`, dropping what changed.
+    fn refresh(&mut self, index: usize, layer: SceneLayer<'_>) -> Result<(), RasterError> {
+        let size = crate::surface_size(layer.list, self.scale)?;
+        let reusable = match self.layers.get(index) {
+            Some(cached) => {
+                same_layer(cached.kind, layer.kind)
+                    && crate::surface_size(&cached.list, self.scale)? == size
+            }
+            None => false,
+        };
+        if !reusable {
+            let fresh = Cached {
+                list: layer.list.clone(),
+                kind: layer.kind,
+                tiles: HashMap::new(),
+            };
+            if index < self.layers.len() {
+                self.layers[index] = fresh;
+            } else {
+                self.layers.push(fresh);
+            }
+            return Ok(());
+        }
+        let cached = &mut self.layers[index];
+        if &cached.list != layer.list {
+            for region in crate::damage(&cached.list, layer.list, self.scale)? {
+                cached.tiles.retain(|&(tx, ty), _| {
+                    !overlaps(
+                        region,
+                        DeviceRect {
+                            x: tx * TILE_SIZE,
+                            y: ty * TILE_SIZE,
+                            width: TILE_SIZE,
+                            height: TILE_SIZE,
+                        },
+                    )
+                });
+            }
+            cached.list = layer.list.clone();
+        }
+        Ok(())
     }
 
     fn render(
@@ -105,80 +202,105 @@ impl Scene {
         frame: SceneFrame<'_>,
         cancellation: &CancellationToken,
     ) -> Result<(Surface, SceneStats), RasterError> {
-        let (content_w, content_h) = crate::surface_size(frame.content, self.scale)?;
         let (w, h) = frame.size;
         let (ox, oy) = frame.offset;
-        let fits = ox.checked_add(w).is_some_and(|r| r <= content_w)
-            && oy.checked_add(h).is_some_and(|b| b <= content_h);
-        if !fits {
-            return Err(RasterError::SurfaceSize);
+        if !matches!(frame.layers.first(), Some(layer) if layer.kind == LayerKind::Page) {
+            return Err(RasterError::InvalidList);
         }
-        // Invalidate what changed since the cached list.
-        match &self.content {
-            Some(old) if crate::surface_size(old, self.scale)? == (content_w, content_h) => {
-                if old != frame.content {
-                    for region in crate::damage(old, frame.content, self.scale)? {
-                        self.tiles.retain(|&(tx, ty), _| {
-                            !overlaps(
-                                region,
-                                DeviceRect {
-                                    x: tx * TILE_SIZE,
-                                    y: ty * TILE_SIZE,
-                                    width: TILE_SIZE,
-                                    height: TILE_SIZE,
-                                },
-                            )
-                        });
-                    }
-                }
-            }
-            _ => self.tiles.clear(),
-        }
-        self.content = Some(frame.content.clone());
+        self.layers.truncate(frame.layers.len());
         let mut output = Surface::new(w, h, self.limits)?;
         let mut stats = SceneStats::default();
-        let view = DeviceRect {
-            x: ox,
-            y: oy,
-            width: w,
-            height: h,
-        };
-        for ty in oy / TILE_SIZE..(oy + h).div_ceil(TILE_SIZE) {
-            for tx in ox / TILE_SIZE..(ox + w).div_ceil(TILE_SIZE) {
-                let rect = DeviceRect {
-                    x: tx * TILE_SIZE,
-                    y: ty * TILE_SIZE,
-                    width: TILE_SIZE.min(content_w - tx * TILE_SIZE),
-                    height: TILE_SIZE.min(content_h - ty * TILE_SIZE),
-                };
-                if !overlaps(rect, view) {
-                    continue;
+        for (index, layer) in frame.layers.iter().enumerate() {
+            self.refresh(index, *layer)?;
+            let (page_w, page_h) = crate::surface_size(layer.list, self.scale)?;
+            // The window in this layer's page coordinates (`from`), and
+            // the window pixels it covers (`to`, same size).
+            let window = DeviceRect {
+                x: ox,
+                y: oy,
+                width: w,
+                height: h,
+            };
+            let (from, to) = match layer.kind {
+                LayerKind::Page => (
+                    window,
+                    DeviceRect {
+                        x: 0,
+                        y: 0,
+                        width: w,
+                        height: h,
+                    },
+                ),
+                LayerKind::Scroller { port, scroll } => {
+                    let Some(shown) = intersect(port, window) else {
+                        continue;
+                    };
+                    let from = DeviceRect {
+                        x: shown
+                            .x
+                            .checked_add(scroll.0)
+                            .ok_or(RasterError::SurfaceSize)?,
+                        y: shown
+                            .y
+                            .checked_add(scroll.1)
+                            .ok_or(RasterError::SurfaceSize)?,
+                        ..shown
+                    };
+                    let to = DeviceRect {
+                        x: shown.x - ox,
+                        y: shown.y - oy,
+                        ..shown
+                    };
+                    (from, to)
                 }
-                if !self.tiles.contains_key(&(tx, ty)) {
-                    let tile = crate::rasterize_region(
-                        frame.content,
-                        self.scale,
-                        rect,
-                        self.limits,
-                        cancellation,
-                    )?;
-                    self.tiles.insert((tx, ty), tile);
-                    stats.painted_tiles += 1;
-                } else {
-                    stats.reused_tiles += 1;
-                }
-                let tile = &self.tiles[&(tx, ty)];
-                // Copy the part of the tile inside the view.
-                let x0 = rect.x.max(ox);
-                let x1 = (rect.x + rect.width).min(ox + w);
-                let y0 = rect.y.max(oy);
-                let y1 = (rect.y + rect.height).min(oy + h);
-                let row_bytes = ((x1 - x0) * 4) as usize;
-                for y in y0..y1 {
-                    let source = (((y - rect.y) * tile.width() + (x0 - rect.x)) * 4) as usize;
-                    let target = (((y - oy) * w + (x0 - ox)) * 4) as usize;
-                    output.pixels_mut_internal()[target..target + row_bytes]
-                        .copy_from_slice(&tile.premultiplied()[source..source + row_bytes]);
+            };
+            let fits = from.x.checked_add(from.width).is_some_and(|r| r <= page_w)
+                && from.y.checked_add(from.height).is_some_and(|b| b <= page_h);
+            if !fits {
+                return Err(RasterError::SurfaceSize);
+            }
+            for ty in from.y / TILE_SIZE..(from.y + from.height).div_ceil(TILE_SIZE) {
+                for tx in from.x / TILE_SIZE..(from.x + from.width).div_ceil(TILE_SIZE) {
+                    let rect = DeviceRect {
+                        x: tx * TILE_SIZE,
+                        y: ty * TILE_SIZE,
+                        width: TILE_SIZE.min(page_w - tx * TILE_SIZE),
+                        height: TILE_SIZE.min(page_h - ty * TILE_SIZE),
+                    };
+                    let Some(part) = intersect(rect, from) else {
+                        continue;
+                    };
+                    let cached = &mut self.layers[index];
+                    if let std::collections::hash_map::Entry::Vacant(slot) =
+                        cached.tiles.entry((tx, ty))
+                    {
+                        slot.insert(crate::rasterize_region(
+                            layer.list,
+                            self.scale,
+                            rect,
+                            self.limits,
+                            cancellation,
+                        )?);
+                        stats.painted_tiles += 1;
+                    } else {
+                        stats.reused_tiles += 1;
+                    }
+                    let tile = &cached.tiles[&(tx, ty)];
+                    let pixels = output.pixels_mut_internal();
+                    for y in part.y..part.y + part.height {
+                        for x in part.x..part.x + part.width {
+                            let source =
+                                (((y - rect.y) * tile.width() + (x - rect.x)) * 4) as usize;
+                            let (dx, dy) = (x - from.x + to.x, y - from.y + to.y);
+                            let target = ((dy * w + dx) * 4) as usize;
+                            let top = &tile.premultiplied()[source..source + 4];
+                            if index == 0 {
+                                pixels[target..target + 4].copy_from_slice(top);
+                            } else {
+                                blend(&mut pixels[target..target + 4], top);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -187,7 +309,13 @@ impl Scene {
             if (layer.width(), layer.height()) != (w, h) {
                 return Err(RasterError::SurfaceSize);
             }
-            over(output.pixels_mut_internal(), layer.premultiplied());
+            let pixels = output.pixels_mut_internal();
+            for (bottom, top) in pixels
+                .chunks_exact_mut(4)
+                .zip(layer.premultiplied().chunks_exact(4))
+            {
+                blend(bottom, top);
+            }
             stats.overlay_pixels = u64::from(w) * u64::from(h);
         }
         Ok((output, stats))

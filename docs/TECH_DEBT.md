@@ -242,7 +242,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
-| TD-181 | Deliberate | Compositor | Scenes layer only the viewport and fixed/viewport-sticky boxes: scroll containers inside the page repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.scene) |
+| TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.parity) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2882,19 +2882,22 @@ does re-solve them).
 the scroll chain, then smooth scrolling and `scrollend` once the shell
 animates frames (M8), with the WPT `css/cssom-view` scrolling tests.
 
-### TD-181 — Scenes layer only the viewport
+### TD-181 — Scene layering limits
 
-The first scene (ADR 0064 §3) caches the page's content in tiles and
-composites fixed and viewport-sticky boxes as an overlay, so scrolling the
-page copies cached tiles. A scroll container inside the page is part of
-the content layer: scrolling it moves its fills, which damages the tiles
-they cover. The overlay is rasterized in full every frame. Pages with
+Scenes (ADR 0064 §3) cache the page in tiled layers: page segments, the
+contents of each top-level scroll container, and an overlay of fixed and
+viewport-sticky boxes. A scroll container nested in another stays in the
+outer one's layer, and a container whose contents sit inside a group
+(opacity, filter, blend, clip-path, transform) or carry rounded clips
+paints into its page segment: scrolling those moves their fills, which
+damages the tiles they cover. The overlay is rasterized in full every
+frame. Pages with
 iframes render in one pass (their frame layers are composited by the
 broker, ADR 0062), `dump-paint` and `hit-test` use the unsnapped
 position, and a page whose overlay boxes are not painted last (a later
 positioned box above a fixed one) is painted in one pass.
-**Pay:** layers for scroll containers (their content painted without
-their own clip, composited into the parent through the scrollport),
-damage-based overlay repaints, frame layers inside scenes, and the same
-snapping for dumps and hit testing.
+**Pay:** nested scroller layers, layers inside groups (the group becomes
+the layer) and rounded scrollports with the M8 GPU compositor
+(`compositor.parity`), damage-based overlay repaints, frame layers inside
+scenes, and the same snapping for dumps and hit testing.
 

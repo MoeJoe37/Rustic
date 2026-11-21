@@ -141,3 +141,21 @@ fn absolute_boxes_scroll_with_their_containing_block_not_their_parent() {
     assert_eq!(top_left(&s, abs), (0.0, 10.0));
     assert_eq!(s.fragments()[abs].clip().y, None);
 }
+
+#[test]
+fn a_scroll_containers_contents_can_be_unclipped_for_a_layer() {
+    let l = layout(
+        "<main><div id=port><div id=inner><div id=item></div></div></div></main>",
+        "main {overflow:hidden; height:150px} #port {overflow:auto; height:50px} \
+         #inner {overflow:hidden; height:30px} #item {height:500px}",
+    );
+    let (port, inner, item) = (3, 4, 5);
+    assert_eq!(l.fragments()[item].clip().y, range(0.0, 30.0));
+    let open = l.without_clips_above(port);
+    // Neither the port nor `main` clips its contents any more; `inner`
+    // still clips its own.
+    assert_eq!(open.fragments()[inner].clip(), rustic_layout::Clip::NONE);
+    assert_eq!(open.fragments()[item].clip().y, range(0.0, 30.0));
+    // The port itself keeps its ancestors' clip.
+    assert_eq!(open.fragments()[port].clip(), l.fragments()[port].clip());
+}

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "b61df726bfffb342129b1a068db56ad03febcfa93361319d98076932509d03a2",
-  "percent": "42.18",
-  "verified_percent": "39.28",
-  "partial_percent": "2.90",
-  "completed": 92,
-  "in_progress": 11,
+  "source_fingerprint": "5463c88e158e2b9ad01e164e5660a0f1b727cbf14cb771ee781827883f5d6aec",
+  "percent": "42.35",
+  "verified_percent": "39.97",
+  "partial_percent": "2.38",
+  "completed": 93,
+  "in_progress": 10,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop & mobile alpha",
       "share": "10.22",
-      "completed": 0,
+      "completed": 1,
       "total": 21,
-      "percent": "6.97",
-      "verified_percent": "0.00",
-      "partial_percent": "6.97"
+      "percent": "8.66",
+      "verified_percent": "6.77",
+      "partial_percent": "1.89"
     },
     {
       "id": "M9",
@@ -6741,94 +6741,100 @@
           "label": "Incremental scene submission and scrolling",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Scroll positions applied to a finished layout: viewport and nested scroll containers, fixed and sticky boxes, clips and clamping, with paint and hit testing following (ADR 0064)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/scroll.rs",
-                  "marker": "pub fn scrolled("
-                },
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0064-scrolling-and-compositor-scenes.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/scroll.rs",
-                  "marker": "fn nested_scroll_containers_move_their_contents_and_clips"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/scroll.rs",
-                  "marker": "fn sticky_boxes_take_their_offset_at_the_new_scroll_position"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/scroll.rs",
-                  "marker": "fn the_viewport_and_scroll_containers_scroll_without_moving_fixed_boxes"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/scroll.rs",
+              "marker": "pub fn scrolled("
             },
             {
-              "label": "Layer scenes: display lists split at scroll containers and fixed/sticky contexts into cached layer rasters that re-composite on scroll",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "docs/adr/0064-scrolling-and-compositor-scenes.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/frames.rs",
-                  "marker": "pub fn submit("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/main.rs",
-                  "marker": "fn render_frames("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn submitted_frames_repaint_only_damage_and_equal_full_rasters"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/frames_render.rs",
-                  "marker": "fn frames_repaint_incrementally_and_match_across_process_modes"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/scroll.rs",
+              "marker": "fn nested_scroll_containers_move_their_contents_and_clips"
             },
             {
-              "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/scrolling.rs",
-                  "marker": "pub(super) fn install_window"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/src/scripting.rs",
-                  "marker": "fn scroll_to(&self"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/scroll.rs",
-                  "marker": "fn scripts_scroll_the_viewport_and_containers_and_the_render_follows"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/scroll.rs",
+              "marker": "fn sticky_boxes_take_their_offset_at_the_new_scroll_position"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/scroll.rs",
+              "marker": "fn the_viewport_and_scroll_containers_scroll_without_moving_fixed_boxes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/scene.rs",
+              "marker": "pub enum LayerKind"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/loader.rs",
+              "marker": "fn scene_lists("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn scroller_layers_show_their_contents_through_the_port_at_their_offset"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames_render.rs",
+              "marker": "fn scrolled_frames_reuse_cached_content_under_a_fixed_overlay"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames_render.rs",
+              "marker": "fn scroll_containers_scroll_from_cached_layers"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/frames.rs",
+              "marker": "pub fn submit("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/main.rs",
+              "marker": "fn render_frames("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn submitted_frames_repaint_only_damage_and_equal_full_rasters"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames_render.rs",
+              "marker": "fn frames_repaint_incrementally_and_match_across_process_modes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/scrolling.rs",
+              "marker": "pub(super) fn install_window"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "fn scroll_to(&self"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/scroll.rs",
+              "marker": "fn scripts_scroll_the_viewport_and_containers_and_the_render_follows"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.69"
         },
         {
@@ -6863,13 +6869,13 @@
         }
       ],
       "points": 13,
-      "completed": 0,
-      "in_progress": 1,
+      "completed": 1,
+      "in_progress": 0,
       "total": 4,
-      "contribution": "0.51",
-      "percent": "17.30",
-      "verified_percent": "0.00",
-      "partial_percent": "17.30"
+      "contribution": "0.69",
+      "percent": "23.07",
+      "verified_percent": "23.07",
+      "partial_percent": "0.00"
     },
     {
       "id": "platform",

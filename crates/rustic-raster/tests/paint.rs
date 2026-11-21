@@ -1842,7 +1842,7 @@ fn submitted_frames_repaint_only_damage_and_equal_full_rasters() {
 
 #[test]
 fn scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes() {
-    use rustic_raster::{Scene, SceneFrame};
+    use rustic_raster::{LayerKind, Scene, SceneFrame, SceneLayer};
     let scale = DeviceScale::new(1.0).unwrap();
     let cancel = CancellationToken::default();
     let limits = RasterLimits::default();
@@ -1879,7 +1879,10 @@ fn scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes() {
         scene
             .submit(
                 SceneFrame {
-                    content: list,
+                    layers: vec![SceneLayer {
+                        list,
+                        kind: LayerKind::Page,
+                    }],
                     overlay: with_overlay.then_some(&overlay),
                     offset: (0, y),
                     size: (300, 200),
@@ -1918,7 +1921,10 @@ fn scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes() {
     // A window past the content is refused, and the cache starts over.
     let past = scene.submit(
         SceneFrame {
-            content: &gray,
+            layers: vec![SceneLayer {
+                list: &gray,
+                kind: LayerKind::Page,
+            }],
             overlay: None,
             offset: (0, 1100),
             size: (300, 200),
@@ -1936,4 +1942,81 @@ fn rasterize_region_like(surface: &Surface, x: u32, y: u32, w: u32, h: u32) -> V
         out.extend_from_slice(&surface.premultiplied()[start..start + (w * 4) as usize]);
     }
     out
+}
+
+#[test]
+fn scroller_layers_show_their_contents_through_the_port_at_their_offset() {
+    use rustic_raster::{LayerKind, Scene, SceneFrame, SceneLayer};
+    let scale = DeviceScale::new(1.0).unwrap();
+    let cancel = CancellationToken::default();
+    let limits = RasterLimits::default();
+    // The page: white, 300x300. The scroller's contents: three 100px
+    // bands at y 0..300 of x 0..100, over a transparent canvas.
+    let page_list = page("<p></p>", "body { margin:0 }", 300.0, 300.0)
+        .list()
+        .unwrap();
+    let contents = page(
+        "<div></div><div></div><div></div>",
+        "body { margin:0 } div { width:100px; height:100px } \
+         div:nth-child(1) { background:#f00 } div:nth-child(2) { background:#0f0 } \
+         div:nth-child(3) { background:#00f }",
+        300.0,
+        300.0,
+    )
+    .list()
+    .unwrap()
+    .over_transparent();
+    let port = DeviceRect {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+    };
+    let mut scene = Scene::new(scale, limits);
+    let at = |scene: &mut Scene, scroll: u32| {
+        scene
+            .submit(
+                SceneFrame {
+                    layers: vec![
+                        SceneLayer {
+                            list: &page_list,
+                            kind: LayerKind::Page,
+                        },
+                        SceneLayer {
+                            list: &contents,
+                            kind: LayerKind::Scroller {
+                                port,
+                                scroll: (0, scroll),
+                            },
+                        },
+                    ],
+                    overlay: None,
+                    offset: (0, 0),
+                    size: (200, 200),
+                },
+                &cancel,
+            )
+            .unwrap()
+    };
+    let pixel = |s: &Surface, x: u32, y: u32| {
+        let i = ((y * s.width() + x) * 4) as usize;
+        s.premultiplied()[i..i + 4].to_vec()
+    };
+    let (frame, first) = at(&mut scene, 0);
+    assert_eq!(pixel(&frame, 5, 5), [255, 0, 0, 255]);
+    assert_eq!(
+        pixel(&frame, 5, 150),
+        [255, 255, 255, 255],
+        "outside the port"
+    );
+    // Scrolled by 150: green at the top half of the port, blue below.
+    let (frame, scrolled) = at(&mut scene, 150);
+    assert_eq!(pixel(&frame, 5, 5), [0, 255, 0, 255]);
+    assert_eq!(pixel(&frame, 5, 60), [0, 0, 255, 255]);
+    assert_eq!(pixel(&frame, 150, 5), [255, 255, 255, 255]);
+    // Scrolling the container painted nothing new: all tiles were cached.
+    assert_eq!(first.painted_tiles, 2);
+    assert_eq!((scrolled.painted_tiles, scrolled.reused_tiles), (0, 2));
+    let mut fresh = Scene::new(scale, limits);
+    assert_eq!(at(&mut fresh, 150).0, frame);
 }

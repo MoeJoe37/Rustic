@@ -22,4 +22,4 @@ pub use raster::{
     DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, rasterize, rasterize_reference,
     rasterize_region, repaint, surface_size,
 };
-pub use scene::{Scene, SceneFrame, SceneStats};
+pub use scene::{LayerKind, Scene, SceneFrame, SceneLayer, SceneStats};

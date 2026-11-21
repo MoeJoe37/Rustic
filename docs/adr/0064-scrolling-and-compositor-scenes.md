@@ -1,7 +1,7 @@
 # ADR 0064 — Scrolling and compositor scenes
 
 Date: 2026-11-21
-Status: Accepted for scroll positions (step 1), viewport scenes (step 2, first part), incremental frames (step 3) and script scrolling (step 4); scroll-container layers remain
+Status: Accepted (all four steps, 2026-11-21); remaining scene limits are TD-181
 
 ## Context
 
@@ -47,10 +47,20 @@ repaint only the tiles whose pixels can change between two display lists.
    compositing the overlay separately can differ from one-pass painting by
    rounding (at most 1/255 per channel), and an incremental scene frame
    equals a fresh scene byte for byte. `render` uses it for such pages
-   without iframes, `render --frames` per frame. Scroll containers inside
-   the page are still part of the content layer, so scrolling one repaints
-   its damage (TD-181); giving them layers of their own completes this
-   step. The CPU scene is the reference the M8 GPU backend must match.
+   without iframes, `render --frames` per frame. Top-level scroll
+   containers (no scroll container above them) get layers of their own:
+   the page is split in paint order into page segments and container
+   contents (`LayerKind::Page` and `LayerKind::Scroller`); a container's
+   contents are painted without its own and its ancestors' clips
+   (`BlockLayout::without_clips_above`) and composited through its
+   scrollport at its own snapped offset, so scrolling it copies cached
+   tiles too. A container is layered only if its contents are one run in
+   paint order, outside every group, without rounded clips; otherwise it
+   paints into the page segment and scrolling it repaints its damage.
+   Boxes are classified along the containing-block chain, so an absolute
+   box positioned outside a container is not part of its layer. Nested
+   containers stay inside their top-level container's layer (TD-181). The
+   CPU scene is the reference the M8 GPU backend must match.
 4. **Incremental frames** (done, catalog step 3). `rustic_raster::Frames` keeps
    the last display list and surface; each submitted list repaints only
    the tiles `damage` reports, so every frame equals a full rasterization

@@ -156,11 +156,19 @@ fn reachable(a: Area, padding: Area, direction: Direction) -> Result<CssRect, Fl
 /// Recompute every fragment's clip from its containing block's clip and
 /// padding box, as [`assign`] does, after fragments moved (scrolling).
 pub(crate) fn reclip(fragments: &mut [BlockFragment]) {
+    reclip_from(fragments, None);
+}
+
+/// Like [`reclip`], but boxes whose containing block is `root` start
+/// unclipped: neither `root` nor its ancestors clip `root`'s contents
+/// (a scroll container's layer, which the compositor clips instead).
+pub(crate) fn reclip_from(fragments: &mut [BlockFragment], root: Option<usize>) {
     let mut own: Vec<Clip> = Vec::with_capacity(fragments.len());
     for i in 0..fragments.len() {
         let f = fragments[i];
         let effective = match f.containing_block() {
             _ if f.scheme() == crate::PositionScheme::Fixed => Clip::NONE,
+            Some(c) if Some(c) == root => Clip::NONE,
             Some(c) if c < i => fragments[c].clip().intersect(own[c]),
             _ => Clip::NONE,
         };

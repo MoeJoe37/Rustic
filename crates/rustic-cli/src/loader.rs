@@ -1923,11 +1923,12 @@ fn scrolled(
     }
 }
 
-/// A page split into scene layers (ADR 0064): content at unscrolled
-/// page coordinates over the whole scrollable area, and fixed and
-/// viewport-sticky boxes as an overlay at window coordinates.
+/// A page split into scene layers (ADR 0064): page segments and scroll
+/// containers' contents at unscrolled page coordinates over the whole
+/// scrollable area, in paint order, and fixed and viewport-sticky boxes
+/// as an overlay at window coordinates.
 struct SceneLists {
-    content: rustic_paint::DisplayList,
+    layers: Vec<(rustic_paint::DisplayList, rustic_raster::LayerKind)>,
     overlay: Option<rustic_paint::DisplayList>,
     offset: (u32, u32),
     size: (u32, u32),
@@ -1936,7 +1937,11 @@ struct SceneLists {
 impl SceneLists {
     fn frame(&self) -> rustic_raster::SceneFrame<'_> {
         rustic_raster::SceneFrame {
-            content: &self.content,
+            layers: self
+                .layers
+                .iter()
+                .map(|(list, kind)| rustic_raster::SceneLayer { list, kind: *kind })
+                .collect(),
             overlay: self.overlay.as_ref(),
             offset: self.offset,
             size: self.size,
@@ -1944,47 +1949,80 @@ impl SceneLists {
     }
 }
 
-/// The commands of `list` up to the first overlay command, and from it:
-/// `None` unless every overlay command comes after every content command
-/// and no group, clip or transform spans the boundary.
-fn split_point(list: &rustic_paint::DisplayList, overlay: &[bool]) -> Option<usize> {
+/// Which layer a box paints into.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LayerClass {
+    Page,
+    /// The contents of the scroll container with this fragment index.
+    Container(usize),
+    Overlay,
+}
+
+/// Each command's layer class (groups, clips and transforms take their
+/// root box's; their ends the matching begin's); `None` if unbalanced.
+fn command_classes(
+    list: &rustic_paint::DisplayList,
+    class_of: &dyn Fn(usize) -> LayerClass,
+) -> Option<Vec<(LayerClass, usize)>> {
     use rustic_paint::DisplayCommand as C;
-    let is_overlay = |source: usize| overlay.get(source).copied().unwrap_or(false);
-    let mut stack: Vec<bool> = Vec::new();
-    let mut boundary = None;
-    for (index, command) in list.commands().iter().enumerate() {
+    let mut stack: Vec<LayerClass> = Vec::new();
+    let mut out = Vec::with_capacity(list.commands().len());
+    for command in list.commands() {
         let class = match command {
-            C::Fill(item) => is_overlay(item.source_box),
+            C::Fill(item) => class_of(item.source_box),
             C::BeginGroup { source_box, .. }
             | C::BeginClip { source_box, .. }
-            | C::BeginTransform { source_box, .. } => is_overlay(*source_box),
+            | C::BeginTransform { source_box, .. } => class_of(*source_box),
             C::EndGroup | C::EndClip | C::EndTransform => *stack.last()?,
         };
-        if class && boundary.is_none() {
-            // The overlay starts here, outside every content group.
-            if !stack.is_empty() {
-                return None;
-            }
-            boundary = Some(index);
-        }
-        if !class && boundary.is_some() {
-            return None;
-        }
-        match command {
-            C::BeginGroup { .. } | C::BeginClip { .. } | C::BeginTransform { .. } => {
-                stack.push(class);
-            }
+        // The depth outside this command.
+        let depth = match command {
             C::EndGroup | C::EndClip | C::EndTransform => {
                 stack.pop();
+                stack.len()
             }
-            C::Fill(_) => {}
+            _ => stack.len(),
+        };
+        if matches!(
+            command,
+            C::BeginGroup { .. } | C::BeginClip { .. } | C::BeginTransform { .. }
+        ) {
+            stack.push(class);
         }
+        out.push((class, depth));
     }
-    Some(boundary.unwrap_or(list.commands().len()))
+    stack.is_empty().then_some(out)
+}
+
+/// Whether `class`'s commands form one run that starts and ends outside
+/// every group, without rounded clips.
+fn layerable(
+    list: &rustic_paint::DisplayList,
+    classes: &[(LayerClass, usize)],
+    class: LayerClass,
+) -> bool {
+    let positions: Vec<usize> = classes
+        .iter()
+        .enumerate()
+        .filter(|(_, (c, _))| *c == class)
+        .map(|(index, _)| index)
+        .collect();
+    let (Some(&first), Some(&last)) = (positions.first(), positions.last()) else {
+        return true;
+    };
+    let contiguous = last - first + 1 == positions.len();
+    let outside = classes[first].1 == 0 && classes[last].1 == 0;
+    let square = list.commands()[first..=last]
+        .iter()
+        .all(|command| match command {
+            rustic_paint::DisplayCommand::Fill(item) => item.rounded_clip.is_none(),
+            _ => true,
+        });
+    contiguous && outside && square
 }
 
 /// Build the scene layers for a page, or `None` when it cannot be layered
-/// (overlay boxes not painted last, or RTL scroll ranges).
+/// (overlay boxes not painted last, or an RTL viewport range).
 fn scene_lists(
     input: LayoutInput<'_>,
     tree: &rustic_layout::BoxTree,
@@ -1992,6 +2030,8 @@ fn scene_lists(
     viewport: rustic_layout::CssSize,
     images: &HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>,
 ) -> Result<Option<SceneLists>, LoadError> {
+    use rustic_layout::PositionScheme;
+    use rustic_raster::LayerKind;
     let factor = rustic_layout::CssPx::new(1.0)
         .map(|one| one.to_device(input.view.scale()).get())
         .map_err(|_| LoadError::InvalidLimits)?;
@@ -1999,34 +2039,74 @@ fn scene_lists(
     if range.min != (0.0, 0.0) {
         return Ok(None);
     }
-    let mut positions = scroll_positions(layout, input.limits, input.scroll).unwrap_or_default();
-    // Snap the viewport to whole device pixels so tiles copy exactly.
-    let (vx, vy) = range.clamp(positions.viewport());
     let snap = |v: f64| (v * factor).round() / factor;
+    let device = |v: f64| (v * factor).round().max(0.0) as u32;
+    let mut positions = scroll_positions(layout, input.limits, input.scroll).unwrap_or_default();
+    let (vx, vy) = range.clamp(positions.viewport());
     let (vx, vy) = (snap(vx), snap(vy));
     positions.set_viewport(vx, vy);
-    // Fixed and viewport-sticky boxes and everything inside them.
-    let mut overlay = vec![false; tree.boxes().len()];
-    for fragment in layout.fragments() {
-        let own = match fragment.scheme() {
-            rustic_layout::PositionScheme::Fixed => true,
-            rustic_layout::PositionScheme::Sticky => fragment
+    let fragments = layout.fragments();
+    let mut fragment_of_box = vec![None; tree.boxes().len()];
+    for (index, fragment) in fragments.iter().enumerate() {
+        if let Some(slot) = fragment_of_box.get_mut(fragment.source_box()) {
+            slot.get_or_insert(index);
+        }
+    }
+    // Fragment classes along the containing-block chain: fixed and
+    // viewport-sticky boxes are the overlay, the contents of a top-level
+    // scroll container (no scroll container above it) its layer.
+    let mut fragment_class: Vec<LayerClass> = Vec::with_capacity(fragments.len());
+    let mut scrolled_above: Vec<bool> = Vec::with_capacity(fragments.len());
+    for (index, fragment) in fragments.iter().enumerate() {
+        let parent = fragment.containing_block().filter(|&c| c < index);
+        let own_overlay = match fragment.scheme() {
+            PositionScheme::Fixed => true,
+            PositionScheme::Sticky => fragment
                 .sticky()
                 .is_some_and(|constraint| constraint.scroll_container().is_none()),
             _ => false,
         };
-        if own {
-            if let Some(slot) = overlay.get_mut(fragment.source_box()) {
-                *slot = true;
+        let inherited = match parent {
+            Some(c) if fragment_class[c] == LayerClass::Overlay => LayerClass::Overlay,
+            Some(c)
+                if fragment_class[c] == LayerClass::Page
+                    && layout.scroll_range(c).is_some()
+                    && !scrolled_above[c] =>
+            {
+                LayerClass::Container(c)
             }
-        }
+            Some(c) => fragment_class[c],
+            None => LayerClass::Page,
+        };
+        let class = if own_overlay {
+            LayerClass::Overlay
+        } else {
+            inherited
+        };
+        fragment_class.push(class);
+        scrolled_above
+            .push(parent.is_some_and(|c| scrolled_above[c] || layout.scroll_range(c).is_some()));
     }
-    for index in 0..overlay.len() {
-        if let Some(parent) = tree.boxes()[index].parent() {
-            if parent < index && overlay[parent] {
-                overlay[index] = true;
-            }
-        }
+    // Other boxes (inline, text) follow their block: inside a container's
+    // own block they are its contents.
+    let mut box_class = vec![LayerClass::Page; tree.boxes().len()];
+    for index in 0..box_class.len() {
+        box_class[index] = match fragment_of_box[index] {
+            Some(f) => fragment_class[f],
+            None => match tree.boxes()[index].parent().filter(|&p| p < index) {
+                Some(p) => match fragment_of_box[p] {
+                    Some(f)
+                        if fragment_class[f] == LayerClass::Page
+                            && layout.scroll_range(f).is_some()
+                            && !scrolled_above[f] =>
+                    {
+                        LayerClass::Container(f)
+                    }
+                    _ => box_class[p],
+                },
+                None => LayerClass::Page,
+            },
+        };
     }
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),
@@ -2044,40 +2124,166 @@ fn scene_lists(
         )
         .map_err(LoadError::Paint)
     };
-    // Content: scroll containers at their positions, the viewport at zero,
-    // painted over the whole page.
-    let mut inner = positions.clone();
-    inner.set_viewport(0.0, 0.0);
-    let content_layout = layout.scrolled(viewport, &inner).map_err(LoadError::Flow)?;
-    let area = rustic_layout::CssSize::new(
+    let containers: Vec<usize> = (0..fragments.len())
+        .filter(|&f| {
+            fragment_class[f] == LayerClass::Page
+                && layout.scroll_range(f).is_some_and(|r| r.min == (0.0, 0.0))
+                && !scrolled_above[f]
+        })
+        .collect();
+    // Every layer paints over one area: the page's scrollable extent and
+    // each container's whole contents (unscrolled, top-level containers
+    // move only with the viewport, which is at zero here).
+    let (mut right, mut bottom) = (
         viewport.width().get() + range.max.0,
         viewport.height().get() + range.max.1,
-    )
-    .map_err(|_| LoadError::InvalidLimits)?;
-    let full = build(&content_layout, area)?;
-    let Some(split) = split_point(&full, &overlay) else {
+    );
+    for &c in &containers {
+        if let Some(extent) = fragments[c].scrollable_overflow() {
+            right = right.max(extent.origin().x.get() + extent.size().width().get());
+            bottom = bottom.max(extent.origin().y.get() + extent.size().height().get());
+        }
+    }
+    let area = rustic_layout::CssSize::new(right.ceil(), bottom.ceil())
+        .map_err(|_| LoadError::InvalidLimits)?;
+    // Which containers can be layers: find out with them unscrolled.
+    let mut unscrolled = positions.clone();
+    unscrolled.set_viewport(0.0, 0.0);
+    for &c in &containers {
+        unscrolled.set_box(c, 0.0, 0.0);
+    }
+    let probe = build(
+        &layout
+            .scrolled(viewport, &unscrolled)
+            .map_err(LoadError::Flow)?,
+        area,
+    )?;
+    let probe_class = |source: usize| box_class.get(source).copied().unwrap_or(LayerClass::Page);
+    let Some(classes) = command_classes(&probe, &probe_class) else {
         return Ok(None);
     };
-    let content = full.retain(|index, _| index < split);
+    // The overlay must come last, outside every group.
+    if let Some(first) = classes.iter().position(|(c, _)| *c == LayerClass::Overlay) {
+        if classes[first].1 != 0
+            || classes[first..]
+                .iter()
+                .any(|(c, _)| *c != LayerClass::Overlay)
+        {
+            return Ok(None);
+        }
+    }
+    let layered: Vec<usize> = containers
+        .iter()
+        .copied()
+        .filter(|&c| layerable(&probe, &classes, LayerClass::Container(c)))
+        .collect();
+    // Containers that are not layered paint into the page, scrolled.
+    let class_of = |source: usize| match box_class.get(source).copied() {
+        Some(LayerClass::Container(c)) if !layered.contains(&c) => LayerClass::Page,
+        Some(class) => class,
+        None => LayerClass::Page,
+    };
+    let mut page_positions = positions.clone();
+    page_positions.set_viewport(0.0, 0.0);
+    for &c in &layered {
+        page_positions.set_box(c, 0.0, 0.0);
+    }
+    let page_layout = layout
+        .scrolled(viewport, &page_positions)
+        .map_err(LoadError::Flow)?;
+    let page = build(&page_layout, area)?;
+    let Some(classes) = command_classes(&page, &class_of) else {
+        return Ok(None);
+    };
+    let mut layers = Vec::new();
+    let mut start = 0;
+    while start < classes.len() {
+        let class = classes[start].0;
+        let mut end = start;
+        while end < classes.len() && classes[end].0 == class {
+            end += 1;
+        }
+        match class {
+            LayerClass::Overlay => break,
+            LayerClass::Page => {
+                let list = page.retain(|index, _| (start..end).contains(&index));
+                let list = if layers.is_empty() {
+                    list
+                } else {
+                    list.over_transparent()
+                };
+                layers.push((list, LayerKind::Page));
+            }
+            LayerClass::Container(c) => {
+                if layers.is_empty() {
+                    layers.push((page.retain(|_, _| false), LayerKind::Page));
+                }
+                let own = build(&page_layout.without_clips_above(c), area)?;
+                let Some(own_classes) = command_classes(&own, &class_of) else {
+                    return Ok(None);
+                };
+                let list = own
+                    .retain(|index, _| own_classes[index].0 == LayerClass::Container(c))
+                    .over_transparent();
+                let fragment = page_layout.fragments()[c];
+                let padding = fragment.padding();
+                let (mut x0, mut y0) = (padding.origin().x.get(), padding.origin().y.get());
+                let (mut x1, mut y1) = (
+                    x0 + padding.size().width().get(),
+                    y0 + padding.size().height().get(),
+                );
+                let clip = fragment.clip();
+                if let Some(r) = clip.x {
+                    x0 = x0.max(r.start.get());
+                    x1 = x1.min(r.end.get());
+                }
+                if let Some(r) = clip.y {
+                    y0 = y0.max(r.start.get());
+                    y1 = y1.min(r.end.get());
+                }
+                let (px, py) = (device(x0), device(y0));
+                let port = rustic_raster::DeviceRect {
+                    x: px,
+                    y: py,
+                    width: device(x1).saturating_sub(px),
+                    height: device(y1).saturating_sub(py),
+                };
+                let at = layout
+                    .scroll_range(c)
+                    .map_or((0.0, 0.0), |r| r.clamp(positions.of_box(c)));
+                let scroll = (device(snap(at.0)), device(snap(at.1)));
+                positions.set_box(c, snap(at.0), snap(at.1));
+                if port.width > 0 && port.height > 0 {
+                    layers.push((list, LayerKind::Scroller { port, scroll }));
+                }
+            }
+        }
+        start = end;
+    }
+    if layers.is_empty() {
+        layers.push((page.retain(|_, _| false), LayerKind::Page));
+    }
     let window = rustic_raster::surface_size(&build(layout, viewport)?, input.view.scale())
         .map_err(LoadError::Raster)?;
-    let overlay_list = if split < full.commands().len() {
+    let overlay = if classes.iter().any(|(c, _)| *c == LayerClass::Overlay) {
         let scrolled = layout
             .scrolled(viewport, &positions)
             .map_err(LoadError::Flow)?;
         let list = build(&scrolled, viewport)?;
-        let Some(split) = split_point(&list, &overlay) else {
+        let Some(overlay_classes) = command_classes(&list, &class_of) else {
             return Ok(None);
         };
-        Some(list.retain(|index, _| index >= split).over_transparent())
+        Some(
+            list.retain(|index, _| overlay_classes[index].0 == LayerClass::Overlay)
+                .over_transparent(),
+        )
     } else {
         None
     };
-    let offset = ((vx * factor).round() as u32, (vy * factor).round() as u32);
     Ok(Some(SceneLists {
-        content,
-        overlay: overlay_list,
-        offset,
+        layers,
+        overlay,
+        offset: (device(vx), device(vy)),
         size: window,
     }))
 }
@@ -2090,8 +2296,7 @@ fn render_scene(
     scene: &mut rustic_raster::Scene,
 ) -> Result<Option<(rustic_raster::Surface, rustic_raster::SceneStats)>, LoadError> {
     let (tree, layout, viewport, images, _) = block_layout(input)?;
-    let scrolled_viewport = scroll_positions(&layout, input.limits, input.scroll)
-        .is_some_and(|positions| positions.viewport() != (0.0, 0.0));
+    let scrolled_viewport = scroll_positions(&layout, input.limits, input.scroll).is_some();
     let fixed = layout.fragments().iter().any(|f| {
         f.scheme() == rustic_layout::PositionScheme::Fixed
             || f.sticky().is_some_and(|c| c.scroll_container().is_none())

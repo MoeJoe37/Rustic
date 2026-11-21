@@ -245,3 +245,112 @@ fn scrolled_frames_reuse_cached_content_under_a_fixed_overlay() {
     assert_eq!(pixel(&frame, 5, 100), [0, 255, 0, 255]);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A header, a 200px scroll container of five 100px bands, and a footer.
+fn container_page(script: &str) -> String {
+    let mut page = String::from(
+        "<!doctype html><style>body{margin:0} #head,#foot{height:50px;background:#888}\
+         section{height:200px;overflow:auto} .band{height:100px}</style>\
+         <div id=head></div><section>",
+    );
+    for color in ["#f00", "#0f0", "#00f", "#ff0", "#0ff"] {
+        page.push_str(&format!(
+            "<div class=band style=\"background:{color}\"></div>"
+        ));
+    }
+    page.push_str("</section><div id=foot></div>");
+    page.push_str(script);
+    page
+}
+
+#[test]
+fn scroll_containers_scroll_from_cached_layers() {
+    let dir = std::env::temp_dir().join(format!("rustic-scene-box-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let animated = dir.join("animated.html");
+    std::fs::write(
+        &animated,
+        container_page(
+            "<script>var s = document.querySelector('section');\
+             function step() { s.scrollTop += 100; requestAnimationFrame(step) }\
+             requestAnimationFrame(step)</script>",
+        ),
+    )
+    .unwrap();
+    let still = dir.join("still.html");
+    std::fs::write(&still, container_page("")).unwrap();
+    let out = dir.join("anim.png").to_string_lossy().into_owned();
+    let animated = animated.to_string_lossy().into_owned();
+    let output = rustic(&[
+        "render",
+        "--run-scripts",
+        "--frames",
+        "3",
+        "--viewport",
+        "300x400",
+        "--output",
+        &out,
+        &animated,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report = String::from_utf8_lossy(&output.stdout).into_owned();
+    // Three layers (header part, the container's contents, footer part)
+    // of 2x2 tiles each paint 12 tiles first. Scrolling the container to
+    // 200 reuses them all; to 300 it exposes the contents' third tile row
+    // (512px and below, two columns) and nothing else.
+    let lines: Vec<_> = report.lines().collect();
+    assert_eq!(lines.len(), 3, "{report}");
+    assert!(
+        lines[0].contains("scene painted 12 content tiles, reused 0"),
+        "{report}"
+    );
+    assert!(
+        lines[1].contains("scene painted 0 content tiles, reused 12"),
+        "{report}"
+    );
+    assert!(
+        lines[2].contains("scene painted 2 content tiles, reused 10"),
+        "{report}"
+    );
+    // Each frame equals a fresh render with the container at that position
+    // (fragment 3: html, body, head, then the section).
+    for k in 0..3 {
+        let fresh = dir
+            .join(format!("fresh-{k}.png"))
+            .to_string_lossy()
+            .into_owned();
+        let scroll = format!("3=0,{}", 100 * (k + 1));
+        let still = still.to_string_lossy().into_owned();
+        let output = rustic(&[
+            "render",
+            "--viewport",
+            "300x400",
+            "--scroll-box",
+            &scroll,
+            "--output",
+            &fresh,
+            &still,
+        ]);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let frame = std::fs::read(dir.join(format!("anim-{k}.png"))).unwrap();
+        assert_eq!(frame, std::fs::read(&fresh).unwrap(), "frame {k}");
+    }
+    // Frame 1 (scrolled to 200): blue at the top of the port, yellow below;
+    // the header and footer stay where they are.
+    let frame = dir.join("anim-1.png");
+    assert_eq!(pixel(&frame, 5, 60), [0, 0, 255, 255]);
+    assert_eq!(pixel(&frame, 5, 160), [255, 255, 0, 255]);
+    assert_eq!(pixel(&frame, 5, 25), [136, 136, 136, 255]);
+    assert_eq!(pixel(&frame, 5, 275), [136, 136, 136, 255]);
+    assert_eq!(pixel(&frame, 5, 350), [255, 255, 255, 255]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

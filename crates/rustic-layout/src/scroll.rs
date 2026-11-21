@@ -195,6 +195,17 @@ impl BlockLayout {
     }
 }
 
+impl BlockLayout {
+    /// This layout with the contents of fragment `root` unclipped by
+    /// `root` and its ancestors (clips inside `root` stay), for painting a
+    /// scroll container's contents as a layer of their own (ADR 0064).
+    pub fn without_clips_above(&self, root: usize) -> Self {
+        let mut out = self.clone();
+        crate::overflow::reclip_from(out.fragments_mut(), Some(root));
+        out
+    }
+}
+
 /// Move `rect` by `(dx, dy)`, as fragments do when they scroll.
 pub(crate) fn translate_rect(rect: CssRect, dx: f64, dy: f64) -> Result<CssRect, FlowError> {
     moved(rect, dx, dy)

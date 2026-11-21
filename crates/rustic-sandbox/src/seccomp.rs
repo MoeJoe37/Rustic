@@ -14,6 +14,12 @@
 //! bypass the table. The list was measured by tracing the renderer
 //! through the CLI test suites. Building the program is safe Rust; it is
 //! checked here by an interpreter of the same instructions.
+//!
+//! [`network_filter`] is the network process's filter (ADR 0061, TD-176):
+//! the same allowlist plus the client socket calls, with `socket` limited
+//! to `AF_INET` and `AF_INET6` so it cannot reach Unix-domain services
+//! (abstract sockets are visible in a shared network namespace) or
+//! netlink.
 
 /// One BPF instruction (`struct sock_filter`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -177,6 +183,33 @@ const ALLOWED: &[(&str, Option<u32>, Option<u32>)] = &[
     ("membarrier", Some(324), Some(283)),
 ];
 
+/// Client socket calls the network process adds, as in [`ALLOWED`].
+/// `socket` itself is handled separately (address families).
+const NETWORK_ALLOWED: &[(&str, Option<u32>, Option<u32>)] = &[
+    ("connect", Some(42), Some(203)),
+    ("getsockopt", Some(55), Some(209)),
+    ("setsockopt", Some(54), Some(208)),
+    ("getsockname", Some(51), Some(204)),
+    ("getpeername", Some(52), Some(205)),
+    ("sendto", Some(44), Some(206)),
+    ("recvfrom", Some(45), Some(207)),
+    ("sendmsg", Some(46), Some(211)),
+    ("recvmsg", Some(47), Some(212)),
+    ("shutdown", Some(48), Some(210)),
+];
+
+/// `socket` numbers.
+const fn socket_number(arch: Arch) -> u32 {
+    match arch {
+        Arch::X86_64 => 41,
+        Arch::Aarch64 => 198,
+    }
+}
+
+const AF_INET: u32 = 2;
+const AF_INET6: u32 = 10;
+const EAFNOSUPPORT: u16 = 97;
+
 /// `(clone, ioctl)` numbers.
 const fn special(arch: Arch) -> (u32, u32) {
     match arch {
@@ -185,17 +218,33 @@ const fn special(arch: Arch) -> (u32, u32) {
     }
 }
 
-fn allowed_numbers(arch: Arch) -> impl Iterator<Item = u32> {
-    ALLOWED
-        .iter()
+fn numbers(
+    list: &'static [(&'static str, Option<u32>, Option<u32>)],
+    arch: Arch,
+) -> impl Iterator<Item = u32> {
+    list.iter()
         .filter_map(move |&(_, x86_64, aarch64)| match arch {
             Arch::X86_64 => x86_64,
             Arch::Aarch64 => aarch64,
         })
 }
 
+fn allowed_numbers(arch: Arch) -> impl Iterator<Item = u32> {
+    numbers(ALLOWED, arch)
+}
+
 /// The renderer filter for `arch`.
 pub fn renderer_filter(arch: Arch) -> Vec<Instruction> {
+    build(arch, false)
+}
+
+/// The network process filter for `arch`: the renderer's allowlist plus
+/// client sockets of the Internet address families.
+pub fn network_filter(arch: Arch) -> Vec<Instruction> {
+    build(arch, true)
+}
+
+fn build(arch: Arch, network: bool) -> Vec<Instruction> {
     let op = |code, jt, jf, k| Instruction { code, jt, jf, k };
     let mut program = vec![
         op(LD_W_ABS, 0, 0, ARCH),
@@ -224,8 +273,22 @@ pub fn renderer_filter(arch: Arch) -> Vec<Instruction> {
     program.push(op(JEQ, 1, 0, TERMINAL_INJECTION[1]));
     program.push(op(RET, 0, 0, ALLOW));
     program.push(op(RET, 0, 0, errno(EPERM)));
+    if network {
+        // socket: Internet families only.
+        program.push(op(JEQ, 0, 5, socket_number(arch)));
+        program.push(op(LD_W_ABS, 0, 0, argument_low(0)));
+        program.push(op(JEQ, 2, 0, AF_INET));
+        program.push(op(JEQ, 1, 0, AF_INET6));
+        program.push(op(RET, 0, 0, errno(EAFNOSUPPORT)));
+        program.push(op(RET, 0, 0, ALLOW));
+        // The comparisons below read the syscall number again.
+        program.push(op(LD_W_ABS, 0, 0, NR));
+    }
     // The allowlist jumps to the final ALLOW; everything else is ENOSYS.
-    let numbers: Vec<u32> = allowed_numbers(arch).collect();
+    let mut numbers: Vec<u32> = allowed_numbers(arch).collect();
+    if network {
+        numbers.extend(self::numbers(NETWORK_ALLOWED, arch));
+    }
     for (index, &number) in numbers.iter().enumerate() {
         // Distance to the final instruction: the remaining comparisons
         // and the ENOSYS return. The list is far below 255 entries.
@@ -409,6 +472,50 @@ mod tests {
             }
             // TCGETS.
             assert_eq!(decide(arch, ioctl, [1, 0x5401, 0, 0, 0, 0]), ALLOW);
+        }
+    }
+
+    #[test]
+    fn the_network_filter_adds_internet_client_sockets_only() {
+        for arch in ARCHES {
+            let program = network_filter(arch);
+            let decide =
+                |nr, args| evaluate(&program, arch.audit(), nr, args).expect("well-formed");
+            let socket = socket_number(arch);
+            for family in [AF_INET, AF_INET6] {
+                assert_eq!(decide(socket, [u64::from(family), 1, 0, 0, 0, 0]), ALLOW);
+                assert_eq!(
+                    super::tests::decide(arch, socket, [u64::from(family), 1, 0, 0, 0, 0]),
+                    errno(ENOSYS),
+                    "the renderer still has no sockets"
+                );
+            }
+            // AF_UNIX, AF_NETLINK, AF_PACKET, AF_VSOCK.
+            for family in [1u64, 16, 17, 40] {
+                assert_eq!(decide(socket, [family, 1, 0, 0, 0, 0]), errno(EAFNOSUPPORT));
+            }
+            for number in numbers(NETWORK_ALLOWED, arch).chain(allowed_numbers(arch)) {
+                assert_eq!(decide(number, [0; 6]), ALLOW, "{number}");
+            }
+            let (clone, ioctl) = special(arch);
+            assert_eq!(decide(clone, [0x1000_0000, 0, 0, 0, 0, 0]), errno(EPERM));
+            assert_eq!(decide(ioctl, [1, 0x5412, 0, 0, 0, 0]), errno(EPERM));
+            for &(name, x86_64, aarch64) in DANGEROUS {
+                if matches!(name, "socket" | "connect") {
+                    continue;
+                }
+                let number = if arch == Arch::X86_64 {
+                    x86_64
+                } else {
+                    aarch64
+                };
+                if let Some(number) = number {
+                    assert_eq!(decide(number, [0; 6]), errno(ENOSYS), "{name}");
+                }
+            }
+            for nr in 0..600 {
+                assert!(evaluate(&program, arch.audit(), nr, [0; 6]).is_some());
+            }
         }
     }
 

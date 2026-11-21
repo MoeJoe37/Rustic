@@ -186,14 +186,25 @@ impl Surface {
         Some(unpremultiply([p[0], p[1], p[2], p[3]]))
     }
 
+    pub(crate) fn pixels_mut_internal(&mut self) -> &mut [u8] {
+        &mut self.pixels
+    }
+
     #[cfg(test)]
     pub(crate) fn pixels_mut(&mut self) -> &mut [u8] {
         &mut self.pixels
     }
 
-    fn fill_opaque(&mut self, color: Srgba) {
+    /// Clear to the canvas color: opaque for a page, fully transparent for
+    /// an overlay layer (ADR 0064).
+    fn fill_canvas(&mut self, color: Srgba) {
+        let pixel = if color.a == 0 {
+            [0, 0, 0, 0]
+        } else {
+            [color.r, color.g, color.b, 255]
+        };
         for p in self.pixels.chunks_exact_mut(4) {
-            p.copy_from_slice(&[color.r, color.g, color.b, 255]);
+            p.copy_from_slice(&pixel);
         }
     }
 }
@@ -2061,7 +2072,7 @@ fn render(
     let to_u32 = |v: usize| u32::try_from(v).map_err(|_| RasterError::SurfaceSize);
     let mut surface = Surface::new(to_u32(frame.w)?, to_u32(frame.h)?, limits)?;
     work.charge(frame.w as u64 * frame.h as u64)?;
-    surface.fill_opaque(list.canvas());
+    surface.fill_canvas(list.canvas());
     let size = (surface.width, surface.height);
     let bytes = surface.pixels.len();
     // Open layers, innermost last; a transform without clips has no buffer.

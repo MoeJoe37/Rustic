@@ -280,7 +280,16 @@ pub struct LoadedDocument {
     /// Where the page's scripts left the scroll positions (ADR 0064).
     scroll: rustic_engine::ScrollState,
     /// `render --frames`: each frame's pixels and what it repainted.
-    frames: Vec<(rustic_raster::Surface, rustic_raster::FrameStats)>,
+    frames: Vec<(rustic_raster::Surface, FrameReport)>,
+}
+
+/// How one `--frames` frame was painted.
+#[derive(Clone, Copy, Debug)]
+pub enum FrameReport {
+    /// Damaged tiles repainted over the previous frame.
+    Damage(rustic_raster::FrameStats),
+    /// Through the scene: cached content tiles and the overlay (ADR 0064).
+    Scene(rustic_raster::SceneStats),
 }
 
 impl LoadedDocument {
@@ -293,7 +302,7 @@ impl LoadedDocument {
     }
 
     /// `render --frames`: the painted frames and their repaint statistics.
-    pub fn frames(&self) -> &[(rustic_raster::Surface, rustic_raster::FrameStats)] {
+    pub fn frames(&self) -> &[(rustic_raster::Surface, FrameReport)] {
         &self.frames
     }
 
@@ -827,6 +836,10 @@ fn run_scripted_load(
             limits.script_view.scale(),
             rustic_raster::RasterLimits::default(),
         );
+        let mut scene = rustic_raster::Scene::new(
+            limits.script_view.scale(),
+            rustic_raster::RasterLimits::default(),
+        );
         let mut bytes = 0usize;
         for index in 0..limits.frames {
             if index > 0 {
@@ -840,26 +853,47 @@ fn run_scripted_load(
             document.offer_rendering_opportunity()?;
             document.run_next_with_render(|_, _| ())?;
             let state = document.scroll_state();
-            let list = display_list(LayoutInput {
+            let engine_document = document.document();
+            let input = LayoutInput {
                 scroll: Some(&state),
                 ..LayoutInput::new(
-                    &document.document(),
+                    &engine_document,
                     &source.path,
                     limits,
                     limits.script_view,
                     Some(&applied_files),
                     source.network.as_ref(),
                 )
-            })?;
-            let stats = painter
-                .submit(list, &cancellation)
-                .map_err(LoadError::Raster)?;
-            let surface = painter.surface().expect("a frame was submitted").clone();
+            };
+            // Scrolled pages and pages with fixed boxes go through the
+            // scene; the rest repaint their damage.
+            let (surface, report) = match render_scene(input, &mut scene)? {
+                Some((surface, stats)) => {
+                    painter = rustic_raster::Frames::new(
+                        limits.script_view.scale(),
+                        rustic_raster::RasterLimits::default(),
+                    );
+                    (surface, FrameReport::Scene(stats))
+                }
+                None => {
+                    scene = rustic_raster::Scene::new(
+                        limits.script_view.scale(),
+                        rustic_raster::RasterLimits::default(),
+                    );
+                    let list = display_list(input)?;
+                    let stats = painter
+                        .submit(list, &cancellation)
+                        .map_err(LoadError::Raster)?;
+                    let surface = painter.surface().expect("a frame was submitted").clone();
+                    (surface, FrameReport::Damage(stats))
+                }
+            };
+            drop(engine_document);
             bytes = bytes.saturating_add(surface.premultiplied().len());
             if bytes > limits.max_dump_bytes {
                 return Err(LoadError::Dump(DumpError::OutputLimit));
             }
-            frames.push((surface, stats));
+            frames.push((surface, report));
         }
     } else {
         document.offer_rendering_opportunity()?;
@@ -1840,21 +1874,22 @@ fn block_layout(
 
 /// The layout with the command's `--scroll` and `--scroll-box` positions
 /// applied (ADR 0064); the unscrolled layout when there are none.
-fn scrolled(
-    layout: rustic_layout::BlockLayout,
-    viewport: rustic_layout::CssSize,
+/// The command's and the scripts' scroll positions (ADR 0064): where
+/// scripts left the page, with `--scroll` and `--scroll-box` on top;
+/// `None` when nothing is scrolled.
+fn scroll_positions(
+    layout: &rustic_layout::BlockLayout,
     limits: LoaderLimits,
     script: Option<&rustic_engine::ScrollState>,
-) -> Result<rustic_layout::BlockLayout, LoadError> {
+) -> Option<rustic_layout::ScrollPositions> {
     let script = script.filter(|state| **state != rustic_engine::ScrollState::default());
     if limits.scroll == (0.0, 0.0)
         && limits.scroll_boxes.iter().all(Option::is_none)
         && script.is_none()
     {
-        return Ok(layout);
+        return None;
     }
     let mut positions = rustic_layout::ScrollPositions::new();
-    // Where scripts left the page, then the command line on top.
     if let Some(state) = script {
         positions.set_viewport(state.viewport.0, state.viewport.1);
         for (index, fragment) in layout.fragments().iter().enumerate() {
@@ -1869,9 +1904,208 @@ fn scrolled(
     for &(index, x, y) in limits.scroll_boxes.iter().flatten() {
         positions.set_box(index, x, y);
     }
-    layout
-        .scrolled(viewport, &positions)
-        .map_err(LoadError::Flow)
+    Some(positions)
+}
+
+/// The layout with the command's and the scripts' scroll positions
+/// applied; the unscrolled layout when there are none.
+fn scrolled(
+    layout: rustic_layout::BlockLayout,
+    viewport: rustic_layout::CssSize,
+    limits: LoaderLimits,
+    script: Option<&rustic_engine::ScrollState>,
+) -> Result<rustic_layout::BlockLayout, LoadError> {
+    match scroll_positions(&layout, limits, script) {
+        Some(positions) => layout
+            .scrolled(viewport, &positions)
+            .map_err(LoadError::Flow),
+        None => Ok(layout),
+    }
+}
+
+/// A page split into scene layers (ADR 0064): content at unscrolled
+/// page coordinates over the whole scrollable area, and fixed and
+/// viewport-sticky boxes as an overlay at window coordinates.
+struct SceneLists {
+    content: rustic_paint::DisplayList,
+    overlay: Option<rustic_paint::DisplayList>,
+    offset: (u32, u32),
+    size: (u32, u32),
+}
+
+impl SceneLists {
+    fn frame(&self) -> rustic_raster::SceneFrame<'_> {
+        rustic_raster::SceneFrame {
+            content: &self.content,
+            overlay: self.overlay.as_ref(),
+            offset: self.offset,
+            size: self.size,
+        }
+    }
+}
+
+/// The commands of `list` up to the first overlay command, and from it:
+/// `None` unless every overlay command comes after every content command
+/// and no group, clip or transform spans the boundary.
+fn split_point(list: &rustic_paint::DisplayList, overlay: &[bool]) -> Option<usize> {
+    use rustic_paint::DisplayCommand as C;
+    let is_overlay = |source: usize| overlay.get(source).copied().unwrap_or(false);
+    let mut stack: Vec<bool> = Vec::new();
+    let mut boundary = None;
+    for (index, command) in list.commands().iter().enumerate() {
+        let class = match command {
+            C::Fill(item) => is_overlay(item.source_box),
+            C::BeginGroup { source_box, .. }
+            | C::BeginClip { source_box, .. }
+            | C::BeginTransform { source_box, .. } => is_overlay(*source_box),
+            C::EndGroup | C::EndClip | C::EndTransform => *stack.last()?,
+        };
+        if class && boundary.is_none() {
+            // The overlay starts here, outside every content group.
+            if !stack.is_empty() {
+                return None;
+            }
+            boundary = Some(index);
+        }
+        if !class && boundary.is_some() {
+            return None;
+        }
+        match command {
+            C::BeginGroup { .. } | C::BeginClip { .. } | C::BeginTransform { .. } => {
+                stack.push(class);
+            }
+            C::EndGroup | C::EndClip | C::EndTransform => {
+                stack.pop();
+            }
+            C::Fill(_) => {}
+        }
+    }
+    Some(boundary.unwrap_or(list.commands().len()))
+}
+
+/// Build the scene layers for a page, or `None` when it cannot be layered
+/// (overlay boxes not painted last, or RTL scroll ranges).
+fn scene_lists(
+    input: LayoutInput<'_>,
+    tree: &rustic_layout::BoxTree,
+    layout: &rustic_layout::BlockLayout,
+    viewport: rustic_layout::CssSize,
+    images: &HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>,
+) -> Result<Option<SceneLists>, LoadError> {
+    let factor = rustic_layout::CssPx::new(1.0)
+        .map(|one| one.to_device(input.view.scale()).get())
+        .map_err(|_| LoadError::InvalidLimits)?;
+    let range = layout.viewport_scroll_range(viewport);
+    if range.min != (0.0, 0.0) {
+        return Ok(None);
+    }
+    let mut positions = scroll_positions(layout, input.limits, input.scroll).unwrap_or_default();
+    // Snap the viewport to whole device pixels so tiles copy exactly.
+    let (vx, vy) = range.clamp(positions.viewport());
+    let snap = |v: f64| (v * factor).round() / factor;
+    let (vx, vy) = (snap(vx), snap(vy));
+    positions.set_viewport(vx, vy);
+    // Fixed and viewport-sticky boxes and everything inside them.
+    let mut overlay = vec![false; tree.boxes().len()];
+    for fragment in layout.fragments() {
+        let own = match fragment.scheme() {
+            rustic_layout::PositionScheme::Fixed => true,
+            rustic_layout::PositionScheme::Sticky => fragment
+                .sticky()
+                .is_some_and(|constraint| constraint.scroll_container().is_none()),
+            _ => false,
+        };
+        if own {
+            if let Some(slot) = overlay.get_mut(fragment.source_box()) {
+                *slot = true;
+            }
+        }
+    }
+    for index in 0..overlay.len() {
+        if let Some(parent) = tree.boxes()[index].parent() {
+            if parent < index && overlay[parent] {
+                overlay[index] = true;
+            }
+        }
+    }
+    let resources = rustic_paint::Resources {
+        fonts: Some(fonts()),
+        images: images.clone(),
+    };
+    let build = |layout: &rustic_layout::BlockLayout, area: rustic_layout::CssSize| {
+        rustic_paint::DisplayList::build_with(
+            input.document,
+            tree,
+            layout,
+            area,
+            &resources,
+            rustic_paint::PaintLimits::default(),
+            input.cancellation,
+        )
+        .map_err(LoadError::Paint)
+    };
+    // Content: scroll containers at their positions, the viewport at zero,
+    // painted over the whole page.
+    let mut inner = positions.clone();
+    inner.set_viewport(0.0, 0.0);
+    let content_layout = layout.scrolled(viewport, &inner).map_err(LoadError::Flow)?;
+    let area = rustic_layout::CssSize::new(
+        viewport.width().get() + range.max.0,
+        viewport.height().get() + range.max.1,
+    )
+    .map_err(|_| LoadError::InvalidLimits)?;
+    let full = build(&content_layout, area)?;
+    let Some(split) = split_point(&full, &overlay) else {
+        return Ok(None);
+    };
+    let content = full.retain(|index, _| index < split);
+    let window = rustic_raster::surface_size(&build(layout, viewport)?, input.view.scale())
+        .map_err(LoadError::Raster)?;
+    let overlay_list = if split < full.commands().len() {
+        let scrolled = layout
+            .scrolled(viewport, &positions)
+            .map_err(LoadError::Flow)?;
+        let list = build(&scrolled, viewport)?;
+        let Some(split) = split_point(&list, &overlay) else {
+            return Ok(None);
+        };
+        Some(list.retain(|index, _| index >= split).over_transparent())
+    } else {
+        None
+    };
+    let offset = ((vx * factor).round() as u32, (vy * factor).round() as u32);
+    Ok(Some(SceneLists {
+        content,
+        overlay: overlay_list,
+        offset,
+        size: window,
+    }))
+}
+
+/// Render the page through a scene when it is scrolled or has an overlay
+/// (ADR 0064: the scene is the reference for scrolled pages); `None`
+/// otherwise, or when it cannot be layered.
+fn render_scene(
+    input: LayoutInput<'_>,
+    scene: &mut rustic_raster::Scene,
+) -> Result<Option<(rustic_raster::Surface, rustic_raster::SceneStats)>, LoadError> {
+    let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let scrolled_viewport = scroll_positions(&layout, input.limits, input.scroll)
+        .is_some_and(|positions| positions.viewport() != (0.0, 0.0));
+    let fixed = layout.fragments().iter().any(|f| {
+        f.scheme() == rustic_layout::PositionScheme::Fixed
+            || f.sticky().is_some_and(|c| c.scroll_container().is_none())
+    });
+    if !scrolled_viewport && !fixed {
+        return Ok(None);
+    }
+    let Some(lists) = scene_lists(input, &tree, &layout, viewport, &images.images)? else {
+        return Ok(None);
+    };
+    scene
+        .submit(lists.frame(), input.cancellation)
+        .map(Some)
+        .map_err(LoadError::Raster)
 }
 
 fn display_list(input: LayoutInput<'_>) -> Result<rustic_paint::DisplayList, LoadError> {
@@ -2102,6 +2336,18 @@ pub(crate) fn render_layers(
     let layout = scrolled(layout, viewport, limits, input.scroll)?;
     let document_url = input.network.map(|session| session.document_url().clone());
     let sites = frame_sites(input.document, document_url.as_ref());
+    if sites.is_empty() {
+        let mut scene =
+            rustic_raster::Scene::new(view.scale(), rustic_raster::RasterLimits::default());
+        if let Some((surface, _)) = render_scene(input, &mut scene)? {
+            return Ok(Surface {
+                width: surface.width(),
+                height: surface.height(),
+                pixels: surface.premultiplied().to_vec(),
+                layers: Vec::new(),
+            });
+        }
+    }
     let build = |images: HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>| {
         let resources = rustic_paint::Resources {
             fonts: Some(fonts()),

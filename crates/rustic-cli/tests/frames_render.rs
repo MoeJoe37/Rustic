@@ -132,3 +132,116 @@ fn frames_repaint_incrementally_and_match_across_process_modes() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Ten 300px bands under a translucent fixed header.
+fn bands(script: &str) -> String {
+    let colors = [
+        "#f00", "#0f0", "#00f", "#ff0", "#0ff", "#f0f", "#800", "#080", "#008", "#880",
+    ];
+    let mut page = String::from(
+        "<!doctype html><style>body{margin:0} .band{height:300px}\
+         #head{position:fixed;top:0;left:0;width:400px;height:40px;background:rgba(0,0,0,0.5)}\
+         </style><div id=head></div>",
+    );
+    for color in colors {
+        page.push_str(&format!(
+            "<div class=band style=\"background:{color}\"></div>"
+        ));
+    }
+    page.push_str(script);
+    page
+}
+
+#[test]
+fn scrolled_frames_reuse_cached_content_under_a_fixed_overlay() {
+    let dir = std::env::temp_dir().join(format!("rustic-scene-render-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let animated = dir.join("animated.html");
+    std::fs::write(
+        &animated,
+        bands(
+            "<script>function step() { scrollBy(0, 100); requestAnimationFrame(step) }\
+             requestAnimationFrame(step)</script>",
+        ),
+    )
+    .unwrap();
+    let still = dir.join("still.html");
+    std::fs::write(&still, bands("")).unwrap();
+    let out = dir.join("anim.png").to_string_lossy().into_owned();
+    let animated = animated.to_string_lossy().into_owned();
+    let output = rustic(&[
+        "render",
+        "--run-scripts",
+        "--frames",
+        "4",
+        "--viewport",
+        "400x300",
+        "--output",
+        &out,
+        &animated,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report = String::from_utf8_lossy(&output.stdout).into_owned();
+    let lines: Vec<_> = report.lines().collect();
+    // 400x300 spans two tile columns. Frame 0 (scrolled to 100, rows
+    // 0-1 of 256px) paints 4 tiles; 200 reuses them; 300 exposes row 2
+    // (2 tiles); 400 reuses rows 1-2. The overlay is the whole window.
+    assert!(
+        lines[0].contains("scene painted 4 content tiles, reused 0"),
+        "{report}"
+    );
+    for line in &lines {
+        assert!(line.contains("overlay 120000 pixels"), "{report}");
+    }
+    let painted: Vec<usize> = lines
+        .iter()
+        .map(|line| {
+            line.split("scene painted ")
+                .nth(1)
+                .unwrap()
+                .split(' ')
+                .next()
+                .unwrap()
+                .parse()
+                .unwrap()
+        })
+        .collect();
+    assert_eq!(painted, [4, 0, 2, 0], "{report}");
+    // Each frame equals a fresh render of the still page at that position.
+    for k in 0..4 {
+        let fresh = dir
+            .join(format!("fresh-{k}.png"))
+            .to_string_lossy()
+            .into_owned();
+        let scroll = format!("0,{}", 100 * (k + 1));
+        let still = still.to_string_lossy().into_owned();
+        let output = rustic(&[
+            "render",
+            "--viewport",
+            "400x300",
+            "--scroll",
+            &scroll,
+            "--output",
+            &fresh,
+            &still,
+        ]);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let frame = std::fs::read(dir.join(format!("anim-{k}.png"))).unwrap();
+        assert_eq!(frame, std::fs::read(&fresh).unwrap(), "frame {k}");
+    }
+    // Under the header (alpha 128) the band shows at 127/255; below, as is.
+    // Frame 2 is scrolled to 300: the second band (green) is at the top.
+    let frame = dir.join("anim-2.png");
+    assert_eq!(pixel(&frame, 5, 5), [0, 127, 0, 255]);
+    assert_eq!(pixel(&frame, 5, 100), [0, 255, 0, 255]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

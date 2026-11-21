@@ -91,6 +91,10 @@ Positions clamp to each scrollport's range; fixed boxes stay, sticky boxes
 re-solve, and nothing is laid out again. Scripts can scroll too; the image
 shows where they left the page.
 
+A scrolled page, or one with fixed boxes, renders through a scene (ADR
+0064): cached content tiles at the scroll offset (snapped to device
+pixels) with the fixed boxes composited over them.
+
 Frames: render --frames N (1 to 600, needs --run-scripts) paints N
 rendering opportunities 1/60 s of the manual clock apart, repainting only
 the tiles that changed, and writes NAME-0.EXT ... NAME-(N-1).EXT for
@@ -542,14 +546,20 @@ fn render_frames(
         Err(code) => return code,
     };
     let mut report = String::new();
-    for (index, (surface, stats)) in frames.into_iter().enumerate() {
-        report.push_str(&format!(
-            "frame {index}: repainted {} of {} tiles ({} pixels){}\n",
-            stats.repainted_tiles,
-            stats.total_tiles,
-            stats.repainted_pixels,
-            if stats.full { ", full" } else { "" }
-        ));
+    for (index, (surface, painted)) in frames.into_iter().enumerate() {
+        report.push_str(&match painted {
+            loader::FrameReport::Damage(stats) => format!(
+                "frame {index}: repainted {} of {} tiles ({} pixels){}\n",
+                stats.repainted_tiles,
+                stats.total_tiles,
+                stats.repainted_pixels,
+                if stats.full { ", full" } else { "" }
+            ),
+            loader::FrameReport::Scene(stats) => format!(
+                "frame {index}: scene painted {} content tiles, reused {}, overlay {} pixels\n",
+                stats.painted_tiles, stats.reused_tiles, stats.overlay_pixels
+            ),
+        });
         if split {
             renderer::emit_surface(rustic_ipc::protocol::Surface {
                 width: surface.width(),

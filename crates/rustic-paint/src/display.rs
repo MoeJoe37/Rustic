@@ -2226,7 +2226,8 @@ impl DisplayList {
         self.viewport
     }
 
-    /// The opaque color the whole canvas is cleared to.
+    /// The color the whole canvas is cleared to: opaque, or fully
+    /// transparent for an overlay layer ([`Self::over_transparent`]).
     pub const fn canvas(&self) -> Srgba {
         self.canvas
     }
@@ -2234,6 +2235,32 @@ impl DisplayList {
     /// Paint commands, in paint order.
     pub fn commands(&self) -> &[DisplayCommand] {
         &self.commands
+    }
+
+    /// This list with only the commands `keep` accepts (by index), side
+    /// tables kept whole so every index stays valid (scene layers, ADR
+    /// 0064). The caller keeps groups, clips and transforms balanced.
+    pub fn retain(&self, mut keep: impl FnMut(usize, &DisplayCommand) -> bool) -> Self {
+        let mut list = self.clone();
+        list.commands = self
+            .commands
+            .iter()
+            .enumerate()
+            .filter(|(index, command)| keep(*index, command))
+            .map(|(_, command)| *command)
+            .collect();
+        list
+    }
+
+    /// This list over a transparent canvas, for an overlay layer.
+    pub fn over_transparent(mut self) -> Self {
+        self.canvas = Srgba {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 0,
+        };
+        self
     }
 
     /// The topmost box whose border box contains `point` (CSS pixels from the

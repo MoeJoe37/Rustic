@@ -1839,3 +1839,101 @@ fn submitted_frames_repaint_only_damage_and_equal_full_rasters() {
     let stat = frames.submit(wide, &cancel).unwrap();
     assert!(stat.full && stat.total_tiles == 6);
 }
+
+#[test]
+fn scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes() {
+    use rustic_raster::{Scene, SceneFrame};
+    let scale = DeviceScale::new(1.0).unwrap();
+    let cancel = CancellationToken::default();
+    let limits = RasterLimits::default();
+    // A 600x1200 page of four 300px bands; the window is 300x200.
+    let content = |third: &str| {
+        page(
+            "<div></div><div></div><div id=c></div><div></div>",
+            &format!(
+                "body {{ margin:0 }} div {{ height:300px }} \
+                 div:nth-child(1) {{ background:#f00 }} div:nth-child(2) {{ background:#0f0 }} \
+                 #c {{ background:{third} }} div:nth-child(4) {{ background:#ff0 }}"
+            ),
+            600.0,
+            1200.0,
+        )
+        .list()
+        .unwrap()
+    };
+    let overlay = page(
+        "<div></div>",
+        "body { margin:0 } div { width:10px; height:10px; background:rgba(0,0,0,0.5) }",
+        300.0,
+        200.0,
+    )
+    .list()
+    .unwrap()
+    .over_transparent();
+    let blue = content("#00f");
+    let gray = content("#888");
+    let full_blue = rasterize(&blue, scale, limits, &cancel).unwrap();
+    let crop = |surface: &Surface, x: u32, y: u32| rasterize_region_like(surface, x, y, 300, 200);
+    let mut scene = Scene::new(scale, limits);
+    let run = |scene: &mut Scene, list: &DisplayList, y: u32, with_overlay: bool| {
+        scene
+            .submit(
+                SceneFrame {
+                    content: list,
+                    overlay: with_overlay.then_some(&overlay),
+                    offset: (0, y),
+                    size: (300, 200),
+                },
+                &cancel,
+            )
+            .unwrap()
+    };
+    // Without an overlay a frame is exactly the visible part of the page.
+    let (frame, stats) = run(&mut scene, &blue, 0, false);
+    assert_eq!(frame.premultiplied(), crop(&full_blue, 0, 0));
+    assert_eq!((stats.painted_tiles, stats.reused_tiles), (2, 0));
+    // Scrolling within the cached tiles paints nothing.
+    let (frame, stats) = run(&mut scene, &blue, 50, false);
+    assert_eq!(frame.premultiplied(), crop(&full_blue, 0, 50));
+    assert_eq!((stats.painted_tiles, stats.reused_tiles), (0, 2));
+    // Scrolling further paints only newly exposed tiles: two tile rows
+    // (256..768) of the two columns the 300px window spans.
+    let (frame, stats) = run(&mut scene, &blue, 400, false);
+    assert_eq!(frame.premultiplied(), crop(&full_blue, 0, 400));
+    assert_eq!((stats.painted_tiles, stats.reused_tiles), (4, 0));
+    // A content change invalidates only the damaged tiles; the result
+    // equals a fresh scene of the new content.
+    let (changed, _) = run(&mut scene, &gray, 400, false);
+    let mut fresh = Scene::new(scale, limits);
+    let (expected, _) = run(&mut fresh, &gray, 400, false);
+    assert_eq!(changed, expected);
+    // The overlay composites over the content: black at alpha 128 keeps
+    // 127/255 of the red band.
+    let (frame, stats) = run(&mut scene, &gray, 0, true);
+    assert_eq!(stats.overlay_pixels, 300 * 200);
+    assert_eq!(&frame.premultiplied()[..4], &[127, 0, 0, 255]);
+    assert_eq!(&frame.premultiplied()[40..44], &[255, 0, 0, 255]);
+    let mut fresh = Scene::new(scale, limits);
+    assert_eq!(run(&mut fresh, &gray, 0, true).0, frame);
+    // A window past the content is refused, and the cache starts over.
+    let past = scene.submit(
+        SceneFrame {
+            content: &gray,
+            overlay: None,
+            offset: (0, 1100),
+            size: (300, 200),
+        },
+        &cancel,
+    );
+    assert_eq!(past.unwrap_err(), RasterError::SurfaceSize);
+}
+
+/// The `w x h` pixels of `surface` at `x, y`, premultiplied.
+fn rasterize_region_like(surface: &Surface, x: u32, y: u32, w: u32, h: u32) -> Vec<u8> {
+    let mut out = Vec::new();
+    for row in y..y + h {
+        let start = ((row * surface.width() + x) * 4) as usize;
+        out.extend_from_slice(&surface.premultiplied()[start..start + (w * 4) as usize]);
+    }
+    out
+}

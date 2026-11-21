@@ -12,6 +12,7 @@ mod damage;
 mod frames;
 mod png;
 mod raster;
+mod scene;
 
 pub use compare::{Difference, compare};
 pub use damage::damage;
@@ -21,3 +22,4 @@ pub use raster::{
     DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, rasterize, rasterize_reference,
     rasterize_region, repaint, surface_size,
 };
+pub use scene::{Scene, SceneFrame, SceneStats};

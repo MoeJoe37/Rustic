@@ -2573,9 +2573,10 @@ an unscrolled layout in one pass, without laying out again; `dump-paint`,
 
 | Incremental frames | `rustic_raster::Frames::submit` repaints only `damage` tiles (full on the first frame or a new size; a failed repaint keeps nothing stale); `render --frames N` steps the clock 1/60 s per frame, runs due tasks and animation frames, paints incrementally, writes numbered PNGs and a repaint line per frame; split and single-process runs agree byte for byte | `submitted_frames_repaint_only_damage_and_equal_full_rasters`, `frames_repaint_incrementally_and_match_across_process_modes` |
 
-Next ([ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)): layer scenes
-with cached rasters, so scrolling stops repainting what only moved.
-Script-scrolling gaps: TD-180.
+| Viewport scenes | `rustic_raster::Scene`: lazily rasterized, cached content tiles at unscrolled coordinates plus a fixed/viewport-sticky overlay over a transparent canvas; frames copy visible tiles at the snapped offset, content changes drop only damaged tiles; layering refused unless the overlay is painted last; incremental frames equal fresh scenes byte for byte | `scenes_reuse_content_tiles_across_scrolls_and_equal_fresh_scenes`, `scrolled_frames_reuse_cached_content_under_a_fixed_overlay` |
+
+Next ([ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)): layers for
+scroll containers inside the page (TD-181). Script-scrolling gaps: TD-180.
 
 ## ISO-01 — Out-of-process frames and popups
 

@@ -1,7 +1,7 @@
 # ADR 0064 — Scrolling and compositor scenes
 
 Date: 2026-11-21
-Status: Accepted for scroll positions (step 1), incremental frames (step 3) and script scrolling (step 4); layer scenes (step 2) are the plan
+Status: Accepted for scroll positions (step 1), viewport scenes (step 2, first part), incremental frames (step 3) and script scrolling (step 4); scroll-container layers remain
 
 ## Context
 
@@ -32,12 +32,25 @@ repaint only the tiles whose pixels can change between two display lists.
    out again; paint, raster and hit testing consume its result unchanged.
 2. **CLI.** `dump-paint`, `render` and `hit-test` take `--scroll X,Y` and
    `--scroll-box N=X,Y`; frames and popups do not inherit them.
-3. **Scenes (next).** A scene splits the display list at scroll containers
-   and fixed or sticky stacking contexts into layers, each rasterized into
-   its own cached surface. A scroll then re-composites cached layers at
-   new offsets and rasterizes only newly exposed regions; content changes
-   use the existing tile damage per layer. The CPU compositor is the
-   reference the M8 GPU backend must match.
+3. **Scenes** (viewport part done; maintainer decisions 2026-11-21).
+   `rustic_raster::Scene` has a content layer, the page at unscrolled
+   coordinates over its whole scrollable area, rasterized lazily in
+   256-pixel tiles that stay cached, and an overlay layer of fixed and
+   viewport-sticky boxes (and their contents) over a transparent canvas
+   at window coordinates. A frame copies the visible tiles at the
+   viewport offset and composites the overlay over them; a content change
+   drops only the tiles `damage` reports. The viewport position snaps to
+   whole device pixels. Layering needs every overlay command after every
+   content command with no group, clip or transform spanning the
+   boundary; otherwise the frame is painted in one pass. **The scene's
+   output is the reference for scrolled pages and pages with an overlay**:
+   compositing the overlay separately can differ from one-pass painting by
+   rounding (at most 1/255 per channel), and an incremental scene frame
+   equals a fresh scene byte for byte. `render` uses it for such pages
+   without iframes, `render --frames` per frame. Scroll containers inside
+   the page are still part of the content layer, so scrolling one repaints
+   its damage (TD-181); giving them layers of their own completes this
+   step. The CPU scene is the reference the M8 GPU backend must match.
 4. **Incremental frames** (done, catalog step 3). `rustic_raster::Frames` keeps
    the last display list and surface; each submitted list repaints only
    the tiles `damage` reports, so every frame equals a full rasterization

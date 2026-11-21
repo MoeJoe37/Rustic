@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 42.35%** = 39.97% verified complete + 2.38% partial credit. 93/221 capabilities complete, 10 in progress.
+**Overall completion: 42.52%** = 39.97% verified complete + 2.55% partial credit. 93/221 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `5463c88e158e2b9ad01e164e5660a0f1b727cbf14cb771ee781827883f5d6aec`.
+Catalog: `engine-v4`. Source fingerprint: `4fedce5141fc7dfa70051840b8f1ded0922ee613eb13de09e99abe18e7d089f6`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `5463c88e158e2b9ad01e164e5660a0f1b727c
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 3/8 | 74.42% | 34.37% | 3.72% |
-| M8 Desktop & mobile alpha | 1/21 | 8.66% | 6.77% | 10.22% |
+| M8 Desktop & mobile alpha | 1/21 | 10.29% | 6.77% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.85% |
@@ -46,7 +46,7 @@ Catalog: `engine-v4`. Source fingerprint: `5463c88e158e2b9ad01e164e5660a0f1b727c
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 3/11 | 5 | 55.38% | 25.58% | 5% | 2.76 |
 | Compositor & GPU | 1/4 | 0 | 23.07% | 23.07% | 3% | 0.69 |
-| Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
+| Platform hosts | 1/9 | 1 | 8.33% | 4.16% | 4% | 0.33 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
 | DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
 | Extensions (MV2) | 0/10 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -321,7 +321,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 ### Platform hosts
 
 - **complete** `platform.crosschecks` — Android/iOS shared-core cross-compilation · size 1 · M1 · 0.16% of engine ([source](../../.github/workflows/ci.yml), [test](../../.github/workflows/ci.yml))
-- **planned** `platform.linux` — Linux runtime and native host acceptance · size 3 · M8 · 0.50% of engine
+- **in progress 33.33%** `platform.linux` — Linux runtime and native host acceptance · size 3 · M8 · 0.50% of engine
+  - [x] Native window on Wayland and X11 presenting renderer-process frames, with scrolling input and clean failure without a window system (ADR 0065) ([source](../../crates/rustic-shell/src/lib.rs), [source](../../docs/adr/0065-desktop-window-host.md), [test](../../crates/rustic-shell/src/lib.rs), [test](../../crates/rustic-cli/tests/view.rs))
+  - [ ] Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182)
+  - [ ] Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64
 - **planned** `platform.windows` — Windows runtime and native host acceptance · size 3 · M8 · 0.50% of engine
 - **planned** `platform.macos` — macOS runtime and native host acceptance · size 3 · M8 · 0.50% of engine
 - **planned** `platform.android` — Android runtime and native host acceptance · size 3 · M8 · 0.50% of engine

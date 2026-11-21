@@ -33,6 +33,7 @@ Usage:
   rustic render --output <png> [VIEW] [OPTIONS] [--] <file>
   rustic reftest [VIEW] [OPTIONS] [--] <test>
   rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
+  rustic view [--window WxH] [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled by default) and
@@ -94,6 +95,12 @@ shows where they left the page.
 A scrolled page, or one with fixed boxes, renders through a scene (ADR
 0064): cached content tiles at the scroll offset (snapped to device
 pixels) with the fixed boxes composited over them.
+
+Window: view opens the page in a native window (Wayland or X11 on Linux;
+ADR 0065) at --window WxH logical pixels (default 1024x768). Each frame
+renders in a renderer process at the window's size and device scale; the
+wheel, arrow keys, Page Up/Down, space and Home scroll, Escape closes. It
+accepts the document options above. --exit-after N closes after N frames.
 
 Frames: render --frames N (1 to 600, needs --run-scripts) paints N
 rendering opportunities 1/60 s of the manual clock apart, repainting only
@@ -213,6 +220,9 @@ fn main() -> ExitCode {
             "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; OpenType text shaping and CSS wrapping available; JavaScript via --run-scripts; HTTP(S) to loopback origins granted with --allow-origin; general remote browsing: not implemented"
         );
         return ExitCode::SUCCESS;
+    }
+    if args[0] == "view" {
+        return ExitCode::from(view_command(&args[1..]));
     }
     if broker::splits(&args[0]) && !broker::single_process() {
         return ExitCode::from(broker::run(&args[0].to_string_lossy(), &args[1..]));
@@ -408,6 +418,7 @@ pub(crate) struct RenderArgs {
 pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     let mut output = None;
     let mut frames = 1usize;
+    let mut report_scroll = false;
     let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
     let mut iter = args.iter();
@@ -428,6 +439,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
                     .and_then(|v| v.parse::<f64>().ok())
                     .ok_or("--scale requires a number")?;
             }
+            Some("--report-scroll") => report_scroll = true,
             Some("--frames") => {
                 frames = iter
                     .next()
@@ -469,6 +481,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
         return Err("--frames needs --run-scripts".into());
     }
     limits.frames = frames;
+    limits.report_scroll = report_scroll;
     Ok(RenderArgs {
         output,
         view,
@@ -526,6 +539,122 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
         return 1;
     }
     0
+}
+
+/// `view`: the page in a native window (UI-02, ADR 0065). Each frame is a
+/// `render` in a renderer process at the window's size, device scale and
+/// scroll position; the window scrolls with the wheel and keys and closes
+/// with Escape.
+fn view_command(args: &[OsString]) -> u8 {
+    let usage = |message: &str| {
+        eprintln!("rustic view: {message}\n\n{USAGE}");
+        2
+    };
+    if broker::single_process() {
+        return usage(
+            "view shows pages from renderer processes; it cannot run with --single-process",
+        );
+    }
+    let mut size = (1024, 768);
+    let mut exit_after = None;
+    let mut rest = Vec::new();
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.to_str() {
+            Some("--window") => {
+                let parsed = iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.split_once('x'))
+                    .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
+                    .filter(|&(w, h)| (64..=8192).contains(&w) && (64..=8192).contains(&h));
+                match parsed {
+                    Some(parsed) => size = parsed,
+                    None => return usage("--window requires WxH with each side from 64 to 8192"),
+                }
+            }
+            Some("--exit-after") => {
+                match iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.parse::<u32>().ok())
+                {
+                    Some(frames) if frames > 0 => exit_after = Some(frames),
+                    _ => return usage("--exit-after requires a positive frame count"),
+                }
+            }
+            Some("--viewport" | "--scale" | "--zoom" | "--output" | "--frames") => {
+                return usage("the window sets the view; use --window WxH");
+            }
+            _ => rest.push(arg.clone()),
+        }
+    }
+    let Some(path) = rest.last() else {
+        return usage("missing file path");
+    };
+    let title = format!("{} — Rustic", Path::new(path).to_string_lossy());
+    let config = rustic_shell::WindowConfig {
+        title,
+        size,
+        exit_after,
+    };
+    match rustic_shell::run(config, ViewPage { args: rest }) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("rustic view: {}", EscapedText(&error));
+            1
+        }
+    }
+}
+
+/// The page `view` shows: `render` arguments without the view.
+struct ViewPage {
+    args: Vec<OsString>,
+}
+
+impl rustic_shell::Content for ViewPage {
+    fn paint(
+        &mut self,
+        size: (u32, u32),
+        scale: f64,
+        scroll: (f64, f64),
+    ) -> Result<rustic_shell::Painted, String> {
+        let scale = if scale.is_finite() {
+            scale.clamp(0.25, 8.0)
+        } else {
+            1.0
+        };
+        let css = |device: u32| ((f64::from(device) / scale).round() as u32).clamp(1, 16_384);
+        let mut args: Vec<OsString> = [
+            "--viewport".to_owned(),
+            format!("{}x{}", css(size.0), css(size.1)),
+            "--scale".to_owned(),
+            format!("{scale}"),
+            "--scroll".to_owned(),
+            format!("{},{}", scroll.0, scroll.1),
+            "--report-scroll".to_owned(),
+            "--output".to_owned(),
+            "view.png".to_owned(),
+        ]
+        .into_iter()
+        .map(OsString::from)
+        .collect();
+        args.extend(self.args.iter().cloned());
+        let (surface, output) = broker::render_surface(&args)
+            .map_err(|status| format!("the page did not render (status {status})"))?;
+        // The renderer reports where it painted; it is untrusted, so only
+        // finite, non-negative positions are taken.
+        let reported = String::from_utf8_lossy(&output)
+            .lines()
+            .find_map(|line| line.strip_prefix("scroll "))
+            .and_then(|at| at.split_once(','))
+            .and_then(|(x, y)| Some((x.parse::<f64>().ok()?, y.parse::<f64>().ok()?)))
+            .filter(|&(x, y)| x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0);
+        Ok(rustic_shell::Painted {
+            surface,
+            scroll: reported.unwrap_or(scroll),
+        })
+    }
 }
 
 /// `render --frames N`: paint N rendering opportunities incrementally

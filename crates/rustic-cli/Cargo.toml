@@ -30,6 +30,7 @@ rustic-layout = { path = "../rustic-layout" }
 rustic-text = { path = "../rustic-text" }
 rustic-paint = { path = "../rustic-paint" }
 rustic-raster = { path = "../rustic-raster" }
+rustic-shell = { path = "../rustic-shell" }
 rustic-codecs = { path = "../rustic-codecs" }
 
 [dev-dependencies]

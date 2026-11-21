@@ -22,8 +22,9 @@ This distinction is the project's chosen scope, recorded in
 
 **Adopted so far:** the font adapters HarfRust, Skrifa and Wuff
 ([ADR 0014](adr/0014-reviewed-font-adapters.md), see "M3 font adoption" below)
-and the TLS stack rustls with `ring` and `rustls-platform-verifier`
-([ADR 0051](adr/0051-transport-and-tls.md)).
+the TLS stack rustls with `ring` and `rustls-platform-verifier`
+([ADR 0051](adr/0051-transport-and-tls.md)), and the desktop host winit and
+softbuffer ([ADR 0065](adr/0065-desktop-window-host.md)).
 Every other name in this table is a candidate to evaluate at the relevant
 milestone, not an installed package, version recommendation or compatibility
 guarantee. The JavaScript engine (and its RegExp engine), Wasm runtime, HTML,
@@ -38,7 +39,7 @@ CSS, layout, paint, codecs and URL code stay original Rust (ADR 0001).
 | Font parsing/shaping | **Adopted (M3):** HarfRust 0.16.0, Skrifa 0.50.0, Wuff 0.2.10; discovery is Rustic's own host-granted walk | Font selection, CSS metrics, bidi/line breaking integration, layout |
 | Image codecs | **Chosen at M3:** original bounded inflate/PNG/JPEG/GIF/WebP decoders in `rustic-codecs`, no library; video/audio codecs remain candidates | Input/output limits, resource accounting, sandbox isolation and color handling |
 | Raster/GPU | Original CPU display-list interpreter; GPU adapter such as wgpu later | Paint semantics, scene correctness, device loss and CPU fallback |
-| Desktop host | Window/event library such as winit with platform adapters | Chrome, input routing, lifecycle and permission decisions |
+| Desktop host | **Adopted (M8):** winit 0.30.13 and softbuffer 0.4.8 in `rustic-shell`, minimal features, Wayland/X11 loaded at run time ([ADR 0065](adr/0065-desktop-window-host.md); graph and licenses there) | Chrome, input routing, lifecycle and permission decisions; page rendering stays in renderer processes |
 | Persistence | Reviewed embedded transactional store or SQLite adapter | Partition keys, quotas, schemas, migration and private mode |
 | Serialization | Reviewed format/library after protocol prototype | IPC schema, validation, capabilities, bounds and versioning |
 | Diagnostics/testing | Lightweight tracing, property testing, fuzzing/benchmark tooling as needed | Redaction, reproducibility, budgets and meaningful assertions |

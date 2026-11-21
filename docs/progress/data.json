@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "5463c88e158e2b9ad01e164e5660a0f1b727cbf14cb771ee781827883f5d6aec",
-  "percent": "42.35",
+  "source_fingerprint": "4fedce5141fc7dfa70051840b8f1ded0922ee613eb13de09e99abe18e7d089f6",
+  "percent": "42.52",
   "verified_percent": "39.97",
-  "partial_percent": "2.38",
+  "partial_percent": "2.55",
   "completed": 93,
-  "in_progress": 10,
+  "in_progress": 11,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -87,9 +87,9 @@
       "share": "10.22",
       "completed": 1,
       "total": 21,
-      "percent": "8.66",
+      "percent": "10.29",
       "verified_percent": "6.77",
-      "partial_percent": "1.89"
+      "partial_percent": "3.52"
     },
     {
       "id": "M9",
@@ -6908,9 +6908,47 @@
           "label": "Linux runtime and native host acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Native window on Wayland and X11 presenting renderer-process frames, with scrolling input and clean failure without a window system (ADR 0065)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/lib.rs",
+                  "marker": "pub fn run("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0065-desktop-window-host.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-shell/src/lib.rs",
+                  "marker": "fn surfaces_present_over_white_and_uncovered_pixels_stay_white"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn view_presents_frames_in_a_window_or_fails_cleanly_without_one"
+                }
+              ]
+            },
+            {
+              "label": "Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.50"
         },
         {
@@ -6986,12 +7024,12 @@
       ],
       "points": 24,
       "completed": 1,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 9,
-      "contribution": "0.16",
-      "percent": "4.16",
+      "contribution": "0.33",
+      "percent": "8.33",
       "verified_percent": "4.16",
-      "partial_percent": "0.00"
+      "partial_percent": "4.17"
     },
     {
       "id": "a11y",

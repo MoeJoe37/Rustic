@@ -156,8 +156,9 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Desktop and mobile alpha (M8): 1 section</summary>
+<summary>Desktop and mobile alpha (M8): 2 sections</summary>
 
+- [UI-02 — Desktop window](#ui-02--desktop-window)
 - [UI-05 — Scroll positions](#ui-05--scroll-positions)
 
 </details>
@@ -2554,6 +2555,24 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## UI-02 — Desktop window
+
+Added 2026-11-21 (`rustic-shell`, `rustic-cli/src/main.rs` `view_command`,
+[ADR 0065](adr/0065-desktop-window-host.md)). `rustic view FILE` opens a
+native window (winit, Wayland or X11 on Linux) and presents each frame with
+softbuffer; every frame is a `render` in a sandboxed renderer at the
+window's size, device scale and scroll position, composited by the broker
+and returned instead of written (`broker::render_surface`).
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Presentation | Premultiplied pixels over white into the 0RGB buffer; uncovered pixels white; short buffers never panic | `surfaces_present_over_white_and_uncovered_pixels_stay_white` |
+| Input | Wheel lines (40 CSS px), touchpad pixels, arrows, Page Up/Down (7/8 page), space, Home scroll; the position never goes negative and the renderer's clamped, snapped position is kept; Escape and close end the loop | `scroll_inputs_move_and_stop_at_the_origin`, `render_reports_the_clamped_snapped_scroll_position` |
+| Window | Opens and presents frames under Wayland and X11 (`--exit-after N`); without a window system it fails with exit status 1; view options are usage errors | `view_presents_frames_in_a_window_or_fails_cleanly_without_one` |
+| Untrusted report | `render --report-scroll` prints `scroll X,Y`; the broker passes only well-formed lines and `view` accepts only finite non-negative positions | the tests above |
+
+Open: TD-182 (re-render per frame, no page input, Linux only).
 
 ## UI-05 — Scroll positions
 

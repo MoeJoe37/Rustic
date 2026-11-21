@@ -249,6 +249,29 @@ fn child_args(parent: &[String], scripts: bool) -> Vec<String> {
     args
 }
 
+/// A composited page and the renderer's standard output.
+type Captured = (rustic_raster::Surface, Vec<u8>);
+
+thread_local! {
+    /// `Some` while [`render_surface`] runs: `serve` leaves the page here
+    /// instead of writing it.
+    static CAPTURE: std::cell::RefCell<Option<Option<Captured>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Run `render` with `args` (which must name an `--output`, unused) in a
+/// renderer and return the composited page and the renderer's standard
+/// output (`--report-scroll`), for the window host (`view`, ADR 0065).
+pub fn render_surface(args: &[OsString]) -> Result<Captured, u8> {
+    CAPTURE.with(|slot| *slot.borrow_mut() = Some(None));
+    let status = run("render", args);
+    let captured = CAPTURE.with(|slot| slot.borrow_mut().take()).flatten();
+    match captured {
+        Some(page) if status == 0 => Ok(page),
+        _ => Err(if status == 0 { 1 } else { status }),
+    }
+}
+
 /// Run `command` with its document in a renderer. Returns the exit status.
 pub fn run(command: &str, args: &[OsString]) -> u8 {
     let Some((limits, path, output)) = document_argument(command, args) else {
@@ -933,10 +956,21 @@ fn serve(
                 .is_err(),
         );
     }
+    if command == "render" && surfaces.len() == 1 && CAPTURE.with(|slot| slot.borrow().is_some()) {
+        let page = surfaces.pop().expect("one surface");
+        CAPTURE.with(|slot| *slot.borrow_mut() = Some(Some((page, finished.output))));
+        return 0;
+    }
+    // With an image, the renderer's standard output is its report
+    // (`--report-scroll`), printed after the file is written.
+    let mut report = Vec::new();
     let bytes = match surfaces.pop() {
         // `render`: this broker encodes the composited page.
         Some(surface) => match rustic_raster::encode_png(&surface, limits.max_dump_bytes) {
-            Ok(png) => png,
+            Ok(png) => {
+                report = finished.output;
+                png
+            }
             Err(error) => {
                 eprintln!("rustic {command}: {error}");
                 return 1;
@@ -957,7 +991,27 @@ fn serve(
                 );
                 return 1;
             }
-            0
+            // The renderer is untrusted: only well-formed report lines
+            // reach the terminal.
+            let lines: String = String::from_utf8_lossy(&report)
+                .lines()
+                .filter(|line| {
+                    line.strip_prefix("scroll ").is_some_and(|at| {
+                        !at.is_empty()
+                            && at
+                                .bytes()
+                                .all(|b| b.is_ascii_digit() || matches!(b, b'.' | b',' | b'-'))
+                    })
+                })
+                .map(|line| format!("{line}\n"))
+                .collect();
+            let mut stdout = io::stdout().lock();
+            u8::from(
+                stdout
+                    .write_all(lines.as_bytes())
+                    .and_then(|()| stdout.flush())
+                    .is_err(),
+            )
         }
         None => {
             let mut stdout = io::stdout().lock();

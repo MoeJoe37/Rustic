@@ -72,6 +72,7 @@ instead of rewriting the history of a decision.
 | [0062](0062-out-of-process-frames.md) | Every `iframe` document renders in a renderer of its own with its own grant; the embedder sends black-painted pixels and per-frame coverage, and the broker composites the frame it never showed the embedder | Accepted |
 | [0063](0063-macos-renderer-sandbox.md) | macOS renderers under a deny-by-default Seatbelt profile through `sandbox-exec`, opt-in with `--sandbox` until verified on native Macs | Proposed |
 | [0064](0064-scrolling-and-compositor-scenes.md) | Scroll positions are applied to a finished layout along the containing-block chain (fixed stays, sticky re-solves, clips follow); scenes of cached layers and script scrolling build on them | Accepted (step 1) |
+| [0065](0065-desktop-window-host.md) | Desktop window host: winit 0.30 and softbuffer 0.4 in `rustic-shell`, minimal features; `rustic view` renders each frame in a sandboxed renderer | Accepted |
 
 ## Records by area
 

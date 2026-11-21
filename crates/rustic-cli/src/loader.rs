@@ -81,6 +81,9 @@ pub struct LoaderLimits {
     pub scroll: (f64, f64),
     /// `--scroll-box N=X,Y`: scroll container positions by fragment index.
     pub scroll_boxes: [Option<(usize, f64, f64)>; MAX_CLICKS],
+    /// `render --report-scroll`: print the viewport position the page
+    /// was painted at (`scroll X,Y`) on standard output (ADR 0065).
+    pub report_scroll: bool,
     /// `render --frames N`: rendering opportunities to paint, one frame
     /// every [`FRAME_INTERVAL`] of the manual clock (1 by default).
     pub frames: usize,
@@ -110,6 +113,7 @@ impl Default for LoaderLimits {
             scroll: (0.0, 0.0),
             scroll_boxes: [None; MAX_CLICKS],
             frames: 1,
+            report_scroll: false,
         }
     }
 }
@@ -2538,6 +2542,18 @@ pub(crate) fn render_layers(
     let input = parsed.layout_input(path, limits, view);
     let cancellation = input.cancellation;
     let (tree, layout, viewport, images, _) = block_layout(input)?;
+    if limits.report_scroll {
+        // The position the scene paints: clamped, snapped to device pixels.
+        let range = layout.viewport_scroll_range(viewport);
+        let at = scroll_positions(&layout, limits, input.scroll)
+            .map_or((0.0, 0.0), |positions| range.clamp(positions.viewport()));
+        let factor = rustic_layout::CssPx::new(1.0)
+            .map(|one| one.to_device(view.scale()).get())
+            .unwrap_or(1.0);
+        let snap = |v: f64| (v * factor).round() / factor;
+        let line = format!("scroll {},{}\n", snap(at.0), snap(at.1));
+        crate::renderer::emit_stdout(line.as_bytes()).map_err(LoadError::Io)?;
+    }
     let layout = scrolled(layout, viewport, limits, input.scroll)?;
     let document_url = input.network.map(|session| session.document_url().clone());
     let sites = frame_sites(input.document, document_url.as_ref());

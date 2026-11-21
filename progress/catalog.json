@@ -6346,8 +6346,46 @@
           "label": "Linux runtime and native host acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Native window on Wayland and X11 presenting renderer-process frames, with scrolling input and clean failure without a window system (ADR 0065)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/lib.rs",
+                  "marker": "pub fn run("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0065-desktop-window-host.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-shell/src/lib.rs",
+                  "marker": "fn surfaces_present_over_white_and_uncovered_pixels_stay_white"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn view_presents_frames_in_a_window_or_fails_cleanly_without_one"
+                }
+              ]
+            },
+            {
+              "label": "Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "platform.windows",

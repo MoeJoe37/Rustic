@@ -370,3 +370,114 @@ fn a_hung_renderer_is_stopped_by_the_watchdog() {
     );
     assert!(started.elapsed() < std::time::Duration::from_secs(20));
 }
+
+fn script_site() -> FixtureServer {
+    FixtureServer::start([
+        (
+            "/",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/html")],
+                b"<!doctype html><body>\
+<script src=/crash.js></script>\
+<script src=/ok.js></script>",
+            ),
+        ),
+        (
+            "/crash.js",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/javascript")],
+                b"document.body.setAttribute('data-crash', 'ran');",
+            ),
+        ),
+        (
+            "/ok.js",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/javascript")],
+                b"document.body.setAttribute('data-ok', 'ran');",
+            ),
+        ),
+    ])
+    .unwrap()
+}
+
+#[test]
+fn a_crashed_network_process_fails_its_requests_and_is_replaced() {
+    let server = script_site();
+    let grant = format!("http://a.test={}", server.address());
+    let output = rustic(
+        &[
+            "dump-dom",
+            "--run-scripts",
+            "--allow-origin",
+            &grant,
+            "http://a.test/",
+        ],
+        &[("RUSTIC_TEST_NETWORK_PROCESS", "crash-on:/crash.js")],
+    );
+    let err = text(&output.stderr);
+    assert!(output.status.success(), "{err}");
+    let dom = text(&output.stdout);
+    // The script whose exchange died is a network error; the next one
+    // runs, fetched by a fresh network process.
+    assert!(!dom.contains("data-crash"), "{dom}");
+    assert!(dom.contains("local=\"data-ok\" value=\"ran\""), "{dom}");
+    assert!(err.contains("network process stopped"), "{err}");
+    let targets: Vec<String> = server.requests().iter().map(|r| r.target.clone()).collect();
+    assert_eq!(
+        targets,
+        ["/", "/ok.js"],
+        "the crashed exchange sent nothing"
+    );
+}
+
+#[test]
+fn a_network_process_that_crashes_every_time_cannot_loop() {
+    let server = script_site();
+    let grant = format!("http://a.test={}", server.address());
+    let output = rustic(
+        &["dump-dom", "--allow-origin", &grant, "http://a.test/"],
+        &[("RUSTIC_TEST_NETWORK_PROCESS", "crash")],
+    );
+    assert_eq!(output.status.code(), Some(1), "{}", text(&output.stderr));
+    assert!(output.stdout.is_empty());
+    assert!(server.requests().is_empty());
+    // A single-process run has no network process and is unaffected.
+    let output = rustic(
+        &[
+            "dump-dom",
+            "--single-process",
+            "--allow-origin",
+            &grant,
+            "http://a.test/",
+        ],
+        &[("RUSTIC_TEST_NETWORK_PROCESS", "crash")],
+    );
+    assert!(output.status.success(), "{}", text(&output.stderr));
+}
+
+#[test]
+fn a_compromised_network_process_is_cut_off_by_the_broker() {
+    let server = script_site();
+    let grant = format!("http://a.test={}", server.address());
+    for mode in [
+        "credit-overrun",
+        "bad-status",
+        "foreign-exchange",
+        "unknown-error",
+    ] {
+        let output = rustic(
+            &["dump-dom", "--allow-origin", &grant, "http://a.test/"],
+            &[("RUSTIC_TEST_NETWORK_PROCESS", mode)],
+        );
+        let err = text(&output.stderr);
+        assert_eq!(output.status.code(), Some(1), "{mode}: {err}");
+        assert!(output.stdout.is_empty(), "{mode}");
+        assert!(
+            err.contains("network process") && !err.contains("panicked"),
+            "{mode}: {err}"
+        );
+    }
+}

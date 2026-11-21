@@ -11,6 +11,7 @@ mod broker;
 mod fonts;
 mod images;
 mod loader;
+mod netproc;
 mod network;
 mod reftest;
 mod renderer;
@@ -140,6 +141,12 @@ fn main() -> ExitCode {
         .is_some_and(|arg| arg == renderer::RENDERER_COMMAND)
     {
         return ExitCode::from(renderer::run());
+    }
+    if env::args_os()
+        .nth(1)
+        .is_some_and(|arg| arg == netproc::NETWORK_COMMAND)
+    {
+        return ExitCode::from(netproc::run());
     }
 
     let args = match fonts::configure(env::args_os().skip(1).collect()) {

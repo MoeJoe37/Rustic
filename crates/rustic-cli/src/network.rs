@@ -552,6 +552,14 @@ fn build_fetcher(config: &NetworkConfig, max_bytes: usize) -> Result<Fetcher, Ne
         max_body_bytes: u64::try_from(max_bytes).unwrap_or(u64::MAX),
         ..TransportLimits::default()
     };
+    let jar = CookieJar::new(PublicSuffixList::bundled(), CookieLimits::default());
+    if !crate::broker::single_process() {
+        // Split run: exchanges (sockets, TLS, HTTP parsing) run in the
+        // network process; this process keeps the decisions (ISO-07).
+        let transport = crate::netproc::transport(policy, limits, config.ca_pem.as_deref())
+            .map_err(NetworkLoadError::Tls)?;
+        return Ok(Fetcher::new(transport, jar, NETWORK_TIMEOUT));
+    }
     let transport =
         Transport::new(policy, limits).map_err(|e| NetworkLoadError::Tls(e.to_string()))?;
     let tls = match &config.ca_pem {
@@ -559,7 +567,6 @@ fn build_fetcher(config: &NetworkConfig, max_bytes: usize) -> Result<Fetcher, Ne
         None => TlsConfig::platform(),
     }
     .map_err(|e| NetworkLoadError::Tls(e.to_string()))?;
-    let jar = CookieJar::new(PublicSuffixList::bundled(), CookieLimits::default());
     Ok(Fetcher::new(transport.with_tls(tls), jar, NETWORK_TIMEOUT))
 }
 

@@ -9,6 +9,7 @@ use rustic_base::CancellationToken;
 
 use crate::coding::ContentDecoder;
 use crate::pipe::{Consumer, Producer, Wait, pipe};
+use crate::remote::{Connector, ExchangeHooks};
 use crate::response::{BodyDecoder, HeadParser, ProtocolError, ResponseHead, framing};
 use crate::tls::{CertificateError, TlsConfig, TlsFailure, classify};
 use crate::{LimitsError, NetworkPolicy, Request, TransportLimits};
@@ -24,6 +25,9 @@ pub struct Transport {
     policy: Arc<NetworkPolicy>,
     limits: TransportLimits,
     tls: Arc<std::sync::OnceLock<Option<TlsConfig>>>,
+    /// Where exchanges run when not on this process's threads (a network
+    /// process, ISO-07).
+    connector: Option<Arc<dyn Connector>>,
 }
 
 impl Transport {
@@ -34,7 +38,17 @@ impl Transport {
             policy: Arc::new(policy),
             limits,
             tls: Arc::new(std::sync::OnceLock::new()),
+            connector: None,
         })
+    }
+
+    /// Run every exchange through `connector` (a network process) instead
+    /// of on this process's threads. The policy is still checked here,
+    /// before anything is handed over; the connector receives only the
+    /// address this policy granted.
+    pub fn with_connector(mut self, connector: Arc<dyn Connector>) -> Self {
+        self.connector = Some(connector);
+        self
     }
 
     /// Verify `https` certificates with `tls` instead of the platform
@@ -66,6 +80,9 @@ impl Transport {
             .policy
             .route(request.url())
             .ok_or(TransportError::Blocked)?;
+        if let Some(connector) = &self.connector {
+            return connector.start(request, address, &self.limits);
+        }
         let tls = if request.url().scheme() == "https" {
             Some(self.tls().ok_or(TransportError::TlsUnavailable)?)
         } else {
@@ -91,6 +108,7 @@ impl Transport {
             cancel,
             consumer,
             ended: Cell::new(false),
+            hooks: None,
         })
     }
 }
@@ -112,9 +130,12 @@ pub enum NetEvent {
 
 /// One running request. Dropping it cancels the request.
 pub struct Exchange {
-    cancel: CancellationToken,
-    consumer: Consumer,
-    ended: Cell<bool>,
+    pub(crate) cancel: CancellationToken,
+    pub(crate) consumer: Consumer,
+    pub(crate) ended: Cell<bool>,
+    /// Told about consumption and cancellation when the exchange runs in
+    /// another process.
+    pub(crate) hooks: Option<Arc<dyn ExchangeHooks>>,
 }
 
 impl Exchange {
@@ -123,6 +144,11 @@ impl Exchange {
     /// [`TransportError::Cancelled`] unless it already finished.
     pub fn cancel(&self) {
         self.cancel.cancel();
+        if let Some(hooks) = &self.hooks {
+            if !self.ended.get() {
+                hooks.cancelled();
+            }
+        }
     }
 
     /// The next event, waiting at most `timeout` (`None` waits until one
@@ -134,8 +160,14 @@ impl Exchange {
         let event = self
             .consumer
             .next(timeout.map(|timeout| Instant::now() + timeout))?;
-        if matches!(event, NetEvent::Finished | NetEvent::Failed(_)) {
-            self.ended.set(true);
+        match &event {
+            NetEvent::Finished | NetEvent::Failed(_) => self.ended.set(true),
+            NetEvent::Body(bytes) => {
+                if let Some(hooks) = &self.hooks {
+                    hooks.consumed(bytes.len());
+                }
+            }
+            NetEvent::Response(_) => {}
         }
         Some(event)
     }
@@ -154,6 +186,7 @@ impl Exchange {
             cancel: CancellationToken::default(),
             consumer,
             ended: Cell::new(false),
+            hooks: None,
         }
     }
 
@@ -181,7 +214,7 @@ impl Exchange {
 
 impl Drop for Exchange {
     fn drop(&mut self) {
-        self.cancel.cancel();
+        self.cancel();
     }
 }
 
@@ -227,6 +260,10 @@ pub enum TransportError {
     Cancelled,
     /// The response violated HTTP/1.1 or a [`TransportLimits`] bound.
     Protocol(ProtocolError),
+    /// The network process that ran the exchange stopped, broke the
+    /// protocol or could not be started (ISO-07). The request is not
+    /// retried.
+    NetworkProcess,
 }
 
 impl fmt::Display for TransportError {
@@ -247,6 +284,7 @@ impl fmt::Display for TransportError {
             }
             Self::Cancelled => formatter.write_str("request cancelled"),
             Self::Protocol(error) => error.fmt(formatter),
+            Self::NetworkProcess => formatter.write_str("the network process stopped"),
         }
     }
 }

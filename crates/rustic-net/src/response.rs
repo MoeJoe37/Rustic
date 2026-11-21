@@ -48,6 +48,32 @@ impl ResponseHead {
         &self.headers
     }
 
+    /// A head built from parts that crossed a process boundary, checked
+    /// as the parser would check them: a final status from 200 to 999
+    /// (interim 1xx heads never reach a consumer), a reason phrase
+    /// without control bytes other than tab, and at most
+    /// `max_header_count` fields (already validated by [`Headers`]).
+    pub fn from_parts(
+        version: HttpVersion,
+        status: u16,
+        reason: Vec<u8>,
+        headers: Headers,
+    ) -> Result<Self, ProtocolError> {
+        if !(200..=999).contains(&status)
+            || reason
+                .iter()
+                .any(|&byte| byte == 0x7f || (byte < 0x20 && byte != b'\t'))
+        {
+            return Err(ProtocolError::InvalidStatusLine);
+        }
+        Ok(Self {
+            version,
+            status,
+            reason,
+            headers,
+        })
+    }
+
     /// The same status line with other header fields (cache freshening).
     pub(crate) fn with_headers(&self, headers: Headers) -> Self {
         Self {

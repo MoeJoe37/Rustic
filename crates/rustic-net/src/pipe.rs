@@ -97,6 +97,12 @@ impl Producer {
         Ok(())
     }
 
+    /// Body bytes queued now.
+    pub(crate) fn buffered(&self) -> (usize, usize) {
+        let state = self.0.lock();
+        (state.buffered, state.peak)
+    }
+
     /// Whether the consumer is gone.
     pub(crate) fn consumer_gone(&self) -> bool {
         self.0.lock().consumer_gone

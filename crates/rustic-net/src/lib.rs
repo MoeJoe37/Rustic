@@ -52,6 +52,7 @@ mod pipe;
 mod policy;
 pub mod redirect;
 pub mod referrer;
+pub mod remote;
 mod request;
 mod response;
 pub mod site;

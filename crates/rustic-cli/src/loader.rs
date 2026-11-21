@@ -268,6 +268,8 @@ pub struct LoadedDocument {
     document: EngineDocument,
     applied_files: Option<AppliedLocalFiles>,
     network: Option<Rc<dyn Session>>,
+    /// Where the page's scripts left the scroll positions (ADR 0064).
+    scroll: rustic_engine::ScrollState,
 }
 
 impl LoadedDocument {
@@ -285,14 +287,17 @@ impl LoadedDocument {
         limits: LoaderLimits,
         view: rustic_layout::View,
     ) -> LayoutInput<'a> {
-        LayoutInput::new(
-            &self.document,
-            path,
-            limits,
-            view,
-            self.applied_files.as_ref(),
-            self.network.as_ref(),
-        )
+        LayoutInput {
+            scroll: Some(&self.scroll),
+            ..LayoutInput::new(
+                &self.document,
+                path,
+                limits,
+                view,
+                self.applied_files.as_ref(),
+                self.network.as_ref(),
+            )
+        }
     }
 }
 
@@ -338,6 +343,7 @@ pub fn load_document(
         document: load.finish()?,
         applied_files: None,
         network: None,
+        scroll: rustic_engine::ScrollState::default(),
     })
 }
 
@@ -478,6 +484,7 @@ fn load_unscripted_network_document(
         document: load.finish()?,
         applied_files: Some(applied_snapshot(limits)),
         network: Some(Rc::clone(&network.session)),
+        scroll: rustic_engine::ScrollState::default(),
     };
     Ok((document, selected))
 }
@@ -782,10 +789,12 @@ fn run_scripted_load(
     document.offer_rendering_opportunity()?;
     document.run_next_with_render(|_, _| ())?;
     print_console(&document);
+    let scroll = document.scroll_state();
     Ok(LoadedDocument {
         document: document.into_document(),
         applied_files: Some(applied_files),
         network: source.network,
+        scroll,
     })
 }
 
@@ -1258,6 +1267,7 @@ fn compute_styles(
         cancellation,
         applied_files,
         network,
+        ..
     } = input;
     let node_error = |error| LoadError::Dump(DumpError::Node(error));
     check_cancelled(cancellation)?;
@@ -1414,6 +1424,8 @@ struct LayoutInput<'a> {
     cancellation: &'a CancellationToken,
     applied_files: Option<&'a AppliedLocalFiles>,
     network: Option<&'a Rc<dyn Session>>,
+    /// The scroll positions scripts left, for painting.
+    scroll: Option<&'a rustic_engine::ScrollState>,
 }
 
 impl<'a> LayoutInput<'a> {
@@ -1435,6 +1447,7 @@ impl<'a> LayoutInput<'a> {
             cancellation: parsed.cancellation(),
             applied_files,
             network,
+            scroll: None,
         }
     }
 }
@@ -1530,7 +1543,7 @@ impl LayoutSource for LocalLayout {
         document: &Document,
         mode: DocumentMode,
     ) -> Result<LayoutGeometry, LayoutReadError> {
-        let (tree, layout, _, _, styles) = block_layout(LayoutInput {
+        let (tree, layout, viewport, _, styles) = block_layout(LayoutInput {
             document,
             mode,
             encoding: self.encoding,
@@ -1540,6 +1553,7 @@ impl LayoutSource for LocalLayout {
             cancellation: &self.cancellation,
             applied_files: Some(&self.applied_files),
             network: self.network.as_ref(),
+            scroll: None,
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
         // Public block fragments omit anonymous wrappers and include atomic
@@ -1570,6 +1584,8 @@ impl LayoutSource for LocalLayout {
                 },
             );
         }
+        let (scroll_ranges, viewport_scroll_range, scroll_chains) =
+            scroll_geometry(&layout, viewport);
         Ok(LayoutGeometry {
             box_sizes,
             offset_widths: layout
@@ -1611,8 +1627,60 @@ impl LayoutSource for LocalLayout {
                     ))
                 })
                 .collect::<Result<_, LayoutReadError>>()?,
+            scroll_ranges,
+            viewport_scroll_range,
+            scroll_chains,
         })
     }
+}
+
+/// Scroll ranges and chains for script scrolling (ADR 0064): each scroll
+/// container's range by element, the viewport's, and for each element
+/// whether the viewport moves it and which containers do.
+#[allow(
+    clippy::type_complexity,
+    reason = "the three geometry maps, built together"
+)]
+fn scroll_geometry(
+    layout: &rustic_layout::BlockLayout,
+    viewport: rustic_layout::CssSize,
+) -> (
+    HashMap<rustic_dom::NodeId, [f64; 4]>,
+    [f64; 4],
+    HashMap<rustic_dom::NodeId, (bool, Vec<rustic_dom::NodeId>)>,
+) {
+    let flat =
+        |range: rustic_layout::ScrollRange| [range.min.0, range.min.1, range.max.0, range.max.1];
+    let fragments = layout.fragments();
+    let mut ranges = HashMap::new();
+    let mut chains: Vec<(bool, Vec<rustic_dom::NodeId>)> = Vec::with_capacity(fragments.len());
+    let mut by_node = HashMap::new();
+    for (index, fragment) in fragments.iter().enumerate() {
+        if let Some(range) = layout.scroll_range(index) {
+            ranges.insert(fragment.node(), flat(range));
+        }
+        let fixed = fragment.scheme() == rustic_layout::PositionScheme::Fixed;
+        let chain = match fragment.containing_block() {
+            _ if fixed => (false, Vec::new()),
+            Some(c) if c < index => {
+                let (viewport, mut containers) = chains[c].clone();
+                if layout.scroll_range(c).is_some() {
+                    containers.push(fragments[c].node());
+                }
+                (viewport, containers)
+            }
+            _ => (true, Vec::new()),
+        };
+        by_node
+            .entry(fragment.node())
+            .or_insert_with(|| chain.clone());
+        chains.push(chain);
+    }
+    (
+        ranges,
+        flat(layout.viewport_scroll_range(viewport)),
+        by_node,
+    )
 }
 
 fn block_layout(
@@ -1684,12 +1752,28 @@ fn scrolled(
     layout: rustic_layout::BlockLayout,
     viewport: rustic_layout::CssSize,
     limits: LoaderLimits,
+    script: Option<&rustic_engine::ScrollState>,
 ) -> Result<rustic_layout::BlockLayout, LoadError> {
-    if limits.scroll == (0.0, 0.0) && limits.scroll_boxes.iter().all(Option::is_none) {
+    let script = script.filter(|state| **state != rustic_engine::ScrollState::default());
+    if limits.scroll == (0.0, 0.0)
+        && limits.scroll_boxes.iter().all(Option::is_none)
+        && script.is_none()
+    {
         return Ok(layout);
     }
     let mut positions = rustic_layout::ScrollPositions::new();
-    positions.set_viewport(limits.scroll.0, limits.scroll.1);
+    // Where scripts left the page, then the command line on top.
+    if let Some(state) = script {
+        positions.set_viewport(state.viewport.0, state.viewport.1);
+        for (index, fragment) in layout.fragments().iter().enumerate() {
+            if let Some(&(x, y)) = state.elements.get(&fragment.node()) {
+                positions.set_box(index, x, y);
+            }
+        }
+    }
+    if limits.scroll != (0.0, 0.0) {
+        positions.set_viewport(limits.scroll.0, limits.scroll.1);
+    }
     for &(index, x, y) in limits.scroll_boxes.iter().flatten() {
         positions.set_box(index, x, y);
     }
@@ -1700,7 +1784,7 @@ fn scrolled(
 
 fn display_list(input: LayoutInput<'_>) -> Result<rustic_paint::DisplayList, LoadError> {
     let (tree, layout, viewport, images, _) = block_layout(input)?;
-    let layout = scrolled(layout, viewport, input.limits)?;
+    let layout = scrolled(layout, viewport, input.limits, input.scroll)?;
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),
         images: images.images,
@@ -1923,7 +2007,7 @@ pub(crate) fn render_layers(
     let input = parsed.layout_input(path, limits, view);
     let cancellation = input.cancellation;
     let (tree, layout, viewport, images, _) = block_layout(input)?;
-    let layout = scrolled(layout, viewport, limits)?;
+    let layout = scrolled(layout, viewport, limits, input.scroll)?;
     let document_url = input.network.map(|session| session.document_url().clone());
     let sites = frame_sites(input.document, document_url.as_ref());
     let build = |images: HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>| {

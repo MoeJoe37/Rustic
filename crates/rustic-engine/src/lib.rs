@@ -31,7 +31,7 @@ pub use rustic_bindings::page::{
 };
 pub use scripting::{
     DocumentTurn, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument,
-    TaskLimits,
+    ScrollState, TaskLimits,
 };
 pub use tasks::TimerId;
 

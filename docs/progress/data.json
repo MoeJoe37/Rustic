@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "492ef479c71b4d6a271a823bd94a211d90d3ad9e664accba717b52597114a2bc",
-  "percent": "41.83",
+  "source_fingerprint": "9949f46f7396f4ff7d56ee22dc8c4948d1616d5eb06d66ab2c1a01f9a891e6f8",
+  "percent": "42.01",
   "verified_percent": "39.28",
-  "partial_percent": "2.55",
+  "partial_percent": "2.73",
   "completed": 92,
   "in_progress": 11,
   "total": 221,
@@ -87,9 +87,9 @@
       "share": "10.22",
       "completed": 0,
       "total": 21,
-      "percent": "3.58",
+      "percent": "5.28",
       "verified_percent": "0.00",
-      "partial_percent": "3.58"
+      "partial_percent": "5.28"
     },
     {
       "id": "M9",
@@ -6787,11 +6787,27 @@
             },
             {
               "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/scrolling.rs",
+                  "marker": "pub(super) fn install_window"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "fn scroll_to(&self"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/scroll.rs",
+                  "marker": "fn scripts_scroll_the_viewport_and_containers_and_the_render_follows"
+                }
+              ]
             }
           ],
-          "credit": "25.00",
+          "credit": "50.00",
           "engine_share": "0.69"
         },
         {
@@ -6829,10 +6845,10 @@
       "completed": 0,
       "in_progress": 1,
       "total": 4,
-      "contribution": "0.17",
-      "percent": "5.76",
+      "contribution": "0.34",
+      "percent": "11.53",
       "verified_percent": "0.00",
-      "partial_percent": "5.76"
+      "partial_percent": "11.53"
     },
     {
       "id": "platform",

@@ -30,6 +30,7 @@ mod mutation_observer;
 mod node_tree;
 mod popups;
 mod resize_observer;
+mod scrolling;
 mod selectors;
 mod web_storage;
 mod window;
@@ -151,6 +152,16 @@ pub trait PageTree: Debug {
     fn computed_style(&self, _node: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
         Err(LayoutReadError::Unavailable)
     }
+    /// The scroll position of an element, or of the viewport for `None`
+    /// (ADR 0064).
+    fn scroll_position(&self, _node: Option<NodeId>) -> (f64, f64) {
+        (0.0, 0.0)
+    }
+    /// Scroll an element (or the viewport for `None`) to a position,
+    /// clamped to its range; whether the position changed.
+    fn scroll_to(&self, _node: Option<NodeId>, _x: f64, _y: f64) -> Result<bool, LayoutReadError> {
+        Ok(false)
+    }
     /// The element's untransformed box sizes, or `None` without a layout box.
     fn box_sizes(&self, _node: NodeId) -> Result<Option<BoxSizes>, LayoutReadError> {
         Ok(None)
@@ -196,6 +207,8 @@ struct Page {
     now: std::cell::Cell<std::time::Duration>,
     /// `window.open()` requests for the host.
     popups: popups::Popups,
+    /// `scroll` event targets for the next rendering opportunity.
+    scrolls: scrolling::PendingScrolls,
 }
 
 impl ExecutionHost for Page {
@@ -468,6 +481,7 @@ fn install_page(
                 bounding_client_rect,
                 0,
             )?;
+            scrolling::install_element(agent, proto)?;
             html_collections::install_lookup::<false>(agent, proto)
         },
     )?;
@@ -532,6 +546,7 @@ fn install_page(
     let headers_iterator = fetch::install(agent)?;
     let navigator = activation::install(agent)?;
     popups::install(agent)?;
+    scrolling::install_window(agent)?;
     agent.root(Value::object(headers_iterator))?;
     let fetch_records = agent.new_weak_map()?;
     agent.root(Value::object(fetch_records))?;
@@ -566,6 +581,7 @@ fn install_page(
         activation: std::cell::Cell::new((None, false)),
         now: std::cell::Cell::new(std::time::Duration::ZERO),
         popups: popups::Popups::default(),
+        scrolls: scrolling::PendingScrolls::default(),
     }))
 }
 
@@ -678,6 +694,17 @@ pub fn take_form_submissions(agent: &Agent) -> FormSubmissions {
         .and_then(|host| host.as_any().downcast_ref::<Page>())
         .map(|page| page.events.forms.take_submissions())
         .unwrap_or_default()
+}
+
+/// "Run the scroll steps" of a rendering opportunity: fire the `scroll`
+/// events queued since the last one, the viewport's at the document
+/// (bubbling) and each scroll container's at its element.
+pub fn fire_scroll_events(agent: &mut Agent) -> JsResult<()> {
+    let targets = with_page(agent, |_, page| Ok(page.scrolls.take()))?;
+    for target in targets {
+        events::deliver_lifecycle(agent, LifecycleEvent::Scroll(target))?;
+    }
+    Ok(())
 }
 
 /// Take the popups the page opened (with transient activation) since the

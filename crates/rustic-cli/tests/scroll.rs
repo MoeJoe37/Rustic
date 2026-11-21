@@ -121,3 +121,94 @@ fn hit_testing_follows_the_scroll_position_and_bad_values_are_usage_errors() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// PAGE plus a script that scrolls the viewport and the section, and
+/// records what it observes in `data-*` attributes.
+const SCRIPTED: &str = "<script>\
+    var seen = [];\
+    document.addEventListener('scroll', () => seen.push('doc'));\
+    var section = document.querySelector('section');\
+    section.addEventListener('scroll', () => seen.push('section'));\
+    window.scrollTo(0, 50);\
+    window.scrollBy({top: 50});\
+    window.scrollTo(0, 100);\
+    section.scrollTop = 150;\
+    var root = document.documentElement;\
+    var info = [scrollX, scrollY, pageYOffset, root.scrollTop, section.scrollTop,\
+      section.scrollLeft, document.body.scrollTop,\
+      section.querySelector('div').getBoundingClientRect().top];\
+    section.scrollTop = 1e9;\
+    info.push(section.scrollTop);\
+    window.scrollTo({top: -5});\
+    info.push(scrollY);\
+    window.scrollTo(0, 100);\
+    requestAnimationFrame(() => {\
+      document.body.setAttribute('data-info', info.join());\
+      document.body.setAttribute('data-seen', seen.join());\
+    });\
+    </script>";
+
+#[test]
+fn scripts_scroll_the_viewport_and_containers_and_the_render_follows() {
+    let dir = std::env::temp_dir().join(format!("rustic-scroll-js-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let page = dir.join("page.html");
+    std::fs::write(&page, format!("{PAGE}{SCRIPTED}")).unwrap();
+    let page_arg = page.to_string_lossy().into_owned();
+    // Scripts lay out at the 1280x720 script view: 1220px of page.
+    let output = rustic(&["dump-dom", "--run-scripts", &page_arg]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let dom = String::from_utf8_lossy(&output.stdout);
+    // scrollX, scrollY, pageYOffset, html.scrollTop (the viewport),
+    // section scrollTop/Left, body.scrollTop (not a scroll container),
+    // the yellow block's top (200 - 100 viewport - 150 section), the
+    // clamped section maximum (180) and the clamped viewport minimum.
+    assert!(
+        dom.contains("local=\"data-info\" value=\"0,100,100,100,150,0,0,-50,180,0\""),
+        "{dom}"
+    );
+    // One event per scrolled target at the rendering opportunity.
+    assert!(
+        dom.contains("local=\"data-seen\" value=\"doc,section\""),
+        "{dom}"
+    );
+    // The render shows where the script left the page: the viewport at
+    // 100 (the blue block) unless --scroll says otherwise.
+    let png = dir.join("out.png");
+    let png_arg = png.to_string_lossy().into_owned();
+    let render = |extra: &[&str]| {
+        let mut args = vec![
+            "render",
+            "--run-scripts",
+            "--viewport",
+            "50x50",
+            "--output",
+            &png_arg,
+        ];
+        args.extend_from_slice(extra);
+        args.push(&page_arg);
+        let output = rustic(&args);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let bytes = std::fs::read(&png).unwrap();
+        let image =
+            decode_png(&bytes, PngLimits::default(), &CancellationToken::default()).unwrap();
+        let i = (5 * 50 + 5) * 4;
+        [
+            image.pixels[i],
+            image.pixels[i + 1],
+            image.pixels[i + 2],
+            image.pixels[i + 3],
+        ]
+    };
+    assert_eq!(render(&[]), BLUE);
+    assert_eq!(render(&["--scroll", "0,1"]), RED);
+    let _ = std::fs::remove_dir_all(&dir);
+}

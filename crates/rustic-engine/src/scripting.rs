@@ -177,9 +177,34 @@ struct ScriptTree {
     // Keep root checks in a deterministic order under the native work budget.
     pending_classics: RefCell<Vec<NodeId>>,
     layout: RefCell<LayoutReads>,
+    /// Scroll positions (ADR 0064): the viewport's, and scroll containers'
+    /// by element.
+    scroll: RefCell<ScrollState>,
+}
+
+/// The document's scroll positions.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ScrollState {
+    /// The viewport's position in CSS pixels.
+    pub viewport: (f64, f64),
+    /// Scroll containers' positions, by element.
+    pub elements: HashMap<NodeId, (f64, f64)>,
 }
 
 impl ScriptTree {
+    /// `None` for the viewport: the document element in no-quirks mode
+    /// stands for it (CSSOM View `scrollTop`); other targets stay.
+    fn scroll_target(&self, node: Option<NodeId>) -> Option<NodeId> {
+        let node = node?;
+        let document = self.read()?;
+        let root = document.root();
+        let document_element = document.children(root).ok()?.find(|&child| {
+            document
+                .node(child)
+                .is_ok_and(|n| matches!(n.kind(), rustic_dom::NodeKind::Element(_)))
+        });
+        (document_element != Some(node) || self.quirks_mode()).then_some(node)
+    }
     fn read_layout<T>(
         &self,
         empty: T,
@@ -267,14 +292,66 @@ impl PageTree for ScriptTree {
     }
 
     fn client_rect(&self, id: NodeId) -> Result<[f64; 4], LayoutReadError> {
+        let scroll = self.scroll.borrow().clone();
         self.read_layout([0.0; 4], |geometry| {
-            geometry
+            let mut rect = geometry
                 .client_rects
                 .get(&id)
                 .copied()
                 .unwrap_or(Some([0.0; 4]))
-                .ok_or(LayoutReadError::Unavailable)
+                .ok_or(LayoutReadError::Unavailable)?;
+            // Client rectangles are relative to the scrolled viewport.
+            if let Some((viewport, containers)) = geometry.scroll_chains.get(&id) {
+                if *viewport {
+                    rect[0] -= scroll.viewport.0;
+                    rect[1] -= scroll.viewport.1;
+                }
+                for container in containers {
+                    let (x, y) = scroll.elements.get(container).copied().unwrap_or_default();
+                    rect[0] -= x;
+                    rect[1] -= y;
+                }
+            }
+            Ok(rect)
         })
+    }
+
+    fn scroll_position(&self, node: Option<NodeId>) -> (f64, f64) {
+        let scroll = self.scroll.borrow();
+        match self.scroll_target(node) {
+            None => scroll.viewport,
+            Some(node) => scroll.elements.get(&node).copied().unwrap_or_default(),
+        }
+    }
+
+    fn scroll_to(&self, node: Option<NodeId>, x: f64, y: f64) -> Result<bool, LayoutReadError> {
+        let target = self.scroll_target(node);
+        let range = self.read_layout(None, |geometry| {
+            Ok(match target {
+                None => Some(geometry.viewport_scroll_range),
+                Some(node) => geometry.scroll_ranges.get(&node).copied(),
+            })
+        })?;
+        // Not a scroll container (or no layout): nothing scrolls.
+        let Some([min_x, min_y, max_x, max_y]) = range else {
+            return Ok(false);
+        };
+        let clamp = |value: f64, min: f64, max: f64| {
+            if value.is_finite() {
+                value.clamp(min, max.max(min))
+            } else {
+                0.0
+            }
+        };
+        let next = (clamp(x, min_x, max_x), clamp(y, min_y, max_y));
+        let mut scroll = self.scroll.borrow_mut();
+        let slot = match target {
+            None => &mut scroll.viewport,
+            Some(node) => scroll.elements.entry(node).or_default(),
+        };
+        let changed = *slot != next;
+        *slot = next;
+        Ok(changed)
     }
 
     fn box_sizes(&self, id: NodeId) -> Result<Option<page::BoxSizes>, LayoutReadError> {
@@ -409,6 +486,7 @@ impl<C: Clock> ScriptedDocument<C> {
             current_script: Cell::new(None),
             pending_classics: RefCell::default(),
             layout: RefCell::default(),
+            scroll: RefCell::default(),
         });
         let owner = document
             .read()
@@ -751,6 +829,11 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or_else(|_| page::ConsoleLog::default(), page::take_console_messages)
     }
 
+    /// The document's scroll positions, as script left them (ADR 0064).
+    pub fn scroll_state(&self) -> ScrollState {
+        self.document.scroll.borrow().clone()
+    }
+
     /// Take the popups `window.open()` asked for with transient activation;
     /// the host opens them (ADR 0062).
     pub fn take_popups(&self) -> Vec<page::PopupRequest> {
@@ -1005,6 +1088,11 @@ impl<C: Clock> ScriptedDocument<C> {
         let cursor = self.pending.queue.borrow().frame_cursor();
         let timestamp = Value::number(frame.timestamp().as_secs_f64() * 1_000.0);
         self.begin_turn()?;
+        // "Run the scroll steps" come before animation frame callbacks.
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let fired = page::fire_scroll_events(agent);
+        self.page_result(fired)?;
+        self.checkpoint()?;
         loop {
             let root = self.pending.queue.borrow_mut().pop_frame(cursor);
             let Some(root) = root else {

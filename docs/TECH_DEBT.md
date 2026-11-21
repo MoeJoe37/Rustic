@@ -62,7 +62,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M8 (hosts, GPU and platform services) | TD-173, TD-175, TD-177, TD-178, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -241,6 +241,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
+| TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2864,3 +2865,19 @@ while adding frames (ADR 0062), whose tests size frames with CSS.
 **Pay:** add a presentational-hint declaration block per element below
 author rules (CSS Cascade 4, "non-CSS presentational hints"), starting with HTML's dimension
 attributes, with the WPT `html/rendering` tests.
+
+### TD-180 — Script scrolling is the position subset
+
+ADR 0064 step 4 gives scripts the scroll positions: `scrollX`/`scrollY`,
+`scroll()`/`scrollTo()`/`scrollBy()` on Window and Element,
+`scrollTop`/`scrollLeft` and `scroll` events. Missing: the CSSOM View size
+members (`scrollWidth`, `scrollHeight`, `clientWidth`, `clientHeight`,
+`clientTop`, `clientLeft`), `scrollIntoView`, smooth `behavior` (every
+scroll is instant), `scrollend`, scroll snapping and scroll anchoring, and
+`getBoundingClientRect` moves sticky boxes with their scroll container
+instead of re-solving their offset at the script's position (painting
+does re-solve them).
+**Pay:** the size members from the same geometry, `scrollIntoView` over
+the scroll chain, then smooth scrolling and `scrollend` once the shell
+animates frames (M8), with the WPT `css/cssom-view` scrolling tests.
+

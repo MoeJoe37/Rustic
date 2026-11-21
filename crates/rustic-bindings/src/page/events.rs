@@ -721,6 +721,9 @@ pub enum LifecycleEvent {
     ScriptLoad(NodeId),
     /// Script source or its dependency graph failed to load.
     ScriptError(NodeId),
+    /// The viewport (`None`, fired at the document and bubbling) or a
+    /// scroll container scrolled.
+    Scroll(Option<NodeId>),
 }
 
 pub(super) fn deliver_lifecycle(agent: &mut Agent, event: LifecycleEvent) -> JsResult<()> {
@@ -750,6 +753,28 @@ pub(super) fn deliver_lifecycle(agent: &mut Agent, event: LifecycleEvent) -> JsR
                 "load",
                 0,
             ),
+            LifecycleEvent::Scroll(None) => (
+                Target {
+                    value: page.root,
+                    node: true,
+                },
+                "scroll",
+                Event::BUBBLES,
+            ),
+            LifecycleEvent::Scroll(Some(node)) => {
+                let mut wrappers = page.wrappers.borrow_mut();
+                let target = page.read(agent, node.document(), |agent, document| {
+                    wrap(&mut wrappers, agent, document, node)
+                })?;
+                (
+                    Target {
+                        value: target,
+                        node: true,
+                    },
+                    "scroll",
+                    0,
+                )
+            }
             LifecycleEvent::ScriptLoad(node) | LifecycleEvent::ScriptError(node) => {
                 let mut wrappers = page.wrappers.borrow_mut();
                 let target = page.read(agent, node.document(), |agent, document| {

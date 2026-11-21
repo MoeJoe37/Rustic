@@ -33,6 +33,15 @@ pub struct LayoutGeometry {
     /// Content and border box sizes of elements with block or atomic boxes,
     /// for ResizeObserver. Elements without an entry report zero.
     pub box_sizes: HashMap<NodeId, BoxSizes>,
+    /// Scroll containers' position ranges `[min x, min y, max x, max y]`
+    /// (ADR 0064). Elements without an entry do not scroll.
+    pub scroll_ranges: HashMap<NodeId, [f64; 4]>,
+    /// The viewport's position range, like [`Self::scroll_ranges`].
+    pub viewport_scroll_range: [f64; 4],
+    /// For each element with a box: whether the viewport's position moves
+    /// it (not for fixed boxes), and the scroll containers on its
+    /// containing-block chain whose positions move it.
+    pub scroll_chains: HashMap<NodeId, (bool, Vec<NodeId>)>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

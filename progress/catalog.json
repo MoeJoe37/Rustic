@@ -6243,8 +6243,24 @@
             },
             {
               "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-bindings/src/page/scrolling.rs",
+                  "marker": "pub(super) fn install_window"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-engine/src/scripting.rs",
+                  "marker": "fn scroll_to(&self"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/scroll.rs",
+                  "marker": "fn scripts_scroll_the_viewport_and_containers_and_the_render_follows"
+                }
+              ]
             }
           ]
         },

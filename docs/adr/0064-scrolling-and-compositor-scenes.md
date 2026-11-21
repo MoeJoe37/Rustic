@@ -1,7 +1,7 @@
 # ADR 0064 — Scrolling and compositor scenes
 
 Date: 2026-11-21
-Status: Accepted for scroll positions (step 1); scenes and incremental submission are the plan for the next steps
+Status: Accepted for scroll positions (step 1) and script scrolling (step 4, 2026-11-21); scenes and incremental submission are the plan for the next steps
 
 ## Context
 
@@ -31,18 +31,25 @@ repaint only the tiles whose pixels can change between two display lists.
    reaches left). The pass is one walk over the fragments and never lays
    out again; paint, raster and hit testing consume its result unchanged.
 2. **CLI.** `dump-paint`, `render` and `hit-test` take `--scroll X,Y` and
-   `--scroll-box N=X,Y`; frames and popups do not inherit them. Script
-   layout reads still use the unscrolled layout, because script cannot
-   scroll yet (step 4).
+   `--scroll-box N=X,Y`; frames and popups do not inherit them.
 3. **Scenes (next).** A scene splits the display list at scroll containers
    and fixed or sticky stacking contexts into layers, each rasterized into
    its own cached surface. A scroll then re-composites cached layers at
    new offsets and rasterizes only newly exposed regions; content changes
    use the existing tile damage per layer. The CPU compositor is the
    reference the M8 GPU backend must match.
-4. **Script scrolling (next).** `scrollX`/`scrollY`, `scrollTo`/`scrollBy`,
-   `Element.scrollTop`/`scrollLeft` and `scroll` events feed the same
-   positions.
+4. **Script scrolling** (done). The engine keeps the document's scroll
+   positions (`ScrollState`); `window.scrollX`/`scrollY`/`pageXOffset`/
+   `pageYOffset`, `scroll()`/`scrollTo()`/`scrollBy()` (numbers or
+   `ScrollToOptions`) and `Element.scrollTop`/`scrollLeft`/`scroll()`/
+   `scrollTo()`/`scrollBy()` read and set them, clamped to the layout's
+   ranges (a layout read); the document element stands for the viewport
+   in no-quirks mode. A change queues one `scroll` event per target for
+   the next rendering opportunity, before animation frame callbacks: at
+   the document (bubbling) for the viewport, at the element otherwise.
+   `getBoundingClientRect` subtracts the positions on the element's
+   containing-block chain. The CLI paints where scripts left the page;
+   `--scroll` overrides the viewport and `--scroll-box` containers.
 
 ## Consequences
 

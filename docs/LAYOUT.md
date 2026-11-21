@@ -427,8 +427,11 @@ margins still collapse through it. Scroll containers report
 boxes, each restricted by any intermediate `clip`. The area is clamped to what a
 scroll origin can reach: nothing above the top, nothing before the start edge in
 LTR, nothing past the right edge in RTL. The viewport reports the same for the
-initial containing block. Scroll positions stay at zero, and no scrollbar gutter
-is reserved, like overlay scrollbars. `overflow-clip-margin` and end-padding
+initial containing block. Layout itself runs at scroll position zero;
+`BlockLayout::scrolled` applies viewport and scroll-container positions
+afterwards without laying out again (ADR 0064): contents move along the
+containing-block chain, fixed boxes stay, sticky boxes re-solve and clips
+follow. No scrollbar gutter is reserved, like overlay scrollbars. `overflow-clip-margin` and end-padding
 inflation are not implemented (TD-45).
 
 ### Limits and evidence

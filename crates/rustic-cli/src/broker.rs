@@ -220,6 +220,8 @@ fn child_args(parent: &[String], scripts: bool) -> Vec<String> {
         "--output",
         "--at",
         "--click",
+        "--scroll",
+        "--scroll-box",
     ];
     let mut args = Vec::new();
     let mut iter = parent.iter();

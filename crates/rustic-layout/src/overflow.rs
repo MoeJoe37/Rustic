@@ -1,7 +1,8 @@
 //! Overflow clipping and scroll-container geometry (CSS Overflow 3 §2–3).
 //!
-//! No scrolling UI exists: scroll positions stay at the origin and no
-//! scrollbar gutter is reserved (as with overlay scrollbars). Clips follow the
+//! Layout runs at scroll position zero; `crate::scroll` applies other
+//! positions afterwards. No scrollbar gutter is reserved (as with overlay
+//! scrollbars). Clips follow the
 //! containing-block chain, so an absolutely positioned box escapes the overflow
 //! of ancestors between it and its containing block, and fixed boxes escape all.
 
@@ -150,6 +151,22 @@ fn reachable(a: Area, padding: Area, direction: Direction) -> Result<CssRect, Fl
         },
         CssSize::new((right - left).max(0.0), (a.3 - top).max(0.0))?,
     )?)
+}
+
+/// Recompute every fragment's clip from its containing block's clip and
+/// padding box, as [`assign`] does, after fragments moved (scrolling).
+pub(crate) fn reclip(fragments: &mut [BlockFragment]) {
+    let mut own: Vec<Clip> = Vec::with_capacity(fragments.len());
+    for i in 0..fragments.len() {
+        let f = fragments[i];
+        let effective = match f.containing_block() {
+            _ if f.scheme() == crate::PositionScheme::Fixed => Clip::NONE,
+            Some(c) if c < i => fragments[c].clip().intersect(own[c]),
+            _ => Clip::NONE,
+        };
+        fragments[i].set_clip(effective);
+        own.push(own_clip(&f).unwrap_or(Clip::NONE));
+    }
 }
 
 /// Assign effective clips and scrollable overflow; returns the viewport's.

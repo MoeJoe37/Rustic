@@ -84,6 +84,12 @@ one animation frame. --click X,Y (repeat up to 8; needs --run-scripts)
 then delivers a trusted primary click at that point in CSS pixels, which
 gives the page transient user activation.
 
+Scrolling: dump-paint, render and hit-test accept --scroll X,Y (the
+viewport's scroll position in CSS pixels) and --scroll-box N=X,Y (scroll
+container N, the fragment index dump-layout prints; repeat up to 8).
+Positions clamp to each scrollport's range; fixed boxes stay, sticky boxes
+re-solve, and nothing is laid out again.
+
 Frames and popups: render loads each <iframe> into a renderer of its own
 and composites it (split runs only; one process paints frames white).
 window.open() opens a popup only with transient activation, in a renderer
@@ -655,6 +661,39 @@ pub(crate) fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsStri
                 }
                 Some("--run-scripts") => {
                     limits.run_scripts = true;
+                    continue;
+                }
+                Some("--scroll") => {
+                    limits.scroll = iter
+                        .next()
+                        .and_then(|value| value.to_str())
+                        .and_then(|value| value.split_once(','))
+                        .and_then(|(x, y)| Some((x.parse::<f64>().ok()?, y.parse::<f64>().ok()?)))
+                        .filter(|&(x, y)| x.is_finite() && y.is_finite())
+                        .ok_or("--scroll requires X,Y in CSS pixels")?;
+                    continue;
+                }
+                Some("--scroll-box") => {
+                    let parsed = iter
+                        .next()
+                        .and_then(|value| value.to_str())
+                        .and_then(|value| value.split_once('='))
+                        .and_then(|(index, at)| {
+                            let (x, y) = at.split_once(',')?;
+                            Some((
+                                index.parse::<usize>().ok()?,
+                                x.parse::<f64>().ok()?,
+                                y.parse::<f64>().ok()?,
+                            ))
+                        })
+                        .filter(|&(_, x, y)| x.is_finite() && y.is_finite())
+                        .ok_or("--scroll-box requires N=X,Y (N a dump-layout fragment index)")?;
+                    let slot = limits
+                        .scroll_boxes
+                        .iter_mut()
+                        .find(|slot| slot.is_none())
+                        .ok_or("at most 8 --scroll-box positions")?;
+                    *slot = Some(parsed);
                     continue;
                 }
                 Some("--click") => {

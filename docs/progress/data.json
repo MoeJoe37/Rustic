@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "a07588e64f107fe3bfe4a96a94d6555c961331ad15e2c285bc8eb68495248789",
-  "percent": "41.66",
+  "source_fingerprint": "492ef479c71b4d6a271a823bd94a211d90d3ad9e664accba717b52597114a2bc",
+  "percent": "41.83",
   "verified_percent": "39.28",
-  "partial_percent": "2.38",
+  "partial_percent": "2.55",
   "completed": 92,
-  "in_progress": 10,
+  "in_progress": 11,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -87,9 +87,9 @@
       "share": "10.22",
       "completed": 0,
       "total": 21,
-      "percent": "1.89",
+      "percent": "3.58",
       "verified_percent": "0.00",
-      "partial_percent": "1.89"
+      "partial_percent": "3.58"
     },
     {
       "id": "M9",
@@ -6741,9 +6741,57 @@
           "label": "Incremental scene submission and scrolling",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Scroll positions applied to a finished layout: viewport and nested scroll containers, fixed and sticky boxes, clips and clamping, with paint and hit testing following (ADR 0064)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/scroll.rs",
+                  "marker": "pub fn scrolled("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0064-scrolling-and-compositor-scenes.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/scroll.rs",
+                  "marker": "fn nested_scroll_containers_move_their_contents_and_clips"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/scroll.rs",
+                  "marker": "fn sticky_boxes_take_their_offset_at_the_new_scroll_position"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/scroll.rs",
+                  "marker": "fn the_viewport_and_scroll_containers_scroll_without_moving_fixed_boxes"
+                }
+              ]
+            },
+            {
+              "label": "Layer scenes: display lists split at scroll containers and fixed/sticky contexts into cached layer rasters that re-composite on scroll",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "0.69"
         },
         {
@@ -6779,12 +6827,12 @@
       ],
       "points": 13,
       "completed": 0,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 4,
-      "contribution": "0.00",
-      "percent": "0.00",
+      "contribution": "0.17",
+      "percent": "5.76",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "5.76"
     },
     {
       "id": "platform",

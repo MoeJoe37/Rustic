@@ -156,6 +156,13 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
+<summary>Desktop and mobile alpha (M8): 1 section</summary>
+
+- [UI-05 — Scroll positions](#ui-05--scroll-positions)
+
+</details>
+
+<details>
 <summary>Isolation and security (M7): 4 sections</summary>
 
 - [ISO-01 — Out-of-process frames and popups](#iso-01--out-of-process-frames-and-popups)
@@ -2547,6 +2554,24 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## UI-05 — Scroll positions
+
+Added 2026-11-21 (`rustic-layout/src/scroll.rs`, `rustic-cli/src/loader.rs`
+`scrolled`, [ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)).
+`BlockLayout::scrolled` applies viewport and scroll-container positions to
+an unscrolled layout in one pass, without laying out again; `dump-paint`,
+`render` and `hit-test` take `--scroll X,Y` and `--scroll-box N=X,Y`.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Movement | Contents move by the negated position along the containing-block chain; nested containers add up; absolute boxes follow their containing block, fixed boxes stay; lines, inline boxes and glyphs move with their block | `the_viewport_scrolls_content_but_not_fixed_boxes_within_its_range`, `nested_scroll_containers_move_their_contents_and_clips`, `absolute_boxes_scroll_with_their_containing_block_not_their_parent` |
+| Sticky | Sticky offsets re-solve at the scroll container's position | `sticky_boxes_take_their_offset_at_the_new_scroll_position` |
+| Clips and ranges | Clips recomputed over moved padding boxes; positions clamp to `min..=max` from the scrollable overflow; zero is the identity; non-scroll-container positions are ignored | the tests above |
+| CLI | Painted pixels and hit testing follow; bad values are usage errors; frames and popups do not inherit the options | `the_viewport_and_scroll_containers_scroll_without_moving_fixed_boxes`, `hit_testing_follows_the_scroll_position_and_bad_values_are_usage_errors` |
+
+Next ([ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)): layer scenes
+with cached rasters, incremental frame submission, and script scrolling.
 
 ## ISO-01 — Out-of-process frames and popups
 

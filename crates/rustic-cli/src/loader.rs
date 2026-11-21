@@ -77,6 +77,10 @@ pub struct LoaderLimits {
     /// `--click X,Y` points (CSS pixels), delivered as trusted primary
     /// clicks after the load's script turns.
     pub clicks: [Option<(f64, f64)>; MAX_CLICKS],
+    /// `--scroll X,Y`: the viewport's scroll position for painting.
+    pub scroll: (f64, f64),
+    /// `--scroll-box N=X,Y`: scroll container positions by fragment index.
+    pub scroll_boxes: [Option<(usize, f64, f64)>; MAX_CLICKS],
 }
 
 /// Most `--click` points one command takes.
@@ -95,6 +99,8 @@ impl Default for LoaderLimits {
             formatting: rustic_layout::FormattingLimits::default(),
             images: crate::images::ImageLimits::default(),
             clicks: [None; MAX_CLICKS],
+            scroll: (0.0, 0.0),
+            scroll_boxes: [None; MAX_CLICKS],
         }
     }
 }
@@ -1672,8 +1678,29 @@ fn block_layout(
     Ok((tree, layout, viewport, images, styles))
 }
 
+/// The layout with the command's `--scroll` and `--scroll-box` positions
+/// applied (ADR 0064); the unscrolled layout when there are none.
+fn scrolled(
+    layout: rustic_layout::BlockLayout,
+    viewport: rustic_layout::CssSize,
+    limits: LoaderLimits,
+) -> Result<rustic_layout::BlockLayout, LoadError> {
+    if limits.scroll == (0.0, 0.0) && limits.scroll_boxes.iter().all(Option::is_none) {
+        return Ok(layout);
+    }
+    let mut positions = rustic_layout::ScrollPositions::new();
+    positions.set_viewport(limits.scroll.0, limits.scroll.1);
+    for &(index, x, y) in limits.scroll_boxes.iter().flatten() {
+        positions.set_box(index, x, y);
+    }
+    layout
+        .scrolled(viewport, &positions)
+        .map_err(LoadError::Flow)
+}
+
 fn display_list(input: LayoutInput<'_>) -> Result<rustic_paint::DisplayList, LoadError> {
     let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let layout = scrolled(layout, viewport, input.limits)?;
     let resources = rustic_paint::Resources {
         fonts: Some(fonts()),
         images: images.images,
@@ -1896,6 +1923,7 @@ pub(crate) fn render_layers(
     let input = parsed.layout_input(path, limits, view);
     let cancellation = input.cancellation;
     let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let layout = scrolled(layout, viewport, limits)?;
     let document_url = input.network.map(|session| session.document_url().clone());
     let sites = frame_sites(input.document, document_url.as_ref());
     let build = |images: HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>| {

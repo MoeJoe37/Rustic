@@ -6197,8 +6197,56 @@
           "label": "Incremental scene submission and scrolling",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Scroll positions applied to a finished layout: viewport and nested scroll containers, fixed and sticky boxes, clips and clamping, with paint and hit testing following (ADR 0064)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/scroll.rs",
+                  "marker": "pub fn scrolled("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0064-scrolling-and-compositor-scenes.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/scroll.rs",
+                  "marker": "fn nested_scroll_containers_move_their_contents_and_clips"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/scroll.rs",
+                  "marker": "fn sticky_boxes_take_their_offset_at_the_new_scroll_position"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/scroll.rs",
+                  "marker": "fn the_viewport_and_scroll_containers_scroll_without_moving_fixed_boxes"
+                }
+              ]
+            },
+            {
+              "label": "Layer scenes: display lists split at scroll containers and fixed/sticky contexts into cached layer rasters that re-composite on scroll",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "compositor.backend",

@@ -23,6 +23,7 @@ mod margins;
 mod overflow;
 mod position;
 mod replaced;
+mod scroll;
 mod sizing;
 mod sticky;
 mod tailoring;
@@ -41,6 +42,7 @@ pub use geometry::{
 };
 pub use overflow::{AxisRange, Clip};
 pub use replaced::NaturalSize;
+pub use scroll::{ScrollPositions, ScrollRange};
 pub use sizing::{BlockMeasure, Edges, MeasureError, measure_block_width};
 pub use sticky::StickyConstraint;
 pub use text::{InlineFragment, LineFragment, PositionedGlyph, TextFragment};

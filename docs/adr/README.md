@@ -71,6 +71,7 @@ instead of rewriting the history of a decision.
 | [0061](0061-network-process.md) | Exchanges (sockets, TLS, HTTP framing, content codings) run in a `rustic __network` child; the broker keeps every decision and revalidates replies under credit-based flow control | Accepted |
 | [0062](0062-out-of-process-frames.md) | Every `iframe` document renders in a renderer of its own with its own grant; the embedder sends black-painted pixels and per-frame coverage, and the broker composites the frame it never showed the embedder | Accepted |
 | [0063](0063-macos-renderer-sandbox.md) | macOS renderers under a deny-by-default Seatbelt profile through `sandbox-exec`, opt-in with `--sandbox` until verified on native Macs | Proposed |
+| [0064](0064-scrolling-and-compositor-scenes.md) | Scroll positions are applied to a finished layout along the containing-block chain (fixed stays, sticky re-solves, clips follow); scenes of cached layers and script scrolling build on them | Accepted (step 1) |
 
 ## Records by area
 

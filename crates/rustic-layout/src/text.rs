@@ -16,8 +16,8 @@ use crate::{CssPoint, CssPx, CssRect, CssSize};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LineFragment {
     block: usize,
-    rect: CssRect,
-    baseline: CssPx,
+    pub(crate) rect: CssRect,
+    pub(crate) baseline: CssPx,
 }
 
 impl LineFragment {
@@ -53,12 +53,12 @@ pub struct TextFragment {
     node: NodeId,
     source_box: usize,
     text: Range<usize>,
-    rect: CssRect,
-    baseline: CssPx,
+    pub(crate) rect: CssRect,
+    pub(crate) baseline: CssPx,
     level: u8,
     face: usize,
     font_size: f64,
-    glyphs: Vec<PositionedGlyph>,
+    pub(crate) glyphs: Vec<PositionedGlyph>,
     parent: Option<usize>,
 }
 
@@ -117,9 +117,9 @@ pub struct InlineFragment {
     line: usize,
     node: NodeId,
     source_box: usize,
-    border: CssRect,
-    padding: CssRect,
-    content: CssRect,
+    pub(crate) border: CssRect,
+    pub(crate) padding: CssRect,
+    pub(crate) content: CssRect,
     starts: bool,
     ends: bool,
     parent: Option<usize>,

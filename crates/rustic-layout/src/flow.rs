@@ -86,9 +86,9 @@ pub struct BlockFragment {
     node: NodeId,
     source_box: usize,
     parent: Option<usize>,
-    content: CssRect,
-    padding: CssRect,
-    border: CssRect,
+    pub(crate) content: CssRect,
+    pub(crate) padding: CssRect,
+    pub(crate) border: CssRect,
     margin: Edges,
     containing_width: CssPx,
     scheme: PositionScheme,
@@ -96,7 +96,7 @@ pub struct BlockFragment {
     containing_block: Option<usize>,
     overflow: (Overflow, Overflow),
     clip: Clip,
-    scrollable: Option<CssRect>,
+    pub(crate) scrollable: Option<CssRect>,
     line: Option<usize>,
     sticky: Option<StickyConstraint>,
     /// For an atomic inline, its enclosing inline fragment on the line.
@@ -2188,6 +2188,22 @@ impl BlockLayout {
     /// Inline box fragments (one per box per line), by line, in box preorder.
     pub fn inlines(&self) -> &[InlineFragment] {
         &self.inlines
+    }
+
+    pub(crate) fn fragments_mut(&mut self) -> &mut [BlockFragment] {
+        &mut self.fragments
+    }
+
+    pub(crate) fn lines_mut(&mut self) -> &mut [LineFragment] {
+        &mut self.lines
+    }
+
+    pub(crate) fn texts_mut(&mut self) -> &mut [TextFragment] {
+        &mut self.texts
+    }
+
+    pub(crate) fn inlines_mut(&mut self) -> &mut [InlineFragment] {
+        &mut self.inlines
     }
 
     /// Rounded widths of the untransformed border-box unions for CSSOM View.

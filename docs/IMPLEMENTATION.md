@@ -2539,6 +2539,48 @@ service step. The existing 128 KiB limit test still passes after removing tempor
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
 
+## ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)
+
+Added 2026-11-21 (`rustic-sandbox`, `rustic-cli/src/broker.rs`,
+[ADR 0058](adr/0058-linux-renderer-sandbox.md),
+[ADR 0060](adr/0060-windows-renderer-sandbox.md)). Split document
+commands confine their renderer by default; `--no-sandbox` or
+`RUSTIC_SANDBOX=0` opts out, `--sandbox` or `RUSTIC_SANDBOX=1` demands a
+sandbox (an error on macOS, TD-174), any other `RUSTIC_SANDBOX` value is
+a usage error (`a_bad_sandbox_setting_is_a_usage_error`), and a sandbox
+that cannot start is an error, never an unconfined run.
+
+Linux: bubblewrap as before plus a seccomp-bpf allowlist built by
+`rustic_sandbox::seccomp::renderer_filter` (about 75 measured calls,
+`clone` without `CLONE_NEW*`, `ioctl` without `TIOCSTI`/`TIOCLINUX`,
+`ENOSYS` for everything else including sockets, other ABIs killed),
+handed to `bwrap --seccomp` as descriptor 3 by `/bin/sh`
+(`dangerous_calls_fail_and_measured_calls_pass`,
+`the_allowlist_has_no_duplicates_or_dangerous_calls`,
+`clone_creates_threads_but_no_namespaces`,
+`terminal_injection_ioctls_are_refused`, `other_abis_are_killed`,
+`programs_are_within_kernel_limits_and_serialize_eight_bytes_each`, run
+against an interpreter of the generated program). x86-64 and aarch64
+have tables; aarch64 is checked only by those unit tests (TD-12).
+
+Windows: `rustic_sandbox::spawn_app_container` starts the renderer in
+the `Rustic.Renderer` AppContainer as an LPAC with no capabilities,
+suspended, with only its standard pipes inherited, no console, child
+processes restricted, a minimal environment, in a job that kills it with
+the broker's handle and admits one process
+(`command_lines_quote_spaces_quotes_and_trailing_backslashes`,
+`environment_blocks_are_sorted_terminated_and_validated`). Under LPAC
+Winsock cannot start, so the renderer has no sockets; a plain
+AppContainer still reached loopback services and was rejected.
+
+Verification on native Linux x86-64 (WSL 2, Ubuntu, bubblewrap 0.11.1)
+and native Windows 11 x64: `the_sandbox_denies_files_network_and_processes_or_fails_closed`
+reads a file beside the document, lists a directory, writes a file,
+connects to a loopback listener and starts a shell from a compromised
+renderer; all succeed with `--no-sandbox` and all fail with `--sandbox`
+and by default. Every CLI suite runs with the default sandbox on both
+systems, and on Linux the pinned Window WPT selection too.
+
 ## ISO-02 — Split renderer process and brokered authority
 
 Added 2026-11-20 (`rustic-ipc`, `rustic-cli/src/broker.rs`,
@@ -2569,11 +2611,10 @@ matching, and in the broker Opaque Response Blocking and COEP
 `opaque_response_blocking_and_coep_keep_other_sites_out_of_the_renderer`).
 
 Linux sandbox ([ADR 0058](adr/0058-linux-renderer-sandbox.md), opt-in
-`--sandbox` or `RUSTIC_SANDBOX=1`): the renderer runs under bubblewrap with
-every namespace unshared, no capabilities, a new session, a cleared
-environment and only read-only `/usr` and its executable; it fails closed
-(`the_linux_sandbox_denies_files_network_and_processes_or_fails_closed`).
-Every CLI suite and the pinned WPT selection pass sandboxed. A watchdog
+when added; on by default since 2026-11-21, see ISO-03/ISO-04 above): the
+renderer runs under bubblewrap with every namespace unshared, no
+capabilities, a new session, a cleared environment and only read-only
+`/usr` and its executable; it fails closed. A watchdog
 stops a renderer after `--renderer-timeout` seconds
 (`a_hung_renderer_is_stopped_by_the_watchdog`).
 
@@ -2590,7 +2631,8 @@ exclusive `.part` file and renames it, and never opens the file
 (`downloads_are_saved_only_to_the_granted_directory_without_overwriting`).
 
 Test hooks `RUSTIC_TEST_RENDERER_CRASH`, `RUSTIC_TEST_RENDERER_HANG` and
-`RUSTIC_TEST_COMPROMISED_RENDERER` (`1`, `garbage`, `escape`) change only what the renderer does,
+`RUSTIC_TEST_COMPROMISED_RENDERER` (`1`, `garbage`, `escape`, with the escape targets in
+`RUSTIC_TEST_ESCAPE_ADDRESS`, `_FILE`, `_HOME` and `_DIR`) change only what the renderer does,
 which the broker treats as hostile anyway; they grant nothing.
 
 ## NET-03 — fetch(), Headers, Request and Response

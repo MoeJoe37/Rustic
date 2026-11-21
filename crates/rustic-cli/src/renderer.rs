@@ -283,24 +283,32 @@ fn escape(mut channel: Link) -> u8 {
             Err(error) => format!("{label}: denied ({error})\n"),
         });
     };
+    // Targets come from the test (the sandbox clears the environment
+    // except these hooks); the defaults are the usual Unix ones.
+    let target = |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.into());
     attempt(
-        "read-etc-passwd",
-        std::fs::read("/etc/passwd")
+        "read-user-file",
+        std::fs::read(target("RUSTIC_TEST_ESCAPE_FILE", "/etc/passwd"))
             .map(|bytes| format!("{} bytes", bytes.len()))
             .map_err(|error| error.kind().to_string()),
     );
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home".to_owned());
+    let home = target(
+        "RUSTIC_TEST_ESCAPE_HOME",
+        &std::env::var("HOME").unwrap_or_else(|_| "/home".to_owned()),
+    );
     attempt(
         "list-home",
         std::fs::read_dir(&home)
             .map(|entries| format!("{} entries", entries.count()))
             .map_err(|error| error.kind().to_string()),
     );
+    let probe = std::path::Path::new(&target("RUSTIC_TEST_ESCAPE_DIR", "/tmp"))
+        .join(format!("rustic-escape-probe-{}", std::process::id()));
     attempt(
-        "write-tmp",
-        std::fs::write("/tmp/rustic-escape-probe", b"x")
+        "write-temp",
+        std::fs::write(&probe, b"x")
             .map(|()| {
-                let _ = std::fs::remove_file("/tmp/rustic-escape-probe");
+                let _ = std::fs::remove_file(&probe);
                 "wrote".to_owned()
             })
             .map_err(|error| error.kind().to_string()),
@@ -312,18 +320,40 @@ fn escape(mut channel: Link) -> u8 {
             .parse::<std::net::SocketAddr>()
             .map_err(|error| error.to_string())
             .and_then(|address| {
-                std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(2))
-                    .map(|_| "connected".to_owned())
-                    .map_err(|error| error.kind().to_string())
+                // In the Windows LPAC sandbox Winsock cannot start and std
+                // panics; that is the denial, not a crash of the probe.
+                std::panic::set_hook(Box::new(|_| {}));
+                let connected = std::panic::catch_unwind(|| {
+                    std::net::TcpStream::connect_timeout(
+                        &address,
+                        std::time::Duration::from_secs(2),
+                    )
+                });
+                let _ = std::panic::take_hook();
+                match connected {
+                    Ok(Ok(_)) => Ok("connected".to_owned()),
+                    Ok(Err(error)) => Err(error.kind().to_string()),
+                    Err(_) => Err("sockets unavailable".to_owned()),
+                }
             }),
     );
     attempt(
         "spawn-shell",
-        std::process::Command::new("/bin/sh")
-            .args(["-c", "true"])
-            .status()
-            .map(|status| status.to_string())
-            .map_err(|error| error.kind().to_string()),
+        if cfg!(windows) {
+            let mut shell = std::process::Command::new(
+                std::path::Path::new(&target("SystemRoot", r"C:\Windows"))
+                    .join(r"System32\cmd.exe"),
+            );
+            shell.args(["/c", "exit", "0"]);
+            shell
+        } else {
+            let mut shell = std::process::Command::new("/bin/sh");
+            shell.args(["-c", "true"]);
+            shell
+        }
+        .status()
+        .map(|status| status.to_string())
+        .map_err(|error| error.kind().to_string()),
     );
     let done = RendererMessage::Done {
         status: 0,

@@ -304,6 +304,7 @@ dependencies = [
  "rustic-net",
  "rustic-paint",
  "rustic-raster",
+ "rustic-sandbox",
  "rustic-storage",
  "rustic-style",
  "rustic-text",
@@ -442,6 +443,13 @@ dependencies = [
  "rustic-paint",
  "rustic-style",
  "rustic-text",
+]
+
+[[package]]
+name = "rustic-sandbox"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

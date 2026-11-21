@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d991b0a2e88f55694b587a08089a944aeb7553021c1db0ef6da00ed259111c2d",
-  "percent": "41.32",
+  "source_fingerprint": "fb0732883ea2b988bfdc5ea2ae59a6285b30aebf6b6deb67309b22aad2f31087",
+  "percent": "41.50",
   "verified_percent": "38.70",
-  "partial_percent": "2.62",
+  "partial_percent": "2.80",
   "completed": 91,
   "in_progress": 11,
   "total": 221,
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 2,
       "total": 8,
-      "percent": "65.36",
+      "percent": "70.05",
       "verified_percent": "18.75",
-      "partial_percent": "46.61"
+      "partial_percent": "51.30"
     },
     {
       "id": "M8",
@@ -6310,7 +6310,7 @@
                 {
                   "kind": "source",
                   "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "fn renderer_command()"
+                  "marker": "fn spawn_confined(exe: &Path) -> io::Result<Started>"
                 },
                 {
                   "kind": "source",
@@ -6320,14 +6320,35 @@
                 {
                   "kind": "test",
                   "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed"
+                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
                 }
               ]
             },
             {
               "label": "Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-sandbox/src/seccomp.rs",
+                  "marker": "pub fn renderer_filter(arch: Arch) -> Vec<Instruction>"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "pub const SANDBOX_AVAILABLE: bool"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-sandbox/src/seccomp.rs",
+                  "marker": "fn dangerous_calls_fail_and_measured_calls_pass"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "for mode in [Some(\"--sandbox\"), None]"
+                }
+              ]
             },
             {
               "label": "Linux aarch64: native verification run",
@@ -6335,7 +6356,33 @@
               "evidence": []
             },
             {
-              "label": "Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners",
+              "label": "Windows x64: capability-less LPAC AppContainer renderer in a kill-on-close job, on by default, with an ADR, verified natively (ADR 0060)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-sandbox/src/windows.rs",
+                  "marker": "pub fn spawn_app_container("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0060-windows-renderer-sandbox.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-sandbox/src/windows.rs",
+                  "marker": "fn environment_blocks_are_sorted_terminated_and_validated"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
+                }
+              ]
+            },
+            {
+              "label": "Windows ARM64: native verification run",
               "status": "planned",
               "evidence": []
             },
@@ -6345,7 +6392,7 @@
               "evidence": []
             }
           ],
-          "credit": "20.00",
+          "credit": "50.00",
           "engine_share": "0.58"
         },
         {
@@ -6443,7 +6490,7 @@
                 {
                   "kind": "test",
                   "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed"
+                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
                 }
               ]
             },
@@ -6647,10 +6694,10 @@
       "completed": 2,
       "in_progress": 6,
       "total": 11,
-      "contribution": "2.43",
-      "percent": "48.64",
+      "contribution": "2.60",
+      "percent": "52.13",
       "verified_percent": "13.95",
-      "partial_percent": "34.69"
+      "partial_percent": "38.18"
     },
     {
       "id": "compositor",

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 41.32%** = 38.70% verified complete + 2.62% partial credit. 91/221 capabilities complete, 11 in progress.
+**Overall completion: 41.50%** = 38.70% verified complete + 2.80% partial credit. 91/221 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `d991b0a2e88f55694b587a08089a944aeb7553021c1db0ef6da00ed259111c2d`.
+Catalog: `engine-v4`. Source fingerprint: `fb0732883ea2b988bfdc5ea2ae59a6285b30aebf6b6deb67309b22aad2f31087`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `d991b0a2e88f55694b587a08089a944aeb755
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 2/8 | 65.36% | 18.75% | 3.72% |
+| M7 Isolation & security | 2/8 | 70.05% | 18.75% | 3.72% |
 | M8 Desktop & mobile alpha | 0/21 | 1.89% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `d991b0a2e88f55694b587a08089a944aeb755
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 2/11 | 6 | 48.64% | 13.95% | 5% | 2.43 |
+| Security & IPC | 2/11 | 6 | 52.13% | 13.95% | 5% | 2.60 |
 | Compositor & GPU | 0/4 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -283,11 +283,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] One fresh renderer and grant per document; no authority across navigations ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [x] Opaque Response Blocking and COEP/CORP in the broker for every no-cors subresource ([source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [ ] Cross-origin frames and opener groups in renderer assignment (needs iframes and window.open, TD-130)
-- **in progress 20.00%** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
+- **in progress 50.00%** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine
   - [x] Linux: renderer under namespaces with no filesystem, network or capabilities, fail closed (ADR 0058) ([source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0058-linux-renderer-sandbox.md), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [ ] Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172)
+  - [x] Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172) ([source](../../crates/rustic-sandbox/src/seccomp.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-sandbox/src/seccomp.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
   - [ ] Linux aarch64: native verification run
-  - [ ] Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners
+  - [x] Windows x64: capability-less LPAC AppContainer renderer in a kill-on-close job, on by default, with an ADR, verified natively (ADR 0060) ([source](../../crates/rustic-sandbox/src/windows.rs), [source](../../docs/adr/0060-windows-renderer-sandbox.md), [test](../../crates/rustic-sandbox/src/windows.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+  - [ ] Windows ARM64: native verification run
   - [ ] macOS: App Sandbox or seatbelt profile with an ADR, verified on native x64 and ARM64 runners
 - **in progress 33.33%** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
   - [x] Android and iOS isolation design over the shared broker protocol (ADR 0059) ([source](../../docs/adr/0059-mobile-renderer-isolation.md), [test](../../crates/rustic-ipc/tests/channel.rs))

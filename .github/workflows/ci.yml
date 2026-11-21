@@ -106,6 +106,17 @@ jobs:
         run: rustup toolchain install "$RUST_VERSION" --profile minimal
       - name: Report host target
         run: rustc -vV | grep '^host:'
+      - name: Install bubblewrap for the default Linux renderer sandbox
+        # ADR 0058: renderers run under bwrap with a seccomp allowlist. Ubuntu
+        # 24.04 may restrict unprivileged user namespaces through AppArmor;
+        # the sysctl is absent on images without that restriction.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends bubblewrap
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - name: Test all targets
         run: cargo test --locked --workspace --all-targets
       - name: Test documentation examples
@@ -168,6 +179,10 @@ jobs:
       # s390x). Serial tests cost little here because the slow tests sleep.
       # TD-22 tracks this.
       RUST_TEST_THREADS: "1"
+      # The seccomp allowlist has tables for x86-64 and aarch64 only, and
+      # bubblewrap would run the host's emulator: renderers here opt out of
+      # the sandbox explicitly (ADR 0058).
+      RUSTIC_SANDBOX: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -266,6 +281,17 @@ jobs:
         env:
           CHECK_TOOLCHAIN: ${{ matrix.toolchain }}
         run: rustup toolchain install "$CHECK_TOOLCHAIN" --profile minimal
+      - name: Install bubblewrap for the default Linux renderer sandbox
+        # ADR 0058: renderers run under bwrap with a seccomp allowlist. Ubuntu
+        # 24.04 may restrict unprivileged user namespaces through AppArmor;
+        # the sysctl is absent on images without that restriction.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends bubblewrap
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - name: Test compiler compatibility
         env:
           RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}

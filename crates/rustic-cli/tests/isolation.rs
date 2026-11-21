@@ -265,49 +265,74 @@ fn bubblewrap_available() -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
+/// Whether this machine can run the renderer sandbox: Windows always
+/// (AppContainer), Linux with a working bubblewrap on x86-64 or aarch64.
+fn sandbox_available() -> bool {
+    if cfg!(windows) {
+        return true;
+    }
+    cfg!(target_os = "linux")
+        && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
+        && bubblewrap_available()
+}
+
+const ESCAPES: [&str; 5] = [
+    "read-user-file",
+    "list-home",
+    "write-temp",
+    "connect-loopback",
+    "spawn-shell",
+];
+
 #[test]
-fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed() {
+fn the_sandbox_denies_files_network_and_processes_or_fails_closed() {
     let site = Site::new("sandbox");
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap().to_string();
-    let probe = |sandbox: bool| {
+    let outside = site.0.join("outside.txt").to_string_lossy().into_owned();
+    let home = site.0.to_string_lossy().into_owned();
+    let probe = |mode: Option<&str>| {
         let mut args = vec![];
-        if sandbox {
-            args.push("--sandbox");
-        }
+        args.extend(mode);
         let page = site.page();
         args.extend_from_slice(&["dump-dom", &page]);
-        rustic(
-            &args,
-            &[
-                ("RUSTIC_TEST_COMPROMISED_RENDERER", "escape"),
-                ("RUSTIC_TEST_ESCAPE_ADDRESS", &address),
-            ],
-        )
+        let mut command = Command::new(env!("CARGO_BIN_EXE_rustic"));
+        command
+            .args(&args)
+            .env_remove("RUSTIC_SANDBOX")
+            .env("RUSTIC_TEST_COMPROMISED_RENDERER", "escape")
+            .env("RUSTIC_TEST_ESCAPE_ADDRESS", &address)
+            .env("RUSTIC_TEST_ESCAPE_FILE", &outside)
+            .env("RUSTIC_TEST_ESCAPE_HOME", &home)
+            .env("RUSTIC_TEST_ESCAPE_DIR", &home);
+        command.output().expect("run rustic")
     };
-    if !cfg!(target_os = "linux") || !bubblewrap_available() {
-        // No sandbox here: the command refuses rather than run unconfined.
-        let output = probe(true);
+    if !sandbox_available() {
+        // No sandbox here: asking for one fails rather than run unconfined.
+        let output = probe(Some("--sandbox"));
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stdout.is_empty());
         return;
     }
     // The unconfined control run shows the probes would work.
-    let open = text(&probe(false).stdout);
-    assert!(open.contains("read-etc-passwd: allowed"), "{open}");
-    assert!(open.contains("connect-loopback: allowed"), "{open}");
-    let output = probe(true);
-    assert!(output.status.success(), "{}", text(&output.stderr));
-    let confined = text(&output.stdout);
-    for probe in [
-        "read-etc-passwd",
-        "list-home",
-        "write-tmp",
-        "connect-loopback",
-        "spawn-shell",
-    ] {
-        assert!(confined.contains(&format!("{probe}: denied")), "{confined}");
+    let open = text(&probe(Some("--no-sandbox")).stdout);
+    for escape in ESCAPES {
+        assert!(open.contains(&format!("{escape}: allowed")), "{open}");
     }
+    // Explicitly and by default, every probe is denied.
+    for mode in [Some("--sandbox"), None] {
+        let output = probe(mode);
+        assert!(output.status.success(), "{}", text(&output.stderr));
+        let confined = text(&output.stdout);
+        for escape in ESCAPES {
+            assert!(
+                confined.contains(&format!("{escape}: denied")),
+                "{confined}"
+            );
+        }
+    }
+    // Nothing was written outside the renderer.
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "secret");
     // Real rendering still works inside the sandbox.
     let page = site.page();
     let output = rustic(&["--sandbox", "dump-dom", &page], &[]);
@@ -316,6 +341,15 @@ fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed() {
     // The sandbox and the single-process mode exclude each other.
     let output = rustic(&["--sandbox", "--single-process", "dump-dom", &page], &[]);
     assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn a_bad_sandbox_setting_is_a_usage_error() {
+    let site = Site::new("sandbox-setting");
+    let page = site.page();
+    let output = rustic(&["dump-dom", &page], &[("RUSTIC_SANDBOX", "yes")]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
 }
 
 #[test]

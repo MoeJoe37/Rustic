@@ -88,3 +88,32 @@ No dependency is new in M7.
 
 General remote browsing stays disabled: the transport still reaches only
 allowlisted loopback origins (TD-157).
+
+## Addendum 2026-11-21 — default sandboxes on Linux and Windows
+
+Release-blocking item 2 (no seccomp filter) is closed, and item 1 is
+narrowed: the renderer is confined **by default** on Linux (bubblewrap
+plus a measured seccomp-bpf allowlist, ADR 0058, TD-172 paid) and on
+Windows (a capability-less LPAC AppContainer in a kill-on-close job,
+ADR 0060), and failing to set up the sandbox is an error. The escape
+probe in `crates/rustic-cli/tests/isolation.rs` (read a user file, list
+a directory, write a file, connect to loopback, start a shell) succeeds
+unconfined and fails confined on native Linux x86-64 (WSL 2) and native
+Windows 11 x64; every CLI suite and, on Linux, the pinned WPT selection
+pass with the sandbox on.
+
+New native code: `crates/rustic-sandbox/src/windows.rs` is the first
+project `unsafe` (Win32 process, AppContainer, job and pipe calls, one
+documented operation per block, enforced by Clippy). It is reviewed here
+as broker code: handles are owned by `OwnedHandle`, the attribute list
+and the values it points to outlive `CreateProcessW`, strings are
+NUL-terminated and arguments containing NUL are refused, the process is
+created suspended and terminated if the job cannot be applied, and no
+code path starts it unconfined. One finding during the work: a plain
+AppContainer still reached loopback services on this Windows 11 23H2
+machine with the firewall on, so the launcher uses LPAC, under which
+Winsock cannot start.
+
+Still blocking remote browsing: macOS has no sandbox (TD-174); Linux
+aarch64, Windows ARM64, macOS, Android and iOS have no native run
+(TD-12); no independent external review.

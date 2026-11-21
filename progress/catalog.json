@@ -5790,7 +5790,7 @@
                 {
                   "kind": "source",
                   "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "fn renderer_command()"
+                  "marker": "fn spawn_confined(exe: &Path) -> io::Result<Started>"
                 },
                 {
                   "kind": "source",
@@ -5800,14 +5800,35 @@
                 {
                   "kind": "test",
                   "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed"
+                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
                 }
               ]
             },
             {
               "label": "Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-sandbox/src/seccomp.rs",
+                  "marker": "pub fn renderer_filter(arch: Arch) -> Vec<Instruction>"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "pub const SANDBOX_AVAILABLE: bool"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-sandbox/src/seccomp.rs",
+                  "marker": "fn dangerous_calls_fail_and_measured_calls_pass"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "for mode in [Some(\"--sandbox\"), None]"
+                }
+              ]
             },
             {
               "label": "Linux aarch64: native verification run",
@@ -5815,7 +5836,33 @@
               "evidence": []
             },
             {
-              "label": "Windows: AppContainer/restricted-token renderer with an ADR, verified on native x64 and ARM64 runners",
+              "label": "Windows x64: capability-less LPAC AppContainer renderer in a kill-on-close job, on by default, with an ADR, verified natively (ADR 0060)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-sandbox/src/windows.rs",
+                  "marker": "pub fn spawn_app_container("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0060-windows-renderer-sandbox.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-sandbox/src/windows.rs",
+                  "marker": "fn environment_blocks_are_sorted_terminated_and_validated"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
+                }
+              ]
+            },
+            {
+              "label": "Windows ARM64: native verification run",
               "status": "planned",
               "evidence": []
             },
@@ -5919,7 +5966,7 @@
                 {
                   "kind": "test",
                   "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_linux_sandbox_denies_files_network_and_processes_or_fails_closed"
+                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
                 }
               ]
             },

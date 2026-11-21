@@ -84,10 +84,13 @@ one animation frame.
 Process isolation: document commands (all but reftest) run their page in a
 renderer child process that asks this process for every file, network and
 storage access. --single-process runs everything in one process.
---sandbox (Linux, needs bubblewrap; or RUSTIC_SANDBOX=1) confines the
-renderer: no files, no network, no other processes; it fails rather than
-run unconfined. --renderer-timeout SECONDS stops a renderer that runs
-longer (default 120).
+The renderer is confined by default on Linux (bubblewrap and a seccomp
+filter; x86-64 and aarch64) and Windows (a capability-less AppContainer):
+no files, no network, no other processes. Without a working sandbox the
+command fails rather than run unconfined. --no-sandbox (or
+RUSTIC_SANDBOX=0) accepts an unconfined renderer; --sandbox (or
+RUSTIC_SANDBOX=1) demands one, also where none exists (macOS: an error).
+--renderer-timeout SECONDS stops a renderer that runs longer (default 120).
 --download-dir DIR saves navigations that turn out to be downloads into DIR
 (sanitized names, never overwriting); without it downloads are refused.
 

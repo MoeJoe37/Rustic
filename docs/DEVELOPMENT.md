@@ -37,6 +37,11 @@ rustup toolchain install stable --profile minimal
 cargo +stable test --locked --workspace --all-targets
 ```
 
+The CLI tests run renderers in the default sandbox (M7). On Linux x86-64 and
+aarch64 that needs `bwrap` (bubblewrap) on `PATH` and unprivileged user
+namespaces; on Windows nothing extra. On other Linux architectures, and to
+run tests without a sandbox deliberately, set `RUSTIC_SANDBOX=0`.
+
 Keep `Cargo.lock` committed and use `--locked` so implicit resolution changes
 fail visibly; its only third-party packages are the reviewed font adapters of
 [ADR 0014](adr/0014-reviewed-font-adapters.md). The CLI accepts only `info`, `--help`,

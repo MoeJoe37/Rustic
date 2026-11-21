@@ -12,9 +12,9 @@
 //! command with an error; nothing it half-produced is written.
 
 use std::ffi::OsString;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -33,7 +33,14 @@ use crate::network::{NetworkSession, ResourceKind, Session};
 use crate::stylesheets::LocalStylesheetFetcher;
 
 static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
+/// Whether renderers are confined. On by default where Rustic has a
+/// sandbox (Linux, Windows); `--no-sandbox` or `RUSTIC_SANDBOX=0` turns it
+/// off, `--sandbox` or `RUSTIC_SANDBOX=1` demands it (an error where none
+/// exists).
 static SANDBOX: AtomicBool = AtomicBool::new(false);
+
+/// Whether this platform has a renderer sandbox (ADR 0058, ADR 0060).
+pub const SANDBOX_AVAILABLE: bool = cfg!(any(target_os = "linux", windows));
 static TIMEOUT_SECONDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(120);
 
 /// Environment variables a sandboxed renderer may keep (test hooks and
@@ -44,12 +51,22 @@ const SANDBOX_ENV: &[&str] = &[
     "RUSTIC_TEST_RENDERER_HANG",
     "RUSTIC_TEST_COMPROMISED_RENDERER",
     "RUSTIC_TEST_ESCAPE_ADDRESS",
+    "RUSTIC_TEST_ESCAPE_FILE",
+    "RUSTIC_TEST_ESCAPE_HOME",
+    "RUSTIC_TEST_ESCAPE_DIR",
 ];
 
-/// Remove `--single-process` from `args`.
+/// Remove the process options (`--single-process`, `--sandbox`,
+/// `--no-sandbox`, `--renderer-timeout`) from `args`.
 pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     let mut output = Vec::new();
     let mut args = args.into_iter();
+    let mut choice = match std::env::var_os("RUSTIC_SANDBOX") {
+        Some(value) if value == "1" => Some(true),
+        Some(value) if value == "0" => Some(false),
+        Some(_) => return Err("RUSTIC_SANDBOX must be 0 or 1".into()),
+        None => None,
+    };
     while let Some(arg) = args.next() {
         if arg == "--" {
             output.push(arg);
@@ -59,7 +76,9 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
         if arg == "--single-process" {
             SINGLE_PROCESS.store(true, Ordering::Relaxed);
         } else if arg == "--sandbox" {
-            SANDBOX.store(true, Ordering::Relaxed);
+            choice = Some(true);
+        } else if arg == "--no-sandbox" {
+            choice = Some(false);
         } else if arg == "--renderer-timeout" {
             let seconds = args
                 .next()
@@ -72,16 +91,20 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
             output.push(arg);
         }
     }
-    if std::env::var_os("RUSTIC_SANDBOX").is_some_and(|value| value == "1") {
-        SANDBOX.store(true, Ordering::Relaxed);
-    }
-    if SANDBOX.load(Ordering::Relaxed) && SINGLE_PROCESS.load(Ordering::Relaxed) {
+    let single = SINGLE_PROCESS.load(Ordering::Relaxed);
+    if choice == Some(true) && single {
         return Err(
             "--sandbox confines the renderer process; it cannot be used with \
                     --single-process"
                 .into(),
         );
     }
+    // `--single-process` is an explicit choice of no renderer process, so
+    // there is nothing to confine.
+    SANDBOX.store(
+        !single && choice.unwrap_or(SANDBOX_AVAILABLE),
+        Ordering::Relaxed,
+    );
     Ok(output)
 }
 
@@ -249,31 +272,168 @@ fn document_argument(
     }
 }
 
-/// The renderer command line: the executable itself, or under `--sandbox`
-/// that executable inside bubblewrap (ADR 0058) with every namespace
-/// unshared (no network), a filesystem of the read-only system libraries
-/// and the executable only, no capabilities, a new session (no terminal
-/// injection), a cleared environment, and death with the broker.
-fn renderer_command() -> io::Result<Command> {
-    let exe = std::env::current_exe()?;
-    if !SANDBOX.load(Ordering::Relaxed) {
-        let mut command = Command::new(exe);
-        command.arg(crate::renderer::RENDERER_COMMAND);
-        return Ok(command);
+/// A renderer process: unconfined, or in the Windows AppContainer.
+enum Process {
+    Child(Child),
+    /// A bubblewrap renderer and its filter file, which lives until the
+    /// launcher has opened (and removed) it or the process is gone.
+    #[cfg(not(windows))]
+    Sandboxed {
+        child: Child,
+        _filter: SeccompFile,
+    },
+    #[cfg(windows)]
+    Confined(rustic_sandbox::Confined),
+}
+
+impl Process {
+    fn id(&self) -> u32 {
+        match self {
+            Self::Child(child) => child.id(),
+            #[cfg(not(windows))]
+            Self::Sandboxed { child, .. } => child.id(),
+            #[cfg(windows)]
+            Self::Confined(confined) => confined.id(),
+        }
     }
+
+    fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
+        match self {
+            Self::Child(child) => child.wait(),
+            #[cfg(not(windows))]
+            Self::Sandboxed { child, .. } => child.wait(),
+            #[cfg(windows)]
+            Self::Confined(confined) => confined.wait(),
+        }
+    }
+
+    fn kill(&mut self) -> io::Result<()> {
+        match self {
+            Self::Child(child) => child.kill(),
+            #[cfg(not(windows))]
+            Self::Sandboxed { child, .. } => child.kill(),
+            #[cfg(windows)]
+            Self::Confined(confined) => confined.kill(),
+        }
+    }
+}
+
+/// The renderer's standard error, whichever way it was started.
+enum RendererStderr {
+    Pipe(std::process::ChildStderr),
+    #[cfg(windows)]
+    File(std::fs::File),
+}
+
+impl Read for RendererStderr {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Pipe(pipe) => pipe.read(buffer),
+            #[cfg(windows)]
+            Self::File(file) => file.read(buffer),
+        }
+    }
+}
+
+type Started = (
+    Process,
+    Box<dyn Read + Send>,
+    Box<dyn Write + Send>,
+    RendererStderr,
+);
+
+type Spawned = (
+    Process,
+    Box<dyn Read + Send>,
+    Box<dyn Write + Send>,
+    std::thread::JoinHandle<()>,
+);
+
+/// The sandbox environment: only the allowed variables (test hooks and
+/// backtraces; nothing that names a user, a home or a display).
+fn sandbox_env() -> Vec<(OsString, OsString)> {
+    SANDBOX_ENV
+        .iter()
+        .filter_map(|name| std::env::var_os(name).map(|value| (OsString::from(name), value)))
+        .collect()
+}
+
+fn pipes(child: &mut Child) -> (Box<dyn Read + Send>, Box<dyn Write + Send>, RendererStderr) {
+    let stdin = child.stdin.take().expect("piped");
+    let stdout = child.stdout.take().expect("piped");
+    let stderr = RendererStderr::Pipe(child.stderr.take().expect("piped"));
+    (Box::new(stdout), Box::new(stdin), stderr)
+}
+
+/// Start the renderer: the executable itself, or, under the sandbox,
+/// that executable confined by the operating system (ADR 0058 on Linux,
+/// ADR 0060 on Windows). A sandbox that cannot be set up is an error.
+fn spawn_process() -> io::Result<Started> {
+    let exe = std::env::current_exe()?;
+    if SANDBOX.load(Ordering::Relaxed) {
+        return spawn_confined(&exe);
+    }
+    let mut child = Command::new(exe)
+        .arg(crate::renderer::RENDERER_COMMAND)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let (stdout, stdin, stderr) = pipes(&mut child);
+    Ok((Process::Child(child), stdout, stdin, stderr))
+}
+
+/// Windows: the executable in the renderer AppContainer with no
+/// capabilities, in a kill-on-close job of one process (ADR 0060).
+#[cfg(windows)]
+fn spawn_confined(exe: &Path) -> io::Result<Started> {
+    let command = std::ffi::OsStr::new(crate::renderer::RENDERER_COMMAND);
+    let (confined, pipes) = rustic_sandbox::spawn_app_container(exe, &[command], &sandbox_env())?;
+    Ok((
+        Process::Confined(confined),
+        Box::new(pipes.stdout),
+        Box::new(pipes.stdin),
+        RendererStderr::File(pipes.stderr),
+    ))
+}
+
+/// Linux: the executable inside bubblewrap with every namespace unshared
+/// (no network), a filesystem of the read-only system libraries and the
+/// executable only, no capabilities, a new session (no terminal
+/// injection), a cleared environment, death with the broker, and the
+/// seccomp-bpf filter of `rustic_sandbox::seccomp` (ADR 0058). `/bin/sh`
+/// opens the filter as descriptor 3 for `bwrap --seccomp` (std cannot pass
+/// a descriptor without unsafe code) and removes the file first.
+#[cfg(not(windows))]
+fn spawn_confined(exe: &Path) -> io::Result<Started> {
     if !cfg!(target_os = "linux") {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            "--sandbox is implemented on Linux only (ISO-04 covers Windows and macOS)",
+            "--sandbox is implemented on Linux and Windows only (macOS: TD-174)",
         ));
     }
+    let arch = rustic_sandbox::seccomp::Arch::current().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::Unsupported,
+            "the renderer sandbox has no system-call table for this CPU architecture; \
+             run with --no-sandbox to accept an unconfined renderer",
+        )
+    })?;
     let exe = exe.to_str().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
             "the executable path is not UTF-8",
         )
     })?;
-    let mut command = Command::new("bwrap");
+    let filter = SeccompFile::create(&rustic_sandbox::seccomp::to_bytes(
+        &rustic_sandbox::seccomp::renderer_filter(arch),
+    ))?;
+    let mut command = Command::new("/bin/sh");
+    command.args([
+        "-c",
+        "exec 3<\"$0\" && rm -f -- \"$0\" && exec bwrap --seccomp 3 \"$@\"",
+    ]);
+    command.arg(&filter.0);
     command.args([
         "--unshare-all",
         "--die-with-parent",
@@ -296,26 +456,62 @@ fn renderer_command() -> io::Result<Command> {
         "--chdir",
         "/",
     ]);
-    for name in SANDBOX_ENV {
-        if let Some(value) = std::env::var_os(name) {
-            command.arg("--setenv").arg(name).arg(value);
-        }
+    for (name, value) in sandbox_env() {
+        command.arg("--setenv").arg(name).arg(value);
     }
     command.args(["/renderer", crate::renderer::RENDERER_COMMAND]);
-    Ok(command)
-}
-
-type Spawned = (Child, ChildStdout, ChildStdin, std::thread::JoinHandle<()>);
-
-fn spawn() -> io::Result<Spawned> {
-    let mut child = renderer_command()?
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
-    let stdin = child.stdin.take().expect("piped");
-    let stdout = child.stdout.take().expect("piped");
-    let stderr = child.stderr.take().expect("piped");
+    let (stdout, stdin, stderr) = pipes(&mut child);
+    Ok((
+        Process::Sandboxed {
+            child,
+            _filter: filter,
+        },
+        stdout,
+        stdin,
+        stderr,
+    ))
+}
+
+/// The filter program in a new private file, removed on drop unless the
+/// launcher has removed it already.
+#[cfg(not(windows))]
+struct SeccompFile(PathBuf);
+
+#[cfg(not(windows))]
+impl SeccompFile {
+    fn create(bytes: &[u8]) -> io::Result<Self> {
+        use std::os::unix::fs::OpenOptionsExt;
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "rustic-seccomp-{}-{}.bpf",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)?;
+        let created = Self(path);
+        file.write_all(bytes)?;
+        Ok(created)
+    }
+}
+
+#[cfg(not(windows))]
+impl Drop for SeccompFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn spawn() -> io::Result<Spawned> {
+    let (process, stdout, stdin, stderr) = spawn_process()?;
     // Relay the renderer's diagnostics with control characters escaped, so
     // a compromised renderer cannot drive the user's terminal.
     let relay = std::thread::spawn(move || {
@@ -328,7 +524,7 @@ fn spawn() -> io::Result<Spawned> {
             line.clear();
         }
     });
-    Ok((child, stdout, stdin, relay))
+    Ok((process, stdout, stdin, relay))
 }
 
 fn serve(

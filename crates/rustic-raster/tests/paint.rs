@@ -1789,3 +1789,53 @@ fn atomic_inlines_paint_after_their_line_above_later_blocks_and_floats() {
         "the inline-block's content paints with it"
     );
 }
+
+#[test]
+fn submitted_frames_repaint_only_damage_and_equal_full_rasters() {
+    use rustic_raster::Frames;
+    let scale = DeviceScale::new(1.0).unwrap();
+    let cancel = CancellationToken::default();
+    let frame = |left: u32, color: &str| {
+        page(
+            "<div id=a></div><div id=b></div>",
+            &format!(
+                "body {{ margin:0 }} div {{ height:20px }} \
+                 #a {{ margin-left:{left}px; width:20px; background:{color} }} \
+                 #b {{ width:20px; background:#00f }}"
+            ),
+            1000.0,
+            600.0,
+        )
+        .list()
+        .unwrap()
+    };
+    let mut frames = Frames::new(scale, RasterLimits::default());
+    let lists = [
+        frame(0, "#f00"),
+        frame(0, "#f00"),
+        frame(0, "#0f0"),
+        frame(600, "#0f0"),
+    ];
+    let mut stats = Vec::new();
+    for list in &lists {
+        stats.push(frames.submit(list.clone(), &cancel).unwrap());
+        let full = rasterize(list, scale, RasterLimits::default(), &cancel).unwrap();
+        assert_eq!(
+            frames.surface().unwrap(),
+            &full,
+            "every frame equals a full raster"
+        );
+    }
+    // 1000x600 is 4x3 tiles. The first frame paints all, an identical one
+    // nothing, a recolor one tile, a move the tiles it leaves and enters.
+    let tiles: Vec<_> = stats.iter().map(|s| (s.repainted_tiles, s.full)).collect();
+    assert_eq!(tiles, [(12, true), (0, false), (1, false), (2, false)]);
+    assert!(stats.iter().all(|s| s.total_tiles == 12));
+    assert_eq!(stats[1].repainted_pixels, 0);
+    // A new size repaints everything.
+    let wide = page("<div></div>", "div{height:5px}", 500.0, 600.0)
+        .list()
+        .unwrap();
+    let stat = frames.submit(wide, &cancel).unwrap();
+    assert!(stat.full && stat.total_tiles == 6);
+}

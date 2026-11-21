@@ -1,7 +1,7 @@
 # ADR 0064 — Scrolling and compositor scenes
 
 Date: 2026-11-21
-Status: Accepted for scroll positions (step 1) and script scrolling (step 4, 2026-11-21); scenes and incremental submission are the plan for the next steps
+Status: Accepted for scroll positions (step 1), incremental frames (step 3) and script scrolling (step 4); layer scenes (step 2) are the plan
 
 ## Context
 
@@ -38,7 +38,17 @@ repaint only the tiles whose pixels can change between two display lists.
    new offsets and rasterizes only newly exposed regions; content changes
    use the existing tile damage per layer. The CPU compositor is the
    reference the M8 GPU backend must match.
-4. **Script scrolling** (done). The engine keeps the document's scroll
+4. **Incremental frames** (done, catalog step 3). `rustic_raster::Frames` keeps
+   the last display list and surface; each submitted list repaints only
+   the tiles `damage` reports, so every frame equals a full rasterization
+   of its list. `render --frames N` (with `--run-scripts`) steps the manual
+   clock by 1/60 s per frame, runs the tasks that are due, offers a
+   rendering opportunity, paints the DOM incrementally and writes
+   `NAME-K.EXT` per frame with a repaint line per frame on standard
+   output. A scroll moves every scrolled fill, so it still repaints what
+   moved; caching scrolled content is what layer scenes add. Frames paint
+   iframes white (TD-178).
+5. **Script scrolling** (done, catalog step 4). The engine keeps the document's scroll
    positions (`ScrollState`); `window.scrollX`/`scrollY`/`pageXOffset`/
    `pageYOffset`, `scroll()`/`scrollTo()`/`scrollBy()` (numbers or
    `ScrollToOptions`) and `Element.scrollTop`/`scrollLeft`/`scroll()`/

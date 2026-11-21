@@ -40,8 +40,9 @@ thread_local! {
     static GRANTED: RefCell<Option<SessionDocument>> = const { RefCell::new(None) };
     /// The broker, which loads this document's frames (renderer mode only).
     static FRAMES: RefCell<Option<Rc<BrokerLink>>> = const { RefCell::new(None) };
-    /// The rendered surface, sent before `Done` (`render` only).
-    static SURFACE: RefCell<Option<Surface>> = const { RefCell::new(None) };
+    /// The rendered surfaces, sent before `Done` (`render` only; one per
+    /// frame with `--frames`).
+    static SURFACE: RefCell<Vec<Surface>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Where `render` sends frame requests: the broker, in a renderer.
@@ -57,7 +58,7 @@ pub(crate) fn frame_host() -> Option<Rc<dyn crate::loader::FrameHost>> {
 /// Hand the rendered surface to the broker, which composites the frames
 /// and writes the PNG.
 pub(crate) fn emit_surface(surface: Surface) {
-    SURFACE.with(|slot| *slot.borrow_mut() = Some(surface));
+    SURFACE.with(|slot| slot.borrow_mut().push(surface));
 }
 
 impl crate::loader::FrameHost for BrokerLink {
@@ -214,7 +215,7 @@ pub fn run() -> u8 {
     let status = crate::run_command(&mut engine, &command).unwrap_or(2);
     let output = OUTPUT.with(|output| output.borrow_mut().take().unwrap_or_default());
     FRAMES.with(|frames| frames.borrow_mut().take());
-    if let Some(mut surface) = SURFACE.with(|slot| slot.borrow_mut().take()) {
+    for mut surface in SURFACE.with(|slot| std::mem::take(&mut *slot.borrow_mut())) {
         if fault.as_deref() == Some("forge") {
             // Claim a frame this renderer was never given.
             surface.layers.push(rustic_ipc::protocol::FrameLayer {

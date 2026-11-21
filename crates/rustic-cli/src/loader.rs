@@ -81,7 +81,15 @@ pub struct LoaderLimits {
     pub scroll: (f64, f64),
     /// `--scroll-box N=X,Y`: scroll container positions by fragment index.
     pub scroll_boxes: [Option<(usize, f64, f64)>; MAX_CLICKS],
+    /// `render --frames N`: rendering opportunities to paint, one frame
+    /// every [`FRAME_INTERVAL`] of the manual clock (1 by default).
+    pub frames: usize,
 }
+
+/// The manual clock's step between `--frames` (60 per second).
+pub const FRAME_INTERVAL: Duration = Duration::from_micros(16_667);
+/// Most `--frames`.
+pub const MAX_FRAMES: usize = 600;
 
 /// Most `--click` points one command takes.
 pub const MAX_CLICKS: usize = 8;
@@ -101,6 +109,7 @@ impl Default for LoaderLimits {
             clicks: [None; MAX_CLICKS],
             scroll: (0.0, 0.0),
             scroll_boxes: [None; MAX_CLICKS],
+            frames: 1,
         }
     }
 }
@@ -270,6 +279,8 @@ pub struct LoadedDocument {
     network: Option<Rc<dyn Session>>,
     /// Where the page's scripts left the scroll positions (ADR 0064).
     scroll: rustic_engine::ScrollState,
+    /// `render --frames`: each frame's pixels and what it repainted.
+    frames: Vec<(rustic_raster::Surface, rustic_raster::FrameStats)>,
 }
 
 impl LoadedDocument {
@@ -279,6 +290,11 @@ impl LoadedDocument {
 
     pub fn cancellation(&self) -> &CancellationToken {
         self.document.cancellation()
+    }
+
+    /// `render --frames`: the painted frames and their repaint statistics.
+    pub fn frames(&self) -> &[(rustic_raster::Surface, rustic_raster::FrameStats)] {
+        &self.frames
     }
 
     fn layout_input<'a>(
@@ -344,6 +360,7 @@ pub fn load_document(
         applied_files: None,
         network: None,
         scroll: rustic_engine::ScrollState::default(),
+        frames: Vec::new(),
     })
 }
 
@@ -485,6 +502,7 @@ fn load_unscripted_network_document(
         applied_files: Some(applied_snapshot(limits)),
         network: Some(Rc::clone(&network.session)),
         scroll: rustic_engine::ScrollState::default(),
+        frames: Vec::new(),
     };
     Ok((document, selected))
 }
@@ -743,18 +761,33 @@ fn run_scripted_load(
     // Tasks already queued without a deadline (such as unhandled-rejection
     // notifications) run before the clock advances, under their own bound.
     let mut queued_turns = 0usize;
-    settle(&mut document, &mut queued_turns, &mut turns)?;
+    // A frame sequence lets timers advance with its clock instead.
+    let animated = limits.frames > 1;
+    let settle_now = |document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+                      queued: &mut usize,
+                      turns: &mut usize| {
+        if animated {
+            run_ready(document, queued)
+        } else {
+            settle(document, queued, turns)
+        }
+    };
+    settle_now(&mut document, &mut queued_turns, &mut turns)?;
     // Trusted host input: each `--click` hits the topmost box at its point
     // and gives the page transient activation (HTML §6.4.3).
     for &(x, y) in limits.clicks.iter().flatten() {
-        let list = display_list(LayoutInput::new(
-            &document.document(),
-            &source.path,
-            limits,
-            limits.script_view,
-            Some(&applied_files),
-            source.network.as_ref(),
-        ))?;
+        let state = document.scroll_state();
+        let list = display_list(LayoutInput {
+            scroll: Some(&state),
+            ..LayoutInput::new(
+                &document.document(),
+                &source.path,
+                limits,
+                limits.script_view,
+                Some(&applied_files),
+                source.network.as_ref(),
+            )
+        })?;
         let point = rustic_layout::CssPx::new(x)
             .and_then(|x| Ok((x, rustic_layout::CssPx::new(y)?)))
             .map(|(x, y)| rustic_layout::CssPoint { x, y });
@@ -771,7 +804,7 @@ fn run_scripted_load(
             eprintln!("rustic: --click {x},{y}: the page took no input");
             continue;
         }
-        settle(&mut document, &mut queued_turns, &mut turns)?;
+        settle_now(&mut document, &mut queued_turns, &mut turns)?;
     }
     // Popups open in renderers of their own, through the broker (ADR 0062).
     for popup in document.take_popups() {
@@ -786,8 +819,52 @@ fn run_scripted_load(
             );
         }
     }
-    document.offer_rendering_opportunity()?;
-    document.run_next_with_render(|_, _| ())?;
+    let mut frames = Vec::new();
+    if animated {
+        // Each frame: the clock steps, due tasks run, then a rendering
+        // opportunity, then the DOM as it stands is painted incrementally.
+        let mut painter = rustic_raster::Frames::new(
+            limits.script_view.scale(),
+            rustic_raster::RasterLimits::default(),
+        );
+        let mut bytes = 0usize;
+        for index in 0..limits.frames {
+            if index > 0 {
+                document
+                    .clock()
+                    .advance(FRAME_INTERVAL)
+                    .map_err(LoadError::ScriptClock)?;
+                queued_turns = 0;
+                run_ready(&mut document, &mut queued_turns)?;
+            }
+            document.offer_rendering_opportunity()?;
+            document.run_next_with_render(|_, _| ())?;
+            let state = document.scroll_state();
+            let list = display_list(LayoutInput {
+                scroll: Some(&state),
+                ..LayoutInput::new(
+                    &document.document(),
+                    &source.path,
+                    limits,
+                    limits.script_view,
+                    Some(&applied_files),
+                    source.network.as_ref(),
+                )
+            })?;
+            let stats = painter
+                .submit(list, &cancellation)
+                .map_err(LoadError::Raster)?;
+            let surface = painter.surface().expect("a frame was submitted").clone();
+            bytes = bytes.saturating_add(surface.premultiplied().len());
+            if bytes > limits.max_dump_bytes {
+                return Err(LoadError::Dump(DumpError::OutputLimit));
+            }
+            frames.push((surface, stats));
+        }
+    } else {
+        document.offer_rendering_opportunity()?;
+        document.run_next_with_render(|_, _| ())?;
+    }
     print_console(&document);
     let scroll = document.scroll_state();
     Ok(LoadedDocument {
@@ -795,7 +872,22 @@ fn run_scripted_load(
         applied_files: Some(applied_files),
         network: source.network,
         scroll,
+        frames,
     })
+}
+
+/// Run the tasks that are ready now, without advancing the clock.
+fn run_ready(
+    document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+    queued_turns: &mut usize,
+) -> Result<(), LoadError> {
+    while document.run_next()?.is_some() {
+        *queued_turns += 1;
+        if *queued_turns == MAX_SCRIPT_TIMER_TURNS {
+            return Err(LoadError::ScriptTurnLimit);
+        }
+    }
+    Ok(())
 }
 
 /// Run queued tasks and due timers until none remain, within the load's

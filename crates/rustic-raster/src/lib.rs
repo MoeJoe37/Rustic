@@ -9,11 +9,13 @@
 
 mod compare;
 mod damage;
+mod frames;
 mod png;
 mod raster;
 
 pub use compare::{Difference, compare};
 pub use damage::damage;
+pub use frames::{FrameStats, Frames};
 pub use png::{PngError, encode_png};
 pub use raster::{
     DeviceRect, RasterError, RasterLimits, Surface, TILE_SIZE, rasterize, rasterize_reference,

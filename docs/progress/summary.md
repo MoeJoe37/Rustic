@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 42.01%** = 39.28% verified complete + 2.73% partial credit. 92/221 capabilities complete, 11 in progress.
+**Overall completion: 42.18%** = 39.28% verified complete + 2.90% partial credit. 92/221 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `9949f46f7396f4ff7d56ee22dc8c4948d1616d5eb06d66ab2c1a01f9a891e6f8`.
+Catalog: `engine-v4`. Source fingerprint: `edae738b7ed2efb4ca2478dcdbcf895218cb1912c503221eff15f768d73670d9`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `9949f46f7396f4ff7d56ee22dc8c4948d1616
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 3/8 | 74.42% | 34.37% | 3.72% |
-| M8 Desktop & mobile alpha | 0/21 | 5.28% | 0.00% | 10.22% |
+| M8 Desktop & mobile alpha | 0/21 | 6.97% | 0.00% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.85% |
@@ -45,7 +45,7 @@ Catalog: `engine-v4`. Source fingerprint: `9949f46f7396f4ff7d56ee22dc8c4948d1616
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 3/11 | 5 | 55.38% | 25.58% | 5% | 2.76 |
-| Compositor & GPU | 0/4 | 1 | 11.53% | 0.00% | 3% | 0.34 |
+| Compositor & GPU | 0/4 | 1 | 17.30% | 0.00% | 3% | 0.51 |
 | Platform hosts | 1/9 | 0 | 4.16% | 4.16% | 4% | 0.16 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
 | DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
@@ -313,10 +313,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Compositor & GPU
 
-- **in progress 50.00%** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine
+- **in progress 75.00%** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine
   - [x] Scroll positions applied to a finished layout: viewport and nested scroll containers, fixed and sticky boxes, clips and clamping, with paint and hit testing following (ADR 0064) ([source](../../crates/rustic-layout/src/scroll.rs), [source](../../docs/adr/0064-scrolling-and-compositor-scenes.md), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
   - [ ] Layer scenes: display lists split at scroll containers and fixed/sticky contexts into cached layer rasters that re-composite on scroll
-  - [ ] Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly
+  - [x] Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly ([source](../../crates/rustic-raster/src/frames.rs), [source](../../crates/rustic-cli/src/main.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs))
   - [x] Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events ([source](../../crates/rustic-bindings/src/page/scrolling.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
 - **planned** `compositor.backend` — Mobile/desktop GPU adapters and CPU fallback · size 5 · M8 · 1.15% of engine
 - **planned** `compositor.recovery` — Surface/device loss and resource recovery · size 2 · M8 · 0.46% of engine

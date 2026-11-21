@@ -222,6 +222,7 @@ fn child_args(parent: &[String], scripts: bool) -> Vec<String> {
         "--click",
         "--scroll",
         "--scroll-box",
+        "--frames",
     ];
     let mut args = Vec::new();
     let mut iter = parent.iter();
@@ -749,8 +750,9 @@ enum Ended {
 struct Finished {
     status: u8,
     output: Vec<u8>,
-    /// `render`: the page with its frames composited.
-    surface: Option<rustic_raster::Surface>,
+    /// `render`: the page with its frames composited (one per frame with
+    /// `--frames`).
+    surfaces: Vec<rustic_raster::Surface>,
 }
 
 /// Run one renderer to the end: start it (confined when the sandbox is
@@ -784,26 +786,30 @@ fn run_renderer(
         handshake_done.store(true, Ordering::SeqCst);
         channel.send(&BrokerMessage::Start(start))?;
         let mut broker = Broker::new(grant, limits, context);
-        let mut surface = None;
+        let mut surfaces: Vec<rustic_raster::Surface> = Vec::new();
+        let mut bytes = 0usize;
+        let refused = || IpcError::Malformed(rustic_ipc::DecodeError::OutOfRange);
         loop {
             match channel.recv::<RendererMessage>()? {
                 RendererMessage::Done { status, output } => {
                     return Ok(Finished {
                         status,
                         output,
-                        surface,
+                        surfaces,
                     });
                 }
                 RendererMessage::Diagnostic(text) => eprintln!("{}", EscapedText(&text)),
                 RendererMessage::Surface(sent) => {
-                    if surface.is_some() || context.factor.is_none() {
-                        return Err(IpcError::Malformed(rustic_ipc::DecodeError::OutOfRange));
+                    // One surface, or one per frame within the output budget.
+                    if context.factor.is_none() || surfaces.len() >= crate::loader::MAX_FRAMES {
+                        return Err(refused());
                     }
-                    surface = Some(
-                        broker
-                            .composite(sent)
-                            .ok_or(IpcError::Malformed(rustic_ipc::DecodeError::OutOfRange))?,
-                    );
+                    let surface = broker.composite(sent).ok_or_else(refused)?;
+                    bytes = bytes.saturating_add(surface.premultiplied().len());
+                    if !surfaces.is_empty() && bytes > limits.max_dump_bytes {
+                        return Err(refused());
+                    }
+                    surfaces.push(surface);
                 }
                 request => {
                     let reply = broker.handle(request);
@@ -900,7 +906,34 @@ fn serve(
     if finished.status != 0 {
         return finished.status;
     }
-    let bytes = match finished.surface {
+    let mut surfaces = finished.surfaces;
+    if surfaces.len() > 1 {
+        // `render --frames`: numbered files, then the frame statistics.
+        let Some(output) = output else {
+            return 1;
+        };
+        for (index, surface) in surfaces.iter().enumerate() {
+            let name = crate::numbered(output, index);
+            let written = rustic_raster::encode_png(surface, limits.max_dump_bytes)
+                .map_err(|error| error.to_string())
+                .and_then(|png| std::fs::write(&name, png).map_err(|error| error.to_string()));
+            if let Err(error) = written {
+                eprintln!(
+                    "rustic {command}: {}: {error}",
+                    EscapedText(&Path::new(&name).to_string_lossy())
+                );
+                return 1;
+            }
+        }
+        let mut stdout = io::stdout().lock();
+        return u8::from(
+            stdout
+                .write_all(&finished.output)
+                .and_then(|()| stdout.flush())
+                .is_err(),
+        );
+    }
+    let bytes = match surfaces.pop() {
         // `render`: this broker encodes the composited page.
         Some(surface) => match rustic_raster::encode_png(&surface, limits.max_dump_bytes) {
             Ok(png) => png,
@@ -1083,9 +1116,9 @@ impl<'a> Broker<'a> {
         let surface = match run_renderer(start, &grant, self.limits, &child) {
             Ok(Finished {
                 status: 0,
-                surface: Some(surface),
+                mut surfaces,
                 ..
-            }) => surface,
+            }) if surfaces.len() == 1 => surfaces.pop().expect("one surface"),
             Ok(_) => {
                 eprintln!("rustic: frame {shown}: the frame did not render");
                 return Err(ResourceFailure::Failed);

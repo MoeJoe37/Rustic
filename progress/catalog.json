@@ -6238,8 +6238,29 @@
             },
             {
               "label": "Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/frames.rs",
+                  "marker": "pub fn submit("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/main.rs",
+                  "marker": "fn render_frames("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn submitted_frames_repaint_only_damage_and_equal_full_rasters"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/frames_render.rs",
+                  "marker": "fn frames_repaint_incrementally_and_match_across_process_modes"
+                }
+              ]
             },
             {
               "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",

@@ -2571,9 +2571,11 @@ an unscrolled layout in one pass, without laying out again; `dump-paint`,
 | CLI | Painted pixels and hit testing follow; bad values are usage errors; frames and popups do not inherit the options | `the_viewport_and_scroll_containers_scroll_without_moving_fixed_boxes`, `hit_testing_follows_the_scroll_position_and_bad_values_are_usage_errors` |
 | Script scrolling | `window.scrollX`/`scrollY`/`pageXOffset`/`pageYOffset`, `scroll`/`scrollTo`/`scrollBy` (numbers or options) and `Element.scrollTop`/`scrollLeft`/`scroll`/`scrollTo`/`scrollBy`, clamped to layout ranges (the document element is the viewport in no-quirks mode; non-containers stay at 0); one `scroll` event per target before animation frames; `getBoundingClientRect` follows; the render paints the script's positions, `--scroll` overrides | `scripts_scroll_the_viewport_and_containers_and_the_render_follows` |
 
+| Incremental frames | `rustic_raster::Frames::submit` repaints only `damage` tiles (full on the first frame or a new size; a failed repaint keeps nothing stale); `render --frames N` steps the clock 1/60 s per frame, runs due tasks and animation frames, paints incrementally, writes numbered PNGs and a repaint line per frame; split and single-process runs agree byte for byte | `submitted_frames_repaint_only_damage_and_equal_full_rasters`, `frames_repaint_incrementally_and_match_across_process_modes` |
+
 Next ([ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)): layer scenes
-with cached rasters and incremental frame submission. Script-scrolling
-gaps: TD-180.
+with cached rasters, so scrolling stops repainting what only moved.
+Script-scrolling gaps: TD-180.
 
 ## ISO-01 — Out-of-process frames and popups
 

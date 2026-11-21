@@ -2845,8 +2845,8 @@ have the same limit: `window.open()` returns `null`, the popup has no
 `window.opener` even when COOP keeps the group, the CLI does not show the
 popup's document, and `_self`, `_parent` and `_top` targets open nothing.
 Only `render` in a split
-run loads frames; `--single-process` and `reftest` (single-process, TD-171)
-paint them white, and the dump commands and `hit-test` do not descend into
+run loads frames; `--single-process`, `reftest` (single-process, TD-171)
+and `render --frames` paint them white, and the dump commands and `hit-test` do not descend into
 them.
 **Pay:** with the M8 browser shell's long-lived renderers, put same-site
 frames of one agent cluster in one renderer (ADR 0057 §1), add WindowProxy

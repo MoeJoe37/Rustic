@@ -88,7 +88,13 @@ Scrolling: dump-paint, render and hit-test accept --scroll X,Y (the
 viewport's scroll position in CSS pixels) and --scroll-box N=X,Y (scroll
 container N, the fragment index dump-layout prints; repeat up to 8).
 Positions clamp to each scrollport's range; fixed boxes stay, sticky boxes
-re-solve, and nothing is laid out again.
+re-solve, and nothing is laid out again. Scripts can scroll too; the image
+shows where they left the page.
+
+Frames: render --frames N (1 to 600, needs --run-scripts) paints N
+rendering opportunities 1/60 s of the manual clock apart, repainting only
+the tiles that changed, and writes NAME-0.EXT ... NAME-(N-1).EXT for
+--output NAME.EXT, printing one repaint line per frame.
 
 Frames and popups: render loads each <iframe> into a renderer of its own
 and composites it (split runs only; one process paints frames white).
@@ -397,6 +403,7 @@ pub(crate) struct RenderArgs {
 
 pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
     let mut output = None;
+    let mut frames = 1usize;
     let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
     let mut iter = args.iter();
@@ -416,6 +423,14 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
                     .and_then(|v| v.to_str())
                     .and_then(|v| v.parse::<f64>().ok())
                     .ok_or("--scale requires a number")?;
+            }
+            Some("--frames") => {
+                frames = iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .filter(|&n| (1..=loader::MAX_FRAMES).contains(&n))
+                    .ok_or("--frames requires a count from 1 to 600")?;
             }
             Some("--zoom") => {
                 zoom = iter
@@ -446,6 +461,10 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
         .map_err(|_| "--scale times --zoom must be at most 64")?;
     let (mut limits, path) = parse_dump_args(&rest)?;
     limits.script_view = view;
+    if frames > 1 && !limits.run_scripts {
+        return Err("--frames needs --run-scripts".into());
+    }
+    limits.frames = frames;
     Ok(RenderArgs {
         output,
         view,
@@ -470,6 +489,9 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     // A renderer hands its surface and frame layers to the broker, which
     // composites the frames (ADR 0062) and writes the PNG.
     let host = renderer::frame_host();
+    if limits.frames > 1 {
+        return render_frames(engine, &args.path, &output, limits, host.is_some());
+    }
     let png = match load(
         engine,
         "render",
@@ -500,6 +522,74 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
         return 1;
     }
     0
+}
+
+/// `render --frames N`: paint N rendering opportunities incrementally
+/// (ADR 0064) and write `NAME-K.EXT` for frame K of `--output NAME.EXT`,
+/// with one statistics line per frame on standard output. Frames paint
+/// iframes white (TD-178).
+fn render_frames(
+    engine: &mut Engine,
+    path: &OsString,
+    output: &OsString,
+    limits: LoaderLimits,
+    split: bool,
+) -> u8 {
+    let frames = match load(engine, "render", limits, path, |parsed, _| {
+        Ok(parsed.frames().to_vec())
+    }) {
+        Ok(frames) => frames,
+        Err(code) => return code,
+    };
+    let mut report = String::new();
+    for (index, (surface, stats)) in frames.into_iter().enumerate() {
+        report.push_str(&format!(
+            "frame {index}: repainted {} of {} tiles ({} pixels){}\n",
+            stats.repainted_tiles,
+            stats.total_tiles,
+            stats.repainted_pixels,
+            if stats.full { ", full" } else { "" }
+        ));
+        if split {
+            renderer::emit_surface(rustic_ipc::protocol::Surface {
+                width: surface.width(),
+                height: surface.height(),
+                pixels: surface.premultiplied().to_vec(),
+                layers: Vec::new(),
+            });
+            continue;
+        }
+        let png = match rustic_raster::encode_png(&surface, limits.max_dump_bytes) {
+            Ok(png) => png,
+            Err(error) => {
+                eprintln!("rustic render: {error}");
+                return 1;
+            }
+        };
+        let name = numbered(output, index);
+        if let Err(error) = std::fs::write(&name, png) {
+            eprintln!(
+                "rustic render: {}: {error}",
+                EscapedText(&Path::new(&name).to_string_lossy())
+            );
+            return 1;
+        }
+    }
+    if renderer::emit_stdout(report.as_bytes()).is_err() {
+        return 1;
+    }
+    0
+}
+
+/// `NAME-K.EXT` for `NAME.EXT` (or `NAME-K` without an extension).
+pub(crate) fn numbered(output: &OsString, index: usize) -> OsString {
+    let path = Path::new(output);
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+    let name = match path.extension() {
+        Some(extension) => format!("{stem}-{index}.{}", extension.to_string_lossy()),
+        None => format!("{stem}-{index}"),
+    };
+    path.with_file_name(name).into_os_string()
 }
 
 fn hit_test_command(engine: &mut Engine, args: &[OsString]) -> u8 {

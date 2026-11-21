@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "9949f46f7396f4ff7d56ee22dc8c4948d1616d5eb06d66ab2c1a01f9a891e6f8",
-  "percent": "42.01",
+  "source_fingerprint": "edae738b7ed2efb4ca2478dcdbcf895218cb1912c503221eff15f768d73670d9",
+  "percent": "42.18",
   "verified_percent": "39.28",
-  "partial_percent": "2.73",
+  "partial_percent": "2.90",
   "completed": 92,
   "in_progress": 11,
   "total": 221,
@@ -87,9 +87,9 @@
       "share": "10.22",
       "completed": 0,
       "total": 21,
-      "percent": "5.28",
+      "percent": "6.97",
       "verified_percent": "0.00",
-      "partial_percent": "5.28"
+      "partial_percent": "6.97"
     },
     {
       "id": "M9",
@@ -6782,8 +6782,29 @@
             },
             {
               "label": "Incremental frame submission: each frame rasterizes only damaged tiles and newly exposed regions, matching a full repaint exactly",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/frames.rs",
+                  "marker": "pub fn submit("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/main.rs",
+                  "marker": "fn render_frames("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn submitted_frames_repaint_only_damage_and_equal_full_rasters"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/frames_render.rs",
+                  "marker": "fn frames_repaint_incrementally_and_match_across_process_modes"
+                }
+              ]
             },
             {
               "label": "Script scrolling: scrollX/scrollY, scrollTo/scrollBy, Element.scrollTop/scrollLeft and scroll events",
@@ -6807,7 +6828,7 @@
               ]
             }
           ],
-          "credit": "50.00",
+          "credit": "75.00",
           "engine_share": "0.69"
         },
         {
@@ -6845,10 +6866,10 @@
       "completed": 0,
       "in_progress": 1,
       "total": 4,
-      "contribution": "0.34",
-      "percent": "11.53",
+      "contribution": "0.51",
+      "percent": "17.30",
       "verified_percent": "0.00",
-      "partial_percent": "11.53"
+      "partial_percent": "17.30"
     },
     {
       "id": "platform",

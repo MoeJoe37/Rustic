@@ -214,7 +214,10 @@ fn a_dripping_peer_is_not_idle_but_hits_the_total_timeout() {
             .unwrap();
     let limits = TransportLimits {
         idle_timeout: Duration::from_millis(200),
-        total_timeout: Some(Duration::from_millis(400)),
+        // The head alone drips for about 200 ms; 800 ms leaves a loaded
+        // runner time to deliver some body before the total timeout, while
+        // the whole drip (about 1.2 s) still cannot finish.
+        total_timeout: Some(Duration::from_millis(800)),
         ..TransportLimits::default()
     };
     let transport = transport_for(&server, limits);

@@ -83,7 +83,7 @@ What hosted CI still does not cover:
 
 - **Android and iOS barely run.** Both are compile-checked; the only
   execution is the Android isolated-renderer test on an API 34 x86-64
-  emulator (ADR 0059), added to CI on 2026-11-22 and not yet run. iOS runs
+  emulator (ADR 0059), added to CI on 2026-11-22 and passing since its first run that day. iOS runs
   nothing. The first on-device surfaces are MOB-03/04, the first task of M8
   mobile hosts.
 - **Two cross-checks are partial.** `aarch64-pc-windows-gnullvm` and

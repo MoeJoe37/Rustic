@@ -1,7 +1,7 @@
 # ADR 0059 — Android and iOS renderer isolation (design)
 
 Date: 2026-11-20
-Status: Proposed. Android implemented 2026-11-22 (`android/`, `crates/rustic-android`), first emulator run pending in CI; iOS design only
+Status: Proposed. Android implemented 2026-11-22 (`android/`, `crates/rustic-android`), verified on the API 34 x86-64 emulator in CI on 2026-11-22 (run 45026285903); iOS design only
 
 ## Context
 

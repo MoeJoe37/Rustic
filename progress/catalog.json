@@ -5831,8 +5831,29 @@
             },
             {
               "label": "Android: isolated-process renderer service with crash recovery, verified on the emulator (CI job android-emulator)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "android/app/src/main/AndroidManifest.xml",
+                  "marker": "android:isolatedProcess=\"true\""
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-android/src/jni.rs",
+                  "marker": "fn Java_dev_rustic_android_RendererService_nativeRun"
+                },
+                {
+                  "kind": "test",
+                  "path": "android/app/src/androidTest/java/dev/rustic/android/IsolationTest.java",
+                  "marker": "public void theRendererServiceIsIsolatedAndCannotEscape"
+                },
+                {
+                  "kind": "test",
+                  "path": "android/app/src/androidTest/java/dev/rustic/android/IsolationTest.java",
+                  "marker": "public void theIsolatedRendererServesTheBrokerAndACrashIsRecovered"
+                }
+              ]
             },
             {
               "label": "Android: the same checks on a physical device (needs a device or device farm)",

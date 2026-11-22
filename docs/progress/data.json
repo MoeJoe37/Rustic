@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d8bb435c57333e7d44192458526b382c2d89a26f17b058e8f5331b79c2f88662",
-  "percent": "42.84",
+  "source_fingerprint": "0d333943911a2ee12f87cf972b8580889238a209013acea27925b4d478b840ea",
+  "percent": "42.96",
   "verified_percent": "40.90",
-  "partial_percent": "1.94",
+  "partial_percent": "2.06",
   "completed": 95,
   "in_progress": 9,
   "total": 221,
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 5,
       "total": 8,
-      "percent": "83.02",
+      "percent": "86.14",
       "verified_percent": "59.37",
-      "partial_percent": "23.65"
+      "partial_percent": "26.77"
     },
     {
       "id": "M8",
@@ -6353,8 +6353,29 @@
             },
             {
               "label": "Android: isolated-process renderer service with crash recovery, verified on the emulator (CI job android-emulator)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "android/app/src/main/AndroidManifest.xml",
+                  "marker": "android:isolatedProcess=\"true\""
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-android/src/jni.rs",
+                  "marker": "fn Java_dev_rustic_android_RendererService_nativeRun"
+                },
+                {
+                  "kind": "test",
+                  "path": "android/app/src/androidTest/java/dev/rustic/android/IsolationTest.java",
+                  "marker": "public void theRendererServiceIsIsolatedAndCannotEscape"
+                },
+                {
+                  "kind": "test",
+                  "path": "android/app/src/androidTest/java/dev/rustic/android/IsolationTest.java",
+                  "marker": "public void theIsolatedRendererServesTheBrokerAndACrashIsRecovered"
+                }
+              ]
             },
             {
               "label": "Android: the same checks on a physical device (needs a device or device farm)",
@@ -6372,7 +6393,7 @@
               "evidence": []
             }
           ],
-          "credit": "20.00",
+          "credit": "40.00",
           "engine_share": "0.58"
         },
         {
@@ -6674,10 +6695,10 @@
       "completed": 5,
       "in_progress": 3,
       "total": 11,
-      "contribution": "3.08",
-      "percent": "61.78",
+      "contribution": "3.20",
+      "percent": "64.10",
       "verified_percent": "44.18",
-      "partial_percent": "17.60"
+      "partial_percent": "19.92"
     },
     {
       "id": "compositor",

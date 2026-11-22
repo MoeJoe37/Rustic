@@ -14,7 +14,8 @@
 //! The profile denies everything by default and allows only what a
 //! process needs to start and run on its inherited pipes: executing the
 //! renderer binary itself, reading the dynamic loader, system libraries
-//! and the dyld shared cache, a few `sysctl` values the Rust runtime reads,
+//! and the dyld shared cache (with the Preboot volume it is found through),
+//! reading (not setting) system parameters,
 //! and signalling itself. No network, no file writes, no reads of user
 //! files, no other processes, no Mach services (so no window server,
 //! pasteboard, keychain or launch services).
@@ -31,28 +32,14 @@ const SYSTEM_READS: &[&str] = &[
     "/System/Library/Frameworks",
     "/System/Library/PrivateFrameworks",
     "/System/Library/dyld",
-    "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld",
-    // The resolved form of the line above: Seatbelt matches real paths,
-    // and `/System/Volumes/Preboot` is `/private/preboot`.
-    "/private/preboot/Cryptexes/OS/System/Library/dyld",
-    "/System/Cryptexes/OS/System/Library/dyld",
+    "/System/Cryptexes/OS",
+    // dyld finds the OS cryptex (the shared cache on macOS 13+) through
+    // libignition, which reads the Preboot volume's boot objects; both the
+    // firmlinked and the resolved forms are named, because Seatbelt
+    // matches real paths. Preboot holds no user data.
+    "/System/Volumes/Preboot",
+    "/private/preboot",
     "/private/var/db/dyld",
-];
-
-/// `sysctl` values the Rust standard library and allocator read (CPU
-/// count, page size, OS version for `std`'s feature checks).
-const SYSCTLS: &[&str] = &[
-    "hw.activecpu",
-    "hw.logicalcpu",
-    "hw.logicalcpu_max",
-    "hw.ncpu",
-    "hw.pagesize",
-    "hw.pagesize_compat",
-    "kern.osproductversion",
-    "kern.osrelease",
-    "kern.osvariant_status",
-    "kern.version",
-    "sysctl.proc_translated",
 ];
 
 /// Why a profile could not be built.
@@ -144,13 +131,15 @@ fn base_profile(exe: &Path, title: &str) -> Result<String, ProfileError> {
     // dyld resolves its search paths through the parent directories.
     profile.push_str(
         "(allow file-read-metadata\n    (literal \"/\")\n    (literal \"/private\")\n    \
-         (literal \"/private/var\")\n    (literal \"/System\")\n    (literal \"/usr\"))\n",
+         (literal \"/private/var\")\n    (literal \"/private/var/db\")\n    \
+         (literal \"/System\")\n    (literal \"/System/Volumes\")\n    \
+         (literal \"/System/Library\")\n    (literal \"/Library\")\n    (literal \"/usr\"))\n",
     );
-    profile.push_str("(allow sysctl-read\n");
-    for name in SYSCTLS {
-        let _ = writeln!(profile, "    (sysctl-name {})", literal(name));
-    }
-    profile.push_str(")\n(allow signal (target self))\n");
+    // Reading system parameters is allowed in full: dyld's libignition
+    // reads boot parameters whose names are not documented (the first
+    // native run aborted in it with a name list). Nothing can be set.
+    // Narrowing this to logged names is TD-174 follow-up work.
+    profile.push_str("(allow sysctl-read)\n(allow signal (target self))\n");
     Ok(profile)
 }
 

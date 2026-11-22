@@ -27,7 +27,7 @@ use std::ptr::{null, null_mut};
 use std::sync::Mutex;
 
 use windows_sys::Win32::Foundation::{
-    HANDLE, HANDLE_FLAG_INHERIT, LocalFree, SetHandleInformation, WAIT_OBJECT_0,
+    HANDLE, HANDLE_FLAG_INHERIT, LocalFree, SetHandleInformation, WAIT_ABANDONED, WAIT_OBJECT_0,
 };
 use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
 use windows_sys::Win32::Security::Isolation::{
@@ -43,11 +43,11 @@ use windows_sys::Win32::System::JobObjects::{
 use windows_sys::Win32::System::Pipes::CreatePipe;
 use windows_sys::Win32::System::SystemInformation::GetSystemDirectoryW;
 use windows_sys::Win32::System::Threading::{
-    CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW, DETACHED_PROCESS,
+    CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateMutexW, CreateProcessW, DETACHED_PROCESS,
     DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, INFINITE,
     InitializeProcThreadAttributeList, PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY,
     PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_INFORMATION, ResumeThread,
+    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_INFORMATION, ReleaseMutex, ResumeThread,
     STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
     WaitForSingleObject,
 };
@@ -58,10 +58,8 @@ use windows_sys::Win32::System::Threading::{
 const CONTAINER: &str = "Rustic.Renderer";
 /// `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)`.
 const ALREADY_EXISTS: i32 = 0x8007_00B7_u32 as i32;
-/// `E_UNEXPECTED`, which a racing profile creation can return.
-const UNEXPECTED: i32 = 0x8000_FFFF_u32 as i32;
-/// Retries of a profile creation that lost a race (50 ms to 800 ms).
-const PROFILE_RETRIES: u32 = 5;
+/// The named mutex that serializes profile creation within the session.
+const PROFILE_LOCK: &str = "Local\\Rustic.Renderer.Profile";
 /// `PROCESS_CREATION_CHILD_PROCESS_RESTRICTED`: the renderer cannot create
 /// processes even outside its job.
 const CHILD_PROCESS_RESTRICTED: u32 = 1;
@@ -303,52 +301,76 @@ fn confine(process: &OwnedHandle) -> io::Result<OwnedHandle> {
     Ok(job)
 }
 
+/// Holds the profile-creation mutex until dropped.
+struct ProfileLock(OwnedHandle);
+
+impl ProfileLock {
+    fn acquire() -> io::Result<Self> {
+        let name = wide(OsStr::new(PROFILE_LOCK));
+        // SAFETY: null attributes are allowed; `name` is NUL-terminated.
+        let raw = unsafe { CreateMutexW(null(), 0, name.as_ptr()) };
+        if raw.is_null() {
+            return Err(os_error("CreateMutexW"));
+        }
+        // SAFETY: CreateMutexW returned a new handle owned by nobody else.
+        let handle = unsafe { OwnedHandle::from_raw_handle(raw as RawHandle) };
+        // SAFETY: `handle` is a live mutex handle. An abandoned mutex (a
+        // broker died holding it) is acquired too; profile creation is
+        // idempotent, so nothing it guarded can be half-done.
+        let waited = unsafe { WaitForSingleObject(handle.as_raw_handle() as HANDLE, INFINITE) };
+        if waited != WAIT_OBJECT_0 && waited != WAIT_ABANDONED {
+            return Err(os_error("WaitForSingleObject"));
+        }
+        Ok(Self(handle))
+    }
+}
+
+impl Drop for ProfileLock {
+    fn drop(&mut self) {
+        // SAFETY: this thread acquired the mutex in `acquire`.
+        unsafe { ReleaseMutex(self.0.as_raw_handle() as HANDLE) };
+    }
+}
+
 /// The container's SID, freed with `FreeSid`.
 struct ContainerSid(PSID);
 
 impl ContainerSid {
     /// Create the container profile, or find the one an earlier run made.
     ///
-    /// Two brokers starting their first renderers at once race to create
-    /// the profile, and the loser can get `E_UNEXPECTED` ("Catastrophic
-    /// failure") rather than `ERROR_ALREADY_EXISTS` (seen on native Windows
-    /// ARM64 CI with parallel tests). Such a failure is retried a few times
-    /// with a growing pause; by then the other broker's profile exists.
+    /// Brokers starting their first renderers at once race to create the
+    /// profile, and the losers fail with `E_UNEXPECTED`,
+    /// `ERROR_BAD_ENVIRONMENT` or `ERROR_FILE_NOT_FOUND` rather than
+    /// `ERROR_ALREADY_EXISTS` (seen on native Windows CI with parallel
+    /// tests), so the step runs under a session-wide named mutex.
     fn open() -> io::Result<Self> {
+        let _serialized = ProfileLock::acquire()?;
         let name = wide(OsStr::new(CONTAINER));
         let description = wide(OsStr::new("Rustic renderer processes"));
-        let mut attempt = 0u32;
-        loop {
-            let mut sid: PSID = null_mut();
-            // SAFETY: the strings are NUL-terminated; no capabilities are
-            // passed; `sid` is a valid out pointer.
-            let mut result = unsafe {
-                CreateAppContainerProfile(
-                    name.as_ptr(),
-                    name.as_ptr(),
-                    description.as_ptr(),
-                    null(),
-                    0,
-                    &mut sid,
-                )
-            };
-            if result == ALREADY_EXISTS {
-                // SAFETY: as above.
-                result =
-                    unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut sid) };
-            }
-            if result >= 0 && !sid.is_null() {
-                return Ok(Self(sid));
-            }
-            if result != UNEXPECTED || attempt >= PROFILE_RETRIES {
-                return Err(with_step(
-                    "CreateAppContainerProfile",
-                    hresult_error(result),
-                ));
-            }
-            attempt += 1;
-            std::thread::sleep(std::time::Duration::from_millis(25 << attempt));
+        let mut sid: PSID = null_mut();
+        // SAFETY: the strings are NUL-terminated; no capabilities are
+        // passed; `sid` is a valid out pointer.
+        let mut result = unsafe {
+            CreateAppContainerProfile(
+                name.as_ptr(),
+                name.as_ptr(),
+                description.as_ptr(),
+                null(),
+                0,
+                &mut sid,
+            )
+        };
+        if result == ALREADY_EXISTS {
+            // SAFETY: as above.
+            result = unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut sid) };
         }
+        if result < 0 || sid.is_null() {
+            return Err(with_step(
+                "CreateAppContainerProfile",
+                hresult_error(result),
+            ));
+        }
+        Ok(Self(sid))
     }
 
     fn to_string_sid(&self) -> io::Result<String> {

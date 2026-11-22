@@ -34,9 +34,13 @@ from a build directory.
    Allowed: executing the renderer binary (and nothing else, no fork);
    reading that binary, dyld, `/usr/lib`, the system frameworks and the
    dyld shared cache in each location macOS versions use, and
-   `/dev/urandom`; metadata of the few parent directories dyld walks; a
-   named list of `sysctl` values the Rust runtime reads; signals to
-   itself. Everything else is denied: networking, every file write,
+   `/dev/urandom`; the Preboot volume (`/System/Volumes/Preboot`, really
+   `/private/preboot`), through which dyld's libignition finds the OS
+   cryptex holding the shared cache; metadata of the few parent
+   directories dyld walks; reading (never setting) `sysctl` values;
+   signals to itself. The first native run (macOS 15, 2026-11-22) aborted
+   in libignition with a named `sysctl` list and without Preboot, hence
+   both; narrowing the `sysctl` reads to logged names remains. Everything else is denied: networking, every file write,
    reading user files, other processes, Mach service lookups (no window
    server, pasteboard, keychain or launch services) and IOKit. The
    executable is named by its canonical path (Seatbelt matches resolved

@@ -886,7 +886,10 @@ fn serve(
     let finished = match run_renderer(start, grant, limits, context) {
         Ok(finished) => finished,
         Err(Ended::NotStarted(error)) => {
-            if SANDBOX.load(Ordering::Relaxed) && error.kind() == io::ErrorKind::NotFound {
+            if SANDBOX.load(Ordering::Relaxed)
+                && !cfg!(windows)
+                && error.kind() == io::ErrorKind::NotFound
+            {
                 let tool = if cfg!(target_os = "macos") {
                     "/usr/bin/sandbox-exec"
                 } else {

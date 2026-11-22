@@ -109,9 +109,15 @@ fn the_platform_verifier_does_not_trust_the_test_ca() {
     policy.allow(&url(&origin), server.address()).unwrap();
     // No `with_tls`: the platform verifier is used.
     let transport = Transport::new(policy, TransportLimits::default()).unwrap();
-    assert_eq!(
-        get(&transport, &origin).unwrap_err(),
-        TransportError::Certificate(CertificateError::UnknownIssuer)
+    let error = get(&transport, &origin).unwrap_err();
+    // macOS's trust evaluation reports a test certificate's policy
+    // failures (seen natively: a reason rustls maps to `Other`) along with
+    // the untrusted issuer; elsewhere the issuer is the reason.
+    let other_on_macos =
+        cfg!(target_os = "macos") && error == TransportError::Certificate(CertificateError::Other);
+    assert!(
+        other_on_macos || error == TransportError::Certificate(CertificateError::UnknownIssuer),
+        "{error:?}"
     );
     assert!(server.requests().is_empty());
 }

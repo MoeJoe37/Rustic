@@ -156,7 +156,10 @@ jobs:
     # 32-bit pointers, big-endian byte order and a non-x86/ARM instruction set.
     name: Emulated test (${{ matrix.target }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    # The whole suite under QEMU passed 40 minutes in November 2026 (armv7
+    # and s390x were cut off mid-run, not failing); riscv64 needs about as
+    # long.
+    timeout-minutes: 100
     strategy:
       fail-fast: false
       matrix:

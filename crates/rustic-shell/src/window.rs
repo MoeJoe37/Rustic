@@ -5,12 +5,12 @@ use std::rc::Rc;
 
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
-use crate::{Content, ScrollInput, WindowConfig, present_over_white, scrolled_by};
+use crate::{Content, ScrollInput, WindowConfig, present, scrolled_by};
 
 struct Shell<C: Content> {
     config: WindowConfig,
@@ -20,6 +20,10 @@ struct Shell<C: Content> {
     scroll: (f64, f64),
     presented: u32,
     error: Option<String>,
+    /// The cursor, in device pixels.
+    cursor: (f64, f64),
+    /// The trusted strip's height in device pixels at the last frame.
+    strip: u32,
 }
 
 impl<C: Content> Shell<C> {
@@ -42,8 +46,12 @@ impl<C: Content> Shell<C> {
             let message = format!("cannot size the window buffer: {error}");
             return self.fail(event_loop, message);
         }
+        // The page gets the rows below the trusted strip; the strip is
+        // drawn after the page, so it shows the document just committed.
+        let scale = window.scale_factor();
+        let top = ((self.content.chrome_height() * scale).ceil().max(0.0) as u32).min(size.height);
         let painted = match self.content.paint(
-            (size.width, size.height),
+            (size.width, (size.height - top).max(1)),
             window.scale_factor(),
             self.scroll,
         ) {
@@ -51,6 +59,10 @@ impl<C: Content> Shell<C> {
             Err(error) => return self.fail(event_loop, error),
         };
         self.scroll = painted.scroll;
+        let chrome = match self.content.chrome(size.width, scale) {
+            Ok(chrome) => chrome,
+            Err(error) => return self.fail(event_loop, error),
+        };
         let mut buffer = match surface.buffer_mut() {
             Ok(buffer) => buffer,
             Err(error) => {
@@ -58,18 +70,24 @@ impl<C: Content> Shell<C> {
                 return self.fail(event_loop, message);
             }
         };
-        present_over_white(&painted.surface, size.width, size.height, &mut buffer);
+        self.strip = present(
+            &painted.surface,
+            chrome.as_ref(),
+            size.width,
+            size.height,
+            &mut buffer,
+        );
         if let Err(error) = buffer.present() {
             let message = format!("cannot present the frame: {error}");
             return self.fail(event_loop, message);
         }
         self.presented += 1;
-        if self
-            .config
-            .exit_after
-            .is_some_and(|frames| self.presented >= frames)
-        {
-            event_loop.exit();
+        match self.config.exit_after {
+            Some(frames) if self.presented >= frames => event_loop.exit(),
+            // A counted run presents its frames without waiting for the
+            // window system to ask (a bare X server never does).
+            Some(_) => window.request_redraw(),
+            None => {}
         }
     }
 
@@ -77,7 +95,8 @@ impl<C: Content> Shell<C> {
         let Some(window) = &self.window else {
             return;
         };
-        let page = f64::from(window.inner_size().height) / window.scale_factor();
+        let page = f64::from(window.inner_size().height.saturating_sub(self.strip))
+            / window.scale_factor();
         let next = scrolled_by(&input, self.scroll, window.scale_factor(), page);
         if next != self.scroll {
             self.scroll = next;
@@ -119,6 +138,24 @@ impl<C: Content> ApplicationHandler for Shell<C> {
                 }
             }
             WindowEvent::RedrawRequested => self.redraw(event_loop),
+            WindowEvent::CursorMoved { position, .. } => self.cursor = (position.x, position.y),
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => {
+                // Only real clicks inside the strip reach it; the page never
+                // sees them and cannot synthesize them.
+                let (x, y) = self.cursor;
+                if let Some(window) = &self.window {
+                    let scale = window.scale_factor();
+                    if (0.0..f64::from(self.strip)).contains(&y)
+                        && self.content.chrome_click(x / scale, y / scale)
+                    {
+                        window.request_redraw();
+                    }
+                }
+            }
             WindowEvent::MouseWheel { delta, .. } => self.scroll(match delta {
                 MouseScrollDelta::LineDelta(x, y) => ScrollInput::Lines(f64::from(x), f64::from(y)),
                 MouseScrollDelta::PixelDelta(p) => ScrollInput::Pixels(p.x, p.y),
@@ -132,7 +169,15 @@ impl<C: Content> ApplicationHandler for Shell<C> {
                     },
                 ..
             } => match logical_key {
-                Key::Named(NamedKey::Escape) => event_loop.exit(),
+                Key::Named(NamedKey::Escape) => {
+                    if self.content.chrome_escape() {
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    } else {
+                        event_loop.exit();
+                    }
+                }
                 Key::Named(NamedKey::ArrowDown) => self.scroll(ScrollInput::Down),
                 Key::Named(NamedKey::ArrowUp) => self.scroll(ScrollInput::Up),
                 Key::Named(NamedKey::PageDown | NamedKey::Space) => {
@@ -159,6 +204,8 @@ pub fn run(config: WindowConfig, content: impl Content) -> Result<(), String> {
         scroll: (0.0, 0.0),
         presented: 0,
         error: None,
+        cursor: (0.0, 0.0),
+        strip: 0,
     };
     event_loop
         .run_app(&mut shell)

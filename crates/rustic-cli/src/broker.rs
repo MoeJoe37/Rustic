@@ -284,6 +284,16 @@ thread_local! {
     /// instead of writing it.
     static CAPTURE: std::cell::RefCell<Option<Option<Captured>>> =
         const { std::cell::RefCell::new(None) };
+    /// The URL of the document the last command committed (after
+    /// redirects), decided here, never reported by the renderer: the
+    /// window's trusted address display (TD-173).
+    static COMMITTED: std::cell::RefCell<Option<Url>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The URL of the document the last brokered command committed, for the
+/// trusted address display. The broker decides it; a renderer cannot.
+pub fn committed_url() -> Option<Url> {
+    COMMITTED.with(|committed| committed.borrow().clone())
 }
 
 /// Run `render` with `args` (which must name an `--output`, unused) in a
@@ -301,6 +311,7 @@ pub fn render_surface(args: &[OsString]) -> Result<Captured, u8> {
 
 /// Run `command` with its document in a renderer. Returns the exit status.
 pub fn run(command: &str, args: &[OsString]) -> u8 {
+    COMMITTED.with(|committed| committed.borrow_mut().take());
     let Some((limits, path, output)) = document_argument(command, args) else {
         // A usage error: let the command report it; nothing is loaded.
         let mut engine = rustic_engine::Engine::new(1);
@@ -374,6 +385,7 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
         };
         (Grant::Local { root }, document)
     };
+    COMMITTED.with(|committed| *committed.borrow_mut() = Url::parse(&document.url, None).ok());
     let mut renderer_args: Vec<String> = Vec::new();
     if let Some(locale) = crate::network::configured_locale() {
         renderer_args.extend(["--locale".to_owned(), locale.to_owned()]);

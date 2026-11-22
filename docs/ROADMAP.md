@@ -620,7 +620,7 @@ Linux x86-64). ISO-04: the Windows renderer runs in a capability-less
 LPAC AppContainer and a kill-on-close job, on by default
 ([ADR 0060](adr/0060-windows-renderer-sandbox.md), verified on native
 Windows 11 x64; the first project `unsafe`, confined to `rustic-sandbox`);
-macOS confines it by default with a Seatbelt profile the renderer applies to itself ([ADR 0063](adr/0063-macos-renderer-sandbox.md), verified on native macOS x64 and ARM64 2026-11-22); all three run natively on x64 and ARM64 in CI. ISO-05: user activation and brokered downloads;
+macOS confines it by default with a Seatbelt profile the renderer applies to itself ([ADR 0063](adr/0063-macos-renderer-sandbox.md), verified on native macOS x64 and ARM64 2026-11-22); all three run natively on x64 and ARM64 in CI. ISO-05: user activation, brokered downloads, and the trusted strip in `rustic view` (address display and permission prompt drawn by the broker, prompt and clipboard rules, 2026-11-22; page APIs reach it in M8, TD-173);
 prompts wait for the M8 shell. ISO-06: [security review](reviews/2026-11-20-m7-security-review.md)
 with fuzzing, an unsafe/native inventory and an AddressSanitizer run.
 ISO-07: crash, protocol-violation and hang recovery for renderers, and

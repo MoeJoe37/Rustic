@@ -7,6 +7,7 @@ use rustic_engine::{Engine, Viewport};
 use std::path::Path;
 
 mod broker;
+mod chrome;
 mod fonts;
 mod images;
 mod loader;
@@ -98,8 +99,11 @@ pixels) with the fixed boxes composited over them.
 Window: view opens the page in a native window (Wayland or X11 on Linux;
 ADR 0065) at --window WxH logical pixels (default 1024x768). Each frame
 renders in a renderer process at the window's size and device scale; the
-wheel, arrow keys, Page Up/Down, space and Home scroll, Escape closes. It
-accepts the document options above. --exit-after N closes after N frames.
+wheel, arrow keys, Page Up/Down, space and Home scroll, Escape closes. A
+strip above the page, drawn by this process and never by the page, shows
+the committed address (ASCII host, Secure/Not secure) and any permission
+prompt (Escape dismisses it). It accepts the document options above.
+--exit-after N closes after N frames.
 
 Frames: render --frames N (1 to 600, needs --run-scripts) paints N
 rendering opportunities 1/60 s of the manual clock apart, repainting only
@@ -612,7 +616,13 @@ fn view_command(args: &[OsString]) -> u8 {
         size,
         exit_after,
     };
-    match rustic_shell::run(config, ViewPage { args: rest }) {
+    let page = ViewPage {
+        args: rest,
+        permissions: chrome::Permissions::default(),
+        shown: None,
+        strip_width: 0.0,
+    };
+    match rustic_shell::run(config, page) {
         Ok(()) => 0,
         Err(error) => {
             eprintln!("rustic view: {}", EscapedText(&error));
@@ -624,6 +634,13 @@ fn view_command(args: &[OsString]) -> u8 {
 /// The page `view` shows: `render` arguments without the view.
 struct ViewPage {
     args: Vec<OsString>,
+    /// The window's permission decisions and its prompt (TD-173).
+    permissions: chrome::Permissions,
+    /// The URL the address display shows: the last one the broker
+    /// committed.
+    shown: Option<rustic_url::Url>,
+    /// The strip's width in CSS pixels at the last frame (for clicks).
+    strip_width: f64,
 }
 
 impl rustic_shell::Content for ViewPage {
@@ -668,6 +685,54 @@ impl rustic_shell::Content for ViewPage {
             surface,
             scroll: reported.unwrap_or(scroll),
         })
+    }
+
+    fn chrome_height(&self) -> f64 {
+        f64::from(chrome::height(&self.permissions))
+    }
+
+    fn chrome(&mut self, width: u32, scale: f64) -> Result<Option<rustic_raster::Surface>, String> {
+        let scale = if scale.is_finite() {
+            scale.clamp(0.25, 8.0)
+        } else {
+            1.0
+        };
+        // The broker's committed URL, never one a renderer reports; a new
+        // document closes the previous one's prompt.
+        if let Some(committed) = broker::committed_url() {
+            if self.shown.as_ref() != Some(&committed) {
+                if self.shown.is_some() {
+                    self.permissions.navigated(std::time::Instant::now());
+                }
+                self.shown = Some(committed);
+            }
+        }
+        let address = match &self.shown {
+            Some(url) => chrome::address(url),
+            None => chrome::Address {
+                security: chrome::Security::Opaque,
+                host: "about:blank".to_owned(),
+                detail: String::new(),
+            },
+        };
+        self.strip_width = (f64::from(width) / scale).floor();
+        chrome::paint(&address, &self.permissions, width, scale).map(Some)
+    }
+
+    fn chrome_click(&mut self, x: f64, y: f64) -> bool {
+        chrome::hit(&self.permissions, self.strip_width, x, y).is_some_and(|answer| {
+            self.permissions
+                .answer(answer, std::time::Instant::now())
+                .is_some()
+        })
+    }
+
+    fn chrome_escape(&mut self) -> bool {
+        self.permissions.pending().is_some()
+            && self
+                .permissions
+                .answer(chrome::Answer::Dismiss, std::time::Instant::now())
+                .is_some()
     }
 }
 

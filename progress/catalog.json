@@ -5846,66 +5846,67 @@
           "label": "Trusted permissions, activation, files and downloads",
           "size": 3,
           "milestone": "M7",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "User activation: transient and sticky, trusted input only, consumable by hosts",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/activation.rs",
-                  "marker": "pub const TRANSIENT_ACTIVATION"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-engine/tests/input.rs",
-                  "marker": "fn trusted_input_gives_transient_and_sticky_user_activation"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/activation.rs",
+              "marker": "pub const TRANSIENT_ACTIVATION"
             },
             {
-              "label": "Downloads only through the broker: granted directory, sanitized names, no overwrite, atomic writes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/network.rs",
-                  "marker": "pub(crate) fn save_download"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/network.rs",
-                  "marker": "fn downloads_are_saved_only_to_the_granted_directory_without_overwriting"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/input.rs",
+              "marker": "fn trusted_input_gives_transient_and_sticky_user_activation"
             },
             {
-              "label": "File access only through broker grants; renderers open nothing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "fn resource("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_local_grant"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-cli/src/network.rs",
+              "marker": "pub(crate) fn save_download"
             },
             {
-              "label": "Trusted permission prompts, address display and clipboard in the browser shell (M8, TD-173)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn downloads_are_saved_only_to_the_granted_directory_without_overwriting"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "fn resource("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_local_grant"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/chrome.rs",
+              "marker": "pub struct Permissions"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-shell/src/lib.rs",
+              "marker": "pub fn present("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/chrome.rs",
+              "marker": "fn early_clicks_are_ignored_and_answers_are_kept_per_origin"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/chrome.rs",
+              "marker": "fn addresses_show_ascii_hosts_without_credentials_or_fragments"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-shell/src/lib.rs",
+              "marker": "fn page_pixels_never_reach_the_trusted_strip"
             }
           ]
         },

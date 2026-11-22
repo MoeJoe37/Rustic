@@ -234,7 +234,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
 | TD-171 | Deliberate | Isolation | The renderer was split but not confined, and `reftest` ran single-process | Paid 2026-11-22 (watchdog 2026-11-20, Linux and Windows sandboxes 2026-11-21, macOS and `reftest` 2026-11-22) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox had no seccomp-bpf syscall filter | Paid |
-| TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
+| TD-173 | Deliberate | Permissions | The trusted strip (address display, permission prompt) and the permission and clipboard rules exist (2026-11-22), but no page API reaches them yet (renderers live one frame); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 | TD-174 | Deliberate | Isolation | macOS renderers were not confined by default | Paid 2026-11-22 (ADR 0063 Accepted, verified on native macOS x64 and ARM64; follow-ups TD-183) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
 | TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined by default on Linux (2026-11-21) and macOS (Seatbelt network profile, 2026-11-22); on Windows it runs with the user's rights, because an AppContainer cannot reach the loopback addresses the CLI grants | Open, Windows with TD-157 |
@@ -2777,6 +2777,22 @@ attribute or Windows Mark of the Web (both need platform calls).
 streamed downloads through the broker, and quarantine metadata per
 platform.
 **Trigger:** the M8 desktop shell.
+**Partly paid 2026-11-22:** `rustic view` draws a trusted strip above the
+page (`rustic-cli/src/chrome.rs`, `rustic_shell::present`): the address
+the broker committed (after redirects; ASCII hosts, no credentials or
+fragment, elided from the host's start so the registrable domain stays
+visible, "Secure"/"Not secure"/"File"), and a permission prompt with
+Block and Allow. The broker renders the strip itself, scripts off, from
+escaped printable ASCII; page pixels never reach its rows and clicks
+there never reach the page. `chrome::Permissions` holds the rules:
+secure, non-opaque origins only, transient activation required, one
+prompt at a time, buttons ignore clicks for 500 ms, answers kept per
+origin for the session, three dismissals embargo an origin, a new
+document closes the old prompt; clipboard writes need activation and
+focus, reads need focus and the permission. Remaining: page APIs
+(Notifications, Permissions, Geolocation, async Clipboard) reaching these
+rules once renderers are long-lived (TD-178), streamed downloads, and
+quarantine metadata.
 
 ### TD-174 — macOS has no renderer sandbox
 

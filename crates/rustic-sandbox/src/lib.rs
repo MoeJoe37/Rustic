@@ -12,7 +12,8 @@
 //!   platform. On macOS, `enter` applies one to the calling process
 //!   through `sandbox_init`, which needs `unsafe` FFI.
 //! - `windows` (Windows only) launches a renderer in an AppContainer with no
-//!   capabilities, inside a kill-on-close job that admits one process
+//!   capabilities, or the network process in one with only outbound
+//!   Internet and certificate-verification capabilities, inside a kill-on-close job that admits one process
 //!   (ADR 0060). It and the macOS `enter` are the only modules in Rustic
 //!   that contain `unsafe` code; every block states its invariants.
 
@@ -28,4 +29,4 @@ mod windows;
 pub use seatbelt_enter::enter;
 
 #[cfg(windows)]
-pub use windows::{Confined, Pipes, spawn_app_container};
+pub use windows::{Confined, Container, Pipes, spawn_app_container};

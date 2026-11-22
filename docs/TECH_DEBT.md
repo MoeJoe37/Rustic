@@ -56,8 +56,8 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M7 entry (before hostile remote content) | TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -218,7 +218,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
-| TD-157 | Deliberate | Network | No DNS: the transport reaches only allowlisted loopback origins (TLS paid 2026-11-20) | Open, M7 entry |
+| TD-157 | Deliberate | Network | No DNS: the transport reached only allowlisted loopback origins | Paid 2026-11-22 (TLS 2026-11-20; DNS and public addresses, ADR 0066) |
 | TD-158 | Deliberate | Network | No content-coding decoding: no `Accept-Encoding` is sent and `Content-Encoding` bodies are delivered still encoded | Paid 2026-11-20 |
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Paid 2026-11-20 |
@@ -237,7 +237,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-173 | Deliberate | Permissions | The trusted strip (address display, permission prompt) and the permission and clipboard rules exist (2026-11-22), but no page API reaches them yet (renderers live one frame); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 | TD-174 | Deliberate | Isolation | macOS renderers were not confined by default | Paid 2026-11-22 (ADR 0063 Accepted, verified on native macOS x64 and ARM64; follow-ups TD-183) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
-| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined by default on Linux (2026-11-21) and macOS (Seatbelt network profile, 2026-11-22); on Windows it runs with the user's rights, because an AppContainer cannot reach the loopback addresses the CLI grants | Open, Windows with TD-157 |
+| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) was not OS-confined | Paid 2026-11-22 (Linux 2026-11-21, macOS and Windows 2026-11-22; Windows loopback fixture runs stay unconfined, ADR 0066) |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
@@ -2547,6 +2547,17 @@ owns name resolution.
 network broker capability, with the allowlist replaced by broker policy.
 **Trigger:** M7 entry (remote browsing) or the first non-loopback test
 host.
+**Paid 2026-11-22 (ADR 0066):** `--allow-origin ORIGIN` lets one origin,
+and `--allow-remote` every origin, resolve through the system resolver in
+the broker (`NetworkPolicy::address`). A resolved name or IP literal
+reaches only public unicast addresses (`rustic_net::is_public`: no
+loopback, private, CGNAT, link-local, unique-local, documentation,
+multicast or reserved ranges, including mapped forms), so DNS cannot be
+turned against the user's machine or network; the network process
+re-checks every address and never resolves. Evidence:
+`resolved_origins_reach_only_public_addresses`,
+`special_purpose_addresses_are_not_public`,
+`resolved_origins_never_reach_local_addresses`.
 
 ### TD-158 — Content codings are not decoded (Paid)
 
@@ -2891,6 +2902,15 @@ of their own.
 by default with the renderer sandbox and passes
 `the_seatbelt_network_process_reaches_only_internet_sockets` (explicit
 and default runs) on native macOS x64 and ARM64. Windows remains.
+**Paid 2026-11-22 (Windows, ADR 0066):** with remote addresses (TD-157)
+the Windows network process starts in its own LPAC, `Rustic.Network`,
+with `internetClient`, `lpacCryptoServices` and `registryRead` only, in
+a kill-on-close job of one process, whenever no loopback fixture origin
+is granted (no AppContainer can reach loopback; such runs serve only the
+user's own servers and stay unconfined).
+`the_windows_network_process_is_confined_for_remote_origins` checks the
+escape probes (file, directory, `cmd.exe`, loopback) unconfined and
+confined; it runs on the native Windows runners in the next CI run.
 
 ### TD-177 — Frame compositing is linear and untransformed
 

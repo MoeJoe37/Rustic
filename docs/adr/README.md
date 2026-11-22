@@ -73,6 +73,7 @@ instead of rewriting the history of a decision.
 | [0063](0063-macos-renderer-sandbox.md) | macOS renderers under a deny-by-default Seatbelt profile through `sandbox-exec`, opt-in with `--sandbox` until verified on native Macs | Proposed |
 | [0064](0064-scrolling-and-compositor-scenes.md) | Scroll positions are applied to a finished layout along the containing-block chain (fixed stays, sticky re-solves, clips follow); scenes of cached layers and script scrolling build on them | Accepted (step 1) |
 | [0065](0065-desktop-window-host.md) | Desktop window host: winit 0.30 and softbuffer 0.4 in `rustic-shell`, minimal features; `rustic view` renders each frame in a sandboxed renderer | Accepted |
+| [0066](0066-remote-addresses-and-windows-network-container.md) | Remote origins resolve through the system resolver in the broker and reach only public addresses (no DNS rebinding to loopback or private networks); the Windows network process runs in a `Rustic.Network` LPAC with internetClient | Accepted |
 
 ## Records by area
 

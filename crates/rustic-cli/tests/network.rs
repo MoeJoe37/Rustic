@@ -181,6 +181,45 @@ fn ungranted_origins_and_bad_grants_fail_without_sending() {
     assert!(server.requests().is_empty());
 }
 
+/// TD-157: an origin granted without an address resolves through the
+/// system resolver, but a resolved name never reaches loopback or private
+/// addresses (DNS rebinding), in either process model; nothing is sent.
+#[test]
+fn resolved_origins_never_reach_local_addresses() {
+    let server = server();
+    let port = server.address().port();
+    for host in ["localhost", "127.0.0.1"] {
+        let url = format!("http://{host}:{port}/");
+        for grant in [
+            vec!["--allow-origin", url.trim_end_matches('/')],
+            vec!["--allow-remote"],
+        ] {
+            for single in [false, true] {
+                let mut args = Vec::new();
+                if single {
+                    args.push("--single-process");
+                }
+                args.push("dump-dom");
+                args.extend_from_slice(&grant);
+                args.push(&url);
+                let output = rustic(&args);
+                assert_eq!(
+                    output.status.code(),
+                    Some(1),
+                    "{args:?}: {}",
+                    stderr(&output)
+                );
+                assert!(
+                    stderr(&output).contains("local or private addresses"),
+                    "{args:?}: {}",
+                    stderr(&output)
+                );
+            }
+        }
+    }
+    assert!(server.requests().is_empty());
+}
+
 #[test]
 fn https_documents_verify_certificates_against_the_given_roots() {
     let tls = concat!(

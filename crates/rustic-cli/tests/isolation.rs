@@ -589,6 +589,62 @@ fn the_sandboxed_network_process_reaches_only_internet_sockets() {
     drop(listener);
 }
 
+/// TD-176 on Windows: a run whose origins all resolve (no loopback
+/// fixture grant) starts the network process in the `Rustic.Network`
+/// AppContainer, which denies reading files, listing directories,
+/// starting programs and connecting to loopback. The probe request is
+/// failed in the network process, so nothing reaches the Internet.
+#[cfg(windows)]
+#[test]
+fn the_windows_network_process_is_confined_for_remote_origins() {
+    let site = Site::new("network-container");
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let outside = site.0.join("outside.txt").to_string_lossy().into_owned();
+    let home = site.0.to_string_lossy().into_owned();
+    // A public IP literal: granted without DNS; the request never leaves.
+    let origin = "http://93.184.216.34";
+    let probe = |mode: &str| {
+        let output = Command::new(env!("CARGO_BIN_EXE_rustic"))
+            .args([
+                mode,
+                "dump-dom",
+                "--allow-origin",
+                origin,
+                "http://93.184.216.34/",
+            ])
+            .env_remove("RUSTIC_SANDBOX")
+            .env("RUSTIC_TEST_NETWORK_PROCESS", "escape-only")
+            .env("RUSTIC_TEST_ESCAPE_FILE", &outside)
+            .env("RUSTIC_TEST_ESCAPE_DIR", &home)
+            .env("RUSTIC_TEST_ESCAPE_ADDRESS", &address)
+            .output()
+            .expect("run rustic");
+        text(&output.stderr)
+    };
+    let probes = [
+        "read-user-file",
+        "list-home",
+        "spawn-shell",
+        "connect-loopback",
+    ];
+    let open = probe("--no-sandbox");
+    for name in probes {
+        assert!(
+            open.contains(&format!("network-escape {name}: allowed")),
+            "{open}"
+        );
+    }
+    let confined = probe("--sandbox");
+    for name in probes {
+        assert!(
+            confined.contains(&format!("network-escape {name}: denied")),
+            "{confined}"
+        );
+    }
+    drop(listener);
+}
+
 /// TD-176 on macOS (ADR 0063): under the sandbox the network
 /// process's Seatbelt profile keeps loopback TCP (its job) but denies
 /// reading files, listing directories, starting programs and connecting

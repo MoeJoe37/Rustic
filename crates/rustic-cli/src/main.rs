@@ -130,11 +130,14 @@ RUSTIC_SANDBOX=1) demands one, also where none exists (an error).
 --download-dir DIR saves navigations that turn out to be downloads into DIR
 (sanitized names, never overwriting); without it downloads are refused.
 
-Network (development prototype, loopback only): any document command accepts
-an http:// or https:// URL in place of <file> when each origin it may reach is
-granted with --allow-origin ORIGIN=ADDRESS (for example
---allow-origin http://a.test:8080=127.0.0.1:8080; ADDRESS must be loopback,
-there is no DNS; repeat up to 64). Redirects, cookies, CORS, CSP, mixed
+Network: any document command accepts an http:// or https:// URL in place of
+<file> when each origin it may reach is granted: --allow-origin ORIGIN=ADDRESS
+routes an origin to a loopback fixture server (for example
+--allow-origin http://a.test:8080=127.0.0.1:8080), --allow-origin ORIGIN lets
+that origin resolve through the system resolver (repeat up to 64), and
+--allow-remote lets every origin resolve. A resolved name reaches only public
+addresses: never loopback, private, link-local or other special-purpose ones,
+so pages cannot use DNS to reach this machine or its network. Redirects, cookies, CORS, CSP, mixed
 content and nosniff apply to the document's stylesheets, scripts and images;
 other origins are blocked. --ca-file PEM trusts only the given roots instead
 of the platform store; certificate errors are never bypassed. A response
@@ -235,7 +238,7 @@ fn main() -> ExitCode {
             viewport.height()
         );
         println!(
-            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; OpenType text shaping and CSS wrapping available; JavaScript via --run-scripts; HTTP(S) to loopback origins granted with --allow-origin; general remote browsing: not implemented"
+            "HTML: local document parsing via dump-dom; CSS: selectors, cascade and computed style via dump-style; M3: principal boxes via dump-boxes, normalized flow boxes via dump-formatting, block reference geometry via dump-layout and block, inline and text painting via dump-paint and render, reftests via reftest, hit testing via hit-test; OpenType text shaping and CSS wrapping available; JavaScript via --run-scripts; HTTP(S) to origins granted with --allow-origin (loopback fixtures or resolved public addresses) or --allow-remote; interactive browser shell (navigation, tabs, input to pages): not implemented"
         );
         return ExitCode::SUCCESS;
     }
@@ -368,8 +371,8 @@ fn load<T>(
     let network = granted.is_none() && network::is_network_argument(path);
     if network && !network::has_grants() {
         eprintln!(
-            "rustic {command}: network URLs need --allow-origin ORIGIN=ADDRESS for each origin; \
-             nothing was sent"
+            "rustic {command}: network URLs need --allow-origin ORIGIN[=ADDRESS] for each origin, \
+             or --allow-remote; nothing was sent"
         );
         return Err(2);
     }

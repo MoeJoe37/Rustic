@@ -40,10 +40,9 @@ static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
 static SANDBOX: AtomicBool = AtomicBool::new(false);
 
 /// Whether renderers (and the network process) are confined in this run.
-/// (Windows does not confine the network process yet, TD-176: an
-/// AppContainer cannot connect to loopback, the only addresses the CLI
-/// grants.)
-#[cfg(not(windows))]
+/// (On Windows the network process is confined only when no loopback
+/// fixture origin is granted: an AppContainer cannot connect to loopback,
+/// TD-176.)
 pub(crate) fn sandboxed() -> bool {
     SANDBOX.load(Ordering::Relaxed)
 }
@@ -332,8 +331,8 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
     let (grant, document) = if crate::network::is_network_argument(&path) {
         if !crate::network::has_grants() {
             eprintln!(
-                "rustic {command}: network URLs need --allow-origin ORIGIN=ADDRESS for each \
-                 origin; nothing was sent"
+                "rustic {command}: network URLs need --allow-origin ORIGIN[=ADDRESS] for each \
+                 origin, or --allow-remote; nothing was sent"
             );
             return 2;
         }
@@ -482,8 +481,9 @@ fn document_argument(
 }
 
 /// A renderer process: unconfined (or self-confined by Seatbelt on macOS), in
-/// bubblewrap, or in the Windows AppContainer.
-enum Process {
+/// bubblewrap, or in the Windows AppContainer. The network process uses
+/// it too.
+pub(crate) enum Process {
     Child(Child),
     /// A bubblewrap renderer and its filter file, which lives until the
     /// launcher has opened (and removed) it or the process is gone.
@@ -507,7 +507,7 @@ impl Process {
         }
     }
 
-    fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
+    pub(crate) fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
         match self {
             Self::Child(child) => child.wait(),
             #[cfg(not(any(windows, target_os = "macos")))]
@@ -517,7 +517,7 @@ impl Process {
         }
     }
 
-    fn kill(&mut self) -> io::Result<()> {
+    pub(crate) fn kill(&mut self) -> io::Result<()> {
         match self {
             Self::Child(child) => child.kill(),
             #[cfg(not(any(windows, target_os = "macos")))]
@@ -598,7 +598,12 @@ fn spawn_process() -> io::Result<Started> {
 #[cfg(windows)]
 fn spawn_confined(exe: &Path) -> io::Result<Started> {
     let command = std::ffi::OsStr::new(crate::renderer::RENDERER_COMMAND);
-    let (confined, pipes) = rustic_sandbox::spawn_app_container(exe, &[command], &sandbox_env())?;
+    let (confined, pipes) = rustic_sandbox::spawn_app_container(
+        rustic_sandbox::Container::Renderer,
+        exe,
+        &[command],
+        &sandbox_env(),
+    )?;
     Ok((
         Process::Confined(confined),
         Box::new(pipes.stdout),

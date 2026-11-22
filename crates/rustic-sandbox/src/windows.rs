@@ -1,4 +1,5 @@
-//! The Windows renderer launcher (ISO-04, ADR 0060).
+//! The Windows renderer and network process launcher (ISO-04, ADR 0060;
+//! TD-176 for the network process's container).
 //!
 //! A renderer starts in the `Rustic.Renderer` AppContainer with no
 //! capabilities: it cannot open the user's files, the registry outside its
@@ -33,7 +34,10 @@ use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
 use windows_sys::Win32::Security::Isolation::{
     CreateAppContainerProfile, DeriveAppContainerSidFromAppContainerName,
 };
-use windows_sys::Win32::Security::{FreeSid, PSID, SECURITY_ATTRIBUTES, SECURITY_CAPABILITIES};
+use windows_sys::Win32::Security::{
+    DeriveCapabilitySidsFromName, FreeSid, PSID, SECURITY_ATTRIBUTES, SECURITY_CAPABILITIES,
+    SID_AND_ATTRIBUTES,
+};
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
     JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -52,14 +56,62 @@ use windows_sys::Win32::System::Threading::{
     WaitForSingleObject,
 };
 
-/// The AppContainer every renderer shares. Renderers hold no authority
-/// and keep nothing on disk, so one container profile is enough; the
-/// broker separates documents by process (ADR 0057).
-const CONTAINER: &str = "Rustic.Renderer";
+/// Which AppContainer a process starts in.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Container {
+    /// `Rustic.Renderer`, shared by every renderer, with no capabilities.
+    /// Renderers hold no authority and keep nothing on disk, so one
+    /// container profile is enough; the broker separates documents by
+    /// process (ADR 0057).
+    Renderer,
+    /// `Rustic.Network`, the network process (ADR 0061, TD-176): only the
+    /// capabilities for outbound Internet connections and certificate
+    /// verification. It cannot connect to loopback or the local network,
+    /// open the user's files or start processes.
+    Network,
+}
+
+impl Container {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Renderer => "Rustic.Renderer",
+            Self::Network => "Rustic.Network",
+        }
+    }
+
+    fn description(self) -> &'static str {
+        match self {
+            Self::Renderer => "Rustic renderer processes",
+            Self::Network => "Rustic network process",
+        }
+    }
+
+    /// The named mutex that serializes this profile's creation within the
+    /// session.
+    fn lock(self) -> &'static str {
+        match self {
+            Self::Renderer => "Local\\Rustic.Renderer.Profile",
+            Self::Network => "Local\\Rustic.Network.Profile",
+        }
+    }
+
+    /// The named capabilities the container's processes hold:
+    /// `internetClient` (outbound connections to the Internet, not to
+    /// loopback or private networks), `lpacCryptoServices` and
+    /// `registryRead` (the certificate store and chain engine that TLS
+    /// verification uses in a less privileged AppContainer).
+    fn capabilities(self) -> &'static [&'static str] {
+        match self {
+            Self::Renderer => &[],
+            Self::Network => &["internetClient", "lpacCryptoServices", "registryRead"],
+        }
+    }
+}
+
 /// `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)`.
 const ALREADY_EXISTS: i32 = 0x8007_00B7_u32 as i32;
-/// The named mutex that serializes profile creation within the session.
-const PROFILE_LOCK: &str = "Local\\Rustic.Renderer.Profile";
+/// `SE_GROUP_ENABLED`: a capability SID the process holds.
+const SE_GROUP_ENABLED: u32 = 0x0000_0004;
 /// `PROCESS_CREATION_CHILD_PROCESS_RESTRICTED`: the renderer cannot create
 /// processes even outside its job.
 const CHILD_PROCESS_RESTRICTED: u32 = 1;
@@ -127,12 +179,15 @@ impl Confined {
 /// and execute it (and nothing else); the call fails if the broker may not
 /// change that file's permissions.
 pub fn spawn_app_container(
+    container: Container,
     program: &Path,
     args: &[&OsStr],
     env: &[(OsString, OsString)],
 ) -> io::Result<(Confined, Pipes)> {
-    let sid = ContainerSid::open()?;
+    let sid = ContainerSid::open(container)?;
     grant_executable(program, &sid.to_string_sid()?)?;
+    let capability_sids = Capabilities::derive(container.capabilities())?;
+    let mut granted = capability_sids.attributes();
     let system = system_directory()?;
 
     let (child_stdin, stdin) = pipe(Side::ChildReads)?;
@@ -141,8 +196,12 @@ pub fn spawn_app_container(
 
     let mut capabilities = SECURITY_CAPABILITIES {
         AppContainerSid: sid.0,
-        Capabilities: null_mut(),
-        CapabilityCount: 0,
+        Capabilities: if granted.is_empty() {
+            null_mut()
+        } else {
+            granted.as_mut_ptr()
+        },
+        CapabilityCount: granted.len() as u32,
         Reserved: 0,
     };
     let inherited: [HANDLE; 3] = [
@@ -198,8 +257,8 @@ pub fn spawn_app_container(
     let mut information = PROCESS_INFORMATION::default();
     // SAFETY: every pointer refers to a live, NUL-terminated buffer or
     // initialized structure owned by this frame: the attribute list and
-    // the values it points to (`capabilities`, `inherited`,
-    // `child_policy`) outlive the call, `command_line` is mutable as the
+    // the values it points to (`capabilities`, the `granted` SIDs it
+    // points to, `inherited`, `child_policy`) outlive the call, `command_line` is mutable as the
     // API requires, and `environment` is a double-NUL-terminated UTF-16
     // block as `CREATE_UNICODE_ENVIRONMENT` declares.
     let created = unsafe {
@@ -305,8 +364,8 @@ fn confine(process: &OwnedHandle) -> io::Result<OwnedHandle> {
 struct ProfileLock(OwnedHandle);
 
 impl ProfileLock {
-    fn acquire() -> io::Result<Self> {
-        let name = wide(OsStr::new(PROFILE_LOCK));
+    fn acquire(container: Container) -> io::Result<Self> {
+        let name = wide(OsStr::new(container.lock()));
         // SAFETY: null attributes are allowed; `name` is NUL-terminated.
         let raw = unsafe { CreateMutexW(null(), 0, name.as_ptr()) };
         if raw.is_null() {
@@ -343,10 +402,10 @@ impl ContainerSid {
     /// `ERROR_BAD_ENVIRONMENT` or `ERROR_FILE_NOT_FOUND` rather than
     /// `ERROR_ALREADY_EXISTS` (seen on native Windows CI with parallel
     /// tests), so the step runs under a session-wide named mutex.
-    fn open() -> io::Result<Self> {
-        let _serialized = ProfileLock::acquire()?;
-        let name = wide(OsStr::new(CONTAINER));
-        let description = wide(OsStr::new("Rustic renderer processes"));
+    fn open(container: Container) -> io::Result<Self> {
+        let _serialized = ProfileLock::acquire(container)?;
+        let name = wide(OsStr::new(container.name()));
+        let description = wide(OsStr::new(container.description()));
         let mut sid: PSID = null_mut();
         // SAFETY: the strings are NUL-terminated; no capabilities are
         // passed; `sid` is a valid out pointer.
@@ -406,6 +465,92 @@ impl Drop for ContainerSid {
         // are freed with FreeSid, and is freed once.
         unsafe { FreeSid(self.0) };
     }
+}
+
+/// Capability SIDs derived from capability names, freed on drop.
+struct Capabilities {
+    /// Each name's capability SIDs, as `DeriveCapabilitySidsFromName`
+    /// allocated them.
+    sids: Vec<PSID>,
+}
+
+impl Capabilities {
+    fn derive(names: &[&str]) -> io::Result<Self> {
+        let mut capabilities = Self { sids: Vec::new() };
+        for name in names {
+            let name = wide(OsStr::new(name));
+            let mut groups: *mut PSID = null_mut();
+            let mut group_count = 0u32;
+            let mut sids: *mut PSID = null_mut();
+            let mut sid_count = 0u32;
+            // SAFETY: `name` is NUL-terminated; the four out pointers are
+            // valid locals. On success the arrays and the SIDs in them are
+            // allocated with LocalAlloc and owned by the caller.
+            let derived = unsafe {
+                DeriveCapabilitySidsFromName(
+                    name.as_ptr(),
+                    &mut groups,
+                    &mut group_count,
+                    &mut sids,
+                    &mut sid_count,
+                )
+            };
+            if derived == 0 {
+                return Err(os_error("DeriveCapabilitySidsFromName"));
+            }
+            // SAFETY: on success `groups` holds `group_count` SIDs.
+            let group_list = unsafe { slice_or_empty(groups, group_count) };
+            for &group in group_list {
+                // SAFETY: each group SID was LocalAlloc'd and is freed once;
+                // group SIDs are not used.
+                unsafe { LocalFree(group.cast()) };
+            }
+            // SAFETY: `groups` itself was LocalAlloc'd (or is null).
+            unsafe { LocalFree(groups.cast()) };
+            // SAFETY: on success `sids` holds `sid_count` SIDs.
+            let sid_list = unsafe { slice_or_empty(sids, sid_count) };
+            capabilities.sids.extend_from_slice(sid_list);
+            // SAFETY: the array was LocalAlloc'd (or is null); the SIDs it
+            // held now belong to `capabilities`.
+            unsafe { LocalFree(sids.cast()) };
+        }
+        Ok(capabilities)
+    }
+
+    /// The SIDs as enabled capability entries; valid while `self` lives.
+    fn attributes(&self) -> Vec<SID_AND_ATTRIBUTES> {
+        self.sids
+            .iter()
+            .map(|&sid| SID_AND_ATTRIBUTES {
+                Sid: sid,
+                Attributes: SE_GROUP_ENABLED,
+            })
+            .collect()
+    }
+}
+
+impl Drop for Capabilities {
+    fn drop(&mut self) {
+        for &sid in &self.sids {
+            // SAFETY: each SID came from DeriveCapabilitySidsFromName,
+            // which allocates with LocalAlloc, and is freed once.
+            unsafe { LocalFree(sid.cast()) };
+        }
+    }
+}
+
+/// `count` elements at `pointer`, or none for a null pointer.
+///
+/// # Safety
+///
+/// A non-null `pointer` must point to `count` initialized, readable
+/// elements that stay valid for the returned lifetime.
+unsafe fn slice_or_empty<'a, T>(pointer: *mut T, count: u32) -> &'a [T] {
+    if pointer.is_null() || count == 0 {
+        return &[];
+    }
+    // SAFETY: the caller guarantees `count` readable elements.
+    unsafe { std::slice::from_raw_parts(pointer, count as usize) }
 }
 
 /// A process/thread attribute list, deleted on drop.
@@ -527,11 +672,14 @@ fn system_directory() -> io::Result<PathBuf> {
 /// Let the container read and execute `program`. Done once per program
 /// and broker; `icacls` is run from the system directory, never `PATH`.
 fn grant_executable(program: &Path, sid: &str) -> io::Result<()> {
-    static GRANTED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+    static GRANTED: Mutex<Vec<(PathBuf, String)>> = Mutex::new(Vec::new());
     let mut granted = GRANTED
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if granted.iter().any(|path| path == program) {
+    if granted
+        .iter()
+        .any(|(path, granted_sid)| path == program && granted_sid == sid)
+    {
         return Ok(());
     }
     let status = Command::new(system_directory()?.join("icacls.exe"))
@@ -545,11 +693,11 @@ fn grant_executable(program: &Path, sid: &str) -> io::Result<()> {
     if !status.success() {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "could not let the renderer AppContainer read the executable \
+            "could not let the AppContainer read the executable \
              (the broker needs permission to change its access control list)",
         ));
     }
-    granted.push(program.to_owned());
+    granted.push((program.to_owned(), sid.to_owned()));
     Ok(())
 }
 

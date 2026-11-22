@@ -1,7 +1,7 @@
 # ADR 0061 — Network process
 
 Date: 2026-11-21
-Status: Accepted for the CLI prototype (verified on native Linux, Windows and macOS runners; OS-confined on Linux and macOS, not Windows, TD-176)
+Status: Accepted for the CLI prototype (verified on native Linux, Windows and macOS runners; OS-confined on Linux and macOS, and on Windows for remote origins since ADR 0066)
 
 ## Context
 

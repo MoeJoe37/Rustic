@@ -195,7 +195,7 @@ type Slot = Arc<Mutex<RemoteFeed>>;
 
 /// One running network process.
 struct Link {
-    child: Mutex<Child>,
+    child: Mutex<crate::broker::Process>,
     /// The bubblewrap filter file, kept until the launcher removed it.
     #[cfg(not(windows))]
     _filter: Option<crate::broker::SeccompFile>,
@@ -221,6 +221,35 @@ type Pipes = (
     Box<dyn Write + Send>,
     Box<dyn Read + Send>,
 );
+
+/// A started network process and its standard output, input and error.
+#[cfg(windows)]
+type ProcessPipes = (
+    crate::broker::Process,
+    Box<dyn Read + Send>,
+    Box<dyn Write + Send>,
+    Box<dyn Read + Send>,
+);
+
+/// Windows: the child in the `Rustic.Network` AppContainer (outbound
+/// Internet and certificate verification only, no loopback, files or
+/// processes), in a kill-on-close job of one process (TD-176).
+#[cfg(windows)]
+fn spawn_confined(exe: &std::path::Path) -> io::Result<ProcessPipes> {
+    let command = std::ffi::OsStr::new(NETWORK_COMMAND);
+    let (confined, pipes) = rustic_sandbox::spawn_app_container(
+        rustic_sandbox::Container::Network,
+        exe,
+        &[command],
+        &crate::broker::sandbox_env(),
+    )?;
+    Ok((
+        crate::broker::Process::Confined(confined),
+        Box::new(pipes.stdout),
+        Box::new(pipes.stdin),
+        Box::new(pipes.stderr),
+    ))
+}
 
 /// Start the child unconfined.
 fn spawn_plain(exe: &std::path::Path) -> io::Result<Pipes> {
@@ -266,8 +295,10 @@ impl Link {
         // renderer, but keeps Internet sockets (TD-176): bubblewrap and a
         // seccomp filter on Linux, the Seatbelt network profile on macOS
         // (both on by default).
-        // A setup failure is an error, never an unconfined start. Windows
-        // starts it unconfined for now (TD-176).
+        // A setup failure is an error, never an unconfined start. On
+        // Windows it runs in the `Rustic.Network` AppContainer unless a
+        // loopback fixture origin is granted, which no AppContainer can
+        // reach (TD-176); remote origins are always served confined.
         #[cfg(not(windows))]
         let (child, stdout, stdin, stderr, filter) =
             if crate::broker::sandboxed() && cfg!(target_os = "macos") {
@@ -282,8 +313,16 @@ impl Link {
                 let (child, stdout, stdin, stderr) = spawn_plain(&exe)?;
                 (child, stdout, stdin, stderr, None)
             };
+        #[cfg(not(windows))]
+        let child = crate::broker::Process::Child(child);
         #[cfg(windows)]
-        let (child, stdout, stdin, stderr) = spawn_plain(&exe)?;
+        let (child, stdout, stdin, stderr) =
+            if crate::broker::sandboxed() && !crate::network::has_loopback_grants() {
+                spawn_confined(&exe)?
+            } else {
+                let (child, stdout, stdin, stderr) = spawn_plain(&exe)?;
+                (crate::broker::Process::Child(child), stdout, stdin, stderr)
+            };
         let mut child = child;
         // Relay the child's diagnostics escaped: it is untrusted and must
         // not write control sequences to the user's terminal.
@@ -614,12 +653,17 @@ fn exchange(
     let limits = transport_limits(&open.limits).ok_or(TransportError::Blocked)?;
     let url = Url::parse(&open.url, None).map_err(|_| TransportError::Blocked)?;
     let address: SocketAddr = open.address.parse().map_err(|_| TransportError::Blocked)?;
-    // The broker's grant is re-checked here as defence in depth: the
-    // policy still refuses anything but a loopback address (TD-157).
+    // The broker's grant is re-checked here as defence in depth: a
+    // loopback fixture address, or a public one the broker resolved
+    // (TD-157); never a private or other special-purpose address. This
+    // process never resolves names.
     let mut policy = NetworkPolicy::deny_all();
-    policy
-        .allow(&url, address)
-        .map_err(|_| TransportError::Blocked)?;
+    if address.ip().is_loopback() {
+        policy.allow(&url, address)
+    } else {
+        policy.allow_public(&url, address)
+    }
+    .map_err(|_| TransportError::Blocked)?;
     let mut request = Request::new(&open.method, url).map_err(|_| TransportError::Blocked)?;
     for (name, value) in &open.headers {
         request
@@ -723,6 +767,14 @@ fn misbehave(mode: &str, out: &Out, id: u64, url: &str) -> bool {
             escape_probes();
             false
         }
+        // Probe, then fail the request without connecting anywhere (a
+        // remote grant in a test that must not use the Internet).
+        "escape-only" => {
+            escape_probes();
+            let (code, detail) = rustic_net::remote::error_code(TransportError::Blocked);
+            send(NetworkEvent::Failed { id, code, detail });
+            true
+        }
         "crash" => panic!("simulated network process crash"),
         _ if mode
             .strip_prefix("crash-on:")
@@ -760,7 +812,9 @@ fn misbehave(mode: &str, out: &Out, id: u64, url: &str) -> bool {
 
 /// Try what a compromised network process would (TD-176) and report
 /// each attempt on standard error as `network-escape NAME: allowed` or
-/// `denied`. Connecting to loopback TCP is its job and is not probed.
+/// `denied`. Connecting to loopback TCP is its job on Linux and macOS
+/// and is not probed there; on Windows it is (the container serves remote
+/// origins only).
 fn escape_probes() {
     let report = |name: &str, allowed: bool| {
         eprintln!(
@@ -777,13 +831,23 @@ fn escape_probes() {
         "list-home",
         std::fs::read_dir(var("RUSTIC_TEST_ESCAPE_DIR")).is_ok(),
     );
-    report(
-        "spawn-shell",
-        Command::new("/bin/sh")
-            .args(["-c", "exit 0"])
-            .status()
-            .is_ok_and(|status| status.success()),
-    );
+    let shell = if cfg!(windows) {
+        Command::new("cmd.exe").args(["/c", "exit 0"]).status()
+    } else {
+        Command::new("/bin/sh").args(["-c", "exit 0"]).status()
+    };
+    report("spawn-shell", shell.is_ok_and(|status| status.success()));
+    // Windows: loopback is out of the network container's reach (TD-176).
+    #[cfg(windows)]
+    {
+        let reached = var("RUSTIC_TEST_ESCAPE_ADDRESS")
+            .to_str()
+            .and_then(|address| address.parse::<std::net::SocketAddr>().ok())
+            .is_some_and(|address| {
+                std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2)).is_ok()
+            });
+        report("connect-loopback", reached);
+    }
     #[cfg(target_os = "linux")]
     {
         use std::os::linux::net::SocketAddrExt;

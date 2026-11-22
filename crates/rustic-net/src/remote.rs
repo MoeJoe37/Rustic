@@ -238,6 +238,8 @@ pub fn error_code(error: TransportError) -> (u16, u16) {
         TransportError::Cancelled => (9, 0),
         TransportError::Protocol(kind) => (10, index_of(&PROTOCOL_ERRORS, &kind)),
         TransportError::NetworkProcess => (11, 0),
+        TransportError::NameNotResolved => (12, 0),
+        TransportError::NotPublic => (13, 0),
     }
 }
 
@@ -268,6 +270,8 @@ pub fn error_from_code(code: u16, detail: u16) -> Option<TransportError> {
             .get(detail)
             .map(|&kind| TransportError::Protocol(kind)),
         11 => plain(TransportError::NetworkProcess),
+        12 => plain(TransportError::NameNotResolved),
+        13 => plain(TransportError::NotPublic),
         _ => None,
     }
 }
@@ -382,6 +386,8 @@ mod tests {
             TransportError::Timeout(TimeoutKind::Total),
             TransportError::Cancelled,
             TransportError::NetworkProcess,
+            TransportError::NameNotResolved,
+            TransportError::NotPublic,
         ];
         errors.extend(CERTIFICATE_ERRORS.map(TransportError::Certificate));
         errors.extend(IO_KINDS.map(TransportError::Connect));
@@ -396,7 +402,15 @@ mod tests {
             error_code(TransportError::Io(io::ErrorKind::Other)),
             "unlisted I/O kinds travel as Other"
         );
-        for (code, detail) in [(0, 0), (1, 1), (3, 6), (8, 2), (12, 0), (u16::MAX, 0)] {
+        for (code, detail) in [
+            (0, 0),
+            (1, 1),
+            (3, 6),
+            (8, 2),
+            (12, 1),
+            (14, 0),
+            (u16::MAX, 0),
+        ] {
             assert_eq!(error_from_code(code, detail), None);
         }
     }

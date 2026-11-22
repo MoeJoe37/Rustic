@@ -3,8 +3,10 @@
 //!
 //! The network is off unless the user grants origins: `--allow-origin
 //! ORIGIN=ADDR` routes one `http`/`https` origin to a loopback socket
-//! address (the transport has no DNS and refuses other addresses, ADR
-//! 0051), and `--ca-file PEM` replaces the platform trust store with the
+//! address (a fixture server, ADR 0051), `--allow-origin ORIGIN` lets one
+//! origin resolve through the system resolver, and `--allow-remote` lets
+//! every origin resolve (TD-157); resolved names reach only public
+//! addresses, never loopback or private ones. `--ca-file PEM` replaces the platform trust store with the
 //! given roots, for fixture servers with their own certificate authority.
 //! Without a grant an `http(s)` argument fails before anything is sent.
 //!
@@ -56,7 +58,10 @@ const MAX_REMEMBERED_CHARSETS: usize = 4096;
 /// The user's network grants, parsed once from the arguments.
 #[derive(Default)]
 struct NetworkConfig {
-    routes: Vec<(Url, SocketAddr)>,
+    /// Granted origins: a fixed loopback address, or `None` to resolve.
+    routes: Vec<(Url, Option<SocketAddr>)>,
+    /// `--allow-remote`: every origin may resolve.
+    any_remote: bool,
     ca_pem: Option<Vec<u8>>,
     /// The user's locale, for the HTML fallback encoding (`--locale`).
     locale: Option<String>,
@@ -89,6 +94,8 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
                 return Err("at most 64 --allow-origin grants are accepted".into());
             }
             config.routes.push(parse_grant(&value)?);
+        } else if arg == "--allow-remote" {
+            config.any_remote = true;
         } else if arg == "--ca-file" {
             let path = args.next().ok_or("--ca-file requires a PEM file")?;
             let metadata = std::fs::metadata(&path).map_err(|e| format!("--ca-file: {e}"))?;
@@ -127,21 +134,34 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     Ok(output)
 }
 
-/// `ORIGIN=ADDRESS`, for example `http://a.test=127.0.0.1:8080`.
-fn parse_grant(value: &str) -> Result<(Url, SocketAddr), String> {
+/// `ORIGIN=ADDRESS`, for example `http://a.test=127.0.0.1:8080` (a
+/// loopback fixture), or `ORIGIN` alone, for example `https://example.com`
+/// (resolved, public addresses only).
+fn parse_grant(value: &str) -> Result<(Url, Option<SocketAddr>), String> {
     let invalid = || {
         format!(
-            "--allow-origin {}: expected ORIGIN=ADDRESS with an http(s) origin and a loopback \
+            "--allow-origin {}: expected an http(s) ORIGIN, or ORIGIN=ADDRESS with a loopback \
              address",
             EscapedText(value)
         )
     };
-    let (origin, address) = value.rsplit_once('=').ok_or_else(invalid)?;
+    let (origin, address) = match value.rsplit_once('=') {
+        Some((origin, address)) => (origin, Some(address)),
+        None => (value, None),
+    };
     let origin = Url::parse(origin, None).map_err(|_| invalid())?;
-    let address: SocketAddr = address.parse().map_err(|_| invalid())?;
-    NetworkPolicy::deny_all()
-        .allow(&origin, address)
-        .map_err(|_| invalid())?;
+    let mut policy = NetworkPolicy::deny_all();
+    let address = match address {
+        Some(address) => {
+            let address: SocketAddr = address.parse().map_err(|_| invalid())?;
+            policy.allow(&origin, address).map_err(|_| invalid())?;
+            Some(address)
+        }
+        None => {
+            policy.allow_resolved(&origin).map_err(|_| invalid())?;
+            None
+        }
+    };
     Ok((origin, address))
 }
 
@@ -160,9 +180,20 @@ pub fn configured_locale() -> Option<&'static str> {
     CONFIG.get().and_then(|config| config.locale.as_deref())
 }
 
+/// Whether any origin is routed to a loopback fixture address (an
+/// AppContainer cannot reach those, TD-176).
+#[cfg(windows)]
+pub(crate) fn has_loopback_grants() -> bool {
+    CONFIG
+        .get()
+        .is_some_and(|config| config.routes.iter().any(|(_, address)| address.is_some()))
+}
+
 /// Whether any `--allow-origin` grant was given.
 pub fn has_grants() -> bool {
-    CONFIG.get().is_some_and(|config| !config.routes.is_empty())
+    CONFIG
+        .get()
+        .is_some_and(|config| !config.routes.is_empty() || config.any_remote)
 }
 
 /// Whether a command-line argument names an `http:` or `https:` URL.
@@ -208,7 +239,7 @@ impl fmt::Display for NetworkLoadError {
         match self {
             Self::InvalidUrl => formatter.write_str("not a valid URL"),
             Self::NoGrants => formatter
-                .write_str("network loading needs --allow-origin ORIGIN=ADDRESS for each origin"),
+                .write_str("network loading needs --allow-origin ORIGIN[=ADDRESS] for each origin, or --allow-remote"),
             Self::Tls(error) => write!(formatter, "TLS setup failed: {error}"),
             Self::Navigation(error) => write!(formatter, "navigation failed: {error}"),
             Self::Body(error) => write!(formatter, "reading the response failed: {error}"),
@@ -409,7 +440,7 @@ pub fn navigate(
 ) -> Result<NetworkDocument, NetworkLoadError> {
     let url = Url::parse(url, None).map_err(|_| NetworkLoadError::InvalidUrl)?;
     let config = CONFIG.get_or_init(NetworkConfig::default);
-    if config.routes.is_empty() {
+    if config.routes.is_empty() && !config.any_remote {
         return Err(NetworkLoadError::NoGrants);
     }
     let mut fetcher = build_fetcher(config, max_bytes)?;
@@ -552,10 +583,15 @@ pub(crate) fn save_download(
 
 fn build_fetcher(config: &NetworkConfig, max_bytes: usize) -> Result<Fetcher, NetworkLoadError> {
     let mut policy = NetworkPolicy::deny_all();
+    if config.any_remote {
+        policy.allow_any_remote();
+    }
     for (origin, address) in &config.routes {
-        policy
-            .allow(origin, *address)
-            .map_err(|_| NetworkLoadError::NoGrants)?;
+        match address {
+            Some(address) => policy.allow(origin, *address),
+            None => policy.allow_resolved(origin),
+        }
+        .map_err(|_| NetworkLoadError::NoGrants)?;
     }
     let limits = TransportLimits {
         max_body_bytes: u64::try_from(max_bytes).unwrap_or(u64::MAX),
@@ -1242,8 +1278,11 @@ mod tests {
         assert!(parse_grant("https://a.test:8443=[::1]:8443").is_ok());
         assert!(parse_grant("http://a.test=192.0.2.1:80").is_err());
         assert!(parse_grant("ftp://a.test=127.0.0.1:21").is_err());
-        assert!(parse_grant("http://a.test").is_err());
         assert!(parse_grant("http://a.test=localhost:80").is_err());
+        // An origin alone resolves (TD-157).
+        assert_eq!(parse_grant("https://a.test").unwrap().1, None);
+        assert!(parse_grant("ftp://a.test").is_err());
+        assert!(parse_grant("not a url").is_err());
     }
 
     #[test]

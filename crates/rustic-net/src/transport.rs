@@ -12,7 +12,7 @@ use crate::pipe::{Consumer, Producer, Wait, pipe};
 use crate::remote::{Connector, ExchangeHooks};
 use crate::response::{BodyDecoder, HeadParser, ProtocolError, ResponseHead, framing};
 use crate::tls::{CertificateError, TlsConfig, TlsFailure, classify};
-use crate::{LimitsError, NetworkPolicy, Request, TransportLimits};
+use crate::{LimitsError, NetworkPolicy, PolicyError, Request, Resolver, TransportLimits};
 
 /// Starts HTTP/1.1 exchanges with origins the [`NetworkPolicy`] allows.
 ///
@@ -28,6 +28,25 @@ pub struct Transport {
     /// Where exchanges run when not on this process's threads (a network
     /// process, ISO-07).
     connector: Option<Arc<dyn Connector>>,
+    /// Resolves the hosts of origins the policy lets resolve.
+    resolver: ResolverHandle,
+}
+
+/// The resolver a transport uses (the system resolver by default).
+#[derive(Clone)]
+struct ResolverHandle(Arc<Resolver>);
+
+impl std::ops::Deref for ResolverHandle {
+    type Target = Resolver;
+    fn deref(&self) -> &Resolver {
+        &*self.0
+    }
+}
+
+impl fmt::Debug for ResolverHandle {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("Resolver")
+    }
 }
 
 impl Transport {
@@ -39,7 +58,15 @@ impl Transport {
             limits,
             tls: Arc::new(std::sync::OnceLock::new()),
             connector: None,
+            resolver: ResolverHandle(Arc::new(crate::system_resolver)),
         })
+    }
+
+    /// Resolve host names with `resolver` instead of the system resolver
+    /// (tests). Its results pass the same public-address check.
+    pub fn with_resolver(mut self, resolver: Arc<Resolver>) -> Self {
+        self.resolver = ResolverHandle(resolver);
+        self
     }
 
     /// Run every exchange through `connector` (a network process) instead
@@ -78,8 +105,12 @@ impl Transport {
     pub fn start(&self, request: Request) -> Result<Exchange, TransportError> {
         let address = self
             .policy
-            .route(request.url())
-            .ok_or(TransportError::Blocked)?;
+            .address(request.url(), &*self.resolver)
+            .map_err(|error| match error {
+                PolicyError::NotResolved => TransportError::NameNotResolved,
+                PolicyError::NotPublic => TransportError::NotPublic,
+                _ => TransportError::Blocked,
+            })?;
         if let Some(connector) = &self.connector {
             return connector.start(request, address, &self.limits);
         }
@@ -264,6 +295,11 @@ pub enum TransportError {
     /// protocol or could not be started (ISO-07). The request is not
     /// retried.
     NetworkProcess,
+    /// The host name of an allowed origin did not resolve.
+    NameNotResolved,
+    /// The host resolved only to loopback, private or other non-public
+    /// addresses, which a resolved origin never reaches.
+    NotPublic,
 }
 
 impl fmt::Display for TransportError {
@@ -285,6 +321,10 @@ impl fmt::Display for TransportError {
             Self::Cancelled => formatter.write_str("request cancelled"),
             Self::Protocol(error) => error.fmt(formatter),
             Self::NetworkProcess => formatter.write_str("the network process stopped"),
+            Self::NameNotResolved => formatter.write_str("the host name did not resolve"),
+            Self::NotPublic => formatter.write_str(
+                "the host resolved only to local or private addresses, which remote origins never reach",
+            ),
         }
     }
 }

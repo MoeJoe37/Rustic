@@ -633,9 +633,11 @@ it runs in bubblewrap with only the network kept and a seccomp filter
 that admits Internet sockets only; on macOS a Seatbelt network profile
 confines it (ADR 0063).
 ISO-08 is a design only ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
-Still open: Android and iOS runs (TD-12), Windows confinement of the
-network process (TD-176, waits for remote addresses), trusted prompts and
-an independent external review. The demo runs:
+Since 2026-11-22 remote origins resolve through the system resolver and
+reach only public addresses (ADR 0066, TD-157), and the Windows network
+process runs in its own AppContainer for them (TD-176).
+Still open: Android and iOS runs (TD-12) and an independent external
+review. The demo runs:
 `crates/rustic-cli/tests/isolation.rs`.
 
 **Gate:** all applicable [security gates](SECURITY.md) pass with recorded evidence

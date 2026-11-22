@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1382" viewBox="0 0 1000 1382" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 42.82%</title>
-<desc id="desc">Weighted engine completion is 42.82%: 40.90% from capabilities verified complete and 1.92% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
+<title id="title">Rustic engine completion: 42.84%</title>
+<desc id="desc">Weighted engine completion is 42.84%: 40.90% from capabilities verified complete and 1.94% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
 <text x="24.00" y="60" fill="#8b949e" font-size="12">95/221 capabilities complete · 9 in progress · 25 subsystems · engine-v4</text>
-<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">42.82%</text>
+<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">42.84%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
-<rect x="24.00" y="76" width="407.65" height="14" rx="4" fill="#388bfd"/>
+<rect x="24.00" y="76" width="407.84" height="14" rx="4" fill="#388bfd"/>
 <rect x="24.00" y="76" width="389.37" height="14" rx="4" fill="#2ea043"/>
 <rect x="24" y="104" width="10" height="10" rx="2" fill="#2ea043"/>
 <text x="40.00" y="113" fill="#c9d1d9" font-size="12">40.90% verified complete</text>
 <rect x="224" y="104" width="10" height="10" rx="2" fill="#388bfd"/>
-<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+1.92% partial credit (verified steps)</text>
+<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+1.94% partial credit (verified steps)</text>
 <rect x="524" y="104" width="10" height="10" rx="2" fill="#30363d"/>
-<text x="540.00" y="113" fill="#c9d1d9" font-size="12">57.18% remaining</text>
+<text x="540.00" y="113" fill="#c9d1d9" font-size="12">57.16% remaining</text>
 <text x="24.00" y="142" fill="#f0f6fc" font-size="14" font-weight="600">Scope map</text>
 <text x="976.00" y="142" fill="#8b949e" font-size="11" text-anchor="end">block width = share of engine · fill = subsystem progress</text>
 <g><title>Foundation: 100.00% of 1% engine weight (1.00 engine points)</title>
@@ -113,9 +113,9 @@
 <rect x="666.10" y="184" width="1" height="16" fill="#30363d"/>
 <text x="666.60" y="210" fill="#8b949e" font-size="10" text-anchor="middle">Store</text>
 </g>
-<g><title>Security &amp; IPC: 61.39% of 5% engine weight (3.06 engine points)</title>
+<g><title>Security &amp; IPC: 61.78% of 5% engine weight (3.08 engine points)</title>
 <rect x="681.88" y="150" width="45.60" height="32" rx="3" fill="#21262d"/>
-<rect x="681.88" y="150" width="27.99" height="32" rx="3" fill="#388bfd"/>
+<rect x="681.88" y="150" width="28.17" height="32" rx="3" fill="#388bfd"/>
 <rect x="681.88" y="150" width="20.15" height="32" rx="3" fill="#2ea043"/>
 <rect x="704.18" y="184" width="1" height="4" fill="#30363d"/>
 <text x="704.68" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Sec</text>
@@ -214,13 +214,13 @@
 <text x="434.00" y="428" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
 <text x="488.00" y="428" fill="#8b949e" font-size="11" text-anchor="end">4.38%</text>
 </g>
-<g><title>M7 Isolation &amp; security: 82.50% (5/8 capabilities, 3.72% of engine)</title>
+<g><title>M7 Isolation &amp; security: 83.02% (5/8 capabilities, 3.72% of engine)</title>
 <text x="24.00" y="458" fill="#8b949e" font-size="12" font-weight="600">M7</text>
 <text x="60.00" y="458" fill="#c9d1d9" font-size="12">Isolation &amp; security</text>
 <rect x="224.00" y="449" width="150.00" height="10" rx="3" fill="#21262d"/>
-<rect x="224.00" y="449" width="123.75" height="10" rx="3" fill="#388bfd"/>
+<rect x="224.00" y="449" width="124.53" height="10" rx="3" fill="#388bfd"/>
 <rect x="224.00" y="449" width="89.06" height="10" rx="3" fill="#2ea043"/>
-<text x="434.00" y="458" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">82.50%</text>
+<text x="434.00" y="458" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">83.02%</text>
 <text x="488.00" y="458" fill="#8b949e" font-size="11" text-anchor="end">3.72%</text>
 </g>
 <g><title>M8 Desktop &amp; mobile alpha: 10.29% (1/21 capabilities, 10.22% of engine)</title>
@@ -870,13 +870,13 @@
 </g>
 <text x="976.00" y="1007" fill="#c9d1d9" font-size="12" text-anchor="end">0.72</text>
 </g>
-<g><title>Security &amp; IPC: 5/11 capabilities complete, 61.39% done, 3.06 of 5 engine points</title>
+<g><title>Security &amp; IPC: 5/11 capabilities complete, 61.78% done, 3.08 of 5 engine points</title>
 <text x="32.00" y="1037" fill="#f0f6fc" font-size="12">Security &amp; IPC</text>
 <text x="236.00" y="1037" fill="#8b949e" font-size="12" text-anchor="end">5%</text>
 <rect x="252.00" y="1028" width="200.00" height="10" rx="3" fill="#21262d"/>
-<rect x="252.00" y="1028" width="122.78" height="10" rx="3" fill="#388bfd"/>
+<rect x="252.00" y="1028" width="123.56" height="10" rx="3" fill="#388bfd"/>
 <rect x="252.00" y="1028" width="88.36" height="10" rx="3" fill="#2ea043"/>
-<text x="504.00" y="1037" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">61.39%</text>
+<text x="504.00" y="1037" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">61.78%</text>
 <g><title>Bounded versioned hostile-peer-safe IPC: complete, size 3, M7</title>
 <rect x="520.00" y="1026" width="24.51" height="14" rx="2" fill="#2ea043"/>
 </g>
@@ -911,12 +911,12 @@
 <g><title>Authenticated updates, incident response and vulnerability triage: planned, size 3, M10</title>
 <rect x="829.30" y="1026" width="24.51" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Fuzz/native-memory review and security release gate: in progress, size 5, M7, 80.00% verified</title>
+<g><title>Fuzz/native-memory review and security release gate: in progress, size 5, M7, 83.33% verified</title>
 <rect x="855.81" y="1026" width="42.19" height="14" rx="2" fill="#30363d"/>
-<rect x="855.81" y="1026" width="33.75" height="14" rx="2" fill="#388bfd"/>
+<rect x="855.81" y="1026" width="35.15" height="14" rx="2" fill="#388bfd"/>
 <rect x="856.31" y="1026.5" width="41.19" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<text x="976.00" y="1037" fill="#c9d1d9" font-size="12" text-anchor="end">3.06</text>
+<text x="976.00" y="1037" fill="#c9d1d9" font-size="12" text-anchor="end">3.08</text>
 </g>
 <g><title>Compositor &amp; GPU: 1/4 capabilities complete, 23.07% done, 0.69 of 3 engine points</title>
 <rect x="24" y="1048" width="952" height="30" fill="#161b22"/>
@@ -1175,6 +1175,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 03efe0c25b6e</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot bff550b1636a</text>
 </g>
 </svg>

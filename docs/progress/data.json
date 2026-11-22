@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "03efe0c25b6ee252c554ca19d0d7cc2d12dd201ac7ba852435b88b3e9adbfb1c",
-  "percent": "42.82",
+  "source_fingerprint": "bff550b1636ae800f27bbeae57f8f9b2d064a64a0ab846cdc3b946f2049d8ede",
+  "percent": "42.84",
   "verified_percent": "40.90",
-  "partial_percent": "1.92",
+  "partial_percent": "1.94",
   "completed": 95,
   "in_progress": 9,
   "total": 221,
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 5,
       "total": 8,
-      "percent": "82.50",
+      "percent": "83.02",
       "verified_percent": "59.37",
-      "partial_percent": "23.13"
+      "partial_percent": "23.65"
     },
     {
       "id": "M8",
@@ -6645,12 +6645,28 @@
               ]
             },
             {
-              "label": "Independent external security review",
+              "label": "External review packet: scope, build and run steps, unsafe inventory, known limitations, questions",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/reviews/2026-11-22-m7-external-review-packet.md",
+                  "marker": "## Scope, in priority order"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
+                }
+              ]
+            },
+            {
+              "label": "Independent external security review (needs reviewers outside the project)",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "80.00",
+          "credit": "83.33",
           "engine_share": "0.58"
         }
       ],
@@ -6658,10 +6674,10 @@
       "completed": 5,
       "in_progress": 3,
       "total": 11,
-      "contribution": "3.06",
-      "percent": "61.39",
+      "contribution": "3.08",
+      "percent": "61.78",
       "verified_percent": "44.18",
-      "partial_percent": "17.21"
+      "partial_percent": "17.60"
     },
     {
       "id": "compositor",

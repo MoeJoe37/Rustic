@@ -72,6 +72,27 @@ how the renderer process is created, confined and connected differs.
   with KVM), per-site renderer processes from a real browsing session
   (M8 host), and `useAppZygote`.
 
+## iOS: what remains outside the repository (2026-11-22)
+
+The renderer side is ready to run in a web content extension: it needs
+only a stream to the broker (`rustic_cli::run_renderer_over`) and the
+broker can drive a renderer it did not start (`rustic_cli::run_hosted`),
+as the Android service does. What cannot be done from here:
+
+- Apple's browser-engine entitlement
+  (`com.apple.developer.web-browser-engine.host` and the extension
+  entitlements), granted per developer account and only for apps
+  distributed in eligible regions. Without it the extensions cannot be
+  signed for a device, and Rustic does not ship a browsing mode (point 3
+  above).
+- An Xcode project with the host app and its web content and networking
+  extensions, signed with that entitlement, plus a simulator run on a
+  macOS runner and a run on a physical iPhone or iPad.
+
+Rust's iOS targets (`aarch64-apple-ios`, `aarch64-apple-ios-sim`,
+`x86_64-apple-ios`) already build the shared engine libraries in CI
+(`mobile` job).
+
 ## Verification required before acceptance
 
 - Android emulator (ARM64 and x86-64) and a device: the compromised-

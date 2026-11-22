@@ -6111,7 +6111,23 @@
               ]
             },
             {
-              "label": "Independent external security review",
+              "label": "External review packet: scope, build and run steps, unsafe inventory, known limitations, questions",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/reviews/2026-11-22-m7-external-review-packet.md",
+                  "marker": "## Scope, in priority order"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/isolation.rs",
+                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
+                }
+              ]
+            },
+            {
+              "label": "Independent external security review (needs reviewers outside the project)",
               "status": "planned",
               "evidence": []
             }

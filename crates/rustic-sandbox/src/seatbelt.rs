@@ -1,5 +1,5 @@
-//! The macOS renderer and network process sandbox profiles (ADR 0063, **Proposed**: written and
-//! unit-tested on Linux, not yet verified on a Mac).
+//! The macOS renderer and network process sandbox profiles (ADR 0063,
+//! verified on native macOS x64 and ARM64).
 //!
 //! macOS confines a process with a Seatbelt profile in the Sandbox Profile
 //! Language (SBPL), the mechanism Chromium's and Firefox's macOS sandboxes
@@ -134,7 +134,7 @@ fn base_profile(exe: &Path, title: &str) -> Result<String, ProfileError> {
     // Reading system parameters is allowed in full: dyld's libignition
     // reads boot parameters whose names are not documented (the first
     // native run aborted in it with a name list). Nothing can be set.
-    // Narrowing this to logged names is TD-174 follow-up work.
+    // Narrowing this to logged names is TD-183.
     profile.push_str("(allow sysctl-read)\n(allow signal (target self))\n");
     Ok(profile)
 }

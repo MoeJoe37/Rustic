@@ -2637,7 +2637,7 @@ decoding. The broker keeps grants, CSP, mixed content, CORS, cookies,
 the HTTP cache and ORB. `--single-process` keeps exchanges in process.
 Under the sandbox on Linux the child runs in bubblewrap with only the
 network namespace shared and an Internet-socket seccomp filter; on macOS
-`--sandbox` starts it under the Seatbelt network profile of ADR 0063
+it confines itself with the Seatbelt network profile of ADR 0063
 (outbound IP connections and the trust daemons only,
 `the_seatbelt_network_process_reaches_only_internet_sockets`); Windows
 starts it unconfined (TD-176).
@@ -2663,9 +2663,9 @@ Added 2026-11-21 (`rustic-sandbox`, `rustic-cli/src/broker.rs`,
 [ADR 0060](adr/0060-windows-renderer-sandbox.md)). Split document
 commands confine their renderer by default; `--no-sandbox` or
 `RUSTIC_SANDBOX=0` opts out, `--sandbox` or `RUSTIC_SANDBOX=1` demands a
-sandbox (on macOS the proposed Seatbelt profile of
+sandbox (on macOS the Seatbelt profile of
 [ADR 0063](adr/0063-macos-renderer-sandbox.md), applied by the renderer to itself with `sandbox_init`,
-not yet verified on a Mac and so not the default there, TD-174;
+on by default since its native verification on 2026-11-22;
 `the_profile_denies_by_default_and_names_only_the_renderer`,
 `paths_are_quoted_or_refused`), any other `RUSTIC_SANDBOX` value is
 a usage error (`a_bad_sandbox_setting_is_a_usage_error`), and a sandbox

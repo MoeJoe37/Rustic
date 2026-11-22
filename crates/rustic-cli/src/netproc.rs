@@ -264,7 +264,8 @@ impl Link {
         let exe = std::env::current_exe()?;
         // Under the sandbox the network process is confined like a
         // renderer, but keeps Internet sockets (TD-176): bubblewrap and a
-        // seccomp filter on Linux, the Seatbelt network profile on macOS.
+        // seccomp filter on Linux, the Seatbelt network profile on macOS
+        // (both on by default).
         // A setup failure is an error, never an unconfined start. Windows
         // starts it unconfined for now (TD-176).
         #[cfg(not(windows))]

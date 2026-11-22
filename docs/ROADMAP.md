@@ -603,7 +603,7 @@ WebSocket are planned in [ADR 0055](adr/0055-downloads-broker-and-websocket-plan
 **Demo:** kill or simulate compromise of a renderer; chrome survives and forbidden
 file/network/other-site operations fail at the OS or broker boundary.
 
-**Status 2026-11-21:** ISO-02 done: document commands
+**Status 2026-11-22:** ISO-02 done: document commands
 run in a `__renderer` child over the bounded IPC of
 [ADR 0056](adr/0056-ipc-format.md), and the broker answers every file,
 network, `fetch()` and storage request from its own grant. ISO-01: process
@@ -620,7 +620,7 @@ Linux x86-64). ISO-04: the Windows renderer runs in a capability-less
 LPAC AppContainer and a kill-on-close job, on by default
 ([ADR 0060](adr/0060-windows-renderer-sandbox.md), verified on native
 Windows 11 x64; the first project `unsafe`, confined to `rustic-sandbox`);
-macOS has a proposed Seatbelt sandbox behind `--sandbox`, not yet verified on a Mac ([ADR 0063](adr/0063-macos-renderer-sandbox.md), TD-174). ISO-05: user activation and brokered downloads;
+macOS confines it by default with a Seatbelt profile the renderer applies to itself ([ADR 0063](adr/0063-macos-renderer-sandbox.md), verified on native macOS x64 and ARM64 2026-11-22); all three run natively on x64 and ARM64 in CI. ISO-05: user activation and brokered downloads;
 prompts wait for the M8 shell. ISO-06: [security review](reviews/2026-11-20-m7-security-review.md)
 with fuzzing, an unsafe/native inventory and an AddressSanitizer run.
 ISO-07: crash, protocol-violation and hang recovery for renderers, and
@@ -630,12 +630,12 @@ runs sockets, TLS, HTTP framing and content decoding run in a
 credit-based flow control; a crashed or protocol-breaking one fails only
 its in-flight requests and is replaced (at most four per run). On Linux
 it runs in bubblewrap with only the network kept and a seccomp filter
-that admits Internet sockets only; on macOS `--sandbox` confines it with
-a Seatbelt network profile (ADR 0063).
+that admits Internet sockets only; on macOS a Seatbelt network profile
+confines it (ADR 0063).
 ISO-08 is a design only ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
-Still open: native Linux aarch64, Windows ARM64, macOS, Android and iOS
-runs (TD-12), the macOS sandbox, Windows/macOS confinement of the network
-process (TD-176), trusted prompts and an independent external review. The demo runs:
+Still open: Android and iOS runs (TD-12), Windows confinement of the
+network process (TD-176, waits for remote addresses), trusted prompts and
+an independent external review. The demo runs:
 `crates/rustic-cli/tests/isolation.rs`.
 
 **Gate:** all applicable [security gates](SECURITY.md) pass with recorded evidence
@@ -652,7 +652,7 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       simulator or device. Restoring hosted CI (or replacing it with
       self-hosted runners) is therefore a hard prerequisite of M7, not a
       convenience ([TD-12](TECH_DEBT.md)).
-- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: [ADR 0063](adr/0063-macos-renderer-sandbox.md), Proposed, TD-174), each
+- [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: [ADR 0063](adr/0063-macos-renderer-sandbox.md), Accepted 2026-11-22), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
 - [x] **The engine already runs split.** Done 2026-11-20: every document
       command except `reftest` runs in a `rustic __renderer` child over

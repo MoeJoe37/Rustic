@@ -57,9 +57,9 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-174, TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
-| M8 (hosts, GPU and platform services) | TD-173, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
@@ -232,18 +232,19 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
 | TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives; bodies are complete byte strings (no `ReadableStream`, `arrayBuffer()`, `blob()`, `formData()`, `AbortSignal`), Headers iterators are snapshots, and the API base URL ignores `<base>` in the CLI | Open, M9 web APIs |
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
-| TD-171 | Deliberate | Isolation | The renderer is confined by default only on Linux and Windows (macOS: TD-174), and `reftest` still runs single-process (watchdog paid 2026-11-20, Linux and Windows sandboxes 2026-11-21) | Open, M7 (ISO-04) |
+| TD-171 | Deliberate | Isolation | `reftest` still runs single-process (watchdog paid 2026-11-20, Linux and Windows sandboxes 2026-11-21, macOS 2026-11-22) | Open, M7 (ISO-04) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox had no seccomp-bpf syscall filter | Paid |
 | TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
-| TD-174 | Deliberate | Isolation | macOS renderers are not confined by default: the Seatbelt sandbox of ADR 0063 (Proposed, 2026-11-21) runs only with `--sandbox` and has not been verified on a Mac | Open, M7 (ISO-04, native macOS runs) |
+| TD-174 | Deliberate | Isolation | macOS renderers were not confined by default | Paid 2026-11-22 (ADR 0063 Accepted, verified on native macOS x64 and ARM64; follow-ups TD-183) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
-| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined by default only on Linux (bubblewrap with the network kept, Internet-socket seccomp filter, 2026-11-21); macOS has a Seatbelt profile under `--sandbox` (2026-11-22, default with TD-174); on Windows it runs with the user's rights, because an AppContainer cannot reach the loopback addresses the CLI grants | Open, M7 (ISO-04), Windows with TD-157 |
+| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined by default on Linux (2026-11-21) and macOS (Seatbelt network profile, 2026-11-22); on Windows it runs with the user's rights, because an AppContainer cannot reach the loopback addresses the CLI grants | Open, Windows with TD-157 |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
 | TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.parity) |
 | TD-182 | Deliberate | Desktop host | `rustic view` starts a renderer and lays the page out again for every frame, runs no scripts between frames, routes no input to the page (only scrolling), has no browser UI and is verified only on Linux | Open, M8 (platform.linux, UI-01) |
+| TD-183 | Deliberate | Isolation | The macOS Seatbelt profiles allow reading every `sysctl` value, and initializers that run before `main` (AppKit is linked for `rustic view`) run before the profile applies | Open, M8 (macOS packaging) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2736,6 +2737,8 @@ renderer after `--renderer-timeout`, and Linux has the opt-in bubblewrap
 sandbox of ADR 0058. **Partly paid 2026-11-21:** the renderer is confined
 by default on Linux (ADR 0058 with a seccomp allowlist) and Windows
 (ADR 0060); macOS remains (TD-174), and `reftest`.
+**Partly paid 2026-11-22:** macOS confines by default too (ADR 0063,
+TD-174 paid); `reftest` remains.
 **Trigger:** before any remote browsing (the M7 gate).
 
 ### TD-172 — The Linux sandbox filters no system calls
@@ -2771,6 +2774,14 @@ platform.
 
 ### TD-174 — macOS has no renderer sandbox
 
+**Paid 2026-11-22:** the first native macOS 15 runs (x64 and ARM64)
+found that a renderer started under `sandbox-exec` aborts in dyld; the
+renderer and network process now apply their profiles to themselves with
+`sandbox_init` before reading broker input (`rustic_sandbox::enter`), the
+escape probes pass on both runners, the sandbox is on by default
+(`SANDBOX_AVAILABLE`), and ADR 0063 is Accepted. Narrower `sysctl` reads
+and pre-`main` initializers are TD-183.
+
 **Partly paid 2026-11-21:** ADR 0063 (Proposed) adds a deny-by-default
 Seatbelt profile (`rustic_sandbox::seatbelt`) started through
 `sandbox_init` (applied by the renderer itself) when `--sandbox` is given; it is unit-tested and
@@ -2788,6 +2799,18 @@ and ARM64, which no runner provides (TD-12).
 **Pay:** a deny-by-default seatbelt profile with the same probe tests,
 on by default.
 **Trigger:** a native macOS runner, and before remote browsing on macOS.
+
+### TD-183 — macOS profile breadth: sysctl reads and pre-main code
+
+The Seatbelt profiles (ADR 0063) allow `sysctl-read` of every name,
+which reveals system details such as the host name, because the first
+native runs could not log which names dyld's libignition needs. And the
+binary links AppKit (for `rustic view`), whose initializers run before
+`main`, so before the renderer's profile applies; they read no page
+input but may open Mach connections that stay usable.
+**Pay:** narrow the `sysctl` list from logged reads on native runners,
+and give renderers a binary or launch path without the window stack.
+**Trigger:** M8 macOS packaging, or a finding against either.
 
 ### TD-175 — The Linux sandbox sees all of `/usr` and needs bubblewrap
 
@@ -2842,6 +2865,10 @@ therefore paid together with remote addresses (TD-157): then an LPAC
 with `internetClient` (and `privateNetworkClientServer` for LAN
 grants) serves remote exchanges, while loopback grants need a design
 of their own.
+**Update 2026-11-22 (macOS paid):** the Seatbelt network profile is on
+by default with the renderer sandbox and passes
+`the_seatbelt_network_process_reaches_only_internet_sockets` (explicit
+and default runs) on native macOS x64 and ARM64. Windows remains.
 
 ### TD-177 — Frame compositing is linear and untransformed
 

@@ -1,7 +1,7 @@
 # ADR 0061 — Network process
 
 Date: 2026-11-21
-Status: Accepted for the CLI prototype (verified on Linux x86-64 in the sandbox gate; OS-confined on Linux only, TD-176)
+Status: Accepted for the CLI prototype (verified on native Linux, Windows and macOS runners; OS-confined on Linux and macOS, not Windows, TD-176)
 
 ## Context
 
@@ -56,8 +56,8 @@ service and Gecko's socket process make the same split.
    `AF_INET` and `AF_INET6`. Unix-domain sockets are refused because a
    shared network namespace exposes abstract sockets (X11, D-Bus,
    container runtimes). Setup failure is an error, as for renderers.
-   macOS uses the Seatbelt network profile of ADR 0063 under
-   `--sandbox`; Windows starts it unconfined for now (TD-176).
+   macOS uses the Seatbelt network profile of ADR 0063 (by default);
+   Windows starts it unconfined for now (TD-176).
 
 ## Consequences
 

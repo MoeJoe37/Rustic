@@ -1,7 +1,7 @@
 # ADR 0063 — macOS renderer sandbox
 
 Date: 2026-11-21
-Status: **Proposed** (implemented, unit-tested and type-checked for `aarch64-apple-darwin` and `x86_64-apple-darwin` on Linux; not yet run on a Mac)
+Status: **Accepted** 2026-11-22 (verified on native macOS 15 x64 and ARM64 CI runners; on by default)
 
 ## Context
 

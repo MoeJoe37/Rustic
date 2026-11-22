@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "0944bbf6e7e25d1f8698802847a35885e28519f050c76de928e291dc0727b69d",
-  "percent": "42.52",
-  "verified_percent": "39.97",
-  "partial_percent": "2.55",
-  "completed": 93,
-  "in_progress": 11,
+  "source_fingerprint": "e3440a1094fb740dd2e62c88e08d549a253b19d7fb7b985ce4a0c117000655e2",
+  "percent": "42.81",
+  "verified_percent": "40.55",
+  "partial_percent": "2.26",
+  "completed": 94,
+  "in_progress": 10,
   "total": 221,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -75,11 +75,11 @@
       "id": "M7",
       "label": "Isolation & security",
       "share": "3.72",
-      "completed": 3,
+      "completed": 4,
       "total": 8,
-      "percent": "74.42",
-      "verified_percent": "34.37",
-      "partial_percent": "40.05"
+      "percent": "82.23",
+      "verified_percent": "50.00",
+      "partial_percent": "32.23"
     },
     {
       "id": "M8",
@@ -6311,99 +6311,20 @@
           "label": "Verified Windows/macOS/Linux sandboxing",
           "size": 5,
           "milestone": "M7",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Linux: renderer under namespaces with no filesystem, network or capabilities, fail closed (ADR 0058)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "fn spawn_confined(exe: &Path) -> io::Result<Started>"
-                },
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0058-linux-renderer-sandbox.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
             },
             {
-              "label": "Linux: seccomp-bpf syscall allowlist and sandbox on by default (TD-172)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-sandbox/src/seccomp.rs",
-                  "marker": "pub fn renderer_filter(arch: Arch) -> Vec<Instruction>"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "pub const SANDBOX_AVAILABLE: bool"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-sandbox/src/seccomp.rs",
-                  "marker": "fn dangerous_calls_fail_and_measured_calls_pass"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "for mode in [Some(\"--sandbox\"), None]"
-                }
-              ]
-            },
-            {
-              "label": "Linux aarch64: native verification run",
-              "status": "planned",
-              "evidence": []
-            },
-            {
-              "label": "Windows x64: capability-less LPAC AppContainer renderer in a kill-on-close job, on by default, with an ADR, verified natively (ADR 0060)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-sandbox/src/windows.rs",
-                  "marker": "pub fn spawn_app_container("
-                },
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0060-windows-renderer-sandbox.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-sandbox/src/windows.rs",
-                  "marker": "fn environment_blocks_are_sorted_terminated_and_validated"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn the_sandbox_denies_files_network_and_processes_or_fails_closed"
-                }
-              ]
-            },
-            {
-              "label": "Windows ARM64: native verification run",
-              "status": "planned",
-              "evidence": []
-            },
-            {
-              "label": "macOS: App Sandbox or seatbelt profile with an ADR, verified on native x64 and ARM64 runners",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "pub const SANDBOX_AVAILABLE: bool"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.58"
         },
         {
@@ -6723,13 +6644,13 @@
         }
       ],
       "points": 43,
-      "completed": 3,
-      "in_progress": 5,
+      "completed": 4,
+      "in_progress": 4,
       "total": 11,
-      "contribution": "2.76",
-      "percent": "55.38",
-      "verified_percent": "25.58",
-      "partial_percent": "29.80"
+      "contribution": "3.06",
+      "percent": "61.20",
+      "verified_percent": "37.20",
+      "partial_percent": "24.00"
     },
     {
       "id": "compositor",

@@ -34,7 +34,7 @@ use crate::stylesheets::LocalStylesheetFetcher;
 
 static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
 /// Whether renderers are confined. On by default where Rustic has a
-/// sandbox (Linux, Windows); `--no-sandbox` or `RUSTIC_SANDBOX=0` turns it
+/// sandbox (Linux, Windows, macOS); `--no-sandbox` or `RUSTIC_SANDBOX=0` turns it
 /// off, `--sandbox` or `RUSTIC_SANDBOX=1` demands it (an error where none
 /// exists).
 static SANDBOX: AtomicBool = AtomicBool::new(false);
@@ -49,10 +49,9 @@ pub(crate) fn sandboxed() -> bool {
 }
 
 /// Whether renderers are confined by default here: the verified
-/// sandboxes (ADR 0058 Linux, ADR 0060 Windows). macOS has a proposed
-/// Seatbelt sandbox (ADR 0063) that `--sandbox` turns on; it becomes the
-/// default once it is verified on native Macs (TD-174).
-pub const SANDBOX_AVAILABLE: bool = cfg!(any(target_os = "linux", windows));
+/// sandboxes (ADR 0058 Linux, ADR 0060 Windows, ADR 0063 macOS, the last
+/// verified on native macOS x64 and ARM64 on 2026-11-22).
+pub const SANDBOX_AVAILABLE: bool = cfg!(any(target_os = "linux", windows, target_os = "macos"));
 static TIMEOUT_SECONDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(120);
 
 /// Tells a macOS child (`renderer` or `network`) to confine itself with
@@ -587,7 +586,7 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
     ))
 }
 
-/// macOS (ADR 0063, Proposed): the executable with a cleared environment
+/// macOS (ADR 0063): the executable with a cleared environment
 /// and `RUSTIC_SEATBELT=renderer`, which makes it apply the deny-by-default
 /// Seatbelt profile of `rustic_sandbox::seatbelt` to itself before it
 /// reads anything from the broker (a failure ends it before the

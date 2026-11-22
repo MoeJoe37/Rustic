@@ -265,21 +265,16 @@ fn bubblewrap_available() -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
-/// Whether this machine can run the renderer sandbox: Windows always
-/// (AppContainer), Linux with a working bubblewrap on x86-64 or aarch64.
+/// Whether this machine can run the renderer sandbox: Windows
+/// (AppContainer) and macOS (Seatbelt) always, Linux with a working
+/// bubblewrap on x86-64 or aarch64.
 fn sandbox_available() -> bool {
-    if cfg!(windows) {
+    if cfg!(any(windows, target_os = "macos")) {
         return true;
     }
     cfg!(target_os = "linux")
         && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
         && bubblewrap_available()
-}
-
-/// macOS: the proposed Seatbelt sandbox (ADR 0063), which `--sandbox`
-/// turns on but which is not the default until verified on native Macs.
-fn proposed_sandbox_available() -> bool {
-    cfg!(target_os = "macos")
 }
 
 const ESCAPES: [&str; 5] = [
@@ -313,31 +308,6 @@ fn the_sandbox_denies_files_network_and_processes_or_fails_closed() {
             .env("RUSTIC_TEST_ESCAPE_DIR", &home);
         command.output().expect("run rustic")
     };
-    if proposed_sandbox_available() {
-        // The first native macOS run verifies ADR 0063: every probe works
-        // unconfined (also by default, for now) and fails under --sandbox.
-        for mode in [Some("--no-sandbox"), None] {
-            let open = text(&probe(mode).stdout);
-            for escape in ESCAPES {
-                assert!(open.contains(&format!("{escape}: allowed")), "{open}");
-            }
-        }
-        let output = probe(Some("--sandbox"));
-        assert!(output.status.success(), "{}", text(&output.stderr));
-        let confined = text(&output.stdout);
-        for escape in ESCAPES {
-            assert!(
-                confined.contains(&format!("{escape}: denied")),
-                "{confined}"
-            );
-        }
-        assert_eq!(std::fs::read_to_string(&outside).unwrap(), "secret");
-        let page = site.page();
-        let output = rustic(&["--sandbox", "dump-dom", &page], &[]);
-        assert!(output.status.success(), "{}", text(&output.stderr));
-        assert!(text(&output.stdout).contains("text \"x\""));
-        return;
-    }
     if !sandbox_available() {
         // No sandbox here: asking for one fails rather than run unconfined.
         let output = probe(Some("--sandbox"));
@@ -571,16 +541,13 @@ fn the_sandboxed_network_process_reaches_only_internet_sockets() {
     drop(listener);
 }
 
-/// TD-176 on macOS (ADR 0063, Proposed): under `--sandbox` the network
+/// TD-176 on macOS (ADR 0063): under the sandbox the network
 /// process's Seatbelt profile keeps loopback TCP (its job) but denies
 /// reading files, listing directories, starting programs and connecting
 /// to a Unix-domain socket.
 #[cfg(target_os = "macos")]
 #[test]
 fn the_seatbelt_network_process_reaches_only_internet_sockets() {
-    if !proposed_sandbox_available() {
-        return;
-    }
     let site = Site::new("network-seatbelt");
     let server = script_site();
     let grant = format!("http://a.test={}", server.address());
@@ -593,9 +560,10 @@ fn the_seatbelt_network_process_reaches_only_internet_sockets() {
     let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     let outside = site.0.join("outside.txt").to_string_lossy().into_owned();
     let home = site.0.to_string_lossy().into_owned();
-    let probe = |mode: &str| {
+    let probe = |mode: Option<&str>| {
         let output = Command::new(env!("CARGO_BIN_EXE_rustic"))
-            .args([mode, "dump-dom", "--allow-origin", &grant, "http://a.test/"])
+            .args(mode)
+            .args(["dump-dom", "--allow-origin", &grant, "http://a.test/"])
             .env_remove("RUSTIC_SANDBOX")
             .env("RUSTIC_TEST_NETWORK_PROCESS", "escape")
             .env("RUSTIC_TEST_ESCAPE_FILE", &outside)
@@ -613,19 +581,22 @@ fn the_seatbelt_network_process_reaches_only_internet_sockets() {
         "spawn-shell",
         "connect-unix-socket",
     ];
-    let open = probe("--no-sandbox");
+    let open = probe(Some("--no-sandbox"));
     for name in probes {
         assert!(
             open.contains(&format!("network-escape {name}: allowed")),
             "{open}"
         );
     }
-    let confined = probe("--sandbox");
-    for name in probes {
-        assert!(
-            confined.contains(&format!("network-escape {name}: denied")),
-            "{confined}"
-        );
+    // Explicitly and by default.
+    for mode in [Some("--sandbox"), None] {
+        let confined = probe(mode);
+        for name in probes {
+            assert!(
+                confined.contains(&format!("network-escape {name}: denied")),
+                "{mode:?}: {confined}"
+            );
+        }
     }
     drop(listener);
     let _ = std::fs::remove_file(&socket);

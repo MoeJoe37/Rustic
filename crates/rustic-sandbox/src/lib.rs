@@ -8,7 +8,7 @@
 //!   bubblewrap installs in the renderer (ADR 0058). Safe Rust, compiled and
 //!   tested on every platform.
 //! - [`seatbelt`] builds the macOS renderer and network process Seatbelt
-//!   (SBPL) profiles (ADR 0063, Proposed). Safe Rust, tested on every
+//!   (SBPL) profiles (ADR 0063). Safe Rust, tested on every
 //!   platform. On macOS, `enter` applies one to the calling process
 //!   through `sandbox_init`, which needs `unsafe` FFI.
 //! - `windows` (Windows only) launches a renderer in an AppContainer with no

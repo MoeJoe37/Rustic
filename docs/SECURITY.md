@@ -86,11 +86,13 @@ M7 introduces mandatory process boundaries, sandbox launch verification, brokere
 services and cross-origin frame/site-assignment policy. The reference browser
 must refuse remote mode if the selected platform's required isolation is absent.
 An explicitly separate test harness is never advertised as protected browsing. Status
-2026-11-21: renderers are separate processes with brokered authority on
+2026-11-22: renderers are separate processes with brokered authority on
 every platform the CLI runs on. They are confined by default on Linux
 (bubblewrap and a seccomp filter, [ADR 0058](adr/0058-linux-renderer-sandbox.md))
 and Windows (an LPAC AppContainer in a job, [ADR 0060](adr/0060-windows-renderer-sandbox.md)),
-verified natively only on x86-64; macOS has none (TD-174). See the
+and macOS (a Seatbelt profile the renderer applies to itself,
+[ADR 0063](adr/0063-macos-renderer-sandbox.md)), verified on native x64
+and ARM64 runners of all three (2026-11-22). See the
 [M7 security review](reviews/2026-11-20-m7-security-review.md).
 
 The OS implementation is platform-specific. Linux namespace/seccomp policy,

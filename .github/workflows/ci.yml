@@ -118,7 +118,15 @@ jobs:
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
       - name: Test all targets
-        run: cargo test --locked --workspace --all-targets
+        run: cargo test --locked --workspace --all-targets --no-fail-fast
+      - name: Show sandbox denials (ADR 0063)
+        if: failure() && runner.os == 'macOS'
+        run: |
+          log show --last 30m --style compact \
+            --predicate 'sender == "Sandbox" OR eventMessage CONTAINS "deny("' \
+            | grep -i rustic | sort | uniq -c | sort -rn | head -150 || true
+          ls -t ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i rustic | head -3 \
+            | while read -r report; do head -80 ~/Library/Logs/DiagnosticReports/"$report"; done || true
       - name: Test documentation examples
         run: cargo test --locked --workspace --doc
       - name: CLI smoke test
@@ -211,36 +219,65 @@ jobs:
   cross:
     # Compile every crate, including tests and tools, for further CPU/OS
     # families that browsers run on. This catches portability errors early;
-    # it does not link or execute on the target.
+    # it does not link or execute on the target. ring (TLS, M6) compiles C
+    # and assembly, so each target names a C cross compiler; where no
+    # packaged one exists (`ring: skip`) the crates that use ring are left
+    # out and recorded in TD-12.
     name: Cross-check (${{ matrix.target }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - arm-unknown-linux-gnueabihf
-          - aarch64-unknown-linux-musl
-          - aarch64-pc-windows-gnullvm
-          - i686-pc-windows-msvc
-          - powerpc64le-unknown-linux-gnu
-          - loongarch64-unknown-linux-gnu
-          - x86_64-unknown-freebsd
-          - x86_64-unknown-linux-musl
+        include:
+          - target: arm-unknown-linux-gnueabihf
+            packages: gcc-arm-linux-gnueabihf
+            cc: arm-linux-gnueabihf-gcc
+          - target: aarch64-unknown-linux-musl
+            packages: gcc-aarch64-linux-gnu
+            cc: aarch64-linux-gnu-gcc
+          - target: aarch64-pc-windows-gnullvm
+            ring: skip
+          - target: i686-pc-windows-msvc
+            os: windows-2022
+          - target: powerpc64le-unknown-linux-gnu
+            packages: gcc-powerpc64le-linux-gnu
+            cc: powerpc64le-linux-gnu-gcc
+          - target: loongarch64-unknown-linux-gnu
+            ring: skip
+          - target: x86_64-unknown-freebsd
+          - target: x86_64-unknown-linux-musl
+            packages: musl-tools
+            cc: musl-gcc
+    env:
+      CHECK_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install pinned Rust and target standard library
-        env:
-          CHECK_TARGET: ${{ matrix.target }}
         run: |
           rustup toolchain install "$RUST_VERSION" --profile minimal
           rustup target add --toolchain "$RUST_VERSION" "$CHECK_TARGET"
-      - name: Check every crate and test
+      - name: Install the C cross compiler
+        if: matrix.packages
         env:
-          CHECK_TARGET: ${{ matrix.target }}
+          PACKAGES: ${{ matrix.packages }}
+          TARGET_C_COMPILER: ${{ matrix.cc }}
+        run: |
+          sudo apt-get update -q
+          # shellcheck disable=SC2086
+          sudo apt-get install -y -q --no-install-recommends $PACKAGES
+          echo "TARGET_CC=$TARGET_C_COMPILER" >> "$GITHUB_ENV"
+      - name: Check every crate and test
+        if: matrix.ring != 'skip'
         run: cargo check --locked --workspace --all-targets --target "$CHECK_TARGET"
+      - name: Check every crate and test except those using ring (TD-12)
+        if: matrix.ring == 'skip'
+        run: >-
+          cargo check --locked --workspace --all-targets --target "$CHECK_TARGET"
+          --exclude rustic-net --exclude rustic-engine --exclude rustic-bindings
+          --exclude rustic-cli --exclude rustic-fuzz
 
   fuzz:
     name: Parser fuzz smoke
@@ -348,6 +385,19 @@ jobs:
         run: |
           rustup toolchain install "$RUST_VERSION" --profile minimal
           rustup target add --toolchain "$RUST_VERSION" "$CHECK_TARGET"
+      - name: Use the Android NDK's compilers for C dependencies
+        if: runner.os == 'Linux'
+        env:
+          CHECK_TARGET: ${{ matrix.target }}
+        run: |
+          bin="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          case "$CHECK_TARGET" in
+            armv7-linux-androideabi) clang=armv7a-linux-androideabi24-clang ;;
+            *) clang="${CHECK_TARGET}24-clang" ;;
+          esac
+          test -x "$bin/$clang"
+          echo "TARGET_CC=$bin/$clang" >> "$GITHUB_ENV"
+          echo "TARGET_AR=$bin/llvm-ar" >> "$GITHUB_ENV"
       - name: Select iOS SDK
         if: runner.os == 'macOS'
         env:

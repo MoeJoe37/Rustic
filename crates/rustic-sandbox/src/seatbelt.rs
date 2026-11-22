@@ -32,6 +32,9 @@ const SYSTEM_READS: &[&str] = &[
     "/System/Library/PrivateFrameworks",
     "/System/Library/dyld",
     "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld",
+    // The resolved form of the line above: Seatbelt matches real paths,
+    // and `/System/Volumes/Preboot` is `/private/preboot`.
+    "/private/preboot/Cryptexes/OS/System/Library/dyld",
     "/System/Cryptexes/OS/System/Library/dyld",
     "/private/var/db/dyld",
 ];
@@ -106,7 +109,7 @@ pub fn renderer_profile(exe: &Path) -> Result<String, ProfileError> {
 /// The network process profile (ADR 0061, TD-176) for the binary at
 /// `exe` (canonical, as for [`renderer_profile`]): the renderer profile
 /// plus outbound connections to IP addresses (TCP and UDP; Unix-domain
-/// sockets stay denied) and the trust daemons of [`TRUST_SERVICES`]. No
+/// sockets stay denied) and the certificate trust daemons. No
 /// file beyond the renderer's is readable and nothing is writable.
 pub fn network_profile(exe: &Path) -> Result<String, ProfileError> {
     let mut profile = base_profile(exe, "Rustic network process (ADR 0061, ADR 0063)")?;

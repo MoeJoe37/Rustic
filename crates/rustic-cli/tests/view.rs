@@ -82,8 +82,21 @@ fn view_presents_frames_in_a_window_or_fails_cleanly_without_one() {
         );
     }
     let output = rustic(&["view", "--exit-after", "1", &page], false);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("cannot reach the window system"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if cfg!(any(windows, target_os = "macos")) {
+        // The window system is not found through environment variables
+        // here: a desktop session presents and exits, a session without
+        // one fails cleanly.
+        assert!(
+            output.status.success()
+                || (output.status.code() == Some(1)
+                    && stderr.contains("cannot reach the window system")),
+            "{stderr}"
+        );
+    } else {
+        assert_eq!(output.status.code(), Some(1), "{stderr}");
+        assert!(stderr.contains("cannot reach the window system"));
+    }
     // The window sets the view; bad options are usage errors.
     for bad in [
         vec!["view", "--viewport", "10x10", &page],

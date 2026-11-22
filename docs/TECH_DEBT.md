@@ -89,7 +89,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
 | TD-10 | Deliberate | HTML parser | Processing-instruction tree construction, scripting-on trees and `selectedcontent` are covered. | Paid |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, `url.blob` (M9) |
-| TD-12 | Deliberate | CI / platforms | ARM and 32-bit now in CI, but mobile is check-only and runs are blocked | Open |
+| TD-12 | Deliberate | CI / platforms | Native x64/ARM64 CI runs again (2026-11-22); mobile is check-only and two cross-checks skip the crates that use ring | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, M7 browser shell (DevTools) |
@@ -400,6 +400,16 @@ for aarch64 Linux, Android (aarch64 and armv7), Windows (x86_64-gnu), iOS and
 i686. **Pay:** restore billing so the full matrix runs, then add Android/iOS
 test runs once a host exists. **Trigger:** now for billing; mobile tests with
 the mobile hosts.
+**Update 2026-11-22 (billing paid):** the repository moved to an account
+where Actions runs, and the full matrix ran again for the first time since
+2026-11-08 (native Linux/Windows/macOS x64 and ARM64). Its findings were
+fixed in the same pass: cross-checks lacked C compilers for ring (M6),
+now installed per target (Android uses the runner's NDK; `i686-pc-windows-msvc`
+is checked on a Windows runner); `aarch64-pc-windows-gnullvm` and
+`loongarch64-unknown-linux-gnu` have no packaged C cross compiler, so there
+the crates that use ring (`rustic-net`, `rustic-engine`, `rustic-bindings`,
+`rustic-cli`, `rustic-fuzz`) are left out of the check. What remains:
+those two partial checks, and Android/iOS test runs.
 
 ### TD-13 — Long spec state-machine functions
 

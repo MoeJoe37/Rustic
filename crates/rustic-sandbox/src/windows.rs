@@ -58,6 +58,10 @@ use windows_sys::Win32::System::Threading::{
 const CONTAINER: &str = "Rustic.Renderer";
 /// `HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS)`.
 const ALREADY_EXISTS: i32 = 0x8007_00B7_u32 as i32;
+/// `E_UNEXPECTED`, which a racing profile creation can return.
+const UNEXPECTED: i32 = 0x8000_FFFF_u32 as i32;
+/// Retries of a profile creation that lost a race (50 ms to 800 ms).
+const PROFILE_RETRIES: u32 = 5;
 /// `PROCESS_CREATION_CHILD_PROCESS_RESTRICTED`: the renderer cannot create
 /// processes even outside its job.
 const CHILD_PROCESS_RESTRICTED: u32 = 1;
@@ -304,33 +308,47 @@ struct ContainerSid(PSID);
 
 impl ContainerSid {
     /// Create the container profile, or find the one an earlier run made.
+    ///
+    /// Two brokers starting their first renderers at once race to create
+    /// the profile, and the loser can get `E_UNEXPECTED` ("Catastrophic
+    /// failure") rather than `ERROR_ALREADY_EXISTS` (seen on native Windows
+    /// ARM64 CI with parallel tests). Such a failure is retried a few times
+    /// with a growing pause; by then the other broker's profile exists.
     fn open() -> io::Result<Self> {
         let name = wide(OsStr::new(CONTAINER));
         let description = wide(OsStr::new("Rustic renderer processes"));
-        let mut sid: PSID = null_mut();
-        // SAFETY: the strings are NUL-terminated; no capabilities are
-        // passed; `sid` is a valid out pointer.
-        let mut result = unsafe {
-            CreateAppContainerProfile(
-                name.as_ptr(),
-                name.as_ptr(),
-                description.as_ptr(),
-                null(),
-                0,
-                &mut sid,
-            )
-        };
-        if result == ALREADY_EXISTS {
-            // SAFETY: as above.
-            result = unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut sid) };
+        let mut attempt = 0u32;
+        loop {
+            let mut sid: PSID = null_mut();
+            // SAFETY: the strings are NUL-terminated; no capabilities are
+            // passed; `sid` is a valid out pointer.
+            let mut result = unsafe {
+                CreateAppContainerProfile(
+                    name.as_ptr(),
+                    name.as_ptr(),
+                    description.as_ptr(),
+                    null(),
+                    0,
+                    &mut sid,
+                )
+            };
+            if result == ALREADY_EXISTS {
+                // SAFETY: as above.
+                result =
+                    unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &mut sid) };
+            }
+            if result >= 0 && !sid.is_null() {
+                return Ok(Self(sid));
+            }
+            if result != UNEXPECTED || attempt >= PROFILE_RETRIES {
+                return Err(with_step(
+                    "CreateAppContainerProfile",
+                    hresult_error(result),
+                ));
+            }
+            attempt += 1;
+            std::thread::sleep(std::time::Duration::from_millis(25 << attempt));
         }
-        if result < 0 || sid.is_null() {
-            return Err(with_step(
-                "CreateAppContainerProfile",
-                hresult_error(result),
-            ));
-        }
-        Ok(Self(sid))
     }
 
     fn to_string_sid(&self) -> io::Result<String> {

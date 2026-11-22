@@ -69,7 +69,7 @@ implementations to raise the number.
 last. Overall progress moved from 42.96% to 43.12% and M7 from 86.14% to
 100%; no completed step lost credit and no unfinished step was deleted:
 
-- new last milestone **M14 Mobile devices & five-platform 1.0**; M8 is now
+- new last milestone **M14 Mobile devices & 1.0** (the final five-platform acceptance); M8 is now
   "Desktop alpha" and M13 "Desktop engine 1.0";
 - moved to M14 unchanged: `security.mobile` (its design and emulator steps
   keep their credit), `platform.android`, `platform.ios` and

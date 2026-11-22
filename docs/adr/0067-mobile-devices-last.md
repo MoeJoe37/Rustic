@@ -24,7 +24,7 @@ make it the final thing to do.
 
 ## Decision
 
-1. **A new last milestone, M14 "Mobile devices & five-platform 1.0".** It
+1. **A new last milestone, M14 "Mobile devices & 1.0".** It
    holds the Android and iOS device work: `security.mobile` (its finished
    design and emulator steps keep their credit), `platform.android`,
    `platform.ios`, `platform.device` (signed mobile artifacts,

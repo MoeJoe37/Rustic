@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "1100200920f789500feddb57d5584e6f1c763e4e32f0107d73ce35aec4dd58c5",
+  "source_fingerprint": "d786f241bc2971363947abba39265a0bebca41f580e6aedcf1abc78795bed492",
   "percent": "43.12",
   "verified_percent": "41.83",
   "partial_percent": "1.29",
@@ -143,7 +143,7 @@
     },
     {
       "id": "M14",
-      "label": "Mobile devices & five-platform 1.0",
+      "label": "Mobile devices & 1.0",
       "share": "3.27",
       "completed": 0,
       "total": 9,

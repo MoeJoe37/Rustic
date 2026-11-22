@@ -2,7 +2,7 @@
 
 **Overall completion: 43.12%** = 41.83% verified complete + 1.29% partial credit. 97/226 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `1100200920f789500feddb57d5584e6f1c763e4e32f0107d73ce35aec4dd58c5`.
+Catalog: `engine-v4`. Source fingerprint: `d786f241bc2971363947abba39265a0bebca41f580e6aedcf1abc78795bed492`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -23,7 +23,7 @@ Catalog: `engine-v4`. Source fingerprint: `1100200920f789500feddb57d5584e6f1c763
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
 | M13 Desktop engine 1.0 | 0/1 | 0.00% | 0.00% | 0.45% |
-| M14 Mobile devices & five-platform 1.0 | 0/9 | 7.09% | 0.00% | 3.27% |
+| M14 Mobile devices & 1.0 | 0/9 | 7.09% | 0.00% | 3.27% |
 
 ## Subsystems
 

@@ -6,19 +6,20 @@ the [progress summary](progress/summary.md) describe working code, and every
 status there is backed by tests. Update the relevant document (and a decision
 record when a boundary changes) in the same change as the code.
 
-## Where things stand (2026-11-18)
+## Where things stand (2026-11-22)
 
 | Milestone | State | Read |
 | --- | --- | --- |
-| M0 Foundation | Done; requiring the `CI` check on `main` is an open admin step | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| M0 Foundation | Done; hosted CI runs again on `moejoe873/Rustic` (2026-11-22); requiring the `CI` check on `main` is an open admin step | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | M1 Document core | Done (28/28 capabilities): URL, HTML tokenizer and tree builder, DOM, local `dump-dom` | [URL.md](URL.md), [HTML.md](HTML.md), [HTML_TREE.md](HTML_TREE.md), [DOM.md](DOM.md) |
 | M2 Styles | Done (8/8): CSS syntax, selectors, values, cascade with layers, media/container queries, invalidation | [CSS.md](CSS.md) |
 | M3 Static rendering | Done (17/17): block/inline/flex layout, OpenType text, images, CPU raster, `render`, reftests, hit testing | [LAYOUT.md](LAYOUT.md), [TEXT.md](TEXT.md), [PAINT.md](PAINT.md) |
 | M4 JavaScript | Done (13/13) on 2026-11-16: parser, collected heap, bytecode interpreter, standard library, modules, realms, Intl, limits and benchmark gate. The ARM64 benchmark record is from emulation (TD-125) | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
-| M5 Scripted documents | Complete for the declared scope (11/11). Scripts, DOM bindings, events, mutation and resize observers, error reporting, focus, forms, the pinned WPT gate and the first cross-engine report. Emulated and MSRV tiers still need a run. | [SCRIPTING.md](SCRIPTING.md), [review](reviews/2026-11-19-m5-completion.md) |
-| M6 Networking | Done 2026-11-20: HTTP/1.1 transport with TLS, Fetch, CORS, cookies, CSP, cache, profiles and Web Storage over allowlisted loopback origins; remote hosts wait for DNS (TD-157) | [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services), [review](reviews/2026-11-20-m6-completion.md) |
-| M7 Isolation | Current. Split renderer over bounded IPC, site process keys and ORB, default renderer sandboxes on Linux and Windows, a network process with crash recovery, user activation and brokered downloads. Open: macOS sandbox, Windows/macOS network-process confinement, native ARM64/macOS/mobile runs, external review | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [security review](reviews/2026-11-20-m7-security-review.md) |
-| M8–M10 | Not started: desktop/mobile alpha, compatibility, beta | [ROADMAP.md](ROADMAP.md) |
+| M5 Scripted documents | Complete for the declared scope (11/11). Scripts, DOM bindings, events, mutation and resize observers, error reporting, focus, forms, the pinned WPT gate and the first cross-engine report. The emulated, MSRV and native tiers passed in the first full hosted run (2026-11-22) | [SCRIPTING.md](SCRIPTING.md), [review](reviews/2026-11-19-m5-completion.md) |
+| M6 Networking | Done 2026-11-20: HTTP/1.1 transport with TLS, Fetch, CORS, cookies, CSP, cache, profiles and Web Storage over allowlisted loopback origins. Remote origins resolving to public addresses followed in M7 (ADR 0066, TD-157 paid) | [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services), [review](reviews/2026-11-20-m6-completion.md) |
+| M7 Isolation | Current (5/8). Split renderer over bounded IPC, out-of-process iframes and popups, site process keys, COOP/COEP and ORB, renderer sandboxes on by default on Linux, Windows and macOS, a confined network process on all three with crash recovery, user activation, brokered downloads and the trusted address/permission strip. Open: Android/iOS isolation (design only, ADR 0059), the remaining recovery and audit steps, and an independent external review | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [security review](reviews/2026-11-20-m7-security-review.md) |
+| M8 Desktop and mobile alpha | Started early (1/21): compositor scenes and scrolling (UI-05, ADR 0064) done; `rustic view` desktop window on Linux (UI-02, ADR 0065) | [ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha), [IMPLEMENTATION.md](IMPLEMENTATION.md#ui-02--desktop-window) |
+| M9–M10 | Not started: compatibility, beta | [ROADMAP.md](ROADMAP.md) |
 | M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, full engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
 
 The [progress summary](progress/summary.md) is regenerated from
@@ -30,15 +31,18 @@ table needs an update.
 
 Two things are true of every milestone so far and are easy to miss:
 
-- **Platform evidence is uneven.** Hosted CI has been blocked by a billing
-  limit since 2026-11-08, so recent merges are verified in a Linux sandbox:
-  native x86-64, emulated 32-bit ARM, 32-bit x86, RISC-V and big-endian, and
-  compile checks for Linux aarch64, Windows, Android and iOS. Native Windows
-  (x64 and ARM64), macOS (x64 and ARM64) and Linux aarch64 test runs are
-  waiting for CI to come back ([TD-12](TECH_DEBT.md), [PLATFORMS.md](PLATFORMS.md)).
+- **Desktop evidence is back; mobile has none.** Hosted CI was blocked by a
+  billing limit from 2026-11-08 to 2026-11-22, when the repository moved to
+  `moejoe873/Rustic`. The first full run there (native x64 and ARM64 Linux,
+  Windows and macOS, the emulated tiers and every compile check) found
+  portability bugs in the work merged during the gap, which are fixed, and
+  passed on `feature` at `9961c1c` ([TD-12](TECH_DEBT.md),
+  [PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
 - **Nothing runs on a phone yet.** Android and iOS are compile-checked only;
-  the first on-device surface is MOB-03/04, scheduled in
-  [ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration).
+  the first on-device surfaces are MOB-03/04, the first task of M8 mobile
+  hosts ([ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha)),
+  and mobile renderer isolation is a design only
+  ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
 
 ## Reading order
 
@@ -91,7 +95,9 @@ New to the project? Read these in order:
 | [TEXT.md](TEXT.md) | Unicode data, fonts, shaping, bidi and line breaking |
 | [PAINT.md](PAINT.md) | Display lists, CPU raster, image decoding and hit testing |
 | [JS.md](JS.md) | The JavaScript engine: parser, heap and collector, bytecode interpreter, built-ins, modules, realms, Intl, Test262 gates and benchmarks |
-| [SCRIPTING.md](SCRIPTING.md) | Scripted documents: lifecycle, script/timer/input/rendering turns, Web IDL, DOM bindings, events and the open M5 work |
+| [SCRIPTING.md](SCRIPTING.md) | Scripted documents: lifecycle, script/timer/input/rendering turns, Web IDL, DOM bindings, events, observers, forms and their remaining limits |
+| Networking (M6) | No separate guide yet: the [NET sections of IMPLEMENTATION.md](IMPLEMENTATION.md#net-01--http11-transport-without-tls), [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services) and ADRs 0051–0055 and 0066 |
+| Isolation (M7) | [SECURITY.md](SECURITY.md) for the model; the [ISO sections of IMPLEMENTATION.md](IMPLEMENTATION.md#iso-02--split-renderer-process-and-brokered-authority), [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate) and ADRs 0056–0063 for what is built |
 
 **History:** [reviews/](reviews/) holds dated milestone and checkpoint reviews.
 [IMPLEMENTATION.md](IMPLEMENTATION.md) and [PROGRESS.md](PROGRESS.md) keep
@@ -112,14 +118,18 @@ an earlier one's "remaining" notes.
 | Text | Shaping compared against 30 committed HarfBuzz reference cases |
 | JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required; 21,939 of the 22,427 that run pass (97.8%); 17,545 of 18,791 in the gated `test/built-ins` areas pass (93.4%); 1,240 of 1,326 in the gated `test/intl402` areas pass (93.5%); all 696 executed module files pass. Eight benchmark workloads with pinned checksums and a committed heap-size report |
 | Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock; binding tests for identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles. No WPT `dom/` or `html/` results yet (`web.conformance`) |
-| Robustness | 24 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
+| Robustness | 29 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
 | Platforms | Native tests on x64/ARM64 Linux, Windows and macOS; emulated 32-bit ARM/x86, RISC-V and big-endian; cross-checks for Android, iOS and eight more targets |
 
 There are no whole-WPT pass rates, no Test262 rate over the whole suite
 (each gate covers the implemented areas, and proposal features are skipped),
-no sandbox guarantees, no comparison with another engine's performance and no
-releases yet. The only third-party Rust
-crates are the reviewed font adapters of [ADR 0014](adr/0014-reviewed-font-adapters.md).
+no externally reviewed sandbox, no performance comparison beyond the
+[first JavaScript report](reviews/2026-11-19-perf-01-m5.md) and no releases
+yet. Third-party Rust crates are limited to the reviewed and pinned ones in
+[DEPENDENCIES.md](DEPENDENCIES.md): the font adapters
+([ADR 0014](adr/0014-reviewed-font-adapters.md)), TLS and content decoding
+([ADR 0051](adr/0051-transport-and-tls.md)) and the desktop window
+([ADR 0065](adr/0065-desktop-window-host.md)).
 Configuration in the repository is distinct from a successful hosted run;
 inspect the [Actions page](https://github.com/moejoe873/Rustic/actions) for run
 results.

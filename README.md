@@ -12,10 +12,11 @@ on: x86-64, ARM64, 32-bit ARM and 32-bit x86, with RISC-V, big-endian and other
 architectures kept working too. CI runs the full test suite natively on x64 and
 ARM64 Linux, Windows and macOS, under emulation on 32-bit ARM, 32-bit x86,
 RISC-V and big-endian s390x, and compile-checks Android, iOS and further targets.
-Device shells, rendering, input, and runtime validation are still planned. See
+Android and iOS hosts, on-device rendering, input and runtime validation are
+still planned; a first desktop window host exists (`rustic view`). See
 [platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: M6 networking and browser services.** M1–M5 are complete
+**Current stage: M7 isolation and security.** M1–M6 are complete
 for their declared scope. Rustic's own pipeline turns a local HTML file into a PNG
 through parsing, the CSS cascade, block/inline/flex layout, OpenType text,
 image decoding and a CPU rasterizer, with resize/zoom and hit testing. M4
@@ -44,10 +45,25 @@ validate and submit forms without navigation, and watch element sizes with
 upstream `testharness.js`, and a [first cross-engine report](docs/reviews/2026-11-19-perf-01-m5.md)
 compares the JavaScript engine with V8, SpiderMonkey and JavaScriptCore
 ([M5 review](docs/reviews/2026-11-19-m5-completion.md)).
-M6 entry work is under way: Rustic decodes and encodes all 40
-[Encoding Standard](docs/ENCODING.md) encodings, and stylesheets honor their
-`@charset`. Networking itself and
-native app hosts are later milestones.
+M6 added controlled networking: Rustic's own HTTP/1.1 transport with TLS,
+Fetch and `fetch()`, CORS, cookies, the HTTP cache, CSP and mixed content,
+profiles and Web Storage, all 40 [Encoding Standard](docs/ENCODING.md)
+encodings, and loading documents and subresources from origins the command
+line grants ([M6 review](docs/reviews/2026-11-20-m6-completion.md)).
+
+M7, the current milestone, splits the engine into processes: every document
+command runs its page in a renderer child over bounded, versioned IPC, and the
+broker answers each file, network and storage request from its own grant.
+Renderers are confined by default on Linux (bubblewrap and seccomp), Windows
+(a capability-less AppContainer) and macOS (Seatbelt); sockets, TLS and HTTP
+run in a separate, confined network process; iframes and popups get renderers
+of their own with site process keys, COOP, COEP and ORB; and crashed or
+misbehaving children are replaced without stale authority. Remote origins can
+be granted and resolve only to public addresses. `rustic view` opens a page in
+a native desktop window with a trusted address and permission strip the page
+cannot paint over. Android/iOS isolation and an external security review are
+still open ([ROADMAP §10](docs/ROADMAP.md#10-m7--isolation-and-security-gate),
+[security review](docs/reviews/2026-11-20-m7-security-review.md)).
 See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 <!-- rustic-progress:start -->
@@ -109,8 +125,10 @@ cargo test --locked --workspace --all-targets
 
 The toolchain file pins Rust **1.99.1**; the minimum supported Rust version is
 **1.85.0** and the workspace uses the 2024 edition. `rustic` is a development
-tool, not a browser: every command reads one local file (URLs are rejected) and
-prints a deterministic result.
+tool, not a browser: every command reads one local file, or an `http(s)` URL
+whose origins are granted with `--allow-origin`/`--allow-remote`, runs the page
+in a sandboxed renderer process and prints a deterministic result (`--help`
+lists every option).
 
 | Command | Output |
 | --- | --- |
@@ -122,6 +140,8 @@ prints a deterministic result.
 | `render --output out.png` | A CPU-rasterized PNG; `--viewport WxH` and `--zoom` relayout |
 | `reftest` | Compares a page with its `rel=match`/`rel=mismatch` references |
 | `hit-test --at X,Y` | The topmost box at each point |
+| `view` | The page in a native window (Wayland/X11 on Linux), scrollable, under a trusted address strip |
+| `info` | A summary of what this build implements |
 
 Text uses OpenType shaping with bidi and CSS line breaking; `--font FILE` grants
 local TTF/OTF/WOFF/WOFF2 fonts, otherwise bundled test fonts keep output
@@ -146,12 +166,20 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-codecs` | Bounded inflate, PNG, JPEG, GIF and WebP decoders |
 | `rustic-js` | ECMAScript parser, garbage-collected heap, bytecode interpreter, standard library and Intl |
 | `rustic-bindings` | Web IDL conversions, `Window`/`Document`/node wrappers, events, and the shared DOM/JS garbage collection |
+| `rustic-encoding` | All 40 Encoding Standard decoders and encoders |
+| `rustic-net` | HTTP/1.1 transport and TLS, Fetch, CORS, cookies, HTTP cache, CSP, navigation, address policy |
+| `rustic-storage` | Profiles, partitioned storage keys, quotas and Web Storage |
+| `rustic-ipc` | Bounded, versioned broker/renderer/network-process IPC |
+| `rustic-sandbox` | OS confinement: Linux seccomp filters, Windows AppContainers, macOS Seatbelt profiles |
 | `rustic-engine` | Document lifecycle, script, input, timer and rendering turns, viewport configuration |
-| `rustic-cli` | The `rustic` development tool |
-| `rustic-fuzz` | Deterministic mutation fuzzing (21 targets) |
+| `rustic-shell` | Desktop window host (winit and softbuffer) |
+| `rustic-cli` | The `rustic` development tool: broker, renderer and network processes |
+| `rustic-fuzz` | Deterministic mutation fuzzing (29 targets) |
 
 Future crates in the [architecture](docs/ARCHITECTURE.md) are created only when
-their milestone needs them. All packages are unpublished.
+their milestone needs them. All packages are unpublished. The third-party
+crates (font adapters, TLS, content decoding, the desktop window) are reviewed
+and pinned in [DEPENDENCIES.md](docs/DEPENDENCIES.md).
 
 ## Development direction
 

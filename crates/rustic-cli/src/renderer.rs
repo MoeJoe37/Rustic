@@ -10,7 +10,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::io::{self, StdinLock, StdoutLock, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -31,7 +31,7 @@ use crate::network::{ResourceKind, Session, SessionDocument};
 /// The hidden subcommand that runs a renderer.
 pub const RENDERER_COMMAND: &str = "__renderer";
 
-type Link = Channel<StdinLock<'static>, StdoutLock<'static>>;
+type Link = Channel<Box<dyn Read>, Box<dyn Write>>;
 
 thread_local! {
     /// Command output, collected instead of written (renderer mode only).
@@ -162,9 +162,14 @@ pub(crate) fn grant(document: SessionDocument) {
 
 /// Run as a renderer. Returns the process exit status.
 pub fn run() -> u8 {
-    let stdin = io::stdin().lock();
-    let stdout = io::stdout().lock();
-    let mut channel = match Channel::connect(stdin, stdout, Role::Renderer, Limits::default()) {
+    run_over(Box::new(io::stdin().lock()), Box::new(io::stdout().lock()))
+}
+
+/// Run as a renderer over `reader` and `writer`, a stream to the broker
+/// other than standard input and output (the Android isolated service's
+/// socket, ADR 0059). Returns the exit status.
+pub fn run_over(reader: Box<dyn Read>, writer: Box<dyn Write>) -> u8 {
+    let mut channel = match Channel::connect(reader, writer, Role::Renderer, Limits::default()) {
         Ok(channel) => channel,
         Err(error) => {
             eprintln!("rustic renderer: {error}");

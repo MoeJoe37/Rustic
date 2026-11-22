@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rustic-base", "crates/rustic-dom", "crates/rustic-url", "crates/rustic-html", "crates/rustic-engine", "crates/rustic-cli", "crates/rustic-css", "crates/rustic-fuzz", "crates/rustic-style", "crates/rustic-layout", "crates/rustic-paint", "crates/rustic-raster", "crates/rustic-text", "crates/rustic-codecs", "crates/rustic-js", "crates/rustic-bindings", "crates/rustic-encoding", "crates/rustic-net", "crates/rustic-storage", "crates/rustic-ipc", "crates/rustic-sandbox", "crates/rustic-shell"]
+members = ["crates/rustic-base", "crates/rustic-dom", "crates/rustic-url", "crates/rustic-html", "crates/rustic-engine", "crates/rustic-cli", "crates/rustic-css", "crates/rustic-fuzz", "crates/rustic-style", "crates/rustic-layout", "crates/rustic-paint", "crates/rustic-raster", "crates/rustic-text", "crates/rustic-codecs", "crates/rustic-js", "crates/rustic-bindings", "crates/rustic-encoding", "crates/rustic-net", "crates/rustic-storage", "crates/rustic-ipc", "crates/rustic-sandbox", "crates/rustic-shell", "crates/rustic-android"]
 resolver = "3"
 
 [workspace.package]

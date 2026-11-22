@@ -1,0 +1,33 @@
+[package]
+name = "rustic-android"
+description = "Rustic's Android host glue: JNI entry points for the isolated renderer service and the broker (ADR 0059)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "rustic_android"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rustic-cli = { path = "../rustic-cli" }
+
+# JNI needs exported unmangled symbols and file descriptors handed over by
+# Java, both `unsafe` in Rust (ADR 0059): denied, not forbidden, so only
+# the `jni` module can allow it, and every unsafe block states why it is
+# sound. Everything else matches the workspace lints.
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"

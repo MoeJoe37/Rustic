@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[lib]
+name = "rustic_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "rustic"
 path = "src/main.rs"

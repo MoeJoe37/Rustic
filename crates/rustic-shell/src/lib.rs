@@ -14,17 +14,19 @@
 
 use rustic_raster::Surface;
 
-// Android has no desktop window: its host is an activity (ADR 0059), so
-// winit and softbuffer are not built there and `run` reports that.
-#[cfg(not(target_os = "android"))]
+// Android and iOS have no desktop window: their hosts are an activity and
+// a BrowserEngineKit app (ADR 0059), so winit and softbuffer are not built
+// there and `run` reports that.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod window;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use window::run;
 
-/// Android: no desktop window exists; the mobile host owns presentation.
-#[cfg(target_os = "android")]
+/// Android and iOS: no desktop window exists; the mobile host owns
+/// presentation.
+#[cfg(any(target_os = "android", target_os = "ios"))]
 pub fn run(_config: WindowConfig, _content: impl Content) -> Result<(), String> {
-    Err("cannot reach the window system: Android has no desktop window".into())
+    Err("cannot reach the window system: mobile platforms have no desktop window".into())
 }
 
 /// CSS pixels one wheel line or arrow key scrolls.

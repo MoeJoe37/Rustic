@@ -5830,12 +5830,22 @@
               ]
             },
             {
-              "label": "Android: isolated-process renderer service verified on emulator and device, with crash recovery",
+              "label": "Android: isolated-process renderer service with crash recovery, verified on the emulator (CI job android-emulator)",
               "status": "planned",
               "evidence": []
             },
             {
-              "label": "iOS: BrowserEngineKit web content and networking extensions verified on simulator and device, with the engine entitlement",
+              "label": "Android: the same checks on a physical device (needs a device or device farm)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "iOS: BrowserEngineKit web content and networking extensions verified on the simulator",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "iOS: the same on a device with Apple's browser-engine entitlement (needs Apple approval and a device)",
               "status": "planned",
               "evidence": []
             }
@@ -6183,7 +6193,7 @@
             },
             {
               "kind": "source",
-              "path": "crates/rustic-cli/src/main.rs",
+              "path": "crates/rustic-cli/src/lib.rs",
               "marker": "fn render_frames("
             },
             {

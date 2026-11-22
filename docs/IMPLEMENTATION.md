@@ -2560,7 +2560,7 @@ benchmark record is from QEMU emulation (TD-125).
 
 ## UI-02 — Desktop window
 
-Added 2026-11-21 (`rustic-shell`, `rustic-cli/src/main.rs` `view_command`,
+Added 2026-11-21 (`rustic-shell`, `rustic-cli/src/lib.rs` `view_command`,
 [ADR 0065](adr/0065-desktop-window-host.md)). `rustic view FILE` opens a
 native window (winit, Wayland or X11 on Linux) and presents each frame with
 softbuffer; every frame is a `render` in a sandboxed renderer at the

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The broker (the app's main process) may use the network; isolated
+         renderer processes never get this permission (ADR 0059). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="Rustic"
+        android:allowBackup="false"
+        android:extractNativeLibs="true">
+
+        <!-- A renderer: its own UID per process, no permissions, no
+             network, no access to the app's files (isolated_app). -->
+        <service
+            android:name=".RendererService"
+            android:isolatedProcess="true"
+            android:process=":renderer"
+            android:exported="false" />
+
+        <!-- The control for the isolation test: the same probes in an
+             ordinary (not isolated) app process, which they must reach. -->
+        <service
+            android:name=".ProbeService"
+            android:process=":probe"
+            android:exported="false" />
+    </application>
+</manifest>

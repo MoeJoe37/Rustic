@@ -62,11 +62,14 @@ not expose an unrestricted native escape hatch to page script accidentally.
 
 ## Memory, resource exhaustion, and native code
 
-Project crates forbid unsafe Rust. The one exception is `rustic-sandbox`, and
+Project crates forbid unsafe Rust. The exceptions are `rustic-sandbox`, and
 inside it only two modules: the Windows launcher
 ([ADR 0060](adr/0060-windows-renderer-sandbox.md)), which only calls Win32, and
 the macOS `enter` module ([ADR 0063](adr/0063-macos-renderer-sandbox.md)),
-which only calls `sandbox_init`. Every unsafe block is documented (enforced by
+which only calls `sandbox_init`; and the `jni` module of `rustic-android`
+([ADR 0059](adr/0059-mobile-renderer-isolation.md)), which only exports the
+JNI symbols and adopts descriptors Java detached (integers only, no JNI
+environment calls). Every unsafe block is documented (enforced by
 Clippy). Any further exception requires its own ADR and the same
 treatment. Dependencies
 may contain unsafe code; Rust is not a guarantee against their vulnerabilities.

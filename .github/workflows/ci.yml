@@ -426,10 +426,75 @@ jobs:
           CHECK_TARGET: ${{ matrix.target }}
         run: cargo check --locked --workspace --lib --target "$CHECK_TARGET"
 
+  android-emulator:
+    name: Android isolated renderer (emulator, x86-64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust and the Android standard library
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup target add --toolchain "$RUST_VERSION" x86_64-linux-android
+      - name: Build the native library with the Android NDK
+        run: |
+          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
+          if [ -z "$ndk" ] || [ ! -d "$ndk" ]; then
+            ndk="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          fi
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export TARGET_CC="$bin/x86_64-linux-android28-clang"
+          export TARGET_AR="$bin/llvm-ar"
+          export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$TARGET_CC"
+          cargo build --locked --release -p rustic-android --target x86_64-linux-android
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          cp target/x86_64-linux-android/release/librustic_android.so android/app/src/main/jniLibs/x86_64/
+      - name: Install Gradle 8.11.1 (checksum pinned)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gradle.zip" https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
+          echo "f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6  $RUNNER_TEMP/gradle.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.11.1/bin" >> "$GITHUB_PATH"
+          echo "JAVA_HOME=${JAVA_HOME_17_X64}" >> "$GITHUB_ENV"
+      - name: Build the app and its tests
+        working-directory: android
+        run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Start an emulator (API 34, x86-64, KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          tools="$sdk/cmdline-tools/latest/bin"
+          yes | "$tools/sdkmanager" --licenses > /dev/null || true
+          "$tools/sdkmanager" --install "emulator" "platform-tools" "system-images;android-34;default;x86_64" > /dev/null
+          echo no | "$tools/avdmanager" create avd -n rustic -k "system-images;android-34;default;x86_64" --force
+          nohup "$sdk/emulator/emulator" -avd rustic -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          "$sdk/platform-tools/adb" wait-for-device
+          for _ in $(seq 1 120); do
+            if [ "$("$sdk/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then
+              break
+            fi
+            sleep 5
+          done
+          "$sdk/platform-tools/adb" shell getprop sys.boot_completed
+          echo "$sdk/platform-tools" >> "$GITHUB_PATH"
+      - name: Run the isolation tests on the emulator
+        working-directory: android
+        run: gradle --no-daemon connectedDebugAndroidTest
+      - name: Show test reports and the device log on failure
+        if: failure()
+        run: |
+          find android/app/build -path '*androidTest-results*' -name '*.xml' -exec cat {} + || true
+          adb logcat -d | grep -iE 'rustic|AndroidRuntime|DEBUG|isolated' | tail -n 300 || true
+          tail -n 50 "$RUNNER_TEMP/emulator.log" || true
+
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, emulated, cross, fuzz, compatibility, repository, mobile]
+    needs: [quality, test, emulated, cross, fuzz, compatibility, repository, mobile, android-emulator]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -443,8 +508,9 @@ jobs:
           COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
           REPOSITORY_RESULT: ${{ needs.repository.result }}
           MOBILE_RESULT: ${{ needs.mobile.result }}
+          ANDROID_RESULT: ${{ needs.android-emulator.result }}
         run: |
-          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$EMULATED_RESULT" "$CROSS_RESULT" "$FUZZ_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT"; do
+          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$EMULATED_RESULT" "$CROSS_RESULT" "$FUZZ_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT" "$ANDROID_RESULT"; do
             if [ "$result" != success ]; then
               echo "A required job did not succeed: $result"
               exit 1

@@ -1149,6 +1149,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-android"
+version = "0.1.0"
+dependencies = [
+ "rustic-cli",
+]
+
+[[package]]
 name = "rustic-base"
 version = "0.1.0"
 

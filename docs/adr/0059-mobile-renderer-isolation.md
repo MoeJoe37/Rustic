@@ -1,7 +1,7 @@
 # ADR 0059 — Android and iOS renderer isolation (design)
 
 Date: 2026-11-20
-Status: Proposed (design only; nothing here has run on a device, emulator or simulator)
+Status: Proposed. Android implemented 2026-11-22 (`android/`, `crates/rustic-android`), first emulator run pending in CI; iOS design only
 
 ## Context
 
@@ -46,6 +46,31 @@ how the renderer process is created, confined and connected differs.
 3. Without the entitlement or outside eligible regions, Rustic does not
    ship a browsing mode on iOS: it never substitutes WKWebView and never
    runs untrusted content in the app process.
+
+## Android implementation (2026-11-22)
+
+- `android/` is a Gradle project (AGP 8.7.3, Gradle 8.11.1 with a pinned
+  checksum, minSdk 28) with `RendererService` (`isolatedProcess`, process
+  `:renderer`), `ProbeService` (the same code in an ordinary process, as
+  the test's control) and `Broker`. CI builds `crates/rustic-android` for
+  `x86_64-linux-android` with the NDK and copies it to `jniLibs`.
+- `crates/rustic-android` is the JNI glue: integers only (descriptors,
+  flags, statuses), so no JNI environment calls; its one `unsafe` module
+  exports the symbols and adopts descriptors Java detached.
+- The broker side is `rustic_cli::run_hosted`: a document command whose
+  renderer the host started (`HostedRenderer`, a stream plus a stop
+  function); the watchdog and protocol checks are the desktop ones. The
+  renderer side is `rustic_cli::run_renderer_over`.
+- `IsolationTest` (instrumented, emulator API 34 x86-64, CI job
+  `android-emulator`): the service is isolated (`Process.isIsolated()`);
+  reading and listing the app's files, connecting to loopback and
+  starting a shell all fail in it and succeed in the control process; a
+  renderer that aborts fails its `dump-dom` and a fresh service serves
+  the next one. `crates/rustic-cli/tests/hosted.rs` checks the hosted
+  path on desktop over a Unix socket pair.
+- Not yet: a physical device run, ARM64 emulator (needs an ARM64 runner
+  with KVM), per-site renderer processes from a real browsing session
+  (M8 host), and `useAppZygote`.
 
 ## Verification required before acceptance
 

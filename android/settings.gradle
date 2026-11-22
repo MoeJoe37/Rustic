@@ -1,0 +1,19 @@
+// Rustic's Android host (ADR 0059): the isolated renderer service and its
+// emulator test. The native library is built by Cargo
+// (`crates/rustic-android`) and copied to app/src/main/jniLibs/<abi>/ by
+// CI before Gradle runs.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "rustic-android"
+include ":app"

@@ -72,7 +72,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 42.90%** (40.90% verified complete + 2.00% partial credit) — 95/221 capabilities complete and 9 in progress across 25 subsystems. Current milestone: **M7 Isolation & security**, 84.58% done.
+**Overall engine completion: 42.82%** (40.90% verified complete + 1.92% partial credit) — 95/221 capabilities complete and 9 in progress across 25 subsystems. Current milestone: **M7 Isolation & security**, 82.50% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 42.90%** = 40.90% verified complete + 2.00% partial credit. 95/221 capabilities complete, 9 in progress.
+**Overall completion: 42.82%** = 40.90% verified complete + 1.92% partial credit. 95/221 capabilities complete, 9 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `72ddb432bc1809d7afb7b146214754edd49f689755f08ccb2a491e089335bb20`.
+Catalog: `engine-v4`. Source fingerprint: `4938b9e72b0167141c3b0e348e98a30f17363257495d75f2d7ca64076212c7ec`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,7 +16,7 @@ Catalog: `engine-v4`. Source fingerprint: `72ddb432bc1809d7afb7b146214754edd49f6
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 5/8 | 84.58% | 59.37% | 3.72% |
+| M7 Isolation & security | 5/8 | 82.50% | 59.37% | 3.72% |
 | M8 Desktop & mobile alpha | 1/21 | 10.29% | 6.77% | 10.22% |
 | M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
@@ -44,7 +44,7 @@ Catalog: `engine-v4`. Source fingerprint: `72ddb432bc1809d7afb7b146214754edd49f6
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 5/11 | 3 | 62.94% | 44.18% | 5% | 3.14 |
+| Security & IPC | 5/11 | 3 | 61.39% | 44.18% | 5% | 3.06 |
 | Compositor & GPU | 1/4 | 0 | 23.07% | 23.07% | 3% | 0.69 |
 | Platform hosts | 1/9 | 1 | 8.33% | 4.16% | 4% | 0.33 |
 | Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -280,10 +280,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `security.authority` — Browser-assigned authority and capability brokering · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
 - **complete** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine ([source](../../crates/rustic-net/src/isolation.rs), [source](../../docs/adr/0057-process-model-and-site-isolation.md), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0062-out-of-process-frames.md), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-net/tests/navigation.rs))
 - **complete** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine ([test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs))
-- **in progress 33.33%** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
+- **in progress 20.00%** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
   - [x] Android and iOS isolation design over the shared broker protocol (ADR 0059) ([source](../../docs/adr/0059-mobile-renderer-isolation.md), [test](../../crates/rustic-ipc/tests/channel.rs))
-  - [ ] Android: isolated-process renderer service verified on emulator and device, with crash recovery
-  - [ ] iOS: BrowserEngineKit web content and networking extensions verified on simulator and device, with the engine entitlement
+  - [ ] Android: isolated-process renderer service with crash recovery, verified on the emulator (CI job android-emulator)
+  - [ ] Android: the same checks on a physical device (needs a device or device farm)
+  - [ ] iOS: BrowserEngineKit web content and networking extensions verified on the simulator
+  - [ ] iOS: the same on a device with Apple's browser-engine entitlement (needs Apple approval and a device)
 - **complete** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-bindings/src/page/activation.rs), [test](../../crates/rustic-engine/tests/input.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-cli/tests/network.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/chrome.rs), [source](../../crates/rustic-shell/src/lib.rs), [test](../../crates/rustic-cli/src/chrome.rs), [test](../../crates/rustic-cli/src/chrome.rs), [test](../../crates/rustic-shell/src/lib.rs))
 - **in progress 80.00%** `security.recovery` — Renderer/service crash recovery without stale authority · size 3 · M7 · 0.34% of engine
   - [x] A crashed or protocol-breaking renderer ends its command without output; the broker survives ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
@@ -303,7 +305,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Compositor & GPU
 
-- **complete** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-layout/src/scroll.rs), [source](../../docs/adr/0064-scrolling-and-compositor-scenes.md), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-cli/tests/scroll.rs), [source](../../crates/rustic-raster/src/scene.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-raster/src/frames.rs), [source](../../crates/rustic-cli/src/main.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-bindings/src/page/scrolling.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
+- **complete** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-layout/src/scroll.rs), [source](../../docs/adr/0064-scrolling-and-compositor-scenes.md), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-cli/tests/scroll.rs), [source](../../crates/rustic-raster/src/scene.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-raster/src/frames.rs), [source](../../crates/rustic-cli/src/lib.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-bindings/src/page/scrolling.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
 - **planned** `compositor.backend` — Mobile/desktop GPU adapters and CPU fallback · size 5 · M8 · 1.15% of engine
 - **planned** `compositor.recovery` — Surface/device loss and resource recovery · size 2 · M8 · 0.46% of engine
 - **planned** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M8 · 0.69% of engine

@@ -494,9 +494,26 @@ pub(crate) enum Process {
     },
     #[cfg(windows)]
     Confined(rustic_sandbox::Confined),
+    /// A renderer the host started (Android's isolated service); stopping
+    /// it closes its socket.
+    Hosted(std::sync::Arc<dyn Fn() + Send + Sync>),
 }
 
 impl Process {
+    /// What the watchdog calls to stop this process from another thread.
+    fn killer(&self) -> Box<dyn FnOnce() + Send> {
+        match self {
+            Self::Hosted(stop) => {
+                let stop = std::sync::Arc::clone(stop);
+                Box::new(move || stop())
+            }
+            other => {
+                let pid = other.id();
+                Box::new(move || kill_process(pid))
+            }
+        }
+    }
+
     fn id(&self) -> u32 {
         match self {
             Self::Child(child) => child.id(),
@@ -504,6 +521,7 @@ impl Process {
             Self::Sandboxed { child, .. } => child.id(),
             #[cfg(windows)]
             Self::Confined(confined) => confined.id(),
+            Self::Hosted(_) => 0,
         }
     }
 
@@ -514,6 +532,7 @@ impl Process {
             Self::Sandboxed { child, .. } => child.wait(),
             #[cfg(windows)]
             Self::Confined(confined) => confined.wait(),
+            Self::Hosted(_) => Err(io::Error::other("the renderer service ended")),
         }
     }
 
@@ -524,6 +543,10 @@ impl Process {
             Self::Sandboxed { child, .. } => child.kill(),
             #[cfg(windows)]
             Self::Confined(confined) => confined.kill(),
+            Self::Hosted(stop) => {
+                stop();
+                Ok(())
+            }
         }
     }
 }
@@ -531,6 +554,8 @@ impl Process {
 /// The renderer's standard error, whichever way it was started.
 pub(crate) enum RendererStderr {
     Pipe(std::process::ChildStderr),
+    /// A hosted renderer's diagnostics stay with its host.
+    Nothing,
     #[cfg(windows)]
     File(std::fs::File),
 }
@@ -539,10 +564,63 @@ impl Read for RendererStderr {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         match self {
             Self::Pipe(pipe) => pipe.read(buffer),
+            Self::Nothing => Ok(0),
             #[cfg(windows)]
             Self::File(file) => file.read(buffer),
         }
     }
+}
+
+/// A renderer a host started outside this process tree: the Android
+/// isolated renderer service (ADR 0059), connected over a socket the host
+/// handed over.
+pub struct HostedRenderer {
+    /// The renderer's end of the stream, read side.
+    pub reader: Box<dyn Read + Send>,
+    /// The renderer's end of the stream, write side.
+    pub writer: Box<dyn Write + Send>,
+    /// Stops the renderer (closes the socket; the host unbinds the
+    /// service). Called by the watchdog and on protocol errors.
+    pub stop: std::sync::Arc<dyn Fn() + Send + Sync>,
+}
+
+thread_local! {
+    /// The renderer the next command on this thread uses instead of
+    /// starting a process (one per command: a second renderer, such as a
+    /// frame's, is refused).
+    static HOSTED: std::cell::RefCell<Option<HostedRenderer>> =
+        const { std::cell::RefCell::new(None) };
+    /// `Some` while [`run_hosted`] runs: command output collects here.
+    static OUTPUT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Run document `command` with `args` against `renderer`, which the host
+/// started (the Android isolated service), and return the exit status and
+/// what the command would have written to standard output.
+pub fn run_hosted(command: &str, args: &[OsString], renderer: HostedRenderer) -> (u8, Vec<u8>) {
+    HOSTED.with(|hosted| *hosted.borrow_mut() = Some(renderer));
+    OUTPUT.with(|output| *output.borrow_mut() = Some(Vec::new()));
+    let status = run(command, args);
+    HOSTED.with(|hosted| hosted.borrow_mut().take());
+    let output = OUTPUT.with(|output| output.borrow_mut().take().unwrap_or_default());
+    (status, output)
+}
+
+/// Command output: to standard output, or to the host's buffer.
+fn write_output(bytes: &[u8]) -> io::Result<()> {
+    let collected = OUTPUT.with(|output| {
+        output
+            .borrow_mut()
+            .as_mut()
+            .map(|buffer| buffer.extend_from_slice(bytes))
+            .is_some()
+    });
+    if collected {
+        return Ok(());
+    }
+    let mut stdout = io::stdout().lock();
+    stdout.write_all(bytes)?;
+    stdout.flush()
 }
 
 type Started = (
@@ -579,6 +657,19 @@ fn pipes(child: &mut Child) -> (Box<dyn Read + Send>, Box<dyn Write + Send>, Ren
 /// that executable confined by the operating system (ADR 0058 on Linux,
 /// ADR 0060 on Windows). A sandbox that cannot be set up is an error.
 fn spawn_process() -> io::Result<Started> {
+    if let Some(hosted) = HOSTED.with(|hosted| hosted.borrow_mut().take()) {
+        return Ok((
+            Process::Hosted(hosted.stop),
+            hosted.reader,
+            hosted.writer,
+            RendererStderr::Nothing,
+        ));
+    }
+    if OUTPUT.with(|output| output.borrow().is_some()) {
+        return Err(io::Error::other(
+            "the host provides one renderer per command",
+        ));
+    }
     let exe = std::env::current_exe()?;
     if SANDBOX.load(Ordering::Relaxed) {
         return spawn_confined(&exe);
@@ -841,7 +932,7 @@ fn run_renderer(
     // Watchdog: a renderer that does not finish in time is killed, and the
     // pipe closing ends the wait below (security.recovery).
     let seconds = TIMEOUT_SECONDS.load(Ordering::Relaxed);
-    let pid = child.id();
+    let kill = child.killer();
     let (finished, watch) = std::sync::mpsc::channel::<()>();
     let timed_out = std::sync::Arc::new(AtomicBool::new(false));
     let flag = std::sync::Arc::clone(&timed_out);
@@ -850,7 +941,7 @@ fn run_renderer(
             == Err(std::sync::mpsc::RecvTimeoutError::Timeout)
         {
             flag.store(true, Ordering::SeqCst);
-            kill_process(pid);
+            kill();
         }
     });
     let handshake_done = AtomicBool::new(false);
@@ -977,11 +1068,8 @@ fn serve(
     if finished.status != 0 {
         // A failing reftest still prints its verdict lines.
         if command == "reftest" && finished.status == 1 {
-            let mut stdout = io::stdout().lock();
             // A broken pipe changes nothing: the status is already a failure.
-            let _ = stdout
-                .write_all(&finished.output)
-                .and_then(|()| stdout.flush());
+            let _ = write_output(&finished.output);
         }
         return finished.status;
     }
@@ -1004,13 +1092,7 @@ fn serve(
                 return 1;
             }
         }
-        let mut stdout = io::stdout().lock();
-        return u8::from(
-            stdout
-                .write_all(&finished.output)
-                .and_then(|()| stdout.flush())
-                .is_err(),
-        );
+        return u8::from(write_output(&finished.output).is_err());
     }
     if command == "render" && surfaces.len() == 1 && CAPTURE.with(|slot| slot.borrow().is_some()) {
         let page = surfaces.pop().expect("one surface");
@@ -1061,21 +1143,10 @@ fn serve(
                 })
                 .map(|line| format!("{line}\n"))
                 .collect();
-            let mut stdout = io::stdout().lock();
-            u8::from(
-                stdout
-                    .write_all(lines.as_bytes())
-                    .and_then(|()| stdout.flush())
-                    .is_err(),
-            )
+            u8::from(write_output(lines.as_bytes()).is_err())
         }
         None => {
-            let mut stdout = io::stdout().lock();
-            if stdout
-                .write_all(&bytes)
-                .and_then(|()| stdout.flush())
-                .is_err()
-            {
+            if write_output(&bytes).is_err() {
                 return 1;
             }
             0

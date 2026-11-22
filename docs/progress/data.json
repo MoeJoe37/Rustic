@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "72ddb432bc1809d7afb7b146214754edd49f689755f08ccb2a491e089335bb20",
-  "percent": "42.90",
+  "source_fingerprint": "4938b9e72b0167141c3b0e348e98a30f17363257495d75f2d7ca64076212c7ec",
+  "percent": "42.82",
   "verified_percent": "40.90",
-  "partial_percent": "2.00",
+  "partial_percent": "1.92",
   "completed": 95,
   "in_progress": 9,
   "total": 221,
@@ -77,9 +77,9 @@
       "share": "3.72",
       "completed": 5,
       "total": 8,
-      "percent": "84.58",
+      "percent": "82.50",
       "verified_percent": "59.37",
-      "partial_percent": "25.21"
+      "partial_percent": "23.13"
     },
     {
       "id": "M8",
@@ -6352,17 +6352,27 @@
               ]
             },
             {
-              "label": "Android: isolated-process renderer service verified on emulator and device, with crash recovery",
+              "label": "Android: isolated-process renderer service with crash recovery, verified on the emulator (CI job android-emulator)",
               "status": "planned",
               "evidence": []
             },
             {
-              "label": "iOS: BrowserEngineKit web content and networking extensions verified on simulator and device, with the engine entitlement",
+              "label": "Android: the same checks on a physical device (needs a device or device farm)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "iOS: BrowserEngineKit web content and networking extensions verified on the simulator",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "iOS: the same on a device with Apple's browser-engine entitlement (needs Apple approval and a device)",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "20.00",
           "engine_share": "0.58"
         },
         {
@@ -6648,10 +6658,10 @@
       "completed": 5,
       "in_progress": 3,
       "total": 11,
-      "contribution": "3.14",
-      "percent": "62.94",
+      "contribution": "3.06",
+      "percent": "61.39",
       "verified_percent": "44.18",
-      "partial_percent": "18.76"
+      "partial_percent": "17.21"
     },
     {
       "id": "compositor",
@@ -6727,7 +6737,7 @@
             },
             {
               "kind": "source",
-              "path": "crates/rustic-cli/src/main.rs",
+              "path": "crates/rustic-cli/src/lib.rs",
               "marker": "fn render_frames("
             },
             {

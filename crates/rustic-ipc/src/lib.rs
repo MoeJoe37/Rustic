@@ -16,6 +16,7 @@
 
 #![warn(missing_docs)]
 
+pub mod gpu;
 pub mod network;
 pub mod protocol;
 mod wire;
@@ -42,6 +43,9 @@ pub enum Role {
     /// decoding for exchanges the broker has already granted
     /// ([`network`] protocol).
     Network,
+    /// The GPU process: composites pages for display and holds no
+    /// authority ([`gpu`] protocol, ADR 0068).
+    Gpu,
 }
 
 impl Role {
@@ -50,6 +54,7 @@ impl Role {
             Self::Broker => 1,
             Self::Renderer => 2,
             Self::Network => 3,
+            Self::Gpu => 4,
         }
     }
 
@@ -58,7 +63,7 @@ impl Role {
     fn peer(self) -> Self {
         match self {
             Self::Broker => Self::Renderer,
-            Self::Renderer | Self::Network => Self::Broker,
+            Self::Renderer | Self::Network | Self::Gpu => Self::Broker,
         }
     }
 }

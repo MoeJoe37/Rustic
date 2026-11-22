@@ -27,8 +27,9 @@ run on 2026-11-22. M7 isolation closed on 2026-11-22 with its
 on by default on Linux, Windows and macOS, a confined network process and
 crash recovery ([§10](#10-m7--isolation-and-security-gate)). **M8 desktop
 alpha is the current milestone**: compositor scenes and scrolling (UI-05) and
-a Linux desktop window (UI-02) are done, and the GPU process is next; M9–M13
-are unstarted. **Android and iOS device work is deferred to the last
+a Linux desktop window (UI-02) are done, and frames are composited in a
+confined GPU process ([ADR 0068](adr/0068-gpu-process.md)); M9–M13 are
+unstarted. **Android and iOS device work is deferred to the last
 milestone, M14** ([ADR 0067](adr/0067-mobile-devices-last.md),
 [§17](#17-m14--mobile-devices-and-five-platform-10)): the platforms stay
 release targets, and their compile checks and the Android emulator job stay
@@ -717,6 +718,13 @@ on Windows, macOS and Linux with keyboard/IME, lifecycle and accessibility
 checks. Record each platform's actual status; alpha labels list known
 limitations.
 
+**Status 2026-11-22:** UI-05 scenes and scrolling (ADR 0064) and the GPU
+process boundary ([ADR 0068](adr/0068-gpu-process.md): frame compositing in
+a confined `rustic __gpu` child with crash, hang and protocol-violation
+recovery and CPU fallback) are done; UI-02 has a Linux window (ADR 0065).
+Next: the long-lived renderer per page (TD-182), then the hardware GPU
+backends inside the GPU process.
+
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
 declare broad site compatibility from a small handpicked demo collection.
@@ -950,9 +958,9 @@ in the milestone sections above.
 | done | ISO-03/ISO-04: desktop renderer sandboxes | Escape probes fail by default on Linux, Windows and macOS | Done 2026-11-22 (ADR 0058, 0060, 0063), green on native x64 and ARM64 at `9961c1c` |
 | done | Network process and its confinement | Exchanges in a `__network` child, confined on Linux, macOS and Windows; remote origins reach only public addresses | Done 2026-11-22 (ADR 0061, 0066; TD-157 and TD-176 paid) |
 | done | M7 completion review | Every M7 gate with recorded evidence; M7 debt rows moved | Done 2026-11-22 ([review](reviews/2026-11-22-m7-completion.md)); mobile device work, GPU crash step and external review rescheduled by ADR 0067 |
-| 1 | UI-05: GPU process (ADR first: GPU abstraction, backends and process boundary) | Compositor scenes are submitted over IPC to a `__gpu` child that presents them; a crashed or protocol-breaking GPU process is replaced without stale authority and the CPU path keeps working (`compositor.recovery`) | Next |
+| 1 | UI-05: GPU process | Frames are composited by a confined `__gpu` child; a crashed, hung or protocol-breaking GPU process is replaced without stale authority and the CPU path keeps working (`compositor.recovery` step 1) | Step 1 done 2026-11-22 ([ADR 0068](adr/0068-gpu-process.md)); scenes and window presentation move into it with the backend (TD-184, TD-185) |
 | 2 | TD-182: long-lived renderer per page | Input routed to the page, scene frames over IPC, scripts running between frames (`platform.linux` step 2) | After or alongside row 1 |
-| 3 | UI-05: desktop GPU backends (`compositor.backend`) | Direct3D 12, Metal and Vulkan adapters with CPU fallback and parity fixtures | After row 1 |
+| 3 | UI-05: desktop GPU backends (`compositor.backend`, ADR first) | Direct3D 12, Metal and Vulkan adapters inside the GPU process with CPU fallback and parity fixtures | Next after row 2 |
 | 4 | UI-02: Windows and macOS windows (`platform.windows`, `platform.macos`) | The Linux `rustic view` window on Windows and macOS, native x64 and ARM64 | After row 2 |
 | — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |
 | — | External security review (`security.brave`, external dependency) | Outside reviewers return findings on the [packet](reviews/2026-11-22-m7-external-review-packet.md); findings fixed or recorded | Waiting for reviewers; due before the M10 beta |

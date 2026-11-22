@@ -43,6 +43,12 @@ static SANDBOX: AtomicBool = AtomicBool::new(false);
 /// (On Windows the network process is confined only when no loopback
 /// fixture origin is granted: an AppContainer cannot connect to loopback,
 /// TD-176.)
+/// How long a renderer may run (`--renderer-timeout`); a GPU process gets
+/// the same for one composition.
+pub(crate) fn renderer_timeout() -> std::time::Duration {
+    std::time::Duration::from_secs(TIMEOUT_SECONDS.load(Ordering::Relaxed))
+}
+
 pub(crate) fn sandboxed() -> bool {
     SANDBOX.load(Ordering::Relaxed)
 }
@@ -66,7 +72,9 @@ pub fn confine_self(kind: &std::ffi::OsStr) -> Result<(), String> {
     let exe = std::env::current_exe()
         .and_then(std::fs::canonicalize)
         .map_err(|error| format!("cannot find the executable: {error}"))?;
-    let profile = if kind == "renderer" {
+    // The GPU process holds no authority and gets the renderer's profile
+    // until its backend needs driver access (ADR 0068).
+    let profile = if kind == "renderer" || kind == "gpu" {
         rustic_sandbox::seatbelt::renderer_profile(&exe)
     } else if kind == "network" {
         rustic_sandbox::seatbelt::network_profile(&exe)
@@ -89,6 +97,7 @@ const SANDBOX_ENV: &[&str] = &[
     "RUSTIC_TEST_ESCAPE_HOME",
     "RUSTIC_TEST_ESCAPE_DIR",
     "RUSTIC_TEST_NETWORK_PROCESS",
+    "RUSTIC_TEST_GPU_PROCESS",
     "RUSTIC_TEST_ESCAPE_ABSTRACT",
     "RUSTIC_TEST_ESCAPE_UNIX",
     "RUSTIC_TEST_FAULT_URL",
@@ -501,7 +510,7 @@ pub(crate) enum Process {
 
 impl Process {
     /// What the watchdog calls to stop this process from another thread.
-    fn killer(&self) -> Box<dyn FnOnce() + Send> {
+    pub(crate) fn killer(&self) -> Box<dyn FnOnce() + Send> {
         match self {
             Self::Hosted(stop) => {
                 let stop = std::sync::Arc::clone(stop);
@@ -1189,23 +1198,44 @@ impl<'a> Broker<'a> {
     /// `None` is a protocol violation: a wrong size, pixels that are not
     /// premultiplied, a layer outside the surface or a handle this broker
     /// never gave out.
+    ///
+    /// The pixels are composited by the GPU process (ADR 0068), which sees
+    /// only the checked layers and the frames they name, renumbered so
+    /// handle `n` is the `n`th frame sent; the broker's handles stay here.
     fn composite(&self, surface: rustic_ipc::protocol::Surface) -> Option<rustic_raster::Surface> {
-        let mut page = rustic_raster::Surface::from_premultiplied(
+        let page = rustic_raster::Surface::from_premultiplied(
             surface.width,
             surface.height,
             surface.pixels,
             rustic_raster::RasterLimits::default(),
         )?;
-        for layer in &surface.layers {
+        let fits = |start: u32, extent: u32, limit: u32| {
+            start.checked_add(extent).is_some_and(|end| end <= limit)
+        };
+        let mut frames: Vec<&rustic_raster::Surface> = Vec::new();
+        let mut handles: Vec<u32> = Vec::new();
+        let mut layers = Vec::with_capacity(surface.layers.len());
+        for mut layer in surface.layers {
             let frame = self.frames.get(usize::try_from(layer.handle).ok()?)?;
-            page.add_frame(
-                frame,
-                (layer.x, layer.y, layer.width, layer.height),
-                &layer.coverage,
-            )
-            .ok()?;
+            let count = u64::from(layer.width) * u64::from(layer.height);
+            if !fits(layer.x, layer.width, page.width())
+                || !fits(layer.y, layer.height, page.height())
+                || u64::try_from(layer.coverage.len()).ok()? != count
+            {
+                return None;
+            }
+            let index = match handles.iter().position(|&handle| handle == layer.handle) {
+                Some(index) => index,
+                None => {
+                    handles.push(layer.handle);
+                    frames.push(frame);
+                    handles.len() - 1
+                }
+            };
+            layer.handle = u32::try_from(index).ok()?;
+            layers.push(layer);
         }
-        Some(page)
+        crate::gpuproc::composite(&page, &layers, &frames)
     }
 
     /// Load and render an `iframe` in a renderer of its own (ADR 0062):

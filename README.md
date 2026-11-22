@@ -66,8 +66,10 @@ external security review is still wanted before the beta; the
 
 M8, the current milestone, is the desktop alpha: `rustic view` already opens a
 page in a native Linux window with a trusted address and permission strip the
-page cannot paint over, and the GPU process is next
-([ROADMAP §18](docs/ROADMAP.md#18-current-implementation-queue)).
+page cannot paint over, and out-of-process frames are composited in a
+confined GPU process that is replaced if it crashes, hangs or misbehaves,
+with the CPU compositor as fallback ([ADR 0068](docs/adr/0068-gpu-process.md),
+[ROADMAP §18](docs/ROADMAP.md#18-current-implementation-queue)).
 **Android and iOS are deferred to the last milestone (M14)**, not dropped:
 they stay release platforms, every Android and iOS target is still
 compile-checked in CI and the Android isolated renderer service runs on an
@@ -82,7 +84,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 43.12%** (41.83% verified complete + 1.29% partial credit) — 97/226 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 12.87% done.
+**Overall engine completion: 43.27%** (41.83% verified complete + 1.44% partial credit) — 97/226 capabilities complete and 8 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 14.76% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

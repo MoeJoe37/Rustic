@@ -156,15 +156,16 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Desktop and mobile alpha (M8): 2 sections</summary>
+<summary>Desktop alpha (M8, current): 3 sections</summary>
 
+- [UI-05 — GPU process](#ui-05--gpu-process)
 - [UI-02 — Desktop window](#ui-02--desktop-window)
 - [UI-05 — Scroll positions](#ui-05--scroll-positions)
 
 </details>
 
 <details>
-<summary>Isolation and security (M7, current): 6 sections</summary>
+<summary>Isolation and security (M7): 6 sections</summary>
 
 - [Remote origins and the Windows network container](#remote-origins-and-the-windows-network-container)
 - [ISO-05 — Trusted address and permission strip](#iso-05--trusted-address-and-permission-strip)
@@ -2557,6 +2558,29 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## UI-05 — GPU process
+
+Added 2026-11-22 (`rustic_ipc::gpu`, `rustic-cli/src/gpuproc.rs`,
+[ADR 0068](adr/0068-gpu-process.md)). In a split run, a page surface with
+out-of-process frame layers is composited by a `rustic __gpu` child
+instead of the broker. The child runs the reference compositor
+(`Surface::add_frame`), so pixels are unchanged; hardware backends replace
+it inside the child later. `--single-process` composites in place.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Broker keeps decisions | The broker validates the renderer's surface, resolves handles from its own table and checks every layer's geometry before sending; the child sees renumbered frames, never handles, URLs or grants | `frames_composite_in_the_gpu_process_with_the_reference_pixels`, the ADR 0062 suites in `frames.rs` and `frames_render.rs` |
+| Protocol | `Role::Gpu` handshake; stateless `Composite` / `Composited`, `Failed`; 256 MiB frames (larger compositions stay on the CPU); counts bounded before allocation; trailing bytes refused | `messages_round_trip_and_reject_trailing_bytes`, `layer_and_frame_counts_are_bounded_before_allocation`, fuzz target `ipc-frame` (sides 4 and 5) |
+| Hostile replies | A reply with another id, another size or pixels that are not premultiplied kills the process; the frame is composited by the broker | `a_lying_or_hung_gpu_process_is_cut_off_and_the_page_is_unchanged` |
+| Crash and hang recovery | A crashed, hung (an eighth of the renderer timeout, 1–15 s) or protocol-breaking process is killed, its frame composited on the CPU, and the next frame starts a fresh process, at most four per run; then the run composites on the CPU | `a_crashed_gpu_process_is_replaced_for_the_next_frame`, `frames_composite_in_the_gpu_process_with_the_reference_pixels` |
+| Confinement | Like a renderer: bubblewrap + renderer seccomp filter (Linux), `Rustic.Renderer` AppContainer (Windows), Seatbelt renderer profile via `RUSTIC_SEATBELT=gpu` (macOS); a failed setup composites on the CPU, never unconfined | `the_sandboxed_gpu_process_cannot_reach_files_network_or_programs` |
+
+Test hook `RUSTIC_TEST_GPU_PROCESS` (`crash`, `crash-on-layers:N`, `hang`,
+`wrong-size`, `wrong-id`, `not-premultiplied`, `escape` with the
+`RUSTIC_TEST_ESCAPE_*` targets) changes only what the GPU process does.
+Open: pixel copies over the pipe (TD-184); `rustic view` still
+composites in the broker (TD-185).
 
 ## UI-02 — Desktop window
 

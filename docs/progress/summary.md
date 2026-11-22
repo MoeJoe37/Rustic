@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 43.12%** = 41.83% verified complete + 1.29% partial credit. 97/226 capabilities complete, 7 in progress.
+**Overall completion: 43.27%** = 41.83% verified complete + 1.44% partial credit. 97/226 capabilities complete, 8 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `d786f241bc2971363947abba39265a0bebca41f580e6aedcf1abc78795bed492`.
+Catalog: `engine-v4`. Source fingerprint: `b280c42cf854bb6e2059557ed182cf79ffa75406d0637cb12bec71973d6a07ec`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `d786f241bc2971363947abba39265a0bebca4
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 1/18 | 12.87% | 8.51% | 8.12% |
+| M8 Desktop alpha | 1/18 | 14.76% | 8.51% | 8.12% |
 | M9 Compatibility expansion | 0/52 | 2.60% | 0.00% | 22.01% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
@@ -46,7 +46,7 @@ Catalog: `engine-v4`. Source fingerprint: `d786f241bc2971363947abba39265a0bebca4
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
-| Compositor & GPU | 1/5 | 0 | 23.07% | 23.07% | 3% | 0.69 |
+| Compositor & GPU | 1/5 | 1 | 28.20% | 23.07% | 3% | 0.84 |
 | Platform hosts | 1/9 | 1 | 8.33% | 4.16% | 4% | 0.33 |
 | Accessibility | 0/5 | 0 | 0.00% | 0.00% | 2% | 0.00 |
 | DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
@@ -299,7 +299,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-layout/src/scroll.rs), [source](../../docs/adr/0064-scrolling-and-compositor-scenes.md), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-cli/tests/scroll.rs), [source](../../crates/rustic-raster/src/scene.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-raster/src/frames.rs), [source](../../crates/rustic-cli/src/lib.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-bindings/src/page/scrolling.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
 - **planned** `compositor.backend` — Desktop GPU adapters and CPU fallback · size 3 · M8 · 0.69% of engine
 - **planned** `compositor.mobile` — Android and iOS GPU adapters verified on devices · size 2 · M14 · 0.46% of engine
-- **planned** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine
+- **in progress 33.33%** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine
+  - [x] GPU process: crashes, hangs and protocol violations recovered without stale authority, with CPU fallback (ADR 0068) ([source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
+  - [ ] Window surface loss and recreation in the desktop host
+  - [ ] GPU device loss and resource recovery in the hardware backend
 - **planned** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M8 · 0.69% of engine
 
 ### Platform hosts

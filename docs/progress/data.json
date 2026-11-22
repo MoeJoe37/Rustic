@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d786f241bc2971363947abba39265a0bebca41f580e6aedcf1abc78795bed492",
-  "percent": "43.12",
+  "source_fingerprint": "b280c42cf854bb6e2059557ed182cf79ffa75406d0637cb12bec71973d6a07ec",
+  "percent": "43.27",
   "verified_percent": "41.83",
-  "partial_percent": "1.29",
+  "partial_percent": "1.44",
   "completed": 97,
-  "in_progress": 7,
+  "in_progress": 8,
   "total": 226,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -87,9 +87,9 @@
       "share": "8.12",
       "completed": 1,
       "total": 18,
-      "percent": "12.87",
+      "percent": "14.76",
       "verified_percent": "8.51",
-      "partial_percent": "4.36"
+      "partial_percent": "6.25"
     },
     {
       "id": "M9",
@@ -6761,9 +6761,42 @@
           "label": "Surface/device loss, GPU process crash/restart and resource recovery",
           "size": 2,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "GPU process: crashes, hangs and protocol violations recovered without stale authority, with CPU fallback (ADR 0068)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/gpuproc.rs",
+                  "marker": "pub const MAX_GPU_STARTS"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn a_crashed_gpu_process_is_replaced_for_the_next_frame"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn a_lying_or_hung_gpu_process_is_cut_off_and_the_page_is_unchanged"
+                }
+              ]
+            },
+            {
+              "label": "Window surface loss and recreation in the desktop host",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "GPU device loss and resource recovery in the hardware backend",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "33.33",
           "engine_share": "0.46"
         },
         {
@@ -6779,12 +6812,12 @@
       ],
       "points": 13,
       "completed": 1,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 5,
-      "contribution": "0.69",
-      "percent": "23.07",
+      "contribution": "0.84",
+      "percent": "28.20",
       "verified_percent": "23.07",
-      "partial_percent": "0.00"
+      "partial_percent": "5.13"
     },
     {
       "id": "platform",

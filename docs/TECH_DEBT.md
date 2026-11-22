@@ -59,7 +59,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
@@ -250,6 +250,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.parity) |
 | TD-182 | Deliberate | Desktop host | `rustic view` starts a renderer and lays the page out again for every frame, runs no scripts between frames, routes no input to the page (only scrolling), has no browser UI and is verified only on Linux | Open, M8 (platform.linux, UI-01) |
 | TD-183 | Deliberate | Isolation | The macOS Seatbelt profiles allow reading every `sysctl` value, and initializers that run before `main` (AppKit is linked for `rustic view`) run before the profile applies | Open, M8 (macOS packaging) |
+| TD-184 | Deliberate | Compositor / IPC | The GPU process receives the page and frame pixels over its pipe and returns the composited page for every composited frame (two full copies), because there is no shared memory yet | Open, M8 (compositor.backend) |
+| TD-185 | Deliberate | Compositor / desktop host | `rustic view` presents frames composited in the broker; the GPU process does not own the window surface yet | Open, M8 (platform.linux) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2862,6 +2864,25 @@ and ARM64, which no runner provides (TD-12).
 **Pay:** a deny-by-default seatbelt profile with the same probe tests,
 on by default.
 **Trigger:** a native macOS runner, and before remote browsing on macOS.
+
+### TD-184 — GPU process pixels travel over a pipe
+
+ADR 0068 moved frame compositing into a `rustic __gpu` child. Each
+composited frame sends the page and its frames' pixels over the child's
+standard input and returns the composited page, two full copies per
+frame, because Rustic has no shared memory between processes yet
+(TD-170). Compositions larger than half the 256 MiB frame limit stay in
+the broker. **Pay:** shared-memory surfaces (or the platform's GPU
+texture sharing) under the backend record. **Trigger:** the hardware
+backend (`compositor.backend`), or a profile showing the copies.
+
+### TD-185 — The window is not presented by the GPU process
+
+`rustic view` composites its frames through the GPU process like
+`render`, but the window's surface (softbuffer, ADR 0065) is still
+written by the broker. **Pay:** hand the window surface to the GPU
+process when the hardware backend presents it. **Trigger:** the backend
+record, or TD-182's long-lived renderer.
 
 ### TD-183 — macOS profile breadth: sysctl reads and pre-main code
 

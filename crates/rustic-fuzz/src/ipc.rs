@@ -1,8 +1,9 @@
-//! `ipc-frame`: the broker/renderer and broker/network-process protocol
-//! decoders (`rustic-ipc`) over arbitrary frames from a hostile peer.
+//! `ipc-frame`: the broker/renderer, broker/network-process and
+//! broker/GPU-process protocol decoders (`rustic-ipc`) over arbitrary frames from a hostile peer.
 //! Decoding never panics, and the encoding is canonical: a frame that
 //! decodes re-encodes to the same bytes.
 
+use rustic_ipc::gpu::{Composite, GpuCommand, GpuEvent, Image};
 use rustic_ipc::network::{ExchangeLimits, Head, NetworkCommand, NetworkEvent, Open};
 use rustic_ipc::protocol::{
     BrokerMessage, DocumentGrant, FrameLayer, FrameRequest, RendererMessage, ResourceKind, Start,
@@ -126,6 +127,43 @@ pub(crate) fn seeds() -> Vec<Vec<u8>> {
             frame.extend(encode_frame(&event));
             seeds.push(frame);
         }
+        let command = GpuCommand::Composite(Box::new(Composite {
+            id,
+            page: Surface {
+                width: 2,
+                height: 1,
+                pixels: vec![255; 8],
+                layers: vec![FrameLayer {
+                    handle: (id % 2) as u32,
+                    x: (id % 2) as u32,
+                    width: 1,
+                    height: 1,
+                    coverage: vec![id as u8],
+                    ..FrameLayer::default()
+                }],
+            },
+            frames: vec![Image {
+                width: 1,
+                height: 1,
+                pixels: vec![0, 0, id as u8, 255],
+            }],
+        }));
+        let mut frame = vec![4u8];
+        frame.extend(encode_frame(&command));
+        seeds.push(frame);
+        for event in [
+            GpuEvent::Composited {
+                id,
+                width: 1,
+                height: 1,
+                pixels: vec![id as u8, 0, 0, 255],
+            },
+            GpuEvent::Failed { id },
+        ] {
+            let mut frame = vec![5u8];
+            frame.extend(encode_frame(&event));
+            seeds.push(frame);
+        }
     }
     seeds
 }
@@ -166,11 +204,13 @@ impl Target for IpcFrameTarget {
         let Some((&side, payload)) = input.split_first() else {
             return Ok(());
         };
-        match side & 3 {
+        match side % 6 {
             0 => canonical::<BrokerMessage>(payload),
             1 => canonical::<RendererMessage>(payload),
             2 => canonical::<NetworkCommand>(payload),
-            _ => canonical::<NetworkEvent>(payload),
+            3 => canonical::<NetworkEvent>(payload),
+            4 => canonical::<GpuCommand>(payload),
+            _ => canonical::<GpuEvent>(payload),
         }
     }
 }

@@ -433,6 +433,19 @@ fn compromised(mut channel: Link, document: &str, mode: &std::ffi::OsStr) -> u8 
 /// compromised renderer would, and report what worked. Under `--sandbox`
 /// every attempt must fail.
 fn escape(mut channel: Link) -> u8 {
+    let done = RendererMessage::Done {
+        status: 0,
+        output: escape_report().into_bytes(),
+    };
+    match channel.send(&done) {
+        Ok(()) => 0,
+        Err(_) => 1,
+    }
+}
+
+/// The escape probes' report, one `label: allowed|denied (detail)` line
+/// each (also run by the GPU process's test hook, ADR 0068).
+pub(crate) fn escape_report() -> String {
     let mut report = String::new();
     let mut attempt = |label: &str, result: Result<String, String>| {
         report.push_str(&match result {
@@ -512,14 +525,7 @@ fn escape(mut channel: Link) -> u8 {
         .map(|status| status.to_string())
         .map_err(|error| error.kind().to_string()),
     );
-    let done = RendererMessage::Done {
-        status: 0,
-        output: report.into_bytes(),
-    };
-    match channel.send(&done) {
-        Ok(()) => 0,
-        Err(_) => 1,
-    }
+    report
 }
 
 /// The channel to the broker and the request counter.

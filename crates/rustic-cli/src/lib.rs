@@ -13,6 +13,7 @@ use std::path::Path;
 mod broker;
 mod chrome;
 mod fonts;
+mod gpuproc;
 mod images;
 mod loader;
 mod netproc;
@@ -193,7 +194,9 @@ pub fn main() -> ExitCode {
     #[cfg(target_os = "macos")]
     if let Some(kind) = env::var_os(broker::SEATBELT_VARIABLE) {
         let child = env::args_os().nth(1).is_some_and(|arg| {
-            arg == renderer::RENDERER_COMMAND || arg == netproc::NETWORK_COMMAND
+            arg == renderer::RENDERER_COMMAND
+                || arg == netproc::NETWORK_COMMAND
+                || arg == gpuproc::GPU_COMMAND
         });
         let confined = if child {
             broker::confine_self(&kind)
@@ -216,6 +219,12 @@ pub fn main() -> ExitCode {
         .is_some_and(|arg| arg == netproc::NETWORK_COMMAND)
     {
         return ExitCode::from(netproc::run());
+    }
+    if env::args_os()
+        .nth(1)
+        .is_some_and(|arg| arg == gpuproc::GPU_COMMAND)
+    {
+        return ExitCode::from(gpuproc::run());
     }
 
     let args = match fonts::configure(env::args_os().skip(1).collect()) {

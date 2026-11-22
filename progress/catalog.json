@@ -6205,8 +6205,41 @@
           "label": "Surface/device loss, GPU process crash/restart and resource recovery",
           "size": 2,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "GPU process: crashes, hangs and protocol violations recovered without stale authority, with CPU fallback (ADR 0068)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/gpuproc.rs",
+                  "marker": "pub const MAX_GPU_STARTS"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn a_crashed_gpu_process_is_replaced_for_the_next_frame"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn a_lying_or_hung_gpu_process_is_cut_off_and_the_page_is_unchanged"
+                }
+              ]
+            },
+            {
+              "label": "Window surface loss and recreation in the desktop host",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "GPU device loss and resource recovery in the hardware backend",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "compositor.parity",

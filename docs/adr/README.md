@@ -75,6 +75,7 @@ instead of rewriting the history of a decision.
 | [0065](0065-desktop-window-host.md) | Desktop window host: winit 0.30 and softbuffer 0.4 in `rustic-shell`, minimal features; `rustic view` renders each frame in a sandboxed renderer | Accepted |
 | [0066](0066-remote-addresses-and-windows-network-container.md) | Remote origins resolve through the system resolver in the broker and reach only public addresses (no DNS rebinding to loopback or private networks); the Windows network process runs in a `Rustic.Network` LPAC with internetClient | Accepted |
 | [0067](0067-mobile-devices-last.md) | Android and iOS device work moves to the final milestone M14; M8 is the desktop alpha, M13 desktop 1.0; mobile CI checks stay; external review recorded as an external dependency | Accepted scope update |
+| [0068](0068-gpu-process.md) | GPU process: frame compositing moves from the broker to a confined, stateless `rustic __gpu` child with crash/hang recovery and CPU fallback; hardware backends are a later record | Accepted (step 1) |
 
 ## Records by area
 
@@ -94,7 +95,7 @@ instead of rewriting the history of a decision.
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
-| Compositor and desktop host (M8, started early) | 0064, 0065 |
+| Compositor and desktop host (M8) | 0064, 0065, 0068 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -108,7 +109,7 @@ authority boundary or `unsafe` code.
 | --- | --- | --- |
 | Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
 | Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented and green on the emulator) | Accepting ISO-08/MOB-07 (M14, ADR 0067) | Platform security boundary verified only on a device, emulator or simulator |
-| GPU abstraction and backends (Direct3D 12, Metal, Vulkan, GL ES) | UI-05 (M8) | Major platform dependency and `unsafe`/FFI surface |
+| GPU abstraction and backends (Direct3D 12, Metal, Vulkan; GL ES and mobile in M14) inside the GPU process of [0068](0068-gpu-process.md) | UI-05 hardware backends (M8) | Major platform dependency and `unsafe`/FFI surface |
 | Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8 desktop; mobile in M14) | Platform dependencies on five OS families |
 | WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
 | Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | New `unsafe` outside `rustic-sandbox` |

@@ -280,7 +280,7 @@ jobs:
         run: >-
           cargo check --locked --workspace --all-targets --target "$CHECK_TARGET"
           --exclude rustic-net --exclude rustic-engine --exclude rustic-bindings
-          --exclude rustic-cli --exclude rustic-fuzz
+          --exclude rustic-cli --exclude rustic-fuzz --exclude rustic-android
 
   fuzz:
     name: Parser fuzz smoke
@@ -462,26 +462,49 @@ jobs:
         working-directory: android
         run: gradle --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Start an emulator (API 34, x86-64, KVM)
+        timeout-minutes: 20
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           tools="$sdk/cmdline-tools/latest/bin"
+          adb="$sdk/platform-tools/adb"
+          # avdmanager and the emulator must agree on where the AVD lives.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
           yes | "$tools/sdkmanager" --licenses > /dev/null || true
-          "$tools/sdkmanager" --install "emulator" "platform-tools" "system-images;android-34;default;x86_64" > /dev/null
+          "$tools/sdkmanager" --install "emulator" "platform-tools" "platforms;android-34" "system-images;android-34;default;x86_64" > /dev/null
           echo no | "$tools/avdmanager" create avd -n rustic -k "system-images;android-34;default;x86_64" --force
-          nohup "$sdk/emulator/emulator" -avd rustic -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          "$sdk/platform-tools/adb" wait-for-device
+          "$tools/avdmanager" list avd
+          "$sdk/emulator/emulator" -accel-check || true
+          nohup "$sdk/emulator/emulator" -avd rustic -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator_pid=$!
+          booted=
+          # Poll instead of `adb wait-for-device`, which waits forever when
+          # the emulator exits during start-up.
           for _ in $(seq 1 120); do
-            if [ "$("$sdk/platform-tools/adb" shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then
+            if ! kill -0 "$emulator_pid" 2> /dev/null; then
+              echo "The emulator exited during start-up:"
+              cat "$RUNNER_TEMP/emulator.log"
+              exit 1
+            fi
+            if [ "$("$adb" shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" = 1 ]; then
+              booted=1
               break
             fi
             sleep 5
           done
-          "$sdk/platform-tools/adb" shell getprop sys.boot_completed
+          if [ -z "$booted" ]; then
+            echo "The emulator did not finish booting in 10 minutes:"
+            tail -n 200 "$RUNNER_TEMP/emulator.log"
+            exit 1
+          fi
+          "$adb" shell input keyevent 82 || true
           echo "$sdk/platform-tools" >> "$GITHUB_PATH"
       - name: Run the isolation tests on the emulator
+        timeout-minutes: 20
         working-directory: android
         run: gradle --no-daemon connectedDebugAndroidTest
       - name: Show test reports and the device log on failure

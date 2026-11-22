@@ -638,6 +638,17 @@ fn comparison(items: &[&Value], pos: usize) -> Option<(MediaComparison, usize)> 
     }
 }
 
+/// `value` as it reads back from its serialization (six decimals), so a
+/// query evaluates the same before and after a serialize/parse round trip:
+/// `(device-width: 2e-8px)` serializes as `0px`, and so matches as `0px`.
+fn serialized(value: f64) -> f64 {
+    let mut text = String::new();
+    if write_number(&mut text, value).is_err() {
+        return value;
+    }
+    text.parse().unwrap_or(value)
+}
+
 /// A feature value of `kind` at the start of `items`, and how many items it
 /// used.
 fn feature_value(kind: FeatureType, items: &[&Value]) -> Option<(MediaFeatureValue, usize)> {
@@ -646,7 +657,7 @@ fn feature_value(kind: FeatureType, items: &[&Value]) -> Option<(MediaFeatureVal
         FeatureType::Length => match first {
             Token::Dimension(n, unit) => Some((
                 MediaFeatureValue::Length(Length {
-                    value: n.value,
+                    value: serialized(n.value),
                     unit: LengthUnit::from_name(unit)?,
                 }),
                 1,
@@ -658,7 +669,7 @@ fn feature_value(kind: FeatureType, items: &[&Value]) -> Option<(MediaFeatureVal
         },
         FeatureType::Ratio => {
             let number = |t: &Token| match t {
-                Token::Number(n) if n.value >= 0.0 => Some(n.value),
+                Token::Number(n) if n.value >= 0.0 => Some(serialized(n.value)),
                 _ => None,
             };
             let a = number(first)?;
@@ -675,7 +686,10 @@ fn feature_value(kind: FeatureType, items: &[&Value]) -> Option<(MediaFeatureVal
         }
         FeatureType::Resolution => match first {
             Token::Dimension(n, unit) if n.value >= 0.0 => Some((
-                MediaFeatureValue::Resolution(n.value, ResolutionUnit::from_name(unit)?),
+                MediaFeatureValue::Resolution(
+                    serialized(n.value),
+                    ResolutionUnit::from_name(unit)?,
+                ),
                 1,
             )),
             _ => None,

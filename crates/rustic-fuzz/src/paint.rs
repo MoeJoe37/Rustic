@@ -189,9 +189,9 @@ impl Target for PaintTarget {
         ) else {
             return Ok(());
         };
-        // Every box paints at most one background, each command refers to a
-        // laid-out box, and groups are balanced.
-        let mut backgrounds = std::collections::HashSet::new();
+        // Every box paints at most one background per fragment, each command
+        // refers to a laid-out box, and groups are balanced.
+        let mut backgrounds = std::collections::HashMap::new();
         // Open layers: `true` for a clip-path layer, `false` for a group.
         let mut layers: Vec<bool> = Vec::new();
         // Open transforms.
@@ -239,7 +239,21 @@ impl Target for PaintTarget {
                     if item.rounded_clip.is_some_and(|c| c >= list.clips().len()) {
                         return Err("item names a missing rounded clip".into());
                     }
-                    if item.role == ItemRole::Background && !backgrounds.insert(item.node) {
+                    // An inline box split around a block paints one
+                    // background per fragment (CSS 2 §9.2.1.1).
+                    let painted = backgrounds.entry(item.node).or_insert(0usize);
+                    if item.role == ItemRole::Background {
+                        *painted += 1;
+                    }
+                    if item.role == ItemRole::Background
+                        && *painted
+                            > layout
+                                .inlines()
+                                .iter()
+                                .filter(|f| f.node() == item.node)
+                                .count()
+                                .max(1)
+                    {
                         return Err("a box painted its background twice".into());
                     }
                 }

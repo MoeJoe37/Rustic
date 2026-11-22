@@ -9,6 +9,7 @@
 
 use rustic_dom::{NodeId, NodeKind};
 
+use super::formatting::Entry;
 use super::{ParseError, TreeBuilder};
 
 impl TreeBuilder {
@@ -113,6 +114,28 @@ impl TreeBuilder {
         Ok(())
     }
 
+    /// Whether the parser still refers to `root` or one of its descendants.
+    fn retains_any_in(&self, root: NodeId) -> Result<bool, ParseError> {
+        // Not `retained_nodes`, which reports nothing once parsing is done:
+        // the end-of-file mirroring runs with elements still open.
+        let retained = |id: NodeId| {
+            self.open.contains(&id)
+                || self.head == Some(id)
+                || self.form == Some(id)
+                || self.context == Some(id)
+                || self.formatting.iter().any(|entry| match entry {
+                    Entry::Element(node, _) => *node == id,
+                    Entry::Marker => false,
+                })
+                || self
+                    .selected_options
+                    .iter()
+                    .chain(&self.pending_options)
+                    .any(|&(select, option)| select == id || option == id)
+        };
+        Ok(self.document.walk(root)?.any(|(id, _)| retained(id)))
+    }
+
     /// Replace `target`'s children with deep clones of `option`'s children.
     fn clone_into_selectedcontent(
         &mut self,
@@ -122,7 +145,11 @@ impl TreeBuilder {
         let old: Vec<NodeId> = self.document.children(target)?.collect();
         for child in old {
             self.document.detach(child)?;
-            if !self.exposed_document {
+            // The replaced children may still be open or in the list of
+            // active formatting elements (a `selectedcontent` inside its own
+            // selected option): such a subtree is only detached, as the
+            // standard does, and stays live for the parser.
+            if !self.exposed_document && !self.retains_any_in(child)? {
                 self.document.destroy_subtree(child)?;
             }
         }

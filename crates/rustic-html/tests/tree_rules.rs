@@ -183,6 +183,22 @@ fn selectedcontent_mirrors_the_selected_option_when_it_is_popped() {
 }
 
 #[test]
+fn selectedcontent_inside_its_own_option_keeps_open_elements_live() {
+    // Nightly fuzz reproducer: the end-of-file mirror replaced the children
+    // of a selectedcontent that sits inside the selected option, and the
+    // replaced `<d>` was destroyed while still open.
+    for source in [
+        "<select><option sn><selectedcontent><d>Y",
+        "<select><option selected><selectedcontent><b>x</option>y",
+        "<select><option><selectedcontent><i><b>z",
+    ] {
+        let result = parse(source);
+        let doc = result.document();
+        assert!(doc.dump_tree(doc.root(), 1 << 16).is_ok(), "{source}");
+    }
+}
+
+#[test]
 fn selectedcontent_clones_consume_the_document_budget() {
     let source = "<select><button><selectedcontent></button><option>A</option></select>";
     // html, head, body, select, button, selectedcontent, option, two texts and the root.

@@ -166,6 +166,7 @@ pub fn splits(command: &OsString) -> bool {
                 | "dump-paint"
                 | "render"
                 | "hit-test"
+                | "reftest"
         )
     )
 }
@@ -378,7 +379,7 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
         renderer_args.extend(["--locale".to_owned(), locale.to_owned()]);
     }
     renderer_args.extend(args.iter().map(|arg| arg.to_string_lossy().into_owned()));
-    let factor = (command == "render")
+    let factor = matches!(command, "render" | "reftest")
         .then(|| crate::parse_render_args(args).ok())
         .flatten()
         .and_then(|parsed| {
@@ -431,6 +432,14 @@ fn document_argument(
             let parsed = crate::parse_render_args(args).ok()?;
             parsed.output.as_ref()?;
             Some((parsed.limits, parsed.path, parsed.output))
+        }
+        "reftest" => {
+            // References come from the broker inside the grant (TD-171).
+            let parsed = crate::parse_render_args(args).ok()?;
+            if parsed.output.is_some() {
+                return None;
+            }
+            Some((parsed.limits, parsed.path, None))
         }
         "hit-test" => {
             let mut rest = Vec::new();
@@ -949,6 +958,14 @@ fn serve(
         }
     };
     if finished.status != 0 {
+        // A failing reftest still prints its verdict lines.
+        if command == "reftest" && finished.status == 1 {
+            let mut stdout = io::stdout().lock();
+            // A broken pipe changes nothing: the status is already a failure.
+            let _ = stdout
+                .write_all(&finished.output)
+                .and_then(|()| stdout.flush());
+        }
         return finished.status;
     }
     let mut surfaces = finished.surfaces;

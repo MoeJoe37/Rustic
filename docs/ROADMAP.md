@@ -655,7 +655,7 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
 - [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: [ADR 0063](adr/0063-macos-renderer-sandbox.md), Accepted 2026-11-22), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
 - [x] **The engine already runs split.** Done 2026-11-20: every document
-      command except `reftest` runs in a `rustic __renderer` child over
+      command except `reftest` (it joined 2026-11-22, TD-171) runs in a `rustic __renderer` child over
       ADR 0056 IPC with no OS restrictions, and the CLI suites (M3–M6) run
       through it ([IMPLEMENTATION.md](IMPLEMENTATION.md#iso-02--split-renderer-process-and-brokered-authority)). Before OS restrictions are added,
       the renderer runs in a child process over the ISO-02 IPC on Linux with

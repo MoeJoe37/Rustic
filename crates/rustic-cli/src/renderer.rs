@@ -43,6 +43,46 @@ thread_local! {
     /// The rendered surfaces, sent before `Done` (`render` only; one per
     /// frame with `--frames`).
     static SURFACE: RefCell<Vec<Surface>> = const { RefCell::new(Vec::new()) };
+    /// The granted document's session (renderer mode only): the broker
+    /// link and the document URL, for further local documents.
+    static SESSION: RefCell<Option<Rc<BrokeredSession>>> = const { RefCell::new(None) };
+}
+
+/// Whether this process is a renderer serving a broker.
+pub(crate) fn active() -> bool {
+    SESSION.with(|session| session.borrow().is_some())
+}
+
+/// The granted document's URL (renderer mode only).
+pub(crate) fn document_url() -> Option<Url> {
+    SESSION.with(|session| session.borrow().as_ref().map(|s| s.url.clone()))
+}
+
+/// Another local document, asked from the broker like any file in the
+/// grant (reftest references, TD-171): the broker serves only files
+/// inside the granted document's directory, after symbolic links resolve.
+/// `None` outside renderer mode or for a non-local document.
+pub(crate) fn granted_local_document(
+    url: &Url,
+    max_bytes: usize,
+) -> Option<Result<SessionDocument, FetchError>> {
+    let parent = SESSION.with(|session| session.borrow().clone())?;
+    if !parent.local {
+        return None;
+    }
+    let bytes = parent.fetch(url, &ResourceKind::Stylesheet, max_bytes);
+    Some(bytes.map(|bytes| SessionDocument {
+        session: Rc::new(BrokeredSession {
+            link: Rc::clone(&parent.link),
+            url: url.clone(),
+            csp: CspList::default(),
+            local: true,
+            storage: false,
+            charsets: RefCell::new(HashMap::new()),
+        }),
+        bytes,
+        transport_encoding: None,
+    }))
 }
 
 /// Where `render` sends frame requests: the broker, in a renderer.
@@ -112,6 +152,12 @@ pub fn emit_file(path: &OsString, bytes: Vec<u8>) -> io::Result<()> {
 /// The granted document, once (renderer mode only).
 pub fn take_granted() -> Option<SessionDocument> {
     GRANTED.with(|granted| granted.borrow_mut().take())
+}
+
+/// Make `document` the one the next load uses (a reftest reference the
+/// broker served, TD-171).
+pub(crate) fn grant(document: SessionDocument) {
+    GRANTED.with(|granted| *granted.borrow_mut() = Some(document));
 }
 
 /// Run as a renderer. Returns the process exit status.
@@ -199,6 +245,7 @@ pub fn run() -> u8 {
         .transport_charset
         .as_deref()
         .and_then(rustic_encoding::Encoding::for_label);
+    SESSION.with(|slot| *slot.borrow_mut() = Some(Rc::clone(&session)));
     GRANTED.with(|granted| {
         *granted.borrow_mut() = Some(SessionDocument {
             session,
@@ -215,6 +262,7 @@ pub fn run() -> u8 {
     let status = crate::run_command(&mut engine, &command).unwrap_or(2);
     let output = OUTPUT.with(|output| output.borrow_mut().take().unwrap_or_default());
     FRAMES.with(|frames| frames.borrow_mut().take());
+    SESSION.with(|slot| slot.borrow_mut().take());
     for mut surface in SURFACE.with(|slot| std::mem::take(&mut *slot.borrow_mut())) {
         if fault.as_deref() == Some("forge") {
             // Claim a frame this renderer was never given.

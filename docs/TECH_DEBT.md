@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | M7 entry (before hostile remote content) | TD-157, TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-171, TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M7 browser shell and isolation (DevTools, ISO-01) | TD-176, TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
@@ -232,7 +232,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
 | TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives; bodies are complete byte strings (no `ReadableStream`, `arrayBuffer()`, `blob()`, `formData()`, `AbortSignal`), Headers iterators are snapshots, and the API base URL ignores `<base>` in the CLI | Open, M9 web APIs |
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
-| TD-171 | Deliberate | Isolation | `reftest` still runs single-process (watchdog paid 2026-11-20, Linux and Windows sandboxes 2026-11-21, macOS 2026-11-22) | Open, M7 (ISO-04) |
+| TD-171 | Deliberate | Isolation | The renderer was split but not confined, and `reftest` ran single-process | Paid 2026-11-22 (watchdog 2026-11-20, Linux and Windows sandboxes 2026-11-21, macOS and `reftest` 2026-11-22) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox had no seccomp-bpf syscall filter | Paid |
 | TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 | TD-174 | Deliberate | Isolation | macOS renderers were not confined by default | Paid 2026-11-22 (ADR 0063 Accepted, verified on native macOS x64 and ARM64; follow-ups TD-183) |
@@ -2740,6 +2740,12 @@ by default on Linux (ADR 0058 with a seccomp allowlist) and Windows
 **Partly paid 2026-11-22:** macOS confines by default too (ADR 0063,
 TD-174 paid); `reftest` remains.
 **Trigger:** before any remote browsing (the M7 gate).
+**Paid 2026-11-22:** `reftest` runs its test in a renderer like the other
+document commands. The renderer resolves each reference lexically and
+asks the broker for it, which serves only files inside the test's
+directory after symbolic links resolve (the single-process rule); the
+verdict lines match a single-process run, failures included
+(`tests/isolation.rs`).
 
 ### TD-172 — The Linux sandbox filters no system calls
 
@@ -2898,7 +2904,7 @@ have the same limit: `window.open()` returns `null`, the popup has no
 `window.opener` even when COOP keeps the group, the CLI does not show the
 popup's document, and `_self`, `_parent` and `_top` targets open nothing.
 Only `render` in a split
-run loads frames; `--single-process`, `reftest` (single-process, TD-171)
+run loads frames; `--single-process`, `reftest`
 and `render --frames` paint them white, and the dump commands and `hit-test` do not descend into
 them.
 **Pay:** with the M8 browser shell's long-lived renderers, put same-site

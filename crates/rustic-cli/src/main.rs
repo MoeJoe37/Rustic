@@ -1,6 +1,5 @@
 use std::env;
 use std::ffi::OsString;
-use std::io::{self, Write};
 use std::process::ExitCode;
 
 use rustic_base::EscapedText;
@@ -114,17 +113,15 @@ of its own (network documents, at most 4 per command); its DOM is not
 printed, and a line on standard error reports its process key and whether
 COOP or noopener severed the opener.
 
-Process isolation: document commands (all but reftest) run their page in a
+Process isolation: document commands (reftest too) run their page in a
 renderer child process that asks this process for every file, network and
 storage access. --single-process runs everything in one process.
 The renderer is confined by default on Linux (bubblewrap and a seccomp
-filter; x86-64 and aarch64) and Windows (a capability-less AppContainer):
-no files, no network, no other processes. Without a working sandbox the
+filter; x86-64 and aarch64), Windows (a capability-less AppContainer) and
+macOS (a Seatbelt profile the child applies to itself, ADR 0063): no files, no network, no other processes. Without a working sandbox the
 command fails rather than run unconfined. --no-sandbox (or
 RUSTIC_SANDBOX=0) accepts an unconfined renderer; --sandbox (or
-RUSTIC_SANDBOX=1) demands one, also where none exists (an error). On
-macOS --sandbox uses a proposed Seatbelt profile (ADR 0063) that is not
-yet verified there, so renderers are not confined by default.
+RUSTIC_SANDBOX=1) demands one, also where none exists (an error).
 --renderer-timeout SECONDS stops a renderer that runs longer (default 120).
 --download-dir DIR saves navigations that turn out to be downloads into DIR
 (sanitized names, never overwriting); without it downloads are refused.
@@ -804,11 +801,20 @@ fn reftest_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     };
     let (limits, view) = (args.limits, args.view);
     let loaded = load(engine, "reftest", limits, &args.path, |parsed, path| {
-        let test = std::fs::canonicalize(path).map_err(loader::LoadError::Io)?;
+        // A renderer has no file system: the broker resolved the test
+        // (TD-171) and its URL names the canonical file.
+        let confined = renderer::active();
+        let test = if confined {
+            renderer::document_url()
+                .and_then(|url| stylesheets::url_path(&url))
+                .ok_or(loader::LoadError::NotLocalPath)?
+        } else {
+            std::fs::canonicalize(path).map_err(loader::LoadError::Io)?
+        };
         let rendered = loader::render_list(parsed, path, limits, view)?;
         Ok((
             rendered,
-            reftest::manifest(parsed.parsed().document(), &test),
+            reftest::manifest(parsed.parsed().document(), &test, confined),
         ))
     });
     let (rendered, manifest) = match loaded {
@@ -829,9 +835,26 @@ fn reftest_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     let mut report = String::new();
     let mut all = manifest.invalid_fuzzy.is_empty() && !manifest.references.is_empty();
     for reference in &manifest.references {
-        let detail = match &reference.path {
-            Err(reason) => Err((*reason).to_owned()),
-            Ok(path) => load(
+        // A renderer asks the broker for the reference, which serves only
+        // files inside the test's directory after symbolic links resolve.
+        let brokered = match (&reference.path, manifest.confined) {
+            (Ok(path), true) => match stylesheets::file_url(path)
+                .and_then(|url| renderer::granted_local_document(&url, limits.max_file_bytes))
+            {
+                Some(Ok(document)) => {
+                    renderer::grant(document);
+                    Ok(())
+                }
+                Some(Err(rustic_style::FetchError::NotFound)) => Err("not found"),
+                Some(Err(rustic_style::FetchError::Blocked)) => Err("outside the test's directory"),
+                Some(Err(rustic_style::FetchError::TooLarge)) => Err("too large"),
+                Some(Err(_)) | None => Err("failed to render"),
+            },
+            _ => Ok(()),
+        };
+        let detail = match (reference.path.as_ref(), brokered) {
+            (Err(&reason), _) | (Ok(_), Err(reason)) => Err(reason.to_owned()),
+            (Ok(path), Ok(())) => load(
                 engine,
                 "reftest",
                 limits,
@@ -881,12 +904,7 @@ fn reftest_command(engine: &mut Engine, args: &[OsString]) -> u8 {
         ));
     }
     report.push_str(&format!("{} {shown}\n", if all { "PASS" } else { "FAIL" }));
-    let mut stdout = io::stdout().lock();
-    if stdout
-        .write_all(report.as_bytes())
-        .and_then(|()| stdout.flush())
-        .is_err()
-    {
+    if renderer::emit_stdout(report.as_bytes()).is_err() {
         return 1;
     }
     if all { 0 } else { 1 }

@@ -152,6 +152,8 @@ pub struct Manifest {
     pub references: Vec<Reference>,
     /// `<meta name=fuzzy>` values that could not be parsed.
     pub invalid_fuzzy: Vec<String>,
+    /// Read in a renderer: the broker serves (and checks) each reference.
+    pub confined: bool,
 }
 
 pub(crate) fn attribute(element: DomElement<'_>, name: &str) -> Option<String> {
@@ -179,14 +181,20 @@ fn link_relation(rel: &str) -> Option<Relation> {
 /// Read the references of `document`, a test loaded from the canonical
 /// file `test`. Each `href` resolves against the document base URL (the
 /// first `<base href>`, else the test's `file:` URL) and must name a file
-/// inside the test's directory once symbolic links resolve.
-pub fn manifest(document: &Document, test: &Path) -> Manifest {
+/// inside the test's directory once symbolic links resolve. A `confined`
+/// renderer has no file system: it checks containment lexically and the
+/// broker, which serves the reference, checks it again after symbolic
+/// links resolve (TD-171).
+pub fn manifest(document: &Document, test: &Path, confined: bool) -> Manifest {
     let document_url = file_url(test);
     let root = test.parent().map(Path::to_path_buf);
     let mut base = None;
     let mut links = Vec::new();
     let mut fuzzy = Vec::new();
-    let mut manifest = Manifest::default();
+    let mut manifest = Manifest {
+        confined,
+        ..Manifest::default()
+    };
     let Ok(walk) = document.walk(document.root()) else {
         return manifest;
     };
@@ -225,7 +233,11 @@ pub fn manifest(document: &Document, test: &Path) -> Manifest {
             .find(|(target, _)| target.as_deref() == Some(href.as_str()))
             .or_else(|| fuzzy.iter().rev().find(|(target, _)| target.is_none()))
             .map_or(Fuzzy::EXACT, |(_, value)| *value);
-        let path = resolve(&href, base.as_ref(), root.as_deref());
+        let path = if confined {
+            resolve_lexical(&href, base.as_ref(), root.as_deref())
+        } else {
+            resolve(&href, base.as_ref(), root.as_deref())
+        };
         manifest.references.push(Reference {
             relation,
             href,
@@ -243,19 +255,31 @@ pub(crate) fn resolve(
     base: Option<&Url>,
     root: Option<&Path>,
 ) -> Result<PathBuf, &'static str> {
-    let url = Url::parse(href, base).map_err(|_| "invalid URL")?;
-    let path = url_path(&url).ok_or("not a local file")?;
+    let path = resolve_lexical(href, base, root)?;
     let root = root.ok_or("test has no directory")?;
     // Lexical containment first, then again after symbolic links resolve.
-    let url_root = file_url(root).and_then(|url| url_path(&url));
-    if !url_root.is_some_and(|url_root| path.starts_with(url_root)) {
-        return Err("outside the test's directory");
-    }
     let canonical = fs::canonicalize(&path).map_err(|_| "not found")?;
     if !canonical.starts_with(root) {
         return Err("outside the test's directory");
     }
     Ok(canonical)
+}
+
+/// Resolve `href` to a file inside `root` by its path alone, before any
+/// symbolic link resolves.
+pub(crate) fn resolve_lexical(
+    href: &str,
+    base: Option<&Url>,
+    root: Option<&Path>,
+) -> Result<PathBuf, &'static str> {
+    let url = Url::parse(href, base).map_err(|_| "invalid URL")?;
+    let path = url_path(&url).ok_or("not a local file")?;
+    let root = root.ok_or("test has no directory")?;
+    let url_root = file_url(root).and_then(|url| url_path(&url));
+    if !url_root.is_some_and(|url_root| path.starts_with(url_root)) {
+        return Err("outside the test's directory");
+    }
+    Ok(path)
 }
 
 /// The verdict for one reference given the measured difference.

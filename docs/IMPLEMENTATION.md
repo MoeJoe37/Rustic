@@ -2710,6 +2710,10 @@ document command except `reftest` runs its document in a child process,
 `rustic __renderer`, over the IPC channel on the child's standard
 streams; `--single-process` keeps the old in-process path. No OS
 restrictions are applied yet (ISO-03).
+Since 2026-11-22 `reftest` runs in a renderer too (TD-171): the renderer
+resolves each reference lexically and asks the broker for it, and the
+broker serves only files inside the test's directory after symbolic links
+resolve, so verdicts match a single-process run.
 
 | Contract | Behavior | Regression evidence |
 | --- | --- | --- |

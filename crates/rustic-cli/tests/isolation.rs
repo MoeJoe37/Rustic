@@ -176,6 +176,54 @@ fn split_and_single_process_runs_agree() {
     }
 }
 
+/// TD-171: `reftest` runs in a renderer too; it asks the broker for each
+/// reference, which serves only files inside the test's directory, and
+/// its verdicts match a single-process run, failures included.
+#[test]
+fn reftest_runs_in_a_renderer_and_agrees_with_a_single_process_run() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for (test, status) in [
+        ("tests/reftests/transform-scale-origin.html", 0),
+        ("tests/fixtures/reftest/fails.html", 1),
+    ] {
+        let test = manifest.join(test).to_string_lossy().into_owned();
+        let split = rustic(&["reftest", &test], &[]);
+        let single = rustic(&["--single-process", "reftest", &test], &[]);
+        assert_eq!(split.status.code(), Some(status), "{}", text(&split.stderr));
+        assert_eq!(
+            single.status.code(),
+            Some(status),
+            "{}",
+            text(&single.stderr)
+        );
+        assert_eq!(text(&split.stdout), text(&single.stdout), "{test}");
+    }
+    // A reference that is a symbolic link out of the test's directory is
+    // refused by the broker, as it is in one process.
+    #[cfg(unix)]
+    {
+        let site = Site::new("reftest");
+        let test = site.0.join("site/test.html");
+        std::fs::write(&test, "<link rel=match href=ref.html><p>x").unwrap();
+        std::fs::write(site.0.join("outside.html"), "<p>x").unwrap();
+        std::os::unix::fs::symlink("../outside.html", site.0.join("site/ref.html")).unwrap();
+        let test = test.to_string_lossy().into_owned();
+        for args in [
+            vec!["reftest", &test],
+            vec!["--single-process", "reftest", &test],
+        ] {
+            let output = rustic(&args, &[]);
+            assert_eq!(output.status.code(), Some(1), "{args:?}");
+            assert!(
+                text(&output.stdout)
+                    .starts_with("FAIL match \"ref.html\": outside the test's directory\n"),
+                "{args:?}: {}",
+                text(&output.stdout)
+            );
+        }
+    }
+}
+
 fn png() -> Vec<u8> {
     let surface =
         rustic_raster::Surface::new(2, 2, rustic_raster::RasterLimits::default()).unwrap();

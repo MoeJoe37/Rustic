@@ -1,7 +1,7 @@
 # ADR 0058 — Linux renderer sandbox (bubblewrap)
 
 Date: 2026-11-20
-Status: Accepted 2026-11-21 (on by default with a seccomp-bpf allowlist; verified natively on Linux x86-64; aarch64 waits for a native runner, TD-12)
+Status: Accepted 2026-11-21 (on by default with a seccomp-bpf allowlist; verified natively on Linux x86-64, and on the native Linux ARM64 CI runner with bubblewrap on 2026-11-22 at `9961c1c`)
 
 ## Context
 

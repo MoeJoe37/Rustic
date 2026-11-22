@@ -1,7 +1,7 @@
 # ADR 0060 — Windows renderer sandbox and the first project `unsafe` code
 
 Date: 2026-11-21
-Status: Accepted for the M7 prototype (verified on native Windows 11 x64; ARM64 waits for a native runner, TD-12)
+Status: Accepted for the M7 prototype (verified on native Windows 11 x64, and on the native Windows x64 and ARM64 CI runners on 2026-11-22 at `9961c1c`)
 
 ## Context
 

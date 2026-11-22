@@ -19,7 +19,11 @@ shell. Browser chrome must never be controlled by page DOM or page CSS.
 The implementation starts with local fixtures and no network. A single-process
 development harness is permitted for trusted input; it is not a sandbox. Design
 service interfaces early, then introduce enforced process isolation before
-arbitrary remote content. Rust memory safety alone cannot enforce browser policy.
+arbitrary remote content. Rust memory safety alone cannot enforce browser policy. That order
+held: since M7 every document command runs its page in a confined renderer
+child and its network exchanges in a confined network process, and remote
+origins became grantable only after that (ADR 0066, 2026-11-22). The
+single-process mode remains for trusted fixtures (`--single-process`).
 
 ## 2. Component map
 
@@ -27,7 +31,7 @@ The required product scope includes GPU/Wasm, a native MV2 extension ecosystem
 and a Rustic uBlock Origin port, with comparative security/privacy and performance
 gates. See [PRODUCT.md](PRODUCT.md) and [ADR 0007](adr/0007-product-scope.md).
 
-`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-storage`, `rustic-ipc`, `rustic-sandbox`, `rustic-engine`, `rustic-cli` and the
+`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-storage`, `rustic-ipc`, `rustic-sandbox`, `rustic-engine`, `rustic-shell`, `rustic-cli` and the
 `rustic-fuzz` development tool now exist; see
 [implementation progress](IMPLEMENTATION.md) for their actual scope. The following
 is the target decomposition, not a requirement to create empty crates today.
@@ -49,21 +53,21 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
 | `rustic-wasm` | Original bounded Wasm decoder, validator, interpreter and reviewed acceleration | base; JS/Web integration through explicit adapters | M4 foundations, M5/M9 integration |
 | `rustic-bindings` | Web IDL tooling, JS/DOM wrappers, exception conversion, selector queries, tracing edges | JS, DOM, CSS parser, style matcher; generated from pinned IDL | M5 |
-| `rustic-web` | Browser APIs beyond the DOM core (fetch, storage, workers, messaging). Not created: in M5 the Window, events and timers live in `rustic-bindings` and the task pump in `rustic-engine` ([SCRIPTING.md](SCRIPTING.md)). Split this crate out when M6 adds APIs that need service interfaces | JS, bindings, DOM, service interfaces | M6 |
-| `rustic-net` | Origin allowlist, own HTTP/1.1 transport with limits, timeouts, cancellation and backpressure, TLS adapter, content codings, loopback fixture server (NET-01); navigation, redirects, MIME types, Referrer Policy (NET-02); Fetch modes, CORS, preflight cache and filtered responses (NET-03); cookie jar, sites and partitioned HTTP cache (NET-04, ADR 0054); CSP and mixed content (NET-05) | URL, base, encoding, codecs; rustls, ring, rustls-platform-verifier, brotli-decompressor (ADR 0051) | M6 |
+| `rustic-web` | Browser APIs beyond the DOM core (fetch, storage, workers, messaging). Not created: in M5 the Window, events and timers live in `rustic-bindings` and the task pump in `rustic-engine` ([SCRIPTING.md](SCRIPTING.md)). M6 kept `fetch()` and Web Storage there too, over `rustic-net` and `rustic-storage`; split this crate out when workers or messaging need service interfaces | JS, bindings, DOM, service interfaces | M6 |
+| `rustic-net` | Origin allowlist, own HTTP/1.1 transport with limits, timeouts, cancellation and backpressure, TLS adapter, content codings, loopback fixture server (NET-01); navigation, redirects, MIME types, Referrer Policy (NET-02); Fetch modes, CORS, preflight cache and filtered responses (NET-03); cookie jar, sites and partitioned HTTP cache (NET-04, ADR 0054); CSP and mixed content (NET-05); process keys, COOP/COEP and ORB (ADR 0057); exchanges through a network-process connector (ADR 0061); remote addresses limited to public ranges (ADR 0066) | URL, base, encoding, codecs; rustls, ring, rustls-platform-verifier, brotli-decompressor (ADR 0051) | M6 |
 | `rustic-storage` | Profiles (ephemeral, private, persistent with a lock), storage keys partitioned by top-level site, quotas, versioned checksummed atomic files with quarantine, Web Storage areas (NET-06); later IndexedDB and eviction | none (std only); callers supply origins and sites | M6/M9 |
 | `rustic-ipc` | Versioned bounded broker/renderer channel and protocol over standard streams, hostile-peer decoding (ISO-02, ADR 0056) | none (std only) | M7 |
-| `rustic-sandbox` | Operating-system renderer confinement: the Linux seccomp-bpf program (ADR 0058) and the Windows LPAC AppContainer launcher with its job (ADR 0060); the only crate with `unsafe`, confined to the Windows module | windows-sys (Windows only) | M7 |
+| `rustic-sandbox` | Operating-system confinement of renderer and network processes: the Linux seccomp-bpf programs (ADR 0058), the Windows LPAC AppContainer launcher with its job, including the `Rustic.Network` container (ADR 0060, 0066), and the macOS Seatbelt profiles applied with `sandbox_init` (ADR 0063); the only crate with `unsafe`, confined to the Windows launcher and the macOS `enter` module | windows-sys (Windows only) | M7 |
 | `rustic-extensions` | Rustic MV2 package/identity, isolated worlds, APIs, lifecycle and permissions | JS/web, broker/service interfaces; no ambient page authority | M5/M6 prototypes, M8/M9 delivery |
 | `rustic-filter` | Bounded reference/optimized filtering, list snapshots and broker policy hooks | URL/base, controlled DOM/CSS interfaces | M6–M9 |
-| `rustic-ipc` | Versioned messages, validation, resource handles, bounded transport | base, selected serialization adapter | M7 |
 | `rustic-platform` | Windows/events, font discovery, graphics surfaces, OS adapters | base, platform libraries | M8 |
 | Future Android/iOS adapters | Native surfaces, lifecycle, touch/IME, accessibility and OS service/process bridges | engine/platform contracts; JNI/NDK or Apple SDK only at the boundary | Prototype with M3; host integration M8 |
 | `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
 | `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime, Web IDL bindings and future service interfaces | M0 onward |
-| `rustic-cli` / future `rustic-shell` | Headless test host (broker plus a `__renderer` child per document command since M7, ADR 0056) / desktop browser chrome | engine API, platform | M0 / M8 |
+| `rustic-cli` | Development host: the broker, a `__renderer` child per document (ADR 0056) and a `__network` child (ADR 0061), the trusted address/permission strip | engine API, sandbox, shell | M0 onward |
+| `rustic-shell` | Desktop window and event loop with CPU surface presentation (UI-02, ADR 0065); later the full browser chrome (UI-01) | winit, softbuffer | M8 (started early) |
 | `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
 
 Dependencies form a DAG. Keep the pure tokenizer, selector parser, and JavaScript

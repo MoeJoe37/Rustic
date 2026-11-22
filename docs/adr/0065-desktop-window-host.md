@@ -1,7 +1,7 @@
 # ADR 0065 — Desktop window host (winit and softbuffer)
 
 Date: 2026-11-21
-Status: Accepted (maintainer decision 2026-11-21: winit + softbuffer); verified on Linux x86-64 under Wayland and X11 (XWayland); Windows and macOS untested until native runners return (TD-12)
+Status: Accepted (maintainer decision 2026-11-21: winit + softbuffer); verified on Linux x86-64 under Wayland and X11 (XWayland); on the native Windows and macOS CI runners (2026-11-22) the `view` test opens a window and presents frames; interactive use there is untested (TD-182)
 
 ## Context
 

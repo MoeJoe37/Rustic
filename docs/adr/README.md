@@ -52,7 +52,7 @@ instead of rewriting the history of a decision.
 | [0042](0042-scripted-render-state.md) | Style, layout and frame validity in scripted documents | Accepted for WEB-06 |
 | [0043](0043-encoding-standard.md) | Original Encoding Standard decoders and encoders over pinned, generated indexes | Accepted for `url.encoding` (M6 entry) |
 | [0044](0044-local-html-encoding-replay.md) | Bounded local HTML encoding replay before author script | Accepted for WEB-05 |
-| [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted design for WEB-06; implementation pending |
+| [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted design for WEB-06; initial read-only slice implemented, gate pending |
 | [0046](0046-parse-budget-degradation.md) | Parse budgets degrade: Chromium's depth cap and truncation at the node budget | Accepted for TD-02 (M6 entry) |
 | [0047](0047-mutation-observers.md) | Mutation observers over a document journal, with registrations held as node edges | Accepted for WEB-07 (`dom.observers`) |
 | [0048](0048-error-reporting-and-event-handlers.md) | Error reporting, rejection events, event handler attributes and a bounded console sink | Accepted for WEB-07 |
@@ -70,8 +70,8 @@ instead of rewriting the history of a decision.
 | [0060](0060-windows-renderer-sandbox.md) | Windows renderer in a capability-less LPAC AppContainer and a kill-on-close job; `rustic-sandbox` holds the first project `unsafe` | Accepted |
 | [0061](0061-network-process.md) | Exchanges (sockets, TLS, HTTP framing, content codings) run in a `rustic __network` child; the broker keeps every decision and revalidates replies under credit-based flow control | Accepted |
 | [0062](0062-out-of-process-frames.md) | Every `iframe` document renders in a renderer of its own with its own grant; the embedder sends black-painted pixels and per-frame coverage, and the broker composites the frame it never showed the embedder | Accepted |
-| [0063](0063-macos-renderer-sandbox.md) | macOS renderers under a deny-by-default Seatbelt profile through `sandbox-exec`, opt-in with `--sandbox` until verified on native Macs | Proposed |
-| [0064](0064-scrolling-and-compositor-scenes.md) | Scroll positions are applied to a finished layout along the containing-block chain (fixed stays, sticky re-solves, clips follow); scenes of cached layers and script scrolling build on them | Accepted (step 1) |
+| [0063](0063-macos-renderer-sandbox.md) | macOS renderers under a deny-by-default Seatbelt profile that each child applies to itself with `sandbox_init`; on by default since its native verification on macOS x64 and ARM64 | Accepted 2026-11-22 |
+| [0064](0064-scrolling-and-compositor-scenes.md) | Scroll positions are applied to a finished layout along the containing-block chain (fixed stays, sticky re-solves, clips follow); scenes of cached layers and script scrolling build on them | Accepted (all four steps) |
 | [0065](0065-desktop-window-host.md) | Desktop window host: winit 0.30 and softbuffer 0.4 in `rustic-shell`, minimal features; `rustic view` renders each frame in a sandboxed renderer | Accepted |
 | [0066](0066-remote-addresses-and-windows-network-container.md) | Remote origins resolve through the system resolver in the broker and reach only public addresses (no DNS rebinding to loopback or private networks); the Windows network process runs in a `Rustic.Network` LPAC with internetClient | Accepted |
 
@@ -92,7 +92,8 @@ instead of rewriting the history of a decision.
 | Scripted rendering (M5, WEB-06) | 0023, 0042, 0045 |
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
-| Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061 |
+| Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
+| Compositor and desktop host (M8, started early) | 0064, 0065 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -104,14 +105,12 @@ authority boundary or `unsafe` code.
 
 | Decision | Needed before | Why it needs a record |
 | --- | --- | --- |
-| Acceptance of the TLS part of [0051](0051-transport-and-tls.md) (proposed) | TLS adapter (NET-01, M6) | First network dependency and first native/crypto boundary |
-| Profile and storage format, partition keys and schema versions | NET-06 (M6) | Persistent on-disk compatibility promise |
-| IPC format and broker capabilities | ISO-02 (M7) | Process authority |
-| Sandbox mechanism per OS: Windows, macOS, Linux, Android, iOS | ISO-03/04/08 (M7) | Platform security boundary; ADR 0004 only fixes the order |
+| Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
+| Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed) | ISO-08/MOB-07 implementation | Platform security boundary verified only on a device, emulator or simulator |
 | GPU abstraction and backends (Direct3D 12, Metal, Vulkan, GL ES) | UI-05 (M8) | Major platform dependency and `unsafe`/FFI surface |
-| Windowing, input and accessibility bridges per platform | UI-02/03 (M8) | Platform dependencies on five OS families |
+| Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8) | Platform dependencies on five OS families |
 | WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
-| Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | First `unsafe` in project code |
+| Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | New `unsafe` outside `rustic-sandbox` |
 
 For a new record, use the next four-digit ID and include date, status, context,
 decision, alternatives considered, consequences, validation and revisit trigger.

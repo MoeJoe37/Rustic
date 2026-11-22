@@ -58,7 +58,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | --- | --- | --- |
 | M7 entry (before hostile remote content) | TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
 | M7 browser shell and isolation (DevTools, ISO-01) | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
-| When hosted CI returns | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12 is a hard prerequisite of M7 |
+| With hosted CI (it ran green on 2026-11-22, then stopped again on a billing limit) | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its mobile runs are an M7 gate (`security.mobile`) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
@@ -67,9 +67,12 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
-scope limits, but the short ones before them: TD-12 (no native Windows, macOS or ARM64 test evidence since
-2026-11-08) and TD-111 (a regular expression can run for exponential time
-until the step budget stops it).
+scope limits, but the short ones before them: the "M7 entry" row, whose
+entries were meant to be paid before hostile remote content and are still
+open now that remote origins can be granted (ADR 0066, 2026-11-22), notably
+TD-111 (a regular expression can run for exponential time until the step
+budget stops it); and TD-12 (no Android or iOS test runs, and hosted jobs
+stopped again after one green native run on 2026-11-22).
 
 ## Ledger
 
@@ -89,7 +92,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
 | TD-10 | Deliberate | HTML parser | Processing-instruction tree construction, scripting-on trees and `selectedcontent` are covered. | Paid |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, `url.blob` (M9) |
-| TD-12 | Deliberate | CI / platforms | Native x64/ARM64 CI runs again (2026-11-22); mobile is check-only and two cross-checks skip the crates that use ring | Open |
+| TD-12 | Deliberate | CI / platforms | Native x64/ARM64 CI ran green on 2026-11-22 (jobs stopped again later that day on a billing limit); mobile is check-only and two cross-checks skip the crates that use ring | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, M7 browser shell (DevTools) |
@@ -388,7 +391,7 @@ past 2,000 bytes / 1,000 code points fail to bound quadratic work. The pinned
 WPT `urltestdata.json` subset now includes all non-ASCII records (887 of 899;
 only blob cases are excluded).
 
-### TD-12 — Mobile is check-only; platform CI currently cannot run
+### TD-12 — Mobile is check-only; hosted CI is intermittent
 
 `ci.yml` now tests natively on Linux, Windows and macOS for both x64 and
 ARM64, and under emulation for armv7, i686 and riscv64 (32-bit pointers and a
@@ -410,7 +413,11 @@ is checked on a Windows runner); `aarch64-pc-windows-gnullvm` and
 `loongarch64-unknown-linux-gnu` have no packaged C cross compiler, so there
 the crates that use ring (`rustic-net`, `rustic-engine`, `rustic-bindings`,
 `rustic-cli`, `rustic-fuzz`) are left out of the check. What remains:
-those two partial checks, and Android/iOS test runs.
+those two partial checks, and Android/iOS test runs. The full matrix passed
+on `feature` at `9961c1c` (run 45003031562). Later on 2026-11-22 GitHub
+stopped starting jobs on the new account too ("recent account payments have
+failed or your spending limit needs to be increased"), so later commits wait
+for the next hosted run.
 
 ### TD-13 — Long spec state-machine functions
 
@@ -2033,6 +2040,12 @@ it to the job summary) before any ARM64 performance claim, at the latest with
 the first cross-engine report of PERF-01.
 
 **Rescheduled 2026-11-19 (M5 completion review):** M5 closed without native ARM64 hardware; the first PERF-01 report is x86-64 only. Moved to the M8 row, where reference devices are chosen.
+
+**Note 2026-11-22:** the first green hosted run on `moejoe873/Rustic` (run
+45003031562, `feature` at `9961c1c`) printed a native Linux ARM64 record in
+the `Test (Linux ARM64)` job summary. Committing that record to
+[JS.md](JS.md) with its exact runner, CPU and toolchain is the first step of
+paying this entry.
 
 ### TD-126 — Initial DOM prototype and construction coverage
 

@@ -40,7 +40,9 @@ static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
 static SANDBOX: AtomicBool = AtomicBool::new(false);
 
 /// Whether renderers (and the network process) are confined in this run.
-/// (Windows does not confine the network process yet, TD-176.)
+/// (Windows does not confine the network process yet, TD-176: an
+/// AppContainer cannot connect to loopback, the only addresses the CLI
+/// grants.)
 #[cfg(not(windows))]
 pub(crate) fn sandboxed() -> bool {
     SANDBOX.load(Ordering::Relaxed)
@@ -66,6 +68,7 @@ const SANDBOX_ENV: &[&str] = &[
     "RUSTIC_TEST_ESCAPE_DIR",
     "RUSTIC_TEST_NETWORK_PROCESS",
     "RUSTIC_TEST_ESCAPE_ABSTRACT",
+    "RUSTIC_TEST_ESCAPE_UNIX",
     "RUSTIC_TEST_FAULT_URL",
     "RUSTIC_TEST_FAULT",
 ];
@@ -514,7 +517,7 @@ type Spawned = (
 
 /// The sandbox environment: only the allowed variables (test hooks and
 /// backtraces; nothing that names a user, a home or a display).
-fn sandbox_env() -> Vec<(OsString, OsString)> {
+pub(crate) fn sandbox_env() -> Vec<(OsString, OsString)> {
     SANDBOX_ENV
         .iter()
         .filter_map(|name| std::env::var_os(name).map(|value| (OsString::from(name), value)))

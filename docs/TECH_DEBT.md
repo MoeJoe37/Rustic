@@ -237,7 +237,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-173 | Deliberate | Permissions | No trusted permission prompts, address display or clipboard (no browser UI yet); downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
 | TD-174 | Deliberate | Isolation | macOS renderers are not confined by default: the Seatbelt sandbox of ADR 0063 (Proposed, 2026-11-21) runs only with `--sandbox` and has not been verified on a Mac | Open, M7 (ISO-04, native macOS runs) |
 | TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
-| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined only on Linux (bubblewrap with the network kept, Internet-socket seccomp filter, 2026-11-21); on Windows and macOS it runs with the user's rights | Open, M7 (ISO-04) |
+| TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) is OS-confined by default only on Linux (bubblewrap with the network kept, Internet-socket seccomp filter, 2026-11-21); macOS has a Seatbelt profile under `--sandbox` (2026-11-22, default with TD-174); on Windows it runs with the user's rights, because an AppContainer cannot reach the loopback addresses the CLI grants | Open, M7 (ISO-04), Windows with TD-157 |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
@@ -2818,6 +2818,20 @@ abstract Unix socket: allowed unconfined, denied confined). Windows
 (an AppContainer with only the client network capability, in the
 `unsafe` launcher of ADR 0060) and macOS (with TD-174) remain; both need
 native runs.
+**Update 2026-11-22 (macOS written):** `seatbelt::network_profile`
+confines the macOS network process under `--sandbox` (outbound IP
+connections and the certificate trust daemons only), checked by
+`the_seatbelt_network_process_reaches_only_internet_sockets` on the
+native macOS runners; it becomes the default with the renderer profile
+(TD-174). **Windows finding:** an AppContainer (LPAC or not) cannot
+connect to loopback without a machine-wide exemption that needs an
+administrator (`CheckNetIsolation LoopbackExempt`), and the CLI grants
+loopback addresses only (NET-02, no DNS), so a confined Windows network
+process could not reach anything Rustic loads today. Windows is
+therefore paid together with remote addresses (TD-157): then an LPAC
+with `internetClient` (and `privateNetworkClientServer` for LAN
+grants) serves remote exchanges, while loopback grants need a design
+of their own.
 
 ### TD-177 — Frame compositing is linear and untransformed
 

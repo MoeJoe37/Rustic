@@ -1,4 +1,4 @@
-//! The macOS renderer sandbox profile (ADR 0063, **Proposed**: written and
+//! The macOS renderer and network process sandbox profiles (ADR 0063, **Proposed**: written and
 //! unit-tested on Linux, not yet verified on a Mac).
 //!
 //! macOS confines a process with a Seatbelt profile in the Sandbox Profile
@@ -85,22 +85,52 @@ fn literal(path: &str) -> String {
     quoted
 }
 
+/// Mach services the network process may look up: the certificate trust
+/// daemons, so the platform verifier (`rustls-platform-verifier`, which
+/// calls `SecTrustEvaluateWithError`) can evaluate a chain. Evaluation
+/// runs inside `trustd`, so no keychain file is opened here.
+const TRUST_SERVICES: &[&str] = &[
+    "com.apple.trustd",
+    "com.apple.trustd.agent",
+    "com.apple.SecurityServer",
+    "com.apple.ocspd",
+];
+
 /// The renderer profile for the renderer binary at `exe`, which must be
 /// the canonical path (Seatbelt matches resolved paths, and `/var` is a
 /// link to `/private/var`).
 pub fn renderer_profile(exe: &Path) -> Result<String, ProfileError> {
+    base_profile(exe, "Rustic renderer (ADR 0063)")
+}
+
+/// The network process profile (ADR 0061, TD-176) for the binary at
+/// `exe` (canonical, as for [`renderer_profile`]): the renderer profile
+/// plus outbound connections to IP addresses (TCP and UDP; Unix-domain
+/// sockets stay denied) and the trust daemons of [`TRUST_SERVICES`]. No
+/// file beyond the renderer's is readable and nothing is writable.
+pub fn network_profile(exe: &Path) -> Result<String, ProfileError> {
+    let mut profile = base_profile(exe, "Rustic network process (ADR 0061, ADR 0063)")?;
+    profile.push_str("(allow network-outbound (remote ip \"*:*\"))\n(allow mach-lookup\n");
+    for service in TRUST_SERVICES {
+        let _ = writeln!(profile, "    (global-name {})", literal(service));
+    }
+    profile.push_str(")\n");
+    Ok(profile)
+}
+
+fn base_profile(exe: &Path, title: &str) -> Result<String, ProfileError> {
     let exe = exe.to_str().ok_or(ProfileError::UnsafePath)?;
     if !exe.starts_with('/') || exe.chars().any(char::is_control) {
         return Err(ProfileError::UnsafePath);
     }
     let exe = literal(exe);
-    let mut profile = String::from(
+    let mut profile = format!(
         "(version 1)\n\
-         ; Rustic renderer (ADR 0063). Everything not allowed below is denied.\n\
-         (deny default)\n",
+         ; {title}. Everything not allowed below is denied.\n\
+         (deny default)\n"
     );
-    // `sandbox-exec` executes the renderer under this profile; nothing
-    // else may be executed, and the renderer may not fork.
+    // `sandbox-exec` executes the process under this profile; nothing
+    // else may be executed, and the process may not fork.
     let _ = writeln!(profile, "(allow process-exec (literal {exe}))");
     let _ = writeln!(profile, "(allow file-read* (literal {exe}))");
     profile.push_str("(allow file-read*\n");
@@ -162,5 +192,43 @@ mod tests {
                 "{bad:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_network_profile_adds_only_ip_connections_and_trust_services() {
+        let exe = Path::new("/Applications/Rustic.app/rustic");
+        let renderer = renderer_profile(exe).unwrap();
+        let network = network_profile(exe).unwrap();
+        let added = network
+            .lines()
+            .filter(|line| !renderer.lines().any(|kept| kept == *line))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            added.contains("(allow network-outbound (remote ip \"*:*\"))"),
+            "{added}"
+        );
+        assert!(
+            added.contains("(global-name \"com.apple.trustd\")"),
+            "{added}"
+        );
+        // No Unix sockets, inbound connections, writes, forks or files.
+        for forbidden in [
+            "unix-socket",
+            "network-inbound",
+            "network-bind",
+            "file-write",
+            "file-read",
+            "process-fork",
+            "/Users",
+        ] {
+            assert!(!added.contains(forbidden), "{forbidden} in\n{added}");
+        }
+        assert!(network.contains("(deny default)"));
+        assert_eq!(network.matches('(').count(), network.matches(')').count());
+        assert_eq!(
+            network_profile(Path::new("rel")),
+            Err(ProfileError::UnsafePath)
+        );
     }
 }

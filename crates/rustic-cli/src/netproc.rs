@@ -236,16 +236,46 @@ fn spawn_plain(exe: &std::path::Path) -> io::Result<Pipes> {
     Ok((child, Box::new(stdout), Box::new(stdin), Box::new(stderr)))
 }
 
+/// macOS: the child under `sandbox-exec` with the Seatbelt network
+/// profile (ADR 0063, `rustic_sandbox::seatbelt::network_profile`), a
+/// cleared environment and `/` as its working directory.
+#[cfg(not(windows))]
+fn spawn_seatbelt(exe: &std::path::Path) -> io::Result<Pipes> {
+    let exe = std::fs::canonicalize(exe)?;
+    let profile = rustic_sandbox::seatbelt::network_profile(&exe)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+    let mut child = Command::new("/usr/bin/sandbox-exec")
+        .arg("-p")
+        .arg(profile)
+        .arg(&exe)
+        .arg(NETWORK_COMMAND)
+        .env_clear()
+        .envs(crate::broker::sandbox_env())
+        .current_dir("/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdin = child.stdin.take().expect("piped");
+    let stdout = child.stdout.take().expect("piped");
+    let stderr = child.stderr.take().expect("piped");
+    Ok((child, Box::new(stdout), Box::new(stdin), Box::new(stderr)))
+}
+
 impl Link {
     fn start(ca_pem: Option<Vec<u8>>) -> io::Result<Arc<Self>> {
         let exe = std::env::current_exe()?;
-        // Under the sandbox the Linux network process is confined like a
-        // renderer, but keeps the network (TD-176); a setup failure is an
-        // error, never an unconfined start. Windows and macOS start it
-        // unconfined for now (TD-176, TD-174).
+        // Under the sandbox the network process is confined like a
+        // renderer, but keeps Internet sockets (TD-176): bubblewrap and a
+        // seccomp filter on Linux, the Seatbelt network profile on macOS.
+        // A setup failure is an error, never an unconfined start. Windows
+        // starts it unconfined for now (TD-176).
         #[cfg(not(windows))]
         let (child, stdout, stdin, stderr, filter) =
-            if crate::broker::sandboxed() && cfg!(target_os = "linux") {
+            if crate::broker::sandboxed() && cfg!(target_os = "macos") {
+                let (child, stdout, stdin, stderr) = spawn_seatbelt(&exe)?;
+                (child, stdout, stdin, stderr, None)
+            } else if crate::broker::sandboxed() && cfg!(target_os = "linux") {
                 let (child, filter, stdout, stdin, stderr) =
                     crate::broker::spawn_bubblewrap(&exe, NETWORK_COMMAND, true)?;
                 let stderr: Box<dyn Read + Send> = Box::new(stderr);
@@ -764,6 +794,12 @@ fn escape_probes() {
             .and_then(|address| std::os::unix::net::UnixStream::connect_addr(&address))
             .is_ok();
         report("connect-abstract-socket", reached);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let reached =
+            std::os::unix::net::UnixStream::connect(var("RUSTIC_TEST_ESCAPE_UNIX")).is_ok();
+        report("connect-unix-socket", reached);
     }
 }
 

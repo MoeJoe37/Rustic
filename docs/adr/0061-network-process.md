@@ -56,7 +56,8 @@ service and Gecko's socket process make the same split.
    `AF_INET` and `AF_INET6`. Unix-domain sockets are refused because a
    shared network namespace exposes abstract sockets (X11, D-Bus,
    container runtimes). Setup failure is an error, as for renderers.
-   Windows and macOS start it unconfined for now (TD-176).
+   macOS uses the Seatbelt network profile of ADR 0063 under
+   `--sandbox`; Windows starts it unconfined for now (TD-176).
 
 ## Consequences
 

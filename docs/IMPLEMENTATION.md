@@ -2636,8 +2636,11 @@ In a split run every exchange the broker's policy grants runs in a
 decoding. The broker keeps grants, CSP, mixed content, CORS, cookies,
 the HTTP cache and ORB. `--single-process` keeps exchanges in process.
 Under the sandbox on Linux the child runs in bubblewrap with only the
-network namespace shared and an Internet-socket seccomp filter; Windows
-and macOS start it unconfined (TD-176).
+network namespace shared and an Internet-socket seccomp filter; on macOS
+`--sandbox` starts it under the Seatbelt network profile of ADR 0063
+(outbound IP connections and the trust daemons only,
+`the_seatbelt_network_process_reaches_only_internet_sockets`); Windows
+starts it unconfined (TD-176).
 
 | Contract | Behavior | Regression evidence |
 | --- | --- | --- |

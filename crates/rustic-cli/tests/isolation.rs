@@ -570,3 +570,63 @@ fn the_sandboxed_network_process_reaches_only_internet_sockets() {
     }
     drop(listener);
 }
+
+/// TD-176 on macOS (ADR 0063, Proposed): under `--sandbox` the network
+/// process's Seatbelt profile keeps loopback TCP (its job) but denies
+/// reading files, listing directories, starting programs and connecting
+/// to a Unix-domain socket.
+#[cfg(target_os = "macos")]
+#[test]
+fn the_seatbelt_network_process_reaches_only_internet_sockets() {
+    if !proposed_sandbox_available() {
+        return;
+    }
+    let site = Site::new("network-seatbelt");
+    let server = script_site();
+    let grant = format!("http://a.test={}", server.address());
+    // Unix socket paths are short (104 bytes); /tmp keeps it within that.
+    let socket = std::path::PathBuf::from(format!(
+        "/tmp/rustic-net-escape-{}.sock",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_file(&socket);
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let outside = site.0.join("outside.txt").to_string_lossy().into_owned();
+    let home = site.0.to_string_lossy().into_owned();
+    let probe = |mode: &str| {
+        let output = Command::new(env!("CARGO_BIN_EXE_rustic"))
+            .args([mode, "dump-dom", "--allow-origin", &grant, "http://a.test/"])
+            .env_remove("RUSTIC_SANDBOX")
+            .env("RUSTIC_TEST_NETWORK_PROCESS", "escape")
+            .env("RUSTIC_TEST_ESCAPE_FILE", &outside)
+            .env("RUSTIC_TEST_ESCAPE_DIR", &home)
+            .env("RUSTIC_TEST_ESCAPE_UNIX", &socket)
+            .output()
+            .expect("run rustic");
+        assert!(output.status.success(), "{}", text(&output.stderr));
+        assert!(text(&output.stdout).contains("local=\"script\""));
+        text(&output.stderr)
+    };
+    let probes = [
+        "read-user-file",
+        "list-home",
+        "spawn-shell",
+        "connect-unix-socket",
+    ];
+    let open = probe("--no-sandbox");
+    for name in probes {
+        assert!(
+            open.contains(&format!("network-escape {name}: allowed")),
+            "{open}"
+        );
+    }
+    let confined = probe("--sandbox");
+    for name in probes {
+        assert!(
+            confined.contains(&format!("network-escape {name}: denied")),
+            "{confined}"
+        );
+    }
+    drop(listener);
+    let _ = std::fs::remove_file(&socket);
+}

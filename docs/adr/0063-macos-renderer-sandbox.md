@@ -52,10 +52,18 @@ from a build directory.
    loopback, start a shell) works unconfined and fails under
    `--sandbox`, and that a real document still renders. Then
    `SANDBOX_AVAILABLE` includes macOS and this ADR becomes Accepted.
-4. **The network process** stays unconfined on macOS (TD-176): it needs
-   outbound sockets, the trust store and the `trustd` Mach service for
-   the platform certificate verifier, which is a separate profile to
-   verify.
+4. **The network process** (ADR 0061, TD-176) gets its own profile,
+   `seatbelt::network_profile` (added 2026-11-22): the renderer profile
+   plus `network-outbound` to IP addresses (Unix-domain sockets stay
+   denied) and Mach lookups of the trust daemons (`com.apple.trustd`,
+   `com.apple.trustd.agent`, `com.apple.SecurityServer`,
+   `com.apple.ocspd`), which evaluate certificate chains out of process
+   for the platform verifier, so no keychain file is opened. It is
+   started the same way under `--sandbox` and verified by
+   `the_seatbelt_network_process_reaches_only_internet_sockets`
+   (read a file, list a directory, start a shell, connect to a Unix
+   socket: allowed unconfined, denied confined) on the native macOS
+   runners.
 
 ## Consequences
 

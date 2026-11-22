@@ -14,8 +14,13 @@ benchmark-checksum and heap-size gates, scripted-document tests on a manual
 clock (turn order, timers, input, frames, wrapper identity and DOM/JS cycle
 collection), CLI snapshot and reftests, and 29 deterministic fuzz targets. The
 [evidence table](README.md#evidence-at-a-glance) lists the counts and each
-subsystem document records its revision. Browser-hosted WPT, integration
-servers, sanitizers and cross-engine benchmark runs are planned; add each
+subsystem document records its revision. The pinned Window WPT selection runs
+through upstream `testharness.js`, network tests run against the loopback
+fixture server ([ADR 0053](adr/0053-loopback-fixture-server.md)), the CLI
+isolation suites drive compromised renderers and network processes against
+the sandboxes, and the first cross-engine JavaScript report exists
+([PERF-01](reviews/2026-11-19-perf-01-m5.md)). Browser-hosted WPT, a
+sanitizer job in CI and page-level cross-engine runs are planned; add each
 harness with the subsystem it tests.
 
 Test262 is not vendored, so its gates are `#[ignore]` tests that need a pinned

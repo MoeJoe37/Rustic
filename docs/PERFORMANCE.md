@@ -1,7 +1,11 @@
 # Performance and measurement plan
 
-There are no comparative engine performance results yet. The first internal
-measurement is the `frame_budget` raster example (a one-box repaint took 3.5 ms
+The only comparative results so far are the
+[first cross-engine JavaScript report](reviews/2026-11-19-perf-01-m5.md)
+(PERF-01, M5 slice: the JS-09 corpus against V8, SpiderMonkey and
+JavaScriptCore shells on x86-64), which records ratios without targets; there
+are no page-load, rendering or memory comparisons yet. The first internal
+rendering measurement is the `frame_budget` raster example (a one-box repaint took 3.5 ms
 at scale 1 and 11 ms at scale 2 in the sandbox, [PAINT.md](PAINT.md)); it is a
 sanity check, not a controlled benchmark. Budgets below are initial engineering
 targets to calibrate; they are not user-facing promises or measurements.

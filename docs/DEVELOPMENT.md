@@ -96,7 +96,7 @@ names/UTF-16 values including lone surrogates. Its diagnostic format is not HTML
 serialization or a stable external protocol. See [AGENTS.md](../AGENTS.md) for
 repository-level coding and validation rules.
 
-## Initial GitHub Actions
+## GitHub Actions
 
 [ci.yml](../.github/workflows/ci.yml) runs on pushes to any branch, pull requests,
 and manual dispatch. Build/test jobs use read-only contents permission, finite job timeouts,
@@ -109,11 +109,12 @@ to refresh generated README assets and dispatch CI for its bot commit.
 | Job | Environment | Checks |
 | --- | --- | --- |
 | `Quality` | Ubuntu 24.04, pinned toolchain | rustfmt, Clippy with denied warnings, rustdoc with denied warnings |
-| `Test (platform)` | Linux x64/ARM64 (Ubuntu 24.04), Windows x64 (2022)/ARM64 (11), macOS ARM64/x64 (15); pinned toolchain | Workspace all-target tests, doctests, CLI info smoke run; JS-09 benchmark results in the Linux ARM64 job summary |
-| `Emulated test (target)` | Ubuntu 24.04 with cross linkers and QEMU user mode | All-target tests and CLI smoke run for 32-bit ARM, 32-bit x86, RISC-V 64 and big-endian s390x |
-| `Cross-check (target)` | Ubuntu 24.04 | `cargo check --all-targets` for ARMv6, musl ARM64/x64, Windows ARM64 (gnullvm) and 32-bit, POWER, LoongArch and FreeBSD |
+| `Test (platform)` | Linux x64/ARM64 (Ubuntu 24.04), Windows x64 (2022)/ARM64 (11), macOS ARM64/x64 (15); pinned toolchain | Workspace all-target tests with the default renderer sandbox (bubblewrap is installed on Linux; Seatbelt denials are printed on macOS failures), doctests, CLI info smoke run; the pinned Window WPT selection on Linux; JS-09 benchmark results in the Linux ARM64 job summary |
+| `Emulated test (target)` | Ubuntu 24.04 with cross linkers and QEMU user mode | All-target tests and CLI smoke run for 32-bit ARM, 32-bit x86, RISC-V 64 and big-endian s390x (renderers run unsandboxed, since bubblewrap would start the host's emulator); 100-minute limit |
+| `Cross-check (target)` | Ubuntu 24.04 | `cargo check --all-targets` for ARMv6, musl ARM64/x64, Windows ARM64 (gnullvm), 32-bit Windows (on a Windows runner), POWER, LoongArch and FreeBSD, with a C cross compiler per target for `ring`; gnullvm and LoongArch leave out the crates that use `ring` (TD-12) |
+| `Parser fuzz smoke` | Ubuntu 24.04 | Replays the saved seeds and runs 20,000 fixed-seed mutations of every fuzz target; reproducers are kept as an artifact on failure |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |
-| `Mobile core (target)` | Ubuntu for Android ARM64/ARMv7/x86-64/x86; macOS for iOS ARM64 device/simulator and x86-64 simulator | Check all workspace libraries with pinned Rust; no application linking or device execution |
+| `Mobile core (target)` | Ubuntu for Android ARM64/ARMv7/x86-64/x86; macOS for iOS ARM64 device/simulator and x86-64 simulator | Check all workspace libraries with pinned Rust (Android C dependencies built with the runner's NDK); no application linking or device execution |
 | `Repository checks` | Ubuntu 24.04, Python 3.11+ | Local Markdown file links, whitespace, TOML/JSON parse, manifest/toolchain consistency |
 | `CI` | Aggregate gate | Fails if any prerequisite fails, is cancelled, or is unexpectedly skipped |
 | `Publish progress` | Successful default-branch CI only | Regenerates README/chart; safely pushes changed outputs and dispatches bot-commit validation |
@@ -186,10 +187,11 @@ gates. Mobile metadata checks are included in the aggregate `CI` job, while
 NDK/Xcode linking, packaging and device testing are staged with actual adapters.
 
 Parser corpora (M1), pinned CSS/flexbox WPT selections and reftests (M2/M3),
-fuzz smoke and nightly campaigns, and dependency auditing now exist. Next: the
-Test262 runtime runner and the JS benchmark/heap report (M4, JS-07/JS-09),
-integrated WPT with the host adapter (M5/M8), and sanitizer/native checks when
-their surface exists. Keep action references pinned and permissions narrow in every workflow.
+fuzz smoke and nightly campaigns, dependency auditing, the JS-09 benchmark
+record and the pinned Window WPT selection now exist. Not yet in CI: the
+Test262 gates (manual, TD-145), a sanitizer job (the M7 AddressSanitizer run
+was by hand, see the [security review](reviews/2026-11-20-m7-security-review.md)),
+browser-hosted WPT through the M8 host adapter, and Android/iOS execution. Keep action references pinned and permissions narrow in every workflow.
 
 Release packaging/signing/publishing requires a separate reviewed workflow once
 there is an actual release contract. Do not grant CI write permission or store

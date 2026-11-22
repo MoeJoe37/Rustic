@@ -2773,7 +2773,7 @@ platform.
 
 **Partly paid 2026-11-21:** ADR 0063 (Proposed) adds a deny-by-default
 Seatbelt profile (`rustic_sandbox::seatbelt`) started through
-`sandbox-exec` when `--sandbox` is given; it is unit-tested and
+`sandbox_init` (applied by the renderer itself) when `--sandbox` is given; it is unit-tested and
 type-checked for both macOS targets on Linux, and the escape-probe test
 has a macOS branch. What remains: run that test on native macOS x64 and
 ARM64, adjust the profile if a system path is missing, then make it the

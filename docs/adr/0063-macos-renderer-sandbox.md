@@ -21,15 +21,20 @@ from a build directory.
 
 ## Decision
 
-1. **Seatbelt through `sandbox-exec`.** The broker starts each renderer as
-   `/usr/bin/sandbox-exec -p PROFILE EXE __renderer` with a cleared
-   environment (the same allowed test variables as other platforms) and
-   `/` as its directory. `sandbox-exec` applies the profile and then
-   executes the renderer, which inherits it permanently. This keeps the
-   project's no-`unsafe` rule outside `rustic-sandbox`'s Windows module:
-   calling `sandbox_init` would need FFI. `sandbox-exec` is marked
-   deprecated in its manual page but ships with every macOS release
-   Rustic targets, and it takes the same profile language.
+1. **Seatbelt through `sandbox_init`, applied by the child itself.** The
+   broker starts each renderer with a cleared environment (the same
+   allowed test variables as other platforms), `/` as its directory and
+   `RUSTIC_SEATBELT=renderer`. First thing in `main`, before reading
+   anything from the broker, the child applies the profile to itself
+   with `sandbox_init` (`rustic_sandbox::enter`, a small audited `unsafe`
+   FFI module like the Windows launcher); a failure ends it before the
+   IPC handshake, which the broker reports as a sandbox failure. The
+   first version started the renderer under `/usr/bin/sandbox-exec`
+   (no `unsafe`), but then dyld ran confined, and on the first native
+   macOS 15 runs (2026-11-22) it aborted in libignition while locating
+   the OS cryptex that holds the shared cache. Applying the profile
+   after start-up is also what Chromium's macOS sandbox does: the
+   libraries are mapped, and no untrusted input has been read yet.
 2. **Deny by default** (`rustic_sandbox::seatbelt::renderer_profile`).
    Allowed: executing the renderer binary (and nothing else, no fork);
    reading that binary, dyld, `/usr/lib`, the system frameworks and the
@@ -51,7 +56,7 @@ from a build directory.
    fails the command, as everywhere ("fail closed"). The default stays
    unconfined on macOS until a native run passes
    `the_sandbox_denies_files_network_and_processes_or_fails_closed`, which
-   now checks, on a Mac with `sandbox-exec`, that every escape probe
+   now checks, on a Mac, that every escape probe
    (read a user file, list a directory, write a file, connect to
    loopback, start a shell) works unconfined and fails under
    `--sandbox`, and that a real document still renders. Then
@@ -76,12 +81,13 @@ incomplete for some macOS version: the symptom is a renderer that cannot
 start under `--sandbox` (a clean error, never an unconfined run), fixed by
 adding the missing read-only path. A renderer has no parent-death signal
 on macOS; it ends when its IPC pipe closes, and the watchdog stops a hung
-one. `sandbox-exec` may be removed by a future macOS; the fallback is the
-same profile through `sandbox_init` in `rustic-sandbox`'s audited
-`unsafe` module, or the App Sandbox for the packaged browser (M8).
+one. `sandbox_init` with a profile string is deprecated API that
+Chromium also relies on; the packaged browser may move to the App
+Sandbox (M8). Initializers that run before `main` (AppKit is linked
+for `rustic view`) are not confined; they read no page input.
 
 ## Revisit
 
 On the first native macOS x64 and ARM64 runs (accept, adjust the
-profile, make it the default), if Apple removes `sandbox-exec`, and when
+profile, make it the default), if Apple removes `sandbox_init`, and when
 the M8 packaged application can use the App Sandbox.

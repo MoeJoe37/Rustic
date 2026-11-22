@@ -2664,7 +2664,7 @@ Added 2026-11-21 (`rustic-sandbox`, `rustic-cli/src/broker.rs`,
 commands confine their renderer by default; `--no-sandbox` or
 `RUSTIC_SANDBOX=0` opts out, `--sandbox` or `RUSTIC_SANDBOX=1` demands a
 sandbox (on macOS the proposed Seatbelt profile of
-[ADR 0063](adr/0063-macos-renderer-sandbox.md) through `sandbox-exec`,
+[ADR 0063](adr/0063-macos-renderer-sandbox.md), applied by the renderer to itself with `sandbox_init`,
 not yet verified on a Mac and so not the default there, TD-174;
 `the_profile_denies_by_default_and_names_only_the_renderer`,
 `paths_are_quoted_or_refused`), any other `RUSTIC_SANDBOX` value is

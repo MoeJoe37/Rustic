@@ -387,7 +387,7 @@ shell (TD-178).
 
 Renderers receive narrow handles instead of ambient OS privileges. Linux uses
 namespace/seccomp/broker controls (bubblewrap, ADR 0058); Windows a
-capability-less LPAC AppContainer and a job (ADR 0060); macOS a deny-by-default Seatbelt profile through `sandbox-exec` (ADR 0063, Proposed until verified on a Mac).
+capability-less LPAC AppContainer and a job (ADR 0060); macOS a deny-by-default Seatbelt profile the renderer applies to itself with `sandbox_init` before reading input (ADR 0063, Proposed until verified on a Mac).
 Android needs its own application/service isolation and broker design, and iOS
 needs the applicable platform browser-engine extension/entitlement model. Do not
 assume desktop process spawning, Linux sandbox controls, or JIT availability can

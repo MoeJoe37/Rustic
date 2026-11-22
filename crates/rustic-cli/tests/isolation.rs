@@ -279,7 +279,7 @@ fn sandbox_available() -> bool {
 /// macOS: the proposed Seatbelt sandbox (ADR 0063), which `--sandbox`
 /// turns on but which is not the default until verified on native Macs.
 fn proposed_sandbox_available() -> bool {
-    cfg!(target_os = "macos") && Path::new("/usr/bin/sandbox-exec").exists()
+    cfg!(target_os = "macos")
 }
 
 const ESCAPES: [&str; 5] = [

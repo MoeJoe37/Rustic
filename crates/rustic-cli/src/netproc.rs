@@ -236,21 +236,18 @@ fn spawn_plain(exe: &std::path::Path) -> io::Result<Pipes> {
     Ok((child, Box::new(stdout), Box::new(stdin), Box::new(stderr)))
 }
 
-/// macOS: the child under `sandbox-exec` with the Seatbelt network
-/// profile (ADR 0063, `rustic_sandbox::seatbelt::network_profile`), a
-/// cleared environment and `/` as its working directory.
+/// macOS: the child with a cleared environment, `/` as its working
+/// directory and `RUSTIC_SEATBELT=network`, which makes it apply the
+/// Seatbelt network profile (ADR 0063,
+/// `rustic_sandbox::seatbelt::network_profile`) to itself before it reads
+/// from the broker.
 #[cfg(not(windows))]
 fn spawn_seatbelt(exe: &std::path::Path) -> io::Result<Pipes> {
-    let exe = std::fs::canonicalize(exe)?;
-    let profile = rustic_sandbox::seatbelt::network_profile(&exe)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
-    let mut child = Command::new("/usr/bin/sandbox-exec")
-        .arg("-p")
-        .arg(profile)
-        .arg(&exe)
+    let mut child = Command::new(exe)
         .arg(NETWORK_COMMAND)
         .env_clear()
         .envs(crate::broker::sandbox_env())
+        .env(crate::broker::SEATBELT_VARIABLE, "network")
         .current_dir("/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

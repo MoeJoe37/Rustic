@@ -3,13 +3,9 @@
 //!
 //! macOS confines a process with a Seatbelt profile in the Sandbox Profile
 //! Language (SBPL), the mechanism Chromium's and Firefox's macOS sandboxes
-//! use. The broker starts the renderer as
-//! `/usr/bin/sandbox-exec -p PROFILE EXE __renderer`: `sandbox-exec`
-//! applies the profile to itself and then executes the renderer, which
-//! inherits it and can never drop it. Starting through `sandbox-exec`
-//! needs no `unsafe` code (calling `sandbox_init` would need FFI); the
-//! tool is deprecated in Apple's documentation but still ships, and the
-//! profile language is the same one `sandbox_init` takes.
+//! use. The renderer (or network process) applies its profile to itself
+//! with `sandbox_init` (`crate::enter`, macOS only) before it reads
+//! anything from the broker, and can never drop it.
 //!
 //! The profile denies everything by default and allows only what a
 //! process needs to start and run on its inherited pipes: executing the
@@ -119,8 +115,8 @@ fn base_profile(exe: &Path, title: &str) -> Result<String, ProfileError> {
          ; {title}. Everything not allowed below is denied.\n\
          (deny default)\n"
     );
-    // `sandbox-exec` executes the process under this profile; nothing
-    // else may be executed, and the process may not fork.
+    // Nothing but the process's own binary may be executed, and it may
+    // not fork.
     let _ = writeln!(profile, "(allow process-exec (literal {exe}))");
     let _ = writeln!(profile, "(allow file-read* (literal {exe}))");
     profile.push_str("(allow file-read*\n");

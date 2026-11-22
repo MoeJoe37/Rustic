@@ -170,6 +170,23 @@ Image options for layout and paint commands (exceeding one breaks the image, nev
   --max-image-decoded-bytes N    total decoded RGBA bytes (default 268435456)";
 
 fn main() -> ExitCode {
+    // A confined macOS child applies its Seatbelt profile before anything
+    // else (ADR 0063); it never runs unconfined when asked to confine.
+    #[cfg(target_os = "macos")]
+    if let Some(kind) = env::var_os(broker::SEATBELT_VARIABLE) {
+        let child = env::args_os().nth(1).is_some_and(|arg| {
+            arg == renderer::RENDERER_COMMAND || arg == netproc::NETWORK_COMMAND
+        });
+        let confined = if child {
+            broker::confine_self(&kind)
+        } else {
+            Ok(())
+        };
+        if let Err(error) = confined {
+            eprintln!("rustic: {error}");
+            return ExitCode::FAILURE;
+        }
+    }
     if env::args_os()
         .nth(1)
         .is_some_and(|arg| arg == renderer::RENDERER_COMMAND)

@@ -55,6 +55,30 @@ pub(crate) fn sandboxed() -> bool {
 pub const SANDBOX_AVAILABLE: bool = cfg!(any(target_os = "linux", windows));
 static TIMEOUT_SECONDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(120);
 
+/// Tells a macOS child (`renderer` or `network`) to confine itself with
+/// that Seatbelt profile before reading from the broker (ADR 0063).
+#[cfg(not(windows))]
+pub(crate) const SEATBELT_VARIABLE: &str = "RUSTIC_SEATBELT";
+
+/// In a child process started with [`SEATBELT_VARIABLE`], apply that
+/// Seatbelt profile to this process. Called first thing in `main`, before
+/// any input from the broker; an error must end the process.
+#[cfg(target_os = "macos")]
+pub fn confine_self(kind: &std::ffi::OsStr) -> Result<(), String> {
+    let exe = std::env::current_exe()
+        .and_then(std::fs::canonicalize)
+        .map_err(|error| format!("cannot find the executable: {error}"))?;
+    let profile = if kind == "renderer" {
+        rustic_sandbox::seatbelt::renderer_profile(&exe)
+    } else if kind == "network" {
+        rustic_sandbox::seatbelt::network_profile(&exe)
+    } else {
+        return Err("unknown sandbox profile".into());
+    }
+    .map_err(|error| error.to_string())?;
+    rustic_sandbox::enter(&profile)
+}
+
 /// Environment variables a sandboxed renderer may keep (test hooks and
 /// backtraces; nothing that names a user, a home or a display).
 const SANDBOX_ENV: &[&str] = &[
@@ -437,7 +461,7 @@ fn document_argument(
     }
 }
 
-/// A renderer process: unconfined (or under `sandbox-exec` on macOS), in
+/// A renderer process: unconfined (or self-confined by Seatbelt on macOS), in
 /// bubblewrap, or in the Windows AppContainer.
 enum Process {
     Child(Child),
@@ -563,22 +587,20 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
     ))
 }
 
-/// macOS (ADR 0063, Proposed): the executable under `sandbox-exec` with
-/// the deny-by-default Seatbelt profile of `rustic_sandbox::seatbelt` and
-/// a cleared environment. A renderer has no parent-death signal here; it
-/// ends when its IPC pipe closes, and the watchdog stops a hung one.
+/// macOS (ADR 0063, Proposed): the executable with a cleared environment
+/// and `RUSTIC_SEATBELT=renderer`, which makes it apply the deny-by-default
+/// Seatbelt profile of `rustic_sandbox::seatbelt` to itself before it
+/// reads anything from the broker (a failure ends it before the
+/// handshake, which the broker reports as a sandbox failure). A renderer
+/// has no parent-death signal here; it ends when its IPC pipe closes, and
+/// the watchdog stops a hung one.
 #[cfg(target_os = "macos")]
 fn spawn_confined(exe: &Path) -> io::Result<Started> {
-    let exe = std::fs::canonicalize(exe)?;
-    let profile = rustic_sandbox::seatbelt::renderer_profile(&exe)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
-    let mut child = Command::new("/usr/bin/sandbox-exec")
-        .arg("-p")
-        .arg(profile)
-        .arg(&exe)
+    let mut child = Command::new(exe)
         .arg(crate::renderer::RENDERER_COMMAND)
         .env_clear()
         .envs(sandbox_env())
+        .env(SEATBELT_VARIABLE, "renderer")
         .current_dir("/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -887,17 +909,12 @@ fn serve(
         Ok(finished) => finished,
         Err(Ended::NotStarted(error)) => {
             if SANDBOX.load(Ordering::Relaxed)
-                && !cfg!(windows)
+                && cfg!(not(any(windows, target_os = "macos")))
                 && error.kind() == io::ErrorKind::NotFound
             {
-                let tool = if cfg!(target_os = "macos") {
-                    "/usr/bin/sandbox-exec"
-                } else {
-                    "bubblewrap (bwrap) on PATH"
-                };
                 eprintln!(
-                    "rustic {command}: --sandbox needs {tool}; the renderer was not started \
-                     without its sandbox"
+                    "rustic {command}: --sandbox needs bubblewrap (bwrap) on PATH; the renderer \
+                     was not started without its sandbox"
                 );
             } else {
                 eprintln!("rustic {command}: cannot start the renderer process: {error}");

@@ -7,7 +7,7 @@ Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 
-**Status (2026-11-19).** M0 has a verified baseline; only the repository-rules
+**Status (2026-11-22).** M0 has a verified baseline; only the repository-rules
 follow-up is open. M1, M2, M3, M4 and M5 are complete for their declared catalog
 scope: local HTML parses, styles, lays out, shapes text, paints and rasterizes
 to PNG on the CPU, and Rustic's own ECMAScript engine (JS-01 to JS-09, with
@@ -17,25 +17,31 @@ QEMU emulation; native ARM64 timings are TD-125. M5 scripted documents
 [completion review](reviews/2026-11-19-m5-completion.md): scripts, DOM
 bindings, events, observers, error reporting, focus, forms, the pinned WPT
 gate and the [first cross-engine report](reviews/2026-11-19-perf-01-m5.md).
-Its emulated, MSRV and cross tiers still need a run on a machine that has
-them. M6 controlled networking (NET-01 to NET-07) closed on 2026-11-20 with
+M6 controlled networking (NET-01 to NET-07) closed on 2026-11-20 with
 its [completion review](reviews/2026-11-20-m6-completion.md): HTTP(S) to
 allowlisted loopback origins, Fetch and `fetch()`, cookies, the HTTP
-cache, CSP, mixed content, profiles and Web Storage; its emulated and cross
-tiers were not run. **M7 is the current milestone**; M8–M13 are unstarted. Native
-Android/iOS surfaces (MOB-03/04) are the first task of M8 mobile hosts. The
+cache, CSP, mixed content, profiles and Web Storage. The emulated, MSRV
+and cross tiers that M5 and M6 could not run passed in the first full hosted
+run on 2026-11-22. **M7 is the current milestone** (5 of 8 capabilities;
+[§10](#10-m7--isolation-and-security-gate)). M8 started early with compositor
+scenes and scrolling (UI-05) and a Linux desktop window (UI-02); M9–M13 are
+unstarted. Native Android/iOS surfaces (MOB-03/04) are the first task of M8
+mobile hosts. The
 [progress summary](progress/summary.md) is the measured status and
 [implementation progress](IMPLEMENTATION.md) records each completed contract;
 neither implies more than its declared scope.
 
-**Verification status.** Hosted CI has been blocked by a billing limit since
-2026-11-08. Until it returns, every merge is checked in a Linux sandbox
-(native x86-64; emulated 32-bit ARM, 32-bit x86, RISC-V and big-endian s390x;
-compile checks for Linux aarch64, Windows, Android and iOS). No change since
-that date has run its tests natively on Windows x64/ARM64, macOS x64/ARM64 or
-Linux aarch64 ([TD-12](TECH_DEBT.md)). This does not block M5 or M6, whose
-code is platform-independent, but it blocks M7 and M8, which need those
-machines ([§10](#10-m7--isolation-and-security-gate)).
+**Verification status.** Hosted CI was blocked by a billing limit from
+2026-11-08 to 2026-11-22; merges in that window were checked in a Linux
+sandbox. On 2026-11-22 the repository moved to `moejoe873/Rustic`, where
+Actions ran the full matrix natively on x64 and ARM64 Linux, Windows and macOS,
+under emulation and in every compile check. Its findings were fixed and the
+whole matrix passed on `feature` at `9961c1c`
+([run](https://github.com/moejoe873/Rustic/actions/runs/45003031562)). Later
+the same day GitHub stopped starting jobs on that account as well (failed
+payments or a spending limit), so commits after `9961c1c` wait for the next
+hosted run. Android and iOS remain compile-checked only ([TD-12](TECH_DEBT.md),
+[PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
 coverage, GPU acceleration, WebAssembly, Rustic-only Manifest V2 extensions and
@@ -445,8 +451,8 @@ presence of a property does not count as correct API support.
 - [ ] The full suite passes on every tier that can run: native x86-64, the
       four emulated tiers, MSRV and the cross-checks; and on native Windows,
       macOS and Linux aarch64 if hosted CI is back. *Native x86-64 passed on
-      2026-11-19; the emulated, MSRV and cross tiers were not available in
-      that sandbox and remain to run.*
+      2026-11-19; the remaining tiers passed in the first full hosted run on
+      2026-11-22 (`feature` at `9961c1c`, which contains all M5 work).*
 - [x] Every open TD entry whose trigger is M5 work (TD-31, TD-118, TD-126,
       TD-129 to TD-134) is paid or given a later, named trigger (TD-10 paid).
 - [x] A completion review is written ([2026-11-19](reviews/2026-11-19-m5-completion.md))
@@ -653,7 +659,10 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       and ISO-08/MOB-07 need an Android emulator or device and an iOS
       simulator or device. Restoring hosted CI (or replacing it with
       self-hosted runners) is therefore a hard prerequisite of M7, not a
-      convenience ([TD-12](TECH_DEBT.md)).
+      convenience ([TD-12](TECH_DEBT.md)). *Desktop half done 2026-11-22:
+      native x64 and ARM64 Linux, Windows and macOS jobs were green at
+      `9961c1c`. Android and iOS runners do not exist yet, and hosted jobs
+      stopped again later that day on a billing limit.*
 - [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: [ADR 0063](adr/0063-macos-renderer-sandbox.md), Accepted 2026-11-22), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
 - [x] **The engine already runs split.** Done 2026-11-20: every document
@@ -882,24 +891,25 @@ it is fixed or a reviewed exception is published.
 ## 17. Current implementation queue
 
 Work in order unless a row says it runs in parallel. Status is as of
-2026-11-17; [implementation progress](IMPLEMENTATION.md) records each finished
-contract, and [§8](#8-m5--scripted-document-integration) has the detailed
-completion tests. The M1 queue (DOC-01a to DOC-09) and the M4 queue (JS-01 to
-JS-09) are complete.
+2026-11-22; [implementation progress](IMPLEMENTATION.md) records each finished
+contract, [§10](#10-m7--isolation-and-security-gate) has the M7 detail and the
+[progress summary](progress/summary.md) the measured state. M1 to M6 are
+complete; their queues (DOC-, CSS-, REN-, JS-, WEB- and NET- tasks) are in the
+milestone sections above.
 
 | Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
-| done | WEB-01 to WEB-04: scheduler, Web IDL, bindings, events, input, timers | See [SCRIPTING.md](SCRIPTING.md) | Done |
-| 1 | WEB-05: `<script>` loading and document readiness | Scripted html5lib records pass, async/defer/module order holds for every arrival order, and `rustic render` runs a scripted fixture | Local lifecycle, CLI and all pinned html5lib records verified. |
-| 2 | WEB-06: invalidation and layout flushes from script | Incremental render equals from-scratch render after random script mutations (differential fuzz) | Planned; ADR first |
-| 3 | WEB-07: mutation observers, error reporting, focus and forms | Observer/microtask order tests; the form-validation demo fixture | Done |
-| 4 | WEB-09: pinned WPT `dom/` and timers selection | Exact expectation list with published denominator | Done: 59-file Window baseline with exact expectations |
-| 5 | M5 completion review and M6 entry checklist | Every box in the M5 exit checklist; transport/TLS ADR accepted (encoding ADR 0043 accepted) | M5 review done 2026-11-19 ([review](reviews/2026-11-19-m5-completion.md)); emulated tiers and the transport/TLS ADR remain for M6 entry. Fixture server and async model ADRs done and the TLS part proposed 2026-11-20 (ADR 0051–0053); NET-01 started |
-| — | PERF-01 (M5 slice): first cross-engine report | JS-09 and DOM corpus against V8, SpiderMonkey and JavaScriptCore on x86-64 and ARM64, with exact versions | Done on x86-64 ([report](reviews/2026-11-19-perf-01-m5.md)); ARM64 is TD-125 (M8) |
-| — | M6 entry, early (parallel): encodings | All 40 Encoding Standard encodings, stylesheet decoding (TD-28) | Done 2026-11-18: [ENCODING.md](ENCODING.md), [ADR 0043](adr/0043-encoding-standard.md). URL query encoding, TD-26 and TD-02 done 2026-11-18. Next: JS fixes due at M6 entry |
-| — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | Parallel; blocked on hosted CI |
-| — | Restore hosted CI | A green run on the full native matrix; then require the `CI` check on `main` (M0 follow-up) and re-verify the merges made since 2026-11-08 on Windows, macOS and Linux aarch64 | Waiting for GitHub Actions billing; hard prerequisite of M7 |
-| — | Debt due now | The "Due in M5" rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule) | With the tasks above |
+| done | ISO-01, ISO-02: process model, IPC and brokered authority | Split runs for every document command; frames and popups in their own renderers | Done 2026-11-21 (ADR 0056, 0057, 0062) |
+| done | ISO-03/ISO-04: desktop renderer sandboxes | Escape probes fail by default on Linux, Windows and macOS | Done 2026-11-22 (ADR 0058, 0060, 0063), green on native x64 and ARM64 at `9961c1c` |
+| done | Network process and its confinement | Exchanges in a `__network` child, confined on Linux, macOS and Windows; remote origins reach only public addresses | Done 2026-11-22 (ADR 0061, 0066; TD-157 and TD-176 paid) |
+| 1 | ISO-08/MOB-07: Android and iOS isolation (`security.mobile`) | Android isolated-process renderer service and iOS BrowserEngineKit extensions verified on emulator/simulator and device, with crash recovery | Design done (ADR 0059, Proposed); both platform steps open, need mobile runners |
+| 2 | ISO-06: independent external security review (`security.audit`, last step) | A focused review of the sandboxes, IPC and broker with findings fixed or recorded | Open; fuzzing, unsafe inventory and AddressSanitizer steps done |
+| 3 | ISO-07: GPU process crash and restart (`security.recovery`, last step) | A GPU process crash recovers without stale authority | Waits for the M8 GPU process; renderer and network-process recovery done |
+| 4 | M7 completion review | Every M7 gate with recorded evidence, payoff-schedule rows for M7 cleared or moved | After rows 1–3 |
+| — | Hosted CI | The full matrix green on every commit since `9961c1c`; then require the `CI` check on `main` (M0 follow-up) | Ran green 2026-11-22 on `moejoe873/Rustic`; jobs stopped again later that day on a billing limit |
+| — | M8 early work (parallel) | UI-05 scenes; UI-02 desktop window on Linux, then Windows and macOS | `compositor.scene` complete (ADR 0064); `rustic view` on Linux (ADR 0065, TD-182) |
+| — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | First task of M8 mobile hosts; needs NDK/Xcode runners |
+| — | Debt due now | The M7 rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule) | With the tasks above |
 
 Update this table in the same change that finishes a task. When it and the
 [progress summary](progress/summary.md) disagree, the summary is the measured
@@ -935,7 +945,7 @@ review and a threat-model update; dependency additions get a boundary review.
 | Upstream standards/tests change | Baseline shifts without code changes | Pin revisions; update in reviewed changes with before/after counts |
 | Parity target keeps moving | Other engines ship features faster than Rustic adds them | Inventory refresh every release; prioritize features shipped by all three and by measured site breakage |
 | Leadership gap stays wide | Ratchet misses at M8/M10 | Profile the biggest gap first; fix representation before adding tiers; no gate is lowered without a reviewed plan update |
-| Native platforms go unverified | Hosted CI stays blocked; merges are checked only on Linux (native x86-64 plus emulation) and compile-checked elsewhere | Keep the sandbox gate strict; restore or replace CI before M7; when it returns, run the whole suite on Windows, macOS and Linux aarch64 before any new feature work and fix what it finds first |
+| Native platforms go unverified | Hosted CI stops starting jobs (2026-11-08 to 2026-11-22, and again from later on 2026-11-22); merges are checked only on Linux (native x86-64 plus emulation) and compile-checked elsewhere | Keep the sandbox gate strict; when hosted jobs run again, run the whole matrix before merging and fix what it finds first, as the first run on `moejoe873/Rustic` did; consider self-hosted runners so billing cannot stop the gate |
 | Docs drift from code | Status tables, counts or "next task" pointers contradict the progress summary | Every finishing change updates [§17](#17-current-implementation-queue) and the docs index; a milestone cannot close without its completion review; prefer links to generated numbers over copied ones (TD-08) |
 | Hand-written bindings do not scale | Each new interface repeats conversion and brand-check code; fixes are applied to one interface and missed in others | Extend the pinned IDL generator (ADR 0025) to each interface family before binding it; TD-126 tracks the hand-bound surface |
 | Script-driven layout thrash | Flush counts per turn grow with page size in WEB-06 tests | Count and bound flushes; keep the from-scratch render as the reference; no caching without the differential test |

@@ -10,7 +10,7 @@ record when a boundary changes) in the same change as the code.
 
 | Milestone | State | Read |
 | --- | --- | --- |
-| M0 Foundation | Done; hosted CI runs again on `moejoe873/Rustic` (2026-11-22); requiring the `CI` check on `main` is an open admin step | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| M0 Foundation | Done; hosted CI ran green on `moejoe873/Rustic` on 2026-11-22, then stopped again on a billing limit; requiring the `CI` check on `main` is an open admin step | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | M1 Document core | Done (28/28 capabilities): URL, HTML tokenizer and tree builder, DOM, local `dump-dom` | [URL.md](URL.md), [HTML.md](HTML.md), [HTML_TREE.md](HTML_TREE.md), [DOM.md](DOM.md) |
 | M2 Styles | Done (8/8): CSS syntax, selectors, values, cascade with layers, media/container queries, invalidation | [CSS.md](CSS.md) |
 | M3 Static rendering | Done (17/17): block/inline/flex layout, OpenType text, images, CPU raster, `render`, reftests, hit testing | [LAYOUT.md](LAYOUT.md), [TEXT.md](TEXT.md), [PAINT.md](PAINT.md) |
@@ -31,12 +31,14 @@ table needs an update.
 
 Two things are true of every milestone so far and are easy to miss:
 
-- **Desktop evidence is back; mobile has none.** Hosted CI was blocked by a
+- **Desktop evidence is intermittent; mobile has none.** Hosted CI was blocked by a
   billing limit from 2026-11-08 to 2026-11-22, when the repository moved to
   `moejoe873/Rustic`. The first full run there (native x64 and ARM64 Linux,
   Windows and macOS, the emulated tiers and every compile check) found
   portability bugs in the work merged during the gap, which are fixed, and
-  passed on `feature` at `9961c1c` ([TD-12](TECH_DEBT.md),
+  passed on `feature` at `9961c1c`. Later that day GitHub stopped starting
+  jobs on the new account as well, so commits after `9961c1c` wait for the
+  next hosted run ([TD-12](TECH_DEBT.md),
   [PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
 - **Nothing runs on a phone yet.** Android and iOS are compile-checked only;
   the first on-device surfaces are MOB-03/04, the first task of M8 mobile

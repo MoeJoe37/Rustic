@@ -70,7 +70,8 @@ cargo deny --locked check advisories licenses bans sources
 Push to the `feature` branch only and merge into `main` once the GitHub
 Actions `CI` check passes;
 [DEVELOPMENT.md](docs/DEVELOPMENT.md#branches-and-merging) describes the merge
-workflow and the sandbox gate to fall back on if Actions cannot run.
+workflow and the sandbox gate to fall back on while Actions cannot start jobs
+(as on 2026-11-22, after one green run, because of an account billing limit).
 
 Use the platform's Python 3.11+ command if it is named `python`. Run affected
 examples or integration harnesses too. GitHub Actions verifies the declared MSRV,

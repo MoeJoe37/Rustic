@@ -80,8 +80,11 @@ checks), and each recorded the scope it ran. The repository moved from
 `MoeJoe37/Rustic` to `moejoe873/Rustic` on 2026-11-22, where Actions runs; the
 first full native run on the new account found and fixed the issues recorded in
 [TD-12](TECH_DEBT.md), and the full matrix was green on `feature` at `9961c1c`.
-When Actions cannot run, fall back to that sandbox gate and say in the commit
-or review which scope ran. Successful default-branch CI also pushes a
+Later the same day GitHub again stopped starting jobs on the new account (its
+message: failed payments or a spending limit), so commits after `9961c1c` have
+no hosted run yet. While that lasts, fall back to the sandbox gate and say in
+the commit or review which scope ran; run the full hosted matrix as soon as
+Actions starts jobs again. Successful default-branch CI also pushes a
 `chore(progress)` commit to `main`, so merge `origin/main` into `feature`
 before pushing rather than force-pushing.
 

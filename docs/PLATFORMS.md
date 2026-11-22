@@ -56,9 +56,10 @@ The tiers above describe the configured CI, and since 2026-11-22 they run
 again: the repository moved to `moejoe873/Rustic`, where GitHub Actions starts
 jobs, and the full matrix passed on `feature` at `9961c1c` (native x64 and
 ARM64 Linux, Windows and macOS; the emulated 32-bit ARM, 32-bit x86, RISC-V and
-big-endian s390x runs; the cross and mobile compile checks). The
-[Actions page](https://github.com/moejoe873/Rustic/actions) holds the result of
-each later push.
+big-endian s390x runs; the cross and mobile compile checks). Later that day
+GitHub stopped starting jobs on the new account too (failed payments or a
+spending limit), so later commits have no hosted run until it resumes; the
+[Actions page](https://github.com/moejoe873/Rustic/actions) shows each push.
 
 From 2026-11-08 to 2026-11-22 GitHub did not start hosted jobs (an account
 billing limit), and merges were checked by the sandbox gate of

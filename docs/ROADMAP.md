@@ -22,11 +22,17 @@ its [completion review](reviews/2026-11-20-m6-completion.md): HTTP(S) to
 allowlisted loopback origins, Fetch and `fetch()`, cookies, the HTTP
 cache, CSP, mixed content, profiles and Web Storage. The emulated, MSRV
 and cross tiers that M5 and M6 could not run passed in the first full hosted
-run on 2026-11-22. **M7 is the current milestone** (5 of 8 capabilities;
-[§10](#10-m7--isolation-and-security-gate)). M8 started early with compositor
-scenes and scrolling (UI-05) and a Linux desktop window (UI-02); M9–M13 are
-unstarted. Native Android/iOS surfaces (MOB-03/04) are the first task of M8
-mobile hosts. The
+run on 2026-11-22. M7 isolation closed on 2026-11-22 with its
+[completion review](reviews/2026-11-22-m7-completion.md): desktop sandboxes
+on by default on Linux, Windows and macOS, a confined network process and
+crash recovery ([§10](#10-m7--isolation-and-security-gate)). **M8 desktop
+alpha is the current milestone**: compositor scenes and scrolling (UI-05) and
+a Linux desktop window (UI-02) are done, and the GPU process is next; M9–M13
+are unstarted. **Android and iOS device work is deferred to the last
+milestone, M14** ([ADR 0067](adr/0067-mobile-devices-last.md),
+[§17](#17-m14--mobile-devices-and-five-platform-10)): the platforms stay
+release targets, and their compile checks and the Android emulator job stay
+in CI. The
 [progress summary](progress/summary.md) is the measured status and
 [implementation progress](IMPLEMENTATION.md) records each completed contract;
 neither implies more than its declared scope.
@@ -40,7 +46,8 @@ whole matrix passed on `feature` at `9961c1c`
 ([run](https://github.com/moejoe873/Rustic/actions/runs/45003031562)). Later
 the same day GitHub stopped starting jobs on that account as well (failed
 payments or a spending limit), so commits after `9961c1c` wait for the next
-hosted run. Android and iOS remain compile-checked only ([TD-12](TECH_DEBT.md),
+hosted run. Android and iOS remain compile-checked only, apart from the
+Android emulator isolation job ([TD-12](TECH_DEBT.md),
 [PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
@@ -54,8 +61,10 @@ faster and leaner than all three. M1–M10 build the engine and a beta;
 [M11](#14-m11--web-platform-parity) closes the remaining feature gap against a
 pinned inventory of everything those engines ship;
 [M12](#15-m12--performance-leadership) turns the measured performance targets
-into gates against all three engines; [M13](#16-m13--full-engine-10) is the
-final acceptance on every platform. [ADR 0018](adr/0018-parity-and-performance-leadership.md)
+into gates against all three engines; [M13](#16-m13--desktop-engine-10) is the
+desktop 1.0 acceptance, and [M14](#17-m14--mobile-devices-and-five-platform-10)
+brings Android and iOS onto real devices and closes with the final
+five-platform acceptance ([ADR 0067](adr/0067-mobile-devices-last.md)). [ADR 0018](adr/0018-parity-and-performance-leadership.md)
 records this scope. No planning checkbox grants implementation credit.
 
 Assume one primary maintainer with occasional contributions. A small team can
@@ -76,12 +85,13 @@ reveals complexity. Later milestones deliberately have no fabricated estimates.
 | M5 Scripted documents | Events and JS mutations update rendered local pages | M3, M4, traced DOM | Re-estimate after M3/M4 |
 | M6 Controlled web services | Fixture-host HTTPS, Fetch policy, cookies and profiles | M5, origin model | Re-estimate after integration prototype |
 | M7 Isolated browsing | Enforced broker/renderer isolation on supported platforms | M6, IPC prototypes | Dedicated security program |
-| M8 Desktop/mobile alpha | Native hosts, accessibility/inspection, required GPU backend and extension/uBO integration | M7 per platform; local surface prototypes start in M3 | Re-estimate by platform |
+| M8 Desktop alpha | Native Windows/macOS/Linux hosts, accessibility/inspection, GPU process and backend, extension/uBO integration | M7 per platform | Re-estimate by platform |
 | M9 Compatibility expansion | Broad modern site/API coverage, published test results | M8 | Open-ended feature program |
 | M10 Embedding and beta | Versioned API and maintained beta/release process | Evidence from M8/M9 | Evidence-based release decision |
 | M11 Web platform parity | Every feature Blink, Gecko or WebKit ships is implemented or has a reviewed decision; WPT/Test262 pass rates at least the best engine's | M9; media/graphics/device tracks can start after M8 | Multi-year feature program |
 | M12 Performance leadership | Faster, leaner and more energy-efficient than all three engines on pinned benchmarks and reference devices | M8 harness and alpha; JIT after M7 isolation | Multi-year optimization program |
-| M13 Full engine 1.0 | All product, parity, performance and security gates pass on all five platform families | M10, M11, M12 | Evidence-based release decision |
+| M13 Desktop engine 1.0 | All product, parity, performance and security gates pass on Windows, macOS and Linux | M10, M11, M12 | Evidence-based release decision |
+| M14 Mobile devices and five-platform 1.0 | Android and iOS hosts on real devices (iOS with Apple's browser-engine entitlement), mobile GPU/accessibility/extensions, signed mobile artifacts, then the final acceptance on all five platforms | M13; Apple entitlement and device access | Deferred to the end by ADR 0067; re-estimate when it starts |
 
 ## 2. Dependency and parallel work strategy
 
@@ -642,8 +652,13 @@ ISO-08 is a design only ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
 Since 2026-11-22 remote origins resolve through the system resolver and
 reach only public addresses (ADR 0066, TD-157), and the Windows network
 process runs in its own AppContainer for them (TD-176).
-Still open: Android and iOS runs (TD-12) and an independent external
-review. The demo runs:
+**Closed 2026-11-22** ([completion review](reviews/2026-11-22-m7-completion.md)).
+By [ADR 0067](adr/0067-mobile-devices-last.md) the Android device and iOS
+work of ISO-08 moved to M14, the GPU process crash step to
+`compositor.recovery` (M8), and the independent external review to
+`security.brave` (M10) as an external dependency: the
+[review packet](reviews/2026-11-22-m7-external-review-packet.md) is ready
+for outside reviewers. The demo runs:
 `crates/rustic-cli/tests/isolation.rs`.
 
 **Gate:** all applicable [security gates](SECURITY.md) pass with recorded evidence
@@ -661,8 +676,8 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       self-hosted runners) is therefore a hard prerequisite of M7, not a
       convenience ([TD-12](TECH_DEBT.md)). *Desktop half done 2026-11-22:
       native x64 and ARM64 Linux, Windows and macOS jobs were green at
-      `9961c1c`. Android and iOS runners do not exist yet, and hosted jobs
-      stopped again later that day on a billing limit.*
+      `9961c1c` and again at `e150a22`, with an Android emulator job.
+      Device and iOS runners moved to M14 with the mobile work (ADR 0067).*
 - [ ] **One ADR per OS sandbox mechanism** and one for the IPC format (IPC: [ADR 0056](adr/0056-ipc-format.md), network process [ADR 0061](adr/0061-network-process.md); Linux: [ADR 0058](adr/0058-linux-renderer-sandbox.md); Windows: [ADR 0060](adr/0060-windows-renderer-sandbox.md); Android/iOS: [ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed; macOS: [ADR 0063](adr/0063-macos-renderer-sandbox.md), Accepted 2026-11-22), each
       with the threat it answers in [SECURITY.md](SECURITY.md).
 - [x] **The engine already runs split.** Done 2026-11-20: every document
@@ -678,26 +693,29 @@ is an explicit error, not a reason to launch an unsandboxed renderer silently.
       framing, cookies, CSP, CORS) run in the smoke job, because M7 treats
       the network process as a hostile peer.
 
-## 11. M8 — Reference desktop and mobile alpha
+## 11. M8 — Reference desktop alpha
 
 - **UI-01:** desktop shell with address entry, tabs, loading/error state, history,
   profiles, zoom, find, downloads and permission UI; keep chrome separate from DOM.
 - **UI-02:** platform window/event loop/surface integration on Linux, then Windows
-  and macOS, plus Android/iOS native hosts when each runtime meets its gates.
-  Shared mobile checks start in M1 and local CPU surfaces in M3, per
-  [MOB-01–MOB-10](MOBILE.md). Document actual platform differences and status.
+  and macOS. Android/iOS native hosts are M14
+  ([§17](#17-m14--mobile-devices-and-five-platform-10)); until then the shared
+  mobile compile checks and the Android emulator job keep the core portable.
+  Document actual platform differences and status.
 - **UI-03:** accessibility roles/names/focus/state tree, keyboard navigation,
   selection, IME/composition, clipboard grants and platform accessibility bridges.
 - **UI-04:** inspector DOM/style/layout views, console, network diagnostics,
   source breakpoints and timeline; debug access disabled by default remotely.
-- **UI-05:** incremental painting, scroll/compositor scenes, GPU prototype with
-  CPU fallback, device-loss recovery and parity fixtures.
+- **UI-05:** incremental painting, scroll/compositor scenes, a GPU process with
+  CPU fallback, device-loss and GPU-process crash recovery without stale
+  authority (moved from M7's ISO-07), and parity fixtures.
 - **UI-06:** headless automation protocol and a WPT runner adapter; record a
   reproducible selected WPT baseline and real-world fixture failures.
 
-**Demo:** a reproducible curated site corpus works in an isolated desktop alpha,
-then native Android/iOS hosts with touch/IME, lifecycle and accessibility checks.
-Record each platform's actual status; alpha labels list known limitations.
+**Demo:** a reproducible curated site corpus works in an isolated desktop alpha
+on Windows, macOS and Linux with keyboard/IME, lifecycle and accessibility
+checks. Record each platform's actual status; alpha labels list known
+limitations.
 
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
@@ -756,7 +774,7 @@ compatibility is not inferred from a version number.
 [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) (within 1.25× of the best
 engine on every pinned benchmark, memory no worse than the median engine) passes
 on every reference device. The full-product gate moves to
-[M13](#16-m13--full-engine-10).
+[M13](#16-m13--desktop-engine-10).
 
 ## 14. M11 — Web platform parity
 
@@ -867,7 +885,7 @@ Intermediate ratchets (M5 baseline, M8 alpha, M10 beta) are defined in
 [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) so the gap is tracked the
 whole way, not discovered at the end.
 
-## 16. M13 — Full engine 1.0
+## 16. M13 — Desktop engine 1.0
 
 **Gate:** all [PRODUCT.md](PRODUCT.md) acceptance criteria pass, including the
 dated Brave security/privacy comparison, the M11 parity gate, the M12
@@ -877,10 +895,9 @@ stable Blink, Gecko and WebKit releases within 30 days of the release; targets
 and measured results are reported separately. Final 100% progress cannot bypass
 these gates.
 
-Platforms: Windows x64 and ARM64; macOS x64 and ARM64; Linux x64 and aarch64;
-Android ARM64, 32-bit ARM and x86-64; iOS/iPadOS ARM64. The 32-bit x86, RISC-V
-and big-endian tiers keep passing the full test suite (see
-[PLATFORMS.md](PLATFORMS.md)).
+Platforms: Windows x64 and ARM64; macOS x64 and ARM64; Linux x64 and aarch64.
+The 32-bit x86, RISC-V and big-endian tiers keep passing the full test suite
+(see [PLATFORMS.md](PLATFORMS.md)). The same gates on Android and iOS are M14.
 
 **After 1.0.** Parity and leadership are kept, not reached once. Every Rustic
 release refreshes the pinned compat data, WPT and benchmark revisions; a feature
@@ -888,28 +905,59 @@ newly shipped by one of the three engines enters the inventory within one
 release cycle, and a lost lead on any gated benchmark blocks the release until
 it is fixed or a reviewed exception is published.
 
-## 17. Current implementation queue
+## 17. M14 — Mobile devices and five-platform 1.0
+
+The last milestone of the plan ([ADR 0067](adr/0067-mobile-devices-last.md)).
+Android and iOS were release platforms from the start (ADR 0006) and remain
+so; their device work waits until the desktop engine is done because it
+depends on hardware, device farms and Apple's browser-engine entitlement that
+the project cannot schedule. Until then the mobile compile checks for all
+seven Android and iOS targets and the Android emulator isolation job stay
+required in CI, and every change follows the portability rules of
+[PLATFORMS.md](PLATFORMS.md).
+
+- **MOB-03/04:** Android and iOS CPU surfaces through the JNI and C/Swift
+  bridges; pixels match headless output on emulator, simulator and device.
+- **MOB-05/06:** touch, viewport/scale, keyboard/IME, caret/selection,
+  background/resume and memory pressure on both systems.
+- **ISO-08 / MOB-07 (`security.mobile`):** the Android isolated-process
+  renderer on a physical device; iOS BrowserEngineKit web-content and
+  networking extensions on the simulator, then on a device with the
+  entitlement ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
+- **MOB-08/09:** native Android and iOS reference hosts with mobile GPU
+  adapters, TalkBack/VoiceOver bridges, MV2 extensions and the uBO port, and
+  Android/iOS reference devices in the performance harness.
+- **MOB-10:** signed reproducible mobile artifacts, supported OS/ABI policy,
+  store and distribution gates and security updates.
+
+**Gate:** the M13 gates pass on Android ARM64, 32-bit ARM and x86-64 and on
+iOS/iPadOS ARM64 devices; missing approvals or entitlements are reported as
+missing, never as support. `release.mobile` is the final five-platform 1.0
+acceptance, and overall progress cannot reach 100% without it.
+
+## 18. Current implementation queue
 
 Work in order unless a row says it runs in parallel. Status is as of
 2026-11-22; [implementation progress](IMPLEMENTATION.md) records each finished
-contract, [§10](#10-m7--isolation-and-security-gate) has the M7 detail and the
-[progress summary](progress/summary.md) the measured state. M1 to M6 are
-complete; their queues (DOC-, CSS-, REN-, JS-, WEB- and NET- tasks) are in the
-milestone sections above.
+contract, [§11](#11-m8--reference-desktop-alpha) has the M8 tasks and the
+[progress summary](progress/summary.md) the measured state. M1 to M7 are
+complete; their queues (DOC-, CSS-, REN-, JS-, WEB-, NET- and ISO- tasks) are
+in the milestone sections above.
 
 | Order | Task | Concrete completion test | Status |
 | --- | --- | --- | --- |
 | done | ISO-01, ISO-02: process model, IPC and brokered authority | Split runs for every document command; frames and popups in their own renderers | Done 2026-11-21 (ADR 0056, 0057, 0062) |
 | done | ISO-03/ISO-04: desktop renderer sandboxes | Escape probes fail by default on Linux, Windows and macOS | Done 2026-11-22 (ADR 0058, 0060, 0063), green on native x64 and ARM64 at `9961c1c` |
 | done | Network process and its confinement | Exchanges in a `__network` child, confined on Linux, macOS and Windows; remote origins reach only public addresses | Done 2026-11-22 (ADR 0061, 0066; TD-157 and TD-176 paid) |
-| 1 | ISO-08/MOB-07: Android and iOS isolation (`security.mobile`) | Android isolated-process renderer service and iOS BrowserEngineKit extensions verified on emulator/simulator and device, with crash recovery | Android implemented 2026-11-22 (`android/`, `rustic-android`; the API 34 x86-64 emulator job passed in CI on 2026-11-22); iOS design only (ADR 0059, Proposed) |
-| 2 | ISO-06: independent external security review (`security.audit`, last step) | A focused review of the sandboxes, IPC and broker with findings fixed or recorded | Open; fuzzing, unsafe inventory and AddressSanitizer steps done |
-| 3 | ISO-07: GPU process crash and restart (`security.recovery`, last step) | A GPU process crash recovers without stale authority | Waits for the M8 GPU process; renderer and network-process recovery done |
-| 4 | M7 completion review | Every M7 gate with recorded evidence, payoff-schedule rows for M7 cleared or moved | After rows 1–3 |
-| — | Hosted CI | The full matrix green on every commit since `9961c1c`; then require the `CI` check on `main` (M0 follow-up) | Ran green 2026-11-22 on `moejoe873/Rustic`; jobs stopped again later that day on a billing limit |
-| — | M8 early work (parallel) | UI-05 scenes; UI-02 desktop window on Linux, then Windows and macOS | `compositor.scene` complete (ADR 0064); `rustic view` on Linux (ADR 0065, TD-182) |
-| — | MOB-03/04: Android/iOS CPU surfaces | Headless pixels match on emulator and simulator | First task of M8 mobile hosts; needs NDK/Xcode runners |
-| — | Debt due now | The M7 rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule) | With the tasks above |
+| done | M7 completion review | Every M7 gate with recorded evidence; M7 debt rows moved | Done 2026-11-22 ([review](reviews/2026-11-22-m7-completion.md)); mobile device work, GPU crash step and external review rescheduled by ADR 0067 |
+| 1 | UI-05: GPU process (ADR first: GPU abstraction, backends and process boundary) | Compositor scenes are submitted over IPC to a `__gpu` child that presents them; a crashed or protocol-breaking GPU process is replaced without stale authority and the CPU path keeps working (`compositor.recovery`) | Next |
+| 2 | TD-182: long-lived renderer per page | Input routed to the page, scene frames over IPC, scripts running between frames (`platform.linux` step 2) | After or alongside row 1 |
+| 3 | UI-05: desktop GPU backends (`compositor.backend`) | Direct3D 12, Metal and Vulkan adapters with CPU fallback and parity fixtures | After row 1 |
+| 4 | UI-02: Windows and macOS windows (`platform.windows`, `platform.macos`) | The Linux `rustic view` window on Windows and macOS, native x64 and ARM64 | After row 2 |
+| — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |
+| — | External security review (`security.brave`, external dependency) | Outside reviewers return findings on the [packet](reviews/2026-11-22-m7-external-review-packet.md); findings fixed or recorded | Waiting for reviewers; due before the M10 beta |
+| — | Android and iOS devices | M14 ([§17](#17-m14--mobile-devices-and-five-platform-10)) | Deferred by ADR 0067; compile checks and the Android emulator job stay in CI |
+| — | Debt due now | The M8 rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule), first "before remote browsing is on by default" | With the tasks above |
 
 Update this table in the same change that finishes a task. When it and the
 [progress summary](progress/summary.md) disagree, the summary is the measured
@@ -920,7 +968,7 @@ in/out scope, input/output contract, acceptance fixtures, budget behavior, and
 documentation to update. A task should fit a reviewable change; split further
 before coding when it spans multiple unrelated contracts.
 
-## 18. Definition of done and risk register
+## 19. Definition of done and risk register
 
 A change is done when the implementation, focused negative/regression tests,
 relevant conformance selection, diagnostics, budget/cancellation behavior, docs,
@@ -946,7 +994,7 @@ review and a threat-model update; dependency additions get a boundary review.
 | Parity target keeps moving | Other engines ship features faster than Rustic adds them | Inventory refresh every release; prioritize features shipped by all three and by measured site breakage |
 | Leadership gap stays wide | Ratchet misses at M8/M10 | Profile the biggest gap first; fix representation before adding tiers; no gate is lowered without a reviewed plan update |
 | Native platforms go unverified | Hosted CI stops starting jobs (2026-11-08 to 2026-11-22, and again from later on 2026-11-22); merges are checked only on Linux (native x86-64 plus emulation) and compile-checked elsewhere | Keep the sandbox gate strict; when hosted jobs run again, run the whole matrix before merging and fix what it finds first, as the first run on `moejoe873/Rustic` did; consider self-hosted runners so billing cannot stop the gate |
-| Docs drift from code | Status tables, counts or "next task" pointers contradict the progress summary | Every finishing change updates [§17](#17-current-implementation-queue) and the docs index; a milestone cannot close without its completion review; prefer links to generated numbers over copied ones (TD-08) |
+| Docs drift from code | Status tables, counts or "next task" pointers contradict the progress summary | Every finishing change updates [§18](#18-current-implementation-queue) and the docs index; a milestone cannot close without its completion review; prefer links to generated numbers over copied ones (TD-08) |
 | Hand-written bindings do not scale | Each new interface repeats conversion and brand-check code; fixes are applied to one interface and missed in others | Extend the pinned IDL generator (ADR 0025) to each interface family before binding it; TD-126 tracks the hand-bound surface |
 | Script-driven layout thrash | Flush counts per turn grow with page size in WEB-06 tests | Count and bound flushes; keep the from-scratch render as the reference; no caching without the differential test |
 | First network dependency widens the trusted base | Transitive crates, C code or per-target assembly appear with the TLS choice | Decide by ADR before NET-01; `cargo deny` and the dependency review gate; all platforms and tiers must build before adoption |

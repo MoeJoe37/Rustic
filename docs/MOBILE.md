@@ -4,7 +4,13 @@
 
 Windows, macOS, Linux, Android and iOS/iPadOS are target platforms for the same
 original Rustic engine. Android/iOS are part of the architecture now, not an
-optional rewrite after desktop completion. Parsers, DOM, JavaScript, layout,
+optional rewrite after desktop completion.
+
+**Schedule (2026-11-22, [ADR 0067](adr/0067-mobile-devices-last.md)):**
+Android and iOS device work is the last milestone, M14, after the desktop
+engine 1.0. Deferred, not dropped: the shared core stays portable, every
+Android and iOS target stays compile-checked in CI, and the Android emulator
+isolation job keeps running. MOB-03 to MOB-10 below are M14 tasks. Parsers, DOM, JavaScript, layout,
 paint semantics and browser policy must stay independent of desktop shells.
 Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink and WebKit are excluded
 as implementation foundations on every target. A system WebView must not silently
@@ -15,8 +21,8 @@ Current mobile support consists of shared-library cross-compilation checks
 the mobile isolation of [ADR 0059](adr/0059-mobile-renderer-isolation.md)
 (Proposed, MOB-07): on Android a test app (`android/`) runs the renderer in an
 isolated-process service through `crates/rustic-android`, with an instrumented
-isolation and crash-recovery test on an API 34 x86-64 emulator in CI (first
-run pending); iOS is a design only. There is no user-facing Android app, iOS
+isolation and crash-recovery test on an API 34 x86-64 emulator in CI (green
+since 2026-11-22); iOS is a design only. There is no user-facing Android app, iOS
 application/framework, device renderer surface, touch/IME bridge or
 real-device test yet. `rustic-shell` builds its desktop window only off Android,
 where the host will be an activity. Passing `cargo check`
@@ -68,14 +74,14 @@ release; missing approvals cannot be represented as successful runtime support.
 | --- | --- | --- |
 | MOB-01 | M1 | Shared library cross-checks for Android ARM64/ARMv7/x86-64/x86 and iOS device plus ARM64/x86-64 simulator, required by CI |
 | MOB-02 | M1–M3 | Audit native dependencies for both mobile systems, licenses, SDK/NDK and thread/resource requirements |
-| MOB-03 | M3, carried forward through M5; now the first task of M8 mobile hosts ([M5 review](reviews/2026-11-19-m5-completion.md)); needs NDK emulator runners | Android local-fixture CPU surface through an unstable JNI/native bridge; compare pixels with headless output |
-| MOB-04 | M3, carried forward through M5; now the first task of M8 mobile hosts; needs Xcode simulator runners | iOS local-fixture CPU surface and C/Swift bridge; link/run in Simulator and on a signed development device where allowed |
-| MOB-05 | After MOB-03/04 (was M3–M5; not started) | Touch, viewport/scale, keyboard/IME, caret/selection and accessibility fixtures on both mobile systems |
-| MOB-06 | M5–M6 | Background/resume, memory pressure, profile isolation, permission UI and cancellation integration tests |
-| MOB-07 | M7 | OS-supported isolated renderer/service design (ADR 0059, Proposed; Android isolated renderer service implemented 2026-11-22), adversarial authority tests and iOS entitlement/process feasibility (open; `security.mobile`) |
-| MOB-08 | M8 | Native mobile reference hosts using Rustic's renderer/runtime; emulator/simulator and real-device suites |
-| MOB-09 | M9 | Shared site/conformance corpus plus mobile editing/fonts/graphics/accessibility and measured energy/memory behavior |
-| MOB-10 | M10 | Reproducible native artifacts, supported OS/ABI policy, signing/distribution gates and security updates |
+| MOB-03 | M14 (was M3–M8; deferred by ADR 0067) | Android local-fixture CPU surface through an unstable JNI/native bridge; compare pixels with headless output |
+| MOB-04 | M14 (was M3–M8; needs Xcode simulator runners) | iOS local-fixture CPU surface and C/Swift bridge; link/run in Simulator and on a signed development device where allowed |
+| MOB-05 | M14, after MOB-03/04 | Touch, viewport/scale, keyboard/IME, caret/selection and accessibility fixtures on both mobile systems |
+| MOB-06 | M14 (shared-core parts landed in M5–M6) | Background/resume, memory pressure, profile isolation, permission UI and cancellation integration tests |
+| MOB-07 | M7 design and emulator; devices and iOS in M14 | OS-supported isolated renderer/service design (ADR 0059, Proposed; Android isolated renderer service green on the emulator 2026-11-22), then a physical Android device and iOS entitlement/process feasibility (`security.mobile`, M14) |
+| MOB-08 | M14 | Native mobile reference hosts using Rustic's renderer/runtime; emulator/simulator and real-device suites |
+| MOB-09 | M14 | Shared site/conformance corpus plus mobile editing/fonts/graphics/accessibility and measured energy/memory behavior |
+| MOB-10 | M14 | Reproducible native artifacts, supported OS/ABI policy, signing/distribution gates and security updates |
 
 Mobile CPU surface prototypes arrive alongside M3's renderer. GPU optimization
 follows a correct CPU/reference path, with surface-loss recovery and device tests.

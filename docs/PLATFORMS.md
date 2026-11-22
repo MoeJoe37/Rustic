@@ -32,6 +32,21 @@ These apply to every change, in every crate:
 - **No silent platform loss.** A change that drops a target from CI needs an
   ADR update explaining why and how it returns.
 
+## Android and iOS: deferred, not dropped (2026-11-22)
+
+[ADR 0067](adr/0067-mobile-devices-last.md) moves Android and iOS device
+work (physical devices, the iOS simulator and Apple's browser-engine
+entitlement, native mobile hosts and mobile shipping) to M14, the last
+milestone, after the desktop engine 1.0. They remain release platforms and
+overall progress cannot reach 100% without them. What stays in force now:
+
+- the **Mobile check** tier below and the Android emulator isolation job
+  remain required by the aggregate `CI` job;
+- the engineering rules above apply to every change, so the shared core keeps
+  building and behaving the same on the mobile targets;
+- mobile-specific code (`crates/rustic-android`, `android/`) is kept working
+  but not extended until M14.
+
 ## Support tiers and CI coverage
 
 Every row is a required job in the [CI workflow](../.github/workflows/ci.yml);
@@ -84,8 +99,9 @@ What hosted CI still does not cover:
 - **Android and iOS barely run.** Both are compile-checked; the only
   execution is the Android isolated-renderer test on an API 34 x86-64
   emulator (ADR 0059), added to CI on 2026-11-22 and passing since its first run that day. iOS runs
-  nothing. The first on-device surfaces are MOB-03/04, the first task of M8
-  mobile hosts.
+  nothing. Device work (MOB-03 onward, iOS with Apple's browser-engine
+  entitlement, mobile shipping) is deliberately the last milestone, M14
+  ([ADR 0067](adr/0067-mobile-devices-last.md)).
 - **Two cross-checks are partial.** `aarch64-pc-windows-gnullvm` and
   `loongarch64-unknown-linux-gnu` have no packaged C cross compiler for
   `ring`, so the crates that use it are left out there (TD-12).

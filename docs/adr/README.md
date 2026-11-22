@@ -74,12 +74,13 @@ instead of rewriting the history of a decision.
 | [0064](0064-scrolling-and-compositor-scenes.md) | Scroll positions are applied to a finished layout along the containing-block chain (fixed stays, sticky re-solves, clips follow); scenes of cached layers and script scrolling build on them | Accepted (all four steps) |
 | [0065](0065-desktop-window-host.md) | Desktop window host: winit 0.30 and softbuffer 0.4 in `rustic-shell`, minimal features; `rustic view` renders each frame in a sandboxed renderer | Accepted |
 | [0066](0066-remote-addresses-and-windows-network-container.md) | Remote origins resolve through the system resolver in the broker and reach only public addresses (no DNS rebinding to loopback or private networks); the Windows network process runs in a `Rustic.Network` LPAC with internetClient | Accepted |
+| [0067](0067-mobile-devices-last.md) | Android and iOS device work moves to the final milestone M14; M8 is the desktop alpha, M13 desktop 1.0; mobile CI checks stay; external review recorded as an external dependency | Accepted scope update |
 
 ## Records by area
 
 | Area | Records |
 | --- | --- |
-| Scope, product and platforms | 0001, 0006, 0007, 0013, 0018 |
+| Scope, product and platforms | 0001, 0006, 0007, 0013, 0018, 0067 |
 | Ownership, isolation and tooling | 0002, 0004, 0005 |
 | HTML and DOM (M1) | 0008, 0009, 0010, 0011, 0012, 0046 |
 | Rendering and text (M3) | 0003, 0014 |
@@ -106,9 +107,9 @@ authority boundary or `unsafe` code.
 | Decision | Needed before | Why it needs a record |
 | --- | --- | --- |
 | Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
-| Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented, emulator run pending) | Accepting ISO-08/MOB-07 | Platform security boundary verified only on a device, emulator or simulator |
+| Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented and green on the emulator) | Accepting ISO-08/MOB-07 (M14, ADR 0067) | Platform security boundary verified only on a device, emulator or simulator |
 | GPU abstraction and backends (Direct3D 12, Metal, Vulkan, GL ES) | UI-05 (M8) | Major platform dependency and `unsafe`/FFI surface |
-| Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8) | Platform dependencies on five OS families |
+| Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8 desktop; mobile in M14) | Platform dependencies on five OS families |
 | WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
 | Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | New `unsafe` outside `rustic-sandbox` |
 

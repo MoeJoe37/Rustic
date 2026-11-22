@@ -13,7 +13,7 @@ guide ([URL](URL.md), [HTML](HTML.md), [tree construction](HTML_TREE.md),
 [DOM](DOM.md), [CSS](CSS.md), [layout](LAYOUT.md), [text](TEXT.md),
 [paint](PAINT.md), [JavaScript](JS.md), [scripted documents](SCRIPTING.md)),
 which describes the current state in one place. What is next is in the
-[roadmap queue](ROADMAP.md#17-current-implementation-queue), and the measured
+[roadmap queue](ROADMAP.md#18-current-implementation-queue), and the measured
 status is the [progress summary](progress/summary.md).
 
 <details>
@@ -1899,9 +1899,9 @@ switching, and that a resize reflows. `paint.conformance` is complete and
 ## Queue status
 
 *Historical section, written between 2026-11-08 and 2026-11-10. The catalog
-is now `engine-v4` (25 subsystems, 221 capabilities, M1–M13; see
+is now `engine-v4` (25 subsystems, 226 capabilities, M1–M14; see
 [PROGRESS.md](PROGRESS.md)), and the current queue is
-[ROADMAP §17](ROADMAP.md#17-current-implementation-queue). The paragraphs
+[ROADMAP §18](ROADMAP.md#18-current-implementation-queue). The paragraphs
 below record how the scope grew and are kept for that history.*
 
 The README now includes an automatically regenerated engine progress map. Its
@@ -2242,7 +2242,7 @@ OpenType/format/tailoring gaps are paid by this completion. Broad text standards
 acceptance and native platform runtime gates remain separate M9/M8 work.
 
 The table below is the status of the original M1–M2 queue items and is kept as
-history; the [roadmap's current queue](ROADMAP.md#17-current-implementation-queue)
+history; the [roadmap's current queue](ROADMAP.md#18-current-implementation-queue)
 lists the next tasks.
 
 | First implementation queue item | Status |

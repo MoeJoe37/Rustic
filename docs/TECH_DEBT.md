@@ -52,27 +52,29 @@ applies and wins if it fires earlier. An entry that reaches its row unpaid is
 either paid then or moved to a later row in the same change, with the reason
 added to the entry. Entries are never left on a row whose milestone has closed.
 
-Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completion review.
+Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completion review, and the M7 rows moved to M8 on 2026-11-22 when M7 closed and Android/iOS device work became M14 ([ADR 0067](adr/0067-mobile-devices-last.md)).
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M7 entry (before hostile remote content) | TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures, an attack surface for remote pages |
-| M7 browser shell and isolation (DevTools, ISO-01) | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
-| With hosted CI (it ran green on 2026-11-22, then stopped again on a billing limit) | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its mobile runs are an M7 gate (`security.mobile`) |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M14 (Android and iOS devices, ADR 0067) | None yet; the device and simulator half of the hosted-CI row's mobile entry is paid here | Device, simulator and Apple-entitlement work deferred to the last milestone; mobile compile checks and the Android emulator job stay in CI meanwhile |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
-scope limits, but the short ones before them: the "M7 entry" row, whose
-entries were meant to be paid before hostile remote content and are still
-open now that remote origins can be granted (ADR 0066, 2026-11-22), notably
+scope limits, but the short ones before them: the "before remote browsing is on by default" row
+(formerly "M7 entry"), whose entries were meant to be paid before hostile
+remote content and are still open now that remote origins can be granted
+(ADR 0066, 2026-11-22), notably
 TD-111 (a regular expression can run for exponential time until the step
-budget stops it); and TD-12 (no Android or iOS test runs, and hosted jobs
-stopped again after one green native run on 2026-11-22).
+budget stops it); and TD-12 (hosted jobs have stopped twice on billing; the
+Android and iOS device runs are deliberately deferred to M14).
 
 ## Ledger
 
@@ -303,6 +305,7 @@ observed.
 allowance, with a timing regression case in the fuzz smoke corpus.
 **Trigger:** a fuzz timeout, a profile showing the walk, or DOM APIs that let
 script move subtrees.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-04 — Invariant `expect` and indexing in library code
 
@@ -403,7 +406,7 @@ local sandbox: the full Linux suite, MSRV 1.85, fuzz smoke, and `cargo check`
 for aarch64 Linux, Android (aarch64 and armv7), Windows (x86_64-gnu), iOS and
 i686. **Pay:** restore billing so the full matrix runs, then add Android/iOS
 test runs once a host exists. **Trigger:** now for billing; mobile tests with
-the mobile hosts.
+the mobile hosts, which are M14 since 2026-11-22 (ADR 0067).
 **Update 2026-11-22 (billing paid):** the repository moved to an account
 where Actions runs, and the full matrix ran again for the first time since
 2026-11-08 (native Linux/Windows/macOS x64 and ARM64). Its findings were
@@ -454,6 +457,7 @@ kind plus an original-input byte offset, with no input text. They already use
 byte offsets, but a URL string has no `SourceId`/revision of its own, so the
 conversion belongs to the caller that knows which document attribute or
 script string the URL came from. Pay at the same trigger.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-16 — Adoption reissues node IDs instead of keeping node identity (Paid)
 
@@ -680,6 +684,7 @@ exponential; 3,000-deep documents style in well under a second. **Pay:** use
 per-element ancestor/sibling bloom filters or the invalidation-time `:has()`
 indexes that engines use. **Trigger:** CSS-06 invalidation work on `:has()`, or
 a measured slow page.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-31 — Form owners ignore the parser's form element pointer (Paid)
 
@@ -958,6 +963,7 @@ interval tree) and cache retry results per available width. Move the budget
 into a non-exhaustive limits type. **Trigger:** profiling of float-heavy pages,
 a fuzz finding that hits `WorkLimit` on small input, or the next `LayoutLimits`
 change.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-45 — Approximations in floats, static positions and scroll geometry
 
@@ -1360,6 +1366,7 @@ per-document budget instead. **Pay:** hand out weak handles or lease
 counts that the budget can see; decode into a reserved allocation; an
 ordered LRU index. **Trigger:** a long-lived engine with many documents,
 or memory pressure reports.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-84 — Image decoder speed and untested paths
 
@@ -1520,6 +1527,7 @@ then fails with `OutOfMemory` even though garbage exists.
 Pay with JS-05: built-ins that loop root their temporaries and poll at loop
 boundaries, or runtime functions adopt handle scopes so allocation itself can
 collect. Trigger: the first built-in that allocates per iteration.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-95 — Stop-the-world, full-heap collection
 
@@ -1638,6 +1646,7 @@ footprint can exceed its limit by those bounds.
 
 Watch for: JS-09's heap report. Pay by charging stack growth to the budget
 when the report needs one number per agent.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-103 — One cache entry per site, one epoch for all
 
@@ -1788,6 +1797,7 @@ Pay with: a linear-time fallback (a Pike VM or lazy DFA) for patterns with
 no backreferences or lookarounds, chosen when the backtracker exceeds a
 step count, as V8's experimental engine does. Trigger: a measured slow
 page or a ReDoS report.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-112 — BigInt size cap and quadratic arithmetic
 
@@ -1873,7 +1883,7 @@ Pay with: a fallible `Heap::flatten(&mut self)` at the places that read
 units, leaving `Heap::string` for strings known to be flat. Trigger: a host
 that needs the limit to hold between safe points (a hard per-renderer cap in
 M7), or a fuzz finding that reaches the overshoot.
-
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-117 — List formatting context and best-fit locale matching
 
@@ -2107,7 +2117,7 @@ lifetime-aware proxy retargeting and implement origin-sensitive property
 access. Test context identity across navigation and cross-origin property
 descriptors with the corresponding Web Platform Tests.
 [ADR 0032](adr/0032-top-level-window-realm.md)
-
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-131 — Extended input and event delivery
 
@@ -2183,6 +2193,7 @@ stylesheet, script or timer becomes ready while the parser is suspended.
 [ADR 0039](adr/0039-local-external-classics.md)
 
 **Rescheduled 2026-11-19 (M5 completion review):** Stylesheet-blocking scripts and task interleaving depend on asynchronous resource loading, which arrives with NET-01; moved to the M6 entry row.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-135 — Dynamic page imports, import maps and data modules
 
@@ -2410,6 +2421,7 @@ property on demand (or build an element's record lazily on first read), and
 return borrowed values from `PageTree::computed_style`. Keep the CSSOM WPT
 cases and add a flush-cost test on a large document.
 **Trigger:** M7 entry, or profiling a page with many elements and layout reads.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-149 — Pseudo-element `getComputedStyle` throws
 
@@ -2445,6 +2457,7 @@ charged to the JS heap, but they are memory nothing will use again.
 during `disconnect` when the node is still reachable.
 **Trigger:** M7 entry, or a heap report that shows observer records
 dominating a page.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-151 — Mutation records for parser and host edits resolve observers when drained
 
@@ -2478,6 +2491,7 @@ preview ([ADR 0048](adr/0048-error-reporting-and-event-handlers.md)).
 through `report_exception`, add `location` with navigation, and implement
 the Console Standard's formatter with side-effect-free previews.
 **Trigger:** M6 navigation, or the DevTools work in M10.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-153 — Event handler content attributes and remaining handler names
 
@@ -2631,6 +2645,7 @@ and fetch metadata (both done 2026-11-20: the `referrer` module and the
 `fetch()`.
 **Trigger:** the engine loading subresources over HTTP (NET-02 wiring) or
 the script-facing `fetch()` binding, whichever comes first.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-162 — gzip and deflate bodies are not streamed
 
@@ -2686,6 +2701,7 @@ arrive and running subresource fetches concurrently; pass the document
 mode to the stylesheet check.
 **Trigger:** the M7 browser shell's network process, or a page-load
 measurement over HTTP.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-166 — Profile locks are not checked for a dead owner
 
@@ -2697,6 +2713,7 @@ MSRV (1.85) predates `File::try_lock`.
 reviewed platform call) held for the profile's life, with the `LOCK` file
 kept only as a hint.
 **Trigger:** the M7 browser shell, which opens the user's real profile.
+**Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
 ### TD-167 — No `storage` events
 

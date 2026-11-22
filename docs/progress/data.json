@@ -1,13 +1,13 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "0d333943911a2ee12f87cf972b8580889238a209013acea27925b4d478b840ea",
-  "percent": "42.96",
-  "verified_percent": "40.90",
-  "partial_percent": "2.06",
-  "completed": 95,
-  "in_progress": 9,
-  "total": 221,
+  "source_fingerprint": "1100200920f789500feddb57d5584e6f1c763e4e32f0107d73ce35aec4dd58c5",
+  "percent": "43.12",
+  "verified_percent": "41.83",
+  "partial_percent": "1.29",
+  "completed": 97,
+  "in_progress": 7,
+  "total": 226,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
   "milestones": [
@@ -74,37 +74,37 @@
     {
       "id": "M7",
       "label": "Isolation & security",
-      "share": "3.72",
-      "completed": 5,
-      "total": 8,
-      "percent": "86.14",
-      "verified_percent": "59.37",
-      "partial_percent": "26.77"
+      "share": "3.13",
+      "completed": 7,
+      "total": 7,
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "M8",
-      "label": "Desktop & mobile alpha",
-      "share": "10.22",
+      "label": "Desktop alpha",
+      "share": "8.12",
       "completed": 1,
-      "total": 21,
-      "percent": "10.29",
-      "verified_percent": "6.77",
-      "partial_percent": "3.52"
+      "total": 18,
+      "percent": "12.87",
+      "verified_percent": "8.51",
+      "partial_percent": "4.36"
     },
     {
       "id": "M9",
       "label": "Compatibility expansion",
-      "share": "22.10",
+      "share": "22.01",
       "completed": 0,
       "total": 52,
-      "percent": "2.59",
+      "percent": "2.60",
       "verified_percent": "0.00",
-      "partial_percent": "2.59"
+      "partial_percent": "2.60"
     },
     {
       "id": "M10",
       "label": "Embedding & beta release",
-      "share": "2.67",
+      "share": "2.55",
       "completed": 0,
       "total": 7,
       "percent": "0.00",
@@ -114,7 +114,7 @@
     {
       "id": "M11",
       "label": "Web platform parity",
-      "share": "14.85",
+      "share": "14.78",
       "completed": 0,
       "total": 30,
       "percent": "0.82",
@@ -124,7 +124,7 @@
     {
       "id": "M12",
       "label": "Performance leadership",
-      "share": "7.91",
+      "share": "7.64",
       "completed": 0,
       "total": 13,
       "percent": "0.00",
@@ -133,13 +133,23 @@
     },
     {
       "id": "M13",
-      "label": "Full engine 1.0",
-      "share": "0.50",
+      "label": "Desktop engine 1.0",
+      "share": "0.45",
       "completed": 0,
       "total": 1,
       "percent": "0.00",
       "verified_percent": "0.00",
       "partial_percent": "0.00"
+    },
+    {
+      "id": "M14",
+      "label": "Mobile devices & five-platform 1.0",
+      "share": "3.27",
+      "completed": 0,
+      "total": 9,
+      "percent": "7.09",
+      "verified_percent": "0.00",
+      "partial_percent": "7.09"
     }
   ],
   "groups": [
@@ -6331,7 +6341,7 @@
           "id": "security.mobile",
           "label": "Verified Android/iOS process and broker restrictions",
           "size": 5,
-          "milestone": "M7",
+          "milestone": "M14",
           "status": "in_progress",
           "evidence": [],
           "steps": [
@@ -6472,94 +6482,60 @@
           "label": "Renderer/service crash recovery without stale authority",
           "size": 3,
           "milestone": "M7",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "A crashed or protocol-breaking renderer ends its command without output; the broker survives",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "the renderer process ended before finishing"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "the renderer process ended before finishing"
             },
             {
-              "label": "A hung renderer is stopped by the broker's watchdog",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "fn kill_process"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn a_hung_renderer_is_stopped_by_the_watchdog"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
             },
             {
-              "label": "Every new renderer starts with a fresh grant; nothing carries over from a dead one",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "enum Grant"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn crashed_and_protocol_breaking_renderers_end_the_command_cleanly"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "fn kill_process"
             },
             {
-              "label": "Network process: exchanges run in a separate process; a crashed or protocol-breaking one fails only its requests and is replaced (ADR 0061)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/netproc.rs",
-                  "marker": "fn fail_all"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn a_crashed_network_process_fails_its_requests_and_is_replaced"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn a_compromised_network_process_is_cut_off_by_the_broker"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_hung_renderer_is_stopped_by_the_watchdog"
             },
             {
-              "label": "GPU process crash and restart (needs the M8 GPU process)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "enum Grant"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/netproc.rs",
+              "marker": "fn fail_all"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_crashed_network_process_fails_its_requests_and_is_replaced"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_compromised_network_process_is_cut_off_by_the_broker"
             }
           ],
-          "credit": "80.00",
+          "credit": "100.00",
           "engine_share": "0.34"
         },
         {
           "id": "security.brave",
-          "label": "Versioned Brave security comparison and independent review",
+          "label": "Versioned Brave security comparison and independent external security review",
           "size": 3,
           "milestone": "M10",
           "status": "planned",
           "evidence": [],
+          "external": "Needs security reviewers outside the project; the review packet is docs/reviews/2026-11-22-m7-external-review-packet.md",
           "credit": "0.00",
           "engine_share": "0.34"
         },
@@ -6585,120 +6561,74 @@
         },
         {
           "id": "security.audit",
-          "label": "Fuzz/native-memory review and security release gate",
+          "label": "Fuzz/native-memory review, external review packet and internal security gate",
           "size": 5,
           "milestone": "M7",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Fuzz targets for every untrusted input, including network parsers, policy decisions and IPC, with a recorded smoke campaign",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-fuzz/src/net.rs",
-                  "marker": "pub(crate) struct HttpResponseTarget"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-fuzz/src/ipc.rs",
-                  "marker": "pub(crate) struct IpcFrameTarget"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-fuzz/tests/harness.rs",
-                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/net.rs",
+              "marker": "pub(crate) struct HttpResponseTarget"
             },
             {
-              "label": "Native and unsafe code inventory of the dependency graph",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/reviews/2026-11-20-m7-security-review.md",
-                  "marker": "## Native and unsafe code"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-fuzz/tests/harness.rs",
-                  "marker": "fn every_target_replays_its_seed_corpus_cleanly"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/ipc.rs",
+              "marker": "pub(crate) struct IpcFrameTarget"
             },
             {
-              "label": "AddressSanitizer run over the network, IPC, storage, codec, HTML, bindings, engine and CLI tests, native C included",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/reviews/2026-11-20-m7-security-review.md",
-                  "marker": "## Dynamic checks"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-net/tests/tls.rs",
-                  "marker": "fn"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-fuzz/tests/harness.rs",
+              "marker": "fn every_target_replays_its_seed_corpus_cleanly"
             },
             {
-              "label": "Renderer compromise and site/profile separation tests",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/renderer.rs",
-                  "marker": "fn compromised"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-storage/tests/profile.rs",
-                  "marker": "fn storage_is_partitioned_by_top_level_site_and_cleared_per_origin"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/reviews/2026-11-20-m7-security-review.md",
+              "marker": "## Native and unsafe code"
             },
             {
-              "label": "External review packet: scope, build and run steps, unsafe inventory, known limitations, questions",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/reviews/2026-11-22-m7-external-review-packet.md",
-                  "marker": "## Scope, in priority order"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/isolation.rs",
-                  "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/reviews/2026-11-20-m7-security-review.md",
+              "marker": "## Dynamic checks"
             },
             {
-              "label": "Independent external security review (needs reviewers outside the project)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-net/tests/tls.rs",
+              "marker": "fn"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/renderer.rs",
+              "marker": "fn compromised"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "fn a_compromised_renderer_cannot_reach_beyond_its_network_grant"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-storage/tests/profile.rs",
+              "marker": "fn storage_is_partitioned_by_top_level_site_and_cleared_per_origin"
+            },
+            {
+              "kind": "source",
+              "path": "docs/reviews/2026-11-22-m7-external-review-packet.md",
+              "marker": "## Scope, in priority order"
             }
           ],
-          "credit": "83.33",
+          "credit": "100.00",
           "engine_share": "0.58"
         }
       ],
       "points": 43,
-      "completed": 5,
-      "in_progress": 3,
+      "completed": 7,
+      "in_progress": 1,
       "total": 11,
-      "contribution": "3.20",
-      "percent": "64.10",
-      "verified_percent": "44.18",
-      "partial_percent": "19.92"
+      "contribution": "3.37",
+      "percent": "67.44",
+      "verified_percent": "62.79",
+      "partial_percent": "4.65"
     },
     {
       "id": "compositor",
@@ -6808,17 +6738,27 @@
         },
         {
           "id": "compositor.backend",
-          "label": "Mobile/desktop GPU adapters and CPU fallback",
-          "size": 5,
+          "label": "Desktop GPU adapters and CPU fallback",
+          "size": 3,
           "milestone": "M8",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.15"
+          "engine_share": "0.69"
+        },
+        {
+          "id": "compositor.mobile",
+          "label": "Android and iOS GPU adapters verified on devices",
+          "size": 2,
+          "milestone": "M14",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.46"
         },
         {
           "id": "compositor.recovery",
-          "label": "Surface/device loss and resource recovery",
+          "label": "Surface/device loss, GPU process crash/restart and resource recovery",
           "size": 2,
           "milestone": "M8",
           "status": "planned",
@@ -6840,7 +6780,7 @@
       "points": 13,
       "completed": 1,
       "in_progress": 0,
-      "total": 4,
+      "total": 5,
       "contribution": "0.69",
       "percent": "23.07",
       "verified_percent": "23.07",
@@ -6944,7 +6884,7 @@
           "id": "platform.android",
           "label": "Android runtime and native host acceptance",
           "size": 3,
-          "milestone": "M8",
+          "milestone": "M14",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
@@ -6954,7 +6894,7 @@
           "id": "platform.ios",
           "label": "iOS/iPadOS runtime and native host acceptance",
           "size": 3,
-          "milestone": "M8",
+          "milestone": "M14",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
@@ -6962,7 +6902,7 @@
         },
         {
           "id": "platform.lifecycle",
-          "label": "Surface, touch/IME and background lifecycle parity",
+          "label": "Surface, input/IME and background lifecycle parity on desktop",
           "size": 3,
           "milestone": "M8",
           "status": "planned",
@@ -6982,9 +6922,9 @@
         },
         {
           "id": "platform.device",
-          "label": "Linked artifacts, device/simulator suites and OS policy",
+          "label": "Signed mobile artifacts, device/simulator suites and store/OS policy",
           "size": 2,
-          "milestone": "M8",
+          "milestone": "M14",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
@@ -7017,13 +6957,23 @@
         },
         {
           "id": "a11y.bridges",
-          "label": "Desktop and mobile accessibility bridges",
-          "size": 5,
+          "label": "Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI)",
+          "size": 3,
           "milestone": "M8",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.71"
+          "engine_share": "0.42"
+        },
+        {
+          "id": "a11y.mobile",
+          "label": "Android TalkBack and iOS VoiceOver bridges verified on devices",
+          "size": 2,
+          "milestone": "M14",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.28"
         },
         {
           "id": "a11y.editing",
@@ -7049,7 +6999,7 @@
       "points": 14,
       "completed": 0,
       "in_progress": 0,
-      "total": 4,
+      "total": 5,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",
@@ -7197,13 +7147,23 @@
         },
         {
           "id": "extensions.platforms",
-          "label": "Native desktop/Android/iOS extension acceptance",
-          "size": 3,
+          "label": "Native desktop extension acceptance",
+          "size": 2,
           "milestone": "M9",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.28"
+          "engine_share": "0.18"
+        },
+        {
+          "id": "extensions.mobile",
+          "label": "Rustic MV2 extensions and the uBO port on Android and iOS devices",
+          "size": 1,
+          "milestone": "M14",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.09"
         },
         {
           "id": "extensions.conformance",
@@ -7219,7 +7179,7 @@
       "points": 32,
       "completed": 0,
       "in_progress": 0,
-      "total": 10,
+      "total": 11,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",
@@ -7360,13 +7320,23 @@
               ]
             },
             {
-              "label": "Reference devices on all five platform families with published per-device reports (M8)",
+              "label": "Reference devices on the three desktop platform families (x64 and ARM64) with published per-device reports (M8)",
               "status": "planned",
               "evidence": []
             }
           ],
           "credit": "50.00",
-          "engine_share": "0.38"
+          "engine_share": "0.37"
+        },
+        {
+          "id": "perf.mobile",
+          "label": "Android and iOS reference devices, per-device reports and the leadership gate on them",
+          "size": 2,
+          "milestone": "M14",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.25"
         },
         {
           "id": "perf.interpreter",
@@ -7376,7 +7346,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         },
         {
           "id": "perf.baseline_jit",
@@ -7386,7 +7356,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.03"
+          "engine_share": "1.00"
         },
         {
           "id": "perf.optimizing_jit",
@@ -7396,7 +7366,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "1.03"
+          "engine_share": "1.00"
         },
         {
           "id": "perf.gc",
@@ -7406,7 +7376,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         },
         {
           "id": "perf.style",
@@ -7416,7 +7386,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         },
         {
           "id": "perf.layout",
@@ -7426,7 +7396,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         },
         {
           "id": "perf.raster",
@@ -7436,7 +7406,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         },
         {
           "id": "perf.loading",
@@ -7446,7 +7416,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         },
         {
           "id": "perf.memory",
@@ -7456,7 +7426,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.38"
+          "engine_share": "0.37"
         },
         {
           "id": "perf.energy",
@@ -7466,7 +7436,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.38"
+          "engine_share": "0.37"
         },
         {
           "id": "perf.startup",
@@ -7480,23 +7450,23 @@
         },
         {
           "id": "perf.gate",
-          "label": "Benchmark leadership gate against Blink, Gecko and WebKit on every reference device",
+          "label": "Benchmark leadership gate against Blink, Gecko and WebKit on every desktop reference device",
           "size": 5,
           "milestone": "M12",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.64"
+          "engine_share": "0.62"
         }
       ],
-      "points": 62,
+      "points": 64,
       "completed": 0,
       "in_progress": 1,
-      "total": 13,
-      "contribution": "0.19",
-      "percent": "2.41",
+      "total": 14,
+      "contribution": "0.18",
+      "percent": "2.34",
       "verified_percent": "0.00",
-      "partial_percent": "2.41"
+      "partial_percent": "2.34"
     },
     {
       "id": "release",
@@ -7511,7 +7481,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.27"
         },
         {
           "id": "release.compatibility",
@@ -7521,7 +7491,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.50"
+          "engine_share": "0.45"
         },
         {
           "id": "release.performance",
@@ -7531,17 +7501,17 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.27"
         },
         {
           "id": "release.artifacts",
-          "label": "Reproducible signed desktop/mobile artifacts and updates",
+          "label": "Reproducible signed desktop artifacts and updates",
           "size": 3,
           "milestone": "M10",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.27"
         },
         {
           "id": "release.comparison",
@@ -7551,17 +7521,27 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.27"
         },
         {
           "id": "release.complete",
-          "label": "Final full-engine 1.0 acceptance across all five target platforms",
+          "label": "Desktop 1.0 acceptance on Windows, macOS and Linux",
           "size": 5,
           "milestone": "M13",
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.50"
+          "engine_share": "0.45"
+        },
+        {
+          "id": "release.mobile",
+          "label": "Final full-engine 1.0 acceptance on all five platforms, including Android and iOS devices",
+          "size": 3,
+          "milestone": "M14",
+          "status": "planned",
+          "evidence": [],
+          "credit": "0.00",
+          "engine_share": "0.27"
         },
         {
           "id": "release.inventory",
@@ -7571,7 +7551,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.30"
+          "engine_share": "0.27"
         },
         {
           "id": "release.interop",
@@ -7581,13 +7561,13 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.50"
+          "engine_share": "0.45"
         }
       ],
-      "points": 30,
+      "points": 33,
       "completed": 0,
       "in_progress": 0,
-      "total": 8,
+      "total": 9,
       "contribution": "0.00",
       "percent": "0.00",
       "verified_percent": "0.00",

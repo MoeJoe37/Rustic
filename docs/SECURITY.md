@@ -106,8 +106,11 @@ remote origins can be granted on the command line and reach only public
 addresses ([ADR 0066](adr/0066-remote-addresses-and-windows-network-container.md)).
 On Android the renderer runs in an isolated-process service
 ([ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed); its emulator
-test is in CI but has not run yet. iOS isolation is a design only. See the
-[M7 security review](reviews/2026-11-20-m7-security-review.md).
+test passes in CI. iOS isolation is a design only; device and iOS work is the
+last milestone, M14 ([ADR 0067](adr/0067-mobile-devices-last.md)). See the
+[M7 security review](reviews/2026-11-20-m7-security-review.md) and the
+[M7 completion review](reviews/2026-11-22-m7-completion.md); an independent
+external review is an external dependency of the M10 beta.
 
 The OS implementation is platform-specific. Linux namespace/seccomp policy,
 Windows token/AppContainer/job policy and macOS Seatbelt each have a prototype

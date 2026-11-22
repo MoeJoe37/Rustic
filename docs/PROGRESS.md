@@ -9,13 +9,13 @@ external badge service to display it.
 ## What the number means
 
 [progress/catalog.json](../progress/catalog.json) defines `engine-v4`: 25 weighted
-subsystems and 221 concrete capabilities covering the whole engine plan, up to
+subsystems and 226 concrete capabilities covering the whole engine plan, up to
 feature parity with Blink, Gecko and WebKit and measured performance leadership
 over all three. Subsystem
 weights sum to 100. Inside a subsystem each capability has a **size** of 1, 2, 3,
 5 or 8 points describing its relative scope, so finishing the CSS property
 catalog (8) moves the bar more than finishing the CSS tokenizer (3). Each
-capability also names the [roadmap](ROADMAP.md) **milestone** (M1–M13) that
+capability also names the [roadmap](ROADMAP.md) **milestone** (M1–M14) that
 delivers it.
 
 A capability earns **credit** of 1 when complete, a verified step fraction when
@@ -37,7 +37,7 @@ network/storage/security, accessibility, performance/reliability, embedding,
 GPU/Wasm, Rustic MV2 extensions, the uBlock Origin port, media/graphics/device
 APIs, the parity inventory and WPT parity gate, the performance-leadership gate
 against Blink, Gecko and WebKit, comparative security evidence, signed artifacts and runtime acceptance on Windows, macOS, Linux, Android and
-iOS/iPadOS. It cannot be reached by completing just the currently existing crates
+iOS/iPadOS (the Android and iOS device work is the last milestone, M14). It cannot be reached by completing just the currently existing crates
 or the first milestone. The final acceptance gate remains open until the actual
 engine and required platform evidence are ready.
 
@@ -62,6 +62,34 @@ implementations to raise the number.
   width is its size, and engine points (weight × progress; all points add up to
   the overall percentage). An outlined cell is in progress; its blue fill is its
   verified step fraction.
+
+## engine-v4 mobile deferral (2026-11-22)
+
+[ADR 0067](adr/0067-mobile-devices-last.md) puts Android and iOS device work
+last. Overall progress moved from 42.96% to 43.12% and M7 from 86.14% to
+100%; no completed step lost credit and no unfinished step was deleted:
+
+- new last milestone **M14 Mobile devices & five-platform 1.0**; M8 is now
+  "Desktop alpha" and M13 "Desktop engine 1.0";
+- moved to M14 unchanged: `security.mobile` (its design and emulator steps
+  keep their credit), `platform.android`, `platform.ios` and
+  `platform.device` (relabelled to signed mobile artifacts and store policy);
+- mixed capabilities split, keeping each subsystem's total:
+  `compositor.backend` 5 → 3 (desktop) + `compositor.mobile` 2,
+  `a11y.bridges` 5 → 3 (desktop) + `a11y.mobile` 2, `extensions.platforms`
+  3 → 2 (desktop) + `extensions.mobile` 1;
+- new scope: `perf.mobile` (2; the `perf.harness` device step now covers the
+  three desktop families) and `release.mobile` (3, the final five-platform
+  acceptance; `release.complete` is the desktop 1.0 acceptance).
+  `release.mobile` joins the mandatory gates with `platform.android` and
+  `platform.ios`;
+- `security.recovery` is complete: its GPU-process step moved into the label
+  of `compositor.recovery` (M8), which builds the GPU process;
+- `security.audit` is complete for its internal gate: its independent-review
+  step was already the scope of `security.brave` ("independent review",
+  M10), which now carries an **external dependency** note. The generator
+  accepts an optional `external` description on an unfinished capability and
+  prints it in the summary and the chart tooltip.
 
 ## engine-v4 milestone correction (2026-11-19)
 

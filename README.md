@@ -51,7 +51,7 @@ profiles and Web Storage, all 40 [Encoding Standard](docs/ENCODING.md)
 encodings, and loading documents and subresources from origins the command
 line grants ([M6 review](docs/reviews/2026-11-20-m6-completion.md)).
 
-M7, the current milestone, splits the engine into processes: every document
+M7 split the engine into processes: every document
 command runs its page in a renderer child over bounded, versioned IPC, and the
 broker answers each file, network and storage request from its own grant.
 Renderers are confined by default on Linux (bubblewrap and seccomp), Windows
@@ -59,12 +59,21 @@ Renderers are confined by default on Linux (bubblewrap and seccomp), Windows
 run in a separate, confined network process; iframes and popups get renderers
 of their own with site process keys, COOP, COEP and ORB; and crashed or
 misbehaving children are replaced without stale authority. Remote origins can
-be granted and resolve only to public addresses. `rustic view` opens a page in
-a native desktop window with a trusted address and permission strip the page
-cannot paint over. An Android isolated-process renderer service is implemented but
-not yet run in CI; iOS isolation and an external security review are still
-open ([ROADMAP §10](docs/ROADMAP.md#10-m7--isolation-and-security-gate),
-[security review](docs/reviews/2026-11-20-m7-security-review.md)).
+be granted and resolve only to public addresses
+([M7 review](docs/reviews/2026-11-22-m7-completion.md)). An independent
+external security review is still wanted before the beta; the
+[review packet](docs/reviews/2026-11-22-m7-external-review-packet.md) is ready.
+
+M8, the current milestone, is the desktop alpha: `rustic view` already opens a
+page in a native Linux window with a trusted address and permission strip the
+page cannot paint over, and the GPU process is next
+([ROADMAP §18](docs/ROADMAP.md#18-current-implementation-queue)).
+**Android and iOS are deferred to the last milestone (M14)**, not dropped:
+they stay release platforms, every Android and iOS target is still
+compile-checked in CI and the Android isolated renderer service runs on an
+emulator there, but device work, Apple's browser-engine entitlement and
+mobile shipping come after the desktop engine
+([ADR 0067](docs/adr/0067-mobile-devices-last.md)).
 See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 <!-- rustic-progress:start -->
@@ -73,7 +82,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 42.96%** (40.90% verified complete + 2.06% partial credit) — 95/221 capabilities complete and 9 in progress across 25 subsystems. Current milestone: **M7 Isolation & security**, 86.14% done.
+**Overall engine completion: 43.12%** (41.83% verified complete + 1.29% partial credit) — 97/226 capabilities complete and 7 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 12.87% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -201,7 +210,8 @@ superiority. See [product requirements](docs/PRODUCT.md) for exact gates and sco
 6. Expand modern platform compatibility, accessibility, performance, and embedding.
 7. Close the remaining feature gap with Blink, Gecko and WebKit (M11).
 8. Beat all three on pinned benchmarks, memory and energy on every reference device (M12).
-9. Ship the full engine 1.0 once every gate passes on all five platform families (M13).
+9. Ship the desktop engine 1.0 once every gate passes on Windows, macOS and Linux (M13).
+10. Bring Android and iOS onto real devices and pass the same gates on all five platform families (M14, last).
 
 Rustic is not based on **Mozilla, Firefox, Gecko, or SpiderMonkey**. No Chromium,
 Blink, WebKit, Servo, or existing JavaScript engine is embedded as its implementation.

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 42.96%** = 40.90% verified complete + 2.06% partial credit. 95/221 capabilities complete, 9 in progress.
+**Overall completion: 43.12%** = 41.83% verified complete + 1.29% partial credit. 97/226 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `0d333943911a2ee12f87cf972b8580889238a209013acea27925b4d478b840ea`.
+Catalog: `engine-v4`. Source fingerprint: `1100200920f789500feddb57d5584e6f1c763e4e32f0107d73ce35aec4dd58c5`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -16,13 +16,14 @@ Catalog: `engine-v4`. Source fingerprint: `0d333943911a2ee12f87cf972b8580889238a
 | M4 ECMAScript runtime | 13/13 | 100.00% | 100.00% | 8.90% |
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
-| M7 Isolation & security | 5/8 | 86.14% | 59.37% | 3.72% |
-| M8 Desktop & mobile alpha | 1/21 | 10.29% | 6.77% | 10.22% |
-| M9 Compatibility expansion | 0/52 | 2.59% | 0.00% | 22.10% |
-| M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.67% |
-| M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.85% |
-| M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.91% |
-| M13 Full engine 1.0 | 0/1 | 0.00% | 0.00% | 0.50% |
+| M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
+| M8 Desktop alpha | 1/18 | 12.87% | 8.51% | 8.12% |
+| M9 Compatibility expansion | 0/52 | 2.60% | 0.00% | 22.01% |
+| M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
+| M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
+| M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
+| M13 Desktop engine 1.0 | 0/1 | 0.00% | 0.00% | 0.45% |
+| M14 Mobile devices & five-platform 1.0 | 0/9 | 7.09% | 0.00% | 3.27% |
 
 ## Subsystems
 
@@ -44,15 +45,15 @@ Catalog: `engine-v4`. Source fingerprint: `0d333943911a2ee12f87cf972b8580889238a
 | Devices & OS integration | 0/10 | 0 | 0.00% | 0.00% | 4% | 0.00 |
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
-| Security & IPC | 5/11 | 3 | 64.10% | 44.18% | 5% | 3.20 |
-| Compositor & GPU | 1/4 | 0 | 23.07% | 23.07% | 3% | 0.69 |
+| Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
+| Compositor & GPU | 1/5 | 0 | 23.07% | 23.07% | 3% | 0.69 |
 | Platform hosts | 1/9 | 1 | 8.33% | 4.16% | 4% | 0.33 |
-| Accessibility | 0/4 | 0 | 0.00% | 0.00% | 2% | 0.00 |
+| Accessibility | 0/5 | 0 | 0.00% | 0.00% | 2% | 0.00 |
 | DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
-| Extensions (MV2) | 0/10 | 0 | 0.00% | 0.00% | 3% | 0.00 |
+| Extensions (MV2) | 0/11 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | uBO port & filtering | 0/8 | 0 | 0.00% | 0.00% | 2% | 0.00 |
-| Performance leadership | 0/13 | 1 | 2.41% | 0.00% | 8% | 0.19 |
-| Embedding & release | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
+| Performance leadership | 0/14 | 1 | 2.34% | 0.00% | 8% | 0.18 |
+| Embedding & release | 0/9 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 
 ## Capability evidence
 
@@ -280,35 +281,25 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `security.authority` — Browser-assigned authority and capability brokering · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
 - **complete** `security.isolation` — Site/agent/process assignment and origin separation · size 5 · M7 · 0.58% of engine ([source](../../crates/rustic-net/src/isolation.rs), [source](../../docs/adr/0057-process-model-and-site-isolation.md), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-net/src/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0062-out-of-process-frames.md), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-net/tests/navigation.rs))
 - **complete** `security.desktop` — Verified Windows/macOS/Linux sandboxing · size 5 · M7 · 0.58% of engine ([test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs))
-- **in progress 40.00%** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M7 · 0.58% of engine
+- **in progress 40.00%** `security.mobile` — Verified Android/iOS process and broker restrictions · size 5 · M14 · 0.58% of engine
   - [x] Android and iOS isolation design over the shared broker protocol (ADR 0059) ([source](../../docs/adr/0059-mobile-renderer-isolation.md), [test](../../crates/rustic-ipc/tests/channel.rs))
   - [x] Android: isolated-process renderer service with crash recovery, verified on the emulator (CI job android-emulator) ([source](../../android/app/src/main/AndroidManifest.xml), [source](../../crates/rustic-android/src/jni.rs), [test](../../android/app/src/androidTest/java/dev/rustic/android/IsolationTest.java), [test](../../android/app/src/androidTest/java/dev/rustic/android/IsolationTest.java))
   - [ ] Android: the same checks on a physical device (needs a device or device farm)
   - [ ] iOS: BrowserEngineKit web content and networking extensions verified on the simulator
   - [ ] iOS: the same on a device with Apple's browser-engine entitlement (needs Apple approval and a device)
 - **complete** `security.permissions` — Trusted permissions, activation, files and downloads · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-bindings/src/page/activation.rs), [test](../../crates/rustic-engine/tests/input.rs), [source](../../crates/rustic-cli/src/network.rs), [test](../../crates/rustic-cli/tests/network.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/chrome.rs), [source](../../crates/rustic-shell/src/lib.rs), [test](../../crates/rustic-cli/src/chrome.rs), [test](../../crates/rustic-cli/src/chrome.rs), [test](../../crates/rustic-shell/src/lib.rs))
-- **in progress 80.00%** `security.recovery` — Renderer/service crash recovery without stale authority · size 3 · M7 · 0.34% of engine
-  - [x] A crashed or protocol-breaking renderer ends its command without output; the broker survives ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [x] A hung renderer is stopped by the broker's watchdog ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [x] Every new renderer starts with a fresh grant; nothing carries over from a dead one ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [x] Network process: exchanges run in a separate process; a crashed or protocol-breaking one fails only its requests and is replaced (ADR 0061) ([source](../../crates/rustic-cli/src/netproc.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [ ] GPU process crash and restart (needs the M8 GPU process)
-- **planned** `security.brave` — Versioned Brave security comparison and independent review · size 3 · M10 · 0.34% of engine
+- **complete** `security.recovery` — Renderer/service crash recovery without stale authority · size 3 · M7 · 0.34% of engine ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [source](../../crates/rustic-cli/src/broker.rs), [source](../../crates/rustic-cli/src/netproc.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-cli/tests/isolation.rs))
+- **planned** `security.brave` — Versioned Brave security comparison and independent external security review · size 3 · M10 · 0.34% of engine · **external dependency:** Needs security reviewers outside the project; the review packet is docs/reviews/2026-11-22-m7-external-review-packet.md
 - **planned** `security.privacy` — Default tracking/bounce/fingerprinting defenses and privacy matrix · size 5 · M10 · 0.58% of engine
 - **planned** `security.updates` — Authenticated updates, incident response and vulnerability triage · size 3 · M10 · 0.34% of engine
-- **in progress 83.33%** `security.audit` — Fuzz/native-memory review and security release gate · size 5 · M7 · 0.58% of engine
-  - [x] Fuzz targets for every untrusted input, including network parsers, policy decisions and IPC, with a recorded smoke campaign ([source](../../crates/rustic-fuzz/src/net.rs), [source](../../crates/rustic-fuzz/src/ipc.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
-  - [x] Native and unsafe code inventory of the dependency graph ([source](../../docs/reviews/2026-11-20-m7-security-review.md), [test](../../crates/rustic-fuzz/tests/harness.rs))
-  - [x] AddressSanitizer run over the network, IPC, storage, codec, HTML, bindings, engine and CLI tests, native C included ([source](../../docs/reviews/2026-11-20-m7-security-review.md), [test](../../crates/rustic-net/tests/tls.rs))
-  - [x] Renderer compromise and site/profile separation tests ([source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-storage/tests/profile.rs))
-  - [x] External review packet: scope, build and run steps, unsafe inventory, known limitations, questions ([source](../../docs/reviews/2026-11-22-m7-external-review-packet.md), [test](../../crates/rustic-cli/tests/isolation.rs))
-  - [ ] Independent external security review (needs reviewers outside the project)
+- **complete** `security.audit` — Fuzz/native-memory review, external review packet and internal security gate · size 5 · M7 · 0.58% of engine ([source](../../crates/rustic-fuzz/src/net.rs), [source](../../crates/rustic-fuzz/src/ipc.rs), [test](../../crates/rustic-fuzz/tests/harness.rs), [source](../../docs/reviews/2026-11-20-m7-security-review.md), [source](../../docs/reviews/2026-11-20-m7-security-review.md), [test](../../crates/rustic-net/tests/tls.rs), [source](../../crates/rustic-cli/src/renderer.rs), [test](../../crates/rustic-cli/tests/isolation.rs), [test](../../crates/rustic-storage/tests/profile.rs), [source](../../docs/reviews/2026-11-22-m7-external-review-packet.md))
 
 ### Compositor & GPU
 
 - **complete** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-layout/src/scroll.rs), [source](../../docs/adr/0064-scrolling-and-compositor-scenes.md), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-cli/tests/scroll.rs), [source](../../crates/rustic-raster/src/scene.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-raster/src/frames.rs), [source](../../crates/rustic-cli/src/lib.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-bindings/src/page/scrolling.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
-- **planned** `compositor.backend` — Mobile/desktop GPU adapters and CPU fallback · size 5 · M8 · 1.15% of engine
-- **planned** `compositor.recovery` — Surface/device loss and resource recovery · size 2 · M8 · 0.46% of engine
+- **planned** `compositor.backend` — Desktop GPU adapters and CPU fallback · size 3 · M8 · 0.69% of engine
+- **planned** `compositor.mobile` — Android and iOS GPU adapters verified on devices · size 2 · M14 · 0.46% of engine
+- **planned** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine
 - **planned** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M8 · 0.69% of engine
 
 ### Platform hosts
@@ -320,16 +311,17 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [ ] Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64
 - **planned** `platform.windows` — Windows runtime and native host acceptance · size 3 · M8 · 0.50% of engine
 - **planned** `platform.macos` — macOS runtime and native host acceptance · size 3 · M8 · 0.50% of engine
-- **planned** `platform.android` — Android runtime and native host acceptance · size 3 · M8 · 0.50% of engine
-- **planned** `platform.ios` — iOS/iPadOS runtime and native host acceptance · size 3 · M8 · 0.50% of engine
-- **planned** `platform.lifecycle` — Surface, touch/IME and background lifecycle parity · size 3 · M8 · 0.50% of engine
+- **planned** `platform.android` — Android runtime and native host acceptance · size 3 · M14 · 0.50% of engine
+- **planned** `platform.ios` — iOS/iPadOS runtime and native host acceptance · size 3 · M14 · 0.50% of engine
+- **planned** `platform.lifecycle` — Surface, input/IME and background lifecycle parity on desktop · size 3 · M8 · 0.50% of engine
 - **planned** `platform.native` — Native font/codec/OS service adapters · size 3 · M8 · 0.50% of engine
-- **planned** `platform.device` — Linked artifacts, device/simulator suites and OS policy · size 2 · M8 · 0.33% of engine
+- **planned** `platform.device` — Signed mobile artifacts, device/simulator suites and store/OS policy · size 2 · M14 · 0.33% of engine
 
 ### Accessibility
 
 - **planned** `a11y.semantics` — Semantic roles, names and state tree · size 3 · M8 · 0.42% of engine
-- **planned** `a11y.bridges` — Desktop and mobile accessibility bridges · size 5 · M8 · 0.71% of engine
+- **planned** `a11y.bridges` — Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI) · size 3 · M8 · 0.42% of engine
+- **planned** `a11y.mobile` — Android TalkBack and iOS VoiceOver bridges verified on devices · size 2 · M14 · 0.28% of engine
 - **planned** `a11y.editing` — Keyboard/IME, focus and assistive editing flows · size 3 · M8 · 0.42% of engine
 - **planned** `a11y.acceptance` — Assistive-technology and accessibility acceptance · size 3 · M8 · 0.42% of engine
 
@@ -350,7 +342,8 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **planned** `extensions.ui` — Actions, options, permissions and developer diagnostics · size 3 · M9 · 0.28% of engine
 - **planned** `extensions.requests` — Blocking webRequest and reviewed response filtering · size 5 · M9 · 0.46% of engine
 - **planned** `extensions.updates` — Signed updates, revocation and rollback protection · size 2 · M9 · 0.18% of engine
-- **planned** `extensions.platforms` — Native desktop/Android/iOS extension acceptance · size 3 · M9 · 0.28% of engine
+- **planned** `extensions.platforms` — Native desktop extension acceptance · size 2 · M9 · 0.18% of engine
+- **planned** `extensions.mobile` — Rustic MV2 extensions and the uBO port on Android and iOS devices · size 1 · M14 · 0.09% of engine
 - **planned** `extensions.conformance` — Supported-API parity and hostile-extension security gate · size 3 · M9 · 0.28% of engine
 
 ### uBO port & filtering
@@ -366,29 +359,31 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Performance leadership
 
-- **in progress 50.00%** `perf.harness` — Cross-engine benchmark harness, reference devices and published reports · size 3 · M8 · 0.38% of engine
+- **in progress 50.00%** `perf.harness` — Cross-engine benchmark harness, reference devices and published reports · size 3 · M8 · 0.37% of engine
   - [x] First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice) ([source](../../tools/cross_engine_bench.py), [source](../../crates/rustic-engine/examples/dom_bench.rs), [test](../../tools/tests/test_cross_engine_bench.py), [test](../../docs/reviews/2026-11-19-perf-01-m5.md))
-  - [ ] Reference devices on all five platform families with published per-device reports (M8)
-- **planned** `perf.interpreter` — Interpreter fast paths: quickening, superinstructions and call inline caches · size 5 · M12 · 0.64% of engine
-- **planned** `perf.baseline_jit` — Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback · size 8 · M12 · 1.03% of engine
-- **planned** `perf.optimizing_jit` — Optimizing JIT with speculation, deoptimization and on-stack replacement · size 8 · M12 · 1.03% of engine
-- **planned** `perf.gc` — Generational, incremental and concurrent garbage collection · size 5 · M12 · 0.64% of engine
-- **planned** `perf.style` — Parallel style resolution and selector-matching caches · size 5 · M12 · 0.64% of engine
-- **planned** `perf.layout` — Incremental and parallel layout with layout caches · size 5 · M12 · 0.64% of engine
-- **planned** `perf.raster` — GPU raster, off-main-thread compositing and threaded scrolling · size 5 · M12 · 0.64% of engine
-- **planned** `perf.loading` — Loading pipeline: preload scanner, streaming parse, priorities, prerender and back/forward cache · size 5 · M12 · 0.64% of engine
-- **planned** `perf.memory` — Memory leadership: compact DOM/style data, tab discarding and memory-pressure handling · size 3 · M12 · 0.38% of engine
-- **planned** `perf.energy` — Energy: timer coalescing, background throttling and idle power · size 3 · M12 · 0.38% of engine
+  - [ ] Reference devices on the three desktop platform families (x64 and ARM64) with published per-device reports (M8)
+- **planned** `perf.mobile` — Android and iOS reference devices, per-device reports and the leadership gate on them · size 2 · M14 · 0.25% of engine
+- **planned** `perf.interpreter` — Interpreter fast paths: quickening, superinstructions and call inline caches · size 5 · M12 · 0.62% of engine
+- **planned** `perf.baseline_jit` — Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback · size 8 · M12 · 1.00% of engine
+- **planned** `perf.optimizing_jit` — Optimizing JIT with speculation, deoptimization and on-stack replacement · size 8 · M12 · 1.00% of engine
+- **planned** `perf.gc` — Generational, incremental and concurrent garbage collection · size 5 · M12 · 0.62% of engine
+- **planned** `perf.style` — Parallel style resolution and selector-matching caches · size 5 · M12 · 0.62% of engine
+- **planned** `perf.layout` — Incremental and parallel layout with layout caches · size 5 · M12 · 0.62% of engine
+- **planned** `perf.raster` — GPU raster, off-main-thread compositing and threaded scrolling · size 5 · M12 · 0.62% of engine
+- **planned** `perf.loading` — Loading pipeline: preload scanner, streaming parse, priorities, prerender and back/forward cache · size 5 · M12 · 0.62% of engine
+- **planned** `perf.memory` — Memory leadership: compact DOM/style data, tab discarding and memory-pressure handling · size 3 · M12 · 0.37% of engine
+- **planned** `perf.energy` — Energy: timer coalescing, background throttling and idle power · size 3 · M12 · 0.37% of engine
 - **planned** `perf.startup` — Startup and new-tab time with snapshots and code caching · size 2 · M12 · 0.25% of engine
-- **planned** `perf.gate` — Benchmark leadership gate against Blink, Gecko and WebKit on every reference device · size 5 · M12 · 0.64% of engine
+- **planned** `perf.gate` — Benchmark leadership gate against Blink, Gecko and WebKit on every desktop reference device · size 5 · M12 · 0.62% of engine
 
 ### Embedding & release
 
-- **planned** `release.embedding` — Versioned ownership/thread/cancellation embedding contract · size 3 · M10 · 0.30% of engine
-- **planned** `release.compatibility` — Representative sites and complete declared conformance gates · size 5 · M10 · 0.50% of engine
-- **planned** `release.performance` — Measured time, memory, reliability and energy budgets for the beta · size 3 · M10 · 0.30% of engine
-- **planned** `release.artifacts` — Reproducible signed desktop/mobile artifacts and updates · size 3 · M10 · 0.30% of engine
-- **planned** `release.comparison` — Published controlled Blink/Gecko/WebKit speed, memory and energy comparison reports · size 3 · M12 · 0.30% of engine
-- **planned** `release.complete` — Final full-engine 1.0 acceptance across all five target platforms · size 5 · M13 · 0.50% of engine
-- **planned** `release.inventory` — Feature parity inventory against Blink, Gecko and WebKit from pinned browser-compat-data · size 3 · M11 · 0.30% of engine
-- **planned** `release.interop` — WPT parity gate: at least the best engine's pass rate on every required directory · size 5 · M11 · 0.50% of engine
+- **planned** `release.embedding` — Versioned ownership/thread/cancellation embedding contract · size 3 · M10 · 0.27% of engine
+- **planned** `release.compatibility` — Representative sites and complete declared conformance gates · size 5 · M10 · 0.45% of engine
+- **planned** `release.performance` — Measured time, memory, reliability and energy budgets for the beta · size 3 · M10 · 0.27% of engine
+- **planned** `release.artifacts` — Reproducible signed desktop artifacts and updates · size 3 · M10 · 0.27% of engine
+- **planned** `release.comparison` — Published controlled Blink/Gecko/WebKit speed, memory and energy comparison reports · size 3 · M12 · 0.27% of engine
+- **planned** `release.complete` — Desktop 1.0 acceptance on Windows, macOS and Linux · size 5 · M13 · 0.45% of engine
+- **planned** `release.mobile` — Final full-engine 1.0 acceptance on all five platforms, including Android and iOS devices · size 3 · M14 · 0.27% of engine
+- **planned** `release.inventory` — Feature parity inventory against Blink, Gecko and WebKit from pinned browser-compat-data · size 3 · M11 · 0.27% of engine
+- **planned** `release.interop` — WPT parity gate: at least the best engine's pass rate on every required directory · size 5 · M11 · 0.45% of engine

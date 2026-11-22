@@ -130,7 +130,8 @@ before untrusted remote execution. See [Core](https://webassembly.github.io/spec
 Extension and filtering contracts start with M5/M6 services, not by delaying the
 first static renderer. Their required product gates land in M8/M9 after isolation.
 M11 closes the feature gap with the other engines, M12 proves performance
-leadership, and M13 full-engine acceptance includes all goals above on each target platform,
+leadership, M13 desktop acceptance includes all goals above on Windows, macOS and Linux,
+and M14 (last, [ADR 0067](adr/0067-mobile-devices-last.md)) repeats it on Android and iOS devices, with
 complete declared standards/site evidence, GPU and Wasm operation, Rustic MV2
 extensions and the uBO port, security review and competitive measurements.
 

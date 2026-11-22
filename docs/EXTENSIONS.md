@@ -108,6 +108,6 @@ These describe behavior to port; Rustic's host/runtime is implemented separately
 | BLK-05/06 | Rustic uBO port UI, advanced controls and transactional list updates | EXT runtime; feature-matrix regression, backup/restore and update rollback tests |
 | BLK-07/08 | Rust optimization, full feature/mobile parity and release | Reference/optimized decision parity, memory/latency/energy budgets and extension/security review |
 
-M13 full-engine acceptance requires both a safe Rustic MV2 platform and the working uBO port;
+M13 desktop and M14 five-platform acceptance require both a safe Rustic MV2 platform and the working uBO port;
 an API skeleton or a filter parser alone is insufficient. Privacy defaults,
 user exceptions and broken-site reporting belong in trusted browser UI.

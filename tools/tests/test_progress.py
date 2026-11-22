@@ -67,6 +67,29 @@ class ProgressTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid evidence path"):
             progress.validate(self.catalog, self.root)
 
+    def test_external_dependencies_are_described_and_reported(self):
+        feature = self.catalog["groups"][0]["features"][0]
+        feature["external"] = "Needs <outside> reviewers"
+        progress.validate(self.catalog, self.root)
+        data = progress.measure(self.catalog, "0" * 64)
+        self.assertIn("**external dependency:** Needs <outside> reviewers", progress.summary(data))
+        self.assertIn("external dependency: Needs &lt;outside&gt; reviewers", progress.render_svg(data))
+        for value in ["", 7]:
+            feature["external"] = value
+            with self.assertRaisesRegex(ValueError, "external dependency"):
+                progress.validate(self.catalog, self.root)
+        feature["external"] = "Needs reviewers"
+        self.complete(feature)
+        with self.assertRaisesRegex(ValueError, "external dependency"):
+            progress.validate(self.catalog, self.root)
+
+    def test_mobile_device_work_is_the_last_milestone_and_cannot_be_dropped(self):
+        ids = {feature["id"]: feature for group in self.catalog["groups"] for feature in group["features"]}
+        last = self.catalog["milestones"][-1]["id"]
+        for identifier in ["platform.android", "platform.ios", "security.mobile", "release.mobile"]:
+            self.assertEqual(ids[identifier]["milestone"], last)
+        self.assertTrue({"platform.android", "platform.ios", "release.mobile"} <= progress.REQUIRED)
+
     def test_catalog_cannot_drop_major_systems_gates_or_duplicate_ids(self):
         for edit in [
             lambda catalog: catalog["groups"].pop(),

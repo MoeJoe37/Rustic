@@ -21,7 +21,7 @@ GROUPS = {"base", "url", "dom", "html", "css", "text", "layout", "paint", "js", 
 SIZES = {1, 2, 3, 5, 8}
 SHORT = {"base": "Base", "url": "URL", "dom": "DOM", "html": "HTML", "css": "CSS", "text": "Text", "layout": "Layout", "paint": "Paint", "js": "JS", "wasm": "Wasm", "web": "Web", "media": "Media", "graphics": "Gfx", "devices": "Device", "network": "Net", "storage": "Store", "security": "Sec", "compositor": "GPU", "platform": "Host", "a11y": "A11y", "devtools": "Dev", "extensions": "Ext", "filtering": "uBO", "perf": "Perf", "release": "Rel"}
 REQUIRED = {"release.complete", "platform.android", "platform.ios", "platform.linux", "platform.windows", "platform.macos", "js.conformance", "js.wasm", "security.audit", "html.conformance", "css.conformance", "layout.incremental", "compositor.parity", "wasm.conformance", "extensions.conformance", "filtering.acceptance", "security.brave", "security.privacy", "security.updates", "release.comparison",
-            "media.conformance", "graphics.conformance", "devices.conformance", "perf.gate", "release.inventory", "release.interop"}
+            "media.conformance", "graphics.conformance", "devices.conformance", "perf.gate", "release.inventory", "release.interop", "release.mobile"}
 
 
 def percent(value: Fraction) -> str:
@@ -84,6 +84,8 @@ def validate(catalog: dict, root: Path) -> None:
             status = feature.get("status")
             if status not in {"planned", "in_progress", "complete"}:
                 raise ValueError(f"invalid capability status: {identifier}")
+            if "external" in feature and (not isinstance(feature["external"], str) or not feature["external"] or status == "complete"):
+                raise ValueError(f"an external dependency needs a description and an unfinished capability: {identifier}")
             evidence = feature.get("evidence", [])
             if status == "complete" and not proven(evidence):
                 raise ValueError(f"completed capability needs source and test evidence: {identifier}")
@@ -285,6 +287,8 @@ def render_svg(data: dict) -> str:
             tip = f'{escape(feature["label"])}: {status}, size {feature["size"]}, {feature["milestone"]}'
             if feature["status"] == "in_progress":
                 tip += f', {feature["credit"]}% verified'
+            if feature.get("external"):
+                tip += f', external dependency: {escape(feature["external"])}'
             lines.append(f'<g><title>{tip}</title>')
             if feature["status"] == "complete":
                 lines.append(f'<rect x="{cx:.2f}" y="{y + 8}" width="{cell - 2:.2f}" height="14" rx="2" fill="{GREEN}"/>')
@@ -329,7 +333,8 @@ def summary(data: dict) -> str:
             if feature["status"] == "in_progress":
                 status += f" {feature['credit']}%"
             lines.append(f"- **{status}** `{feature['id']}` — {feature['label']} · size {feature['size']} · {feature['milestone']} · {feature['engine_share']}% of engine"
-                         + (f" ({proof})" if proof else ""))
+                         + (f" ({proof})" if proof else "")
+                         + (f" · **external dependency:** {feature['external']}" if feature.get("external") else ""))
             for step in feature.get("steps", []):
                 mark = "x" if step["status"] == "complete" else " "
                 proof = ", ".join(f"[{entry['kind']}](../../{entry['path']})" for entry in step.get("evidence", []))

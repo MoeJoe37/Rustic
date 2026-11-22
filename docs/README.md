@@ -17,15 +17,16 @@ record when a boundary changes) in the same change as the code.
 | M4 JavaScript | Done (13/13) on 2026-11-16: parser, collected heap, bytecode interpreter, standard library, modules, realms, Intl, limits and benchmark gate. The ARM64 benchmark record is from emulation (TD-125) | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
 | M5 Scripted documents | Complete for the declared scope (11/11). Scripts, DOM bindings, events, mutation and resize observers, error reporting, focus, forms, the pinned WPT gate and the first cross-engine report. The emulated, MSRV and native tiers passed in the first full hosted run (2026-11-22) | [SCRIPTING.md](SCRIPTING.md), [review](reviews/2026-11-19-m5-completion.md) |
 | M6 Networking | Done 2026-11-20: HTTP/1.1 transport with TLS, Fetch, CORS, cookies, CSP, cache, profiles and Web Storage over allowlisted loopback origins. Remote origins resolving to public addresses followed in M7 (ADR 0066, TD-157 paid) | [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services), [review](reviews/2026-11-20-m6-completion.md) |
-| M7 Isolation | Current (5/8). Split renderer over bounded IPC, out-of-process iframes and popups, site process keys, COOP/COEP and ORB, renderer sandboxes on by default on Linux, Windows and macOS, a confined network process on all three with crash recovery, user activation, brokered downloads and the trusted address/permission strip. Open: Android isolation is implemented (isolated-process renderer service, ADR 0059) but its emulator job has not run; iOS isolation, GPU-process recovery and an independent external review | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [security review](reviews/2026-11-20-m7-security-review.md) |
-| M8 Desktop and mobile alpha | Started early (1/21): compositor scenes and scrolling (UI-05, ADR 0064) done; `rustic view` desktop window on Linux (UI-02, ADR 0065) | [ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha), [IMPLEMENTATION.md](IMPLEMENTATION.md#ui-02--desktop-window) |
+| M7 Isolation | Done 2026-11-22 (7/7 after ADR 0067). Split renderer over bounded IPC, out-of-process iframes and popups, site process keys, COOP/COEP and ORB, renderer sandboxes on by default on Linux, Windows and macOS, a confined network process on all three with crash recovery, user activation, brokered downloads and the trusted address/permission strip. The independent external review is an external dependency of the M10 beta (`security.brave`) | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [review](reviews/2026-11-22-m7-completion.md) |
+| M8 Desktop alpha | Current (1/18): compositor scenes and scrolling (UI-05, ADR 0064) done; `rustic view` desktop window on Linux (UI-02, ADR 0065); the GPU process is next | [ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-alpha), [IMPLEMENTATION.md](IMPLEMENTATION.md#ui-02--desktop-window) |
 | M9–M10 | Not started: compatibility, beta | [ROADMAP.md](ROADMAP.md) |
-| M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, full engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
+| M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, desktop engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
+| M14 Mobile devices | Deferred to the end (ADR 0067): Android and iOS on real devices, iOS entitlement, mobile shipping and the final five-platform 1.0. Mobile compile checks and the Android emulator job stay in CI | [ROADMAP §17](ROADMAP.md#17-m14--mobile-devices-and-five-platform-10), [MOBILE.md](MOBILE.md) |
 
 The [progress summary](progress/summary.md) is regenerated from
 `progress/catalog.json` and is the measured status. Done means done for the
 milestone's declared scope; broad web compatibility is M9 work and native
-Android/iOS host acceptance is M8 work. The capability counts in this table
+Android/iOS host acceptance is M14 work. The capability counts in this table
 come from that summary; when they disagree, the summary is right and this
 table needs an update.
 
@@ -40,19 +41,19 @@ Two things are true of every milestone so far and are easy to miss:
   jobs on the new account as well, so commits after `9961c1c` wait for the
   next hosted run ([TD-12](TECH_DEBT.md),
   [PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
-- **Nothing runs on a phone yet.** Android and iOS are compile-checked only;
-  the first on-device surfaces are MOB-03/04, the first task of M8 mobile
-  hosts ([ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha)).
-  The Android isolated renderer service of
-  [ADR 0059](adr/0059-mobile-renderer-isolation.md) has an emulator CI job
-  that has not run yet; iOS isolation is a design only.
+- **Nothing runs on a phone yet, by choice.** Android and iOS device work is
+  the last milestone, M14 ([ADR 0067](adr/0067-mobile-devices-last.md),
+  [ROADMAP §17](ROADMAP.md#17-m14--mobile-devices-and-five-platform-10)).
+  Meanwhile every Android and iOS target is compile-checked, and the Android
+  isolated renderer service of [ADR 0059](adr/0059-mobile-renderer-isolation.md)
+  passes its emulator CI job; iOS isolation is a design only.
 
 ## Reading order
 
 New to the project? Read these in order:
 
 1. [Architecture](ARCHITECTURE.md): components, ownership, execution and data flow.
-2. [Roadmap](ROADMAP.md): milestones, task IDs, gates, the [current queue](ROADMAP.md#17-current-implementation-queue) and risks.
+2. [Roadmap](ROADMAP.md): milestones, task IDs, gates, the [current queue](ROADMAP.md#18-current-implementation-queue) and risks.
 3. [Implementation progress](IMPLEMENTATION.md): every finished task and its tested contract.
 4. [Technical debt](TECH_DEBT.md): known shortcuts (TD-NN) and the rules that keep them safe.
 5. [Platform support](PLATFORMS.md): the any-device rule and the CI target matrix.
@@ -66,7 +67,7 @@ New to the project? Read these in order:
 | --- | --- |
 | [PRODUCT.md](PRODUCT.md) | Full-product requirements: Brave-level privacy, parity with and performance leadership over Blink/Gecko/WebKit, GPU, Wasm |
 | [EXTENSIONS.md](EXTENSIONS.md) | Rustic-only Manifest V2 extensions and the uBlock Origin port |
-| [ROADMAP.md](ROADMAP.md) | Milestones M0–M13, tasks, gates, current queue and risk register |
+| [ROADMAP.md](ROADMAP.md) | Milestones M0–M14, tasks, gates, current queue and risk register |
 | [PROGRESS.md](PROGRESS.md) | How the README progress map is scored and updated |
 | [STANDARDS.md](STANDARDS.md) | Which standards are targeted and how conformance is reported |
 
@@ -140,7 +141,7 @@ results.
 ## Document conventions
 
 “Must” states a design invariant or milestone gate. “Candidate” means a choice
-still needs a focused evaluation. M0–M13 are defined in the roadmap. Task IDs
+still needs a focused evaluation. M0–M14 are defined in the roadmap. Task IDs
 (DOC-, CSS-, REN-, JS-, WEB-, NET-, ISO-, UI-, MOB-, WASM-, EXT-, BLK-, PAR-,
 MED-, GFX-, DEV-, PERF-) are
 stable; new work gets a new ID rather than reusing one. Future file paths in

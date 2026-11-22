@@ -12,7 +12,7 @@ execution, module and Intl gates with exact passing lists), garbage-collection
 stress runs (a collection at every safe point), the JavaScript limits,
 benchmark-checksum and heap-size gates, scripted-document tests on a manual
 clock (turn order, timers, input, frames, wrapper identity and DOM/JS cycle
-collection), CLI snapshot and reftests, and 24 deterministic fuzz targets. The
+collection), CLI snapshot and reftests, and 29 deterministic fuzz targets. The
 [evidence table](README.md#evidence-at-a-glance) lists the counts and each
 subsystem document records its revision. Browser-hosted WPT, integration
 servers, sanitizers and cross-engine benchmark runs are planned; add each

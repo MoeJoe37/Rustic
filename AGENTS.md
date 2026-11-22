@@ -67,9 +67,10 @@ python3 tools/progress.py --write && python3 tools/progress.py --check
 cargo deny --locked check advisories licenses bans sources
 ```
 
-Push to the `feature` branch only and merge into `main` once the checks pass;
-[DEVELOPMENT.md](docs/DEVELOPMENT.md#branches-and-merging) describes the
-sandbox gate used while hosted Actions is unavailable.
+Push to the `feature` branch only and merge into `main` once the GitHub
+Actions `CI` check passes;
+[DEVELOPMENT.md](docs/DEVELOPMENT.md#branches-and-merging) describes the merge
+workflow and the sandbox gate to fall back on if Actions cannot run.
 
 Use the platform's Python 3.11+ command if it is named `python`. Run affected
 examples or integration harnesses too. GitHub Actions verifies the declared MSRV,

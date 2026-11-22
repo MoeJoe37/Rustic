@@ -1,6 +1,6 @@
 # Rustic
 
-[![CI](https://github.com/MoeJoe37/Rustic/actions/workflows/ci.yml/badge.svg)](https://github.com/MoeJoe37/Rustic/actions/workflows/ci.yml)
+[![CI](https://github.com/moejoe873/Rustic/actions/workflows/ci.yml/badge.svg)](https://github.com/moejoe873/Rustic/actions/workflows/ci.yml)
 
 Rustic is an independent browser engine being built from scratch in Rust. The
 goal is a standards-oriented, embeddable engine with its own HTML/CSS pipeline,
@@ -96,7 +96,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 Install Rust through [rustup](https://rustup.rs/), then:
 
 ```sh
-git clone https://github.com/MoeJoe37/Rustic.git
+git clone https://github.com/moejoe873/Rustic.git
 cd Rustic
 cargo run --locked -p rustic-cli -- --help
 cargo run --locked -p rustic-cli -- dump-dom crates/rustic-cli/tests/fixtures/styled.html

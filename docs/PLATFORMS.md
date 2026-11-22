@@ -50,31 +50,48 @@ behavior evidence, not device support: device support still requires the
 native host, rendering, input, lifecycle and performance gates in the
 [roadmap](ROADMAP.md) and [mobile plan](MOBILE.md).
 
-## Current verification status (2026-11-17)
+## Current verification status (2026-11-22)
 
-The tiers above describe the configured CI. GitHub has not started hosted
-jobs since 2026-11-08 because of an account billing limit. Merges since then
-are checked by the sandbox gate of
-[DEVELOPMENT.md](DEVELOPMENT.md#branches-and-merging), which runs on one Linux
-x64 machine and can therefore cover less:
+The tiers above describe the configured CI, and since 2026-11-22 they run
+again: the repository moved to `moejoe873/Rustic`, where GitHub Actions starts
+jobs, and the full matrix passed on `feature` at `9961c1c` (native x64 and
+ARM64 Linux, Windows and macOS; the emulated 32-bit ARM, 32-bit x86, RISC-V and
+big-endian s390x runs; the cross and mobile compile checks). The
+[Actions page](https://github.com/moejoe873/Rustic/actions) holds the result of
+each later push.
+
+From 2026-11-08 to 2026-11-22 GitHub did not start hosted jobs (an account
+billing limit), and merges were checked by the sandbox gate of
+[DEVELOPMENT.md](DEVELOPMENT.md#branches-and-merging) on one Linux x64 machine.
+The first native runs after that window found portability bugs in that work
+(Windows AppContainer profile races, macOS `dyld` under Seatbelt, missing C
+cross compilers for `ring`), all fixed and recorded in [TD-12](TECH_DEBT.md).
+If Actions stops again, this is what the sandbox gate can and cannot show:
 
 | Platform | What the sandbox gate can show |
 | --- | --- |
 | Linux x64 | Full suite, native |
 | Linux 32-bit ARM, 32-bit x86, RISC-V, big-endian s390x | Full suite under QEMU |
-| Linux aarch64 | Compile check. The JavaScript benchmark corpus was also run once under QEMU for M4 (TD-125) |
+| Linux aarch64 | Compile check |
 | Windows x64 and ARM64 | Compile check at most (GNU-ABI targets); no test run, nothing for the MSVC targets |
 | macOS x64 and ARM64 | Nothing: these targets cannot be built or run from a Linux sandbox |
 | Android (ARM64, 32-bit ARM, x86-64, x86) | Compile check, as in hosted CI |
 | iOS/iPadOS (device and simulator) | Compile check of the shared libraries, as in hosted CI |
 
-Each merge records the scope it actually ran. The shared engine is safe, portable Rust with no OS-specific code yet, which
-keeps the risk of an undetected break low, but it is not zero: path handling,
-line endings, file system behavior and thread stack sizes differ on Windows
-and macOS. When hosted CI returns, the first job is a full native run on
-every tier and fixing whatever it finds, before new feature work
-([TD-12](TECH_DEBT.md), [ROADMAP §17](ROADMAP.md#17-current-implementation-queue)).
-Native runners are a hard prerequisite of M7 (sandboxes) and M8 (hosts).
+What hosted CI still does not cover:
+
+- **Android and iOS run nothing.** They are compile-checked only; the first
+  on-device surfaces are MOB-03/04, the first task of M8 mobile hosts, and
+  mobile renderer isolation (ADR 0059) is a design that has not run on a
+  device, emulator or simulator.
+- **Two cross-checks are partial.** `aarch64-pc-windows-gnullvm` and
+  `loongarch64-unknown-linux-gnu` have no packaged C cross compiler for
+  `ring`, so the crates that use it are left out there (TD-12).
+- **The JavaScript benchmark record for ARM64 is emulated** (TD-125, due in M8).
+
+The engine now has OS-specific code (the renderer and network-process sandboxes
+in `rustic-sandbox`, the desktop window in `rustic-shell`), so a change to
+those crates is only verified once the native job for that OS has passed.
 
 ## Reproducing locally
 

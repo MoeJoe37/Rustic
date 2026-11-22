@@ -126,7 +126,7 @@ not scheduled automation created by this commit.
 - [x] Configure weekly Dependabot checks for Cargo and GitHub Actions.
 - [x] Include Android/iOS in the architecture and configure early shared-core cross-checks; see [mobile plan](MOBILE.md).
 - [x] Support any device that can run a browser: native x64/ARM64 tests on Linux, Windows and macOS, emulated 32-bit ARM/x86, RISC-V and big-endian tests, and further cross-checks; see [platform support](PLATFORMS.md) and ADR 0013.
-- [x] Record a successful baseline CI run ([run](https://github.com/MoeJoe37/Rustic/actions/runs/42371959628)).
+- [x] Record a successful baseline CI run ([run](https://github.com/moejoe873/Rustic/actions/runs/42371959628)).
 - [x] Proceed with the baseline design following maintainer authorization to execute the plan.
 - [ ] Configure repository rules requiring the CI gate after it has run once.
 

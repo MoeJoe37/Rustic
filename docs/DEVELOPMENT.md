@@ -64,13 +64,24 @@ the topmost box at each point.
 
 The repository keeps two branches: `main` and one working branch, `feature`.
 All work is pushed to `feature`; once its checks pass, the maintainer's standing
-instruction is to merge it into `main` straight away. While hosted Actions is
-unavailable (a billing block since 2026-11-08), the checks run in a sandbox
-instead: the gates above, MSRV 1.85.0, the emulated 32-bit ARM/x86, RISC-V and
-big-endian test runs, and the cross/mobile compile checks of
-[PLATFORMS.md](PLATFORMS.md). Record the scope actually run, push the checked
-source to `feature`, then merge that exact source into `main`. Hosted runner
-results remain separate evidence. Successful default-branch CI also pushes a
+instruction is to merge it into `main` straight away. The merge gate is the
+aggregate `CI` job of GitHub Actions on
+[moejoe873/Rustic](https://github.com/moejoe873/Rustic/actions), which runs
+every tier of [PLATFORMS.md](PLATFORMS.md) natively or under emulation. A full
+run takes an hour or more because jobs queue on the free tier, and a new push
+to `feature` cancels the run in progress, so do not push in the middle of a run
+whose emulated results you need. Run the quick local gates above before
+pushing.
+
+From 2026-11-08 to 2026-11-22 Actions could not start jobs (an account billing
+block); merges in that window were checked in a Linux sandbox instead (the
+gates above, MSRV 1.85.0, the emulated tiers and the cross/mobile compile
+checks), and each recorded the scope it ran. The repository moved from
+`MoeJoe37/Rustic` to `moejoe873/Rustic` on 2026-11-22, where Actions runs; the
+first full native run on the new account found and fixed the issues recorded in
+[TD-12](TECH_DEBT.md), and the full matrix was green on `feature` at `9961c1c`.
+When Actions cannot run, fall back to that sandbox gate and say in the commit
+or review which scope ran. Successful default-branch CI also pushes a
 `chore(progress)` commit to `main`, so merge `origin/main` into `feature`
 before pushing rather than force-pushing.
 

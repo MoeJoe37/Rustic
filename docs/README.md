@@ -121,7 +121,7 @@ no sandbox guarantees, no comparison with another engine's performance and no
 releases yet. The only third-party Rust
 crates are the reviewed font adapters of [ADR 0014](adr/0014-reviewed-font-adapters.md).
 Configuration in the repository is distinct from a successful hosted run;
-inspect the [Actions page](https://github.com/MoeJoe37/Rustic/actions) for run
+inspect the [Actions page](https://github.com/moejoe873/Rustic/actions) for run
 results.
 
 ## Document conventions

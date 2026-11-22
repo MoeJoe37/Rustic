@@ -11,11 +11,14 @@ as implementation foundations on every target. A system WebView must not silentl
 replace Rustic's engine on mobile.
 
 Current mobile support consists of shared-library cross-compilation checks
-(green in hosted CI on 2026-11-22 for all seven Android and iOS targets) and a
-mobile isolation design ([ADR 0059](adr/0059-mobile-renderer-isolation.md),
-Proposed, MOB-07). There is no Android APK, iOS application/framework, device
-renderer, touch/IME bridge, implemented mobile sandbox or simulator/device
-runtime test yet. `rustic-shell` builds its desktop window only off Android,
+(green in hosted CI on 2026-11-22 for all seven Android and iOS targets) and
+the mobile isolation of [ADR 0059](adr/0059-mobile-renderer-isolation.md)
+(Proposed, MOB-07): on Android a test app (`android/`) runs the renderer in an
+isolated-process service through `crates/rustic-android`, with an instrumented
+isolation and crash-recovery test on an API 34 x86-64 emulator in CI (first
+run pending); iOS is a design only. There is no user-facing Android app, iOS
+application/framework, device renderer surface, touch/IME bridge or
+real-device test yet. `rustic-shell` builds its desktop window only off Android,
 where the host will be an activity. Passing `cargo check`
 does not prove those work. The desktop development CLI is not a mobile app.
 
@@ -69,7 +72,7 @@ release; missing approvals cannot be represented as successful runtime support.
 | MOB-04 | M3, carried forward through M5; now the first task of M8 mobile hosts; needs Xcode simulator runners | iOS local-fixture CPU surface and C/Swift bridge; link/run in Simulator and on a signed development device where allowed |
 | MOB-05 | After MOB-03/04 (was M3–M5; not started) | Touch, viewport/scale, keyboard/IME, caret/selection and accessibility fixtures on both mobile systems |
 | MOB-06 | M5–M6 | Background/resume, memory pressure, profile isolation, permission UI and cancellation integration tests |
-| MOB-07 | M7 | OS-supported isolated renderer/service design (done as ADR 0059, Proposed), adversarial authority tests and iOS entitlement/process feasibility (open; `security.mobile`) |
+| MOB-07 | M7 | OS-supported isolated renderer/service design (ADR 0059, Proposed; Android isolated renderer service implemented 2026-11-22), adversarial authority tests and iOS entitlement/process feasibility (open; `security.mobile`) |
 | MOB-08 | M8 | Native mobile reference hosts using Rustic's renderer/runtime; emulator/simulator and real-device suites |
 | MOB-09 | M9 | Shared site/conformance corpus plus mobile editing/fonts/graphics/accessibility and measured energy/memory behavior |
 | MOB-10 | M10 | Reproducible native artifacts, supported OS/ABI policy, signing/distribution gates and security updates |

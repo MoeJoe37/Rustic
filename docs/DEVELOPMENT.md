@@ -115,6 +115,7 @@ to refresh generated README assets and dispatch CI for its bot commit.
 | `Parser fuzz smoke` | Ubuntu 24.04 | Replays the saved seeds and runs 20,000 fixed-seed mutations of every fuzz target; reproducers are kept as an artifact on failure |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |
 | `Mobile core (target)` | Ubuntu for Android ARM64/ARMv7/x86-64/x86; macOS for iOS ARM64 device/simulator and x86-64 simulator | Check all workspace libraries with pinned Rust (Android C dependencies built with the runner's NDK); no application linking or device execution |
+| `Android isolated renderer` | Ubuntu 24.04 with the NDK and an API 34 x86-64 emulator | Builds `rustic-android` and the `android/` test app, then runs its instrumented isolation and crash-recovery test (ADR 0059) |
 | `Repository checks` | Ubuntu 24.04, Python 3.11+ | Local Markdown file links, whitespace, TOML/JSON parse, manifest/toolchain consistency |
 | `CI` | Aggregate gate | Fails if any prerequisite fails, is cancelled, or is unexpectedly skipped |
 | `Publish progress` | Successful default-branch CI only | Regenerates README/chart; safely pushes changed outputs and dispatches bot-commit validation |

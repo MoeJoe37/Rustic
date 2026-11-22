@@ -104,8 +104,9 @@ run in a separate network process that the broker revalidates
 ([ADR 0061](adr/0061-network-process.md)), confined on all three systems;
 remote origins can be granted on the command line and reach only public
 addresses ([ADR 0066](adr/0066-remote-addresses-and-windows-network-container.md)).
-Android and iOS isolation is a design only
-([ADR 0059](adr/0059-mobile-renderer-isolation.md)). See the
+On Android the renderer runs in an isolated-process service
+([ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed); its emulator
+test is in CI but has not run yet. iOS isolation is a design only. See the
 [M7 security review](reviews/2026-11-20-m7-security-review.md).
 
 The OS implementation is platform-specific. Linux namespace/seccomp policy,

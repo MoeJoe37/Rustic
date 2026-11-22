@@ -106,7 +106,7 @@ authority boundary or `unsafe` code.
 | Decision | Needed before | Why it needs a record |
 | --- | --- | --- |
 | Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
-| Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed) | ISO-08/MOB-07 implementation | Platform security boundary verified only on a device, emulator or simulator |
+| Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented, emulator run pending) | Accepting ISO-08/MOB-07 | Platform security boundary verified only on a device, emulator or simulator |
 | GPU abstraction and backends (Direct3D 12, Metal, Vulkan, GL ES) | UI-05 (M8) | Major platform dependency and `unsafe`/FFI surface |
 | Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8) | Platform dependencies on five OS families |
 | WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |

@@ -31,7 +31,7 @@ The required product scope includes GPU/Wasm, a native MV2 extension ecosystem
 and a Rustic uBlock Origin port, with comparative security/privacy and performance
 gates. See [PRODUCT.md](PRODUCT.md) and [ADR 0007](adr/0007-product-scope.md).
 
-`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-storage`, `rustic-ipc`, `rustic-sandbox`, `rustic-engine`, `rustic-shell`, `rustic-cli` and the
+`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-storage`, `rustic-ipc`, `rustic-sandbox`, `rustic-engine`, `rustic-shell`, `rustic-android`, `rustic-cli` and the
 `rustic-fuzz` development tool now exist; see
 [implementation progress](IMPLEMENTATION.md) for their actual scope. The following
 is the target decomposition, not a requirement to create empty crates today.
@@ -61,12 +61,13 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-extensions` | Rustic MV2 package/identity, isolated worlds, APIs, lifecycle and permissions | JS/web, broker/service interfaces; no ambient page authority | M5/M6 prototypes, M8/M9 delivery |
 | `rustic-filter` | Bounded reference/optimized filtering, list snapshots and broker policy hooks | URL/base, controlled DOM/CSS interfaces | M6–M9 |
 | `rustic-platform` | Windows/events, font discovery, graphics surfaces, OS adapters | base, platform libraries | M8 |
+| `rustic-android` | JNI entry points (integers and detached descriptors only) through which the `android/` test app's isolated-process service runs a renderer over ADR 0056 IPC (ADR 0059); its `jni` module is the crate's only `unsafe` | `rustic-cli` as a library | M7 |
 | Future Android/iOS adapters | Native surfaces, lifecycle, touch/IME, accessibility and OS service/process bridges | engine/platform contracts; JNI/NDK or Apple SDK only at the boundary | Prototype with M3; host integration M8 |
 | `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
 | `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
 | `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
 | `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime, Web IDL bindings and future service interfaces | M0 onward |
-| `rustic-cli` | Development host: the broker, a `__renderer` child per document (ADR 0056) and a `__network` child (ADR 0061), the trusted address/permission strip | engine API, sandbox, shell | M0 onward |
+| `rustic-cli` | Development host, also linkable as a library (`run_renderer_over`, `run_hosted`) for mobile hosts: the broker, a `__renderer` child per document (ADR 0056) and a `__network` child (ADR 0061), the trusted address/permission strip | engine API, sandbox, shell | M0 onward |
 | `rustic-shell` | Desktop window and event loop with CPU surface presentation (UI-02, ADR 0065); later the full browser chrome (UI-01) | winit, softbuffer | M8 (started early) |
 | `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
 

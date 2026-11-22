@@ -61,8 +61,9 @@ of their own with site process keys, COOP, COEP and ORB; and crashed or
 misbehaving children are replaced without stale authority. Remote origins can
 be granted and resolve only to public addresses. `rustic view` opens a page in
 a native desktop window with a trusted address and permission strip the page
-cannot paint over. Android/iOS isolation and an external security review are
-still open ([ROADMAP §10](docs/ROADMAP.md#10-m7--isolation-and-security-gate),
+cannot paint over. An Android isolated-process renderer service is implemented but
+not yet run in CI; iOS isolation and an external security review are still
+open ([ROADMAP §10](docs/ROADMAP.md#10-m7--isolation-and-security-gate),
 [security review](docs/reviews/2026-11-20-m7-security-review.md)).
 See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
@@ -173,6 +174,7 @@ check CI runs and [TEXT.md](docs/TEXT.md) for font limits.
 | `rustic-sandbox` | OS confinement: Linux seccomp filters, Windows AppContainers, macOS Seatbelt profiles |
 | `rustic-engine` | Document lifecycle, script, input, timer and rendering turns, viewport configuration |
 | `rustic-shell` | Desktop window host (winit and softbuffer) |
+| `rustic-android` | JNI entry points for the Android isolated renderer service (ADR 0059) |
 | `rustic-cli` | The `rustic` development tool: broker, renderer and network processes |
 | `rustic-fuzz` | Deterministic mutation fuzzing (29 targets) |
 

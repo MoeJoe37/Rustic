@@ -81,10 +81,11 @@ If Actions stops again, this is what the sandbox gate can and cannot show:
 
 What hosted CI still does not cover:
 
-- **Android and iOS run nothing.** They are compile-checked only; the first
-  on-device surfaces are MOB-03/04, the first task of M8 mobile hosts, and
-  mobile renderer isolation (ADR 0059) is a design that has not run on a
-  device, emulator or simulator.
+- **Android and iOS barely run.** Both are compile-checked; the only
+  execution is the Android isolated-renderer test on an API 34 x86-64
+  emulator (ADR 0059), added to CI on 2026-11-22 and not yet run. iOS runs
+  nothing. The first on-device surfaces are MOB-03/04, the first task of M8
+  mobile hosts.
 - **Two cross-checks are partial.** `aarch64-pc-windows-gnullvm` and
   `loongarch64-unknown-linux-gnu` have no packaged C cross compiler for
   `ring`, so the crates that use it are left out there (TD-12).

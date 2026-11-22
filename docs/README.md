@@ -17,7 +17,7 @@ record when a boundary changes) in the same change as the code.
 | M4 JavaScript | Done (13/13) on 2026-11-16: parser, collected heap, bytecode interpreter, standard library, modules, realms, Intl, limits and benchmark gate. The ARM64 benchmark record is from emulation (TD-125) | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
 | M5 Scripted documents | Complete for the declared scope (11/11). Scripts, DOM bindings, events, mutation and resize observers, error reporting, focus, forms, the pinned WPT gate and the first cross-engine report. The emulated, MSRV and native tiers passed in the first full hosted run (2026-11-22) | [SCRIPTING.md](SCRIPTING.md), [review](reviews/2026-11-19-m5-completion.md) |
 | M6 Networking | Done 2026-11-20: HTTP/1.1 transport with TLS, Fetch, CORS, cookies, CSP, cache, profiles and Web Storage over allowlisted loopback origins. Remote origins resolving to public addresses followed in M7 (ADR 0066, TD-157 paid) | [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services), [review](reviews/2026-11-20-m6-completion.md) |
-| M7 Isolation | Current (5/8). Split renderer over bounded IPC, out-of-process iframes and popups, site process keys, COOP/COEP and ORB, renderer sandboxes on by default on Linux, Windows and macOS, a confined network process on all three with crash recovery, user activation, brokered downloads and the trusted address/permission strip. Open: Android/iOS isolation (design only, ADR 0059), the remaining recovery and audit steps, and an independent external review | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [security review](reviews/2026-11-20-m7-security-review.md) |
+| M7 Isolation | Current (5/8). Split renderer over bounded IPC, out-of-process iframes and popups, site process keys, COOP/COEP and ORB, renderer sandboxes on by default on Linux, Windows and macOS, a confined network process on all three with crash recovery, user activation, brokered downloads and the trusted address/permission strip. Open: Android isolation is implemented (isolated-process renderer service, ADR 0059) but its emulator job has not run; iOS isolation, GPU-process recovery and an independent external review | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [security review](reviews/2026-11-20-m7-security-review.md) |
 | M8 Desktop and mobile alpha | Started early (1/21): compositor scenes and scrolling (UI-05, ADR 0064) done; `rustic view` desktop window on Linux (UI-02, ADR 0065) | [ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha), [IMPLEMENTATION.md](IMPLEMENTATION.md#ui-02--desktop-window) |
 | M9–M10 | Not started: compatibility, beta | [ROADMAP.md](ROADMAP.md) |
 | M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, full engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
@@ -42,9 +42,10 @@ Two things are true of every milestone so far and are easy to miss:
   [PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
 - **Nothing runs on a phone yet.** Android and iOS are compile-checked only;
   the first on-device surfaces are MOB-03/04, the first task of M8 mobile
-  hosts ([ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha)),
-  and mobile renderer isolation is a design only
-  ([ADR 0059](adr/0059-mobile-renderer-isolation.md)).
+  hosts ([ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-and-mobile-alpha)).
+  The Android isolated renderer service of
+  [ADR 0059](adr/0059-mobile-renderer-isolation.md) has an emulator CI job
+  that has not run yet; iOS isolation is a design only.
 
 ## Reading order
 

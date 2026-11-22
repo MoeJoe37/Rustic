@@ -1,8 +1,10 @@
 # Security architecture and browsing gates
 
-This is a target threat model. The current program has no page execution or network
-support and no sandbox implementation. Future security claims require tests and
-platform evidence, not this document alone. Reporting instructions are in the
+This is the target threat model. As of 2026-11-22 Rustic runs scripts, loads
+granted network origins and confines its renderer and network processes on
+Linux, Windows and macOS (status below), but it has had no independent external
+review and is not a browser for arbitrary sites. Security claims require tests
+and platform evidence, not this document alone. Reporting instructions are in the
 root [security policy](../SECURITY.md).
 
 ## Assets, adversaries, and authority
@@ -60,10 +62,12 @@ not expose an unrestricted native escape hatch to page script accidentally.
 
 ## Memory, resource exhaustion, and native code
 
-Project crates forbid unsafe Rust. The one exception is the Windows launcher
-in `rustic-sandbox` ([ADR 0060](adr/0060-windows-renderer-sandbox.md)): a
-narrow module that only calls Win32, with every unsafe block documented
-(enforced by Clippy). Any further exception requires its own ADR and the same
+Project crates forbid unsafe Rust. The one exception is `rustic-sandbox`, and
+inside it only two modules: the Windows launcher
+([ADR 0060](adr/0060-windows-renderer-sandbox.md)), which only calls Win32, and
+the macOS `enter` module ([ADR 0063](adr/0063-macos-renderer-sandbox.md)),
+which only calls `sandbox_init`. Every unsafe block is documented (enforced by
+Clippy). Any further exception requires its own ADR and the same
 treatment. Dependencies
 may contain unsafe code; Rust is not a guarantee against their vulnerabilities.
 Audit FFI ownership, lengths, alignment, threading, callbacks, panic boundaries,
@@ -92,12 +96,19 @@ every platform the CLI runs on. They are confined by default on Linux
 and Windows (an LPAC AppContainer in a job, [ADR 0060](adr/0060-windows-renderer-sandbox.md)),
 and macOS (a Seatbelt profile the renderer applies to itself,
 [ADR 0063](adr/0063-macos-renderer-sandbox.md)), verified on native x64
-and ARM64 runners of all three (2026-11-22). See the
+and ARM64 runners of all three (2026-11-22). Sockets, TLS and HTTP framing
+run in a separate network process that the broker revalidates
+([ADR 0061](adr/0061-network-process.md)), confined on all three systems;
+remote origins can be granted on the command line and reach only public
+addresses ([ADR 0066](adr/0066-remote-addresses-and-windows-network-container.md)).
+Android and iOS isolation is a design only
+([ADR 0059](adr/0059-mobile-renderer-isolation.md)). See the
 [M7 security review](reviews/2026-11-20-m7-security-review.md).
 
 The OS implementation is platform-specific. Linux namespace/seccomp policy,
-Windows token/AppContainer/job policy, and macOS feasibility each need practical
-prototypes and adversarial verification. Android needs application/service isolation and broker tests;
+Windows token/AppContainer/job policy and macOS Seatbelt each have a prototype
+with escape-probe tests (ADR 0058, 0060, 0063); each still needs the external
+adversarial review of the release gates below. Android needs application/service isolation and broker tests;
 iOS needs the applicable engine extension/process/entitlement design and tests.
 Do not assume desktop process/JIT/sandbox mechanisms exist on mobile. See the
 [mobile gates](MOBILE.md). A compile pass does not prove

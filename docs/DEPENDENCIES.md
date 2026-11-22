@@ -23,8 +23,11 @@ This distinction is the project's chosen scope, recorded in
 **Adopted so far:** the font adapters HarfRust, Skrifa and Wuff
 ([ADR 0014](adr/0014-reviewed-font-adapters.md), see "M3 font adoption" below)
 the TLS stack rustls with `ring` and `rustls-platform-verifier`
-([ADR 0051](adr/0051-transport-and-tls.md)), and the desktop host winit and
-softbuffer ([ADR 0065](adr/0065-desktop-window-host.md)).
+([ADR 0051](adr/0051-transport-and-tls.md)) with `brotli-decompressor` for
+content decoding, `windows-sys` for the Windows sandbox
+([ADR 0060](adr/0060-windows-renderer-sandbox.md)), and the desktop host winit
+and softbuffer ([ADR 0065](adr/0065-desktop-window-host.md)). The pinned graph
+is [third_party/rust-dependencies.json](../third_party/rust-dependencies.json).
 Every other name in this table is a candidate to evaluate at the relevant
 milestone, not an installed package, version recommendation or compatibility
 guarantee. The JavaScript engine (and its RegExp engine), Wasm runtime, HTML,
@@ -40,8 +43,8 @@ CSS, layout, paint, codecs and URL code stay original Rust (ADR 0001).
 | Image codecs | **Chosen at M3:** original bounded inflate/PNG/JPEG/GIF/WebP decoders in `rustic-codecs`, no library; video/audio codecs remain candidates | Input/output limits, resource accounting, sandbox isolation and color handling |
 | Raster/GPU | Original CPU display-list interpreter; GPU adapter such as wgpu later | Paint semantics, scene correctness, device loss and CPU fallback |
 | Desktop host | **Adopted (M8):** winit 0.30.13 and softbuffer 0.4.8 in `rustic-shell`, minimal features, Wayland/X11 loaded at run time ([ADR 0065](adr/0065-desktop-window-host.md); graph and licenses there) | Chrome, input routing, lifecycle and permission decisions; page rendering stays in renderer processes |
-| Persistence | Reviewed embedded transactional store or SQLite adapter | Partition keys, quotas, schemas, migration and private mode |
-| Serialization | Reviewed format/library after protocol prototype | IPC schema, validation, capabilities, bounds and versioning |
+| Persistence | **M6:** Rustic's own versioned, checksummed atomic files in `rustic-storage` for Web Storage; a reviewed embedded transactional store or SQLite adapter remains a candidate for IndexedDB and larger stores | Partition keys, quotas, schemas, migration and private mode |
+| Serialization | **Chosen at M7:** Rustic's own bounded binary IPC format in `rustic-ipc`, no library ([ADR 0056](adr/0056-ipc-format.md)) | IPC schema, validation, capabilities, bounds and versioning |
 | Diagnostics/testing | Lightweight tracing, property testing, fuzzing/benchmark tooling as needed | Redaction, reproducibility, budgets and meaningful assertions |
 
 Before adopting any candidate, check its current documentation, maintenance,

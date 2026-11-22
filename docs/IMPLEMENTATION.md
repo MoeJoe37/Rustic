@@ -136,7 +136,7 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Scripted documents (M5, in progress): 9 sections</summary>
+<summary>Scripted documents (M5): 9 sections</summary>
 
 - [Engine lifecycle — Bounded document ownership and shutdown](#engine-lifecycle--bounded-document-ownership-and-shutdown)
 - [WEB-01 — Document script turns and microtask checkpoints](#web-01--document-script-turns-and-microtask-checkpoints)
@@ -164,11 +164,13 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Isolation and security (M7): 4 sections</summary>
+<summary>Isolation and security (M7, current): 6 sections</summary>
 
+- [Remote origins and the Windows network container](#remote-origins-and-the-windows-network-container)
+- [ISO-05 — Trusted address and permission strip](#iso-05--trusted-address-and-permission-strip)
 - [ISO-01 — Out-of-process frames and popups](#iso-01--out-of-process-frames-and-popups)
 - [ISO-07 — Network process](#iso-07--network-process)
-- [ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)](#iso-03iso-04--renderer-sandboxes-on-by-default-linux-windows)
+- [ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows, macOS)](#iso-03iso-04--renderer-sandboxes-on-by-default-linux-windows-macos)
 - [ISO-02 — Split renderer process and brokered authority](#iso-02--split-renderer-process-and-brokered-authority)
 
 </details>
@@ -2598,6 +2600,43 @@ an unscrolled layout in one pass, without laying out again; `dump-paint`,
 
 Remaining limits: TD-181 (scenes), TD-180 (script scrolling).
 
+## Remote origins and the Windows network container
+
+Added 2026-11-22 (`rustic_net::policy`, `rustic-cli/src/netproc.rs`,
+`rustic_sandbox::windows`, [ADR 0066](adr/0066-remote-addresses-and-windows-network-container.md);
+pays TD-157 and TD-176). `--allow-origin ORIGIN` lets one origin, and
+`--allow-remote` every `http`/`https` origin, resolve through the system
+resolver in the broker; `--allow-origin ORIGIN=ADDRESS` still routes an
+origin to a loopback fixture and wins for that origin.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Public addresses only | A resolved name or IP-literal host connects only to a public unicast address; loopback, private, shared, link-local, unique-local, documentation, multicast, reserved and unspecified ranges are refused before any socket opens, including IPv4-mapped, NAT64 and 6to4 forms (`rustic_net::is_public`, `TransportError::NotPublic`) | `resolved_origins_reach_only_public_addresses`, `special_purpose_addresses_are_not_public`, `resolved_origins_never_reach_local_addresses` |
+| Who resolves | The broker resolves (`NetworkPolicy::address`); the network process never resolves and re-checks every address it is given | the tests above |
+| Windows confinement | Without a loopback fixture grant, the network process runs in its own `Rustic.Network` LPAC (internetClient, lpacCryptoServices, registryRead) | `the_windows_network_process_is_confined_for_remote_origins` |
+
+Status: verified on Linux; the Windows container and the native resolver
+wait for the next hosted run (ADR 0066).
+
+## ISO-05 — Trusted address and permission strip
+
+Added 2026-11-22 (`rustic-cli/src/chrome.rs`, `rustic_shell::present`;
+TD-173 partly paid). `rustic view` draws a strip above the page that the
+broker renders itself, with scripts off, from the URL it committed
+(`broker::committed_url`): the address (ASCII host, no credentials or
+fragment, Secure/Not secure) and any permission prompt. Page pixels never
+reach its rows and clicks there never reach the page.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Address | Hosts in ASCII form, credentials and fragments dropped, long addresses keep the end of the host and the start of the path; every value escaped and limited to printable ASCII | `addresses_show_ascii_hosts_without_credentials_or_fragments`, `elision_keeps_the_end_of_the_host_and_the_start_of_the_path`, `the_strip_escapes_what_it_shows_and_renders` |
+| Prompts | Only secure contexts with a non-opaque origin, only with transient activation, one prompt at a time; buttons ignore clicks for 500 ms after it appears; decisions kept per origin for the session; three dismissals embargo the origin; navigation closes the prompt | `prompts_need_a_secure_origin_activation_and_no_other_prompt`, `early_clicks_are_ignored_and_answers_are_kept_per_origin`, `dismissals_embargo_and_navigation_closes_the_prompt`, `buttons_hit_only_while_a_prompt_is_shown` |
+| Clipboard | Needs focus and transient activation | `clipboard_access_needs_focus_and_activation` |
+| Separation | The shell composes strip and page so page pixels never reach the strip | `page_pixels_never_reach_the_trusted_strip` |
+
+Open (TD-173): no page API reaches the prompt yet, because renderers live
+for one frame; downloads get no quarantine metadata.
+
 ## ISO-01 — Out-of-process frames and popups
 
 Added 2026-11-21 (`rustic-cli/src/loader.rs` `render_layers`,
@@ -2656,7 +2695,7 @@ Test hook `RUSTIC_TEST_NETWORK_PROCESS` (`crash`, `crash-on:PATH`,
 `escape` with `RUSTIC_TEST_ESCAPE_FILE`, `_DIR` and `_ABSTRACT`) changes
 only what the network process does; it grants nothing.
 
-## ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows)
+## ISO-03/ISO-04 — Renderer sandboxes on by default (Linux, Windows, macOS)
 
 Added 2026-11-21 (`rustic-sandbox`, `rustic-cli/src/broker.rs`,
 [ADR 0058](adr/0058-linux-renderer-sandbox.md),
@@ -2682,7 +2721,8 @@ handed to `bwrap --seccomp` as descriptor 3 by `/bin/sh`
 `terminal_injection_ioctls_are_refused`, `other_abis_are_killed`,
 `programs_are_within_kernel_limits_and_serialize_eight_bytes_each`, run
 against an interpreter of the generated program). x86-64 and aarch64
-have tables; aarch64 is checked only by those unit tests (TD-12).
+have tables; aarch64 also ran the CLI suites, escape probes included,
+on the native Linux ARM64 CI runner (green at `9961c1c`, 2026-11-22).
 
 Windows: `rustic_sandbox::spawn_app_container` starts the renderer in
 the `Rustic.Renderer` AppContainer as an LPAC with no capabilities,

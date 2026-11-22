@@ -1,9 +1,14 @@
 # Reviewed Rust dependencies
 
-[rust-dependencies.json](rust-dependencies.json) pins the 24-package font adapter
-graph ([ADR 0014](../docs/adr/0014-reviewed-font-adapters.md)) and the 53-package
-TLS graph for every target ([ADR 0051](../docs/adr/0051-transport-and-tls.md)),
-with retained license digests. `jni`, `jni-macros`, `jni-sys-macros` and
+[rust-dependencies.json](rust-dependencies.json) pins every third-party package
+(224 in all) with retained license digests: the font adapter graph
+([ADR 0014](../docs/adr/0014-reviewed-font-adapters.md)), the TLS graph and
+`brotli-decompressor` for every target
+([ADR 0051](../docs/adr/0051-transport-and-tls.md)), `windows-sys` for the
+Windows sandbox ([ADR 0060](../docs/adr/0060-windows-renderer-sandbox.md)) and
+the desktop window graph of winit and softbuffer
+([ADR 0065](../docs/adr/0065-desktop-window-host.md)). Its `direct` table lists
+each crate's direct dependencies with exact versions and features. `jni`, `jni-macros`, `jni-sys-macros` and
 `rustls-platform-verifier-android` omit license files from their packages, so
 their copies come from upstream at the `source_revision` recorded. The Public
 Suffix List notice (MPL-2.0) belongs to vendored data

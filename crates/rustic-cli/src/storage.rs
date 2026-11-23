@@ -140,6 +140,13 @@ pub(crate) fn save_cookies(bytes: Vec<u8>) -> Result<(), ProfileError> {
     flush()
 }
 
+/// Close the run's profile: once no page holds it, its lock is released.
+/// A later use opens it again.
+pub fn close() {
+    let profile = locked(&PROFILE).take();
+    drop(profile);
+}
+
 /// Write the profile's changes, if it is persistent.
 pub fn flush() -> Result<(), ProfileError> {
     let profile = locked(&PROFILE).clone();

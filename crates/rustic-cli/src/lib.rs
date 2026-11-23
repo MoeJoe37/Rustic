@@ -234,6 +234,14 @@ pub fn run_renderer_over(reader: Box<dyn std::io::Read>, writer: Box<dyn std::io
 
 /// The `rustic` command line.
 pub fn main() -> ExitCode {
+    let status = run_main();
+    // The shared profile lives in a static, which is never dropped: close
+    // it so its lock file goes away when the command ends.
+    storage::close();
+    status
+}
+
+fn run_main() -> ExitCode {
     // A confined macOS child applies its Seatbelt profile before anything
     // else (ADR 0063); it never runs unconfined when asked to confine.
     #[cfg(target_os = "macos")]

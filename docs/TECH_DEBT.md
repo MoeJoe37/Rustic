@@ -234,7 +234,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M7 browser shell |
 | TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
-| TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives; bodies are complete byte strings (no `ReadableStream`, `arrayBuffer()`, `blob()`, `formData()`, `AbortSignal`), Headers iterators are snapshots, and the API base URL ignores `<base>` in the CLI | Open, M9 web APIs |
+| TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives. Bodies remain buffered. `ReadableStream`, `blob()`, `formData()` and `AbortSignal` are pending. The CLI's API base URL ignores `<base>`. | Partly paid, M9 web APIs |
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
 | TD-171 | Deliberate | Isolation | The renderer was split but not confined, and `reftest` ran single-process | Paid 2026-11-22 (watchdog 2026-11-20, Linux and Windows sandboxes 2026-11-21, macOS and `reftest` 2026-11-22) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox had no seccomp-bpf syscall filter | Paid |
@@ -2797,14 +2797,16 @@ the profile quota.
 `fetch()` returns a promise, but the host runs the request to completion
 before returning, so a slow response stalls every other task of the page;
 it is cancelled only with the document. Request and response bodies are
-strings or bytes held whole: `ReadableStream` bodies, `arrayBuffer()`,
-`blob()`, `formData()`, `Response.json()`, `AbortSignal` and upload
-progress are absent. `Headers` iterators walk a snapshot taken when
-iteration starts, while Web IDL's pair iterators see later changes. The
-CLI's API base URL is the response URL, not the `<base>` element's.
+held whole. The CLI uses the response URL as the API base URL.
+
+**Partly paid 2026-11-23:** buffered bodies now accept unshared fixed-length
+array buffers and views and `URLSearchParams`. `arrayBuffer()` and `bytes()`
+return fresh byte storage and consume a supplied body once. `Headers`
+iterators read the current list on each step.
+
 **Pay:** the event-driven fetch controller of TD-161 queuing response and
-body tasks on the networking task source, Streams, typed-array body
-mixins and live pair iterators.
+body tasks on the networking task source, Streams, Blob and FormData body
+support, `Response.json()`, `AbortSignal`, upload progress and `<base>`.
 **Trigger:** the M9 web platform APIs work (Streams, Blob, FormData).
 
 ### TD-170 — IPC copies bodies and serializes requests

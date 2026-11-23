@@ -2580,8 +2580,7 @@
     },
     {
       "name": "Request has arrayBuffer method",
-      "status": "FAIL",
-      "message": "assert_true: request has arrayBuffer method expected true got false"
+      "status": "PASS"
     },
     {
       "name": "Request has blob method",

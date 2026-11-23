@@ -9,8 +9,8 @@
 //! State lives in prototype-less private arrays in a weak map, keyed by
 //! the script object. Header lists are byte strings stored as Latin-1 JS
 //! strings. Bodies are complete byte strings: `text()`, `json()` and
-//! `bodyUsed` work; streams, `arrayBuffer()`, `blob()` and `formData()` do
-//! not exist yet (TD-169).
+//! `bodyUsed`, `arrayBuffer()` and `bytes()` work. Streams, Blob and
+//! FormData remain part of TD-169.
 
 use std::fmt::Debug;
 
@@ -83,6 +83,10 @@ pub trait FetchHost: Debug {
 const HEADERS: &str = "Headers";
 const REQUEST: &str = "Request";
 const RESPONSE: &str = "Response";
+const BODY_TEXT: u8 = 0;
+const BODY_JSON: u8 = 1;
+const BODY_BUFFER: u8 = 2;
+const BODY_BYTES: u8 = 3;
 
 // Header guards (Fetch §5.1).
 const GUARD_NONE: f64 = 0.0;
@@ -177,8 +181,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<ObjectId> {
             ("keepalive", "get keepalive", request_constant::<3>),
         ],
         |agent, proto| {
-            define_method(agent, proto, "text", body_text::<false, false>, 0)?;
-            define_method(agent, proto, "json", body_text::<false, true>, 0)?;
+            install_body_methods::<false>(agent, proto)?;
             define_method(agent, proto, "clone", request_clone, 0)
         },
     )?;
@@ -199,8 +202,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<ObjectId> {
             ("redirected", "get redirected", response_get::<8>),
         ],
         |agent, proto| {
-            define_method(agent, proto, "text", body_text::<true, false>, 0)?;
-            define_method(agent, proto, "json", body_text::<true, true>, 0)?;
+            install_body_methods::<true>(agent, proto)?;
             define_method(agent, proto, "clone", response_clone, 0)
         },
     )?;
@@ -697,15 +699,73 @@ fn enum_member(
     Ok(Some(text))
 }
 
-fn body_member(agent: &mut Agent, init: Value) -> JsResult<Option<Vec<u8>>> {
-    let body = member(agent, init, "body")?;
-    if body.is_nullish() {
-        return Ok(None);
+/// IDL conversion happens before body extraction. An options getter may
+/// detach a buffer or mutate the search parameters before the byte copy.
+enum BodyInit {
+    Empty,
+    Text(String),
+    Bytes(ObjectId),
+    SearchParams(Value),
+}
+
+struct ExtractedBody {
+    bytes: Vec<u8>,
+    content_type: Option<&'static [u8]>,
+}
+
+impl BodyInit {
+    fn convert(agent: &mut Agent, body: Value) -> JsResult<Self> {
+        if body.is_nullish() {
+            return Ok(Self::Empty);
+        }
+        if agent.is_web_buffer_source(body) {
+            return agent.web_unshared_buffer_source(body).map(Self::Bytes);
+        }
+        if super::url::is_search_params(agent, body) {
+            return Ok(Self::SearchParams(body));
+        }
+        to_usv_string(agent, body).map(Self::Text)
     }
-    if body.as_object().is_some() {
-        return Err(type_error(agent, "only string bodies are supported"));
+
+    fn extract(self, agent: &mut Agent) -> JsResult<Option<ExtractedBody>> {
+        let (bytes, content_type) = match self {
+            Self::Empty => return Ok(None),
+            Self::Text(text) => (
+                text.into_bytes(),
+                Some(b"text/plain;charset=UTF-8".as_slice()),
+            ),
+            Self::Bytes(source) => {
+                let length = agent.web_buffer_bytes(source).len();
+                let copy = agent.with_host_memory(length, |agent| {
+                    let mut copy = Vec::new();
+                    copy.try_reserve_exact(length)
+                        .map_err(|_| Abrupt::OutOfMemory)?;
+                    copy.extend_from_slice(agent.web_buffer_bytes(source));
+                    Ok(copy)
+                })?;
+                (copy, None)
+            }
+            Self::SearchParams(value) => (
+                super::url::serialize_search_params(agent, value)?.into_bytes(),
+                Some(b"application/x-www-form-urlencoded;charset=UTF-8".as_slice()),
+            ),
+        };
+        Ok(Some(ExtractedBody {
+            bytes,
+            content_type,
+        }))
     }
-    Ok(Some(to_usv_string(agent, body)?.into_bytes()))
+}
+
+fn append_body_content_type(list: &mut HeaderList, content_type: Option<&[u8]>) {
+    if let Some(content_type) = content_type {
+        if !list
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+        {
+            list.push(("Content-Type".to_owned(), content_type.to_vec()));
+        }
+    }
 }
 
 // ---- Request ----------------------------------------------------------------
@@ -865,25 +925,18 @@ fn request_state(agent: &mut Agent, input: Value, init: Value) -> JsResult<Reque
             }
             state.headers = list;
         }
-        let body = body_member(agent, init)?;
-        if body.is_some() {
+        let body = member(agent, init, "body")?;
+        let body = BodyInit::convert(agent, body)?;
+        if !matches!(body, BodyInit::Empty) {
             if matches!(state.method.as_str(), "GET" | "HEAD") {
                 return Err(type_error(
                     agent,
                     "GET and HEAD requests cannot have a body",
                 ));
             }
-            if !state
-                .headers
-                .iter()
-                .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
-            {
-                state.headers.push((
-                    "Content-Type".to_owned(),
-                    b"text/plain;charset=UTF-8".to_vec(),
-                ));
-            }
-            state.body = body;
+            let body = body.extract(agent)?.expect("provided Request body");
+            append_body_content_type(&mut state.headers, body.content_type);
+            state.body = Some(body.bytes);
         }
         Ok(())
     })?;
@@ -1026,13 +1079,7 @@ fn new_response(agent: &mut Agent, parts: ResponseParts<'_>) -> JsResult<Value> 
 fn construct_response(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let body = args.first().copied().unwrap_or(Value::NULL);
     let init = args.get(1).copied().unwrap_or(Value::UNDEFINED);
-    let body = if body.is_nullish() {
-        None
-    } else if body.as_object().is_some() {
-        return Err(type_error(agent, "only string bodies are supported"));
-    } else {
-        Some(to_usv_string(agent, body)?.into_bytes())
-    };
+    let body = BodyInit::convert(agent, body)?;
     let mut status = 200u16;
     let mut status_text = Vec::new();
     let mut list = Vec::new();
@@ -1071,19 +1118,12 @@ fn construct_response(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
             Ok(())
         })?;
     }
-    if body.is_some() {
+    let body = body.extract(agent)?;
+    if let Some(body) = &body {
         if matches!(status, 101 | 103 | 204 | 205 | 304) {
             return Err(type_error(agent, "a null-body status cannot have a body"));
         }
-        if !list
-            .iter()
-            .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
-        {
-            list.push((
-                "Content-Type".to_owned(),
-                b"text/plain;charset=UTF-8".to_vec(),
-            ));
-        }
+        append_body_content_type(&mut list, body.content_type);
     }
     new_response(
         agent,
@@ -1094,7 +1134,7 @@ fn construct_response(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
             status_text: &status_text,
             headers: &list,
             guard: GUARD_RESPONSE,
-            body: body.as_deref(),
+            body: body.as_ref().map(|body| body.bytes.as_slice()),
             redirected: false,
         },
     )
@@ -1171,9 +1211,42 @@ fn response_clone(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value
 
 // ---- bodies -----------------------------------------------------------------
 
-/// `text()` and `json()` (Fetch §5.3 "consume body"): mark the body used
-/// and resolve with its UTF-8 decoding (BOM removed) or parsed JSON.
-fn body_text<const RESPONSE_BODY: bool, const JSON: bool>(
+fn install_body_methods<const RESPONSE_BODY: bool>(
+    agent: &mut Agent,
+    proto: ObjectId,
+) -> JsResult<()> {
+    define_method(
+        agent,
+        proto,
+        "text",
+        consume_body::<RESPONSE_BODY, BODY_TEXT>,
+        0,
+    )?;
+    define_method(
+        agent,
+        proto,
+        "json",
+        consume_body::<RESPONSE_BODY, BODY_JSON>,
+        0,
+    )?;
+    define_method(
+        agent,
+        proto,
+        "arrayBuffer",
+        consume_body::<RESPONSE_BODY, BODY_BUFFER>,
+        0,
+    )?;
+    define_method(
+        agent,
+        proto,
+        "bytes",
+        consume_body::<RESPONSE_BODY, BODY_BYTES>,
+        0,
+    )
+}
+
+/// Consume a body once with the conversion selected by the Body method.
+fn consume_body<const RESPONSE_BODY: bool, const FORMAT: u8>(
     agent: &mut Agent,
     this: Value,
     _: &[Value],
@@ -1196,9 +1269,15 @@ fn body_text<const RESPONSE_BODY: bool, const JSON: bool>(
             record.set(agent, used_slot, Value::TRUE)?;
             value_bytes(agent, body)
         };
+        let owner = this.as_object().expect("branded Body receiver");
+        match FORMAT {
+            BODY_BUFFER => return agent.new_web_array_buffer(owner, &bytes),
+            BODY_BYTES => return agent.new_web_uint8_array(owner, &bytes),
+            _ => {}
+        }
         let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
         let text = String::from_utf8_lossy(bytes);
-        if JSON {
+        if FORMAT == BODY_JSON {
             let units: Vec<u16> = text.encode_utf16().collect();
             agent.parse_json(&units)
         } else {

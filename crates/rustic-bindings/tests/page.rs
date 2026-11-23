@@ -116,6 +116,66 @@ fn text_decoder_retains_stream_state_through_bom_splits_and_reentry() {
 }
 
 #[test]
+fn fetch_binary_and_search_params_bodies_snapshot_the_input_and_consume_once() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        let checked;
+        function eq(a, b) { if (a !== b) throw `${a} != ${b}`; }
+        async function exercise() {
+            const data = Uint8Array.of(9, 0xEF, 0xBB, 0xBF, 65, 8);
+            const response = new Response(new DataView(data.buffer, 1, 4));
+            const clone = response.clone();
+            data.fill(0);
+            eq(response.headers.get('Content-Type'), null);
+            eq(response.bodyUsed, false);
+            const pending = response.bytes();
+            eq(response.bodyUsed, true);
+            const bytes = await pending;
+            eq(bytes instanceof Uint8Array, true);
+            eq(bytes.join(), '239,187,191,65');
+            bytes[0] = 0;
+            eq(await clone.text(), 'A');
+            try { await response.arrayBuffer(); throw 'expected used body error'; }
+            catch (e) { if (!(e instanceof TypeError)) throw e; }
+
+            const source = Uint8Array.of(1, 2, 3);
+            const request = new Request('https://example.test/', {method:'POST', body:source.subarray(1)});
+            source[1] = 9;
+            eq(request.headers.get('Content-Type'), null);
+            const buffer = await request.arrayBuffer();
+            eq(buffer instanceof ArrayBuffer, true);
+            eq(new Uint8Array(buffer).join(), '2,3');
+
+            const params = new URLSearchParams('q=a b');
+            params.toString = () => 'unexpected';
+            const form = new Response(params, { get status() { params.append('x', '&'); return 200; }});
+            eq(form.headers.get('Content-Type'), 'application/x-www-form-urlencoded;charset=UTF-8');
+            eq(await form.text(), 'q=a+b&x=%26');
+            const detached = Uint8Array.of(65);
+            const empty = new Response(detached, { get status() { detached.buffer.transfer(); return 200; }});
+            eq((await empty.arrayBuffer()).byteLength, 0);
+            eq(empty.bodyUsed, true);
+            const noBody = new Response();
+            eq((await noBody.bytes()).length, 0);
+            eq((await noBody.arrayBuffer()).byteLength, 0);
+            eq(noBody.bodyUsed, false);
+            for (const body of [new SharedArrayBuffer(1), new Uint8Array(new SharedArrayBuffer(1)),
+                                new ArrayBuffer(1, {maxByteLength: 2})]) {
+                try { new Response(body); throw 'expected buffer type error'; }
+                catch (e) { if (!(e instanceof TypeError)) throw e; }
+            }
+        }
+        exercise().then(() => { checked = 'pass'; }, e => { checked = String(e); });
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    let value = agent.evaluate("checked").unwrap().as_string().unwrap();
+    assert_eq!(agent.heap.string(value).to_text(), "pass");
+}
+
+#[test]
 fn dom_rects_are_branded_and_keep_their_values_through_reentry() {
     let document = Document::new(DocumentLimits::default()).unwrap();
     let tree = Rc::new(Tree(RefCell::new(document)));

@@ -49,6 +49,21 @@ const COMPONENTS: [UrlComponent; 9] = [
     UrlComponent::Hash,
 ];
 
+pub(super) fn is_search_params(agent: &Agent, value: Value) -> bool {
+    value
+        .as_object()
+        .is_some_and(|object| agent.host_state::<()>(object, PARAMS).is_some())
+}
+
+pub(super) fn serialize_search_params(agent: &mut Agent, value: Value) -> JsResult<String> {
+    let record = params_record(agent, value)?;
+    let current = data(agent, record)?;
+    Ok(rustic_url::serialize_form(
+        &current.pairs,
+        rustic_encoding::Encoding::Utf8,
+    ))
+}
+
 #[derive(Debug)]
 pub(super) struct Objects {
     records: ObjectId,

@@ -2935,7 +2935,15 @@ the CLI's host is the document's network session.
 | CLI host | Same session, cookies and cache as the document; CORS mode by default (`Origin` sent, cross-origin needs `Access-Control-Allow-Origin`); `connect-src` and mixed content rechecked on every hop before sending | `script_fetch_applies_cors_and_connect_src` |
 
 Bodies are whole byte strings and `fetch()` waits for the response on the
-script's thread (TD-169).
+script's thread (TD-169). In M9 the input now also accepts an unshared
+fixed-length `BufferSource` or `URLSearchParams`. A buffer body copies only
+the view's bytes and receives no implicit Content-Type. Search parameters
+receive the UTF-8 form Content-Type when the caller leaves it absent. Both
+classes expose `arrayBuffer()` and `bytes()`. These read the raw body bytes
+and share the consumption state of `text()` and `json()`.
+`fetch_binary_and_search_params_bodies_snapshot_the_input_and_consume_once`
+covers mutation, detachment, MIME defaults and body consumption. The pinned
+`request-structure.any.js` check for `Request.arrayBuffer()` now passes.
 
 ## NET-04 — Partitioned HTTP cache
 

@@ -168,21 +168,45 @@ impl Agent {
     /// Shared fixed-length buffers are accepted. Resizable or growable
     /// buffers require a different IDL type.
     pub fn web_buffer_source(&mut self, value: Value) -> JsResult<ObjectId> {
+        self.convert_web_buffer(value, true)
+    }
+
+    /// Whether a value has a buffer or buffer view internal slot, before
+    /// applying any Web IDL restrictions on the backing store.
+    pub fn is_web_buffer_source(&self, value: Value) -> bool {
+        value
+            .as_object()
+            .and_then(|object| self.source_buffer(object))
+            .is_some()
+    }
+
+    /// Convert an IDL `BufferSource` whose backing store cannot be shared
+    /// or resizable.
+    pub fn web_unshared_buffer_source(&mut self, value: Value) -> JsResult<ObjectId> {
+        self.convert_web_buffer(value, false)
+    }
+
+    fn convert_web_buffer(&mut self, value: Value, allow_shared: bool) -> JsResult<ObjectId> {
         if let Some(object) = value.as_object() {
-            let buffer = match self.heap.object(object).internal() {
-                Some(Internal::ArrayBuffer(_)) => Some(object),
-                Some(Internal::TypedArray { buffer, .. } | Internal::DataView { buffer, .. }) => {
-                    Some(*buffer)
-                }
-                _ => None,
-            };
-            if buffer
-                .is_some_and(|buffer| self.buffer_data(buffer).is_some_and(|d| d.max.is_none()))
+            if self
+                .source_buffer(object)
+                .and_then(|buffer| self.buffer_data(buffer))
+                .is_some_and(|data| data.max.is_none() && (allow_shared || !data.shared))
             {
                 return Ok(object);
             }
         }
-        self.type_error("expected a fixed-length buffer source")
+        self.type_error("invalid backing store for this buffer source")
+    }
+
+    fn source_buffer(&self, object: ObjectId) -> Option<ObjectId> {
+        match self.heap.object(object).internal() {
+            Some(Internal::ArrayBuffer(_)) => Some(object),
+            Some(Internal::TypedArray { buffer, .. } | Internal::DataView { buffer, .. }) => {
+                Some(*buffer)
+            }
+            _ => None,
+        }
     }
 
     /// Convert an IDL `[AllowShared] Uint8Array`. Proxies and other element
@@ -352,13 +376,27 @@ impl Agent {
     }
 
     pub(crate) fn immutable_bytes_buffer(&mut self, bytes: &[u8]) -> JsResult<ObjectId> {
+        self.array_buffer_from_bytes(bytes, true)
+    }
+
+    /// Create a mutable ArrayBuffer in the relevant realm of a Web IDL
+    /// receiver and copy bytes into its backing store.
+    pub fn new_web_array_buffer(&mut self, owner: ObjectId, bytes: &[u8]) -> JsResult<Value> {
+        let previous = self.heap.realm;
+        self.switch_realm(self.heap.object(owner).realm);
+        let result = self.array_buffer_from_bytes(bytes, false);
+        self.switch_realm(previous);
+        result.map(Value::object)
+    }
+
+    fn array_buffer_from_bytes(&mut self, bytes: &[u8], immutable: bool) -> JsResult<ObjectId> {
         let buffer = self.new_array_buffer(bytes.len())?;
-        let data = self.buffer_data_mut(buffer).expect("new buffer");
+        let data = self.buffer_data_mut(buffer).expect("new array buffer");
         data.bytes
             .as_mut()
-            .expect("attached buffer")
+            .expect("attached array buffer")
             .copy_from_slice(bytes);
-        data.immutable = true;
+        data.immutable = immutable;
         Ok(buffer)
     }
 

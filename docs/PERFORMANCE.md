@@ -1,10 +1,12 @@
 # Performance and measurement plan
 
-The only comparative results so far are the
+Comparative results so far are the
 [first cross-engine JavaScript report](reviews/2026-11-19-perf-01-m5.md)
 (PERF-01, M5 slice: the JS-09 corpus against V8, SpiderMonkey and
-JavaScriptCore shells on x86-64), which records ratios without targets; there
-are no page-load, rendering or memory comparisons yet. The first internal
+JavaScriptCore shells on x86-64) and the
+[M8 reference-device report](reviews/2026-11-23-perf-01-m8-reference-devices.md)
+(six hosted x64 and ARM64 desktops, with Rustic's page pipeline budgets);
+there are no browser page-load or memory comparisons yet. The first internal
 rendering measurement is the `frame_budget` raster example (a one-box repaint took 3.5 ms
 at scale 1 and 11 ms at scale 2 in the sandbox, [PAINT.md](PAINT.md)); it is a
 sanity check, not a controlled benchmark. Budgets below are initial engineering
@@ -218,12 +220,14 @@ Other M8 budgets are the existing ones: the warm frame update (the
 `frame_budget` example's damage-limited repaint within 16.7 ms), the
 50 ms task rule and the per-renderer memory caps of ISO-04.
 
-**Where the M8 ratchet stands.** On the JavaScript corpus the ratio to V8
-with its JIT is 2.0 to 15 on the sandbox (`property_access` 2.0,
-`framework_diff` 15), so the 2.0 speed ratchet for M8 is met by one workload
-and missed by the rest. It is recorded per device by the workflow, as the
-ratchet requires; closing the gap is the M12 interpreter and JIT work
-(`perf.interpreter`, `perf.baseline_jit`), not something an alpha can reach.
+**Where the M8 ratchet stands.** The [first reference-device run](reviews/2026-11-23-perf-01-m8-reference-devices.md)
+put every device within every page budget above. On the JavaScript corpus the
+ratio to the fastest JIT engine (V8, or JavaScriptCore on macOS) is 3.7 to 29
+on the hosted x64 and ARM64 devices and up to 52 on the older Intel Mac, so
+the 2.0 speed ratchet for M8 is missed on every workload. The workflow
+records it per device, as the ratchet requires; closing the gap is the M12
+interpreter and JIT work (`perf.interpreter`, `perf.baseline_jit`), which an
+interpreter-only alpha cannot reach.
 
 ## Optimization order
 

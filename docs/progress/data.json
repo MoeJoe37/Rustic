@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "822b7a519d65eb4524aba3c5535e8e54aca2951c9ad5913803af7b710d0b1471",
-  "percent": "43.44",
-  "verified_percent": "41.83",
-  "partial_percent": "1.61",
-  "completed": 97,
-  "in_progress": 8,
+  "source_fingerprint": "707b28698dc9dac6a097f29e79cd30db8b7b1dc5e4f7f15f741f9fcb833e9c92",
+  "percent": "43.62",
+  "verified_percent": "42.21",
+  "partial_percent": "1.41",
+  "completed": 98,
+  "in_progress": 7,
   "total": 226,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 1,
+      "completed": 2,
       "total": 18,
-      "percent": "16.81",
-      "verified_percent": "8.51",
-      "partial_percent": "8.30"
+      "percent": "19.12",
+      "verified_percent": "13.13",
+      "partial_percent": "5.99"
     },
     {
       "id": "M9",
@@ -7344,42 +7344,30 @@
           "label": "Cross-engine benchmark harness, reference devices and published reports",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/cross_engine_bench.py",
-                  "marker": "def median_interval"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/examples/dom_bench.rs",
-                  "marker": "const WORKLOADS"
-                },
-                {
-                  "kind": "test",
-                  "path": "tools/tests/test_cross_engine_bench.py",
-                  "marker": "def test_eleven_samples_use_the_second_and_tenth_order_statistics"
-                },
-                {
-                  "kind": "test",
-                  "path": "docs/reviews/2026-11-19-perf-01-m5.md",
-                  "marker": "Every engine returned the same checksum"
-                }
-              ]
+              "kind": "source",
+              "path": "tools/cross_engine_bench.py",
+              "marker": "def median_interval"
             },
             {
-              "label": "Reference devices on the three desktop platform families (x64 and ARM64) with published per-device reports (M8)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": ".github/workflows/perf.yml",
+              "marker": "name: Device (${{ matrix.name }})"
+            },
+            {
+              "kind": "test",
+              "path": "tools/tests/test_cross_engine_bench.py",
+              "marker": "def test_merged_report_lists_every_device_with_its_ratio"
+            },
+            {
+              "kind": "test",
+              "path": "docs/reviews/2026-11-23-perf-01-m8-reference-devices.md",
+              "marker": "Every device is within every"
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.37"
         },
         {
@@ -7514,13 +7502,13 @@
         }
       ],
       "points": 64,
-      "completed": 0,
-      "in_progress": 1,
+      "completed": 1,
+      "in_progress": 0,
       "total": 14,
-      "contribution": "0.18",
-      "percent": "2.34",
-      "verified_percent": "0.00",
-      "partial_percent": "2.34"
+      "contribution": "0.37",
+      "percent": "4.68",
+      "verified_percent": "4.68",
+      "partial_percent": "0.00"
     },
     {
       "id": "release",

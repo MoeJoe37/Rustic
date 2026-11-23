@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 43.44%** = 41.83% verified complete + 1.61% partial credit. 97/226 capabilities complete, 8 in progress.
+**Overall completion: 43.62%** = 42.21% verified complete + 1.41% partial credit. 98/226 capabilities complete, 7 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `822b7a519d65eb4524aba3c5535e8e54aca2951c9ad5913803af7b710d0b1471`.
+Catalog: `engine-v4`. Source fingerprint: `707b28698dc9dac6a097f29e79cd30db8b7b1dc5e4f7f15f741f9fcb833e9c92`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `822b7a519d65eb4524aba3c5535e8e54aca29
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 1/18 | 16.81% | 8.51% | 8.12% |
+| M8 Desktop alpha | 2/18 | 19.12% | 13.13% | 8.12% |
 | M9 Compatibility expansion | 0/52 | 2.60% | 0.00% | 22.01% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
@@ -52,7 +52,7 @@ Catalog: `engine-v4`. Source fingerprint: `822b7a519d65eb4524aba3c5535e8e54aca29
 | DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
 | Extensions (MV2) | 0/11 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | uBO port & filtering | 0/8 | 0 | 0.00% | 0.00% | 2% | 0.00 |
-| Performance leadership | 0/14 | 1 | 2.34% | 0.00% | 8% | 0.18 |
+| Performance leadership | 1/14 | 0 | 4.68% | 4.68% | 8% | 0.37 |
 | Embedding & release | 0/9 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 
 ## Capability evidence
@@ -362,9 +362,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Performance leadership
 
-- **in progress 50.00%** `perf.harness` — Cross-engine benchmark harness, reference devices and published reports · size 3 · M8 · 0.37% of engine
-  - [x] First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice) ([source](../../tools/cross_engine_bench.py), [source](../../crates/rustic-engine/examples/dom_bench.rs), [test](../../tools/tests/test_cross_engine_bench.py), [test](../../docs/reviews/2026-11-19-perf-01-m5.md))
-  - [ ] Reference devices on the three desktop platform families (x64 and ARM64) with published per-device reports (M8)
+- **complete** `perf.harness` — Cross-engine benchmark harness, reference devices and published reports · size 3 · M8 · 0.37% of engine ([source](../../tools/cross_engine_bench.py), [source](../../.github/workflows/perf.yml), [test](../../tools/tests/test_cross_engine_bench.py), [test](../../docs/reviews/2026-11-23-perf-01-m8-reference-devices.md))
 - **planned** `perf.mobile` — Android and iOS reference devices, per-device reports and the leadership gate on them · size 2 · M14 · 0.25% of engine
 - **planned** `perf.interpreter` — Interpreter fast paths: quickening, superinstructions and call inline caches · size 5 · M12 · 0.62% of engine
 - **planned** `perf.baseline_jit` — Baseline JIT for x64 and ARM64 behind W^X with interpreter fallback · size 8 · M12 · 1.00% of engine

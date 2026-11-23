@@ -6662,39 +6662,27 @@
           "label": "Cross-engine benchmark harness, reference devices and published reports",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "First cross-engine report: JS-09 corpus against V8, SpiderMonkey and JavaScriptCore, DOM microbenchmarks (M5 slice)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "tools/cross_engine_bench.py",
-                  "marker": "def median_interval"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-engine/examples/dom_bench.rs",
-                  "marker": "const WORKLOADS"
-                },
-                {
-                  "kind": "test",
-                  "path": "tools/tests/test_cross_engine_bench.py",
-                  "marker": "def test_eleven_samples_use_the_second_and_tenth_order_statistics"
-                },
-                {
-                  "kind": "test",
-                  "path": "docs/reviews/2026-11-19-perf-01-m5.md",
-                  "marker": "Every engine returned the same checksum"
-                }
-              ]
+              "kind": "source",
+              "path": "tools/cross_engine_bench.py",
+              "marker": "def median_interval"
             },
             {
-              "label": "Reference devices on the three desktop platform families (x64 and ARM64) with published per-device reports (M8)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": ".github/workflows/perf.yml",
+              "marker": "name: Device (${{ matrix.name }})"
+            },
+            {
+              "kind": "test",
+              "path": "tools/tests/test_cross_engine_bench.py",
+              "marker": "def test_merged_report_lists_every_device_with_its_ratio"
+            },
+            {
+              "kind": "test",
+              "path": "docs/reviews/2026-11-23-perf-01-m8-reference-devices.md",
+              "marker": "Every device is within every"
             }
           ]
         },

@@ -4727,6 +4727,30 @@
           ]
         },
         {
+          "id": "web.encoding",
+          "label": "Window TextEncoder and TextDecoder",
+          "size": 2,
+          "milestone": "M9",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/encoding.rs",
+              "marker": "fn decoder_constructor"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn text_decoder_retains_stream_state_through_bom_splits_and_reentry"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "encoding/textdecoder-fatal-streaming.any.js"
+            }
+          ]
+        },
+        {
           "id": "web.streams",
           "label": "Streams, messaging and structured clone",
           "size": 5,

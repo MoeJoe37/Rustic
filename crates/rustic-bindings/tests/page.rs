@@ -20,6 +20,102 @@ impl PageTree for Tree {
 }
 
 #[test]
+fn text_encoding_uses_web_idl_brands_and_exact_byte_ranges() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function throws(type, f) {
+            try { f(); } catch (error) { if (error instanceof type) return; throw error; }
+            throw 'expected ' + type.name;
+        }
+        class Encoder extends TextEncoder {}
+        const encoder = new Encoder();
+        assert(encoder instanceof Encoder && encoder.encoding === 'utf-8', 'encoder brand');
+        assert(Object.prototype.toString.call(encoder) === '[object TextEncoder]', 'tag');
+        assert(encoder.encode().length === 0 && encoder.encode(undefined).length === 0, 'defaults');
+        assert(encoder.encode(null).join() === '110,117,108,108', 'null conversion');
+        assert(encoder.encode('aé𝄞\uD800b').join() === '97,195,169,240,157,132,158,239,191,189,98', 'USVString');
+        const bytes = new Uint8Array(10).fill(255);
+        const result = encoder.encodeInto('a𝄞é', bytes.subarray(2, 8));
+        assert(result.read === 3 && result.written === 5, 'full scalars and UTF-16 counts');
+        assert(bytes.join() === '255,255,97,240,157,132,158,255,255,255', 'view range');
+        const short = encoder.encodeInto('\uDC00', bytes.subarray(0, 2));
+        assert(short.read === 0 && short.written === 0, 'replacement cannot be split');
+        const shared = new Uint8Array(new SharedArrayBuffer(3));
+        assert(encoder.encodeInto('é', shared).written === 2, 'shared output');
+        const decoder = new TextDecoder(' \tlatin1\n');
+        assert(decoder.encoding === 'windows-1252' && !decoder.fatal && !decoder.ignoreBOM, 'label');
+        assert(decoder.decode(Uint8Array.of(0x80)) === '€', 'legacy decoder');
+        assert(new TextDecoder().decode(new DataView(shared.buffer, 0, 2)) === 'é', 'DataView range');
+        assert(new TextDecoder().decode(Uint8Array.of(65).buffer) === 'A', 'buffer source');
+        assert(new TextDecoder().decode(new Uint16Array([0x4241])) === 'AB', 'typed array bytes');
+        throws(TypeError, () => TextEncoder());
+        throws(TypeError, () => TextDecoder());
+        throws(TypeError, () => TextEncoder.prototype.encode.call({}, 'x'));
+        throws(TypeError, () => Object.create(TextDecoder.prototype).decode());
+        throws(TypeError, () => encoder.encodeInto('x', new Uint8ClampedArray(1)));
+        throws(TypeError, () => encoder.encodeInto('x', new Proxy(bytes, {})));
+        throws(TypeError, () => encoder.encodeInto('x', new Uint8Array(new ArrayBuffer(1, {maxByteLength: 3}))));
+        throws(TypeError, () => decoder.decode(new ArrayBuffer(1, {maxByteLength: 3})));
+        throws(TypeError, () => decoder.decode(null));
+        throws(TypeError, () => decoder.decode(bytes, true));
+        for (const label of ['replacement', 'iso-2022-kr', 'utf-7', null]) {
+            throws(RangeError, () => new TextDecoder(label));
+        }
+        let trace = '';
+        throws(RangeError, () => new TextDecoder({toString() { trace += 'l'; return '?'; }}, {
+            get fatal() { trace += 'f'; }, get ignoreBOM() { trace += 'b'; },
+        }));
+        assert(trace === 'lfb', 'all dictionary getters before constructor steps');
+        const detached = new Uint8Array([65]);
+        assert(decoder.decode(detached, {get stream() { detached.buffer.transfer(); }}) === '', 'detach by options');
+        assert(encoder.encodeInto('x', detached).written === 0, 'detached output');
+    "#).unwrap();
+}
+
+#[test]
+fn text_decoder_retains_stream_state_through_bom_splits_and_reentry() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        const decoder = new TextDecoder();
+        const stream = {stream: true};
+        const bom = Uint8Array.of(0xEF,0xBB,0xBF);
+        assert(decoder.decode(bom.subarray(0, 1), stream) === '', 'split BOM lead');
+        assert(decoder.decode(bom.subarray(1), stream) === '', 'split BOM continuation');
+        assert(decoder.decode(bom, stream) === '\uFEFF', 'same stream keeps next BOM');
+        assert(decoder.decode(Uint8Array.of(0xF0,0x9D), stream) === '', 'split scalar lead');
+        assert(decoder.decode(Uint8Array.of(0x84,0x9E)) === '𝄞', 'split scalar continuation');
+        assert(decoder.decode(bom) === '', 'BOM resets');
+        assert(new TextDecoder(undefined, {ignoreBOM: true}).decode(bom) === '\uFEFF', 'ignoreBOM');
+        assert(new TextDecoder('utf-16be').decode(Uint8Array.of(0xFE,0xFF,0,65)) === 'A', 'UTF-16 BOM');
+        assert(new TextDecoder('shift_jis').decode(Uint8Array.of(0x82,0xA0)) === 'あ', 'multibyte legacy');
+        assert(decoder.decode(Uint8Array.of(0xC2), stream) === '', 'incomplete sequence');
+        assert(decoder.decode() === '\uFFFD', 'empty final flush');
+        const fatal = new TextDecoder('UTF-8', {fatal: 1});
+        assert(fatal.fatal, 'IDL boolean');
+        assert(fatal.decode(Uint8Array.of(0xC2), stream) === '', 'fatal pending input');
+        try { fatal.decode(); throw 'expected fatal error'; }
+        catch (error) { if (!(error instanceof TypeError)) throw error; }
+        assert(fatal.decode(Uint8Array.of(65)) === 'A', 'reuse after fatal error');
+        const input = Uint8Array.of(0xA2);
+        assert(decoder.decode(input, {get stream() {
+            decoder.decode(Uint8Array.of(0xC2), stream);
+            return false;
+        }}) === '¢', 'dictionary getter reentry precedes decode');
+        const large = new Uint8Array(4098).fill(65);
+        large.set([0xF0,0x9D,0x84,0x9E], 4094);
+        assert(decoder.decode(large) === 'A'.repeat(4094) + '𝄞', 'native chunk boundary');
+    "#).unwrap();
+}
+
+#[test]
 fn dom_rects_are_branded_and_keep_their_values_through_reentry() {
     let document = Document::new(DocumentLimits::default()).unwrap();
     let tree = Rc::new(Tree(RefCell::new(document)));

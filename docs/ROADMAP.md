@@ -761,7 +761,7 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 | CSS/layout | Full flex/grid/tables; writing modes; fragmentation/printing; container queries; animations/transforms/effects | WPT reftests plus incremental/full-layout parity |
 | Document formats | SVG parsing/DOM/painting, MathML layout, XML where supported | Separate format conformance and hostile-input corpora |
 | Language | Remaining ECMAScript semantics and built-ins, RegExp/Intl. Implemented additions include `Math.sumPrecise`, `Uint8Array` base64 and hex, JSON source text and raw JSON, and `Array.fromAsync`. [JS.md](JS.md#arrayfromasync-m9) | Test262 full-selection reporting; GC/stack stress |
-| Platform APIs | Streams, workers, structured clone, messaging, URL APIs, encoding, observers | Agent/task/cross-origin tests |
+| Platform APIs | Streams, workers, structured clone, messaging, URL APIs, encoding, observers. Window `TextEncoder` and `TextDecoder` are implemented, with pinned Encoding API cases. [ENCODING.md](ENCODING.md) | Agent/task/cross-origin tests |
 | Offline/data | IndexedDB, Cache API, service workers and update/lifetime rules | Transaction/crash-recovery and partition tests |
 | Graphics/media | Canvas 2D and OffscreenCanvas; audio/video, WebGL, WebGPU and WebRTC are M11 parity work | Rendering corpora, canvas WPT and sandbox review |
 | Network | HTTP/2 and HTTP/3 via reviewed transports, WebSockets, cache/cookie compatibility | Protocol fixtures, cancellation and cross-origin tests |

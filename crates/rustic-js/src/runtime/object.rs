@@ -339,6 +339,12 @@ pub(crate) enum Internal {
     },
     /// A host object's embedder data.
     Host(u64),
+    /// Native host state without JavaScript GC edges.
+    HostState {
+        interface: &'static str,
+        state: std::rc::Rc<dyn std::any::Any>,
+        bytes: usize,
+    },
     /// A read-only Web IDL indexed property getter and its source.
     HostIndexed(super::host_indexed::IndexedHost),
     /// A Web IDL named getter/setter/deleter and its source.

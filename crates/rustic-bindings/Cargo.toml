@@ -12,6 +12,7 @@ publish.workspace = true
 rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }
+rustic-encoding = { path = "../rustic-encoding" }
 rustic-js = { path = "../rustic-js" }
 rustic-net = { path = "../rustic-net" }
 rustic-style = { path = "../rustic-style" }

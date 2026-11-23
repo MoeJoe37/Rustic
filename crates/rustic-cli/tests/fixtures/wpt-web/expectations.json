@@ -1329,6 +1329,936 @@
       "status": "PASS"
     }
   ],
+  "encoding/api-basics.any.js": [
+    {
+      "name": "Default encodings",
+      "status": "PASS"
+    },
+    {
+      "name": "Default inputs",
+      "status": "PASS"
+    },
+    {
+      "name": "Encode/decode round trip: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "Decode sample: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "Decode sample: utf-16be",
+      "status": "PASS"
+    },
+    {
+      "name": "Decode sample: utf-16",
+      "status": "PASS"
+    }
+  ],
+  "encoding/api-surrogates-utf8.any.js": [
+    {
+      "name": "Invalid surrogates encoded into UTF-8: Sanity check",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid surrogates encoded into UTF-8: Surrogate half (low)",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid surrogates encoded into UTF-8: Surrogate half (high)",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid surrogates encoded into UTF-8: Surrogate half (low), in a string",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid surrogates encoded into UTF-8: Surrogate half (high), in a string",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid surrogates encoded into UTF-8: Wrong order",
+      "status": "PASS"
+    }
+  ],
+  "encoding/iso-2022-jp-decoder.any.js": [
+    {
+      "name": "iso-2022-jp decoder: Error ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Error ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: ASCII ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Double ASCII ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, ASCII ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: characters",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: SO / SI",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Roman ESC, characters",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Roman ESC, SO / SI",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Roman ESC, error ESC, Katakana ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Katakana ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Katakana ESC, multibyte ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Katakana ESC, error ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Katakana ESC, error ESC #2, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Katakana ESC, character, Katakana ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Katakana ESC, SO / SI",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC #2, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC, error ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Double multibyte ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Double multibyte ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Double multibyte ESC #2, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC, error ESC #2, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC, single byte, multibyte ESC, character",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC, lead error byte",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: Multibyte ESC, trail error byte",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, error ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, error ESC #2",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, error ESC #3",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, ASCII ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, Roman ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, Katakana ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, Multibyte ESC",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: character, Multibyte ESC #2",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: reset after a final chunk, fatal=false",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: reset after an empty flush, fatal=false",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: reset after a final chunk, fatal=true",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-2022-jp decoder: reset after an empty flush, fatal=true",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-arguments.any.js": [
+    {
+      "name": "TextDecoder decode() with explicit undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "TextDecoder decode() with undefined and undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "TextDecoder decode() with undefined and options",
+      "status": "PASS"
+    },
+    {
+      "name": "TextDecoder decode() with array buffer detached during arg conversion",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-byte-order-marks.any.js": [
+    {
+      "name": "Byte-order marks: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "Byte-order marks: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "Byte-order marks: utf-16be",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-eof.any.js": [
+    {
+      "name": "TextDecoder end-of-queue handling",
+      "status": "PASS"
+    },
+    {
+      "name": "TextDecoder end-of-queue handling using stream: true",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-fatal-streaming.any.js": [
+    {
+      "name": "Fatal flag, non-streaming cases",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag, streaming cases",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-fatal.any.js": [
+    {
+      "name": "Fatal flag: utf-8 - invalid code",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - ends early",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - ends early 2",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - invalid trail",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - invalid trail 2",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - invalid trail 3",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - invalid trail 4",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - invalid trail 5",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - invalid trail 6",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - > 0x10FFFF",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - obsolete lead byte",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+0000 - 2 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+0000 - 3 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+0000 - 4 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+0000 - 5 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+0000 - 6 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+007F - 2 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+007F - 3 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+007F - 4 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+007F - 5 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+007F - 6 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+07FF - 3 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+07FF - 4 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+07FF - 5 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+07FF - 6 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+FFFF - 4 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+FFFF - 5 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+FFFF - 6 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+10FFFF - 5 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - overlong U+10FFFF - 6 bytes",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - lead surrogate",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - trail surrogate",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-8 - surrogate pair",
+      "status": "PASS"
+    },
+    {
+      "name": "Fatal flag: utf-16le - truncated code unit",
+      "status": "PASS"
+    },
+    {
+      "name": "The fatal attribute of TextDecoder",
+      "status": "PASS"
+    },
+    {
+      "name": "Error seen with fatal does not prevent future decodes",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-ignorebom.any.js": [
+    {
+      "name": "BOM is ignored if ignoreBOM option is specified: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "BOM is ignored if ignoreBOM option is specified: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "BOM is ignored if ignoreBOM option is specified: utf-16be",
+      "status": "PASS"
+    },
+    {
+      "name": "The ignoreBOM attribute of TextDecoder",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-mistakes.any.js": [
+    {
+      "name": "Invalid Unicode input is replaced: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid Unicode input is replaced: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid Unicode input is replaced: utf-16be",
+      "status": "PASS"
+    },
+    {
+      "name": "Single-byte encodings are ASCII supersets: windows-1252",
+      "status": "PASS"
+    },
+    {
+      "name": "Single-byte encodings are ASCII supersets: ibm866",
+      "status": "PASS"
+    },
+    {
+      "name": "Most legacy multi-byte encodings are ASCII supersets: gbk",
+      "status": "PASS"
+    },
+    {
+      "name": "Most legacy multi-byte encodings are ASCII supersets: gb18030",
+      "status": "PASS"
+    },
+    {
+      "name": "Most legacy multi-byte encodings are ASCII supersets: big5",
+      "status": "PASS"
+    },
+    {
+      "name": "Most legacy multi-byte encodings are ASCII supersets: euc-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "Most legacy multi-byte encodings are ASCII supersets: shift_jis",
+      "status": "PASS"
+    },
+    {
+      "name": "Most legacy multi-byte encodings are ASCII supersets: euc-kr",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-874",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1250",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1252",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1253",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1254",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1255",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1257",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: windows-1258",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: latin1",
+      "status": "PASS"
+    },
+    {
+      "name": "Fast path misdetection: ascii",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le does not produce more chars than truncated",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16be does not produce more chars than truncated",
+      "status": "PASS"
+    },
+    {
+      "name": "windows-1252 maps bytes outside of latin1: windows-1252",
+      "status": "PASS"
+    },
+    {
+      "name": "windows-1252 maps bytes outside of latin1: latin1",
+      "status": "PASS"
+    },
+    {
+      "name": "windows-1252 maps bytes outside of latin1: ascii",
+      "status": "PASS"
+    },
+    {
+      "name": "windows-1252 does not contain unmapped chars: windows-1252",
+      "status": "PASS"
+    },
+    {
+      "name": "windows-1252 does not contain unmapped chars: latin1",
+      "status": "PASS"
+    },
+    {
+      "name": "windows-1252 does not contain unmapped chars: ascii",
+      "status": "PASS"
+    },
+    {
+      "name": "specific: x-user-defined",
+      "status": "PASS"
+    },
+    {
+      "name": "specific: big5",
+      "status": "PASS"
+    },
+    {
+      "name": "iso-8859-8-i decodes bytes the same way as iso-8859-8",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: koi8-u",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-874",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1252",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1253",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1255",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: macintosh",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1250",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1251",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1254",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1257",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: windows-1258",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: iso-8859-8-i",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: iso-8859-16",
+      "status": "PASS"
+    },
+    {
+      "name": "selected single-byte: x-mac-cyrillic",
+      "status": "PASS"
+    },
+    {
+      "name": "Concatenating two ISO-2022-JP outputs is not always valid",
+      "status": "PASS"
+    },
+    {
+      "name": "gb18030 version and ranges",
+      "status": "PASS"
+    },
+    {
+      "name": "gbk version and ranges",
+      "status": "PASS"
+    },
+    {
+      "name": "gbk decoder is gb18030 decoder",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: big5",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: iso-2022-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: gb18030",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: euc-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: euc-kr",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: shift_jis",
+      "status": "PASS"
+    },
+    {
+      "name": "Replacement, push back ASCII characters: gbk",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,32,161,161",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,32,161,161, split at 1",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,32,161,161, split at 2",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,32,161,161, split at 3",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,32,161,161, split at 4",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,160,161,161",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,160,161,161, split at 1",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,160,161,161, split at 2",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,160,161,161, split at 3",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,160,161,161, split at 4",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,255,176,161",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,255,176,161, split at 1",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,255,176,161, split at 2",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,255,176,161, split at 3",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,255,176,161, split at 4",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,175,161,161",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,175,161,161, split at 1",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,175,161,161, split at 2",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,175,161,161, split at 3",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state: 143,162,175,161,161, split at 4",
+      "status": "PASS"
+    },
+    {
+      "name": "EUC-JP JIS0212 state after a fatal streaming error",
+      "status": "FAIL",
+      "message": "assert_equals: expected \" \u3000\" but got \"\u3000\""
+    },
+    {
+      "name": "Sticky multibyte state: iso-2022-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky multibyte state: gb18030",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky multibyte state: big5",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky multibyte state: shift_jis",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky multibyte state: euc-kr",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky multibyte state: gbk",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky multibyte state: euc-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky fatal BOM: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky fatal BOM: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "Sticky fatal BOM: utf-16be",
+      "status": "PASS"
+    },
+    {
+      "name": "BOM splitting / repeats: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "BOM splitting / repeats: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "BOM splitting / repeats: utf-16be",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: gbk",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: gb18030",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: big5",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: shift_jis",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: euc-kr",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: euc-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "stream: iso-2022-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "fatal stream: utf-8",
+      "status": "PASS"
+    },
+    {
+      "name": "fatal stream: utf-16le",
+      "status": "PASS"
+    },
+    {
+      "name": "fatal stream: utf-16be",
+      "status": "PASS"
+    },
+    {
+      "name": "fatal stream: iso-2022-jp",
+      "status": "FAIL",
+      "message": "assert_equals: expected \"\u203e\" but got \"~\""
+    },
+    {
+      "name": "WPT mislabels: euc-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "WPT mislabels: shift_jis",
+      "status": "PASS"
+    },
+    {
+      "name": "WPT mislabels: iso-2022-jp",
+      "status": "PASS"
+    },
+    {
+      "name": "labels: invalid non-ascii",
+      "status": "PASS"
+    },
+    {
+      "name": "labels: transformed",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textdecoder-utf16-surrogates.any.js": [
+    {
+      "name": "utf-16le - lone surrogate lead",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - lone surrogate lead (fatal flag set)",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - lone surrogate trail",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - lone surrogate trail (fatal flag set)",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - unmatched surrogate lead",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - unmatched surrogate lead (fatal flag set)",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - unmatched surrogate trail",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - unmatched surrogate trail (fatal flag set)",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - swapped surrogate pair",
+      "status": "PASS"
+    },
+    {
+      "name": "utf-16le - swapped surrogate pair (fatal flag set)",
+      "status": "PASS"
+    }
+  ],
+  "encoding/textencoder-utf16-surrogates.any.js": [
+    {
+      "name": "USVString handling: lone surrogate lead",
+      "status": "PASS"
+    },
+    {
+      "name": "USVString handling: lone surrogate trail",
+      "status": "PASS"
+    },
+    {
+      "name": "USVString handling: unmatched surrogate lead",
+      "status": "PASS"
+    },
+    {
+      "name": "USVString handling: unmatched surrogate trail",
+      "status": "PASS"
+    },
+    {
+      "name": "USVString handling: swapped surrogate pair",
+      "status": "PASS"
+    },
+    {
+      "name": "USVString handling: properly encoded MUSICAL SYMBOL G CLEF (U+1D11E)",
+      "status": "PASS"
+    },
+    {
+      "name": "USVString default",
+      "status": "PASS"
+    }
+  ],
   "fetch/api/headers/headers-basic.any.js": [
     {
       "name": "Create headers from no parameter",

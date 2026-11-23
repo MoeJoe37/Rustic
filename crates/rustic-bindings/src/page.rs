@@ -23,6 +23,7 @@ mod computed_style;
 mod creation;
 mod documents;
 mod dom_rect;
+mod encoding;
 mod events;
 mod fetch;
 mod html_collections;
@@ -615,6 +616,7 @@ fn install_page(
     drop(document);
     let window = window::install(agent, scheduler.is_some())?;
     web_storage::install(agent)?;
+    encoding::install(agent)?;
     let headers_iterator = fetch::install(agent)?;
     let navigator = activation::install(agent)?;
     popups::install(agent)?;

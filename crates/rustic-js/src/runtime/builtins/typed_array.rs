@@ -288,6 +288,23 @@ fn allocate(agent: &mut Agent, prototype: ObjectId, view: View) -> JsResult<Obje
 }
 
 impl Agent {
+    /// A fresh Uint8Array from the relevant realm of a Web IDL receiver.
+    pub fn new_web_uint8_array(&mut self, owner: ObjectId, bytes: &[u8]) -> JsResult<Value> {
+        let previous = self.heap.realm;
+        self.switch_realm(self.heap.object(owner).realm);
+        let result = self.allocate_web_uint8_array(bytes);
+        self.switch_realm(previous);
+        result
+    }
+
+    fn allocate_web_uint8_array(&mut self, bytes: &[u8]) -> JsResult<Value> {
+        let kind = ElementKind::Uint8;
+        let prototype = self.intrinsics.typed_array_prototypes[kind.index()];
+        let array = allocate_with_length(self, kind, prototype, bytes.len())?;
+        self.write_web_uint8_array(array, bytes)?;
+        Ok(Value::object(array))
+    }
+
     pub(crate) fn immutable_byte_array(&mut self, bytes: &[u8]) -> JsResult<Value> {
         let buffer = self.immutable_bytes_buffer(bytes)?;
         let kind = ElementKind::Uint8;

@@ -1,5 +1,8 @@
 //! Realm-owned host interfaces and GC-traced slots for host exceptions.
 
+use std::any::Any;
+use std::rc::Rc;
+
 use super::agent::{Agent, JsResult, NativeFn};
 use super::builtins::new_constructor;
 use super::heap::OutOfMemory;
@@ -14,6 +17,59 @@ pub(crate) const HOST_INTERFACE_BYTES: usize =
     size_of::<((u16, &'static str), ObjectId)>() + size_of::<usize>();
 
 impl Agent {
+    /// Allocate a branded ordinary object with bounded, JS-reference-free
+    /// native state. `extra_bytes` covers any storage owned by the state
+    /// beyond the value itself. The object owns the state until collection.
+    pub fn new_host_state<T: Any>(
+        &mut self,
+        interface: &'static str,
+        prototype: ObjectId,
+        state: T,
+        extra_bytes: usize,
+    ) -> JsResult<ObjectId> {
+        let bytes = size_of::<T>()
+            .checked_add(2 * size_of::<usize>())
+            .and_then(|bytes| bytes.checked_add(extra_bytes))
+            .ok_or(OutOfMemory)?;
+        let charge = bytes
+            .checked_add(size_of::<super::object::Extra>())
+            .ok_or(OutOfMemory)?;
+        self.heap.charge(charge)?;
+        let mut object = Object::new(Class::Ordinary, Some(prototype));
+        object.extra_mut().internal = Some(Internal::HostState {
+            interface,
+            state: Rc::new(state),
+            bytes,
+        });
+        Ok(self.heap.alloc_object(object)?)
+    }
+
+    /// Read native state for this exact interface. The caller must keep
+    /// the receiver live while it uses the returned reference.
+    pub fn host_state<T: Any>(&self, object: ObjectId, interface: &'static str) -> Option<Rc<T>> {
+        match self.heap.object(object).internal() {
+            Some(Internal::HostState {
+                interface: brand,
+                state,
+                ..
+            }) if *brand == interface => Rc::clone(state).downcast().ok(),
+            _ => None,
+        }
+    }
+
+    /// Run a host operation with `bytes` of temporary storage charged to
+    /// this heap until the operation returns. The caller reserves fallibly.
+    pub fn with_host_memory<T>(
+        &mut self,
+        bytes: usize,
+        work: impl FnOnce(&mut Self) -> JsResult<T>,
+    ) -> JsResult<T> {
+        self.heap.charge_transient(bytes)?;
+        let result = work(self);
+        self.heap.release_transient(bytes);
+        result
+    }
+
     /// The current realm's host interface prototype, if installed.
     pub fn host_interface_prototype(&self, interface: &'static str) -> Option<ObjectId> {
         self.heap

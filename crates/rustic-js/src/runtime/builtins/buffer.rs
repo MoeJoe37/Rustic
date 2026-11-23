@@ -164,6 +164,93 @@ fn to_uint8_clamp(n: f64) -> u8 {
 }
 
 impl Agent {
+    /// Convert an IDL `AllowSharedBufferSource` without reading its bytes.
+    /// Shared fixed-length buffers are accepted. Resizable or growable
+    /// buffers require a different IDL type.
+    pub fn web_buffer_source(&mut self, value: Value) -> JsResult<ObjectId> {
+        if let Some(object) = value.as_object() {
+            let buffer = match self.heap.object(object).internal() {
+                Some(Internal::ArrayBuffer(_)) => Some(object),
+                Some(Internal::TypedArray { buffer, .. } | Internal::DataView { buffer, .. }) => {
+                    Some(*buffer)
+                }
+                _ => None,
+            };
+            if buffer
+                .is_some_and(|buffer| self.buffer_data(buffer).is_some_and(|d| d.max.is_none()))
+            {
+                return Ok(object);
+            }
+        }
+        self.type_error("expected a fixed-length buffer source")
+    }
+
+    /// Convert an IDL `[AllowShared] Uint8Array`. Proxies and other element
+    /// kinds do not have the required internal slots.
+    pub fn web_uint8_array(&mut self, value: Value) -> JsResult<ObjectId> {
+        if value.as_object().is_some_and(|object| {
+            super::typed_array::view_of(self, object).is_some_and(|v| v.kind == ElementKind::Uint8)
+        }) {
+            return self.web_buffer_source(value);
+        }
+        self.type_error("expected a Uint8Array")
+    }
+
+    /// The bytes of a converted buffer source while no script can run.
+    /// Detachment after conversion (for example by a dictionary getter)
+    /// leaves an empty byte sequence.
+    pub fn web_buffer_bytes(&self, source: ObjectId) -> &[u8] {
+        let (buffer, offset, length) = match self.heap.object(source).internal() {
+            Some(Internal::ArrayBuffer(_)) => (source, 0, None),
+            Some(Internal::DataView {
+                buffer,
+                offset,
+                length,
+            }) => (*buffer, *offset, *length),
+            Some(Internal::TypedArray {
+                buffer,
+                offset,
+                kind,
+                length,
+            }) => (*buffer, *offset, length.map(|length| length * kind.size())),
+            _ => return &[],
+        };
+        let Some(bytes) = self
+            .buffer_data(buffer)
+            .and_then(|data| data.bytes.as_deref())
+        else {
+            return &[];
+        };
+        match length {
+            Some(length) => bytes.get(offset..offset + length),
+            None => bytes.get(offset..),
+        }
+        .unwrap_or_default()
+    }
+
+    /// Fill the prefix of a converted Uint8Array. The caller determines
+    /// the amount to write without executing script after conversion.
+    pub fn write_web_uint8_array(&mut self, destination: ObjectId, bytes: &[u8]) -> JsResult<()> {
+        if bytes.is_empty() {
+            return Ok(());
+        }
+        let Some(view) = super::typed_array::view_of(self, destination)
+            .filter(|view| view.kind == ElementKind::Uint8)
+        else {
+            return self.type_error("expected a Uint8Array");
+        };
+        if bytes.len() > self.web_buffer_bytes(destination).len() {
+            return self.type_error("destination no longer covers the bytes");
+        }
+        self.require_mutable_buffer(view.buffer)?;
+        let target = self
+            .buffer_data_mut(view.buffer)
+            .and_then(|data| data.bytes.as_mut())
+            .expect("an in-bounds Uint8Array");
+        target[view.offset..view.offset + bytes.len()].copy_from_slice(bytes);
+        Ok(())
+    }
+
     /// The raw element for `value` (`NumericToRawBytes` after the
     /// conversion of `TypedArraySetElement`): the low bytes of the result
     /// are the element, least significant first.

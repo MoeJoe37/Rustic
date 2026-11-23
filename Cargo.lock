@@ -1981,6 +1981,7 @@ dependencies = [
  "rustic-base",
  "rustic-css",
  "rustic-dom",
+ "rustic-encoding",
  "rustic-js",
  "rustic-net",
  "rustic-style",

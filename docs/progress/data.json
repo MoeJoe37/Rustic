@@ -1,13 +1,13 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "4c4b964ebb9adfb805b84d5eb1bcb7e35ff7ce1abbcb1d0d9caa3be1bc90fcbc",
-  "percent": "48.38",
-  "verified_percent": "44.49",
-  "partial_percent": "3.89",
-  "completed": 105,
+  "source_fingerprint": "92f17895914ada7ececfd58fbe14436376f6ebdbfe2b21b7668d097a8af8954c",
+  "percent": "48.45",
+  "verified_percent": "44.57",
+  "partial_percent": "3.88",
+  "completed": 106,
   "in_progress": 14,
-  "total": 226,
+  "total": 227,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
   "milestones": [
@@ -54,7 +54,7 @@
     {
       "id": "M5",
       "label": "Scripted documents",
-      "share": "4.90",
+      "share": "4.74",
       "completed": 11,
       "total": 11,
       "percent": "100.00",
@@ -94,12 +94,12 @@
     {
       "id": "M9",
       "label": "Compatibility expansion",
-      "share": "22.01",
-      "completed": 0,
-      "total": 52,
-      "percent": "2.60",
-      "verified_percent": "0.00",
-      "partial_percent": "2.60"
+      "share": "22.18",
+      "completed": 1,
+      "total": 53,
+      "percent": "3.66",
+      "verified_percent": "1.07",
+      "partial_percent": "2.59"
     },
     {
       "id": "M10",
@@ -114,7 +114,7 @@
     {
       "id": "M11",
       "label": "Web platform parity",
-      "share": "14.78",
+      "share": "14.76",
       "completed": 0,
       "total": 30,
       "percent": "0.82",
@@ -4636,7 +4636,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.62"
+          "engine_share": "0.59"
         },
         {
           "id": "web.window",
@@ -4827,7 +4827,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.62"
+          "engine_share": "0.59"
         },
         {
           "id": "web.scheduler",
@@ -4898,7 +4898,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.37"
+          "engine_share": "0.35"
         },
         {
           "id": "web.scripts",
@@ -4979,7 +4979,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.37"
+          "engine_share": "0.35"
         },
         {
           "id": "web.input",
@@ -5035,7 +5035,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.62"
+          "engine_share": "0.59"
         },
         {
           "id": "web.observers",
@@ -5106,7 +5106,33 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.37"
+          "engine_share": "0.35"
+        },
+        {
+          "id": "web.encoding",
+          "label": "Window TextEncoder and TextDecoder",
+          "size": 2,
+          "milestone": "M9",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/encoding.rs",
+              "marker": "fn decoder_constructor"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn text_decoder_retains_stream_state_through_bom_splits_and_reentry"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "encoding/textdecoder-fatal-streaming.any.js"
+            }
+          ],
+          "credit": "100.00",
+          "engine_share": "0.23"
         },
         {
           "id": "web.streams",
@@ -5116,7 +5142,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.62"
+          "engine_share": "0.59"
         },
         {
           "id": "web.conformance",
@@ -5157,7 +5183,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.37"
+          "engine_share": "0.35"
         },
         {
           "id": "web.platform",
@@ -5167,7 +5193,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.62"
+          "engine_share": "0.59"
         },
         {
           "id": "web.performance",
@@ -5177,16 +5203,16 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.37"
+          "engine_share": "0.35"
         }
       ],
-      "points": 40,
-      "completed": 7,
+      "points": 42,
+      "completed": 8,
       "in_progress": 0,
-      "total": 10,
-      "contribution": "3.37",
-      "percent": "67.50",
-      "verified_percent": "67.50",
+      "total": 11,
+      "contribution": "3.45",
+      "percent": "69.04",
+      "verified_percent": "69.04",
       "partial_percent": "0.00"
     },
     {

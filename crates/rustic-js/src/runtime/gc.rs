@@ -497,10 +497,10 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
+                // Bytes hold no references.
+                Some(Internal::ArrayBuffer(_) | Internal::HostState { .. }) => {}
                 // The target is weak: cleared after marking if nothing
                 // else reaches it.
-                // Bytes hold no references.
-                Some(Internal::ArrayBuffer(_)) => {}
                 Some(Internal::WeakRef(_)) => self.weak_refs.push(index),
                 Some(Internal::WeakMap(_)) => self.weak_maps.push(index),
                 Some(Internal::Registry { cells, pending }) => {
@@ -557,6 +557,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::ImportRequest(request)) => request.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
             Some(Internal::HostIndexed(data)) => data.footprint(),
+            Some(Internal::HostState { bytes, .. }) => *bytes,
             Some(Internal::Service { bytes, .. }) => *bytes as usize,
             Some(Internal::Collator(collator)) => std::mem::size_of_val(&**collator),
             Some(Internal::PluralRules(rules)) => std::mem::size_of_val(&**rules),

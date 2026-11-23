@@ -13,6 +13,7 @@ was still in progress, because nothing in it depends on scripting.
 | Encodings | All 40: UTF-8, 28 single-byte encodings, GBK, gb18030, Big5, EUC-JP, ISO-2022-JP, Shift_JIS, EUC-KR, replacement, UTF-16BE/LE, x-user-defined |
 | Labels | "Get an encoding" over all 228 labels: ASCII whitespace trimmed, ASCII case folded (`Encoding::for_label`, `for_label_bytes`) |
 | Decoders | Every decoder, streaming in any chunk sizes, "replacement" and "fatal" modes (`Decoder`) |
+| Window interfaces | `TextEncoder.encode()` and scalar-complete `encodeInto()`. `TextDecoder` uses the same decoders as the document loader, with API-specific label checks, BOM handling, and streaming state. Fixed-length typed arrays, `DataView`, and array buffers can supply bytes. [ADR 0075](adr/0075-web-text-encoding.md) |
 | Encoders | Every encoder one scalar value at a time; unmappable values go back to the caller ("encode or fail"); ISO-2022-JP's end-of-queue escape (`Encoder::finish`) |
 | Hooks | `decode` (BOM sniff, then the fallback encoding), `bom_sniff`, `encode` (HTML forms, `&#NNNN;`), `utf8_decode`, `utf8_decode_without_bom`, `utf8_decode_without_bom_or_fail`, "get an output encoding" |
 | Stylesheets | CSS Syntax §3.2: BOM, then the transport `charset`, then a leading `@charset "…";`, then the referring document's encoding, then UTF-8 (`rustic_css::decode_stylesheet`). `dump-style`, `dump-layout` and `render` load local sheets through it |
@@ -26,7 +27,7 @@ was still in progress, because nothing in it depends on scripting.
 | --- | --- |
 | A late declaration in a *local* file (beyond its 64 KiB prefix) is ignored; only network documents reload | Local replay is ADR 0044's design; revisit with M7 file navigation |
 | `<script src>`, `<img src>` and module specifiers resolving their query in the document's encoding (local files ignore the query, so nothing observable changes yet) | NET-02, when these URLs reach a server |
-| `TextDecoder`, `TextEncoder` and their stream variants | Web IDL bindings (M9 platform APIs) |
+| `TextDecoderStream`, `TextEncoderStream` and worker exposure | M9 Streams and worker bindings |
 | Form submission encodings (`application/x-www-form-urlencoded`, `multipart/form-data` in a legacy encoding) | NET-07 |
 | Vectorized or table-driven fast paths for multi-byte encodings | M12, if a profile shows decoding on a critical path |
 

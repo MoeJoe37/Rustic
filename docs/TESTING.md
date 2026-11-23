@@ -111,7 +111,7 @@ serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
 `rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing with 21 targets (`rustic-fuzz list`): HTML tokenizer, document and
+fuzzing (`rustic-fuzz list`) for HTML tokenizer, document and
 fragment parsers; CSS syntax, selectors, cascade, media queries and incremental
 restyling; anonymous flow normalization; paint/raster; PNG, JPEG, GIF and WebP
 decoding; font parsing and shaping; the JavaScript parser, heap, interpreter and regular expressions; and URLs, with seed replay,
@@ -119,6 +119,11 @@ minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-se
 campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
 cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a
 version/toolchain review; no workflow installs or claims to run them.
+
+The `wasm-binary` target mutates version 1 module seeds and their prefixes.
+It checks section and function spans against the original input, confirms
+instruction offsets and final control delimiters, and checks error offsets
+against their enclosing input bounds.
 
 Triage order: reproducible crash/security issue, unexpected conformance regression,
 deterministic functional failure, flaky result, performance regression. Minimize

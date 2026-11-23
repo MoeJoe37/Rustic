@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 48.59%** = 44.70% verified complete + 3.89% partial credit. 107/227 capabilities complete, 14 in progress.
+**Overall completion: 48.59%** = 44.70% verified complete + 3.89% partial credit. 107/227 capabilities complete, 15 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `edc250e2ed03b4a19600906587f7da6a27bcfd273aa0345376497a6618f8868b`.
+Catalog: `engine-v4`. Source fingerprint: `40477418ad5c1875e42c4623022cbd93ffb02e65355f04039a11f0233e966127`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `edc250e2ed03b4a19600906587f7da6a27bcf
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
-| WebAssembly | 0/8 | 0 | 0.00% | 0.00% | 3% | 0.00 |
+| WebAssembly | 0/8 | 1 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 8/11 | 0 | 69.04% | 69.04% | 5% | 3.45 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -197,7 +197,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### WebAssembly
 
-- **planned** `wasm.decode` — Bounded binary decoder and malformed-module handling · size 2 · M9 · 0.17% of engine
+- **in progress 0.00%** `wasm.decode` — Bounded binary decoder and malformed-module handling · size 2 · M9 · 0.17% of engine ([source](../../crates/rustic-wasm/src/binary.rs), [test](../../crates/rustic-wasm/tests/binary.rs), [test](../../crates/rustic-wasm/tests/instructions.rs), [source](../../crates/rustic-fuzz/src/wasm.rs))
 - **planned** `wasm.validate` — Complete selected type/instruction/module validation · size 3 · M9 · 0.26% of engine
 - **planned** `wasm.execute` — Original interpreter, numerics, control flow and traps · size 5 · M9 · 0.44% of engine
 - **planned** `wasm.instances` — Memories, tables, globals, instances and resource limits · size 3 · M9 · 0.26% of engine

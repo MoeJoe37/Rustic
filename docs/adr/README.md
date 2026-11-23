@@ -84,6 +84,7 @@ instead of rewriting the history of a decision.
 | [0074](0074-browser-shell-and-native-hosts.md) | UI-01 browser shell (tabs, history, address entry, find, zoom, trusted strip) on live pages; host input, IME and lifecycle; system fonts per OS and collection members | Accepted |
 | [0075](0075-web-text-encoding.md) | Window text encoding, Web IDL byte views and GC-owned native binding state | Accepted for M9 `web.encoding` |
 | [0076](0076-window-url-and-search-params.md) | URL state overrides and one shared URL and search parameter snapshot | Accepted for M9 `url.setters` |
+| [0077](0077-wasm-decoding-and-execution-boundaries.md) | WebAssembly binary admission, validator boundary and interpreter-first execution | Accepted for WASM-01 foundations |
 
 ## Records by area
 
@@ -120,7 +121,6 @@ authority boundary or `unsafe` code.
 | Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
 | Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented and green on the emulator) | Accepting ISO-08/MOB-07 (M14, ADR 0067) | Platform security boundary verified only on a device, emulator or simulator |
 | Mobile input and accessibility bridges; mobile windowing (desktop: [0065](0065-desktop-window-host.md), [0073](0073-accessibility.md)) | UI-02/03 (mobile in M14) | Platform dependencies on five OS families |
-| WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
 | Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | New `unsafe` outside `rustic-sandbox` |
 
 For a new record, use the next four-digit ID and include date, status, context,

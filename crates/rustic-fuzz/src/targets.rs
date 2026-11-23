@@ -60,6 +60,7 @@ pub fn all() -> Vec<Box<dyn Target>> {
         Box::new(crate::js_heap::JsHeapTarget),
         Box::new(crate::js_run::JsRunTarget),
         Box::new(crate::js_regexp::JsRegExpTarget),
+        Box::new(crate::wasm::WasmBinaryTarget),
         Box::new(UrlTarget),
         Box::new(crate::encoding::EncodingTarget),
         Box::new(crate::net::HttpResponseTarget),

@@ -4092,8 +4092,29 @@
           "label": "Bounded binary decoder and malformed-module handling",
           "size": 2,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/binary.rs",
+              "marker": "pub fn scan_module"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/binary.rs",
+              "marker": "fn framing_reports_bad_lengths_ordering_and_mismatched_counts"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instructions.rs",
+              "marker": "fn malformed_and_unsupported_instructions_have_distinct_errors"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/wasm.rs",
+              "marker": "struct WasmBinaryTarget"
+            }
+          ]
         },
         {
           "id": "wasm.validate",

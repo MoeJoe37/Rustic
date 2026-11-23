@@ -2080,6 +2080,7 @@ dependencies = [
  "rustic-style",
  "rustic-text",
  "rustic-url",
+ "rustic-wasm",
 ]
 
 [[package]]
@@ -2216,6 +2217,13 @@ version = "0.1.0"
 dependencies = [
  "rustic-base",
  "rustic-encoding",
+]
+
+[[package]]
+name = "rustic-wasm"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
 ]
 
 [[package]]

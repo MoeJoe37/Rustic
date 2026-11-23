@@ -4,7 +4,7 @@
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
-<text x="24.00" y="60" fill="#8b949e" font-size="12">107/227 capabilities complete · 14 in progress · 25 subsystems · engine-v4</text>
+<text x="24.00" y="60" fill="#8b949e" font-size="12">107/227 capabilities complete · 15 in progress · 25 subsystems · engine-v4</text>
 <text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">48.59%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
@@ -655,8 +655,9 @@
 <text x="236.00" y="827" fill="#8b949e" font-size="12" text-anchor="end">3%</text>
 <rect x="252.00" y="818" width="200.00" height="10" rx="3" fill="#21262d"/>
 <text x="504.00" y="827" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Bounded binary decoder and malformed-module handling: planned, size 2, M9</title>
+<g><title>Bounded binary decoder and malformed-module handling: in progress, size 2, M9, 0.00% verified</title>
 <rect x="520.00" y="816" width="20.35" height="14" rx="2" fill="#30363d"/>
+<rect x="520.50" y="816.5" width="19.35" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <g><title>Complete selected type/instruction/module validation: planned, size 3, M9</title>
 <rect x="542.35" y="816" width="31.53" height="14" rx="2" fill="#30363d"/>
@@ -1219,6 +1220,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot edc250e2ed03</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 40477418ad5c</text>
 </g>
 </svg>

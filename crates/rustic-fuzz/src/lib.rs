@@ -32,6 +32,7 @@ mod scripted;
 mod sfnt;
 mod shaping;
 mod targets;
+mod wasm;
 
 pub use corpus::{seed_inputs, workspace_root};
 pub use harness::{

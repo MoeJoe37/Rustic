@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "edc250e2ed03b4a19600906587f7da6a27bcfd273aa0345376497a6618f8868b",
+  "source_fingerprint": "40477418ad5c1875e42c4623022cbd93ffb02e65355f04039a11f0233e966127",
   "percent": "48.59",
   "verified_percent": "44.70",
   "partial_percent": "3.89",
   "completed": 107,
-  "in_progress": 14,
+  "in_progress": 15,
   "total": 227,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -4438,8 +4438,29 @@
           "label": "Bounded binary decoder and malformed-module handling",
           "size": 2,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/binary.rs",
+              "marker": "pub fn scan_module"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/binary.rs",
+              "marker": "fn framing_reports_bad_lengths_ordering_and_mismatched_counts"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instructions.rs",
+              "marker": "fn malformed_and_unsupported_instructions_have_distinct_errors"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/wasm.rs",
+              "marker": "struct WasmBinaryTarget"
+            }
+          ],
           "credit": "0.00",
           "engine_share": "0.17"
         },
@@ -4516,7 +4537,7 @@
       ],
       "points": 34,
       "completed": 0,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 8,
       "contribution": "0.00",
       "percent": "0.00",

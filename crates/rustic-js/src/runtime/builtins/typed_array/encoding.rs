@@ -234,6 +234,7 @@ fn decode_hex(
     capacity: usize,
     mut write: impl FnMut(&mut Agent, usize, &[u8]) -> JsResult<()>,
 ) -> JsResult<Decoded> {
+    agent.heap.flatten(input)?;
     let length = agent.heap.string(input).len();
     let mut result = Decoded::default();
     if length % 2 != 0 {
@@ -246,6 +247,7 @@ fn decode_hex(
     };
     for offset in 0..capacity.min(length / 2) {
         agent.check_native_work()?;
+        agent.heap.flatten(input)?;
         let string = agent.heap.string(input);
         let (Some(high), Some(low)) = (
             digit(string.unit(result.read)),

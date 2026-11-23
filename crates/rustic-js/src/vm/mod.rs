@@ -231,6 +231,7 @@ impl Agent {
         in_function: bool,
     ) -> JsResult<CodeId> {
         self.ensure_can_compile_strings()?;
+        self.heap.flatten(text)?;
         let units = self.heap.string(text).units().collect();
         let syntax_error =
             |agent: &mut Agent, message: &str| Err(agent.throw(ErrorKind::SyntaxError, message));

@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-116, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -181,7 +181,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
 | TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
 | TD-115 | Deliberate | JS | A `SharedArrayBuffer` is shared within one agent only (no cross-agent byte store until workers); typed array elements are read through the generic property path | Open, M9 workers / `perf.interpreter` |
-| TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Open |
+| TD-116 | Deliberate | JS | A rope's flat copy is made behind `&self` and charged late, so the heap can pass its limit until the next allocation or safe point | Paid |
 | TD-117 | Deliberate | JS | Intl list formatting uses fixed templates and best fit uses likely-subtag fallback | Open |
 | TD-118 | Deliberate | JS | A realm is never freed while its agent lives, and its intrinsics are created eagerly (about 119 KB each) | Open, M9 language and web APIs |
 | TD-119 | Deliberate | Style | Scoped styles use the full-restyle path after a DOM mutation | Open, CSS-09 |
@@ -1901,7 +1901,7 @@ and a waiter list shared between agents when workers arrive
 (`storage.workers`, M9), and interpreter fast paths for typed array loads and
 stores keyed on the element kind (`perf.interpreter`, M12).
 
-### TD-116 — A rope's flat copy is charged late
+### TD-116 — A rope's flat copy is charged late (Paid)
 
 `Heap::string` flattens a rope behind `&self` (a `OnceCell`), because 141
 call sites read strings through a shared borrow. It therefore cannot charge
@@ -1918,6 +1918,8 @@ units, leaving `Heap::string` for strings known to be flat. Trigger: a host
 that needs the limit to hold between safe points (a hard per-renderer cap in
 M7), or a fuzz finding that reaches the overshoot.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): `Heap::flatten(&mut self)` charges a rope's flat copy before making it and fails with OutOfMemory past the limit. Reads flatten through it where they can fail: every built-in's `this` and arguments (`call_native`, `construct_native`), `ToNumber`, `ToPropertyKey`, loose equality and `<`, string indexing (`GetV`), `ToString` of an object (a `toString` result), and 41 reads inside built-ins of strings taken from objects (JSON, `join`, RegExp, URI, Intl and the rest). Strict equality compares a rope through its leaves without flattening it (`Heap::strings_equal`). `ToString` of a string value still returns the rope as it is, so `+` and template literals append without copying. `Heap::string` keeps the late copy behind `&self` only as a backstop, counted in debug builds: `reading_ropes_flattens_them_where_it_can_fail` runs 20 kinds of read and checks it is never used, and `flattening_ropes_never_passes_the_heap_limit` reads three large ropes in one expression and stops at the limit (before, the heap passed it until the next safe point). Test262 RegExp and String results are unchanged.
 
 ### TD-117 — List formatting context and best-fit locale matching
 

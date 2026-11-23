@@ -156,6 +156,7 @@ fn is_nan(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 /// The string's code units without leading StrWhiteSpaceChar.
 fn trimmed_start(agent: &mut Agent, value: Value) -> JsResult<Vec<u16>> {
     let s = agent.to_string(value)?;
+    agent.heap.flatten(s)?;
     let units = agent.heap.string(s).to_units();
     let start = units
         .iter()

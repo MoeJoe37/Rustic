@@ -282,7 +282,7 @@ impl Tracer for Marker<'_> {
         // the text now and let the sweep free the chain; unless the copy
         // would not fit (a string doubled onto itself is a small rope).
         if self.heap.rope_fits(id) {
-            let _ = self.heap.string(id);
+            self.heap.flatten_in_collection(id);
             return;
         }
         let mut pending = vec![left, right];

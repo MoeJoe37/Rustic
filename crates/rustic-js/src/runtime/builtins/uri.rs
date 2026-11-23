@@ -92,6 +92,7 @@ pub(super) fn decode<const COMPONENT: bool>(
             continue;
         }
         let start = index;
+        agent.heap.flatten(input)?;
         let source = agent.heap.string(input);
         let first = percent_byte(source, index).ok_or_else(|| malformed(agent))?;
         index += 3;

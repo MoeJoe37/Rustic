@@ -121,6 +121,7 @@ pub(super) fn dynamic_function(
     let body_text = match body {
         Some(b) => {
             let s = agent.to_string(b)?;
+            agent.heap.flatten(s)?;
             agent.heap.string(s).to_text()
         }
         None => String::new(),

@@ -421,6 +421,12 @@ impl Agent {
         this: Value,
         args: &[Value],
     ) -> JsResult<Value> {
+        // Built-ins read their arguments' units through `&Heap`: ropes
+        // among them are flattened here, where running out can fail.
+        self.flatten_value(this)?;
+        for &arg in args {
+            self.flatten_value(arg)?;
+        }
         self.vm.native_depth += 1;
         self.vm.native_from_safe_site = std::mem::take(&mut self.vm.safe_site);
         let saved = self.vm.native_new_target.take();
@@ -495,6 +501,9 @@ impl Agent {
         args: &[Value],
         new_target: ObjectId,
     ) -> JsResult<Value> {
+        for &arg in args {
+            self.flatten_value(arg)?;
+        }
         self.vm.native_depth += 1;
         let saved = self.vm.native_new_target.replace(new_target);
         let saved_function = self.vm.native_function.replace(f);

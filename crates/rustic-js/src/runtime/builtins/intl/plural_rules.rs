@@ -235,6 +235,7 @@ fn decimal_input(agent: &mut Agent, value: Value) -> JsResult<Input> {
                     .checked_mul(4)
                     .ok_or(OutOfMemory)?,
             )?;
+            agent.heap.flatten(id)?;
             let text = agent.heap.string(id).to_text();
             let text = text.trim_matches(|c: char| {
                 crate::unicode::is_whitespace(u32::from(c))

@@ -1119,6 +1119,7 @@ impl Agent {
                 if key == self.length_key() {
                     return Ok(Value::number(self.heap.string_len(s) as f64));
                 }
+                self.heap.flatten(s)?;
                 let string = self.heap.string(s);
                 if let PropertyKey::Index(i) = key {
                     if let Some(unit) = string.unit(i as usize) {

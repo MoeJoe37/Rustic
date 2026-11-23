@@ -992,3 +992,68 @@ fn parse_trees_are_charged_while_they_are_compiled() {
         Err(rustic_js::EvalError::OutOfMemory)
     ));
 }
+
+/// TD-116: the ways script reads a rope flatten it where running out can
+/// fail, so none is left to the late copy behind `&Heap`.
+#[test]
+#[cfg(debug_assertions)]
+fn reading_ropes_flattens_them_where_it_can_fail() {
+    let mut a = agent();
+    a.evaluate(
+        "var base = 'abc'.repeat(200); var n = 0;
+         function rope() { n++; return base + n + 'z' }
+         var o = { toString: rope };",
+    )
+    .unwrap();
+    let before = a.heap.late_flattens();
+    let reads = [
+        "rope().length",
+        "rope()[5]",
+        "rope().indexOf('z')",
+        "rope().slice(1, 3)",
+        "rope() === rope()",
+        "rope() < rope()",
+        "rope() == 5",
+        "JSON.stringify({ a: rope() })",
+        "[rope(), rope()].join('-')",
+        "`${rope()}!`.length",
+        "({ [rope()]: 1 })",
+        "Number(rope())",
+        "parseInt(rope())",
+        "new Map([[rope(), 1]]).get(rope())",
+        "rope().split('z').length",
+        "/z/.test(rope())",
+        "String(o).length",
+        "'x'.concat(o).length",
+        "rope().localeCompare(rope())",
+        "encodeURIComponent(rope()).length",
+    ];
+    for read in reads {
+        a.evaluate(read).unwrap();
+        assert_eq!(a.heap.late_flattens(), before, "{read}");
+    }
+}
+
+/// TD-116: flat copies are charged before they are made, so reading
+/// several large ropes in straight-line code stops at the heap limit
+/// instead of passing it until the next safe point.
+#[test]
+fn flattening_ropes_never_passes_the_heap_limit() {
+    let mut a = Agent::with_heap_limit(4 * MIN_GC_THRESHOLD).unwrap();
+    let limit = a.heap.byte_limit();
+    a.evaluate("var half = 'ab'.repeat(300000);").unwrap();
+    // Each rope's flat copy fits on its own when the rope is made.
+    let result = a.evaluate(
+        "var r1 = half + half, r2 = half + 'x' + half, r3 = half + 'y' + half;
+         r1.indexOf('q') + r2.indexOf('q') + r3.indexOf('q')",
+    );
+    assert!(
+        matches!(result, Err(rustic_js::EvalError::OutOfMemory)),
+        "{result:?}"
+    );
+    assert!(
+        a.heap.peak_bytes() <= limit,
+        "{} > {limit}",
+        a.heap.peak_bytes()
+    );
+}

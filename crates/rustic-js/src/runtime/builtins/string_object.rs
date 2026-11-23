@@ -95,6 +95,7 @@ fn this_units(agent: &mut Agent, this: Value) -> JsResult<Vec<u16>> {
 
 fn units_of(agent: &mut Agent, value: Value) -> JsResult<Vec<u16>> {
     let s = agent.to_string(value)?;
+    agent.heap.flatten(s)?;
     Ok(agent.heap.string(s).to_units())
 }
 
@@ -431,6 +432,7 @@ fn normalize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
         NormalizationForm::Nfc
     } else {
         let form = agent.to_string(argument)?;
+        agent.heap.flatten(form)?;
         let form = agent.heap.string(form);
         if form.units().eq("NFC".encode_utf16()) {
             NormalizationForm::Nfc
@@ -444,6 +446,7 @@ fn normalize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
             return range_error(agent, "invalid normalization form");
         }
     };
+    agent.heap.flatten(string)?;
     let input = agent.heap.string(string);
     if input.units().all(|unit| unit < 0x80) {
         return Ok(Value::string(string));

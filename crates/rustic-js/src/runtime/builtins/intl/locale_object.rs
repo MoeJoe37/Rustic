@@ -94,6 +94,7 @@ fn require_locale(agent: &mut Agent, value: Value) -> JsResult<StringId> {
 pub(super) fn locale_text(agent: &mut Agent, value: Value) -> JsResult<String> {
     let tag = require_locale(agent, value)?;
     agent.heap.charge(agent.heap.string_len(tag))?;
+    agent.heap.flatten(tag)?;
     Ok(agent.heap.string(tag).to_text())
 }
 
@@ -199,6 +200,7 @@ fn get_option(agent: &mut Agent, options: ObjectId, name: &str) -> JsResult<Valu
 fn option_text(agent: &mut Agent, value: Value) -> JsResult<String> {
     let text = agent.to_string(value)?;
     agent.heap.charge(agent.heap.string_len(text))?;
+    agent.heap.flatten(text)?;
     Ok(agent.heap.string(text).to_text())
 }
 

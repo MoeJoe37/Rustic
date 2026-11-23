@@ -136,6 +136,7 @@ fn locale_input(agent: &mut Agent, tag: Value) -> JsResult<String> {
         agent.to_string(tag)?
     };
     agent.heap.charge(agent.heap.string_len(id))?;
+    agent.heap.flatten(id)?;
     Ok(agent.heap.string(id).to_text())
 }
 

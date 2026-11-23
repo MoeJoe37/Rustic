@@ -1132,10 +1132,12 @@ fn join(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
         vec![0x2C]
     } else {
         let s = agent.to_string(separator)?;
+        agent.heap.flatten(s)?;
         agent.heap.string(s).units().collect()
     };
     join_elements(agent, o, length, &separator, |agent, value| {
         let s = agent.to_string(value)?;
+        agent.heap.flatten(s)?;
         Ok(agent.heap.string(s).units().collect())
     })
 }
@@ -1149,6 +1151,7 @@ fn to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<
         let key = agent.heap.key("toLocaleString")?;
         let text = agent.invoke(value, key, &passed)?;
         let s = agent.to_string(text)?;
+        agent.heap.flatten(s)?;
         Ok(agent.heap.string(s).units().collect())
     })
 }

@@ -421,6 +421,7 @@ fn step_iterator(agent: &mut Agent, this: Value, string: bool) -> JsResult<Value
             }
         }
         (IteratorKind::String, Kind::String(s)) => {
+            agent.heap.flatten(s)?;
             let text = agent.heap.string(s);
             match text.unit(index as usize) {
                 None => (None, 0),

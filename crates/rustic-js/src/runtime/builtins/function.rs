@@ -95,6 +95,7 @@ fn function_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult
     let body_text = match body {
         Some(b) => {
             let s = agent.to_string(b)?;
+            agent.heap.flatten(s)?;
             agent.heap.string(s).to_text()
         }
         None => String::new(),
@@ -186,6 +187,7 @@ fn bind(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let target_name = agent.get(target, name_key)?;
     let name = match target_name.as_string() {
         Some(s) => {
+            agent.heap.flatten(s)?;
             let mut text = agent.heap.string(s).to_units();
             let mut units: Vec<u16> = "bound ".encode_utf16().collect();
             units.append(&mut text);

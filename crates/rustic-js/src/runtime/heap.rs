@@ -172,6 +172,8 @@ pub struct Heap {
     pub(crate) stack_bytes: usize,
     /// Bytes charged for parse trees while they are compiled (TD-102).
     pub(crate) transient_bytes: usize,
+    #[cfg(debug_assertions)]
+    late_flattens: Cell<usize>,
     /// Interned strings by content hash; collisions chain through
     /// `atom_next`.
     pub(crate) atoms: HashMap<u64, StringId>,
@@ -246,6 +248,8 @@ impl Heap {
             rope_bytes: Cell::new(0),
             stack_bytes: 0,
             transient_bytes: 0,
+            #[cfg(debug_assertions)]
+            late_flattens: Cell::new(0),
             peak_bytes: 0,
             allocated_bytes: 0,
             gc_clock: None,
@@ -454,7 +458,7 @@ impl Heap {
 
     /// Copy a rope's leaves, left to right, without recursion: a string
     /// built by appending is a chain as deep as it has parts.
-    fn flatten(&self, id: StringId) -> JsStr {
+    fn flat_copy(&self, id: StringId) -> JsStr {
         let rope = self.ropes[&id.0];
         let mut narrow: Vec<u8> = Vec::new();
         let mut units: Vec<u16> = Vec::new();
@@ -479,14 +483,11 @@ impl Heap {
                 }
             }
         }
-        let flat = if rope.wide {
+        if rope.wide {
             JsStr::Utf16(units.into())
         } else {
             JsStr::Latin1(narrow.into())
-        };
-        self.rope_bytes
-            .set(self.rope_bytes.get().saturating_add(flat.storage_bytes()));
-        flat
+        }
     }
 
     /// Store a string from Rust text.
@@ -494,9 +495,81 @@ impl Heap {
         self.alloc_string(JsStr::from_text(text))
     }
 
-    /// The contents of a string.
+    /// The contents of a string. A rope not yet flattened with
+    /// [`Heap::flatten`] is flattened here, behind `&self`, and its copy
+    /// is charged late (at the next allocation or safe point): code that
+    /// can fail flattens first (TD-116).
     pub fn string(&self, id: StringId) -> &JsStr {
-        self.strings.get(id.0).get_or_init(|| self.flatten(id))
+        self.strings.get(id.0).get_or_init(|| {
+            let flat = self.flat_copy(id);
+            self.rope_bytes
+                .set(self.rope_bytes.get().saturating_add(flat.storage_bytes()));
+            #[cfg(debug_assertions)]
+            self.late_flattens.set(self.late_flattens.get() + 1);
+            flat
+        })
+    }
+
+    /// Flatten rope `id` now, charging its flat copy first: past the
+    /// limit this fails instead of copying (TD-116). Flat strings are
+    /// left alone.
+    pub fn flatten(&mut self, id: StringId) -> Result<(), OutOfMemory> {
+        if self.strings.get(id.0).get().is_some() {
+            return Ok(());
+        }
+        let rope = self.ropes[&id.0];
+        self.charge((rope.len as usize) << usize::from(rope.wide))?;
+        let flat = self.flat_copy(id);
+        let _ = self.strings.get(id.0).set(flat);
+        Ok(())
+    }
+
+    /// Flatten a rope during a collection, which resets the budget to
+    /// the live footprint (the copy included) when it ends.
+    pub(crate) fn flatten_in_collection(&self, id: StringId) {
+        let _ = self.strings.get(id.0).get_or_init(|| self.flat_copy(id));
+    }
+
+    /// Ropes flattened behind `&self` by [`Heap::string`] (debug builds),
+    /// for tests that check every read path flattens first.
+    #[cfg(debug_assertions)]
+    pub fn late_flattens(&self) -> usize {
+        self.late_flattens.get()
+    }
+
+    /// Whether two strings have the same contents, without flattening
+    /// either.
+    pub(crate) fn strings_equal(&self, a: StringId, b: StringId) -> bool {
+        if a == b {
+            return true;
+        }
+        if self.string_len(a) != self.string_len(b) {
+            return false;
+        }
+        match (self.strings.get(a.0).get(), self.strings.get(b.0).get()) {
+            (Some(x), Some(y)) => x == y,
+            _ => self.units_of(a).eq(self.units_of(b)),
+        }
+    }
+
+    /// The code units of a string, read through a rope's leaves without
+    /// flattening it.
+    fn units_of(&self, id: StringId) -> impl Iterator<Item = u16> + '_ {
+        let mut pending = vec![id];
+        std::iter::from_fn(move || {
+            while let Some(part) = pending.pop() {
+                match self.strings.get(part.0).get() {
+                    Some(flat) => return Some(flat.units()),
+                    None => {
+                        let rope = self.ropes[&part.0];
+                        pending.push(rope.right);
+                        pending.push(rope.left);
+                    }
+                }
+            }
+            None
+        })
+        .flatten()
     }
 
     pub(crate) fn content_hash(&self, s: &JsStr) -> u64 {
@@ -535,6 +608,7 @@ impl Heap {
     /// The property key for a string in the heap: an array index or an
     /// atom. A string that is already an atom is not hashed again.
     pub fn key_for_string(&mut self, id: StringId) -> Result<PropertyKey, OutOfMemory> {
+        self.flatten(id)?;
         if self.interned.get(id.0) {
             return Ok(match self.string(id).array_index() {
                 Some(index) => PropertyKey::Index(index),

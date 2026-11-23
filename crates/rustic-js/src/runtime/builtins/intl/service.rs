@@ -51,6 +51,7 @@ pub(super) fn option(agent: &mut Agent, options: Option<ObjectId>, name: &str) -
 pub(super) fn text_of(agent: &mut Agent, value: Value) -> JsResult<String> {
     let text = agent.to_string(value)?;
     agent.heap.charge(agent.heap.string_len(text))?;
+    agent.heap.flatten(text)?;
     Ok(agent.heap.string(text).to_text())
 }
 

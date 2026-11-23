@@ -301,6 +301,7 @@ fn date_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Val
                     let v = agent.to_primitive(value, None)?;
                     match v.as_string() {
                         Some(s) => {
+                            agent.heap.flatten(s)?;
                             let text = agent.heap.string(s).to_text();
                             parse(agent, &text)
                         }
@@ -367,6 +368,7 @@ fn date_now(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
 
 fn date_parse(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let s = agent.to_string(arg(args, 0))?;
+    agent.heap.flatten(s)?;
     let text = agent.heap.string(s).to_text();
     Ok(Value::number(time_clip(parse(agent, &text))))
 }

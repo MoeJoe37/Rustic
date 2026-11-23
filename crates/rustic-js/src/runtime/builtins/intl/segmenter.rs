@@ -151,6 +151,7 @@ fn find_boundaries(agent: &mut Agent, string: StringId, granularity: usize) -> J
     agent
         .heap
         .charge(decoded.checked_add(work).ok_or(OutOfMemory)?)?;
+    agent.heap.flatten(string)?;
     let units = agent.heap.string(string).to_units();
     let mut text: Vec<Properties> = Vec::with_capacity(length);
     let mut offsets: Vec<u32> = Vec::with_capacity(positions);
@@ -257,6 +258,7 @@ fn segment_data(
         agent.check_native_work()?;
     }
     agent.heap.charge(len * size_of::<u16>())?;
+    agent.heap.flatten(string)?;
     let source = agent.heap.string(string);
     let units: Vec<u16> = (start..end)
         .map(|at| source.unit(at).expect("segment boundary within input"))

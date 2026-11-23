@@ -83,6 +83,7 @@ impl Agent {
     fn convert_import_request(&mut self, source: Value, options: Value) -> JsResult<ModuleRequest> {
         let specifier = self.to_string(source)?;
         self.heap.charge(2 * self.heap.string_len(specifier))?;
+        self.heap.flatten(specifier)?;
         let specifier = self.heap.string(specifier).to_units();
         let mut attributes = Vec::new();
         if options != Value::UNDEFINED {

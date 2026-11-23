@@ -133,6 +133,7 @@ fn species_getter(_: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 
 fn units_of(agent: &mut Agent, value: Value) -> JsResult<Vec<u16>> {
     let s = agent.to_string(value)?;
+    agent.heap.flatten(s)?;
     Ok(agent.heap.string(s).to_units())
 }
 
@@ -386,6 +387,7 @@ fn escape(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let Some(s) = arg(args, 0).as_string() else {
         return agent.type_error("RegExp.escape expects a string");
     };
+    agent.heap.flatten(s)?;
     let units = agent.heap.string(s).to_units();
     let mut out = Vec::with_capacity(units.len() * 2);
     let hex = |out: &mut Vec<u16>, c: u16| {
@@ -598,6 +600,7 @@ fn run_matcher(
 /// `RegExpBuiltinExec(R, S)` (§22.2.7.2).
 fn builtin_exec(agent: &mut Agent, r: ObjectId, s: Value) -> JsResult<Value> {
     let sid = s.as_string().expect("the caller converted it");
+    agent.heap.flatten(sid)?;
     let length = agent.heap.string(sid).len();
     let mut last_index = get_last_index(agent, r)?;
     let (matcher, _, _) = regexp_data(agent, r).expect("the caller checked");
@@ -802,6 +805,7 @@ fn symbol_match(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
     }
     let unicode = contains_flag(&flags, b'u') || contains_flag(&flags, b'v');
     set_last_index(agent, rx, 0.0)?;
+    agent.heap.flatten(sid)?;
     let units = agent.heap.string(sid).to_units();
     let a = agent.new_array()?;
     let mut n = 0;
@@ -970,6 +974,7 @@ fn symbol_split(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
         return Ok(Value::object(a));
     }
     let s = Value::string(sid);
+    agent.heap.flatten(sid)?;
     let units = agent.heap.string(sid).to_units();
     let size = units.len();
     if size == 0 {
@@ -1108,6 +1113,7 @@ fn symbol_replace(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
     let rx = this_object(agent, this, "[Symbol.replace]")?;
     let sid = agent.to_string(arg(args, 0))?;
     let s = Value::string(sid);
+    agent.heap.flatten(sid)?;
     let units = agent.heap.string(sid).to_units();
     let length_s = units.len();
     let mut replace_value = arg(args, 1);

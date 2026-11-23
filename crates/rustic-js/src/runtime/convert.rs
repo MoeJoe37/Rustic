@@ -146,7 +146,10 @@ impl Agent {
             Kind::Null => Ok(0.0),
             Kind::Boolean(b) => Ok(if b { 1.0 } else { 0.0 }),
             Kind::Number(n) => Ok(n),
-            Kind::String(s) => Ok(string_to_number(self.heap.string(s))),
+            Kind::String(s) => {
+                self.heap.flatten(s)?;
+                Ok(string_to_number(self.heap.string(s)))
+            }
             Kind::Symbol(_) => self.type_error("cannot convert a Symbol to a number"),
             Kind::BigInt(_) => self.type_error("cannot convert a BigInt to a number"),
             Kind::Object(_) => {
@@ -168,8 +171,14 @@ impl Agent {
             Kind::BigInt(b) => self.heap.bigint(b).to_string_radix10(),
             Kind::Symbol(_) => return self.type_error("cannot convert a Symbol to a string"),
             Kind::Object(_) => {
+                // A string from script (`toString`) is flattened here, so
+                // built-ins converting objects read it flat (TD-116). A
+                // string value itself is returned as it is: `+` and
+                // template literals append to ropes without copying them.
                 let primitive = self.to_primitive(value, Some(PreferredType::String))?;
-                return self.to_string(primitive);
+                let s = self.to_string(primitive)?;
+                self.heap.flatten(s)?;
+                return Ok(s);
             }
         };
         Ok(self.heap.alloc_str(&text)?)
@@ -233,7 +242,15 @@ impl Agent {
     }
 
     fn strings_equal(&self, a: StringId, b: StringId) -> bool {
-        a == b || self.heap.string(a) == self.heap.string(b)
+        self.heap.strings_equal(a, b)
+    }
+
+    /// Flatten `value` if it is a rope, charging the copy (TD-116).
+    pub(crate) fn flatten_value(&mut self, value: Value) -> JsResult<()> {
+        if let Some(s) = value.as_string() {
+            self.heap.flatten(s)?;
+        }
+        Ok(())
     }
 
     /// `SameValue`.
@@ -274,6 +291,8 @@ impl Agent {
         if x.type_of() == y.type_of() {
             return Ok(self.is_strictly_equal(x, y));
         }
+        self.flatten_value(x)?;
+        self.flatten_value(y)?;
         Ok(match (x.kind(), y.kind()) {
             (Kind::Null | Kind::Undefined, Kind::Null | Kind::Undefined) => true,
             (Kind::Number(n), Kind::String(s)) | (Kind::String(s), Kind::Number(n)) => {
@@ -322,6 +341,8 @@ impl Agent {
             let py = self.to_primitive(y, Some(PreferredType::Number))?;
             (self.to_primitive(x, Some(PreferredType::Number))?, py)
         };
+        self.flatten_value(px)?;
+        self.flatten_value(py)?;
         if let (Kind::String(a), Kind::String(b)) = (px.kind(), py.kind()) {
             return Ok(Some(self.heap.string(a) < self.heap.string(b)));
         }

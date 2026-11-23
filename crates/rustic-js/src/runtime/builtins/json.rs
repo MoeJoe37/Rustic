@@ -402,6 +402,7 @@ fn parse(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let text = agent.to_string(arg(args, 0))?;
     let reviver = arg(args, 1);
     if !agent.is_callable(reviver) {
+        agent.heap.flatten(text)?;
         let units = agent.heap.string(text).to_units();
         return parse_json_units(agent, &units);
     }
@@ -424,6 +425,7 @@ pub(crate) fn parse_json_units(agent: &mut Agent, text: &[u16]) -> JsResult<Valu
 }
 
 fn source_units(agent: &mut Agent, text: StringId) -> JsResult<Vec<u16>> {
+    agent.heap.flatten(text)?;
     let length = agent.heap.string(text).len();
     for _ in 0..length.div_ceil(1024) {
         agent.check_native_work()?;
@@ -628,6 +630,7 @@ fn stringify(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         // At most ten spaces.
         state.gap = vec![u16::from(b' '); n as usize];
     } else if let Some(s) = space.as_string() {
+        agent.heap.flatten(s)?;
         let units = agent.heap.string(s).to_units();
         state.gap = units[..units.len().min(10)].to_vec();
     }
@@ -727,6 +730,7 @@ fn serialize_property(
         Kind::Null => push_str(agent, state, "null")?,
         Kind::Boolean(b) => push_str(agent, state, if b { "true" } else { "false" })?,
         Kind::String(s) => {
+            agent.heap.flatten(s)?;
             let units = agent.heap.string(s).to_units();
             quote(agent, state, &units)?;
         }

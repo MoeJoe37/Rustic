@@ -276,6 +276,26 @@ pub(crate) fn iterate(
     agent: &mut Agent,
     iterable: Value,
     method: Value,
+    each: impl FnMut(&mut Agent, Value) -> JsResult<bool>,
+) -> JsResult<()> {
+    iterate_with(
+        agent,
+        crate::vm::LoopCollect::NEVER,
+        &[],
+        iterable,
+        method,
+        each,
+    )
+}
+
+/// [`iterate`] that may collect between steps (TD-94), with the
+/// iterator, its `next` method and `held` (what `each` keeps) rooted.
+pub(crate) fn iterate_with(
+    agent: &mut Agent,
+    gc: crate::vm::LoopCollect,
+    held: &[Value],
+    iterable: Value,
+    method: Value,
     mut each: impl FnMut(&mut Agent, Value) -> JsResult<bool>,
 ) -> JsResult<()> {
     let iterator = agent.call(method, iterable, &[])?;
@@ -283,7 +303,14 @@ pub(crate) fn iterate(
         return agent.type_error("iterator is not an object");
     };
     let next = agent.get(object, PropertyKey::String(agent.names.next))?;
+    let mut roots = vec![iterator, next];
+    roots.extend_from_slice(held);
+    let mut first = true;
     loop {
+        if !first {
+            agent.loop_safepoint(gc, &roots)?;
+        }
+        first = false;
         let result = agent.call(next, iterator, &[])?;
         let Some(result) = result.as_object() else {
             return agent.type_error("iterator result is not an object");

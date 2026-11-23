@@ -444,6 +444,8 @@ fn table_for_each(
     class: Class,
     name: &str,
 ) -> JsResult<Value> {
+    // Collect between callbacks when called from a safe site (TD-94).
+    let gc = agent.loop_collect();
     // Brand check first.
     with_table(agent, this, class, name, |_, _| ())?;
     let o = this.as_object().expect("checked above");
@@ -465,6 +467,9 @@ fn table_for_each(
         };
         position = p + 1;
         if let Err(e) = agent.call(f, this_arg, &[v, k, this]) {
+            break Err(e);
+        }
+        if let Err(e) = agent.loop_safepoint(gc, &[this, f, this_arg]) {
             break Err(e);
         }
     };

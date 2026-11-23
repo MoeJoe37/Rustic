@@ -195,6 +195,15 @@ impl VmState {
     }
 }
 
+/// Whether a built-in's loop may collect: see [`Agent::loop_collect`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct LoopCollect(bool);
+
+impl LoopCollect {
+    /// A loop that never collects (its caller holds unrooted values).
+    pub(crate) const NEVER: LoopCollect = LoopCollect(false);
+}
+
 /// What a callee is.
 enum Callee {
     Closure(ObjectId),
@@ -3211,6 +3220,32 @@ impl Agent {
     pub(crate) fn resume_is_collectable(&mut self) -> bool {
         std::mem::take(&mut self.vm.native_from_safe_site)
             && self.vm.native_depth == self.vm.collect_floor + 1
+    }
+
+    /// Whether a built-in that loops may collect between iterations
+    /// (TD-94): it was called from a safe site at the collectable level,
+    /// so its receiver and arguments are rooted by the caller's registers
+    /// and nothing else on the Rust stack holds a handle. Call it first
+    /// thing in the built-in, before anything can run script.
+    pub(crate) fn loop_collect(&mut self) -> LoopCollect {
+        LoopCollect(self.resume_is_collectable())
+    }
+
+    /// An iteration boundary in a built-in's loop: collect if the heap
+    /// asks for it, with `held` (the values the loop keeps in Rust
+    /// locals: its result, a `ToObject` wrapper, its callback) rooted on
+    /// the value stack meanwhile. A loop that may not collect does
+    /// nothing here, as before.
+    pub(crate) fn loop_safepoint(&mut self, gc: LoopCollect, held: &[Value]) -> JsResult<()> {
+        if !gc.0 || !(self.should_collect() || self.heap.over_limit()) {
+            return Ok(());
+        }
+        let at = self.vm.stack.len();
+        self.reserve_stacks(held.len())?;
+        self.vm.stack.extend_from_slice(held);
+        let result = self.collect_at_safe_point();
+        self.vm.stack.truncate(at);
+        result
     }
 
     /// Run `f` with `value` held on the value stack, where the collector

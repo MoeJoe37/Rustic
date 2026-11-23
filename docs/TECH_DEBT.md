@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-134 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -159,7 +159,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-91 | Deliberate | JS | The JS heap never frees: arenas grow until the budget runs out | Paid |
 | TD-92 | Deliberate | JS | BigInt has storage, printing and comparison only; `ToBigInt` and the other numeric conversions are missing | Paid |
 | TD-93 | Watch | JS | Environment bindings are found by a linear name search | Paid |
-| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Open, M7 entry |
+| TD-94 | Deliberate | JS | Collection runs only at caller safe points; a native function cannot collect mid-run | Paid |
 | TD-95 | Deliberate | JS | Collection is stop-the-world and full-heap: no incremental or generational marking | Open, `perf.gc` (M12); measured by JS-09 |
 | TD-96 | Deliberate | JS | No weak references, and DOM host objects are not traced by the JS heap yet | Paid |
 | TD-97 | Deliberate | JS | Syntax the bytecode compiler rejected; asynchronous module execution, dynamic imports and host-provided module metadata (what remains is TD-105 and TD-110) | Paid |
@@ -1544,7 +1544,7 @@ environment slot index. Names are searched only for globals (behind a
 per-site cache) and inside `with`. The name lists that remain in each
 environment are TD-104.
 
-### TD-94 — Collection only at caller safe points
+### TD-94 — Collection only at caller safe points (Paid)
 
 **Rescheduled 2026-11-20 (M6 completion):** M6 pages are loopback fixtures; a native function growing memory without a safe point is an attack-surface concern for hostile remote content, reviewed with the other M7 entry budget items.
 
@@ -1558,6 +1558,8 @@ Pay with JS-05: built-ins that loop root their temporaries and poll at loop
 boundaries, or runtime functions adopt handle scopes so allocation itself can
 collect. Trigger: the first built-in that allocates per iteration.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): built-ins that loop over callbacks or conversions collect between iterations when script called them directly. `Agent::loop_collect` (first thing in the built-in) says whether it was called from a safe site at the collectable level, where its receiver and arguments are rooted by the caller's registers; `Agent::loop_safepoint(gc, held)` then collects at each iteration boundary if the heap asks, with the values the loop keeps in Rust locals (result arrays, `ToObject` wrappers, iterators, callbacks) pushed on the value stack meanwhile. Used by `forEach`, `map`, `filter`, `some`, `every`, `find*`, `reduce*`, `join`, `toLocaleString`, `Array.from` (both paths, through `iterate_with`) and Map and Set `forEach`. Called from inside another built-in, a loop collects nothing, as before. `looping_built_ins_collect_between_callbacks` runs each loop over 20,000 callbacks that make garbage several times a 4 MiB heap (before: OutOfMemory) and, under GC stress, checks the loops' own values survive. Other built-ins that hold many handles in Rust while they loop (sort's merge buffer, JSON) still collect only after they return; the stack-and-parse-tree charges of TD-102 and the per-loop limits bound them.
 
 ### TD-95 — Stop-the-world, full-heap collection
 

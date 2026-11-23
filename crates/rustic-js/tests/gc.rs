@@ -1057,3 +1057,69 @@ fn flattening_ropes_never_passes_the_heap_limit() {
         a.heap.peak_bytes()
     );
 }
+
+/// TD-94: a built-in that loops over a callback collects between
+/// iterations when script called it directly, so garbage the callback
+/// makes does not pile up until the heap runs out.
+#[test]
+fn looping_built_ins_collect_between_callbacks() {
+    let loops = [
+        "big.forEach(function (x) { junk = [x, x, x, x, x, x, x, x]; })",
+        "big.map(function (x) { junk = [x, x, x, x, x, x, x, x]; return 0; }).length",
+        "big.filter(function (x) { junk = [x, x, x, x, x, x, x, x]; return x < 2; }).length",
+        "big.some(function (x) { junk = [x, x, x, x, x, x, x, x]; return false; })",
+        "big.every(function (x) { junk = [x, x, x, x, x, x, x, x]; return true; })",
+        "big.find(function (x) { junk = [x, x, x, x, x, x, x, x]; return false; })",
+        "big.reduce(function (a, x) { junk = [x, x, x, x, x, x, x, x]; return a + 1; }, 0)",
+        "Array.from(big, function (x) { junk = [x, x, x, x, x, x, x, x]; return 0; }).length",
+        "big.join('-').length",
+        "set.forEach(function (x) { junk = [x, x, x, x, x, x, x, x]; })",
+    ];
+    for source in loops {
+        let mut a = Agent::with_heap_limit(4 * MIN_GC_THRESHOLD).unwrap();
+        let limit = a.heap.byte_limit();
+        a.evaluate(
+            "var junk; var big = []; for (var i = 0; i < 20000; i++) big.push(i % 7);
+             var set = new Set(); for (var i = 0; i < 20000; i++) set.add(i);",
+        )
+        .unwrap();
+        let before = a.heap.collections();
+        // 20,000 garbage arrays of eight values: several times the limit.
+        a.evaluate(source)
+            .unwrap_or_else(|e| panic!("{source}: {e:?}"));
+        assert!(a.heap.collections() > before, "{source}");
+        assert!(a.heap.peak_bytes() <= limit, "{source}");
+    }
+    // Under stress (a collection at every chance) the loops' own values
+    // survive: the result arrays, ToObject wrappers, iterators and the
+    // separator strings are rooted while they collect.
+    let mut a = agent();
+    a.heap.set_gc_stress(true);
+    let result = a
+        .evaluate(
+            "var src = []; for (var i = 0; i < 300; i++) src.push({ v: i });
+             var out = src.map(function (o) { return { w: o.v * 2 } })
+                 .filter(function (o) { return o.w % 3 == 0 })
+                 .map(function (o) { return [o.w] });
+             var from = Array.from(new Set(out), function (x) { return { x: x[0] } });
+             var total = from.reduce(function (s, o) { return s + o.x }, 0);
+             var text = Array.prototype.join.call('abc'.repeat(50), '-').length;
+             var seen = 0; new Map(src.map(function (o) { return [o, { s: o }] }))
+                 .forEach(function (v, k) { if (v.s === k) seen++ });
+             [out.length, total, text, seen].join()",
+        )
+        .unwrap();
+    assert_eq!(
+        a.heap.string(result.as_string().unwrap()).to_text(),
+        "100,29700,299,300"
+    );
+    // Called from inside another built-in (not a safe site), the loop
+    // still runs as before, collecting nothing on its own.
+    let mut a = agent();
+    let result = a
+        .evaluate(
+            "[[1, 2, 3]].map(function (inner) { return inner.map(function (x) { return [x] }).length })[0]",
+        )
+        .unwrap();
+    assert_eq!(result, Value::number(3.0));
+}

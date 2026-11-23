@@ -9,7 +9,7 @@
 use std::cmp::Ordering;
 
 use super::{
-    Method, arg, install_constructor, install_methods, iterate, method, new_iterator,
+    Method, arg, install_constructor, install_methods, iterate_with, method, new_iterator,
     prototype_from_new_target,
 };
 use crate::runtime::agent::{Agent, JsResult};
@@ -18,6 +18,7 @@ use crate::runtime::object::{Class, IteratorKind, Object, PropertyDescriptor};
 use crate::runtime::shape::PropertyKey;
 use crate::runtime::value::{ObjectId, StringId, Value};
 use crate::runtime::{ErrorKind, JsStr};
+use crate::vm::LoopCollect;
 
 mod from_async;
 pub(crate) use from_async::FromAsyncState;
@@ -352,6 +353,7 @@ fn of(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 
 /// `Array.from(items, mapfn, thisArg)` (§23.1.2.1).
 fn from(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let items = arg(args, 0);
     let mapper = arg(args, 1);
     let this_arg = arg(args, 2);
@@ -363,7 +365,8 @@ fn from(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     if let Some(using) = agent.get_method(items, iterator_key)? {
         let a = construct_or_array(agent, this, &[])?;
         let mut k = 0.0;
-        iterate(agent, items, using, |agent, value| {
+        let held = [Value::object(a), mapper, this_arg];
+        iterate_with(agent, gc, &held, items, using, |agent, value| {
             if k >= MAX_SAFE_INTEGER {
                 return agent.type_error("Array.from: too many elements");
             }
@@ -392,6 +395,7 @@ fn from(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
         };
         create_index(agent, a, k, value)?;
         k += 1.0;
+        agent.loop_safepoint(gc, &[Value::object(array_like), Value::object(a)])?;
     }
     set_length(agent, a, length)?;
     Ok(Value::object(a))
@@ -412,16 +416,22 @@ fn entries(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 /// The shared loop of `every`, `some`, `forEach`, `map` and `filter`:
 /// calls the callback for each present element, in order, and passes
 /// the result to `step`, which says whether to go on.
+/// `held` are values `step` keeps (a result array), rooted while the
+/// loop collects between iterations (TD-94).
 fn each_present(
     agent: &mut Agent,
+    gc: LoopCollect,
     this: Value,
     args: &[Value],
     name: &str,
+    held: &[Value],
     mut step: impl FnMut(&mut Agent, f64, Value, Value) -> JsResult<bool>,
 ) -> JsResult<(ObjectId, f64)> {
     let (o, length) = this_array_like(agent, this)?;
     let f = callback(agent, args, name)?;
     let this_arg = arg(args, 1);
+    let mut roots = vec![Value::object(o), f, this_arg];
+    roots.extend_from_slice(held);
     let mut k = 0.0;
     while k < length {
         if has_index(agent, o, k)? {
@@ -432,22 +442,33 @@ fn each_present(
             }
         }
         k += 1.0;
+        agent.loop_safepoint(gc, &roots)?;
     }
     Ok((o, length))
 }
 
 fn every(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let mut all = true;
-    each_present(agent, this, args, "every", |agent, _, _, result| {
-        all = agent.to_boolean(result);
-        Ok(all)
-    })?;
+    each_present(
+        agent,
+        gc,
+        this,
+        args,
+        "every",
+        &[],
+        |agent, _, _, result| {
+            all = agent.to_boolean(result);
+            Ok(all)
+        },
+    )?;
     Ok(Value::boolean(all))
 }
 
 fn some(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let mut any = false;
-    each_present(agent, this, args, "some", |agent, _, _, result| {
+    each_present(agent, gc, this, args, "some", &[], |agent, _, _, result| {
         any = agent.to_boolean(result);
         Ok(!any)
     })?;
@@ -455,16 +476,19 @@ fn some(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn for_each(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    each_present(agent, this, args, "forEach", |_, _, _, _| Ok(true))?;
+    let gc = agent.loop_collect();
+    each_present(agent, gc, this, args, "forEach", &[], |_, _, _, _| Ok(true))?;
     Ok(Value::UNDEFINED)
 }
 
 /// `Array.prototype.map` (§23.1.3.21).
 fn map(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let (o, length) = this_array_like(agent, this)?;
     let f = callback(agent, args, "map")?;
     let this_arg = arg(args, 1);
     let a = array_species_create(agent, o, length)?;
+    let roots = [Value::object(o), f, this_arg, Value::object(a)];
     let mut k = 0.0;
     while k < length {
         if has_index(agent, o, k)? {
@@ -473,22 +497,33 @@ fn map(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             create_index(agent, a, k, mapped)?;
         }
         k += 1.0;
+        agent.loop_safepoint(gc, &roots)?;
     }
     Ok(Value::object(a))
 }
 
 /// `Array.prototype.filter` (§23.1.3.8).
 fn filter(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let (o, _) = this_array_like(agent, this)?;
     let a = array_species_create(agent, o, 0.0)?;
     let mut to = 0.0;
-    each_present(agent, this, args, "filter", |agent, _, value, result| {
-        if agent.to_boolean(result) {
-            create_index(agent, a, to, value)?;
-            to += 1.0;
-        }
-        Ok(true)
-    })?;
+    let held = [Value::object(a)];
+    each_present(
+        agent,
+        gc,
+        this,
+        args,
+        "filter",
+        &held,
+        |agent, _, value, result| {
+            if agent.to_boolean(result) {
+                create_index(agent, a, to, value)?;
+                to += 1.0;
+            }
+            Ok(true)
+        },
+    )?;
     Ok(Value::object(a))
 }
 
@@ -501,9 +536,11 @@ fn find_via_predicate(
     name: &str,
     ascending: bool,
 ) -> JsResult<Option<(f64, Value)>> {
+    let gc = agent.loop_collect();
     let (o, length) = this_array_like(agent, this)?;
     let predicate = callback(agent, args, name)?;
     let this_arg = arg(args, 1);
+    let roots = [Value::object(o), predicate, this_arg];
     let mut i = 0.0;
     while i < length {
         let k = if ascending { i } else { length - 1.0 - i };
@@ -517,6 +554,7 @@ fn find_via_predicate(
             return Ok(Some((k, value)));
         }
         i += 1.0;
+        agent.loop_safepoint(gc, &roots)?;
     }
     Ok(None)
 }
@@ -543,6 +581,7 @@ fn find_last_index(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<V
 
 /// `reduce` and `reduceRight` (§23.1.3.24, §23.1.3.25).
 fn reduce_impl(agent: &mut Agent, this: Value, args: &[Value], right: bool) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let name = if right { "reduceRight" } else { "reduce" };
     let (o, length) = this_array_like(agent, this)?;
     let f = callback(agent, args, name)?;
@@ -574,6 +613,7 @@ fn reduce_impl(agent: &mut Agent, this: Value, args: &[Value], right: bool) -> J
             )?;
         }
         i += 1.0;
+        agent.loop_safepoint(gc, &[Value::object(o), f, accumulator])?;
     }
     Ok(accumulator)
 }
@@ -1254,6 +1294,7 @@ fn to_sorted(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
 
 /// `Array.prototype.join` (§23.1.3.18).
 fn join(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let (o, length) = this_array_like(agent, this)?;
     let separator: Vec<u16> = match arg(args, 0) {
         s if s == Value::UNDEFINED => vec![u16::from(b',')],
@@ -1263,7 +1304,7 @@ fn join(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             agent.heap.string(s).to_units()
         }
     };
-    join_with(agent, o, length, &separator, |agent, value| {
+    join_with(agent, gc, o, length, &separator, &[], |agent, value| {
         let s = agent.to_string(value)?;
         agent.heap.flatten(s)?;
         Ok(agent.heap.string(s).to_units())
@@ -1276,15 +1317,19 @@ fn join(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 /// ends instead of recursing until the stack overflows.
 fn join_with(
     agent: &mut Agent,
+    gc: LoopCollect,
     o: ObjectId,
     length: f64,
     separator: &[u16],
+    held: &[Value],
     mut text: impl FnMut(&mut Agent, Value) -> JsResult<Vec<u16>>,
 ) -> JsResult<Value> {
     if agent.vm.join_stack.contains(&o) {
         return Ok(Value::string(agent.names.empty));
     }
     agent.vm.join_stack.push(o);
+    let mut roots = vec![Value::object(o)];
+    roots.extend_from_slice(held);
     let result = (|| {
         let mut units: Vec<u16> = Vec::new();
         let mut k = 0.0;
@@ -1300,6 +1345,8 @@ fn join_with(
                 units.extend_from_slice(&piece);
             }
             k += 1.0;
+            // Converting elements makes garbage; the units are Rust's.
+            agent.loop_safepoint(gc, &roots)?;
         }
         agent.string_from(JsStr::from_units(&units))
     })();
@@ -1322,13 +1369,23 @@ fn to_string(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 /// §19.5.1): each element's own `toLocaleString` with the same
 /// arguments, joined by commas.
 fn to_locale_string(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    let gc = agent.loop_collect();
     let (o, length) = this_array_like(agent, this)?;
     let key = agent.heap.key("toLocaleString")?;
     let passed = [arg(args, 0), arg(args, 1)];
-    join_with(agent, o, length, &[u16::from(b',')], |agent, value| {
-        let v = agent.invoke(value, key, &passed)?;
-        let s = agent.to_string(v)?;
-        agent.heap.flatten(s)?;
-        Ok(agent.heap.string(s).to_units())
-    })
+    let held = [agent.key_to_value(key)?];
+    join_with(
+        agent,
+        gc,
+        o,
+        length,
+        &[u16::from(b',')],
+        &held,
+        |agent, value| {
+            let v = agent.invoke(value, key, &passed)?;
+            let s = agent.to_string(v)?;
+            agent.heap.flatten(s)?;
+            Ok(agent.heap.string(s).to_units())
+        },
+    )
 }

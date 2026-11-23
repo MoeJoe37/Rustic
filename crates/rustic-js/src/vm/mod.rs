@@ -16,7 +16,7 @@ pub use bytecode::CodeId;
 pub use compile::CompileError;
 pub(crate) use compile::{ModuleCode, compile_module};
 pub use interp::VmLimits;
-pub(crate) use interp::exponentiate;
+pub(crate) use interp::{LoopCollect, exponentiate};
 pub(crate) use scope::DEFAULT_EXPORT;
 
 use crate::ast::Program;

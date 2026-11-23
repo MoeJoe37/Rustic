@@ -1,7 +1,7 @@
 # ADR 0077 — WebAssembly decoding and execution boundaries
 
 Date: 2026-11-23
-Status: Accepted for M9 WASM-01–03 foundations
+Status: Accepted for M9 WASM-01–04 foundations
 
 ## Context
 
@@ -32,9 +32,13 @@ and stack budgets apply to the start function and every export call. Trap
 diagnostics retain byte offsets because the interpreter reads the validated
 instructions directly.
 
-Host imports will be supplied through an embedding adapter. Mutable instance
-state will have its own allocation limits. A later compilation tier requires
-its own executable memory and platform review. Every host retains the interpreter.
+Each local instance owns its numeric globals and linear memories. Instantiation
+evaluates global initializers, zeroes memory, applies active data segments and
+runs the start function before exposing the instance. Memory allocation and
+growth share an aggregate byte cap. Bulk memory operations validate both ranges
+and charge their byte work before modifying guest state. Host imports will be
+supplied through an embedding adapter. A later compilation tier requires its
+own executable memory and platform review. Every host retains the interpreter.
 
 ## Alternatives and consequences
 
@@ -57,8 +61,10 @@ complete.
 Tests check framing and declaration encodings, initializer visibility, operand
 types, branch targets, index spaces, cancellation and cumulative budgets.
 Execution tests exercise numerical results and traps, recursive and tail calls,
-loop and block branches, start traps, and work and stack limits. The
-`wasm-binary` fuzz target exercises decoding, validation, and bounded numeric
-execution on mutated modules. Revisit the representation when concrete
+loop and block branches, start traps, and work and stack limits. Instance tests
+cover initialization order, independent state, checked memory ranges, bounded
+growth and bulk memory operations. The `wasm-binary` fuzz target exercises
+decoding, validation, instantiation and bounded execution on mutated modules.
+Revisit the representation when concrete
 reference types need subtype and canonical identity information, or when
 instantiation requires an owned input lifetime.

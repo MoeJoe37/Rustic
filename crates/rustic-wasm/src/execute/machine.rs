@@ -1,8 +1,10 @@
+use super::state::Transfer;
 use super::*;
 use crate::Immediate;
 
-pub(super) fn invoke(
-    instance: &NumericInstance<'_, '_>,
+pub(super) fn invoke<'bytes>(
+    instance: &Executable<'_, 'bytes>,
+    state: &mut State<'bytes>,
     function: usize,
     arguments: &[Value],
     entry_work: usize,
@@ -10,6 +12,7 @@ pub(super) fn invoke(
 ) -> Result<Vec<Value>, ExecutionError> {
     let mut machine = Machine {
         instance,
+        state,
         calls: Vec::new(),
         controls: Vec::new(),
         locals: Vec::new(),
@@ -67,8 +70,9 @@ struct Control {
     loop_start: Option<(usize, usize)>, // Program counter and loop argument count.
 }
 
-struct Machine<'instance, 'module, 'bytes, 'token> {
-    instance: &'instance NumericInstance<'module, 'bytes>,
+struct Machine<'instance, 'module, 'bytes, 'state, 'token> {
+    instance: &'instance Executable<'module, 'bytes>,
+    state: &'state mut State<'bytes>,
     calls: Vec<Call>,
     controls: Vec<Control>,
     locals: Vec<Value>,
@@ -77,7 +81,7 @@ struct Machine<'instance, 'module, 'bytes, 'token> {
     offset: usize,
 }
 
-impl Machine<'_, '_, '_, '_> {
+impl Machine<'_, '_, '_, '_, '_> {
     fn step(&mut self, instruction: &Instruction, jump: Jump) -> Result<(), ExecutionError> {
         match (instruction.opcode, &instruction.immediate) {
             (Opcode::Core(0x00), _) => return Err(error(self.offset, Fault::Unreachable)),
@@ -135,6 +139,53 @@ impl Machine<'_, '_, '_, '_> {
                     Opcode::Core(0x21) => self.locals[index] = self.pop(),
                     _ => self.locals[index] = *self.operands.last().expect("typed operand"),
                 }
+            }
+            (Opcode::Core(0x23), Immediate::Index(global)) => {
+                self.push(self.state.globals[*global as usize])?;
+            }
+            (Opcode::Core(0x24), Immediate::Index(global)) => {
+                self.state.globals[*global as usize] = self.pop();
+            }
+            (Opcode::Core(op @ 0x28..=0x3e), Immediate::Memory { memory, offset, .. }) => {
+                let value = (op >= 0x36).then(|| self.pop());
+                let address = u64::from(self.pop_i32() as u32) + offset;
+                if let Some(result) = self
+                    .state
+                    .access(op, *memory, address, value, self.offset)?
+                {
+                    self.push(result)?;
+                }
+            }
+            (Opcode::Core(0x3f), Immediate::Index(memory)) => {
+                self.push(Value::I32(self.state.size(*memory)))?;
+            }
+            (Opcode::Core(0x40), Immediate::Index(memory)) => {
+                let pages = self.pop_i32() as u32;
+                let result = self
+                    .state
+                    .grow(*memory, pages, self.offset, &mut self.budget)?;
+                self.push(Value::I32(result))?;
+            }
+            (Opcode::Misc(8), Immediate::Indices(data, memory)) => {
+                let transfer = self.pop_transfer();
+                self.state
+                    .init(*data, *memory, transfer, self.offset, &mut self.budget)?;
+            }
+            (Opcode::Misc(9), Immediate::Index(data)) => self.state.drop_data(*data),
+            (Opcode::Misc(10), Immediate::Indices(destination, source)) => {
+                let transfer = self.pop_transfer();
+                self.state.copy(
+                    *destination,
+                    *source,
+                    transfer,
+                    self.offset,
+                    &mut self.budget,
+                )?;
+            }
+            (Opcode::Misc(11), Immediate::Index(memory)) => {
+                let transfer = self.pop_transfer();
+                self.state
+                    .fill(*memory, transfer, self.offset, &mut self.budget)?;
             }
             (opcode, immediate) => {
                 let (params, _) = effect(opcode).expect("prepared numeric instruction");
@@ -286,5 +337,16 @@ impl Machine<'_, '_, '_, '_> {
             unreachable!("validated i32 control operand");
         };
         value
+    }
+
+    fn pop_transfer(&mut self) -> Transfer {
+        let size = self.pop_i32() as u32;
+        let source = self.pop_i32() as u32;
+        let destination = self.pop_i32() as u32;
+        Transfer {
+            destination,
+            source,
+            size,
+        }
     }
 }

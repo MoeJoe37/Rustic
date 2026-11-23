@@ -3273,6 +3273,34 @@ preparation and execution. Each invocation starts with a fresh budget.
 `crates/rustic-wasm/tests/execution.rs` covers returns and branches that unwind
 frames, loop arguments, recursive calls, tail-call frame reuse, numeric
 boundaries, start traps and resource limits. The fuzz target runs compatible
-zero-argument exports under a small execution budget. Mutable globals,
-memories, tables, indirect calls and external imports require wider instance
-support. [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
+zero-argument exports under a small execution budget.
+[ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
+
+## WASM-04 — Instance globals and linear memory
+
+`Instance::instantiate` creates independent local numeric globals and 32-bit
+linear memories, evaluates their initializers, applies active data segments
+and then runs the start function. Function calls share that state. Changes
+made before a trap remain visible to later calls.
+
+The interpreter performs little-endian scalar loads and stores, tracks
+memory size and growth in 64 KiB pages, and implements copy, fill,
+`memory.init` and `data.drop`. It checks the full effective address and the
+source and destination ranges before each transfer. Initial allocation and
+growth share a total byte cap. Bulk work and initialization consume their
+respective execution or preparation budgets.
+
+`crates/rustic-wasm/tests/instances.rs` covers initialization order, isolated
+instances, range failures, segment lifetime and allocation limits. Tables,
+indirect execution, reference values and host imports remain open.
+[ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
+
+A local run of the pinned core suite used WABT 1.0.42 to generate binaries
+and replayed supported invocations in the original module context. Numeric
+and control suites matched 13,224 executions and rejected 746 malformed or
+invalid binaries. The memory, bulk-memory, multi-memory and global suites
+matched 5,871 invocations and 20 instantiation traps and rejected 510
+malformed or invalid binaries. The run used a 64 MiB instance cap for the
+memory-growth fixtures and excluded cases that required linked imports or
+types and instructions outside the implemented profiles.
+[Pinned core suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core)

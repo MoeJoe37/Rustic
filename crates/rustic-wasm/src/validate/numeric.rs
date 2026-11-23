@@ -35,7 +35,7 @@ pub(crate) fn effect(op: Opcode) -> Option<(&'static [Ty], Ty)> {
 }
 
 /// Loaded or stored value type and natural alignment exponent.
-pub(super) fn memory_access(op: u8) -> (Ty, u8) {
+pub(crate) fn memory_access(op: u8) -> (Ty, u8) {
     match op {
         0x28 | 0x36 => (I32, 2),
         0x29 | 0x37 => (I64, 3),

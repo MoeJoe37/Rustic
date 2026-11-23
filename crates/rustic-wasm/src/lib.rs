@@ -1,8 +1,8 @@
 //! Rustic's bounded WebAssembly decoder, validator, and interpreter.
 //!
 //! Follow the module boundary from [`decode_module`] through
-//! [`validate_module`] to [`NumericInstance::instantiate`]. The scanner also
-//! exposes borrowed section and instruction spans for diagnostic tools.
+//! [`validate_module`] to [`Instance::instantiate`]. The scanner also exposes
+//! borrowed section and instruction spans for diagnostic tools.
 
 #![warn(missing_docs)]
 
@@ -18,7 +18,10 @@ pub use binary::{
     BinaryLimits, BinaryModule, FunctionBody, LocalGroup, Section, SectionKind, ValueType,
     scan_module,
 };
-pub use execute::{ExecutionError, ExecutionErrorKind, ExecutionLimits, NumericInstance, Value};
+pub use execute::{
+    ExecutionError, ExecutionErrorKind, ExecutionLimits, Instance, InstanceLimits, NumericInstance,
+    Value,
+};
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,
 };

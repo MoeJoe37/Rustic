@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "ec003362399a2675f19f6b537f99168afa2e78fd353c775d61509ceb3148abf7",
+  "source_fingerprint": "d6513e889fadec99f42ed326c1529ff63e4164dfcbe516af4c3fa7b841fc8f72",
   "percent": "48.66",
   "verified_percent": "44.77",
   "partial_percent": "3.89",
   "completed": 108,
-  "in_progress": 17,
+  "in_progress": 18,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -4531,8 +4531,24 @@
           "label": "Memories, tables, globals, instances and resource limits",
           "size": 3,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/execute.rs",
+              "marker": "pub struct Instance<"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn active_segments_and_start_run_before_exports_and_instances_are_independent"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn bulk_memory_checks_both_ranges_before_copy_and_drops_segments"
+            }
+          ],
           "credit": "0.00",
           "engine_share": "0.26"
         },
@@ -4579,7 +4595,7 @@
       ],
       "points": 34,
       "completed": 0,
-      "in_progress": 3,
+      "in_progress": 4,
       "total": 8,
       "contribution": "0.00",
       "percent": "0.00",

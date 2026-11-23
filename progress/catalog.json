@@ -4179,8 +4179,24 @@
           "label": "Memories, tables, globals, instances and resource limits",
           "size": 3,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/execute.rs",
+              "marker": "pub struct Instance<"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn active_segments_and_start_run_before_exports_and_instances_are_independent"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn bulk_memory_checks_both_ranges_before_copy_and_drops_segments"
+            }
+          ]
         },
         {
           "id": "wasm.web",

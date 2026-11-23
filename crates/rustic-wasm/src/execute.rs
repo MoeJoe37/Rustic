@@ -9,6 +9,9 @@ use crate::{
 
 mod machine;
 mod numeric;
+mod state;
+
+use state::State;
 
 /// A WebAssembly number crossing the interpreter boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,6 +71,8 @@ pub enum ExecutionErrorKind {
     IntegerOverflow,
     /// A trapping float-to-integer conversion received a NaN.
     InvalidConversionToInteger,
+    /// A load, store or segment operation accessed bytes outside an allocation.
+    MemoryOutOfBounds,
 }
 
 use ExecutionErrorKind as Fault;
@@ -127,10 +132,7 @@ impl Default for ExecutionLimits {
 /// Modules with imports, memories, tables, globals, tags, segments, or
 /// non-numeric storage types require a wider interpreter profile.
 pub struct NumericInstance<'module, 'bytes> {
-    module: &'module ValidatedModule<'bytes>,
-    functions: Vec<PreparedFunction<'module>>,
-    exports: HashMap<&'bytes str, usize>,
-    limits: ExecutionLimits,
+    executable: Executable<'module, 'bytes>,
 }
 
 impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
@@ -140,23 +142,126 @@ impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
         limits: ExecutionLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
-        let decoded = module.module();
-        let declarations = decoded.declarations();
         let mut budget = Budget {
             remaining: limits.preparation_work,
             cancellation,
         };
+        let executable = Executable::prepare(module, limits, Profile::NumericOnly, &mut budget)?;
+        executable.run_start(&mut State::default(), cancellation)?;
+        Ok(Self { executable })
+    }
+
+    /// Invoke an exported function with a fresh execution budget.
+    pub fn invoke(
+        &self,
+        export: &str,
+        arguments: &[Value],
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<Value>, ExecutionError> {
+        self.executable
+            .invoke(export, arguments, &mut State::default(), cancellation)
+    }
+}
+
+/// Resource limits for an instance with its own guest state.
+#[derive(Clone, Copy, Debug)]
+pub struct InstanceLimits {
+    /// Preparation and execution limits.
+    pub execution: ExecutionLimits,
+    /// Maximum total bytes of linear memory across this instance.
+    pub memory_bytes: usize,
+}
+
+impl Default for InstanceLimits {
+    fn default() -> Self {
+        Self {
+            execution: ExecutionLimits::default(),
+            memory_bytes: 32 * 1024 * 1024,
+        }
+    }
+}
+
+/// An executable instance with local numeric globals and 32-bit linear memory.
+///
+/// State changes remain visible across invocations, including changes made
+/// before a trap. Each instance owns its memories and globals. This profile
+/// supports local declarations, passive and active data segments, and numeric
+/// functions. Host imports, tables and reference values require a wider profile.
+pub struct Instance<'module, 'bytes> {
+    executable: Executable<'module, 'bytes>,
+    state: State<'bytes>,
+}
+
+impl<'module, 'bytes> Instance<'module, 'bytes> {
+    /// Prepare code, allocate state, apply active segments and run the start function.
+    pub fn instantiate(
+        module: &'module ValidatedModule<'bytes>,
+        limits: InstanceLimits,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ExecutionError> {
+        let mut budget = Budget {
+            remaining: limits.execution.preparation_work,
+            cancellation,
+        };
+        let executable =
+            Executable::prepare(module, limits.execution, Profile::LocalState, &mut budget)?;
+        let mut state = State::new(module.module().declarations(), limits, &mut budget)?;
+        executable.run_start(&mut state, cancellation)?;
+        Ok(Self { executable, state })
+    }
+
+    /// Invoke a function export with fresh execution budgets and persistent state.
+    pub fn invoke(
+        &mut self,
+        export: &str,
+        arguments: &[Value],
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<Value>, ExecutionError> {
+        self.executable
+            .invoke(export, arguments, &mut self.state, cancellation)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Profile {
+    NumericOnly,
+    LocalState,
+}
+
+struct Executable<'module, 'bytes> {
+    module: &'module ValidatedModule<'bytes>,
+    functions: Vec<PreparedFunction<'module>>,
+    exports: HashMap<&'bytes str, usize>,
+    limits: ExecutionLimits,
+}
+
+impl<'module, 'bytes> Executable<'module, 'bytes> {
+    fn prepare(
+        module: &'module ValidatedModule<'bytes>,
+        limits: ExecutionLimits,
+        profile: Profile,
+        budget: &mut Budget<'_>,
+    ) -> Result<Self, ExecutionError> {
+        let decoded = module.module();
+        let declarations = decoded.declarations();
         budget.spend(0, 0)?;
-        let unsupported = [
+        let always_unsupported = [
             declarations.imports.first().map(|entry| entry.offset),
             declarations.tables.first().map(|entry| entry.offset),
-            declarations.memories.first().map(|entry| entry.offset),
-            declarations.globals.first().map(|entry| entry.offset),
             declarations.tags.first().map(|entry| entry.offset),
             declarations.elements.first().map(|entry| entry.offset),
+        ];
+        let stateful = [
+            declarations.memories.first().map(|entry| entry.offset),
+            declarations.globals.first().map(|entry| entry.offset),
             declarations.data.first().map(|entry| entry.offset),
         ];
-        if let Some(offset) = unsupported.into_iter().flatten().min() {
+        let unsupported = always_unsupported.into_iter().chain(
+            stateful
+                .into_iter()
+                .filter(|_| profile == Profile::NumericOnly),
+        );
+        if let Some(offset) = unsupported.flatten().min() {
             return Err(error(offset, Fault::UnsupportedModule));
         }
         for entry in &declarations.types {
@@ -172,38 +277,44 @@ impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
         let mut functions = Vec::new();
         for entry in decoded.functions() {
             let signature = &declarations.types[entry.value.type_index as usize].value;
-            let prepared =
-                PreparedFunction::new(&entry.value, signature, entry.offset, &mut budget)?;
+            let prepared = PreparedFunction::new(&entry.value, signature, entry.offset, budget)?;
             append(&mut functions, prepared, entry.offset)?;
         }
         let mut exports = HashMap::new();
         for entry in &declarations.exports {
             budget.spend(entry.offset, 1 + entry.value.name.len())?;
             let ExportIndex::Function(index) = entry.value.target else {
-                unreachable!("validated module has only function exports in this profile");
+                continue;
             };
             exports
                 .try_reserve(1)
                 .map_err(|_| error(entry.offset, Fault::LimitExceeded))?;
             exports.insert(entry.value.name, index as usize);
         }
-        let instance = Self {
+        Ok(Self {
             module,
             functions,
             exports,
             limits,
-        };
-        if let Some(start) = &declarations.start {
-            machine::invoke(&instance, start.value as usize, &[], 0, cancellation)?;
-        }
-        Ok(instance)
+        })
     }
 
-    /// Invoke an exported function with a fresh execution budget.
-    pub fn invoke(
+    fn run_start(
+        &self,
+        state: &mut State<'bytes>,
+        cancellation: &CancellationToken,
+    ) -> Result<(), ExecutionError> {
+        if let Some(start) = &self.module.module().declarations().start {
+            machine::invoke(self, state, start.value as usize, &[], 0, cancellation)?;
+        }
+        Ok(())
+    }
+
+    fn invoke(
         &self,
         export: &str,
         arguments: &[Value],
+        state: &mut State<'bytes>,
         cancellation: &CancellationToken,
     ) -> Result<Vec<Value>, ExecutionError> {
         let entry_work = export.len();
@@ -217,7 +328,7 @@ impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
             .exports
             .get(export)
             .ok_or_else(|| error(0, Fault::UnknownExport))?;
-        machine::invoke(self, *function, arguments, entry_work, cancellation)
+        machine::invoke(self, state, *function, arguments, entry_work, cancellation)
     }
 
     fn block_arity(&self, block: BlockType) -> (usize, usize) {
@@ -288,7 +399,10 @@ impl<'a> PreparedFunction<'a> {
                         jumps[opener].end = pc;
                     }
                 }
-                Opcode::Core(0x00 | 0x01 | 0x0c..=0x10 | 0x12 | 0x1a..=0x1c | 0x20..=0x22) => {}
+                Opcode::Core(
+                    0x00 | 0x01 | 0x0c..=0x10 | 0x12 | 0x1a..=0x1c | 0x20..=0x24 | 0x28..=0x40,
+                )
+                | Opcode::Misc(8..=11) => {}
                 opcode if effect(opcode).is_some() => {}
                 _ => return Err(error(instruction.offset, Fault::UnsupportedInstruction)),
             }

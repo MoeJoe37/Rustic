@@ -1,8 +1,8 @@
 use rustic_base::CancellationToken;
 use rustic_wasm::{
-    BinaryLimits, DecodeLimits, ExecutionLimits, ExportIndex, InstructionLimits, NumericInstance,
-    Opcode, ValidatedModule, ValidationLimits, decode_instructions, decode_module, scan_module,
-    validate_module,
+    BinaryLimits, DecodeLimits, ExecutionLimits, ExportIndex, Instance, InstanceLimits,
+    InstructionLimits, Opcode, ValidatedModule, ValidationLimits, decode_instructions,
+    decode_module, scan_module, validate_module,
 };
 
 use crate::Target;
@@ -24,6 +24,8 @@ pub(crate) fn seeds() -> impl Iterator<Item = Vec<u8>> {
         b"\0asm\x01\0\0\0\x06\x0e\x02\x7f\0\x41\x05\x0b\x7f\0\x23\0\x41\x01\x6a\x0b",
         // An exported loop which exercises the interpreter's work limit.
         b"\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x03\x02\x01\0\x07\x07\x01\x03run\0\0\x0a\x09\x01\x07\0\x03\x40\x0c\0\x0b\x0b",
+        // An exported load reads bytes applied during instantiation.
+        b"\0asm\x01\0\0\0\x01\x05\x01\x60\0\x01\x7f\x03\x02\x01\0\x05\x03\x01\0\x01\x07\x07\x01\x03run\0\0\x0a\x09\x01\x07\0\x41\0\x2d\0\0\x0b\x0b\x07\x01\0\x41\0\x0b\x01*",
     ];
     modules
         .iter()
@@ -113,14 +115,17 @@ fn check_execution(
     token: &CancellationToken,
 ) -> Result<(), String> {
     let module = validated.module();
-    let limits = ExecutionLimits {
-        preparation_work: 16_384,
-        invocation_work: 512,
-        values: 256,
-        calls: 32,
-        control_frames: 64,
+    let limits = InstanceLimits {
+        execution: ExecutionLimits {
+            preparation_work: 2 * 65_536 + 16_384,
+            invocation_work: 512,
+            values: 256,
+            calls: 32,
+            control_frames: 64,
+        },
+        memory_bytes: 2 * 65_536,
     };
-    let instance = match NumericInstance::instantiate(validated, limits, token) {
+    let mut instance = match Instance::instantiate(validated, limits, token) {
         Ok(instance) => instance,
         Err(error) if error.offset <= input_len => return Ok(()),
         Err(error) => return Err(format!("instantiation error outside input: {error}")),

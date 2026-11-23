@@ -236,6 +236,9 @@ item and retains fixed-size storage. Iterator errors propagate, and a Number
 type error or term-limit error closes the iterator while preserving the original
 throw. [ECMAScript §21.3.2.34](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math.sumprecise)
 
+The native function and its property add 194 bytes to the charged standard
+library footprint per agent on 64-bit targets, from 128,428 to 128,622 bytes.
+
 The 10 pinned Test262 files for this method are part of the exact built-ins
 passing list. Run that selection alone with the pinned checkout above:
 

@@ -321,7 +321,7 @@ pub(super) fn captures(agent: &Agent, f: ObjectId) -> Box<[Value]> {
     }
 }
 
-fn set_capture(agent: &mut Agent, f: ObjectId, index: usize, value: Value) {
+pub(super) fn set_capture(agent: &mut Agent, f: ObjectId, index: usize, value: Value) {
     if let Some(Internal::Captures(c)) = agent.heap.object_mut(f).internal_mut() {
         c[index] = value;
     }
@@ -779,6 +779,11 @@ impl Agent {
                     return Ok(false);
                 }
                 *left -= 1;
+            }
+            // Native-only promise chains may never enter bytecode. Collect
+            // while the next job and all of its arguments are still queued.
+            if self.should_collect() {
+                self.collect_at_safe_point()?;
             }
             let job = self.vm.jobs.pop_front().expect("a queued job");
             self.vm.running_job = Some(job);

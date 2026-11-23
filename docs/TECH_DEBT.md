@@ -209,7 +209,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-140 | Bad | JS | Array destructuring assignment steps the iterator before evaluating a target and does not close it when the target reference throws (TD-100 paid the binding form only) | Open, M9 language and web APIs (`js.conformance`) |
 | TD-141 | Bad | JS | Class, function and direct-eval edge semantics: derived-constructor return override in `catch`/`finally`, inferred names for symbol keys, private names on non-extensible objects, `super` and private names inside direct eval in class bodies | Open, `js.conformance` (M9) |
 | TD-142 | Bad | JS | Built-in edge bugs: weak keys, the String Iterator tag, `Object.fromEntries`, `Object.prototype`'s prototype, array `length` order and buffer checks | Paid |
-| TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (`Array.fromAsync`, iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
+| TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
 | TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
@@ -2357,8 +2357,7 @@ proposal (TD-143).
 
 ### TD-143 — Recent-edition and stage 3 library features
 
-TD-89 covers proposal syntax. The library has no `Array.fromAsync` (95
-files), iterator chunking, joint iteration,
+TD-89 covers proposal syntax. The library has no iterator chunking, joint iteration,
 `includes` and `join` (about 170), immutable `ArrayBuffer` (43),
 `ShadowRealm` (60) or Temporal (4,614 built-in and 2,111 `intl402` files).
 None of these files are skipped: they fail and stay out of the passing
@@ -2374,6 +2373,10 @@ pinned built-ins selection. See [JS.md](JS.md#mathsumprecise-m9).
 `JSON.isRawJSON` are implemented. Two pinned `Uint8Array` cases remain with
 the immutable-buffer proposal because their fixtures call `transferToImmutable`.
 See [JS.md](JS.md#uint8array-and-json-data-interchange-m9).
+
+**Paid for `Array.fromAsync` (2026-11-23).** All 95 files pass in the
+pinned built-ins selection. See [JS.md](JS.md#arrayfromasync-m9) and
+[ADR 0070](adr/0070-native-promise-continuations.md).
 
 ### TD-144 — No proper tail calls
 

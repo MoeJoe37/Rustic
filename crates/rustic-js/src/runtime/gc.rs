@@ -461,6 +461,11 @@ impl Marker<'_> {
                 Some(Internal::Service { bound, .. }) => self.value(*bound),
                 Some(Internal::Locale(tag)) => self.value(Value::string(*tag)),
                 Some(Internal::ModuleEvaluation(graph)) => graph.trace(self),
+                Some(Internal::ArrayFromAsync(state)) => {
+                    for value in state.values() {
+                        self.value(value);
+                    }
+                }
                 Some(Internal::Captures(values)) => {
                     for &v in values.iter() {
                         self.value(v);
@@ -548,6 +553,7 @@ fn object_footprint(object: &Object) -> usize {
                         * (promise.fulfill_reactions.len() + promise.reject_reactions.len())
             }
             Some(Internal::ModuleEvaluation(graph)) => graph.footprint(),
+            Some(Internal::ArrayFromAsync(state)) => std::mem::size_of_val(state.as_ref()),
             Some(Internal::ImportRequest(request)) => request.footprint(),
             Some(Internal::Captures(values)) => 8 * values.len(),
             Some(Internal::HostIndexed(data)) => data.footprint(),

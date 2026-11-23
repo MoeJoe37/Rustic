@@ -77,6 +77,7 @@ instead of rewriting the history of a decision.
 | [0067](0067-mobile-devices-last.md) | Android and iOS device work moves to the final milestone M14; M8 is the desktop alpha, M13 desktop 1.0; mobile CI checks stay; external review recorded as an external dependency | Accepted scope update |
 | [0068](0068-gpu-process.md) | GPU process: frame compositing moves from the broker to a confined, stateless `rustic __gpu` child with crash/hang recovery and CPU fallback; hardware backends are a later record | Accepted (step 1) |
 | [0069](0069-long-lived-renderer.md) | One long-lived renderer per page driven by input and frame requests over IPC, broker-owned time, user scrolls through the page, bounded renderer replacement; `rustic drive` headless driver | Accepted (renderer side; window adoption with UI-01) |
+| [0070](0070-native-promise-continuations.md) | Traced native promise continuations and collection between jobs | Accepted for M9 `Array.fromAsync` |
 
 ## Records by area
 

@@ -140,10 +140,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,939 | 17,644 |
-| Fail | 488 | 1,217 |
+| Pass | 21,939 | 17,739 |
+| Fail | 488 | 1,122 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 97.8% | 93.5% |
+| Pass rate of the files that run | 97.8% | 94.1% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -276,6 +276,30 @@ bytes per 64-bit agent, bringing the standard library to 130,355 bytes.
 ```sh
 cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/Uint8Array
 cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/JSON
+```
+
+### Array.fromAsync (M9)
+
+`Array.fromAsync(items, mapper, thisArg)` returns a realm-intrinsic Promise. It
+prefers `Symbol.asyncIterator`, then adapts `Symbol.iterator`, then uses the
+array-like indexing path. Each step completes before the next pull. For a true
+async iterator it awaits the iterator result and passes the yielded value
+unchanged to the mapper or destination. Array-like values and values from sync
+iterators are awaited. A mapper's result is also awaited before storing it.
+Custom constructors receive zero arguments for iterable inputs or the length
+for array-like inputs. [ECMAScript §23.1.2.2](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.fromasync)
+
+Mapper and element-definition failures trigger asynchronous iterator cleanup.
+The original rejection survives a failed `return()`. The native state retains
+one outstanding await. The job queue checks the normal collection threshold
+between jobs, and each advance spends a native step. The built-in and its
+registration add 217 charged bytes to a fresh 64-bit agent. [ADR 0070](adr/0070-native-promise-continuations.md)
+
+All 95 pinned files for the method pass. They are part of the exact built-ins
+baseline. To run this directory on its own, use the pinned checkout above.
+
+```sh
+cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/Array/fromAsync
 ```
 
 ## Fuzzing

@@ -823,6 +823,49 @@ fn awaiting_async_functions_and_queued_jobs_survive_collection() {
 }
 
 #[test]
+fn array_from_async_keeps_the_original_error_during_close() {
+    let mut agent = agent();
+    agent
+        .evaluate(
+            "var release, log = '';
+         var neverUsed = { next() { return { done: false, value: 2 }; },
+           return() { log += 'close'; return new Promise((_, reject) => { release = reject; }); }
+         };
+         Array.fromAsync({[Symbol.asyncIterator]() { return neverUsed; }}, () => {
+           throw { text: 'original' };
+         }).catch(error => { log += ':' + error.text; });",
+        )
+        .unwrap();
+    agent.run_jobs().unwrap();
+    let closing = agent.evaluate("log").unwrap();
+    assert_eq!(agent.display(closing), "close");
+    agent.collect_garbage(Roots::default());
+    agent
+        .evaluate("release({text: 'replacement'}); neverUsed = release = null;")
+        .unwrap();
+    agent.collect_garbage(Roots::default());
+    agent.run_jobs().unwrap();
+    let result = agent.evaluate("log").unwrap();
+    assert_eq!(agent.display(result), "close:original");
+}
+
+#[test]
+fn array_from_async_native_jobs_reclaim_completed_awaits() {
+    let mut agent = Agent::with_heap_limit(2 * MIN_GC_THRESHOLD).unwrap();
+    agent
+        .evaluate("var result = Array.fromAsync({length: 30000});")
+        .unwrap();
+    let before = agent.heap.collections();
+    agent.run_jobs().unwrap();
+    assert!(agent.heap.collections() > before);
+    let promise = agent.evaluate("result").unwrap().as_object().unwrap();
+    assert_eq!(agent.promise_rejected(promise), Some(false));
+    let array = agent.promise_result(promise).unwrap().as_object().unwrap();
+    let length = key(&mut agent, "length");
+    assert_eq!(agent.get(array, length), Ok(Value::number(30000.0)));
+}
+
+#[test]
 fn async_generators_and_their_queues_survive_collection() {
     let mut a = agent();
     // The generator awaits a promise only `release` resolves; the

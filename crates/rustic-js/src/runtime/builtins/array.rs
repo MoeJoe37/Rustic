@@ -19,6 +19,9 @@ use crate::runtime::shape::PropertyKey;
 use crate::runtime::value::{ObjectId, StringId, Value};
 use crate::runtime::{ErrorKind, JsStr};
 
+mod from_async;
+pub(crate) use from_async::FromAsyncState;
+
 /// 2⁵³ − 1, the largest length an array-like may have.
 const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 /// 2³² − 1, the largest length of an Array exotic object.
@@ -26,6 +29,7 @@ const MAX_ARRAY_LENGTH: f64 = 4_294_967_295.0;
 
 const STATIC_METHODS: &[Method] = &[
     method("from", from, 1),
+    method("fromAsync", from_async::from_async, 1),
     method("isArray", is_array_method, 1),
     method("of", of, 0),
 ];

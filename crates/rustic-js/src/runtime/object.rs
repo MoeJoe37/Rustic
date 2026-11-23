@@ -303,6 +303,8 @@ impl IteratorKind {
 /// Internal slots the collector treats specially.
 #[derive(Clone, Debug)]
 pub(crate) enum Internal {
+    /// Native Array.fromAsync continuation retained by its promise handlers.
+    ArrayFromAsync(Box<super::builtins::FromAsyncState>),
     /// The brand of a frozen JSON.rawJSON wrapper.
     RawJson,
     /// Canonical Unicode locale identifier of an Intl.Locale.

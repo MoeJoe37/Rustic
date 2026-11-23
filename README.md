@@ -70,8 +70,9 @@ page cannot paint over, and out-of-process frames are composited in a
 confined GPU process that is replaced if it crashes, hangs or misbehaves,
 with the CPU compositor as fallback ([ADR 0068](docs/adr/0068-gpu-process.md),
 [ROADMAP §18](docs/ROADMAP.md#18-current-implementation-queue)).
-M9 JavaScript compatibility work includes [`Math.sumPrecise`](docs/JS.md#mathsumprecise-m9)
-and [binary and JSON data interchange](docs/JS.md#uint8array-and-json-data-interchange-m9).
+M9 JavaScript compatibility work includes [`Math.sumPrecise`](docs/JS.md#mathsumprecise-m9),
+[binary and JSON data interchange](docs/JS.md#uint8array-and-json-data-interchange-m9),
+and [`Array.fromAsync`](docs/JS.md#arrayfromasync-m9).
 **Android and iOS are deferred to the last milestone (M14)**, not dropped:
 they stay release platforms, every Android and iOS target is still
 compile-checked in CI and the Android isolated renderer service runs on an

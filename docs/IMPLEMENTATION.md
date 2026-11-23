@@ -16,6 +16,21 @@ which describes the current state in one place. What is next is in the
 [roadmap queue](ROADMAP.md#18-current-implementation-queue), and the measured
 status is the [progress summary](progress/summary.md).
 
+## M9 language — Array.fromAsync
+
+The built-in consumes async iterables, adapts sync iterables through Rustic's
+existing async-from-sync iterator and awaits indexed values for array-like
+inputs. It preserves custom constructors, mapper receivers, observable getter
+order and the distinction between an async iterator's result and its yielded
+value. Mapper and destination-write errors close iterators asynchronously and
+preserve the original rejection.
+
+The runtime traces one continuation and meters each advance. Native-only
+promise chains can collect between jobs at the normal heap threshold. Tests
+cover waiting across collection, closure rejection precedence and 30,000
+native awaits on a 2 MiB heap. All 95 pinned `Array.fromAsync` cases pass.
+See [JS.md](JS.md#arrayfromasync-m9) and [ADR 0070](adr/0070-native-promise-continuations.md).
+
 ## M9 language — Uint8Array and JSON data interchange
 
 The six `Uint8Array` base64 and hex methods share the typed-array buffer paths.

@@ -28,6 +28,8 @@ mod string_object;
 pub(crate) mod typed_array;
 mod uri;
 
+pub(crate) use array::FromAsyncState;
+
 use super::FLAG_NATIVE_CONSTRUCTOR;
 use super::agent::{Abrupt, Agent, JsResult, NativeFn};
 use super::object::{Class, Internal, IteratorKind, PropertyDescriptor};

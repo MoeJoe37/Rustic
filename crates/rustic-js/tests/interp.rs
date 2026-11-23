@@ -2495,6 +2495,30 @@ fn promises_and_async_functions() {
 }
 
 #[test]
+fn array_from_async_orders_pulls_mapping_and_awaits() {
+    let source = "var log = '', n = 0;
+      var p = Promise.resolve(4);
+      var source = { [Symbol.asyncIterator]() {
+        return { next() { log += 'n' + n; return {done: n++ === 1, value:p}; } };
+      } };
+      Array.fromAsync(source, (value, index) => {
+        log += 'm' + (value === p) + index;
+        return {then(resolve) { log += 't'; resolve(7); }};
+      }).then(result => { log += 'r' + result; }); log += 's';";
+    assert_eq!(run_with_jobs(source, "log"), "n0smtrue0tn1r7");
+}
+
+#[test]
+fn array_from_async_between_jobs_observes_the_native_budget() {
+    let mut agent = Agent::new().expect("agent");
+    agent
+        .evaluate("var pending = Array.fromAsync({length: 10000});")
+        .unwrap();
+    agent.set_step_budget(Some(2));
+    assert_eq!(agent.run_jobs(), Err(Abrupt::Cancelled));
+}
+
+#[test]
 fn async_generators_and_for_await() {
     let cases = [
         // Requests queue while the body runs and settle in order.

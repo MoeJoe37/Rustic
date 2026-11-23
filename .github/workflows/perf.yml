@@ -138,7 +138,7 @@ jobs:
             --json "perf-report/$SLUG.json" --output "perf-report/$SLUG.md" --enforce-budgets
       - name: Show the device report
         if: ${{ always() }}
-        run: cat perf-report/*.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: cat perf-report/*.md | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Retain the device report
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -173,7 +173,7 @@ jobs:
             exit 1
           fi
           python3 tools/cross_engine_bench.py --merge "${reports[@]}" --output perf-report.md
-          cat perf-report.md >> "$GITHUB_STEP_SUMMARY"
+          tee -a "$GITHUB_STEP_SUMMARY" < perf-report.md
           mkdir -p merged && cp perf-report.md "${reports[@]}" merged/
       - name: Retain the merged report
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

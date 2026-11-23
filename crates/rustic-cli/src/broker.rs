@@ -1213,13 +1213,8 @@ pub(crate) type Bubblewrapped = (
     RendererStderr,
 );
 
-/// Start `exe command` under bubblewrap and seccomp. A renderer
-/// (`network == false`) gets every namespace unshared and the renderer
-/// filter; the network process (ADR 0061, TD-176) keeps the network
-/// namespace, read-only trust-store directories and the network filter,
-/// which admits only Internet-family client sockets.
-#[cfg(not(windows))]
 /// Which child a bubblewrap sandbox confines (its seccomp filter and binds).
+#[cfg(not(windows))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Confinement {
     /// A renderer: no files beyond `/usr`, no sockets, no devices.
@@ -1232,6 +1227,8 @@ pub(crate) enum Confinement {
     Gpu,
 }
 
+/// Start `exe command` under bubblewrap with the selected child's filter and mounts.
+#[cfg(not(windows))]
 pub(crate) fn spawn_bubblewrap(
     exe: &Path,
     command_name: &str,
@@ -1484,16 +1481,18 @@ fn run_renderer(
     })();
     let _ = finished.send(());
     let _ = watchdog.join();
+    // A paused renderer can treat the automation timeout as end-of-input and
+    // send Done before the watchdog kills it. The expired deadline still wins.
+    if timed_out.load(Ordering::SeqCst) {
+        let _ = child.wait();
+        let _ = relay.join();
+        return Err(Ended::TimedOut(seconds));
+    }
     match result {
         Ok(finished) => {
             let _ = child.wait();
             let _ = relay.join();
             Ok(finished)
-        }
-        Err(IpcError::Closed) if timed_out.load(Ordering::SeqCst) => {
-            let _ = child.wait();
-            let _ = relay.join();
-            Err(Ended::TimedOut(seconds))
         }
         Err(IpcError::Closed) => {
             let status = child.wait();

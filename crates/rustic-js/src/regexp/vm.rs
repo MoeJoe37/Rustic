@@ -527,9 +527,7 @@ impl Compiler {
                 }
             }
         }
-        if max == MAX_COUNT
-            && let Some(&split) = splits.first()
-        {
+        if let (MAX_COUNT, Some(&split)) = (max, splits.first()) {
             self.emit(Inst::Jump { to: split });
         }
         let exit = self.here();

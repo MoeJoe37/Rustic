@@ -110,10 +110,15 @@ fn live_pages_answer_assistive_technology_and_ime_input() {
     );
     // "Joe", then "oe" selected and replaced by the composition.
     assert!(
-        trees[1].contains("  textbox \"Name\" value=\"JY\" focusable focused editable selection=2..2\n"),
+        trees[1].contains(
+            "  textbox \"Name\" value=\"JY\" focusable focused editable selection=2..2\n"
+        ),
         "{text}"
     );
-    assert!(trees[1].contains("  checkbox \"Agree\" focusable checked=true\n"), "{text}");
+    assert!(
+        trees[1].contains("  checkbox \"Agree\" focusable checked=true\n"),
+        "{text}"
+    );
     let missing = Command::new(env!("CARGO_BIN_EXE_rustic"))
         .args(["drive", "--input", "assist click Nobody", &path])
         .output()

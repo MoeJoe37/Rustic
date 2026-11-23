@@ -7,13 +7,17 @@
 //!
 //! A registration is a private array held by its node as a heap edge, so it
 //! lives exactly as long as the node, follows the node through adoption and
-//! keeps its observer alive. The observer keeps the list of its registrations
-//! (not their nodes), which `disconnect` marks dead; the node drops a dead
-//! registration the next time a mutation looks at it (TD-150).
+//! keeps its observer alive. The observer keeps weak references to its
+//! registrations, so a registration dies with its node and the observer's
+//! list is compacted as it grows. `disconnect` marks its registrations dead
+//! and removes each one from the node it was attached to; after an adoption
+//! moved that node, the node drops the dead registration the next time a
+//! mutation looks at it (TD-150, paid).
 //!
 //! [DOM §4.3]: https://dom.spec.whatwg.org/#mutation-observers
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 
 use rustic_dom::{DomString, MutationEntry, NodeId};
 use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, OutOfMemory, Value};
@@ -43,11 +47,18 @@ const REG_BITS: u32 = 1;
 const REG_FILTER: u32 = 2;
 const REG_SOURCE: u32 = 3;
 
-/// Observer slots: `[callback, record queue, registrations, creation serial]`.
+/// Observer slots: `[callback, record queue, weak references to the
+/// registrations, creation serial, live registrations at the last
+/// compaction]`.
 const STATE_CALLBACK: u32 = 0;
 const STATE_RECORDS: u32 = 1;
 const STATE_REGISTRATIONS: u32 = 2;
 const STATE_SERIAL: u32 = 3;
+const STATE_COMPACTED: u32 = 4;
+
+/// The weak registration list is compacted when it holds more than twice
+/// the registrations that were live at the last compaction, and this many.
+const COMPACT_MIN: u32 = 64;
 
 /// Storage slots, rooted for the page's lifetime.
 const STORE_PENDING: u32 = 0;
@@ -78,6 +89,11 @@ pub(super) struct Observers {
     queued: Cell<bool>,
     flushing: Cell<bool>,
     next_serial: Cell<u32>,
+    /// The node each live registration was attached to, for removing its
+    /// edge on `disconnect`. Entries whose node no longer holds the
+    /// registration are pruned as the map doubles.
+    nodes: RefCell<HashMap<Value, NodeId>>,
+    nodes_pruned_at: Cell<usize>,
 }
 
 impl Observers {
@@ -111,6 +127,8 @@ impl Observers {
             queued: Cell::new(false),
             flushing: Cell::new(false),
             next_serial: Cell::new(0),
+            nodes: RefCell::new(HashMap::new()),
+            nodes_pruned_at: Cell::new(0),
         })
     }
 
@@ -196,6 +214,7 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
                 records.value(),
                 registrations.value(),
                 Value::number(f64::from(serial)),
+                Value::number(0.0),
             ],
         )?;
         agent.weak_map_set(page.observers.states, observer, state.value())
@@ -230,6 +249,69 @@ fn values(agent: &mut Agent, array: PrivateArray) -> JsResult<Vec<Value>> {
         out.push(array.get(agent, index)?);
     }
     Ok(out)
+}
+
+/// The observer's registrations that are still alive, with the weak
+/// references that hold them in its list.
+fn owned(agent: &mut Agent, state: PrivateArray) -> JsResult<Vec<(Value, PrivateArray)>> {
+    let list = array_at(agent, state, STATE_REGISTRATIONS)?;
+    let mut out = Vec::new();
+    for weak in values(agent, list)? {
+        let target = weak
+            .as_object()
+            .map_or(Value::UNDEFINED, |id| agent.weak_ref_deref(id));
+        if let Some(registration) = PrivateArray::from_value(target) {
+            out.try_reserve(1).map_err(|_| OutOfMemory)?;
+            out.push((weak, registration));
+        }
+    }
+    Ok(out)
+}
+
+/// Replace the observer's list with `kept` weak references.
+fn set_owned(agent: &mut Agent, state: PrivateArray, kept: &[Value]) -> JsResult<()> {
+    let list = PrivateArray::new(agent, kept)?;
+    state.set(agent, STATE_REGISTRATIONS, list.value())?;
+    let live = u32::try_from(kept.len()).unwrap_or(u32::MAX);
+    state.set(agent, STATE_COMPACTED, Value::number(f64::from(live)))
+}
+
+/// Add a registration to the observer's weak list, compacting the list
+/// when collected registrations have made it grow (TD-150).
+fn push_owned(agent: &mut Agent, state: PrivateArray, registration: PrivateArray) -> JsResult<()> {
+    let weak = Value::object(agent.new_weak_ref(registration.value())?);
+    let list = array_at(agent, state, STATE_REGISTRATIONS)?;
+    push(agent, list, weak)?;
+    let len = list.len(agent)?;
+    let compacted = state
+        .get(agent, STATE_COMPACTED)?
+        .as_number()
+        .unwrap_or(0.0) as u32;
+    if len > COMPACT_MIN && len > compacted.saturating_mul(2) {
+        let live: Vec<Value> = owned(agent, state)?.into_iter().map(|(w, _)| w).collect();
+        set_owned(agent, state, &live)?;
+    }
+    Ok(())
+}
+
+/// Mark a registration dead and remove it from the node that holds it,
+/// when that node is still where it was attached.
+fn kill(
+    agent: &mut Agent,
+    page: &Page,
+    wrappers: &mut DomHeap,
+    registration: PrivateArray,
+) -> JsResult<()> {
+    registration.set(agent, REG_OBSERVER, Value::UNDEFINED)?;
+    if let Some(node) = page
+        .observers
+        .nodes
+        .borrow_mut()
+        .remove(&registration.value())
+    {
+        wrappers.remove_edge(node, registration.value());
+    }
+    Ok(())
 }
 
 fn bits(agent: &mut Agent, registration: PrivateArray) -> JsResult<u32> {
@@ -353,7 +435,6 @@ fn observe(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value
                 return agent.type_error("DOM bindings are busy");
             };
             let state = state(agent, page, receiver)?;
-            let owned = array_at(agent, state, STATE_REGISTRATIONS)?;
             // Step 7: an existing registration of this observer is updated
             // and its transient registrations are dropped.
             let mut existing = None;
@@ -367,17 +448,15 @@ fn observe(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value
             }
             if let Some(registration) = existing {
                 let mut kept = Vec::new();
-                for value in values(agent, owned)? {
-                    let other = PrivateArray::from_value(value).expect("owned registration");
+                for (weak, other) in owned(agent, state)? {
                     if other.get(agent, REG_SOURCE)? == registration.value() {
-                        other.set(agent, REG_OBSERVER, Value::UNDEFINED)?;
+                        kill(agent, page, &mut wrappers, other)?;
                     } else {
                         kept.try_reserve(1).map_err(|_| OutOfMemory)?;
-                        kept.push(value);
+                        kept.push(weak);
                     }
                 }
-                let list = PrivateArray::new(agent, &kept)?;
-                state.set(agent, STATE_REGISTRATIONS, list.value())?;
+                set_owned(agent, state, &kept)?;
                 registration.set(agent, REG_BITS, Value::number(f64::from(options.bits)))?;
                 registration.set(agent, REG_FILTER, filter)?;
                 return Ok(Value::UNDEFINED);
@@ -393,7 +472,7 @@ fn observe(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value
                 ],
             )?;
             hold(agent, page, &mut wrappers, node, registration)?;
-            push(agent, owned, registration.value())?;
+            push_owned(agent, state, registration)?;
             Ok(Value::UNDEFINED)
         })
     })
@@ -416,7 +495,17 @@ fn hold(
         wrappers
             .add_edge(document, node, registration.value())
             .map_err(|error| edge_error(agent, error))
-    })
+    })?;
+    let mut nodes = page.observers.nodes.borrow_mut();
+    nodes.try_reserve(1).map_err(|_| OutOfMemory)?;
+    nodes.insert(registration.value(), node);
+    // Forget registrations whose node collected or moved them away.
+    let pruned = page.observers.nodes_pruned_at.get();
+    if nodes.len() > 64 && nodes.len() > pruned.saturating_mul(2) {
+        nodes.retain(|&value, &mut node| wrappers.edges(node).contains(&value));
+        page.observers.nodes_pruned_at.set(nodes.len());
+    }
+    Ok(())
 }
 
 fn edge_error(agent: &mut Agent, error: DomGcError) -> Abrupt {
@@ -458,14 +547,15 @@ fn live_registration(
 fn disconnect(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
     with_page(agent, |agent, page| {
         let state = state(agent, page, receiver)?;
-        let owned = array_at(agent, state, STATE_REGISTRATIONS)?;
-        for value in values(agent, owned)? {
+        let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
+            return agent.type_error("DOM bindings are busy");
+        };
+        for (_, registration) in owned(agent, state)? {
             agent.check_native_work()?;
-            let registration = PrivateArray::from_value(value).expect("owned registration");
-            registration.set(agent, REG_OBSERVER, Value::UNDEFINED)?;
+            kill(agent, page, &mut wrappers, registration)?;
         }
-        let registrations = PrivateArray::new(agent, &[])?;
-        state.set(agent, STATE_REGISTRATIONS, registrations.value())?;
+        drop(wrappers);
+        set_owned(agent, state, &[])?;
         let records = PrivateArray::new(agent, &[])?;
         state.set(agent, STATE_RECORDS, records.value())?;
         Ok(Value::UNDEFINED)
@@ -714,9 +804,8 @@ fn add_transients(
             let transient = PrivateArray::new(agent, &[observer, bits, filter, source.value()])?;
             with_root(agent, transient.value(), |agent| {
                 let state = state(agent, page, observer)?;
-                let owned = array_at(agent, state, STATE_REGISTRATIONS)?;
-                push(agent, owned, transient.value())?;
-                hold(agent, page, wrappers, node, transient)
+                hold(agent, page, wrappers, node, transient)?;
+                push_owned(agent, state, transient)
             })?;
         }
     }
@@ -862,7 +951,7 @@ fn notify(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
             let (callback, records) = with_page(agent, |agent, page| {
                 let state = state(agent, page, observer)?;
                 let records = take_queue(agent, state)?;
-                drop_transients(agent, state)?;
+                drop_transients(agent, page, state)?;
                 Ok((state.get(agent, STATE_CALLBACK)?, records))
             })?;
             let records = Value::object(records);
@@ -887,24 +976,29 @@ fn notify(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
     })
 }
 
-/// Mark this observer's transient registrations dead and forget them.
-fn drop_transients(agent: &mut Agent, state: PrivateArray) -> JsResult<()> {
-    let owned = array_at(agent, state, STATE_REGISTRATIONS)?;
+/// Mark this observer's transient registrations dead, remove them from
+/// their nodes and forget them.
+fn drop_transients(agent: &mut Agent, page: &Page, state: PrivateArray) -> JsResult<()> {
     let mut kept = Vec::new();
-    let mut changed = false;
-    for value in values(agent, owned)? {
-        let registration = PrivateArray::from_value(value).expect("owned registration");
+    let mut transients = Vec::new();
+    for (weak, registration) in owned(agent, state)? {
         if registration.get(agent, REG_SOURCE)? != Value::UNDEFINED {
-            registration.set(agent, REG_OBSERVER, Value::UNDEFINED)?;
-            changed = true;
+            transients.try_reserve(1).map_err(|_| OutOfMemory)?;
+            transients.push(registration);
         } else {
             kept.try_reserve(1).map_err(|_| OutOfMemory)?;
-            kept.push(value);
+            kept.push(weak);
         }
     }
-    if changed {
-        let list = PrivateArray::new(agent, &kept)?;
-        state.set(agent, STATE_REGISTRATIONS, list.value())?;
+    if !transients.is_empty() {
+        let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
+            return agent.type_error("DOM bindings are busy");
+        };
+        for registration in transients {
+            kill(agent, page, &mut wrappers, registration)?;
+        }
+        drop(wrappers);
+        set_owned(agent, state, &kept)?;
     }
     Ok(())
 }

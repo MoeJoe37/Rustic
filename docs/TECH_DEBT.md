@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-111, TD-116, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-111, TD-116, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-182, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -216,7 +216,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
 | TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Paid |
 | TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, M9 CSS, layout and paint |
-| TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
+| TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Paid |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M7 browser shell (DevTools) |
 | TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled (their compilation must apply CSP `script-src-attr`, see TD-164), body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
@@ -2466,7 +2466,7 @@ with WPT `getComputedStyle-pseudo*` cases.
 
 **Rescheduled 2026-11-19 (M5 completion review):** Pseudo-element styles need generated-box styles in the layout snapshot; moved to the M6 entry row, matching its own trigger (before M6 loads server pages).
 
-### TD-150 — Dead mutation-observer registrations are dropped lazily
+### TD-150 — Dead mutation-observer registrations are dropped lazily (Paid)
 
 A registration is an edge held by its node ([ADR 0047](adr/0047-mutation-observers.md)).
 `disconnect()` and the end of a transient registration mark the record dead
@@ -2483,6 +2483,8 @@ during `disconnect` when the node is still reachable.
 **Trigger:** M7 entry, or a heap report that shows observer records
 dominating a page.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): an observer now holds *weak* references to its registrations, so a registration dies with the node that holds it, and the observer's list is compacted when it holds more than twice the registrations live at the last compaction. `disconnect`, re-observing a node and the end of a transient registration remove the registration's edge from the node it was attached to (a side map from registration to node, pruned as it doubles), instead of leaving it for the next mutation. A node that was adopted after it was observed has a new ID, so its dead edge is still dropped lazily, when the next mutation walks it or the node is collected. Test: `observing_many_short_lived_nodes_does_not_retain_their_registrations` in `crates/rustic-bindings/tests/mutation_observer.rs` (3,000 dead nodes: the old list grew by 408 KB, now under 64 KiB); the Window WPT selection is unchanged at 387/462.
 
 ### TD-151 — Mutation records for parser and host edits resolve observers when drained
 

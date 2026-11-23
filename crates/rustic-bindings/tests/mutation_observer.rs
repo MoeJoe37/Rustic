@@ -361,3 +361,42 @@ fn queue_microtask_runs_in_order_and_reports_exceptions() {
     );
     assert_eq!(page::take_listener_error_count(&agent), 1);
 }
+
+#[test]
+fn observing_many_short_lived_nodes_does_not_retain_their_registrations() {
+    // TD-150: an observer that observes nodes which then die keeps weak
+    // references only, compacted as the list grows, so its footprint does
+    // not grow with every node it ever observed.
+    let (mut agent, _tree) = page();
+    agent
+        .evaluate(
+            "globalThis.observer = new MutationObserver(() => {});
+             globalThis.churn = (n) => {
+                 for (let i = 0; i < n; i++) {
+                     observer.observe(document.createElement('p'), { attributes: true });
+                 }
+             };
+             churn(100);",
+        )
+        .unwrap();
+    let after_warmup = agent.heap.bytes_used();
+    agent.evaluate("churn(3000)").unwrap();
+    let after_churn = agent.heap.bytes_used();
+    let growth = after_churn.saturating_sub(after_warmup);
+    assert!(
+        growth < 64 * 1024,
+        "observer state grew by {growth} bytes for 3,000 dead nodes"
+    );
+    // Disconnecting still stops delivery for a node that is alive.
+    run(
+        &mut agent,
+        "globalThis.log = [];
+         const kept = document.createElement('div');
+         document.body.appendChild(kept);
+         const seen = new MutationObserver(() => log.push('seen'));
+         seen.observe(kept, { attributes: true });
+         seen.disconnect();
+         kept.setAttribute('a', '1');",
+        "if (log.length !== 0) throw 'delivered after disconnect';",
+    );
+}

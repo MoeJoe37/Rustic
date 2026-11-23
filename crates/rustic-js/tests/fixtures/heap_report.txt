@@ -2,10 +2,10 @@
 # Regenerate with RUSTIC_HEAP_REPORT_BLESS=1; explain any line that grows.
 empty object: 72
 object with four properties: 104
-dense array of 1,000 small numbers: 8074
-Latin-1 string of 1,000 characters: 1025
-UTF-16 string of 1,000 characters: 2025
-concatenation of two 500-character strings: 1025
+dense array of 1,000 small numbers: 8072
+Latin-1 string of 1,000 characters: 1024
+UTF-16 string of 1,000 characters: 2024
+concatenation of two 500-character strings: 1024
 closure capturing nothing: 120
 closure capturing one variable: 184
 symbol: 12

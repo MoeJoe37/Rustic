@@ -29,7 +29,7 @@ pub(crate) mod typed_array;
 mod uri;
 
 use super::FLAG_NATIVE_CONSTRUCTOR;
-use super::agent::{Agent, JsResult, NativeFn};
+use super::agent::{Abrupt, Agent, JsResult, NativeFn};
 use super::object::{Class, Internal, IteratorKind, PropertyDescriptor};
 use super::shape::PropertyKey;
 use super::string::JsStr;
@@ -303,13 +303,14 @@ pub(crate) fn iterate(
                 }
                 return Ok(());
             }
-            Err(error) => {
+            Err(error @ Abrupt::Throw(_)) => {
                 let key = PropertyKey::String(agent.names.return_);
                 if let Ok(Some(close)) = agent.get_method(iterator, key) {
                     let _ = agent.call(close, iterator, &[]);
                 }
                 return Err(error);
             }
+            Err(error) => return Err(error),
         }
     }
 }

@@ -4,8 +4,10 @@
 //! `f64`, which the specification allows to be approximate; results on
 //! different platforms may differ in the last bit.
 
-use super::{Method, arg, install_methods, method};
-use crate::runtime::agent::{Agent, JsResult};
+mod exact_sum;
+
+use super::{Method, arg, install_methods, iterate, method};
+use crate::runtime::agent::{Agent, ErrorKind, JsResult};
 use crate::runtime::number::to_uint32;
 use crate::runtime::object::PropertyDescriptor;
 use crate::runtime::shape::PropertyKey;
@@ -91,6 +93,7 @@ const FUNCTIONS: &[Method] = &[
     method("sin", sin, 1),
     method("sinh", sinh, 1),
     method("sqrt", sqrt, 1),
+    method("sumPrecise", sum_precise, 1),
     method("tan", tan, 1),
     method("tanh", tanh, 1),
     method("trunc", trunc, 1),
@@ -189,6 +192,46 @@ fn hypot(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     }
     let sum: f64 = values.iter().map(|v| (v / largest) * (v / largest)).sum();
     Ok(Value::number(largest * sum.sqrt()))
+}
+
+/// `Math.sumPrecise` (§21.3.2.34).
+fn sum_precise(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let items = agent.require_object_coercible(arg(args, 0))?;
+    let key = PropertyKey::Symbol(agent.symbols.iterator);
+    let Some(method) = agent.get_method(items, key)? else {
+        return agent.type_error("Math.sumPrecise requires an iterable");
+    };
+    let mut count = 0;
+    let mut sum = exact_sum::ExactSum::new();
+    let mut non_finite = 0.0_f64;
+    let mut all_negative_zero = true;
+    iterate(agent, items, method, |agent, value| {
+        agent.check_native_work()?;
+        if count == exact_sum::MAX_TERMS {
+            return Err(agent.throw(ErrorKind::RangeError, "Math.sumPrecise has too many values"));
+        }
+        count += 1;
+        let Some(number) = value.as_number() else {
+            return agent.type_error("Math.sumPrecise requires Number values");
+        };
+        // Keep iterating even after a non-finite input. The remaining iterator
+        // steps and type checks are observable.
+        if !number.is_finite() {
+            non_finite += number;
+        } else if non_finite.is_finite() && number.to_bits() != (-0.0_f64).to_bits() {
+            all_negative_zero = false;
+            sum.add(number);
+        }
+        Ok(true)
+    })?;
+    let result = if !non_finite.is_finite() {
+        non_finite
+    } else if all_negative_zero {
+        -0.0
+    } else {
+        sum.finish()
+    };
+    Ok(Value::number(result))
 }
 
 /// `Math.max` and `Math.min` (§21.3.2.24, §21.3.2.25): NaN wins, and

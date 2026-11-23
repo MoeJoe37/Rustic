@@ -28,8 +28,8 @@ on by default on Linux, Windows and macOS, a confined network process and
 crash recovery ([§10](#10-m7--isolation-and-security-gate)). **M8 desktop
 alpha is the current milestone**: compositor scenes and scrolling (UI-05) and
 a Linux desktop window (UI-02) are done, and frames are composited in a
-confined GPU process ([ADR 0068](adr/0068-gpu-process.md)); M9–M13 are
-unstarted. **Android and iOS device work is deferred to the last
+confined GPU process ([ADR 0068](adr/0068-gpu-process.md)). M9 language
+compatibility work has started alongside M8. **Android and iOS device work is deferred to the last
 milestone, M14** ([ADR 0067](adr/0067-mobile-devices-last.md),
 [§17](#17-m14--mobile-devices-and-five-platform-10)): the platforms stay
 release targets, and their compile checks and the Android emulator job stay
@@ -741,7 +741,7 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 | --- | --- | --- |
 | CSS/layout | Full flex/grid/tables; writing modes; fragmentation/printing; container queries; animations/transforms/effects | WPT reftests plus incremental/full-layout parity |
 | Document formats | SVG parsing/DOM/painting, MathML layout, XML where supported | Separate format conformance and hostile-input corpora |
-| Language | Remaining ECMAScript semantics and built-ins, RegExp/Intl; optimization after correctness | Test262 full-selection reporting; GC/stack stress |
+| Language | Remaining ECMAScript semantics and built-ins, RegExp/Intl; `Math.sumPrecise` implemented ([JS.md](JS.md#mathsumprecise-m9)) | Test262 full-selection reporting; GC/stack stress |
 | Platform APIs | Streams, workers, structured clone, messaging, URL APIs, encoding, observers | Agent/task/cross-origin tests |
 | Offline/data | IndexedDB, Cache API, service workers and update/lifetime rules | Transaction/crash-recovery and partition tests |
 | Graphics/media | Canvas 2D and OffscreenCanvas; audio/video, WebGL, WebGPU and WebRTC are M11 parity work | Rendering corpora, canvas WPT and sandbox review |
@@ -965,6 +965,7 @@ in the milestone sections above.
 | 2 | TD-182: long-lived renderer per page | Input routed to the page, scene frames over IPC, scripts running between frames (`platform.linux` step 2) | Done 2026-11-23 ([ADR 0069](adr/0069-long-lived-renderer.md): `broker::live`, `rustic drive`); `rustic view` adopts it with the UI-01 shell |
 | 3 | UI-05: desktop GPU backends (`compositor.backend`, ADR first) | Direct3D 12, Metal and Vulkan adapters inside the GPU process with CPU fallback and parity fixtures | Next after row 2 |
 | 4 | UI-02: Windows and macOS windows (`platform.windows`, `platform.macos`) | The Linux `rustic view` window on Windows and macOS, native x64 and ARM64 | After row 2 |
+| parallel | M9 language: `Math.sumPrecise` (TD-143) | ECMAScript §21.3.2.34, pinned Test262 Math cases, focused rounding, iterator and budget tests | Done for this built-in. The [M9 language gate](#12-m9--compatibility-expansion-program) remains open |
 | — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |
 | — | External security review (`security.brave`, external dependency) | Outside reviewers return findings on the [packet](reviews/2026-11-22-m7-external-review-packet.md); findings fixed or recorded | Waiting for reviewers; due before the M10 beta |
 | — | Android and iOS devices | M14 ([§17](#17-m14--mobile-devices-and-five-platform-10)) | Deferred by ADR 0067; compile checks and the Android emulator job stay in CI |

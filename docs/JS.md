@@ -140,8 +140,8 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,939 | 17,545 |
-| Fail | 488 | 1,246 |
+| Pass | 21,939 | 17,555 |
+| Fail | 488 | 1,236 |
 | Skipped (modules, proposals) | 1,405 | 111 |
 | Pass rate of the files that run | 97.8% | 93.4% |
 
@@ -220,6 +220,28 @@ and preserves completion values and thrown objects. Its global declaration
 tests cover lexical collisions, non-configurable properties, function
 replacement and atomic rejection before any bindings are installed (§16.1.7).
 Realm creation, explicit collection and test agents remain in TD-105.
+
+### Math.sumPrecise (M9)
+
+`Math.sumPrecise(items)` reads a synchronous iterable using its `Symbol.iterator`
+method and checks each item is a Number without coercion. It keeps reading after
+NaN and infinity so later iterator effects and errors remain observable. Empty
+input and all-negative-zero input return `-0`. Cancellation of finite values
+returns `+0`.
+
+The accumulator adds finite values exactly in units of `2^-1074` and then rounds
+the signed result once to nearest, ties to even. Two 34-word magnitudes fit every
+sum allowed by the `2^53 - 1` term limit. The loop charges one native step per
+item and retains fixed-size storage. Iterator errors propagate, and a Number
+type error or term-limit error closes the iterator while preserving the original
+throw. [ECMAScript §21.3.2.34](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math.sumprecise)
+
+The 10 pinned Test262 files for this method are part of the exact built-ins
+passing list. Run that selection alone with the pinned checkout above:
+
+```sh
+cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/Math/sumPrecise
+```
 
 ## Fuzzing
 

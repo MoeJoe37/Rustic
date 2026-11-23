@@ -16,7 +16,7 @@ Android and iOS hosts, on-device rendering, input and runtime validation are
 still planned; a first desktop window host exists (`rustic view`). See
 [platform support](docs/PLATFORMS.md) and the [mobile plan](docs/MOBILE.md).
 
-**Current stage: M7 isolation and security.** M1–M6 are complete
+**Current stage: M8 desktop alpha.** M1–M7 are complete
 for their declared scope. Rustic's own pipeline turns a local HTML file into a PNG
 through parsing, the CSS cascade, block/inline/flex layout, OpenType text,
 image decoding and a CPU rasterizer, with resize/zoom and hit testing. M4
@@ -70,6 +70,8 @@ page cannot paint over, and out-of-process frames are composited in a
 confined GPU process that is replaced if it crashes, hangs or misbehaves,
 with the CPU compositor as fallback ([ADR 0068](docs/adr/0068-gpu-process.md),
 [ROADMAP §18](docs/ROADMAP.md#18-current-implementation-queue)).
+M9 compatibility work has started with the JavaScript built-in
+[`Math.sumPrecise`](docs/JS.md#mathsumprecise-m9).
 **Android and iOS are deferred to the last milestone (M14)**, not dropped:
 they stay release platforms, every Android and iOS target is still
 compile-checked in CI and the Android isolated renderer service runs on an

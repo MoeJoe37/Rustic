@@ -1,6 +1,6 @@
 # Test262 test/built-ins files that pass when executed (JS-05).
 # Revision: 48221d7c1f7745dc13e420a2e850a248c0b2afb4 of https://github.com/tc39/test262
-# 17545 pass, 1246 fail, 111 skipped (modules, proposals).
+# 17555 pass, 1236 fail, 111 skipped (modules, proposals).
 # Regenerate with RUSTIC_TEST262_BLESS=1; see docs/JS.md.
 AggregateError/cause-property.js
 AggregateError/errors-iterabletolist-failures.js
@@ -6743,6 +6743,16 @@ Math/sqrt/name.js
 Math/sqrt/not-a-constructor.js
 Math/sqrt/prop-desc.js
 Math/sqrt/results.js
+Math/sumPrecise/length.js
+Math/sumPrecise/name.js
+Math/sumPrecise/not-a-constructor.js
+Math/sumPrecise/prop-desc.js
+Math/sumPrecise/sum-is-NaN.js
+Math/sumPrecise/sum-is-infinite.js
+Math/sumPrecise/sum-is-minus-zero.js
+Math/sumPrecise/sum.js
+Math/sumPrecise/takes-iterable.js
+Math/sumPrecise/throws-on-non-number.js
 Math/tan/S15.8.2.18_A1.js
 Math/tan/S15.8.2.18_A2.js
 Math/tan/S15.8.2.18_A3.js

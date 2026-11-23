@@ -16,6 +16,19 @@ which describes the current state in one place. What is next is in the
 [roadmap queue](ROADMAP.md#18-current-implementation-queue), and the measured
 status is the [progress summary](progress/summary.md).
 
+## M9 language — Math.sumPrecise
+
+The JavaScript runtime sums any synchronous iterable of Numbers with one final
+binary64 rounding. It preserves signed zero, handles infinities and NaN, and
+closes the iterator when an item fails the Number check or the ECMAScript
+term limit is exceeded. Each item spends a step from the agent budget. The
+accumulator uses fixed storage independent of iterable length.
+
+The pinned Test262 selection checks the built-in and its property descriptors.
+The `sum_precise` tests in `rustic-js/tests/interp.rs` also cover ties, overflow,
+subnormal cancellation, iterator error ordering and the exact step boundary.
+See [JS.md](JS.md#mathsumprecise-m9) for the contract and reproduction command.
+
 <details>
 <summary>Foundation, URL, HTML and DOM (M1): 18 sections</summary>
 

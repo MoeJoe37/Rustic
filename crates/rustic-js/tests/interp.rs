@@ -1755,6 +1755,86 @@ fn dates_follow_the_embedder_clock_and_offset() {
 }
 
 #[test]
+fn sum_precise_rounds_once_and_preserves_zero_sign() {
+    let _report = Report;
+    check("Math.sumPrecise([1e308, 1e308, 1, -1e308, -1e308])", "1");
+    check(
+        "Math.sumPrecise([Number.MAX_VALUE, -Number.MIN_VALUE, -Number.MAX_VALUE]) === -Number.MIN_VALUE",
+        "true",
+    );
+    check("Math.sumPrecise([1, 2 ** -53]) === 1", "true");
+    check(
+        "Math.sumPrecise([1, 2 ** -53, Number.MIN_VALUE]) === 1 + Number.EPSILON",
+        "true",
+    );
+    check(
+        "Math.sumPrecise([1 + Number.EPSILON, 2 ** -53]) === 1 + 2 * Number.EPSILON",
+        "true",
+    );
+    check(
+        "Math.sumPrecise([Number.MAX_VALUE, 2 ** 970]) === Infinity",
+        "true",
+    );
+    check(
+        "Math.sumPrecise([Number.MAX_VALUE, 2 ** 970, -Number.MIN_VALUE]) === Number.MAX_VALUE",
+        "true",
+    );
+    check("Object.is(Math.sumPrecise([]), -0)", "true");
+    check("Object.is(Math.sumPrecise([-0, +0]), +0)", "true");
+    check("Object.is(Math.sumPrecise([-1, 1]), +0)", "true");
+}
+
+#[test]
+fn sum_precise_keeps_iterating_and_closes_only_on_its_own_throw() {
+    let _report = Report;
+    check(
+        "let closed = 0; let coerced = 0; function* items() { try { yield NaN;
+           yield { valueOf() { coerced++; return 3; } }; yield 5;
+         } finally { closed++; throw 'return must not replace the error'; } }
+         try { Math.sumPrecise(items()); } catch (error) { [error.name, closed, coerced].join(','); }",
+        "TypeError,1,0",
+    );
+    check(
+        "let closed = 0; let iterable = { [Symbol.iterator]() { return {
+           next() { return { done: false, get value() { throw 'value lookup'; } }; },
+           return() { closed++; return {}; }
+         }; } }; try { Math.sumPrecise(iterable); } catch (error) { error + ',' + closed; }",
+        "value lookup,0",
+    );
+    check(
+        "Number.prototype[Symbol.iterator] = function* () { yield 2; }; Math.sumPrecise(10)",
+        "2",
+    );
+}
+
+#[test]
+fn sum_precise_charges_each_term_to_the_step_budget() {
+    let mut agent = Agent::new().expect("agent");
+    let function = agent.evaluate("Math.sumPrecise").expect("builtin");
+    let items = agent
+        .evaluate(
+            "let closeLookups = 0;
+             let proto = Object.getPrototypeOf([][Symbol.iterator]());
+             Object.defineProperty(proto, 'return', { get() { closeLookups++; } });
+             [1, 2, 3]",
+        )
+        .expect("items");
+    agent.set_step_budget(Some(3));
+    assert_eq!(
+        agent.call_from_host(function, Value::UNDEFINED, &[items]),
+        Ok(Value::number(6.0))
+    );
+    assert_eq!(agent.step_budget(), Some(0));
+    agent.set_step_budget(Some(2));
+    assert_eq!(
+        agent.call_from_host(function, Value::UNDEFINED, &[items]),
+        Err(Abrupt::Cancelled)
+    );
+    agent.set_step_budget(None);
+    assert_eq!(run_in(&mut agent, "closeLookups"), "0");
+}
+
+#[test]
 fn arrays_math_symbols_and_dynamic_functions() {
     let _report = Report;
     // Array: callbacks, holes, sorting, copying and species.

@@ -1,6 +1,9 @@
 //! The matcher: patterns compiled to a small instruction list and run by
 //! a backtracking machine with explicit stacks, so neither the pattern
 //! nor the input can exhaust the Rust stack, and every step is counted.
+//! Patterns without backreferences or lookarounds also get a second
+//! program for the linear-time matcher in `pike.rs`, which takes over
+//! when a search backtracks too much (TD-111).
 
 use super::case::{canonicalize, close};
 use super::class::CharSet;
@@ -18,7 +21,7 @@ const MAX_BACKTRACK: usize = 1 << 22;
 const POLL_INTERVAL: u32 = 1 << 14;
 
 #[derive(Clone, Copy, Debug)]
-enum Inst {
+pub(super) enum Inst {
     /// One character equal to `c`.
     Char {
         c: u32,
@@ -106,18 +109,37 @@ enum Inst {
         exit: u32,
     },
     Match,
+    /// Linear-time programs only: `regs[from..to] = UNSET` (the
+    /// captures inside a repetition, at the start of each iteration).
+    Clear {
+        from: u32,
+        to: u32,
+    },
+    /// Linear-time programs only: fail if the iteration that started
+    /// when `regs[reg]` was saved matched the empty string.
+    Progress {
+        reg: u32,
+    },
 }
 
 /// A compiled pattern.
 #[derive(Debug)]
 pub(crate) struct Program {
-    insts: Vec<Inst>,
-    sets: Vec<CharSet>,
+    pub(super) insts: Vec<Inst>,
+    pub(super) sets: Vec<CharSet>,
     refs: Vec<Vec<u32>>,
     /// Registers: two per capture (group 0 first), then loop state.
     pub registers: u32,
-    unicode: bool,
+    pub(super) unicode: bool,
 }
+
+/// Instructions a linear-time program may have: repetitions are unrolled
+/// there, so a large counted repetition is left to the backtracker alone.
+const PIKE_MAX_INSTS: usize = 1 << 15;
+
+/// Thread state a linear-time program may need (instructions times
+/// registers, in `u32`s per thread list).
+const PIKE_MAX_STATE: usize = 1 << 21;
 
 struct Compiler {
     insts: Vec<Inst>,
@@ -125,28 +147,99 @@ struct Compiler {
     refs: Vec<Vec<u32>>,
     next_reg: u32,
     unicode: bool,
+    /// Compiling for the linear-time matcher: repetitions unrolled.
+    pike: bool,
+    /// Repetitions open around the current node (linear-time programs).
+    depth: u32,
+    max_depth: u32,
+    /// The linear-time program grew past [`PIKE_MAX_INSTS`].
+    too_big: bool,
+}
+
+impl Compiler {
+    fn new(groups: u32, flags: Flags, pike: bool) -> Compiler {
+        Compiler {
+            insts: Vec::new(),
+            sets: Vec::new(),
+            refs: Vec::new(),
+            next_reg: 2 * (groups + 1),
+            unicode: flags.unicode || flags.sets,
+            pike,
+            depth: 0,
+            max_depth: 0,
+            too_big: false,
+        }
+    }
+
+    fn finish(mut self, node: &Node, flags: Flags) -> Program {
+        self.emit(Inst::Save { reg: 0 });
+        self.node(node, flags, false);
+        self.emit(Inst::Save { reg: 1 });
+        self.emit(Inst::Match);
+        Program {
+            insts: self.insts,
+            sets: self.sets,
+            refs: self.refs,
+            registers: self.next_reg + self.max_depth,
+            unicode: self.unicode,
+        }
+    }
 }
 
 /// Compile `node` (with `groups` capturing groups) under `flags`.
 pub(crate) fn compile(node: &Node, groups: u32, flags: Flags) -> Program {
-    let mut c = Compiler {
-        insts: Vec::new(),
-        sets: Vec::new(),
-        refs: Vec::new(),
-        next_reg: 2 * (groups + 1),
-        unicode: flags.unicode || flags.sets,
-    };
+    Compiler::new(groups, flags, false).finish(node, flags)
+}
+
+/// Compile `node` for the linear-time matcher: `None` when it has a
+/// backreference or a lookaround, which that matcher cannot run, or
+/// unrolls past the size limits.
+pub(crate) fn compile_pike(node: &Node, groups: u32, flags: Flags) -> Option<Program> {
+    if !linear(node) {
+        return None;
+    }
+    let mut c = Compiler::new(groups, flags, true);
     c.emit(Inst::Save { reg: 0 });
     c.node(node, flags, false);
     c.emit(Inst::Save { reg: 1 });
     c.emit(Inst::Match);
-    Program {
+    let registers = c.next_reg + c.max_depth;
+    if c.too_big
+        || c.insts.len() > PIKE_MAX_INSTS
+        || c.insts.len() * registers as usize > PIKE_MAX_STATE
+    {
+        return None;
+    }
+    Some(Program {
         insts: c.insts,
         sets: c.sets,
         refs: c.refs,
-        registers: c.next_reg,
+        registers,
         unicode: c.unicode,
+    })
+}
+
+/// Whether `node` has no backreference or lookaround.
+fn linear(node: &Node) -> bool {
+    let mut stack = vec![node];
+    while let Some(node) = stack.pop() {
+        match node {
+            Node::Look { .. } | Node::BackRef(_) | Node::NamedRef(_) => return false,
+            Node::Capture(inner, _)
+            | Node::Repeat { node: inner, .. }
+            | Node::Modified { node: inner, .. } => stack.push(inner),
+            Node::Concat(nodes) | Node::Alt(nodes) => stack.extend(nodes),
+            Node::Empty
+            | Node::Char(_)
+            | Node::Any
+            | Node::Class(_)
+            | Node::StringClass(..)
+            | Node::Start
+            | Node::End
+            | Node::WordBoundary(_) => {}
+        }
     }
+    true
 }
 
 impl Compiler {
@@ -328,6 +421,10 @@ impl Compiler {
         if max == 0 {
             return;
         }
+        if self.pike {
+            self.unroll(node, min, max, greedy, captures, flags);
+            return;
+        }
         if Self::single_char(node) {
             let star = self.emit(Inst::Star {
                 min,
@@ -370,6 +467,87 @@ impl Compiler {
             greedy,
             exit,
         };
+    }
+}
+
+impl Compiler {
+    /// A repetition for the linear-time matcher: `min` copies, then
+    /// `max - min` optional copies or one loop. An optional iteration
+    /// that matches the empty string fails, as the backtracker's
+    /// `LoopTail` does.
+    fn unroll(
+        &mut self,
+        node: &Node,
+        min: u32,
+        max: u32,
+        greedy: bool,
+        captures: (u32, u32),
+        flags: Flags,
+    ) {
+        let optional = if max == MAX_COUNT { 1 } else { max - min };
+        if min as usize > PIKE_MAX_INSTS || optional as usize > PIKE_MAX_INSTS {
+            self.too_big = true;
+        }
+        if self.too_big {
+            return;
+        }
+        let mark = self.next_reg + self.depth;
+        self.depth += 1;
+        self.max_depth = self.max_depth.max(self.depth);
+        let clear = (2 * captures.0, 2 * captures.1);
+        for _ in 0..min {
+            if clear.0 < clear.1 {
+                self.emit(Inst::Clear {
+                    from: clear.0,
+                    to: clear.1,
+                });
+            }
+            self.node(node, flags, false);
+            if self.insts.len() > PIKE_MAX_INSTS {
+                self.too_big = true;
+                break;
+            }
+        }
+        let mut splits = Vec::new();
+        if !self.too_big {
+            for _ in 0..optional {
+                splits.push(self.emit(Inst::Split { next: 0, alt: 0 }));
+                self.emit(Inst::Save { reg: mark });
+                if clear.0 < clear.1 {
+                    self.emit(Inst::Clear {
+                        from: clear.0,
+                        to: clear.1,
+                    });
+                }
+                self.node(node, flags, false);
+                self.emit(Inst::Progress { reg: mark });
+                if self.insts.len() > PIKE_MAX_INSTS {
+                    self.too_big = true;
+                    break;
+                }
+            }
+        }
+        if max == MAX_COUNT
+            && let Some(&split) = splits.first()
+        {
+            self.emit(Inst::Jump { to: split });
+        }
+        let exit = self.here();
+        for split in splits {
+            let body = split + 1;
+            self.insts[split as usize] = if greedy {
+                Inst::Split {
+                    next: body,
+                    alt: exit,
+                }
+            } else {
+                Inst::Split {
+                    next: exit,
+                    alt: body,
+                }
+            };
+        }
+        self.depth -= 1;
     }
 }
 
@@ -418,6 +596,14 @@ enum Choice {
     Barrier,
 }
 
+/// Backtracks a search may take before it moves to the linear-time
+/// matcher; `exhausted` once it ran out, or the backtracking stacks
+/// reached [`MAX_BACKTRACK`].
+pub(crate) struct Budget {
+    pub left: u64,
+    pub exhausted: bool,
+}
+
 struct Machine<'a, I: Input + ?Sized> {
     program: &'a Program,
     input: &'a I,
@@ -426,6 +612,7 @@ struct Machine<'a, I: Input + ?Sized> {
     choices: Vec<Choice>,
     countdown: u32,
     poll: &'a mut dyn FnMut() -> bool,
+    budget: &'a mut Budget,
 }
 
 impl Program {
@@ -441,11 +628,14 @@ impl Program {
     }
 
     /// Match at exactly `pos`: the registers (captures first) on success.
+    /// Running out of `budget` ends the match with
+    /// [`ExecError::TooComplex`] and marks the budget exhausted.
     pub(crate) fn match_at<I: Input + ?Sized>(
         &self,
         input: &I,
         pos: usize,
         poll: &mut dyn FnMut() -> bool,
+        budget: &mut Budget,
     ) -> Result<Option<Vec<u32>>, ExecError> {
         let mut m = Machine {
             program: self,
@@ -455,6 +645,7 @@ impl Program {
             choices: Vec::new(),
             countdown: POLL_INTERVAL,
             poll,
+            budget,
         };
         if m.run(0, pos as u32)?.is_some() {
             Ok(Some(m.regs))
@@ -491,6 +682,7 @@ impl<I: Input + ?Sized> Machine<'_, I> {
 
     fn push(&mut self, choice: Choice) -> Result<(), ExecError> {
         if self.choices.len() + self.trail.len() >= MAX_BACKTRACK {
+            self.budget.exhausted = true;
             return Err(ExecError::TooComplex);
         }
         self.choices.push(choice);
@@ -508,64 +700,16 @@ impl<I: Input + ?Sized> Machine<'_, I> {
         Ok(())
     }
 
-    /// The character after (`back` false) or before `pos`, and its width.
     fn read(&self, pos: u32, back: bool) -> Option<(u32, u32)> {
-        let pos = pos as usize;
-        let len = self.input.len();
-        if back {
-            if pos == 0 {
-                return None;
-            }
-            let low = u32::from(self.input.unit(pos - 1));
-            if self.program.unicode && (0xDC00..0xE000).contains(&low) && pos >= 2 {
-                let high = u32::from(self.input.unit(pos - 2));
-                if (0xD800..0xDC00).contains(&high) {
-                    return Some((0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00), 2));
-                }
-            }
-            Some((low, 1))
-        } else {
-            if pos >= len {
-                return None;
-            }
-            let high = u32::from(self.input.unit(pos));
-            if self.program.unicode && (0xD800..0xDC00).contains(&high) && pos + 1 < len {
-                let low = u32::from(self.input.unit(pos + 1));
-                if (0xDC00..0xE000).contains(&low) {
-                    return Some((0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00), 2));
-                }
-            }
-            Some((high, 1))
-        }
+        read(self.program, self.input, pos, back)
     }
 
     fn step_pos(pos: u32, width: u32, back: bool) -> u32 {
         if back { pos - width } else { pos + width }
     }
 
-    /// Whether a one-character instruction matches at `pos`; the new
-    /// position if so.
     fn single(&self, inst: Inst, pos: u32) -> Option<u32> {
-        let (ok, back, read) = match inst {
-            Inst::Char { c, back } => {
-                let r = self.read(pos, back)?;
-                (r.0 == c, back, r)
-            }
-            Inst::Set { set, back } => {
-                let r = self.read(pos, back)?;
-                (self.program.sets[set as usize].contains(r.0), back, r)
-            }
-            Inst::Dot { back } => {
-                let r = self.read(pos, back)?;
-                (!is_line_terminator(r.0), back, r)
-            }
-            Inst::AnyChar { back } => {
-                let r = self.read(pos, back)?;
-                (true, back, r)
-            }
-            _ => unreachable!("not a one-character instruction"),
-        };
-        ok.then(|| Self::step_pos(pos, read.1, back))
+        single(self.program, self.input, inst, pos)
     }
 
     fn back_reference(&self, list: u32, ignore_case: bool, back: bool, pos: u32) -> Option<u32> {
@@ -619,29 +763,20 @@ impl<I: Input + ?Sized> Machine<'_, I> {
                         None => false,
                     }
                 }
-                Inst::Start { multiline } => {
+                Inst::Start { .. } | Inst::End { .. } | Inst::WordBoundary { .. } => {
                     pc += 1;
-                    pos == 0
-                        || (multiline
-                            && is_line_terminator(u32::from(self.input.unit(pos as usize - 1))))
+                    assertion(self.input, inst, pos)
                 }
-                Inst::End { multiline } => {
+                Inst::Clear { from, to } => {
+                    for r in from..to {
+                        self.set_reg(r, UNSET);
+                    }
                     pc += 1;
-                    pos as usize == self.input.len()
-                        || (multiline
-                            && is_line_terminator(u32::from(self.input.unit(pos as usize))))
+                    true
                 }
-                Inst::WordBoundary {
-                    negated,
-                    unicode_ignore_case,
-                } => {
+                Inst::Progress { reg } => {
                     pc += 1;
-                    let p = pos as usize;
-                    let a =
-                        p > 0 && is_word(u32::from(self.input.unit(p - 1)), unicode_ignore_case);
-                    let b = p < self.input.len()
-                        && is_word(u32::from(self.input.unit(p)), unicode_ignore_case);
-                    (a != b) != negated
+                    self.regs[reg as usize] != pos
                 }
                 Inst::Split { next, alt } => {
                     let trail = self.trail.len() as u32;
@@ -815,7 +950,15 @@ impl<I: Input + ?Sized> Machine<'_, I> {
             }
             // Backtrack.
             loop {
-                match self.choices.pop() {
+                let choice = self.choices.pop();
+                if matches!(choice, Some(Choice::At { .. } | Choice::Star { .. })) {
+                    if self.budget.left == 0 {
+                        self.budget.exhausted = true;
+                        return Err(ExecError::TooComplex);
+                    }
+                    self.budget.left -= 1;
+                }
+                match choice {
                     None | Some(Choice::Barrier) => {
                         debug_assert_eq!(self.choices.len(), floor);
                         return Ok(None);
@@ -880,6 +1023,95 @@ impl<I: Input + ?Sized> Machine<'_, I> {
                 }
             }
         }
+    }
+}
+
+/// The character after (`back` false) or before `pos`, and its width.
+pub(super) fn read<I: Input + ?Sized>(
+    program: &Program,
+    input: &I,
+    pos: u32,
+    back: bool,
+) -> Option<(u32, u32)> {
+    let pos = pos as usize;
+    let len = input.len();
+    if back {
+        if pos == 0 {
+            return None;
+        }
+        let low = u32::from(input.unit(pos - 1));
+        if program.unicode && (0xDC00..0xE000).contains(&low) && pos >= 2 {
+            let high = u32::from(input.unit(pos - 2));
+            if (0xD800..0xDC00).contains(&high) {
+                return Some((0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00), 2));
+            }
+        }
+        Some((low, 1))
+    } else {
+        if pos >= len {
+            return None;
+        }
+        let high = u32::from(input.unit(pos));
+        if program.unicode && (0xD800..0xDC00).contains(&high) && pos + 1 < len {
+            let low = u32::from(input.unit(pos + 1));
+            if (0xDC00..0xE000).contains(&low) {
+                return Some((0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00), 2));
+            }
+        }
+        Some((high, 1))
+    }
+}
+
+/// Whether a one-character instruction matches at `pos`; the new
+/// position if so.
+pub(super) fn single<I: Input + ?Sized>(
+    program: &Program,
+    input: &I,
+    inst: Inst,
+    pos: u32,
+) -> Option<u32> {
+    let (ok, back, read) = match inst {
+        Inst::Char { c, back } => {
+            let r = read(program, input, pos, back)?;
+            (r.0 == c, back, r)
+        }
+        Inst::Set { set, back } => {
+            let r = read(program, input, pos, back)?;
+            (program.sets[set as usize].contains(r.0), back, r)
+        }
+        Inst::Dot { back } => {
+            let r = read(program, input, pos, back)?;
+            (!is_line_terminator(r.0), back, r)
+        }
+        Inst::AnyChar { back } => {
+            let r = read(program, input, pos, back)?;
+            (true, back, r)
+        }
+        _ => unreachable!("not a one-character instruction"),
+    };
+    ok.then(|| if back { pos - read.1 } else { pos + read.1 })
+}
+
+/// Whether a zero-width assertion (`Start`, `End`, `WordBoundary`)
+/// holds at `pos`.
+pub(super) fn assertion<I: Input + ?Sized>(input: &I, inst: Inst, pos: u32) -> bool {
+    let p = pos as usize;
+    match inst {
+        Inst::Start { multiline } => {
+            p == 0 || (multiline && is_line_terminator(u32::from(input.unit(p - 1))))
+        }
+        Inst::End { multiline } => {
+            p == input.len() || (multiline && is_line_terminator(u32::from(input.unit(p))))
+        }
+        Inst::WordBoundary {
+            negated,
+            unicode_ignore_case,
+        } => {
+            let a = p > 0 && is_word(u32::from(input.unit(p - 1)), unicode_ignore_case);
+            let b = p < input.len() && is_word(u32::from(input.unit(p)), unicode_ignore_case);
+            (a != b) != negated
+        }
+        _ => unreachable!("not an assertion"),
     }
 }
 

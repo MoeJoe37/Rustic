@@ -1,11 +1,13 @@
 //! Regular expressions (ECMA-262 §22.2): the pattern parser with its
 //! early errors, and a backtracking matcher with bounded memory and a
-//! cancellation hook. The RegExp objects that use it are in
+//! cancellation hook, backed by a linear-time matcher for searches that
+//! backtrack too much. The RegExp objects that use it are in
 //! `runtime/builtins/regexp.rs`.
 
 mod case;
 mod class;
 mod parse;
+mod pike;
 mod vm;
 
 pub use parse::PatternError;
@@ -90,6 +92,8 @@ pub enum ExecError {
 #[derive(Debug)]
 pub struct Regex {
     program: vm::Program,
+    /// The same pattern for the linear-time matcher, when it can run it.
+    pike: Option<vm::Program>,
     /// Capturing groups, not counting the whole match.
     pub groups: u32,
     /// Group names (UTF-16) and the groups that carry each.
@@ -109,8 +113,10 @@ impl Regex {
             });
         }
         let program = vm::compile(&parsed.node, parsed.groups, flags);
+        let pike = vm::compile_pike(&parsed.node, parsed.groups, flags);
         Ok(Regex {
             program,
+            pike,
             groups: parsed.groups,
             names: parsed.names,
             flags,
@@ -119,7 +125,9 @@ impl Regex {
 
     /// Bytes the compiled program holds, for the heap budget.
     pub fn footprint(&self) -> usize {
-        std::mem::size_of::<Regex>() + self.program.footprint()
+        std::mem::size_of::<Regex>()
+            + self.program.footprint()
+            + self.pike.as_ref().map_or(0, vm::Program::footprint)
     }
 
     /// Check `pattern` without compiling it (literal early errors).
@@ -165,23 +173,6 @@ impl Regex {
         self.search(input, start, sticky, poll)
     }
 
-    /// Match at exactly `pos`. On success the capture positions, two per
-    /// group (the whole match first), [`UNSET`] where a group did not
-    /// participate. `poll` is called now and then; returning true stops
-    /// the match with [`ExecError::Cancelled`].
-    pub(crate) fn match_at<I: Input + ?Sized>(
-        &self,
-        input: &I,
-        pos: usize,
-        poll: &mut dyn FnMut() -> bool,
-    ) -> Result<Option<Vec<u32>>, ExecError> {
-        let mut regs = self.program.match_at(input, pos, poll)?;
-        if let Some(r) = &mut regs {
-            r.truncate(2 * (self.groups as usize + 1));
-        }
-        Ok(regs)
-    }
-
     /// The first match at `start` or after it (only at `start` when
     /// `sticky`).
     pub(crate) fn search<I: Input + ?Sized>(
@@ -191,11 +182,43 @@ impl Regex {
         sticky: bool,
         poll: &mut dyn FnMut() -> bool,
     ) -> Result<Option<Vec<u32>>, ExecError> {
+        let left = if self.pike.is_some() {
+            FALLBACK_BACKTRACKS
+        } else {
+            u64::MAX
+        };
+        self.search_with(input, start, sticky, poll, left)
+    }
+
+    /// [`Regex::search`] moving to the linear-time matcher after `left`
+    /// backtracks, summed over every start position.
+    fn search_with<I: Input + ?Sized>(
+        &self,
+        input: &I,
+        start: usize,
+        sticky: bool,
+        poll: &mut dyn FnMut() -> bool,
+        left: u64,
+    ) -> Result<Option<Vec<u32>>, ExecError> {
         let unicode = self.flags.unicode || self.flags.sets;
+        let mut budget = vm::Budget {
+            left,
+            exhausted: false,
+        };
         let mut pos = start;
         while pos <= input.len() {
-            if let Some(m) = self.match_at(input, pos, poll)? {
-                return Ok(Some(m));
+            let found = match self.program.match_at(input, pos, poll, &mut budget) {
+                Err(ExecError::TooComplex) if budget.exhausted && self.pike.is_some() => {
+                    // Earlier starts did not match, so the linear-time
+                    // matcher picks up here.
+                    let pike = self.pike.as_ref().expect("checked");
+                    let found = pike.pike_search(input, pos, sticky, poll)?;
+                    return Ok(found.map(|regs| self.groups_of(regs)));
+                }
+                result => result?,
+            };
+            if let Some(regs) = found {
+                return Ok(Some(self.groups_of(regs)));
             }
             if sticky {
                 break;
@@ -213,7 +236,17 @@ impl Regex {
         }
         Ok(None)
     }
+
+    /// The capture registers of a match, without the matcher's own.
+    fn groups_of(&self, mut regs: Vec<u32>) -> Vec<u32> {
+        regs.truncate(2 * (self.groups as usize + 1));
+        regs
+    }
 }
+
+/// Backtracks a search takes before moving to the linear-time matcher
+/// (V8's experimental engine moves after a similar count).
+const FALLBACK_BACKTRACKS: u64 = 1 << 16;
 
 #[cfg(test)]
 mod tests {
@@ -362,21 +395,108 @@ mod tests {
 
     #[test]
     fn catastrophic_patterns_stop_when_asked() {
-        let re = Regex::new(&units("(a*)*b"), Flags::default()).expect("valid");
+        // A backreference keeps the pattern on the backtracker.
+        let re = Regex::new(&units("(a|a)*\\1b"), Flags::default()).expect("valid");
+        assert!(re.pike.is_none());
         let input = units(&"a".repeat(40));
         let mut polls = 0;
         let result = re.search(&input[..], 0, false, &mut || {
             polls += 1;
             polls > 10
         });
-        // Either finished quickly or was stopped.
-        assert!(matches!(result, Ok(None) | Err(ExecError::Cancelled)));
-        let re = Regex::new(&units("(?:a|a)*b"), Flags::default()).expect("valid");
-        let mut polls = 0;
-        let result = re.search(&input[..], 0, false, &mut || {
-            polls += 1;
-            polls > 10
-        });
         assert_eq!(result, Err(ExecError::Cancelled));
+    }
+
+    #[test]
+    fn exponential_patterns_finish_in_linear_time() {
+        // TD-111: each of these takes exponential (or, for the last,
+        // quadratic) time on the backtracker alone.
+        for (pattern, text) in [
+            ("(a+)+b", "a".repeat(5_000)),
+            ("(a*)*b", "a".repeat(5_000)),
+            ("(?:a|a)*b", "a".repeat(5_000)),
+            ("(x+x+)+y", "x".repeat(5_000)),
+            ("^(\\w+\\s?)*$", format!("{}!", "word ".repeat(1_000))),
+            ("a*b", "a".repeat(20_000)),
+        ] {
+            let re = Regex::new(&units(pattern), Flags::default()).expect("valid");
+            let input = units(&text);
+            let mut polls = 0;
+            let result = re.search(&input[..], 0, false, &mut || {
+                polls += 1;
+                false
+            });
+            assert_eq!(result, Ok(None), "{pattern}");
+            // Polls come every 16,384 steps: linear work, not 2^5000.
+            assert!(polls < 20_000, "{pattern}: {polls} polls");
+        }
+        let re = Regex::new(&units("(a+)+b"), Flags::default()).expect("valid");
+        let input = units(&format!("{}b", "a".repeat(5_000)));
+        let found = re.search(&input[..], 0, false, &mut || false);
+        assert_eq!(found, Ok(Some(vec![0, 5_001, 0, 5_000])));
+    }
+
+    /// Search with both matchers alone and compare.
+    fn agree(pattern: &str, flags: &str, text: &str) {
+        let flags = Flags::parse(units(flags)).expect("valid flags");
+        let re = Regex::new(&units(pattern), flags).expect("valid pattern");
+        let pike = re.pike.as_ref().expect("a linear-time program");
+        let input = units(text);
+        for start in 0..=input.len() {
+            for sticky in [false, true] {
+                let backtracker =
+                    re.search_with(&input[..], start, sticky, &mut || false, u64::MAX);
+                let linear = pike
+                    .pike_search(&input[..], start, sticky, &mut || false)
+                    .map(|m| m.map(|regs| re.groups_of(regs)));
+                assert_eq!(
+                    backtracker, linear,
+                    "/{pattern}/ on {text:?} from {start}, sticky {sticky}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_linear_time_matcher_agrees_with_the_backtracker() {
+        let cases: &[(&str, &str, &[&str])] = &[
+            ("a|ab", "", &["ab", "xab", ""]),
+            ("ab|a", "", &["ab", "xa"]),
+            ("(a|ab)(c|bcd)(d*)", "", &["abcd", "abcdd"]),
+            ("(a+)(a*)", "", &["aaaa"]),
+            ("(a+?)(a*)", "", &["aaaa"]),
+            ("(a*?)b", "", &["aab", "b", "ab"]),
+            ("((a)|b)+", "", &["ab", "ba", "aab"]),
+            ("(z)((a+)?(b+)?(c))*", "", &["zaacbbbcac"]),
+            ("(a)|b", "", &["b", "a"]),
+            ("(?:(a)|b)*", "", &["aba", "ab"]),
+            ("(\\w+)\\s(\\w+)", "", &["hello big world"]),
+            ("a{2,4}", "", &["aaaaa", "a", "aaa"]),
+            ("a{2,4}?", "", &["aaaaa"]),
+            ("(ab){2}", "", &["abababx"]),
+            ("(a|b){1,3}c", "", &["ababc", "abc", "c"]),
+            ("^abc$", "m", &["x\nabc\ny", "abc"]),
+            ("\\bfoo\\b", "", &["a foo b", "foobar"]),
+            ("\\Bo", "", &["foo o"]),
+            ("[a-c]+", "i", &["xABCaz"]),
+            (".+", "", &["ab\ncd"]),
+            (".+", "s", &["ab\ncd"]),
+            ("x*", "", &["", "y", "xxy"]),
+            ("(a*)*", "", &["b", "aa"]),
+            ("(a*)+", "", &["b", "aa"]),
+            ("(a|)*b", "", &["aab"]),
+            ("(?:a?)*?b", "", &["ab"]),
+            ("(\\u{1F600}|.)", "u", &["\u{1F600}x"]),
+            (".", "u", &["\u{1F600}", "a\u{1F600}"]),
+            ("[\\q{abc|d}x]+", "v", &["abcdxq"]),
+            ("(?i:a)b", "", &["Ab", "AB"]),
+            ("(a)|(b)|(c)", "", &["c"]),
+            ("((a)|(b))*", "", &["ab", "ba"]),
+        ];
+        for (pattern, flags, texts) in cases {
+            for text in *texts {
+                agree(pattern, flags, text);
+            }
+        }
     }
 }

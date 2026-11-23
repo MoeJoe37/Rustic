@@ -590,9 +590,13 @@ calls a function value. The design is recorded in
     with `u` or `v`.
   - The matcher reads Latin-1 and UTF-16 strings in place, without copying.
     It polls the step budget and the cancellation token every 16,384
-    steps, so a runaway pattern is stopped like a runaway loop; it can still
-    take exponential time until then (TD-111). Its stacks are capped and
-    overflowing them throws a RangeError.
+    steps, so a runaway pattern is stopped like a runaway loop. A pattern
+    with no backreference or lookaround also compiles for a linear-time
+    Pike VM (`regexp/pike.rs`); a search that backtracks more than 65,536
+    times, or outgrows the backtracking stacks, finishes there, so such a
+    pattern costs O(input × pattern) at worst (TD-111 paid). Patterns with
+    backreferences or lookarounds stay on the backtracker, whose stacks are
+    capped: overflowing them throws a RangeError.
   - The agent keeps the last 32 compiled patterns, so `new RegExp(s)` in a
     loop compiles once.
   - The library: the constructor with `RegExp.escape`, `exec`, `test`,

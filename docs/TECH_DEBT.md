@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-111, TD-116, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-116, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-182, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -71,9 +71,8 @@ The largest risks in that list are not the long M9 rows, which are honest
 scope limits, but the short ones before them: the "before remote browsing is on by default" row
 (formerly "M7 entry"), whose entries were meant to be paid before hostile
 remote content and are still open now that remote origins can be granted
-(ADR 0066, 2026-11-22), notably
-TD-111 (a regular expression can run for exponential time until the step
-budget stops it); and TD-12 (hosted jobs have stopped twice on billing; the
+(ADR 0066, 2026-11-22); TD-111 (exponential regular expressions) was paid
+on 2026-11-23 with a linear-time fallback; and TD-12 (hosted jobs have stopped twice on billing; the
 Android and iOS device runs are deliberately deferred to M14).
 
 ## Ledger
@@ -177,7 +176,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-108 | Deliberate | JS | `Date` local time is one fixed offset: no time zone database, no daylight saving time | Open, M9 language and web APIs |
 | TD-109 | Deliberate | JS | Unhandled promise rejections are not reported to the host (no HostPromiseRejectionTracker) | Paid |
 | TD-110 | Deliberate | JS | RegExp Unicode property escapes (`\p{…}`, `\P{…}`, v-mode string properties) parse but cannot run | Open, M9 language and web APIs |
-| TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Open |
+| TD-111 | Deliberate | JS | The RegExp matcher backtracks, so some patterns take exponential time (bounded only by the step budget and cancellation) | Paid |
 | TD-112 | Deliberate | JS | BigInt results are capped at 2²⁰ bits and multiplication and division are schoolbook (quadratic) | Open, `perf.interpreter` (M12) |
 | TD-113 | Deliberate | JS | `for-in` over a proxy collects every key before the loop runs, so traps fire earlier than the specification's lazy enumeration | Open |
 | TD-114 | Deliberate | JS | `caller` and `arguments` of a sloppy function read as `null` through `%ThrowTypeError%` instead of throwing | Open, by design |
@@ -1799,7 +1798,7 @@ tables are shared with rustic-text's segmentation data where they overlap.
 Trigger: the first page that fails on a property escape, or JS-08
 closing.
 
-### TD-111 — The RegExp matcher backtracks
+### TD-111 — The RegExp matcher backtracks (Paid)
 
 `regexp::vm` is a backtracking matcher, as in the other engines, so a
 pattern such as `/(a+)+b/` on a long run of `a`s takes exponential time.
@@ -1813,6 +1812,8 @@ no backreferences or lookarounds, chosen when the backtracker exceeds a
 step count, as V8's experimental engine does. Trigger: a measured slow
 page or a ReDoS report.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): patterns with no backreference or lookaround also compile for a linear-time Pike VM (`crates/rustic-js/src/regexp/pike.rs`, `vm::compile_pike`: repetitions unrolled, an optional iteration that matches empty rejected by a `Progress` instruction, captures cleared by `Clear`). A search moves there after 65,536 backtracks summed over its start positions, or when the backtracking stacks would overflow, and resumes at the start position it reached. Threads keep the backtracker's priority order, so the match and its captures are the same; `the_linear_time_matcher_agrees_with_the_backtracker` compares both matchers alone at every start position, and `exponential_patterns_finish_in_linear_time` runs `(a+)+b`, `(a*)*b`, `(?:a|a)*b` and `^(\\w+\\s?)*$` over 5,000 characters in linear time (previously stopped only by cancellation). Test262 RegExp and String results are unchanged. Patterns with backreferences or lookarounds, and unrolled programs over 32,768 instructions, stay on the backtracker with its step budget, as in V8.
 
 ### TD-112 — BigInt size cap and quadratic arithmetic
 
